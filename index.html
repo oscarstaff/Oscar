@@ -1,0 +1,1340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Oscar Roster — Staff Hub</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0f1923;
+  --sidebar:#081420;
+  --card:#16222f;
+  --border:#1f3347;
+  --border-hi:#2d4760;
+  --accent:#4f8ef7;
+  --accent-dim:rgba(79,142,247,.1);
+  --accent-bd:rgba(79,142,247,.25);
+  --warn:#f05c4e;
+  --warn-dim:rgba(255,107,71,.1);
+  --blue:#5ba8ff;
+  --blue-dim:rgba(91,168,255,.1);
+  --gold:#fbbf4a;
+  --gold-dim:rgba(251,191,74,.1);
+  --text:#dde8f5;
+  --text2:#87a8c4;
+  --text3:#496580;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;overflow:hidden;}
+body{
+  background:var(--bg);color:var(--text);
+  font-family:'Inter',system-ui,sans-serif;
+  font-size:14px;display:flex;flex-direction:column;
+}
+body::before{
+  content:"";position:fixed;inset:0;z-index:-1;
+  background:
+    radial-gradient(ellipse 70% 50% at 10% 0%,rgba(20,70,110,.4) 0%,transparent 70%),
+    radial-gradient(ellipse 60% 50% at 90% 100%,rgba(10,45,80,.35) 0%,transparent 70%),
+    linear-gradient(170deg,#0a1828 0%,#0d1b2a 60%,#091622 100%);
+}
+
+/* ── AUTH ── */
+#authLayer{
+  display:flex;align-items:center;justify-content:center;
+  min-height:100vh;padding:24px;
+}
+.auth-box{width:100%;max-width:420px;}
+.auth-logo{
+  font-size:28px;font-weight:900;color:var(--accent);
+  text-align:center;margin-bottom:6px;letter-spacing:-.6px;
+}
+.auth-tagline{
+  font-size:12px;color:var(--text3);text-align:center;
+  text-transform:uppercase;letter-spacing:1.5px;margin-bottom:32px;
+}
+.auth-card{
+  background:var(--card);border:1px solid var(--border-hi);
+  border-radius:16px;padding:28px;
+  box-shadow:0 20px 60px rgba(0,0,0,.5);
+}
+.auth-link{
+  display:block;text-align:center;background:none;border:none;
+  color:var(--accent);font-size:13px;font-weight:600;
+  cursor:pointer;margin-top:12px;padding:6px;
+  font-family:'Inter',system-ui,sans-serif;
+}
+.auth-link:hover{text-decoration:underline;}
+
+/* ── SHELL ── */
+.shell{display:flex;height:100vh;overflow:hidden;}
+
+/* ── SIDEBAR — desktop only ── */
+.sidebar{
+  width:220px;flex-shrink:0;
+  background:var(--sidebar);
+  border-right:1px solid var(--border);
+  display:flex;flex-direction:column;
+}
+.sb-brand{padding:28px 18px 16px;border-bottom:1px solid var(--border);}
+.sb-brand-name{font-size:15px;font-weight:900;color:var(--accent);letter-spacing:-.4px;}
+.sb-brand-sub{font-size:11px;color:var(--text3);margin-top:3px;}
+.sb-user{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--border);}
+.sb-avatar{width:32px;height:32px;border-radius:50%;flex-shrink:0;background:linear-gradient(135deg,#4f8ef7,#3b6fd4);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#001810;}
+.sb-name{font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.sb-role{font-size:10.5px;color:var(--text3);margin-top:2px;}
+.sb-nav{padding:12px 8px;flex:1;overflow-y:auto;}
+.nav-section-lbl{font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--text3);padding:8px 10px 5px;}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:500;color:var(--text2);transition:all .13s;margin-bottom:2px;position:relative;}
+.nav-item:hover{background:rgba(255,255,255,.05);color:var(--text);}
+.nav-item.active{background:var(--accent-dim);color:var(--accent);font-weight:700;}
+.nav-item.active::before{content:"";position:absolute;left:0;top:25%;bottom:25%;width:3px;border-radius:0 2px 2px 0;background:var(--accent);}
+.nav-icon{width:16px;height:16px;flex-shrink:0;opacity:.75;}
+.nav-item.active .nav-icon{opacity:1;}
+.nav-badge{margin-left:auto;background:var(--warn);color:#fff;border-radius:10px;padding:1px 7px;font-size:9px;font-weight:800;display:none;}
+.sb-foot{padding:14px;border-top:1px solid var(--border);}
+.signout{width:100%;background:transparent;border:1.5px solid var(--border-hi);color:var(--text2);border-radius:10px;padding:9px 14px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:'Inter',system-ui,sans-serif;transition:all .13s;}
+.signout:hover{border-color:var(--warn);color:var(--warn);}
+
+/* ── MAIN ── */
+.main{flex:1;overflow-y:auto;}
+.page{display:none;padding:28px 32px;max-width:820px;}
+.page.active{display:block;}
+.page-hd{margin-bottom:24px;}
+.page-title{font-size:22px;font-weight:800;letter-spacing:-.5px;}
+.page-sub{font-size:12.5px;color:var(--text3);margin-top:5px;}
+
+/* ── BOTTOM NAV — mobile only ── */
+.bottom-nav{
+  display:none;
+  position:fixed;bottom:0;left:0;right:0;
+  background:rgba(8,16,28,.97);
+  backdrop-filter:blur(20px);
+  border-top:1px solid var(--border);
+  z-index:100;
+  padding-bottom:env(safe-area-inset-bottom);
+}
+.bn-items{display:flex;}
+.bn-item{
+  flex:1;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;padding:10px 4px 8px;
+  cursor:pointer;position:relative;
+}
+.bn-icon{width:22px;height:22px;color:var(--text3);transition:color .12s;}
+.bn-label{font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-top:3px;transition:color .12s;}
+.bn-item.active .bn-icon,.bn-item.active .bn-label{color:var(--accent);}
+.bn-badge{position:absolute;top:6px;right:calc(50% - 18px);background:var(--warn);color:#fff;border-radius:10px;padding:1px 5px;font-size:8px;font-weight:800;display:none;}
+
+/* ── MOBILE HEADER ── */
+.mobile-header{
+  display:none;
+  background:rgba(8,16,28,.95);
+  backdrop-filter:blur(20px);
+  border-bottom:1px solid var(--border);
+  padding:14px 16px;
+  align-items:center;justify-content:space-between;
+  position:sticky;top:0;z-index:50;
+}
+.mh-logo{font-size:15px;font-weight:900;color:var(--accent);}
+.mh-user{display:flex;align-items:center;gap:8px;}
+.mh-ava{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#4f8ef7,#3b6fd4);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#001810;}
+.mh-name{font-size:12px;font-weight:700;}
+
+/* ── RESPONSIVE ── */
+@media(max-width:700px){
+  .sidebar{display:none;}
+  .bottom-nav{display:block;}
+  .mobile-header{display:flex;}
+  .shell{flex-direction:column;height:100vh;}
+  .main{flex:1;overflow-y:auto;padding-bottom:70px;}
+  .page{padding:16px 14px;max-width:100%;}
+  .page-title{font-size:18px;}
+  .stats-row{grid-template-columns:1fr 1fr;}
+  .form-grid-2{grid-template-columns:1fr 1fr;}
+  .avail-day-row{flex-wrap:wrap;gap:8px;}
+  .avail-opts{flex-wrap:wrap;}
+  .ao{font-size:11px;padding:6px 10px;}
+  .roster-day-hd{flex-wrap:wrap;}
+  .leave-item-top{flex-wrap:wrap;gap:6px;}
+}
+
+/* ── CARD ── */
+.card{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:14px;padding:24px;margin-bottom:18px;
+}
+.card-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;}
+.card-title{font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--text2);}
+.card-action{
+  font-size:12.5px;font-weight:600;color:var(--accent);
+  background:none;border:none;cursor:pointer;
+  font-family:'Inter',system-ui,sans-serif;
+}
+
+/* ── FIELDS ── */
+.field{margin-bottom:16px;}
+.field-label{
+  display:block;font-size:12px;font-weight:600;
+  color:var(--text2);margin-bottom:7px;
+}
+.field-label .req{color:var(--warn);margin-left:2px;}
+.field-hint{font-size:11px;color:var(--text3);margin-top:5px;line-height:1.5;}
+.f-input{
+  width:100%;background:rgba(255,255,255,.06);
+  border:1.5px solid var(--border-hi);border-radius:10px;
+  color:var(--text);padding:11px 14px;font-size:14px;
+  font-weight:500;outline:none;
+  font-family:'Inter',system-ui,sans-serif;
+  -webkit-appearance:none;transition:border-color .13s,background .13s;
+}
+.f-input:focus{border-color:var(--accent);background:rgba(34,212,160,.04);}
+.f-input::placeholder{color:var(--text3);}
+.f-input.error{border-color:var(--warn)!important;}
+
+/* ── BUTTONS ── */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:7px;
+  padding:12px 22px;border-radius:10px;border:none;
+  font-size:14px;font-weight:700;cursor:pointer;
+  font-family:'Inter',system-ui,sans-serif;
+  transition:all .13s;
+}
+.btn-block{width:100%;}
+.btn-green{
+  background:var(--accent);color:#001810;
+  box-shadow:0 4px 18px rgba(34,212,160,.22);
+}
+.btn-green:hover{filter:brightness(1.07);box-shadow:0 6px 22px rgba(34,212,160,.3);}
+.btn-green:disabled{opacity:.45;cursor:not-allowed;box-shadow:none;}
+.btn-outline{
+  background:transparent;border:1.5px solid var(--border-hi);
+  color:var(--text2);
+}
+.btn-outline:hover{background:rgba(255,255,255,.07);color:var(--text);}
+
+/* ── ALERTS ── */
+.alert{
+  border-radius:10px;padding:11px 15px;
+  font-size:13px;font-weight:600;margin-bottom:16px;
+  display:none;line-height:1.5;
+}
+.alert.show{display:block;}
+.alert-err{background:var(--warn-dim);border:1px solid rgba(255,107,71,.3);color:var(--warn);}
+.alert-ok{background:var(--accent-dim);border:1px solid var(--accent-bd);color:var(--accent);}
+
+/* ── STATS ── */
+.stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:22px;}
+.stat-box{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:14px;padding:18px 20px;
+}
+.stat-val{font-size:30px;font-weight:900;letter-spacing:-1.5px;line-height:1;}
+.stat-val.green{color:var(--accent);}
+.stat-val.blue{color:var(--blue);}
+.stat-val.gold{color:var(--gold);}
+.stat-label{font-size:10.5px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-top:7px;}
+
+/* ── AVAIL HOME SUMMARY ── */
+.avail-summary-row{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:10px 0;border-bottom:1px solid var(--border);
+}
+.avail-summary-row:last-child{border-bottom:none;}
+.asr-day{font-size:13.5px;font-weight:700;}
+.asr-date{font-size:11px;color:var(--text3);margin-top:2px;}
+.asr-status{font-size:12px;font-weight:700;font-family:monospace;}
+.asr-green{color:var(--accent);}
+.asr-red{color:var(--warn);}
+.asr-blue{color:var(--blue);}
+
+/* ── AVAIL FORM ── */
+.avail-day-row{
+  display:flex;align-items:center;gap:16px;
+  padding:12px 0;border-bottom:1px solid var(--border);
+}
+.avail-day-row:last-child{border-bottom:none;}
+.avail-day-info{flex:1;}
+.avail-day-name{font-size:14px;font-weight:700;}
+.avail-day-date{font-size:11px;color:var(--text3);margin-top:2px;}
+.avail-opts{display:flex;gap:6px;}
+.ao{
+  padding:7px 13px;border-radius:8px;
+  border:1.5px solid var(--border-hi);
+  background:transparent;color:var(--text3);
+  font-size:12px;font-weight:700;cursor:pointer;
+  font-family:'Inter',system-ui,sans-serif;
+  transition:all .12s;white-space:nowrap;
+}
+.ao:hover{border-color:var(--text2);color:var(--text2);}
+.ao.yes{background:var(--accent-dim);border-color:var(--accent-bd);color:var(--accent);}
+.ao.custom{background:var(--blue-dim);border-color:rgba(91,168,255,.3);color:var(--blue);}
+.ao.no{background:var(--warn-dim);border-color:rgba(255,107,71,.3);color:var(--warn);}
+.custom-time-row{
+  display:none;align-items:center;gap:10px;
+  padding:4px 0 12px;
+}
+.custom-time-row.open{display:flex;}
+.time-in{
+  flex:1;background:rgba(255,255,255,.07);
+  border:1.5px solid var(--border-hi);border-radius:8px;
+  color:var(--text);padding:9px 10px;
+  font-size:14px;font-weight:700;outline:none;
+  text-align:center;font-family:monospace;
+  transition:border-color .12s;
+}
+.time-in:focus{border-color:var(--blue);}
+.time-sep{color:var(--text3);font-weight:700;font-size:14px;}
+.lock-notice{
+  background:var(--warn-dim);border:1px solid rgba(255,107,71,.25);
+  border-radius:10px;padding:12px 16px;font-size:13px;
+  color:var(--warn);font-weight:600;margin-bottom:18px;display:none;
+}
+
+/* ── ROSTER ── */
+.week-nav{display:flex;align-items:center;gap:12px;margin-bottom:20px;}
+.wnav-btn{
+  background:var(--card);border:1px solid var(--border-hi);
+  color:var(--text2);width:34px;height:34px;
+  border-radius:9px;cursor:pointer;font-size:14px;
+  display:flex;align-items:center;justify-content:center;
+  transition:all .12s;
+}
+.wnav-btn:hover{border-color:var(--accent);color:var(--accent);}
+.wnav-label{font-size:14px;font-weight:700;flex:1;text-align:center;}
+.roster-day{padding:14px 0;border-bottom:1px solid var(--border);}
+.roster-day:last-child{border-bottom:none;}
+.roster-day-hd{display:flex;align-items:center;gap:12px;margin-bottom:8px;}
+.rday-name{font-size:14px;font-weight:800;min-width:44px;}
+.rday-date{font-size:11.5px;color:var(--text3);}
+.shift-pill{
+  display:inline-flex;align-items:center;gap:10px;
+  background:var(--accent-dim);border:1px solid var(--accent-bd);
+  border-radius:9px;padding:9px 14px;margin-bottom:5px;
+}
+.shift-time{font-size:14px;font-weight:800;color:var(--accent);font-family:monospace;}
+.shift-device{font-size:12px;color:var(--blue);}
+.leave-pill{
+  display:inline-flex;align-items:center;
+  background:var(--warn-dim);border:1px solid rgba(255,107,71,.25);
+  border-radius:9px;padding:9px 14px;
+  font-size:13px;font-weight:700;color:var(--warn);
+}
+.no-shift{font-size:12.5px;color:var(--text3);padding:2px 0;}
+.roster-totals{
+  display:grid;grid-template-columns:1fr 1fr;gap:12px;
+  margin-top:18px;padding-top:18px;border-top:1px solid var(--border);
+}
+.rtotal-box{
+  background:rgba(255,255,255,.04);border:1px solid var(--border);
+  border-radius:10px;padding:12px 16px;text-align:center;
+}
+.rtotal-val{font-size:22px;font-weight:800;letter-spacing:-.5px;}
+.rtotal-lbl{font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-top:4px;}
+
+/* ── LEAVE ── */
+.leave-item{
+  background:rgba(255,255,255,.04);border:1px solid var(--border);
+  border-radius:12px;padding:16px 18px;margin-bottom:10px;
+}
+.leave-item-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;}
+.leave-dates{font-size:14px;font-weight:800;}
+.leave-duration{font-size:12px;color:var(--text3);margin-top:3px;}
+.leave-reason-txt{font-size:13px;color:var(--text2);margin-top:8px;line-height:1.6;}
+.status-tag{
+  flex-shrink:0;display:inline-flex;align-items:center;
+  font-size:10.5px;font-weight:800;letter-spacing:.5px;
+  text-transform:uppercase;padding:4px 10px;border-radius:20px;
+  white-space:nowrap;
+}
+.st-pending{background:var(--gold-dim);border:1px solid rgba(251,191,74,.25);color:var(--gold);}
+.st-approved{background:var(--accent-dim);border:1px solid var(--accent-bd);color:var(--accent);}
+.st-declined{background:var(--warn-dim);border:1px solid rgba(255,107,71,.25);color:var(--warn);}
+.manager-note{
+  background:rgba(255,107,71,.07);border:1px solid rgba(255,107,71,.18);
+  border-radius:8px;padding:10px 13px;margin-top:10px;
+  font-size:12.5px;color:var(--warn);line-height:1.6;
+}
+.form-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+
+/* ── NOTIFICATIONS ── */
+.notif-item{
+  background:rgba(255,107,71,.07);border:1px solid rgba(255,107,71,.2);
+  border-radius:12px;padding:16px 18px;margin-bottom:10px;
+  cursor:pointer;position:relative;transition:opacity .13s;
+}
+.notif-item.read{background:rgba(255,255,255,.03);border-color:var(--border);opacity:.6;}
+.notif-dot{position:absolute;top:16px;right:16px;width:8px;height:8px;background:var(--warn);border-radius:50%;}
+.notif-title{font-size:13.5px;font-weight:800;color:var(--warn);}
+.notif-body{font-size:13px;color:var(--text2);margin-top:5px;line-height:1.6;}
+.notif-mgr{font-size:13px;color:var(--warn);margin-top:6px;line-height:1.6;}
+.notif-time{font-size:11px;color:var(--text3);margin-top:6px;}
+
+/* ── EMPTY ── */
+.empty{text-align:center;padding:48px 24px;color:var(--text3);}
+.empty-title{font-size:15px;font-weight:700;color:var(--text2);margin-bottom:6px;}
+.empty-sub{font-size:13px;line-height:1.7;}
+
+/* ── SPINNER ── */
+.sp{display:inline-block;width:15px;height:15px;border:2.5px solid rgba(0,24,16,.25);border-top-color:#001810;border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar{width:4px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:2px;}
+
+/* ── ANTI-FLASH ── */
+body{visibility:hidden;}
+body.ready{visibility:visible;}
+#splash{
+  position:fixed;inset:0;z-index:9999;
+  background:#0f1923;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  transition:opacity .3s ease;
+}
+#splash.fade{opacity:0;pointer-events:none;}
+#splash-logo{font-size:22px;font-weight:900;color:#4f8ef7;letter-spacing:-.5px;margin-bottom:8px;}
+#splash-sub{font-size:11px;color:#496580;text-transform:uppercase;letter-spacing:1.5px;}
+#splash-dots{display:flex;gap:6px;margin-top:24px;}
+#splash-dots span{width:7px;height:7px;border-radius:50%;background:#4f8ef7;opacity:.3;animation:dot-pulse 1.2s infinite;}
+#splash-dots span:nth-child(2){animation-delay:.2s;}
+#splash-dots span:nth-child(3){animation-delay:.4s;}
+@keyframes dot-pulse{0%,100%{opacity:.3;}50%{opacity:1;}}
+
+</style>
+</head>
+<body>
+
+<!-- ── AUTH ── -->
+<div id="splash"><div id="splash-logo">Oscar Roster</div><div id="splash-sub">Staff Hub</div><div id="splash-dots"><span></span><span></span><span></span></div></div>
+<div id="authLayer" style="display:none">
+  <div class="auth-box">
+
+    <div id="pg-login">
+      <div class="auth-logo">Oscar Roster</div>
+      <div class="auth-tagline">Staff Hub</div>
+      <div class="auth-card">
+        <div class="alert alert-err" id="loginErr"></div>
+        <div class="field">
+          <label class="field-label">Full Name</label>
+          <input class="f-input" type="text" id="loginName" placeholder="Enter your full name" autocorrect="off">
+        </div>
+        <div class="field" style="margin-bottom:20px">
+          <label class="field-label">Password</label>
+          <input class="f-input" type="password" id="loginPass" placeholder="Enter your password" onkeydown="if(event.key==='Enter')doLogin()">
+        </div>
+        <button class="btn btn-green btn-block" id="loginBtn" onclick="doLogin()">Sign In</button>
+      </div>
+      <button class="auth-link" onclick="showAuth('setpass')">First time? Set your password</button>
+      <button class="auth-link" onclick="showAuth('resetkey')">Forgot password? Use manager reset key</button>
+    </div>
+
+    <div id="pg-setpass" style="display:none">
+      <div class="auth-logo">Set Password</div>
+      <div class="auth-tagline">First time setup</div>
+      <div class="auth-card">
+        <div class="alert alert-err" id="spErr"></div>
+        <div class="alert alert-ok" id="spOk"></div>
+        <div class="field"><label class="field-label">Full Name</label><input class="f-input" type="text" id="spName" autocorrect="off" placeholder="Enter your full name"></div>
+        <div class="field"><label class="field-label">New Password</label><input class="f-input" type="password" id="spNew" placeholder="Minimum 4 characters"></div>
+        <div class="field" style="margin-bottom:20px"><label class="field-label">Confirm Password</label><input class="f-input" type="password" id="spConfirm" placeholder="Repeat your password"></div>
+        <button class="btn btn-green btn-block" id="spBtn" onclick="doSetPass()">Set Password</button>
+        <button class="btn btn-outline btn-block" onclick="showAuth('login')" style="margin-top:8px">Back to Sign In</button>
+      </div>
+    </div>
+
+    <div id="pg-resetkey" style="display:none">
+      <div class="auth-logo">Reset Password</div>
+      <div class="auth-tagline">Use your manager's reset key</div>
+      <div class="auth-card">
+        <div class="alert alert-err" id="rkErr"></div>
+        <div class="alert alert-ok" id="rkOk"></div>
+        <div class="field"><label class="field-label">Full Name</label><input class="f-input" type="text" id="rkName" autocorrect="off" placeholder="Enter your full name"></div>
+        <div class="field"><label class="field-label">Reset Key</label><input class="f-input" type="text" id="rkKey" placeholder="e.g. ABCD-1234" style="font-family:monospace;letter-spacing:2px;text-transform:uppercase"></div>
+        <div class="field"><label class="field-label">New Password</label><input class="f-input" type="password" id="rkNew" placeholder="Minimum 4 characters"></div>
+        <div class="field" style="margin-bottom:20px"><label class="field-label">Confirm Password</label><input class="f-input" type="password" id="rkConfirm" placeholder="Repeat your password"></div>
+        <button class="btn btn-green btn-block" id="rkBtn" onclick="doResetKey()">Reset Password</button>
+        <button class="btn btn-outline btn-block" onclick="showAuth('login')" style="margin-top:8px">Back to Sign In</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ── HUB ── -->
+<div id="hubLayer" class="shell" style="display:none">
+
+  <!-- MOBILE HEADER -->
+  <div class="mobile-header">
+    <div class="mh-logo">Oscar Roster</div>
+    <div class="mh-user">
+      <div class="mh-ava" id="mhAva"></div>
+      <div class="mh-name" id="mhName"></div>
+    </div>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sb-brand">
+      <div class="sb-brand-name">Oscar Roster</div>
+      <div class="sb-brand-sub">Staff Hub</div>
+    </div>
+    <div class="sb-user">
+      <div class="sb-avatar" id="sbAvatar"></div>
+      <div>
+        <div class="sb-name" id="sbName"></div>
+        <div class="sb-role">Staff Member</div>
+      </div>
+    </div>
+    <nav class="sb-nav">
+      <div class="nav-section-lbl">Menu</div>
+      <div class="nav-item active" id="nav-home" onclick="goTo('home')">
+        <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h4v-4h2v4h4a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z"/></svg>
+        Home
+      </div>
+      <div class="nav-item" id="nav-roster" onclick="goTo('roster')">
+        <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd"/></svg>
+        My Roster
+      </div>
+      <div class="nav-item" id="nav-availability" onclick="goTo('availability')">
+        <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/></svg>
+        Availability
+      </div>
+      <div class="nav-item" id="nav-leave" onclick="goTo('leave')">
+        <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"/></svg>
+        Leave
+      </div>
+      <div class="nav-item" id="nav-admin" onclick="goTo('admin')" style="display:none">
+        <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-6-3a2 2 0 11-4 0 2 2 0 014 0zm-2 4a5 5 0 00-4.546 2.916A5.986 5.986 0 0010 16a5.986 5.986 0 004.546-2.084A5 5 0 0010 11z" clip-rule="evenodd"/></svg>
+        Admin View
+      </div>
+      <div class="nav-item" id="nav-notifications" onclick="goTo('notifications')">
+        <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z"/></svg>
+        Notifications
+        <span class="nav-badge" id="notifBadge"></span>
+      </div>
+    </nav>
+    <div class="sb-foot">
+      <button class="signout" onclick="doLogout()">Sign Out</button>
+    </div>
+  </aside>
+
+  <main class="main">
+
+    <!-- HOME -->
+    <div class="page active" id="page-home">
+      <div class="page-hd">
+        <div class="page-title" id="homeGreeting">Welcome back</div>
+        <div class="page-sub" id="homeWeekSub"></div>
+      </div>
+      <div class="stats-row" id="homeStats"></div>
+      <div class="card">
+        <div class="card-hd">
+          <div class="card-title">This Week — Availability</div>
+          <button class="card-action" onclick="goTo('availability')">Edit</button>
+        </div>
+        <div id="homeAvailSummary"></div>
+      </div>
+    </div>
+
+    <!-- ROSTER -->
+    <div class="page" id="page-roster">
+      <div class="page-hd">
+        <div class="page-title">My Roster</div>
+        <div class="page-sub">Your published shifts for the week</div>
+      </div>
+      <div class="week-nav">
+        <button class="wnav-btn" onclick="rPrev()">&#9664;</button>
+        <div class="wnav-label" id="rosterWeekLbl"></div>
+        <button class="wnav-btn" onclick="rNext()">&#9654;</button>
+      </div>
+      <div class="card" id="rosterCard">
+        <div class="empty"><div class="empty-title">Loading...</div></div>
+      </div>
+    </div>
+
+    <!-- AVAILABILITY -->
+    <div class="page" id="page-availability">
+      <div class="page-hd">
+        <div class="page-title">Set Availability</div>
+        <div class="page-sub" id="availSub"></div>
+      </div>
+      <div class="lock-notice" id="availLock" style="display:none"></div>
+      <div class="card">
+        <div class="card-title" style="margin-bottom:18px">Your Availability This Week</div>
+        <div id="availForm"></div>
+      </div>
+      <div class="alert alert-err" id="availErr"></div>
+      <div id="availBtnArea">
+        <button class="btn btn-green btn-block" id="availBtn" onclick="submitAvail()">Submit Availability</button>
+      </div>
+    </div>
+
+    <!-- LEAVE -->
+    <div class="page" id="page-leave">
+      <div class="page-hd">
+        <div class="page-title">Leave Requests</div>
+        <div class="page-sub">Submit and track your leave</div>
+      </div>
+      <div class="card">
+        <div class="card-title" style="margin-bottom:20px">New Request</div>
+        <div class="alert alert-err" id="leaveErr"></div>
+        <div class="alert alert-ok" id="leaveOk"></div>
+        <div class="form-grid-2">
+          <div class="field">
+            <label class="field-label">From Date <span class="req">*</span></label>
+            <input class="f-input" type="date" id="leaveFrom">
+          </div>
+          <div class="field">
+            <label class="field-label">To Date <span class="req">*</span></label>
+            <input class="f-input" type="date" id="leaveTo">
+          </div>
+        </div>
+        <div class="field">
+          <label class="field-label">Reason <span class="req">*</span></label>
+          <input class="f-input" type="text" id="leaveReason" placeholder="e.g. Annual leave, Medical appointment, Family emergency">
+          <div class="field-hint">Required — your manager needs to understand why you need this leave.</div>
+        </div>
+        <button class="btn btn-green btn-block" id="leaveBtn" onclick="submitLeave()" style="margin-top:4px">Submit Leave Request</button>
+      </div>
+      <div class="card">
+        <div class="card-title" style="margin-bottom:18px">Leave History</div>
+        <div id="leaveHistory"></div>
+      </div>
+    </div>
+
+    <!-- ADMIN -->
+    <div class="page" id="page-admin">
+      <div class="page-hd">
+        <div class="page-title">Admin View</div>
+        <div class="page-sub">Staff availability overview and pending leave</div>
+      </div>
+      <div id="adminContent"><div class="empty"><div class="empty-title">Loading...</div></div></div>
+      <div class="card" style="margin-top:14px">
+        <div class="card-hd">
+          <div class="card-title">Recent Roster Views</div>
+          <button onclick="loadActivityFeed()" style="font-size:11px;font-weight:700;background:none;border:none;color:var(--accent);cursor:pointer;font-family:inherit">Refresh</button>
+        </div>
+        <div id="activityList"><div class="empty" style="padding:12px 0"><div class="empty-sub">Loading...</div></div></div>
+      </div>
+    </div>
+
+    <!-- NOTIFICATIONS -->
+    <div class="page" id="page-notifications">
+      <div class="page-hd">
+        <div class="page-title">Notifications</div>
+        <div class="page-sub">Leave decisions from your manager</div>
+      </div>
+      <div id="notifList"></div>
+    </div>
+
+  </main>
+
+  <!-- BOTTOM NAV (mobile) -->
+  <nav class="bottom-nav">
+    <div class="bn-items">
+      <div class="bn-item active" id="bn-home" onclick="goTo('home')">
+        <svg class="bn-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h4v-4h2v4h4a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z"/></svg>
+        <div class="bn-label">Home</div>
+      </div>
+      <div class="bn-item" id="bn-roster" onclick="goTo('roster')">
+        <svg class="bn-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd"/></svg>
+        <div class="bn-label">Roster</div>
+      </div>
+      <div class="bn-item" id="bn-availability" onclick="goTo('availability')">
+        <svg class="bn-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/></svg>
+        <div class="bn-label">Avail</div>
+      </div>
+      <div class="bn-item" id="bn-leave" onclick="goTo('leave')">
+        <svg class="bn-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"/></svg>
+        <div class="bn-label">Leave</div>
+      </div>
+      <div class="bn-item" id="bn-notifications" onclick="goTo('notifications')">
+        <svg class="bn-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z"/></svg>
+        <div class="bn-label">Alerts</div>
+        <div class="bn-badge" id="bnNotifBadge"></div>
+      </div>
+      <div class="bn-item" id="bn-admin" onclick="goTo('admin')" style="display:none">
+        <svg class="bn-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-6-3a2 2 0 11-4 0 2 2 0 014 0zm-2 4a5 5 0 00-4.546 2.916A5.986 5.986 0 0010 16a5.986 5.986 0 004.546-2.084A5 5 0 0010 11z" clip-rule="evenodd"/></svg>
+        <div class="bn-label">Admin</div>
+      </div>
+    </div>
+  </nav>
+
+</div>
+
+<script>
+const SB="https://jcfgldqrdbfkgbixszds.supabase.co";
+const KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpjZmdsZHFyZGJma2diaXhzemRzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1Nzc3NzEsImV4cCI6MjA5MDE1Mzc3MX0.Wj8cCpnlsoZOPj5sKWeEdfvgjG4Nc-UuTTYgbcrPfeI";
+let STAFF=["Abhishek Karki","Anish Dhodari","Anurag Dahal","Asha Aryal","Bikash Dahal","Kushal Piya","Monika Kawadi","Musica Karki","Nabina Uchchai Thakuri","Nidhi Subedi","Nippu Pokhrel","Pavneet Kaur","Presna Aryal","Prashna Sapkota","Roshana Puri","Sachin Sanwa Limbu","Sagun Panta","Saksham Shrestha","Sami Basnet","Sameekshya Regmi","Sanju Gharti Magar","Sandhya Sangroula","Sanskar Pokharel","Santosh Singh Basnet","Siddhartha Gautam","Supriya Thapa","Tejaswee Bhetwal","Umisha Ghimire","Usam Adhikari"]; // fallback, gets replaced by Supabase
+
+async function loadStaffList(){
+  try{
+    const rows=await sbGet("staff_names","?order=name.asc");
+    if(rows&&rows.length>0){
+      STAFF=rows.map(r=>r.name).filter(Boolean).sort();
+    }
+    // Only keep hardcoded fallback if Supabase returns nothing at all
+  }catch(e){ /* network error — use fallback list */ }
+}
+
+// Separate function that always fetches fresh — used at login to ensure removed staff can't get in
+async function validateStaffName(name){
+  try{
+    const rows=await sbGet("staff_names","?name=eq."+encodeURIComponent(name));
+    if(rows&&rows.length>0)return rows[0].name;
+    return null; // not in Supabase = removed
+  }catch(e){
+    // Network error — fall back to local STAFF array
+    return STAFF.find(n=>n.toLowerCase().trim()===name.toLowerCase().trim())||null;
+  }
+}
+const DAYS=["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
+const DS=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+
+function gMon(d){const r=new Date(d),day=r.getDay();r.setDate(r.getDate()-day+(day===0?-6:1));r.setHours(0,0,0,0);return r;}
+function addD(d,n){const r=new Date(d);r.setDate(r.getDate()+n);return r;}
+function fmt(d){return new Date(d).toLocaleDateString("en-AU",{day:"numeric",month:"short"});}
+function fmtF(d){return new Date(d).toLocaleDateString("en-AU",{day:"numeric",month:"short",year:"numeric"});}
+function iso(d){return new Date(d).toISOString().split("T")[0];}
+function wkL(ws){return fmt(ws)+" \u2013 "+fmt(addD(ws,6));}
+function isLocked(ws){const lk=addD(gMon(ws),-2);lk.setHours(0,0,0,0);return new Date()>=lk;}
+
+let weekStart=gMon(new Date()),rWS=gMon(new Date()),me=null;
+
+async function sbGet(t,f){const r=await fetch(SB+"/rest/v1/"+t+(f||""),{headers:{"apikey":KEY,"Authorization":"Bearer "+KEY}});return r.ok?r.json():[];}
+async function sbPost(t,b){return fetch(SB+"/rest/v1/"+t,{method:"POST",headers:{"apikey":KEY,"Authorization":"Bearer "+KEY,"Content-Type":"application/json","Prefer":"return=minimal"},body:JSON.stringify(b)});}
+async function hash(p){const e=new TextEncoder().encode(p+"oscar_roster_salt_2024"),b=await crypto.subtle.digest("SHA-256",e);return Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,"0")).join("");}
+
+function showAuth(s){
+  ["login","setpass","resetkey"].forEach(p=>document.getElementById("pg-"+p).style.display="none");
+  document.getElementById("pg-"+s).style.display="block";
+}
+function saveMe(n){me=n;sessionStorage.setItem("ou",n);}
+function loadMe(){const n=sessionStorage.getItem("ou");if(n){me=n;return true;}return false;}
+
+async function doLogin(){
+  const name=document.getElementById("loginName").value.trim();
+  const pass=document.getElementById("loginPass").value;
+  const err=document.getElementById("loginErr");err.classList.remove("show");
+  if(!name){err.textContent="Please enter your name.";err.classList.add("show");return;}
+  if(!pass){err.textContent="Please enter your password.";err.classList.add("show");return;}
+  const btn=document.getElementById("loginBtn");btn.disabled=true;btn.innerHTML='<span class="sp"></span> Signing in...';
+  try{
+    // Always validate against Supabase so removed staff can't log in
+    const m=await validateStaffName(name);
+    if(!m){err.textContent="Name not found. You may have been removed from the system.";err.classList.add("show");btn.disabled=false;btn.textContent="Sign In";return;}
+    const h=await hash(pass);
+    const rows=await sbGet("staff_credentials","?staff_name=eq."+encodeURIComponent(m));
+    if(!rows.length){err.textContent="No password set yet. Use 'Set your password' below.";err.classList.add("show");}
+    else if(rows[0].password_hash!==h){err.textContent="Incorrect password. Please try again.";err.classList.add("show");}
+    else{saveMe(m);enterHub();}
+  }catch(e){err.textContent="Connection error. Please try again.";err.classList.add("show");}
+  finally{btn.disabled=false;btn.textContent="Sign In";}
+}
+
+async function doSetPass(){
+  const name=document.getElementById("spName").value.trim();
+  const pass=document.getElementById("spNew").value;
+  const conf=document.getElementById("spConfirm").value;
+  const err=document.getElementById("spErr"),ok=document.getElementById("spOk");
+  err.classList.remove("show");ok.classList.remove("show");
+  if(!name){err.textContent="Please enter your full name.";err.classList.add("show");return;}
+  if(!pass||pass.length<4){err.textContent="Password must be at least 4 characters.";err.classList.add("show");return;}
+  if(pass!==conf){err.textContent="Passwords do not match.";err.classList.add("show");return;}
+  const btn=document.getElementById("spBtn");btn.disabled=true;btn.innerHTML='<span class="sp"></span>';
+  try{
+    // Validate against Supabase — only current staff can register
+    const m=await validateStaffName(name);
+    if(!m){err.textContent="Name not found. Check your spelling or contact your manager.";err.classList.add("show");btn.disabled=false;btn.textContent="Set Password";return;}
+    const ex=await sbGet("staff_credentials","?staff_name=eq."+encodeURIComponent(m));
+    if(ex.length){err.textContent="Password already set. Ask your manager to reset it.";err.classList.add("show");btn.disabled=false;btn.textContent="Set Password";return;}
+    const h=await hash(pass);
+    const res=await sbPost("staff_credentials",{staff_name:m,password_hash:h});
+    if(res.ok||res.status===201){ok.textContent="Password set! Signing you in...";ok.classList.add("show");saveMe(m);setTimeout(enterHub,1200);}
+    else throw new Error();
+  }catch(e){err.textContent="Failed. Please try again.";err.classList.add("show");}
+  finally{btn.disabled=false;btn.textContent="Set Password";}
+}
+
+async function doResetKey(){
+  const name=document.getElementById("rkName").value.trim();
+  const key=document.getElementById("rkKey").value.trim().toUpperCase();
+  const pass=document.getElementById("rkNew").value;
+  const conf=document.getElementById("rkConfirm").value;
+  const err=document.getElementById("rkErr"),ok=document.getElementById("rkOk");
+  err.classList.remove("show");ok.classList.remove("show");
+  const m=STAFF.find(n=>n.toLowerCase().trim()===name.toLowerCase().trim());
+  if(!m){err.textContent="Name not found.";err.classList.add("show");return;}
+  if(!key){err.textContent="Please enter your reset key.";err.classList.add("show");return;}
+  if(!pass||pass.length<4){err.textContent="Password must be at least 4 characters.";err.classList.add("show");return;}
+  if(pass!==conf){err.textContent="Passwords do not match.";err.classList.add("show");return;}
+  const btn=document.getElementById("rkBtn");btn.disabled=true;btn.innerHTML='<span class="sp"></span>';
+  try{
+    const kh=await hash(key);
+    const rows=await sbGet("staff_credentials","?staff_name=eq."+encodeURIComponent(m));
+    if(!rows.length||!rows[0].reset_key_hash){err.textContent="No reset key found. Ask your manager.";err.classList.add("show");btn.disabled=false;btn.textContent="Reset Password";return;}
+    if(rows[0].reset_key_hash!==kh){err.textContent="Invalid key. Please check and try again.";err.classList.add("show");btn.disabled=false;btn.textContent="Reset Password";return;}
+    const nh=await hash(pass);
+    await fetch(SB+"/rest/v1/staff_credentials?staff_name=eq."+encodeURIComponent(m),{method:"PATCH",headers:{"apikey":KEY,"Authorization":"Bearer "+KEY,"Content-Type":"application/json","Prefer":"return=minimal"},body:JSON.stringify({password_hash:nh,reset_key_hash:null})});
+    ok.textContent="Password reset! Signing you in...";ok.classList.add("show");saveMe(m);setTimeout(enterHub,1200);
+  }catch(e){err.textContent="Failed. Check your connection.";err.classList.add("show");}
+  finally{btn.disabled=false;btn.textContent="Reset Password";}
+}
+
+function doLogout(){
+  sessionStorage.removeItem("ou");me=null;
+  document.getElementById("hubLayer").style.display="none";
+  document.getElementById("authLayer").style.display="flex";
+  document.getElementById("loginPass").value="";
+  showAuth("login");
+}
+
+async function enterHub(){
+  await loadStaffList(); // refresh from Supabase in case staff changed
+  document.getElementById("authLayer").style.display="none";
+  document.getElementById("hubLayer").style.display="flex";
+  const first=me.split(" ")[0];
+  await loadMySettings();
+  const ava=me.split(" ").slice(0,2).map(w=>w[0]).join("").toUpperCase();
+  document.getElementById("sbAvatar").textContent=ava;
+  document.getElementById("sbName").textContent=me;
+  document.getElementById("mhAva").textContent=ava;
+  document.getElementById("mhName").textContent=first;
+  const hr=new Date().getHours();
+  document.getElementById("homeGreeting").textContent=(hr<12?"Good morning":hr<17?"Good afternoon":"Good evening")+", "+first;
+  document.getElementById("homeWeekSub").textContent=wkL(weekStart);
+  document.getElementById("availSub").textContent="Week of "+wkL(weekStart);
+  const today=iso(new Date());
+  document.getElementById("leaveFrom").value=today;
+  document.getElementById("leaveTo").value=today;
+  buildAvailForm();
+  Promise.all([loadHomeData(),loadNotifications(),loadLeaveHistory()]);
+  updateRosterPage();
+  goTo("home");
+}
+
+function goTo(p){
+  ["home","roster","availability","leave","notifications","admin"].forEach(x=>{
+    document.getElementById("page-"+x).classList.toggle("active",x===p);
+    document.getElementById("nav-"+x).classList.toggle("active",x===p);
+    const bn=document.getElementById("bn-"+x);
+    if(bn)bn.classList.toggle("active",x===p);
+  });
+  if(p==="availability")checkLock();
+  if(p==="roster"){updateRosterPage();logRosterView();}
+  if(p==="leave")loadLeaveHistory();
+  if(p==="notifications")loadNotifications();
+  if(p==="admin")loadAdminPage();
+  document.querySelector(".main").scrollTop=0;
+}
+
+// AVAILABILITY
+const dayState={};let fBuilt=false;
+function buildAvailForm(){
+  if(fBuilt)return;
+  const el=document.getElementById("availForm");
+  DAYS.forEach((day,i)=>{
+    dayState[i]={type:"all"};
+    const wrap=document.createElement("div");
+    wrap.innerHTML=
+      '<div class="avail-day-row" id="adr-'+i+'">'+
+        '<div class="avail-day-info"><div class="avail-day-name">'+day+'</div><div class="avail-day-date">'+fmt(addD(weekStart,i))+'</div></div>'+
+        '<div class="avail-opts">'+
+          '<button class="ao yes" id="ao-yes-'+i+'" onclick="setDay('+i+',\'all\')">Available</button>'+
+          '<button class="ao" id="ao-custom-'+i+'" onclick="setDay('+i+',\'custom\')">Custom</button>'+
+          '<button class="ao" id="ao-no-'+i+'" onclick="setDay('+i+',\'no\')">Unavailable</button>'+
+        '</div>'+
+      '</div>'+
+      '<div class="custom-time-row" id="ctr-'+i+'">'+
+        '<input type="time" class="time-in" id="cs-'+i+'" value="09:00">'+
+        '<span class="time-sep">to</span>'+
+        '<input type="time" class="time-in" id="ce-'+i+'" value="19:00">'+
+      '</div>';
+    el.appendChild(wrap);
+  });
+  fBuilt=true;
+  loadPrevAvail();
+}
+function setDay(i,type){
+  dayState[i]={type};
+  document.getElementById("ao-yes-"+i).className="ao"+(type==="all"?" yes":"");
+  document.getElementById("ao-custom-"+i).className="ao"+(type==="custom"?" custom":"");
+  document.getElementById("ao-no-"+i).className="ao"+(type==="no"?" no":"");
+  const ct=document.getElementById("ctr-"+i);
+  if(type==="custom")ct.classList.add("open");else ct.classList.remove("open");
+}
+async function loadPrevAvail(){
+  try{
+    const rows=await sbGet("availability_submissions","?staff_name=eq."+encodeURIComponent(me)+"&week_start=eq."+iso(weekStart)+"&order=submitted_at.desc&limit=1");
+    if(!rows.length)return;
+    const av=rows[0].availability;
+    Object.keys(av).forEach(k=>{
+      const a=av[k];setDay(parseInt(k),a.type);
+      if(a.type==="custom"){
+        const s=document.getElementById("cs-"+k),e=document.getElementById("ce-"+k);
+        if(s&&a.start)s.value=a.start;if(e&&a.end)e.value=a.end;
+      }
+    });
+  }catch(e){}
+}
+async function checkLock(){
+  // Reset each time
+  adminHasSetAvail=false;
+  myCanEditAvail=true;
+
+  try{
+    const r=await fetch(SB+"/rest/v1/staff_settings?name=eq."+encodeURIComponent(me),{headers:{"apikey":KEY,"Authorization":"Bearer "+KEY}});
+    if(r.ok){
+      const rows=await r.json();
+      if(rows.length){
+        // Only lock if admin explicitly set can_edit_avail to false
+        myCanEditAvail=rows[0].can_edit_avail!==false;
+        adminHasSetAvail=true;
+      }
+    }
+  }catch(e){}
+
+  // No time lock — only manual lock from admin applies
+  const locked=adminHasSetAvail&&!myCanEditAvail;
+  const lockEl=document.getElementById("availLock");
+  lockEl.style.display=locked?"block":"none";
+  if(locked)lockEl.textContent="Your availability has been locked by your manager.";
+  document.getElementById("availBtnArea").style.display=locked?"none":"block";
+}
+async function submitAvail(){
+  const avail={},err=document.getElementById("availErr");err.classList.remove("show");
+  for(let i=0;i<7;i++){
+    const s=dayState[i];
+    if(s.type==="custom"){
+      const st=document.getElementById("cs-"+i).value,en=document.getElementById("ce-"+i).value;
+      if(st>=en){err.textContent=DAYS[i]+": end time must be after start time.";err.classList.add("show");return;}
+      avail[i]={type:"custom",start:st,end:en};
+    }else avail[i]={type:s.type};
+  }
+  const btn=document.getElementById("availBtn");btn.disabled=true;btn.innerHTML='<span class="sp"></span> Submitting...';
+  try{
+    const res=await sbPost("availability_submissions",{staff_name:me,week_start:iso(weekStart),availability:avail});
+    if(res.ok||res.status===201){btn.textContent="Submitted!";setTimeout(()=>{btn.disabled=false;btn.textContent="Submit Availability";},2500);loadHomeData();}
+    else throw new Error();
+  }catch(e){err.textContent="Failed to submit. Please check your connection.";err.classList.add("show");btn.disabled=false;btn.textContent="Submit Availability";}
+}
+
+// ROSTER
+
+async function logRosterView(){
+  try{
+    await sbPost("roster_views",{
+      staff_name:me,
+      week_start:iso(rWS)
+    });
+  }catch(e){}
+}
+
+function rPrev(){rWS=addD(rWS,-7);updateRosterPage();}
+function rNext(){rWS=addD(rWS,7);updateRosterPage();}
+async function updateRosterPage(){
+  document.getElementById("rosterWeekLbl").textContent=wkL(rWS);
+  const card=document.getElementById("rosterCard");
+  card.innerHTML='<div class="empty"><div class="empty-title">Loading...</div></div>';
+  try{
+    const rows=await sbGet("published_rosters","?week_start=eq."+iso(rWS));
+    if(!rows.length){card.innerHTML='<div class="empty"><div class="empty-title">Not published yet</div><div class="empty-sub">Your manager hasn\'t published the roster for this week. Check back later.</div></div>';return;}
+    const data=rows[0].roster_data;
+    const staffMember=data.staff.find(s=>s.name.toLowerCase()===me.toLowerCase());
+    if(!staffMember){card.innerHTML='<div class="empty"><div class="empty-title">No shifts this week</div><div class="empty-sub">You are not rostered for this week.</div></div>';return;}
+    let html="",totalH=0,shiftDays=0;
+
+    // If single day publish, only show that day
+    const singleDay=data.isSingleDay?data.singleDay:null;
+
+    data.days.forEach((day,i)=>{
+      if(singleDay!==null&&i!==singleDay)return;
+      const ds=staffMember.shifts[i]||[];
+      html+='<div class="roster-day"><div class="roster-day-hd"><div class="rday-name">'+DS[i]+'</div><div class="rday-date">'+fmt(addD(rWS,i))+'</div></div>';
+      if(!ds.length)html+='<div class="no-shift">No shift</div>';
+      else ds.forEach(sh=>{
+        if(sh.type==="leave")html+='<div class="leave-pill">Leave</div>';
+        else{
+          const h=parseInt(sh.end)-parseInt(sh.start);totalH+=h;shiftDays++;
+          html+='<div class="shift-pill"><span class="shift-time">'+sh.start+' \u2013 '+sh.end+'</span>'+(sh.deviceName?'<span class="shift-device">\u{1F4BB} '+sh.deviceName+(sh.deviceStart&&sh.deviceEnd?' ('+sh.deviceStart+'\u2013'+sh.deviceEnd+')':'')+'</span>':'')+'</div>';
+        }
+      });
+      html+='</div>';
+    });
+
+    if(singleDay!==null){
+      html+='<div style="font-size:11px;color:var(--text3);text-align:center;padding:10px 0;font-family:monospace">Single day roster — '+data.weekLabel+'</div>';
+    }else{
+      html+='<div class="roster-totals"><div class="rtotal-box"><div class="rtotal-val" style="color:var(--accent)">'+totalH+'h</div><div class="rtotal-lbl">Total Hours</div></div><div class="rtotal-box"><div class="rtotal-val" style="color:var(--blue)">'+shiftDays+'</div><div class="rtotal-lbl">Shift Days</div></div></div>';
+    }
+    card.innerHTML=html;
+  }catch(e){card.innerHTML='<div class="empty"><div class="empty-title" style="color:var(--warn)">Could not load roster</div></div>';}
+}
+
+// HOME
+async function loadHomeData(){
+  const statsEl=document.getElementById("homeStats"),sumEl=document.getElementById("homeAvailSummary");
+  try{
+    const [ar,lr]=await Promise.all([
+      sbGet("availability_submissions","?staff_name=eq."+encodeURIComponent(me)+"&week_start=eq."+iso(weekStart)+"&order=submitted_at.desc&limit=1"),
+      sbGet("leave_submissions","?staff_name=eq."+encodeURIComponent(me)+"&status=eq.pending")
+    ]);
+    const avDays=ar.length?Object.values(ar[0].availability).filter(a=>a.type!=="no").length:0;
+    statsEl.innerHTML=
+      '<div class="stat-box"><div class="stat-val green">'+avDays+'</div><div class="stat-label">Available Days</div></div>'+
+      '<div class="stat-box"><div class="stat-val blue">'+lr.length+'</div><div class="stat-label">Pending Leave</div></div>'+
+      '<div class="stat-box" style="cursor:pointer" onclick="goTo(\'roster\')"><div class="stat-val" style="color:var(--text2);font-size:20px;margin-top:6px">View</div><div class="stat-label">My Roster</div></div>';
+    if(!ar.length){
+      sumEl.innerHTML='<div class="empty" style="padding:20px 0"><div class="empty-title">No availability submitted</div><div class="empty-sub">Set your availability so your manager can plan the roster.</div><button onclick="goTo(\'availability\')" class="btn btn-green" style="margin-top:16px;padding:10px 20px;font-size:13px">Set Availability</button></div>';
+      return;
+    }
+    const av=ar[0].availability;
+    sumEl.innerHTML=DAYS.map((day,i)=>{
+      const a=av[i]||av[String(i)]||{type:"all"};
+      const lbl=a.type==="custom"?(a.start+" \u2013 "+a.end):(a.type==="all"?"Available":"Unavailable");
+      const cls=a.type==="no"?"asr-red":a.type==="custom"?"asr-blue":"asr-green";
+      return '<div class="avail-summary-row"><div><div class="asr-day">'+DS[i]+'</div><div class="asr-date">'+fmt(addD(weekStart,i))+'</div></div><div class="asr-status '+cls+'">'+lbl+'</div></div>';
+    }).join("");
+  }catch(e){sumEl.innerHTML='<div class="empty" style="padding:12px 0"><div class="empty-sub">Could not load data.</div></div>';}
+}
+
+// LEAVE
+async function submitLeave(){
+  const from=document.getElementById("leaveFrom").value;
+  const to=document.getElementById("leaveTo").value;
+  const reason=document.getElementById("leaveReason").value.trim();
+  const err=document.getElementById("leaveErr"),ok=document.getElementById("leaveOk");
+  err.classList.remove("show");ok.classList.remove("show");
+  document.getElementById("leaveReason").classList.remove("error");
+  if(!from||!to){err.textContent="Please select your leave dates.";err.classList.add("show");return;}
+  if(from>to){err.textContent="End date must be on or after start date.";err.classList.add("show");return;}
+  if(!reason){
+    err.textContent="Please provide a reason for your leave request — this is required.";
+    err.classList.add("show");
+    document.getElementById("leaveReason").classList.add("error");
+    document.getElementById("leaveReason").focus();
+    return;
+  }
+  const btn=document.getElementById("leaveBtn");btn.disabled=true;btn.innerHTML='<span class="sp"></span> Submitting...';
+  try{
+    const res=await sbPost("leave_submissions",{staff_name:me,from_date:from,to_date:to,reason,status:"pending"});
+    if(res.ok||res.status===201){
+      ok.textContent="Request submitted. Your manager will review it shortly.";ok.classList.add("show");
+      document.getElementById("leaveReason").value="";
+      loadLeaveHistory();loadHomeData();
+    }else throw new Error();
+  }catch(e){err.textContent="Failed to submit. Please check your connection.";err.classList.add("show");}
+  finally{btn.disabled=false;btn.textContent="Submit Leave Request";}
+}
+async function loadLeaveHistory(){
+  const el=document.getElementById("leaveHistory");
+  try{
+    const rows=await sbGet("leave_submissions","?staff_name=eq."+encodeURIComponent(me)+"&order=submitted_at.desc");
+    if(!rows.length){el.innerHTML='<div class="empty" style="padding:16px 0"><div class="empty-sub">No leave requests yet.</div></div>';return;}
+    el.innerHTML=rows.map(r=>{
+      const days=Math.round((new Date(r.to_date)-new Date(r.from_date))/(864e5))+1;
+      const sc={pending:"st-pending",approved:"st-approved",declined:"st-declined"}[r.status]||"st-pending";
+      const sl={pending:"Pending",approved:"Approved",declined:"Declined"}[r.status];
+      return '<div class="leave-item">'+
+        '<div class="leave-item-top">'+
+          '<div><div class="leave-dates">'+fmtF(r.from_date)+' \u2014 '+fmtF(r.to_date)+'</div>'+
+          '<div class="leave-duration">'+days+' day'+(days!==1?'s':'')+'</div></div>'+
+          '<div class="status-tag '+sc+'">'+sl+'</div>'+
+        '</div>'+
+        (r.reason?'<div class="leave-reason-txt">'+r.reason+'</div>':'')+
+        (r.status==="declined"&&r.decline_reason?'<div class="manager-note"><strong>Manager note:</strong> '+r.decline_reason+'</div>':'')+
+        '</div>';
+    }).join("");
+  }catch(e){el.innerHTML='<div class="empty" style="padding:12px 0"><div class="empty-sub">Could not load history.</div></div>';}
+}
+
+// NOTIFICATIONS
+async function loadNotifications(){
+  const el=document.getElementById("notifList"),badge=document.getElementById("notifBadge");
+  try{
+    // Fetch both approved and declined leaves
+    const rows=await sbGet("leave_submissions","?staff_name=eq."+encodeURIComponent(me)+"&status=in.(approved,declined)&order=submitted_at.desc");
+    const read=JSON.parse(localStorage.getItem("oR")||"[]");
+    const unread=rows.filter(r=>!read.includes(r.id));
+    badge.textContent=unread.length;badge.style.display=unread.length?"inline":"none";
+    const bnBadge=document.getElementById("bnNotifBadge");
+    if(bnBadge){bnBadge.textContent=unread.length;bnBadge.style.display=unread.length?"block":"none";}
+    if(!rows.length){el.innerHTML='<div class="card"><div class="empty"><div class="empty-title">No notifications</div><div class="empty-sub">You have no alerts right now.</div></div></div>';return;}
+    el.innerHTML=rows.map(r=>{
+      const isRead=read.includes(r.id);
+      const isApproved=r.status==="approved";
+      const cardStyle=isApproved
+        ? 'background:var(--accent-dim);border:1px solid var(--accent-bd);'
+        : 'background:rgba(255,107,71,.07);border:1px solid rgba(255,107,71,.18);';
+      const titleColor=isApproved?'color:var(--accent)':'color:var(--warn)';
+      const title=isApproved?'Leave Request Approved':'Leave Request Declined';
+      return '<div class="notif-item'+(isRead?" read":"")+'" style="'+(isRead?"":cardStyle)+'" onclick="markRead(\''+r.id+'\',this)">'+
+        (!isRead?'<div class="notif-dot" style="background:'+(isApproved?"var(--accent)":"var(--warn)")+'"></div>':'')+
+        '<div class="notif-title" style="'+titleColor+'">'+title+'</div>'+
+        '<div class="notif-body">'+fmtF(r.from_date)+' \u2013 '+fmtF(r.to_date)+(r.reason?' \u00b7 '+r.reason:'')+'</div>'+
+        (r.status==="declined"&&r.decline_reason?'<div class="notif-note"><strong>Reason:</strong> '+r.decline_reason+'</div>':'')+
+        '<div class="notif-time">'+fmtF(r.submitted_at)+'</div>'+
+        '</div>';
+    }).join("");
+  }catch(e){el.innerHTML='<div class="empty"><div class="empty-sub">Could not load notifications.</div></div>';}
+}
+function markRead(id,el){
+  const read=JSON.parse(localStorage.getItem("oR")||"[]");
+  if(!read.includes(id)){read.push(id);localStorage.setItem("oR",JSON.stringify(read));}
+  el.classList.add("read");const dot=el.querySelector(".notif-dot");if(dot)dot.remove();
+  loadNotifications();
+}
+
+
+// ── SETTINGS ──
+let myCanEditAvail=true;
+let myIsAdmin=false;
+let adminHasSetAvail=false; // true only if admin explicitly set a value in staff_settings
+
+async function loadMySettings(){
+  try{
+    const rows=await sbGet("staff_settings","?name=eq."+encodeURIComponent(me));
+    if(rows&&rows.length){
+      myIsAdmin=!!rows[0].is_hub_admin;
+      myCanEditAvail=myIsAdmin?true:(rows[0].can_edit_avail!==false);
+      adminHasSetAvail=true;
+    }
+  }catch(e){}
+
+  // Update availability lock (no time lock — only manual admin lock)
+  const locked=adminHasSetAvail&&!myCanEditAvail;
+  if(locked){
+    document.getElementById("availLock").style.display="block";
+    document.getElementById("availLock").textContent="Your availability has been locked by your manager.";
+    document.getElementById("availBtnArea").style.display="none";
+  } else {
+    document.getElementById("availLock").style.display="none";
+    document.getElementById("availBtnArea").style.display="block";
+  }
+  // Show/hide admin nav — both sidebar and bottom nav
+  document.getElementById("nav-admin").style.display=myIsAdmin?"flex":"none";
+  const bnAdmin=document.getElementById("bn-admin");
+  if(bnAdmin)bnAdmin.style.display=myIsAdmin?"flex":"none";
+}
+
+// ── ADMIN ──
+async function loadAdminPage(){
+  const el=document.getElementById("adminContent");
+  if(!el){console.error("adminContent div not found");return;}
+  el.innerHTML='<div class="empty"><div class="empty-title">Fetching data...</div></div>';
+
+  const isoWeek=iso(weekStart);
+  let availRows=[], leaveRows=[], settingsRows=[];
+
+  try{
+    const r=await fetch(SB+"/rest/v1/availability_submissions?week_start=eq."+isoWeek,{headers:{"apikey":KEY,"Authorization":"Bearer "+KEY}});
+    if(r.ok)availRows=await r.json();
+  }catch(e){console.warn("avail fetch error:",e);}
+
+  try{
+    const r=await fetch(SB+"/rest/v1/leave_submissions?status=eq.pending",{headers:{"apikey":KEY,"Authorization":"Bearer "+KEY}});
+    if(r.ok)leaveRows=await r.json();
+  }catch(e){console.warn("leave fetch error:",e);}
+
+  try{
+    const r=await fetch(SB+"/rest/v1/staff_settings",{headers:{"apikey":KEY,"Authorization":"Bearer "+KEY}});
+    if(r.ok)settingsRows=await r.json();
+  }catch(e){ /* table may not exist yet */ }
+
+  const typeCol={all:"var(--accent)",no:"var(--warn)",custom:"var(--blue)"};
+  const typeLbl={all:"Available",no:"Unavail",custom:""};
+
+  let html='<div class="card"><div class="card-hd"><div class="card-title">Staff Availability — '+wkL(weekStart)+'</div></div>';
+
+  if(!availRows.length){
+    html+='<div style="color:var(--text3);font-size:12px;padding:8px 0 12px">No submissions yet for this week.</div>';
+  }
+
+  STAFF.forEach(function(name){
+    const row=availRows.find(function(r){return r.staff_name&&r.staff_name.toLowerCase()===name.toLowerCase();});
+    const setting=settingsRows.find(function(s){return s.name&&s.name.toLowerCase()===name.toLowerCase();});
+    const encodedName=encodeURIComponent(name);
+
+    // Determine state: no setting = Auto, setting true = Can Edit, setting false = Locked
+    let state, btnLabel, btnColor, nextAction;
+    if(!setting){
+      state="auto";
+      btnLabel="Auto";
+      btnColor="background:rgba(255,255,255,.07);color:var(--text2);border:1px solid var(--border-hi);";
+    } else if(setting.can_edit_avail!==false){
+      state="open";
+      btnLabel="Can Edit";
+      btnColor="background:rgba(34,212,160,.12);color:var(--accent);border:1px solid rgba(34,212,160,.25);";
+    } else {
+      state="locked";
+      btnLabel="Locked";
+      btnColor="background:rgba(255,107,71,.12);color:var(--warn);border:1px solid rgba(255,107,71,.25);";
+    }
+
+    html+='<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);flex-wrap:wrap">';
+    html+='<div style="display:flex;align-items:center;gap:8px;min-width:210px">';
+    html+='<div style="font-size:12.5px;font-weight:700">'+name+'</div>';
+    // Cycle: Auto → Can Edit → Locked → Auto
+    html+='<button onclick="adminCycleAvail(\''+encodedName+'\',\''+state+'\')" style="font-size:9.5px;font-weight:700;padding:3px 9px;border-radius:6px;cursor:pointer;font-family:inherit;'+btnColor+'">'+btnLabel+'</button>';
+    html+='</div>';
+
+    // Availability pills
+    if(!row){
+      html+='<div style="font-size:10px;color:var(--text3);font-family:monospace">No submission</div>';
+    }else{
+      const av=row.availability||{};
+      html+='<div style="display:flex;gap:4px;flex-wrap:wrap">';
+      for(let i=0;i<7;i++){
+        const a=av[i]||av[String(i)]||{type:"all"};
+        const lbl=a.type==="custom"?(a.start.slice(0,5)+"\u2013"+a.end.slice(0,5)):typeLbl[a.type];
+        html+='<div style="font-size:9px;font-weight:700;padding:3px 6px;border-radius:5px;background:rgba(255,255,255,.05);border:1px solid var(--border);color:'+typeCol[a.type]+'">'+DS[i]+' '+lbl+'</div>';
+      }
+      html+='</div>';
+    }
+    html+='</div>';
+  });
+  html+='</div>';
+
+  html+='<div class="card"><div class="card-title" style="margin-bottom:16px">Pending Leave ('+leaveRows.length+')</div>';
+  if(!leaveRows.length){
+    html+='<div class="empty" style="padding:16px 0"><div class="empty-sub">No pending leave requests</div></div>';
+  }else{
+    leaveRows.forEach(function(r){
+      html+='<div class="leave-item"><div class="leave-item-top"><div>'+
+        '<div class="leave-dates">'+r.staff_name+'</div>'+
+        '<div class="leave-duration">'+fmtF(r.from_date)+' \u2014 '+fmtF(r.to_date)+'</div></div>'+
+        '<div class="status-tag st-pending">Pending</div></div>'+
+        (r.reason?'<div class="leave-reason-txt">'+r.reason+'</div>':'')+
+        '</div>';
+    });
+  }
+  html+='</div>';
+
+  el.innerHTML=html;
+
+  // Load recent roster views
+  loadActivityFeed();
+}
+
+async function loadActivityFeed(){
+  const el=document.getElementById("activityList");
+  if(!el)return;
+  try{
+    const isoWeek=iso(weekStart);
+    // Get all views for current week
+    const rows=await sbGet("roster_views","?week_start=eq."+isoWeek);
+    const viewedNames=new Set(rows.map(r=>r.staff_name));
+
+    if(!STAFF.length){el.innerHTML='<div class="empty" style="padding:12px 0"><div class="empty-sub">No staff found</div></div>';return;}
+
+    const viewed=STAFF.filter(n=>viewedNames.has(n));
+    const notViewed=STAFF.filter(n=>!viewedNames.has(n));
+
+    let html='<div style="font-size:11px;color:var(--text3);margin-bottom:10px;font-family:monospace">'+
+      viewed.length+' of '+STAFF.length+' staff have viewed the roster for this week</div>';
+
+    if(notViewed.length){
+      html+='<div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--warn);margin-bottom:8px">Not Viewed ('+notViewed.length+')</div>';
+      html+=notViewed.map(n=>'<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)">'+
+        '<span style="color:var(--warn);font-size:14px">○</span>'+
+        '<span style="font-size:13px;font-weight:600;color:var(--text2)">'+n+'</span>'+
+      '</div>').join('');
+    }
+
+    if(viewed.length){
+      html+='<div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--accent);margin:12px 0 8px">Viewed ('+viewed.length+')</div>';
+      html+=viewed.map(n=>{
+        const r=rows.filter(x=>x.staff_name===n).sort((a,b)=>new Date(b.viewed_at)-new Date(a.viewed_at))[0];
+        const t=new Date(r.viewed_at);
+        const timeStr=t.toLocaleDateString("en-AU",{day:"numeric",month:"short"})+" "+t.toLocaleTimeString("en-AU",{hour:"2-digit",minute:"2-digit"});
+        return '<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)">'+
+          '<div style="display:flex;align-items:center;gap:8px">'+
+            '<span style="color:var(--accent);font-size:14px">✓</span>'+
+            '<span style="font-size:13px;font-weight:600">'+n+'</span>'+
+          '</div>'+
+          '<span style="font-size:11px;color:var(--text3);font-family:monospace">'+timeStr+'</span>'+
+        '</div>';
+      }).join('');
+    }
+
+    el.innerHTML=html;
+  }catch(e){el.innerHTML='<div class="empty" style="padding:12px 0"><div class="empty-sub">Could not load</div></div>';}
+}
+
+function btnStyle(state){
+  if(state==="open")return "background:rgba(34,212,160,.12);color:var(--accent);border:1px solid rgba(34,212,160,.25);";
+  if(state==="locked")return "background:rgba(255,107,71,.12);color:var(--warn);border:1px solid rgba(255,107,71,.25);";
+  return "background:rgba(255,255,255,.07);color:var(--text2);border:1px solid var(--border-hi);";
+}
+
+async function adminCycleAvail(encodedName, currentState){
+  const name=decodeURIComponent(encodedName);
+  const nextState=currentState==="auto"?"open":currentState==="open"?"locked":"auto";
+
+  // Update button immediately for instant feedback
+  event.target.textContent=nextState==="auto"?"Auto":nextState==="open"?"Can Edit":"Locked";
+
+  try{
+    // Always check existing row first
+    const checkR=await fetch(SB+"/rest/v1/staff_settings?name=eq."+encodeURIComponent(name),{
+      headers:{"apikey":KEY,"Authorization":"Bearer "+KEY}
+    });
+    const existing=checkR.ok?await checkR.json():[];
+
+    if(nextState==="auto"){
+      if(existing.length){
+        await fetch(SB+"/rest/v1/staff_settings?name=eq."+encodeURIComponent(name),{
+          method:"DELETE",
+          headers:{"apikey":KEY,"Authorization":"Bearer "+KEY}
+        });
+      }
+    } else {
+      const canEdit=nextState==="open";
+      if(existing.length){
+        await fetch(SB+"/rest/v1/staff_settings?name=eq."+encodeURIComponent(name),{
+          method:"PATCH",
+          headers:{"apikey":KEY,"Authorization":"Bearer "+KEY,"Content-Type":"application/json","Prefer":"return=minimal"},
+          body:JSON.stringify({can_edit_avail:canEdit})
+        });
+      } else {
+        await fetch(SB+"/rest/v1/staff_settings",{
+          method:"POST",
+          headers:{"apikey":KEY,"Authorization":"Bearer "+KEY,"Content-Type":"application/json","Prefer":"return=minimal"},
+          body:JSON.stringify({name:name,can_edit_avail:canEdit})
+        });
+      }
+    }
+
+    // Reload to confirm
+    await loadAdminPage();
+
+  }catch(e){
+    console.warn("cycle failed",e);
+    alert("Failed to update setting: "+e.message);
+    await loadAdminPage(); // reload to restore correct state
+  }
+}
+
+if(loadMe()){
+  enterHub();
+}else{
+  document.getElementById("authLayer").style.display="flex";
+}
+</script>
+
+<script>
+// Remove splash and show content once fonts + DOM are ready
+document.fonts.ready.then(function(){
+  document.body.classList.add('ready');
+  var splash = document.getElementById('splash');
+  if(splash){
+    splash.classList.add('fade');
+    setTimeout(function(){ splash.style.display='none'; }, 320);
+  }
+});
+</script>
+
+</body>
+</html>
