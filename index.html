@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Staff Portal — Oscar Roster</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  * { font-family: 'Inter', system-ui, sans-serif; }
+  .pb-safe { padding-bottom: env(safe-area-inset-bottom, 0px); }
+  input[type="date"]::-webkit-calendar-picker-indicator { opacity: 0.5; }
+  textarea { resize: none; }
+  .slot-btn { transition: all 0.12s; }
+  .slot-btn:active { transform: scale(0.95); }
+  .modal-overlay { backdrop-filter: blur(4px); }
+  .expand-content { overflow: hidden; transition: max-height 0.25s ease; }
+  .rotate-90 { transform: rotate(90deg); }
+</style>
+</head>
+<body class="bg-slate-50 min-h-screen">
+<!-- ═══ LOGIN SCREEN ═══ -->
+<div id="login-screen" class="min-h-screen bg-white flex flex-col">
+  <!-- Top brand bar -->
+  <div class="bg-slate-900 px-6 py-4 flex items-center gap-3">
+    <div class="w-7 h-7 bg-blue-600 flex items-center justify-center rounded">
+      <span class="text-white text-xs font-black">OR</span>
+    </div>
+    <span class="font-bold text-white text-sm">Oscar Roster</span>
+    <span class="text-slate-500 text-xs font-medium ml-1">· Staff Portal</span>
+  </div>
+
+  <!-- Hero -->
+  <div class="flex-1 flex flex-col items-center justify-center px-6 py-12">
+    <div class="w-full max-w-sm">
+      <!-- Logo mark -->
+      <div class="w-14 h-14 bg-gradient-to-br from-blue-600 to-violet-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-blue-200">
+        <span class="text-white text-2xl font-black">OR</span>
+      </div>
+      <h1 class="text-2xl font-bold text-slate-800 text-center mb-1">Welcome back</h1>
+      <p class="text-sm text-slate-500 text-center mb-8">Sign in to access your roster and leave</p>
+
+      <!-- Form -->
+      <div class="space-y-4">
+        <div id="login-err" class="hidden bg-red-50 border border-red-200 text-red-700 text-xs font-medium px-4 py-3 rounded-lg"></div>
+
+        <div>
+          <label class="text-xs font-semibold text-slate-600 uppercase tracking-wide block mb-1.5">Full Name</label>
+          <input id="login-name" type="text" placeholder="Enter your full name" autocomplete="name"
+            class="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder:text-slate-300">
+        </div>
+
+        <div>
+          <label class="text-xs font-semibold text-slate-600 uppercase tracking-wide block mb-1.5">Password</label>
+          <input id="login-pass" type="password" placeholder="Enter your password" autocomplete="current-password"
+            onkeydown="if(event.key==='Enter')doAppLogin()"
+            class="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder:text-slate-300">
+        </div>
+
+        <button onclick="doAppLogin()"
+          class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl text-sm transition-colors active:scale-[0.99] mt-2">
+          Sign In
+        </button>
+
+        <div class="flex justify-between pt-1">
+          <button class="text-xs text-slate-400 hover:text-blue-600 font-medium transition-colors">First time? Set password</button>
+          <button class="text-xs text-slate-400 hover:text-blue-600 font-medium transition-colors">Forgot password?</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="text-center pb-8 text-[11px] text-slate-300">© 2025 Oscar Roster · Staff access only</div>
+</div>
+
+<!-- APP (hidden until login) -->
+<div id="app-shell" class="hidden">
+
+
+<!-- HEADER -->
+<header class="bg-white border-b border-slate-200 sticky top-0 z-40">
+  <div class="max-w-2xl mx-auto px-4 h-14 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <div class="w-7 h-7 bg-blue-600 flex items-center justify-center rounded">
+        <span class="text-white text-xs font-black">OR</span>
+      </div>
+      <span class="font-bold text-slate-800 text-sm">Oscar Roster</span>
+      <span class="text-slate-300 hidden sm:block">·</span>
+      <span class="text-slate-500 text-xs font-medium hidden sm:block">Staff Portal</span>
+    </div>
+    <div class="flex items-center gap-2">
+      <div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center">
+        <span class="text-white text-xs font-bold user-initials">SB</span>
+      </div>
+      <div class="hidden sm:block text-right">
+        <div class="text-xs font-semibold text-slate-700 user-name-display">Sami Basnet</div>
+        <div class="text-xs text-slate-400">Enrolment Team</div>
+        <button onclick="doAppLogout()" class="text-xs text-slate-400 hover:text-red-500 font-medium transition-colors hidden sm:block">Sign out</button>
+    </div>
+    </div>
+  </div>
+</header>
+
+<!-- MAIN CONTENT -->
+<div class="max-w-2xl mx-auto px-4 pb-24">
+
+  <!-- ═══ DASHBOARD ═══ -->
+  <div id="screen-dashboard" class="py-6 space-y-5">
+    <div>
+      <h1 class="text-xl font-bold text-slate-800">Good morning, <span id="greeting-name">Sami</span> 👋</h1>
+      <p class="text-sm text-slate-500 mt-0.5">Week of 7–13 April 2025</p>
+    </div>
+
+    <!-- Leave Balances -->
+    <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
+      <div class="px-5 pt-4 pb-3 border-b border-slate-100 flex items-center justify-between">
+        <h2 class="text-sm font-semibold text-slate-700">Leave Balances</h2>
+        <button onclick="openLeaveModal()" class="text-xs font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-md transition-colors">+ New Request</button>
+      </div>
+      <div class="p-5 grid grid-cols-2 sm:grid-cols-4 gap-5">
+        <div class="space-y-2">
+          <div class="flex justify-between"><span class="text-xs font-medium text-slate-600">Annual</span><span class="text-xs text-slate-400">17 left</span></div>
+          <div class="h-1.5 bg-slate-100 rounded-full overflow-hidden"><div class="h-full bg-blue-500 rounded-full" style="width:15%"></div></div>
+          <div class="text-[11px] text-slate-400">3 of 20 days used</div>
+        </div>
+        <div class="space-y-2">
+          <div class="flex justify-between"><span class="text-xs font-medium text-slate-600">Sick</span><span class="text-xs text-slate-400">8 left</span></div>
+          <div class="h-1.5 bg-slate-100 rounded-full overflow-hidden"><div class="h-full bg-violet-500 rounded-full" style="width:20%"></div></div>
+          <div class="text-[11px] text-slate-400">2 of 10 days used</div>
+        </div>
+        <div class="space-y-2">
+          <div class="flex justify-between"><span class="text-xs font-medium text-slate-600">Personal</span><span class="text-xs text-slate-400">3 left</span></div>
+          <div class="h-1.5 bg-slate-100 rounded-full overflow-hidden"><div class="h-full bg-teal-500 rounded-full" style="width:0%"></div></div>
+          <div class="text-[11px] text-slate-400">0 of 3 days used</div>
+        </div>
+        <div class="space-y-2">
+          <div class="flex justify-between"><span class="text-xs font-medium text-slate-600">Carer's</span><span class="text-xs text-slate-400">5 left</span></div>
+          <div class="h-1.5 bg-slate-100 rounded-full overflow-hidden"><div class="h-full bg-rose-400 rounded-full" style="width:0%"></div></div>
+          <div class="text-[11px] text-slate-400">0 of 5 days used</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Upcoming Shifts -->
+    <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
+      <div class="px-5 pt-4 pb-3 border-b border-slate-100 flex items-center justify-between">
+        <div>
+          <h2 class="text-sm font-semibold text-slate-700">Upcoming Shifts</h2>
+          <p class="text-xs text-slate-400 mt-0.5">4 shifts · 28h this week</p>
+        </div>
+        <button onclick="goTo('availability')" class="text-xs text-slate-500 hover:text-blue-600 font-medium transition-colors">Edit availability →</button>
+      </div>
+      <div class="divide-y divide-slate-50">
+        <div class="px-5 py-3 flex items-center justify-between hover:bg-slate-50 transition-colors">
+          <div class="flex items-center gap-3">
+            <div class="w-9 h-9 rounded-lg bg-blue-50 flex flex-col items-center justify-center flex-shrink-0">
+              <span class="text-[9px] font-bold text-blue-400 uppercase leading-none">Mon</span>
+              <span class="text-xs font-bold text-blue-700 leading-none mt-0.5">7</span>
+            </div>
+            <div><div class="text-sm font-medium text-slate-700">09:00 – 17:00</div><div class="text-xs text-slate-400">Enrolment</div></div>
+          </div>
+          <div class="text-right"><div class="text-xs font-semibold text-slate-600">8h</div><div class="text-[10px] text-emerald-600 font-medium mt-0.5">Rostered</div></div>
+        </div>
+        <div class="px-5 py-3 flex items-center justify-between hover:bg-slate-50 transition-colors">
+          <div class="flex items-center gap-3">
+            <div class="w-9 h-9 rounded-lg bg-blue-50 flex flex-col items-center justify-center flex-shrink-0">
+              <span class="text-[9px] font-bold text-blue-400 uppercase leading-none">Tue</span>
+              <span class="text-xs font-bold text-blue-700 leading-none mt-0.5">8</span>
+            </div>
+            <div><div class="text-sm font-medium text-slate-700">09:00 – 17:00</div><div class="text-xs text-slate-400">Enrolment</div></div>
+          </div>
+          <div class="text-right"><div class="text-xs font-semibold text-slate-600">8h</div><div class="text-[10px] text-emerald-600 font-medium mt-0.5">Rostered</div></div>
+        </div>
+        <div class="px-5 py-3 flex items-center justify-between hover:bg-slate-50 transition-colors">
+          <div class="flex items-center gap-3">
+            <div class="w-9 h-9 rounded-lg bg-blue-50 flex flex-col items-center justify-center flex-shrink-0">
+              <span class="text-[9px] font-bold text-blue-400 uppercase leading-none">Thu</span>
+              <span class="text-xs font-bold text-blue-700 leading-none mt-0.5">10</span>
+            </div>
+            <div><div class="text-sm font-medium text-slate-700">12:00 – 18:00</div><div class="text-xs text-slate-400">Accounts</div></div>
+          </div>
+          <div class="text-right"><div class="text-xs font-semibold text-slate-600">6h</div><div class="text-[10px] text-emerald-600 font-medium mt-0.5">Rostered</div></div>
+        </div>
+        <div class="px-5 py-3 flex items-center justify-between hover:bg-slate-50 transition-colors">
+          <div class="flex items-center gap-3">
+            <div class="w-9 h-9 rounded-lg bg-blue-50 flex flex-col items-center justify-center flex-shrink-0">
+              <span class="text-[9px] font-bold text-blue-400 uppercase leading-none">Fri</span>
+              <span class="text-xs font-bold text-blue-700 leading-none mt-0.5">11</span>
+            </div>
+            <div><div class="text-sm font-medium text-slate-700">09:00 – 15:00</div><div class="text-xs text-slate-400">Enrolment</div></div>
+          </div>
+          <div class="text-right"><div class="text-xs font-semibold text-slate-600">6h</div><div class="text-[10px] text-emerald-600 font-medium mt-0.5">Rostered</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="grid grid-cols-3 gap-3">
+      <button onclick="goTo('availability')" class="bg-white border border-slate-200 rounded-xl p-4 text-left hover:shadow-sm hover:border-slate-300 transition-all active:scale-95">
+        <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center mb-2"><span class="text-white text-sm">◫</span></div>
+        <div class="text-xs font-semibold text-slate-700 leading-tight">Set Availability</div>
+        <div class="text-[10px] text-slate-400 mt-0.5">Update this week</div>
+      </button>
+      <button onclick="openLeaveModal()" class="bg-white border border-slate-200 rounded-xl p-4 text-left hover:shadow-sm hover:border-slate-300 transition-all active:scale-95">
+        <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-violet-600 flex items-center justify-center mb-2"><span class="text-white text-sm">◎</span></div>
+        <div class="text-xs font-semibold text-slate-700 leading-tight">Request Leave</div>
+        <div class="text-[10px] text-slate-400 mt-0.5">Submit a request</div>
+      </button>
+      <button onclick="goTo('status')" class="bg-white border border-slate-200 rounded-xl p-4 text-left hover:shadow-sm hover:border-slate-300 transition-all active:scale-95">
+        <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-teal-500 to-teal-600 flex items-center justify-center mb-2"><span class="text-white text-sm">≡</span></div>
+        <div class="text-xs font-semibold text-slate-700 leading-tight">View Requests</div>
+        <div class="text-[10px] text-slate-400 mt-0.5" id="dash-pending-lbl">1 pending</div>
+      </button>
+    </div>
+
+    <!-- Pending alert -->
+    <div onclick="goTo('status')" class="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-center gap-3 cursor-pointer hover:bg-amber-100 transition-colors">
+      <div class="w-2 h-2 rounded-full bg-amber-400 flex-shrink-0"></div>
+      <div class="flex-1"><div class="text-sm font-medium text-amber-800">1 leave request awaiting approval</div><div class="text-xs text-amber-600 mt-0.5">Tap to view status</div></div>
+      <span class="text-amber-400">›</span>
+    </div>
+  </div>
+
+  <!-- ═══ AVAILABILITY ═══ -->
+  <div id="screen-availability" class="py-6 space-y-5 hidden">
+    <div class="flex items-start justify-between">
+      <div>
+        <h1 class="text-xl font-bold text-slate-800">Weekly Availability</h1>
+        <p class="text-sm text-slate-500 mt-0.5">7 – 13 April 2025</p>
+      </div>
+      <button onclick="saveAvail()" class="text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg transition-colors active:scale-95">Save</button>
+    </div>
+    <div class="flex items-center gap-4 text-xs text-slate-500">
+      <div class="flex items-center gap-1.5"><div class="w-3 h-3 rounded-sm bg-blue-500"></div><span>Available</span></div>
+      <div class="flex items-center gap-1.5"><div class="w-3 h-3 rounded-sm bg-slate-100 border border-slate-200"></div><span>Unavailable</span></div>
+    </div>
+    <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
+      <div class="grid border-b border-slate-100" style="grid-template-columns:80px repeat(3,1fr)">
+        <div class="p-3 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Day</div>
+        <div class="p-3 text-center border-l border-slate-100"><div class="text-[10px] font-bold text-slate-600 uppercase tracking-wide">Morning</div><div class="text-[9px] text-slate-400 mt-0.5">6am–12pm</div></div>
+        <div class="p-3 text-center border-l border-slate-100"><div class="text-[10px] font-bold text-slate-600 uppercase tracking-wide">Afternoon</div><div class="text-[9px] text-slate-400 mt-0.5">12pm–6pm</div></div>
+        <div class="p-3 text-center border-l border-slate-100"><div class="text-[10px] font-bold text-slate-600 uppercase tracking-wide">Evening</div><div class="text-[9px] text-slate-400 mt-0.5">6pm–11pm</div></div>
+      </div>
+      <div id="avail-grid"></div>
+    </div>
+    <div class="bg-blue-50 border border-blue-100 rounded-xl p-4">
+      <div class="text-xs font-semibold text-blue-700 mb-2">Availability Summary</div>
+      <div class="grid grid-cols-3 gap-3 text-center">
+        <div><div class="text-lg font-bold text-blue-700" id="sum-morning">0</div><div class="text-[10px] text-blue-500">Morning days</div></div>
+        <div><div class="text-lg font-bold text-blue-700" id="sum-afternoon">0</div><div class="text-[10px] text-blue-500">Afternoon days</div></div>
+        <div><div class="text-lg font-bold text-blue-700" id="sum-evening">0</div><div class="text-[10px] text-blue-500">Evening days</div></div>
+      </div>
+    </div>
+    <button onclick="saveAvail()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl text-sm transition-colors active:scale-[0.99]">Submit Availability</button>
+  </div>
+
+  <!-- ═══ LEAVE ═══ -->
+  <div id="screen-leave" class="py-6 space-y-5 hidden">
+    <div class="flex items-start justify-between">
+      <div>
+        <h1 class="text-xl font-bold text-slate-800">Leave Requests</h1>
+        <p class="text-sm text-slate-500 mt-0.5">Submit and manage your leave</p>
+      </div>
+      <button onclick="openLeaveModal()" class="text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg transition-colors active:scale-95">+ New Request</button>
+    </div>
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div class="bg-white border border-slate-200 rounded-xl p-4"><div class="text-xs text-slate-500 font-medium">Annual</div><div class="text-2xl font-bold text-slate-800 mt-1">17</div><div class="text-[10px] text-slate-400">days remaining</div><div class="mt-2 h-1 bg-slate-100 rounded-full overflow-hidden"><div class="h-full bg-blue-500 rounded-full" style="width:15%"></div></div></div>
+      <div class="bg-white border border-slate-200 rounded-xl p-4"><div class="text-xs text-slate-500 font-medium">Sick</div><div class="text-2xl font-bold text-slate-800 mt-1">8</div><div class="text-[10px] text-slate-400">days remaining</div><div class="mt-2 h-1 bg-slate-100 rounded-full overflow-hidden"><div class="h-full bg-violet-500 rounded-full" style="width:20%"></div></div></div>
+      <div class="bg-white border border-slate-200 rounded-xl p-4"><div class="text-xs text-slate-500 font-medium">Personal</div><div class="text-2xl font-bold text-slate-800 mt-1">3</div><div class="text-[10px] text-slate-400">days remaining</div><div class="mt-2 h-1 bg-slate-100 rounded-full overflow-hidden"><div class="h-full bg-teal-500 rounded-full" style="width:0%"></div></div></div>
+      <div class="bg-white border border-slate-200 rounded-xl p-4"><div class="text-xs text-slate-500 font-medium">Carer's</div><div class="text-2xl font-bold text-slate-800 mt-1">5</div><div class="text-[10px] text-slate-400">days remaining</div><div class="mt-2 h-1 bg-slate-100 rounded-full overflow-hidden"><div class="h-full bg-rose-400 rounded-full" style="width:0%"></div></div></div>
+    </div>
+    <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+      <div class="px-5 py-3 border-b border-slate-100"><h2 class="text-sm font-semibold text-slate-700">Recent Requests</h2></div>
+      <div id="leave-recent"></div>
+      <button onclick="goTo('status')" class="w-full px-5 py-3 text-xs font-semibold text-blue-600 hover:bg-blue-50 transition-colors text-center block">View all requests →</button>
+    </div>
+  </div>
+
+  <!-- ═══ STATUS ═══ -->
+  <div id="screen-status" class="py-6 space-y-5 hidden">
+    <div>
+      <h1 class="text-xl font-bold text-slate-800">Request Status</h1>
+      <p class="text-sm text-slate-500 mt-0.5">Track all your submitted leave requests</p>
+    </div>
+    <div class="flex items-center gap-2 bg-slate-100 p-1 rounded-lg w-fit">
+      <button onclick="filterReqs('All')" id="filter-All" class="text-xs font-semibold px-3 py-1.5 rounded-md bg-white text-slate-800 shadow-sm transition-all">All</button>
+      <button onclick="filterReqs('Pending')" id="filter-Pending" class="text-xs font-semibold px-3 py-1.5 rounded-md text-slate-500 hover:text-slate-700 transition-all">Pending <span class="ml-1 text-slate-400" id="count-Pending"></span></button>
+      <button onclick="filterReqs('Approved')" id="filter-Approved" class="text-xs font-semibold px-3 py-1.5 rounded-md text-slate-500 hover:text-slate-700 transition-all">Approved <span class="ml-1 text-slate-400" id="count-Approved"></span></button>
+      <button onclick="filterReqs('Declined')" id="filter-Declined" class="text-xs font-semibold px-3 py-1.5 rounded-md text-slate-500 hover:text-slate-700 transition-all">Declined <span class="ml-1 text-slate-400" id="count-Declined"></span></button>
+    </div>
+    <div id="requests-list" class="space-y-3"></div>
+  </div>
+</div>
+
+<!-- BOTTOM NAV -->
+<nav class="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 z-40 pb-safe">
+  <div class="max-w-2xl mx-auto grid grid-cols-4 h-16">
+    <button onclick="goTo('dashboard')" id="nav-dashboard" class="flex flex-col items-center justify-center gap-0.5 text-blue-600 relative">
+      <span class="text-base leading-none">⊞</span>
+      <span class="text-[10px] font-semibold">Dashboard</span>
+      <div class="absolute bottom-0 left-1/2 -translate-x-1/2 w-5 h-0.5 bg-blue-600 rounded-full nav-indicator"></div>
+    </button>
+    <button onclick="goTo('availability')" id="nav-availability" class="flex flex-col items-center justify-center gap-0.5 text-slate-400 hover:text-slate-600 relative">
+      <span class="text-base leading-none">◫</span>
+      <span class="text-[10px] font-semibold">Availability</span>
+    </button>
+    <button onclick="goTo('leave')" id="nav-leave" class="flex flex-col items-center justify-center gap-0.5 text-slate-400 hover:text-slate-600 relative">
+      <span class="text-base leading-none">◎</span>
+      <span class="text-[10px] font-semibold">Leave</span>
+    </button>
+    <button onclick="goTo('status')" id="nav-status" class="flex flex-col items-center justify-center gap-0.5 text-slate-400 hover:text-slate-600 relative">
+      <span class="text-base leading-none">≡</span>
+      <span class="text-[10px] font-semibold">Requests</span>
+      <div id="nav-badge" class="absolute top-2 right-1/2 translate-x-4 w-4 h-4 bg-amber-400 rounded-full flex items-center justify-center hidden"><span class="text-[9px] font-bold text-white" id="nav-badge-num">1</span></div>
+    </button>
+  </div>
+</nav>
+
+<!-- LEAVE MODAL -->
+<div id="leave-modal" class="fixed inset-0 z-50 hidden">
+  <div class="absolute inset-0 bg-slate-900/60 modal-overlay" onclick="closeLeaveModal()"></div>
+  <div class="absolute bottom-0 sm:top-1/2 sm:bottom-auto sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl overflow-hidden shadow-2xl">
+    <div id="modal-form">
+      <div class="px-6 pt-5 pb-4 border-b border-slate-100 flex items-center justify-between">
+        <div><h2 class="text-base font-bold text-slate-800">New Leave Request</h2><p class="text-xs text-slate-400 mt-0.5">Fill in the details below</p></div>
+        <button onclick="closeLeaveModal()" class="w-7 h-7 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors text-xl leading-none">×</button>
+      </div>
+      <div class="px-6 py-5 space-y-4">
+        <div>
+          <label class="text-xs font-semibold text-slate-600 uppercase tracking-wide block mb-2">Leave Type</label>
+          <div class="grid grid-cols-2 gap-2" id="type-buttons">
+            <button onclick="selectType('Annual Leave')" class="type-btn active-type text-xs font-medium py-2.5 px-3 rounded-lg border border-blue-600 bg-blue-600 text-white transition-all">Annual Leave</button>
+            <button onclick="selectType('Sick Leave')" class="type-btn text-xs font-medium py-2.5 px-3 rounded-lg border border-slate-200 bg-white text-slate-600 hover:border-slate-300 transition-all">Sick Leave</button>
+            <button onclick="selectType('Personal Leave')" class="type-btn text-xs font-medium py-2.5 px-3 rounded-lg border border-slate-200 bg-white text-slate-600 hover:border-slate-300 transition-all">Personal Leave</button>
+            <button onclick="selectType('Carer\'s Leave')" class="type-btn text-xs font-medium py-2.5 px-3 rounded-lg border border-slate-200 bg-white text-slate-600 hover:border-slate-300 transition-all">Carer's Leave</button>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div><label class="text-xs font-semibold text-slate-600 uppercase tracking-wide block mb-1.5">From</label><input type="date" id="leave-from" class="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"></div>
+          <div><label class="text-xs font-semibold text-slate-600 uppercase tracking-wide block mb-1.5">To</label><input type="date" id="leave-to" class="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"></div>
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-slate-600 uppercase tracking-wide block mb-1.5">Reason</label>
+          <textarea id="leave-reason" rows="3" placeholder="Briefly describe the reason for your leave..." class="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder:text-slate-300"></textarea>
+        </div>
+        <button onclick="submitLeave()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl text-sm transition-colors active:scale-[0.99]">Submit Request</button>
+      </div>
+    </div>
+    <div id="modal-success" class="hidden p-10 text-center">
+      <div class="w-14 h-14 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4"><span class="text-2xl">✓</span></div>
+      <div class="text-base font-bold text-slate-800">Request Submitted!</div>
+      <p class="text-sm text-slate-500 mt-1">Your manager will review it shortly.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+const DAYS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+const SLOTS = ['Morning','Afternoon','Evening'];
+let currentFilter = 'All';
+let selectedType = 'Annual Leave';
+
+// Availability state
+const avail = {};
+DAYS.forEach((d,i) => {
+  avail[d] = {};
+  SLOTS.forEach(s => avail[d][s] = i < 5 && s !== 'Evening');
+});
+
+// Requests
+let requests = [
+  {id:1,type:'Annual Leave',from:'2025-04-14',to:'2025-04-18',days:5,reason:'Family holiday to Queensland.',status:'Approved',submitted:'Apr 2, 2025',note:'Approved. Have a great break!',noteBy:'Manager · Apr 3'},
+  {id:2,type:'Personal Leave',from:'2025-05-02',to:'2025-05-02',days:1,reason:'Personal appointment that cannot be rescheduled.',status:'Pending',submitted:'Apr 7, 2025',note:null,noteBy:null},
+  {id:3,type:'Sick Leave',from:'2025-03-10',to:'2025-03-11',days:2,reason:'Flu symptoms, doctor\'s certificate attached.',status:'Approved',submitted:'Mar 10, 2025',note:'Get well soon. Certificate received.',noteBy:'Manager · Mar 10'},
+  {id:4,type:'Annual Leave',from:'2025-02-20',to:'2025-02-21',days:2,reason:'Long weekend trip.',status:'Declined',submitted:'Feb 15, 2025',note:'Insufficient coverage that week. Please resubmit for alternate dates.',noteBy:'Manager · Feb 16'},
+];
+
+const STATUS = {
+  Approved: {bg:'bg-emerald-50',text:'text-emerald-700',dot:'bg-emerald-500',border:'border-emerald-200'},
+  Pending:  {bg:'bg-amber-50', text:'text-amber-700', dot:'bg-amber-400', border:'border-amber-200'},
+  Declined: {bg:'bg-red-50',   text:'text-red-700',   dot:'bg-red-400',   border:'border-red-200'},
+};
+
+function fmtDate(iso) {
+  if (!iso) return '';
+  const d = new Date(iso + 'T00:00:00');
+  return d.toLocaleDateString('en-AU', {day:'numeric',month:'short',year:'numeric'});
+}
+
+// ── NAVIGATION ──
+function goTo(screen) {
+  ['dashboard','availability','leave','status'].forEach(s => {
+    document.getElementById('screen-' + s).classList.toggle('hidden', s !== screen);
+    const nav = document.getElementById('nav-' + s);
+    if (nav) {
+      nav.className = nav.className.replace(/text-blue-600|text-slate-400/g, '').trim();
+      nav.classList.add(s === screen ? 'text-blue-600' : 'text-slate-400');
+      const ind = nav.querySelector('.nav-indicator');
+      if (ind) ind.style.display = s === screen ? '' : 'none';
+    }
+  });
+  if (screen === 'status') renderRequests();
+  if (screen === 'leave') renderLeaveRecent();
+  if (screen === 'availability') renderAvailGrid();
+}
+
+// ── AVAILABILITY ──
+function renderAvailGrid() {
+  const grid = document.getElementById('avail-grid');
+  grid.innerHTML = DAYS.map((day, di) => {
+    const isWE = di >= 5;
+    const allOn = SLOTS.every(s => avail[day][s]);
+    return `<div class="grid border-b border-slate-50 last:border-0${isWE ? ' bg-slate-50/50' : ''}" style="grid-template-columns:80px repeat(3,1fr)">
+      <div class="p-3 flex flex-col justify-center">
+        <div class="text-xs font-bold text-slate-700">${day}</div>
+        <div class="text-[10px] text-slate-400">Apr ${7+di}</div>
+        <button onclick="toggleAllDay('${day}')" class="mt-1 text-[9px] font-medium text-blue-500 hover:text-blue-700 text-left transition-colors leading-none">${allOn ? 'Clear' : 'All'}</button>
+      </div>
+      ${SLOTS.map(slot => `
+      <div class="p-2 flex items-center justify-center border-l border-slate-50">
+        <button onclick="toggleSlot('${day}','${slot}')" id="slot-${day}-${slot}"
+          class="slot-btn w-full h-10 rounded-lg text-xs font-semibold ${avail[day][slot] ? 'bg-blue-500 text-white shadow-sm shadow-blue-200' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}">
+          ${avail[day][slot] ? '✓' : '—'}
+        </button>
+      </div>`).join('')}
+    </div>`;
+  }).join('');
+  updateSummary();
+}
+
+function toggleSlot(day, slot) {
+  avail[day][slot] = !avail[day][slot];
+  const btn = document.getElementById(`slot-${day}-${slot}`);
+  if (avail[day][slot]) {
+    btn.className = btn.className.replace('bg-slate-100 text-slate-400 hover:bg-slate-200','bg-blue-500 text-white shadow-sm shadow-blue-200');
+    btn.textContent = '✓';
+  } else {
+    btn.className = btn.className.replace('bg-blue-500 text-white shadow-sm shadow-blue-200','bg-slate-100 text-slate-400 hover:bg-slate-200');
+    btn.textContent = '—';
+  }
+  updateSummary();
+  // Refresh all-button label
+  renderAvailGrid();
+}
+
+function toggleAllDay(day) {
+  const allOn = SLOTS.every(s => avail[day][s]);
+  SLOTS.forEach(s => avail[day][s] = !allOn);
+  renderAvailGrid();
+}
+
+function updateSummary() {
+  SLOTS.forEach((slot, i) => {
+    const id = ['sum-morning','sum-afternoon','sum-evening'][i];
+    document.getElementById(id).textContent = DAYS.filter(d => avail[d][slot]).length;
+  });
+}
+
+function saveAvail() {
+  const btn = event.target;
+  btn.textContent = 'Saved ✓';
+  btn.classList.remove('bg-blue-600','hover:bg-blue-700');
+  btn.classList.add('bg-emerald-600');
+  setTimeout(() => {
+    btn.textContent = 'Save';
+    btn.classList.add('bg-blue-600','hover:bg-blue-700');
+    btn.classList.remove('bg-emerald-600');
+  }, 2000);
+}
+
+// ── LEAVE ──
+function renderLeaveRecent() {
+  const el = document.getElementById('leave-recent');
+  el.innerHTML = requests.slice(0,3).map(r => {
+    const sc = STATUS[r.status];
+    return `<div class="px-5 py-3 border-b border-slate-50 last:border-0 flex items-center justify-between">
+      <div>
+        <div class="text-sm font-medium text-slate-700">${r.type}</div>
+        <div class="text-xs text-slate-400">${fmtDate(r.from)}${r.from!==r.to?' – '+fmtDate(r.to):''} · ${r.days} day${r.days>1?'s':''}</div>
+      </div>
+      <span class="text-[10px] font-bold px-2.5 py-1 rounded-full border ${sc.bg} ${sc.text} ${sc.border}">${r.status}</span>
+    </div>`;
+  }).join('');
+}
+
+// ── STATUS ──
+let expanded = null;
+function renderRequests() {
+  const filtered = currentFilter === 'All' ? requests : requests.filter(r => r.status === currentFilter);
+  const el = document.getElementById('requests-list');
+  // update counts
+  ['Pending','Approved','Declined'].forEach(s => {
+    const el = document.getElementById('count-' + s);
+    if (el) el.textContent = requests.filter(r => r.status === s).length;
+  });
+  // update nav badge
+  const pending = requests.filter(r => r.status === 'Pending').length;
+  const badge = document.getElementById('nav-badge');
+  document.getElementById('nav-badge-num').textContent = pending;
+  badge.classList.toggle('hidden', pending === 0);
+
+  if (!filtered.length) {
+    el.innerHTML = `<div class="bg-white border border-slate-200 rounded-xl p-10 text-center">
+      <div class="text-3xl mb-3">📭</div>
+      <div class="text-sm font-semibold text-slate-500">No ${currentFilter !== 'All' ? currentFilter.toLowerCase() : ''} requests</div>
+      <div class="text-xs text-slate-400 mt-1">Nothing to show here.</div>
+    </div>`;
+    return;
+  }
+  el.innerHTML = filtered.map(r => {
+    const sc = STATUS[r.status];
+    const isExp = expanded === r.id;
+    return `<div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+      <button class="w-full text-left" onclick="toggleExpand(${r.id})">
+        <div class="px-5 py-4 flex items-center gap-4">
+          <div class="w-2 h-2 rounded-full flex-shrink-0 ${sc.dot}"></div>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="text-sm font-semibold text-slate-700">${r.type}</span>
+              <span class="text-[10px] font-bold px-2 py-0.5 rounded-full border ${sc.bg} ${sc.text} ${sc.border}">${r.status}</span>
+            </div>
+            <div class="text-xs text-slate-400 mt-0.5">${fmtDate(r.from)}${r.from!==r.to?' – '+fmtDate(r.to):''} · ${r.days} day${r.days>1?'s':''}</div>
+          </div>
+          <div class="text-right flex-shrink-0">
+            <div class="text-[10px] text-slate-400">Submitted</div>
+            <div class="text-xs font-medium text-slate-500">${r.submitted}</div>
+          </div>
+          <div class="text-slate-300 text-sm transition-transform duration-200${isExp ? ' rotate-90' : ''}">›</div>
+        </div>
+      </button>
+      ${isExp ? `<div class="border-t border-slate-100 px-5 py-4 bg-slate-50 space-y-3">
+        <div>
+          <div class="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1">Reason</div>
+          <p class="text-sm text-slate-600 leading-relaxed">${r.reason}</p>
+        </div>
+        ${r.note ? `<div class="p-3 rounded-lg border ${sc.bg} ${sc.border}">
+          <div class="text-[10px] font-bold uppercase tracking-wide mb-1 ${sc.text}">${r.status === 'Approved' ? '✓ Approved' : r.status === 'Declined' ? '✕ Declined' : 'Note'} · ${r.noteBy}</div>
+          <p class="text-xs leading-relaxed ${sc.text}">${r.note}</p>
+        </div>` : ''}
+        ${r.status === 'Pending' ? `<div class="bg-amber-50 border border-amber-100 p-3 rounded-lg">
+          <div class="text-[10px] font-bold text-amber-600 uppercase tracking-wide mb-1">Awaiting Review</div>
+          <p class="text-xs text-amber-700">Your request is with your manager. You'll be notified when a decision is made.</p>
+        </div>` : ''}
+      </div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function toggleExpand(id) {
+  expanded = expanded === id ? null : id;
+  renderRequests();
+}
+
+function filterReqs(status) {
+  currentFilter = status;
+  ['All','Pending','Approved','Declined'].forEach(s => {
+    const btn = document.getElementById('filter-' + s);
+    if (btn) {
+      if (s === status) btn.className = 'text-xs font-semibold px-3 py-1.5 rounded-md bg-white text-slate-800 shadow-sm transition-all';
+      else btn.className = 'text-xs font-semibold px-3 py-1.5 rounded-md text-slate-500 hover:text-slate-700 transition-all';
+    }
+  });
+  renderRequests();
+}
+
+// ── MODAL ──
+function openLeaveModal() {
+  document.getElementById('leave-modal').classList.remove('hidden');
+  document.getElementById('modal-form').classList.remove('hidden');
+  document.getElementById('modal-success').classList.add('hidden');
+}
+function closeLeaveModal() {
+  document.getElementById('leave-modal').classList.add('hidden');
+  document.getElementById('leave-from').value = '';
+  document.getElementById('leave-to').value = '';
+  document.getElementById('leave-reason').value = '';
+  selectType('Annual Leave');
+}
+
+function selectType(type) {
+  selectedType = type;
+  document.querySelectorAll('.type-btn').forEach(btn => {
+    const isActive = btn.textContent.trim() === type;
+    btn.className = `type-btn text-xs font-medium py-2.5 px-3 rounded-lg border transition-all ${isActive ? 'border-blue-600 bg-blue-600 text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`;
+  });
+}
+
+function submitLeave() {
+  const from = document.getElementById('leave-from').value;
+  const to = document.getElementById('leave-to').value;
+  const reason = document.getElementById('leave-reason').value.trim();
+  if (!from || !to || !reason) return;
+  const days = Math.max(1, Math.round((new Date(to+'T00:00:00') - new Date(from+'T00:00:00')) / 86400000) + 1);
+  requests.unshift({id: Date.now(), type: selectedType, from, to, days, reason, status:'Pending', submitted:'Today', note:null, noteBy:null});
+  document.getElementById('modal-form').classList.add('hidden');
+  document.getElementById('modal-success').classList.remove('hidden');
+  setTimeout(closeLeaveModal, 2200);
+}
+
+
+// ── APP LOGIN ──
+function doAppLogin() {
+  const name = document.getElementById('login-name').value.trim();
+  const pass = document.getElementById('login-pass').value;
+  const err = document.getElementById('login-err');
+  err.classList.add('hidden');
+
+  if (!name) { showLoginErr('Please enter your full name.'); return; }
+  if (!pass)  { showLoginErr('Please enter your password.'); return; }
+
+  // In production this would validate against your backend
+  // For this prototype, any name + password combination works
+  const first = name.split(' ')[0];
+  const initials = name.split(' ').filter(Boolean).map(w => w[0]).join('').slice(0,2).toUpperCase();
+  document.querySelectorAll('.user-initials').forEach(el => el.textContent = initials);
+  document.querySelectorAll('.user-name-display').forEach(el => el.textContent = name);
+  document.getElementById('greeting-name').textContent = first;
+
+  document.getElementById('login-screen').classList.add('hidden');
+  document.getElementById('app-shell').classList.remove('hidden');
+}
+
+function showLoginErr(msg) {
+  const err = document.getElementById('login-err');
+  err.textContent = msg;
+  err.classList.remove('hidden');
+}
+
+function doAppLogout() {
+  document.getElementById('login-screen').classList.remove('hidden');
+  document.getElementById('app-shell').classList.add('hidden');
+  document.getElementById('login-name').value = '';
+  document.getElementById('login-pass').value = '';
+  goTo('dashboard');
+}
+
+// Init
+renderAvailGrid();
+renderRequests();
+renderLeaveRecent();
+</script>
+</div><!-- /app-shell -->
+</body>
+</html>
