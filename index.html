@@ -120,7 +120,7 @@ body::before{
   box-shadow:0 -1px 0 rgba(0,0,0,.05),0 -4px 20px rgba(0,0,0,.04);
   overflow:hidden;
 }
-.bn-items{display:flex;}
+.bn-items{display:flex;width:100%;}
 .bn-item{
   flex:1;min-width:0;max-width:none;
   display:flex;flex-direction:column;align-items:center;
@@ -159,7 +159,7 @@ body::before{
 @media(max-width:700px){
   /* Core */
   .sidebar{display:none!important;}
-  .bottom-nav{display:block;}
+  .bottom-nav{display:flex;flex-direction:column;}
   .mobile-header{display:flex;}
   .shell{display:flex;flex-direction:column;height:100dvh;height:100svh;overflow:hidden;}
   .main{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding-bottom:calc(65px + env(safe-area-inset-bottom,0px));}
@@ -982,7 +982,7 @@ body.ready{visibility:visible;}
 .doc-icon-doc{background:#f0fdf4;color:#16a34a;}
 .doc-icon-img{background:#fdf4ff;color:#9333ea;}
 .doc-title{font-size:13px;font-weight:600;color:#0f172a;flex:1;}
-.doc-team-tag{font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;background:#eff6ff;color:#2563eb;margin-left:4px;}
+.doc-team-tag{font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;background:#eff6ff;color:#2563eb;margin-left:4px;max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block;vertical-align:middle;}
 .doc-badge-new{font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;background:#dcfce7;color:#16a34a;}
 .doc-delete{background:none;border:none;color:#dc2626;cursor:pointer;font-size:11px;font-weight:600;padding:4px 8px;border-radius:6px;font-family:inherit;opacity:0;transition:opacity .12s;}
 .doc-item:hover .doc-delete{opacity:1;}
@@ -1823,7 +1823,7 @@ function renderDocs(docs){
           '<span class="doc-title">'+d.title+'</span>'+
           (isNew?'<span class="doc-badge-new">New</span>':'')+
         '</div>'+
-        (teamTags?'<div style="margin-top:4px;">'+teamTags+'</div>':'')+
+        (teamTags?'<div style="margin-top:4px;display:flex;flex-wrap:wrap;gap:3px;max-height:24px;overflow:hidden;">'+teamTags+'</div>':'')+
       '</div>'+deleteBtn+'</a>';
   }).join('')+'</div>';
 }
@@ -2612,16 +2612,17 @@ function closeAllReactPickers(){
 }
 
 function toggleReactPicker(id, type){
-  closeAllReactPickers();
   const picker=document.getElementById('rp-'+type+'-'+id);
   if(!picker)return;
-  picker.classList.toggle('open');
-  if(picker.classList.contains('open')){
+  const isOpen=picker.classList.contains('open');
+  closeAllReactPickers();
+  if(!isOpen){
+    picker.classList.add('open');
     setTimeout(function(){
       document.addEventListener('click',function handler(e){
         if(!e.target.closest('.react-wrap')){closeAllReactPickers();}
         document.removeEventListener('click',handler);
-      });
+      },{once:true});
     },50);
   }
 }
@@ -2647,7 +2648,7 @@ function makeReactHTML(id, type){
   });
 
   return '<div class="react-wrap">'+
-    '<button class="react-btn'+(hasReact?' has-react':'')+'" data-id="'+id+'" data-type="'+type+'" onclick="event.stopPropagation();toggleReactPicker(this.dataset.id,this.dataset.type)">'+btnLabel+'</button>'+
+    '<button class="react-btn'+(hasReact?' has-react':'')+'" data-id="'+id+'" data-type="'+type+'" onclick="event.stopPropagation();toggleReactPicker(this.dataset.id,this.dataset.type)" onmouseenter="toggleReactPicker(this.dataset.id,this.dataset.type)">'+btnLabel+'</button>'+
     '<div class="react-picker" id="rp-'+type+'-'+id+'">'+opts+'</div>'+
   '</div>';
 }
@@ -2665,25 +2666,6 @@ function pickReaction(id, type, emoji){
   const e=decodeURIComponent(emoji);
   if(type==='ann') reactToAnnouncement(id, e);
   else reactToDiscussion(id, e);
-}
-
-function makeReactHTML(id, type){
-  const key = type==='ann' ? 'ann_react_'+me+'_'+id : 'disc_react_'+me+'_'+id;
-  const myReact = localStorage.getItem(key) || '';
-  const label = myReact ? myReact : '👍';
-  const hasReact = !!myReact;
-
-  const opts = REACT_EMOJIS.map(e =>
-    '<span class="react-opt'+(myReact===e?' selected':'')+'" data-id="'+id+'" data-type="'+type+'" data-emoji="'+encodeURIComponent(e)+'" onclick="event.stopPropagation();handleReactOpt(this)" title="'+e+'">'+e+'</span>'
-  ).join('');
-  return '<div class="react-wrap">'+
-    '<button class="react-btn'+(hasReact?' has-react':'')+'" data-id="'+id+'" data-type="'+type+'" '+
-      'onclick="event.stopPropagation();openReactPicker(this)" '+
-      'onmouseenter="openReactPicker(this)">'+
-      label+(hasReact?'':' React')+
-    '</button>'+
-    '<div class="react-picker" id="react-picker-'+type+'-'+id+'">'+opts+'</div>'+
-  '</div>';
 }
 
 function reactToDiscussion(id,emoji){
