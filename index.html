@@ -214,26 +214,12 @@ body::before{
 
 /* ── RESPONSIVE ── */
 @media(max-width:700px){
-  /* Sidebar icon-only on mobile, no bottom nav */
-  .sidebar{
-    display:flex!important;
-    width:56px!important;
-    flex-shrink:0;
-  }
-  .bottom-nav{display:none!important;}
-  .mobile-header{display:flex!important;}
-  .shell{display:flex;flex-direction:row;height:100dvh;height:calc(var(--vh,1vh)*100);overflow:hidden;}
-  .main{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding-bottom:0;}
-  /* Hide all text, icons only */
-  .sb-brand-name,.sb-brand-sub,.sb-name,.sb-role,.sb-foot,.nav-section-lbl,.signout{display:none!important;}
-  /* font-size:0 hides text nodes, restore on icon */
-  .nav-item{font-size:0!important;padding:13px 0;justify-content:center;gap:0;}
-  .nav-icon{width:22px!important;height:22px!important;font-size:initial;}
-  .nav-badge{font-size:9px!important;}
-  .sb-brand{padding:max(env(safe-area-inset-top,12px),12px) 0 8px;justify-content:center;}
-  .sb-user{padding:8px 0;justify-content:center;}
-  .sb-name,.sb-role{display:none!important;}
-  .sb-nav{padding:8px 4px;}
+  /* Classic bottom nav — clean icons only */
+  .sidebar{display:none!important;}
+  .bottom-nav{display:flex;flex-direction:column;}
+  .mobile-header{display:flex;}
+  .shell{display:flex;flex-direction:column;height:100dvh;height:calc(var(--vh,1vh)*100);overflow:hidden;}
+  .main{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding-bottom:calc(60px + env(safe-area-inset-bottom,0px));}
 
   select,textarea{font-size:16px!important;}
   * { -webkit-tap-highlight-color: transparent; }
@@ -1216,10 +1202,7 @@ body.ready{visibility:visible;}
   width: 100% !important;
   contain: layout style paint;
 }
-/* On mobile: hide bottom nav completely — sidebar is used instead */
-@media(max-width:700px){
-  .bottom-nav{display:none!important;position:static!important;visibility:hidden!important;}
-}
+
 .bottom-nav .bn-items {
   display: flex !important;
   width: 100% !important;
@@ -1250,23 +1233,9 @@ body.ready{visibility:visible;}
 .bottom-nav .bn-label {
   display: none !important;
 }
-.bottom-nav .bn-item.active .bn-label {
-  display: none !important;
-}
 
 
-/* ── Mobile sidebar toggle ── */
-@media(max-width:700px){
-  .sidebar{
-    transition:width .25s cubic-bezier(.4,0,.2,1), opacity .25s ease;
-    overflow:hidden;
-  }
-  .sidebar.sb-hidden{
-    width:0!important;
-    opacity:0;
-    pointer-events:none;
-  }
-}
+
 
 </style>
 </head>
@@ -1376,9 +1345,6 @@ body.ready{visibility:visible;}
 
   <!-- MOBILE HEADER -->
   <div class="mobile-header">
-    <button id="sidebarToggleBtn" onclick="toggleMobileSidebar()" style="background:none;border:none;cursor:pointer;padding:6px;-webkit-tap-highlight-color:transparent;display:flex;align-items:center;justify-content:center;">
-      <svg id="sidebarToggleIcon" width="20" height="20" viewBox="0 0 20 20" fill="#475569"><path fill-rule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd"/></svg>
-    </button>
     <div class="mh-logo">Oscars</div>
     <div class="mh-user">
       <div class="mh-ava" id="mhAva"></div>
@@ -1833,28 +1799,22 @@ body.ready{visibility:visible;}
     <div class="bn-items" id="bottomNavGrid">
       <div class="bn-item active" id="bn-home" data-tab="home" onclick="if(navigator.vibrate)navigator.vibrate(8);goTo('home')">
         <svg class="bn-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h4v-4h2v4h4a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z"/></svg>
-        <div class="bn-label">Home</div>
       </div>
       <div class="bn-item" id="bn-schedule" data-tab="schedule" onclick="if(navigator.vibrate)navigator.vibrate(8);goTo('schedule')">
         <svg class="bn-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd"/></svg>
-        <div class="bn-label">Schedule</div>
       </div>
       <div class="bn-item" id="bn-announcements" data-tab="announcements" onclick="if(navigator.vibrate)navigator.vibrate(8);goTo('announcements')">
         <svg class="bn-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 3a1 1 0 00-1.447-.894L8.763 6H5a3 3 0 000 6h.28l1.771 5.316A1 1 0 008 18h1a1 1 0 001-1v-4.382l6.553 3.276A1 1 0 0018 15V3z" clip-rule="evenodd"/></svg>
-        <div class="bn-label">News</div>
         <div class="bn-badge" id="bnAnnBadge"></div>
       </div>
       <div class="bn-item" id="bn-engagement" data-tab="engagement" onclick="if(navigator.vibrate)navigator.vibrate(8);goTo('engagement')">
         <svg class="bn-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clip-rule="evenodd"/></svg>
-        <div class="bn-label">Engage</div>
       </div>
       <div class="bn-item" id="bn-documents" data-tab="documents" onclick="if(navigator.vibrate)navigator.vibrate(8);goTo('documents')">
         <svg class="bn-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clip-rule="evenodd"/></svg>
-        <div class="bn-label">Docs</div>
       </div>
       <div class="bn-item" id="bn-profile" data-tab="profile" onclick="if(navigator.vibrate)navigator.vibrate(8);goTo('profile')">
         <svg class="bn-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"/></svg>
-        <div class="bn-label">Profile</div>
         <div class="bn-badge" id="bnNotifBadge"></div>
       </div>
       <div class="bn-item" id="bn-feedback" data-tab="feedback" style="display:none;"></div>
