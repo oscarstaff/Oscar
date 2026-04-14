@@ -2197,26 +2197,36 @@ function showEngagementTab(tab){
 async function loadMyFeedback(){
   const el=document.getElementById('myFeedbackList');
   if(!el)return;
-  // We store anonymous feedback - staff can't see others but we track by session key
-  const myKey=localStorage.getItem('fb_session_'+me);
-  if(!myKey){
-    el.innerHTML='<div style="text-align:center;color:#94a3b8;font-size:13px;padding:16px;">No feedback submitted yet.</div>';
-    return;
-  }
+  el.innerHTML='<div style="text-align:center;color:#94a3b8;font-size:13px;padding:16px;">Loading...</div>';
   try{
-    const ids=JSON.parse(myKey||'[]');
-    if(!ids.length){el.innerHTML='<div style="text-align:center;color:#94a3b8;font-size:13px;padding:16px;">No feedback submitted yet.</div>';return;}
-    const rows=await sbGet('feedback','?id=in.('+ids.join(',')+')'+'&order=submitted_at.desc');
-    if(!rows.length){el.innerHTML='<div style="text-align:center;color:#94a3b8;font-size:13px;padding:16px;">No feedback submitted yet.</div>';return;}
+    const rows=await sbGet('feedback','?staff_name=eq.'+encodeURIComponent(me)+'&order=submitted_at.desc');
+    if(!rows||!rows.length){
+      el.innerHTML='<div style="text-align:center;color:#94a3b8;font-size:13px;padding:16px;">No feedback submitted yet.</div>';
+      return;
+    }
     el.innerHTML='<div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Your Previous Feedback</div>'+
       rows.map(r=>{
         const d=new Date(r.submitted_at).toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'});
-        return'<div class="ann-card" style="margin-bottom:10px;">'+
+        const hasInvite=r.meeting_invited===true;
+        const inviteBanner=hasInvite?
+          '<div style="margin-top:10px;padding:10px 14px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;display:flex;align-items:flex-start;gap:10px;">'+
+            '<span style="font-size:18px;flex-shrink:0;">📅</span>'+
+            '<div>'+
+              '<div style="font-size:13px;font-weight:700;color:#1d4ed8;margin-bottom:3px;">Meeting Invitation</div>'+
+              '<div style="font-size:12px;color:#374151;line-height:1.5;">'+(r.meeting_message||'Your manager would like to meet with you in person to discuss your feedback.')+'</div>'+
+            '</div>'+
+          '</div>':'';
+        return '<div class="ann-card" style="margin-bottom:10px;">'+
+          (hasInvite?'<div style="width:8px;height:8px;border-radius:50%;background:#2563eb;margin-bottom:8px;"></div>':'')+
           '<div style="font-size:13px;color:#374151;line-height:1.6;">'+r.body+'</div>'+
-          '<div style="font-size:10px;color:#94a3b8;margin-top:8px;">Submitted '+d+'</div>'+
+          '<div style="font-size:10px;color:#94a3b8;margin-top:6px;">Submitted '+d+'</div>'+
+          inviteBanner+
         '</div>';
       }).join('');
-  }catch(e){console.warn(e);}
+  }catch(e){
+    console.warn(e);
+    el.innerHTML='<div style="text-align:center;color:#dc2626;font-size:13px;padding:16px;">Could not load feedback.</div>';
+  }
 }
 
 async function loadHomeDiscPreview(){
@@ -2772,24 +2782,29 @@ initTheme();
 async function submitFeedback(){
   const body=document.getElementById('fbText').value.trim();
   const err=document.getElementById('fbErr'),ok=document.getElementById('fbOk');
-  err.classList.remove('show');ok.classList.remove('show');
   if(!body){err.textContent='Please write something before submitting.';err.classList.add('show');return;}
   const btn=document.getElementById('fbBtn');btn.disabled=true;btn.innerHTML='<span class="sp"></span> Sending...';
   try{
-    // No staff_name — purely anonymous
     const res=await fetch(SB+'/rest/v1/feedback',{
       method:'POST',
-      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
-      body:JSON.stringify({body})
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=representation'},
+      body:JSON.stringify({body, staff_name:me})
     });
     if(res.ok||res.status===201){
       ok.textContent='Feedback submitted anonymously. Thank you!';ok.classList.add('show');
       document.getElementById('fbText').value='';
-      // Track submitted IDs locally so staff can view their own
+      // Track ID so staff can view their own feedback
       try{
-        const rj=await fetch(SB+'/rest/v1/feedback?order=created_at.desc&limit=1',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
-        if(rj.ok){const rdata=await rj.json();if(rdata.length){const key='fb_session_'+me;const ids=JSON.parse(localStorage.getItem(key)||'[]');ids.push(rdata[0].id);localStorage.setItem(key,JSON.stringify(ids));}}
+        const rdata=await res.json();
+        if(rdata&&rdata.length){
+          const key='fb_session_'+me;
+          const ids=JSON.parse(localStorage.getItem(key)||'[]');
+          ids.push(rdata[0].id);
+          localStorage.setItem(key,JSON.stringify(ids));
+        }
       }catch(e){console.warn(e);}
+      // Refresh list
+      setTimeout(loadMyFeedback, 500);
     }else throw new Error();
   }catch(e){err.textContent='Failed to submit. Please try again.';err.classList.add('show');}
   finally{btn.disabled=false;btn.textContent='Submit Anonymously';}
@@ -2976,6 +2991,20 @@ async function loadAdminAvailGrid2(){
 }
 
 // ── ADMIN PANEL — feedback inbox (profile tab) ──
+async function sendMeetingInvite(id){
+  const msg=prompt('Optional message for the staff member:','Your manager would like to meet with you to discuss your feedback.');
+  if(msg===null)return;
+  try{
+    await fetch(SB+'/rest/v1/feedback?id=eq.'+id,{
+      method:'PATCH',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({meeting_invited:true,meeting_message:msg||'Your manager would like to meet with you to discuss your feedback.'})
+    });
+    showToast('📅 Meeting invite sent');
+    loadAdminFeedback2();
+  }catch(e){alert('Failed to send invite.');}
+}
+
 async function loadAdminFeedback2(){
   const el=document.getElementById('adminFeedbackList2');
   if(!el)return;
@@ -2986,10 +3015,16 @@ async function loadAdminFeedback2(){
     el.innerHTML=rows.map(r=>{
       const d=new Date(r.submitted_at).toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'});
       const isNew=!r.read;
+      const invited=r.meeting_invited===true;
       return '<div style="padding:12px;border-radius:10px;margin-bottom:8px;background:'+(isNew?'#f0f9ff':'#f8fafc')+';border:1px solid '+(isNew?'#bae6fd':'#e2e8f0')+';">'+
         (isNew?'<div style="font-size:9px;font-weight:700;color:#0284c7;text-transform:uppercase;letter-spacing:.8px;margin-bottom:5px;">New</div>':'')+
         '<div style="font-size:13px;color:#1e293b;line-height:1.6;">'+r.body.replace(/\n/g,'<br>')+'</div>'+
-        '<div style="font-size:10px;color:#94a3b8;margin-top:7px;">'+d+'</div>'+
+        '<div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;">'+
+        '<div style="font-size:10px;color:#94a3b8;">'+d+(r.staff_name?' · '+r.staff_name:'')+'</div>'+
+        '<button data-id="'+r.id+'" onclick="sendMeetingInvite(this.dataset.id)" style="font-size:11px;font-weight:600;color:'+(invited?'#94a3b8':'#2563eb')+';background:none;border:1px solid '+(invited?'#e2e8f0':'#bfdbfe')+';border-radius:6px;padding:3px 10px;cursor:pointer;font-family:inherit;">'+
+        (invited?'📅 Resend Invite':'📅 Invite to Meeting')+'</button>'+
+        '</div>'+
+        (invited&&r.meeting_message?'<div style="margin-top:6px;font-size:11px;color:#64748b;font-style:italic;">Invite sent: '+r.meeting_message+'</div>':'')+
         '</div>';
     }).join('');
   }catch(e){el.innerHTML='<div style="color:#dc2626;font-size:13px;">Could not load.</div>';}
