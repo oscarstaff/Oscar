@@ -221,7 +221,7 @@ body::before{
     flex-shrink:0;
   }
   .bottom-nav{display:none!important;}
-  .mobile-header{display:none!important;}
+  .mobile-header{display:flex!important;}
   .shell{display:flex;flex-direction:row;height:100dvh;height:calc(var(--vh,1vh)*100);overflow:hidden;}
   .main{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding-bottom:0;}
   /* Hide all text, icons only */
@@ -1254,6 +1254,20 @@ body.ready{visibility:visible;}
   display: none !important;
 }
 
+
+/* ── Mobile sidebar toggle ── */
+@media(max-width:700px){
+  .sidebar{
+    transition:width .25s cubic-bezier(.4,0,.2,1), opacity .25s ease;
+    overflow:hidden;
+  }
+  .sidebar.sb-hidden{
+    width:0!important;
+    opacity:0;
+    pointer-events:none;
+  }
+}
+
 </style>
 </head>
 <body>
@@ -1362,6 +1376,9 @@ body.ready{visibility:visible;}
 
   <!-- MOBILE HEADER -->
   <div class="mobile-header">
+    <button id="sidebarToggleBtn" onclick="toggleMobileSidebar()" style="background:none;border:none;cursor:pointer;padding:6px;-webkit-tap-highlight-color:transparent;display:flex;align-items:center;justify-content:center;">
+      <svg id="sidebarToggleIcon" width="20" height="20" viewBox="0 0 20 20" fill="#475569"><path fill-rule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd"/></svg>
+    </button>
     <div class="mh-logo">Oscars</div>
     <div class="mh-user">
       <div class="mh-ava" id="mhAva"></div>
@@ -3860,6 +3877,23 @@ document.fonts.ready.then(function(){
     if(loadMe()){enterHub();}else{document.getElementById('authLayer').style.display='flex';}
   }
 });
+
+
+// ── Mobile sidebar toggle ──
+function toggleMobileSidebar(){
+  const sb = document.querySelector('.sidebar');
+  if(!sb) return;
+  const hidden = sb.classList.toggle('sb-hidden');
+  localStorage.setItem('sb_mobile_hidden', hidden ? '1' : '0');
+}
+
+// Restore state on load
+(function(){
+  if(window.innerWidth <= 700 && localStorage.getItem('sb_mobile_hidden') === '1'){
+    const sb = document.querySelector('.sidebar');
+    if(sb) sb.classList.add('sb-hidden');
+  }
+})();
 
 // ── Fix 100dvh reflow on iOS/Android ──
 function setVH(){
