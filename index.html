@@ -115,7 +115,10 @@ body::before{
   -webkit-backdrop-filter:blur(20px);
   border-top:1px solid rgba(226,232,240,.7);
   z-index:200;
+  /* Fill safe area with background colour */
   padding-bottom:env(safe-area-inset-bottom,0px);
+  padding-left:env(safe-area-inset-left,0px);
+  padding-right:env(safe-area-inset-right,0px);
   box-shadow:0 -1px 0 rgba(0,0,0,.05),0 -8px 24px rgba(0,0,0,.05);
 }
 
@@ -1723,6 +1726,36 @@ body.ready{visibility:visible;}
 
       <!-- DOCUMENTS section -->
       <div id="psec-documents" style="display:none;">
+        <!-- Admin upload form -->
+        <div id="docsAdminUploadProfile" style="display:none;" class="card">
+          <div class="card-title" style="margin-bottom:14px;">Add Document</div>
+          <div class="field">
+            <label class="field-label">Title <span class="req">*</span></label>
+            <input class="f-input" type="text" id="docTitleP" placeholder="e.g. Opening Procedures">
+          </div>
+          <div class="field">
+            <label class="field-label">File <span class="req">*</span></label>
+            <div id="docDropZoneP" onclick="document.getElementById('docFileP').click()" style="border:2px dashed #e2e8f0;border-radius:12px;padding:20px;text-align:center;cursor:pointer;" ondragover="event.preventDefault();this.style.borderColor='#2563eb'" ondragleave="this.style.borderColor='#e2e8f0'" ondrop="handleDocDropP(event)">
+              <div id="docDropLabelP" style="font-size:13px;font-weight:600;color:#475569;">Click to choose a file or drag here</div>
+              <div style="font-size:11px;color:#94a3b8;margin-top:4px;">PDF, Word, Excel, images — up to 50MB</div>
+            </div>
+            <input type="file" id="docFileP" style="display:none;" onchange="handleDocFileSelectP(this)">
+          </div>
+          <div class="field">
+            <label class="field-label">Visible to Teams</label>
+            <div id="docTeamPickerP" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;"></div>
+            <div class="field-hint">Leave all unselected to share with everyone.</div>
+          </div>
+          <div id="docProgressP" style="display:none;margin-bottom:12px;">
+            <div style="font-size:12px;color:#475569;margin-bottom:6px;" id="docProgressLabelP">Uploading...</div>
+            <div style="background:#e2e8f0;border-radius:4px;height:6px;overflow:hidden;">
+              <div id="docProgressBarP" style="height:100%;background:#2563eb;border-radius:4px;width:0%;transition:width .2s;"></div>
+            </div>
+          </div>
+          <div class="alert alert-err" id="docErrP"></div>
+          <div class="alert alert-ok" id="docOkP"></div>
+          <button class="btn btn-green" onclick="uploadDocumentP()" id="docUploadBtnP" style="padding:10px 22px;">Upload Document</button>
+        </div>
         <div id="docsProfileList"><div style="text-align:center;color:#94a3b8;padding:32px;font-size:13px;">Loading...</div></div>
       </div>
 
@@ -1841,8 +1874,9 @@ let docsData = [];
 
 async function loadDocsProfile(){
   const el=document.getElementById('docsProfileList');
+  const adminArea=document.getElementById('docsAdminUploadProfile');
   if(!el)return;
-  // Reuse loadDocuments logic but render into profile
+  if(adminArea)adminArea.style.display=myIsAdmin?'block':'none';
   el.innerHTML='<div style="color:#94a3b8;text-align:center;padding:24px;font-size:13px;">Loading...</div>';
   try{
     if(!myTeam){
@@ -1851,17 +1885,92 @@ async function loadDocsProfile(){
     }
     docsData=await sbGet('documents','?order=created_at.desc');
     const filtered=myIsAdmin?docsData:docsData.filter(d=>!d.teams||d.teams.length===0||(myTeam&&d.teams.includes(myTeam)));
-    // Show admin upload form if admin
-    const adminArea=document.getElementById('docsAdminUpload');
-    if(adminArea)adminArea.style.display=myIsAdmin?'block':'none';
-    renderDocs(filtered);
-    // Point docsList to docsProfileList
-    const mainList=document.getElementById('docsList');
-    if(mainList&&el)el.innerHTML=mainList.innerHTML;
-    if(myIsAdmin)loadDocTeamPicker();
+    // Render directly into profile list
+    if(!filtered.length){
+      el.innerHTML='<div style="text-align:center;padding:32px;color:#94a3b8;font-size:13px;">No documents yet.</div>';
+    } else {
+      // Temporarily swap docsList to render into profile
+      const orig=document.getElementById('docsList');
+      const fake=document.createElement('div');
+      fake.id='docsList';
+      if(orig)orig.id='docsList_bak';
+      document.body.appendChild(fake);
+      renderDocs(filtered);
+      el.innerHTML=fake.innerHTML;
+      fake.remove();
+      if(orig)orig.id='docsList';
+    }
+    if(myIsAdmin)loadDocTeamPickerP();
   }catch(e){
     el.innerHTML='<div style="color:#dc2626;text-align:center;padding:24px;font-size:13px;">Could not load documents.</div>';
   }
+}
+
+let docSelectedFileP=null;
+function handleDocFileSelectP(input){if(input.files&&input.files[0])setDocFileP(input.files[0]);}
+function handleDocDropP(e){e.preventDefault();if(e.dataTransfer.files&&e.dataTransfer.files[0])setDocFileP(e.dataTransfer.files[0]);}
+function setDocFileP(file){
+  docSelectedFileP=file;
+  const l=document.getElementById('docDropLabelP');
+  if(l){l.textContent=file.name;l.style.color='#2563eb';}
+  const t=document.getElementById('docTitleP');
+  if(t&&!t.value)t.value=file.name.replace(/\.[^.]+$/,'').replace(/[-_]/g,' ');
+}
+async function loadDocTeamPickerP(){
+  try{
+    const rows=await sbGet('staff_credentials','?select=team&team=not.is.null');
+    const teams=[...new Set(rows.map(r=>r.team).filter(Boolean))].sort();
+    const picker=document.getElementById('docTeamPickerP');
+    if(!picker)return;
+    picker.innerHTML=teams.map(t=>'<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;color:#475569;"><input type="checkbox" class="doc-team-cbp" value="'+t+'"> '+t+'</label>').join('');
+  }catch(e){console.warn(e);}
+}
+async function uploadDocumentP(){
+  const title=document.getElementById('docTitleP').value.trim();
+  const err=document.getElementById('docErrP'),ok=document.getElementById('docOkP');
+  const progress=document.getElementById('docProgressP');
+  const bar=document.getElementById('docProgressBarP');
+  const lbl=document.getElementById('docProgressLabelP');
+  err.classList.remove('show');ok.classList.remove('show');
+  if(!title){err.textContent='Please enter a title.';err.classList.add('show');return;}
+  if(!docSelectedFileP){err.textContent='Please select a file.';err.classList.add('show');return;}
+  const teams=Array.from(document.querySelectorAll('.doc-team-cbp:checked')).map(cb=>cb.value);
+  const btn=document.getElementById('docUploadBtnP');
+  btn.disabled=true;btn.innerHTML='<span class="sp"></span> Uploading...';
+  if(progress)progress.style.display='block';
+  try{
+    const fileName=Date.now()+'-'+docSelectedFileP.name.replace(/[^a-zA-Z0-9._-]/g,'_');
+    if(lbl)lbl.textContent='Uploading '+docSelectedFileP.name+'...';
+    if(bar)bar.style.width='30%';
+    const uploadRes=await fetch(SB+'/storage/v1/object/documents/'+fileName,{
+      method:'POST',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':docSelectedFileP.type||'application/octet-stream'},
+      body:docSelectedFileP
+    });
+    if(!uploadRes.ok)throw new Error('Upload failed: '+uploadRes.status);
+    if(bar)bar.style.width='70%';
+    const fileUrl=SB+'/storage/v1/object/public/documents/'+fileName;
+    const res=await fetch(SB+'/rest/v1/documents',{
+      method:'POST',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({title,category:'General',url:fileUrl,teams,uploaded_by:me,is_new:true})
+    });
+    if(bar)bar.style.width='100%';
+    if(res.ok||res.status===201){
+      ok.textContent='Uploaded!';ok.classList.add('show');
+      document.getElementById('docTitleP').value='';
+      document.getElementById('docFileP').value='';
+      document.getElementById('docDropLabelP').textContent='Click to choose a file or drag here';
+      document.getElementById('docDropLabelP').style.color='';
+      document.querySelectorAll('.doc-team-cbp').forEach(cb=>cb.checked=false);
+      docSelectedFileP=null;
+      setTimeout(()=>{if(progress)progress.style.display='none';if(bar)bar.style.width='0%';},800);
+      await loadDocsProfile();
+    }else throw new Error('Failed '+res.status);
+  }catch(e){
+    console.warn(e);err.textContent=e.message||'Upload failed.';err.classList.add('show');
+    if(progress)progress.style.display='none';
+  }finally{btn.disabled=false;btn.textContent='Upload Document';}
 }
 async function loadDocuments(){
   const el = document.getElementById('docsList');
