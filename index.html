@@ -108,34 +108,99 @@ body::before{
 .bottom-nav{
   display:none;
   position:fixed;bottom:0;left:0;right:0;
-  margin:0;padding:0;
-  width:100%;max-width:100%;
+  width:100%;
   box-sizing:border-box;
-  background:rgba(255,255,255,.92);
+  background:rgba(255,255,255,.93);
   backdrop-filter:blur(20px);
   -webkit-backdrop-filter:blur(20px);
-  border-top:1px solid rgba(226,232,240,.8);
+  border-top:1px solid rgba(226,232,240,.7);
   z-index:200;
+  /* Safe area for iPhone home indicator */
   padding-bottom:env(safe-area-inset-bottom,0px);
-  box-shadow:0 -1px 0 rgba(0,0,0,.05),0 -4px 20px rgba(0,0,0,.04);
-  overflow:hidden;
+  box-shadow:0 -1px 0 rgba(0,0,0,.05),0 -8px 24px rgba(0,0,0,.05);
 }
-.bn-items{display:flex;width:100%;}
+.bn-items{
+  display:flex;
+  width:100%;
+  /* Breathing room above safe area */
+  padding-top:4px;
+  padding-bottom:2px;
+}
 .bn-item{
-  flex:1;min-width:0;max-width:none;
-  display:flex;flex-direction:column;align-items:center;
-  justify-content:center;padding:10px 0 8px;
-  margin:0;
-  cursor:pointer;position:relative;
+  /* Even distribution */
+  flex:1;
+  min-width:0;
+  /* Vertical centering */
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  /* Comfortable tap target — min 52px total */
+  min-height:52px;
+  padding:7px 4px 5px;
+  /* Interaction */
+  cursor:pointer;
+  position:relative;
   -webkit-tap-highlight-color:transparent;
   touch-action:manipulation;
   user-select:none;
-  overflow:hidden;
+  transition:transform .12s cubic-bezier(.34,1.4,.7,1);
 }
-.bn-icon{width:22px;height:22px;color:#94a3b8;transition:color .12s;}
-.bn-label{font-size:9px;font-weight:600;color:#94a3b8;letter-spacing:.2px;margin-top:3px;transition:color .12s;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;}
-.bn-item.active .bn-icon,.bn-item.active .bn-label{color:#2563eb;}
-.bn-badge{position:absolute;top:6px;right:calc(50% - 16px);background:#dc2626;color:#fff;border-radius:10px;padding:1px 5px;font-size:8px;font-weight:800;display:none;}
+.bn-item:active{transform:scale(.88);}
+/* Icon */
+.bn-icon{
+  width:24px;
+  height:24px;
+  color:#94a3b8;
+  flex-shrink:0;
+  transition:color .15s,transform .15s cubic-bezier(.34,1.4,.7,1);
+}
+/* Label */
+.bn-label{
+  font-size:10px;
+  font-weight:600;
+  color:#94a3b8;
+  letter-spacing:.1px;
+  margin-top:4px;
+  line-height:1;
+  white-space:nowrap;
+  transition:color .15s;
+  /* Prevent overflow on tiny screens */
+  max-width:100%;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  text-align:center;
+}
+/* Active state */
+.bn-item.active .bn-icon{color:#2563eb;transform:scale(1.1);}
+.bn-item.active .bn-label{color:#2563eb;}
+/* Badge */
+.bn-badge{
+  position:absolute;
+  top:5px;right:calc(50% - 18px);
+  background:#dc2626;color:#fff;
+  border-radius:10px;padding:1px 5px;
+  font-size:8px;font-weight:800;
+  display:none;
+  pointer-events:none;
+}
+/* Active underline indicator */
+.bn-item::after{
+  content:"";
+  position:absolute;
+  bottom:0;left:25%;right:25%;
+  height:2px;border-radius:2px 2px 0 0;
+  background:#2563eb;
+  transform:scaleX(0);
+  transition:transform .2s cubic-bezier(.34,1.4,.7,1);
+}
+.bn-item.active::after{transform:scaleX(1);}
+/* Very small screens */
+@media(max-width:360px){
+  .bn-icon{width:22px;height:22px;}
+  .bn-label{font-size:9px;}
+  .bn-item{padding:6px 2px 4px;}
+}
 
 /* ── MOBILE HEADER ── */
 .mobile-header{
@@ -626,15 +691,7 @@ body.ready{visibility:visible;}
 }
 .nav-item:hover::after{opacity:1;}
 
-/* ── Bottom nav active indicator ── */
-.bn-item{
-  flex:1;display:flex;flex-direction:column;align-items:center;
-  justify-content:center;padding:10px 4px 8px;
-  cursor:pointer;position:relative;
-  transition:transform .15s;
-}
-.bn-item:active{transform:scale(.9);}
-.bn-item.active .bn-icon,.bn-item.active .bn-label{color:#2563eb;}
+/* ── Bottom nav active indicator (consolidated above) ── */
 .bn-item::after{
   content:"";position:absolute;
   bottom:0;left:25%;right:25%;
