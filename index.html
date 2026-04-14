@@ -119,80 +119,62 @@ body::before{
   padding-bottom:env(safe-area-inset-bottom,0px);
   box-shadow:0 -1px 0 rgba(0,0,0,.05),0 -8px 24px rgba(0,0,0,.05);
 }
+
+
+
+
+
+
+
+
+.bn-item.active 
+.bn-item.active 
+
+
+
+
+
+
+@media(max-width:360px){
+
+}
+
+/* ── BOTTOM NAV ITEMS — single source of truth ── */
 .bn-items{
   display:flex;
   width:100%;
-  padding-top:6px;
-  padding-bottom:4px;
 }
 .bn-item{
-  flex:1;
+  flex:1 1 0;
   min-width:0;
   display:flex;
-  flex-direction:column;
   align-items:center;
   justify-content:center;
-  gap:4px;
-  min-height:52px;
-  padding:6px 2px;
+  min-height:58px;
   cursor:pointer;
   position:relative;
   -webkit-tap-highlight-color:transparent;
   touch-action:manipulation;
-  user-select:none;
-  transition:transform .12s cubic-bezier(.34,1.4,.7,1);
 }
-.bn-item:active{transform:scale(.88);}
-/* Icon */
+.bn-item:active{ opacity:.6; }
 .bn-icon{
-  width:24px;
-  height:24px;
+  width:26px;
+  height:26px;
   color:#94a3b8;
+  display:block;
   flex-shrink:0;
-  transition:color .15s,transform .15s cubic-bezier(.34,1.4,.7,1);
 }
-/* Label */
-.bn-label{
-  font-size:10px;
-  font-weight:600;
-  color:#94a3b8;
-  letter-spacing:.1px;
-  line-height:1;
-  white-space:nowrap;
-  transition:color .15s;
-  max-width:100%;
-  overflow:hidden;
-  text-overflow:ellipsis;
-  text-align:center;
-}
-/* Active state */
-.bn-item.active .bn-icon{color:#2563eb;transform:scale(1.1);}
-.bn-item.active .bn-label{color:#2563eb;}
-/* Badge */
+.bn-item.active .bn-icon{ color:#2563eb; }
 .bn-badge{
   position:absolute;
-  top:5px;right:calc(50% - 18px);
-  background:#dc2626;color:#fff;
-  border-radius:10px;padding:1px 5px;
-  font-size:8px;font-weight:800;
-  display:none;
-  pointer-events:none;
+  top:8px; right:calc(50% - 18px);
+  background:#dc2626; color:#fff;
+  border-radius:10px; padding:1px 5px;
+  font-size:8px; font-weight:800;
+  display:none; pointer-events:none;
 }
-/* Active underline indicator */
-.bn-item::after{
-  content:"";
-  position:absolute;
-  bottom:0;left:25%;right:25%;
-  height:2px;border-radius:2px 2px 0 0;
-  background:#2563eb;
-  transform:scaleX(0);
-  transition:transform .2s cubic-bezier(.34,1.4,.7,1);
-}
-.bn-item.active::after{transform:scaleX(1);}
-/* Very small screens */
-@media(max-width:360px){
-
-}
+[data-theme="dark"] .bn-icon{ color:#4b6480; }
+[data-theme="dark"] .bn-item.active .bn-icon{ color:#60a5fa; }
 
 /* ── MOBILE HEADER ── */
 .mobile-header{
@@ -929,10 +911,9 @@ body.ready{visibility:visible;}
 [data-theme="dark"] .stat-val.green { color: #60a5fa; }
 [data-theme="dark"] .mh-logo { color: #60a5fa; }
 [data-theme="dark"] .mh-name { color: #e2e8f0; }
-[data-theme="dark"] .bn-label { color: #4b6480; }
-[data-theme="dark"] .bn-item.active .bn-label,
-[data-theme="dark"] .bn-item.active .bn-icon { color: #60a5fa; }
-[data-theme="dark"] .bn-item::after { background: #60a5fa; }
+
+
+
 [data-theme="dark"] .auth-logo { background: linear-gradient(90deg,#60a5fa,#a78bfa,#60a5fa); background-size:200% auto; -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
 [data-theme="dark"] #splash { background: #0f172a; }
 [data-theme="dark"] #splash-logo { color: #60a5fa; }
@@ -1046,7 +1027,7 @@ body.ready{visibility:visible;}
 
 
 /* ── SQUISH INTERACTIONS ── */
-.bn-item:active { transform: scale(0.92); }
+
 .nav-item:active { transform: scale(0.96); }
 .btn:active, button:active { transform: scale(0.95); }
 .ao:active { transform: scale(0.93); }
@@ -1185,14 +1166,7 @@ body.ready{visibility:visible;}
 /* ══ BOTTOM NAV LAYOUT LOCK ══
    Prevents reflow from 100dvh recalculation on iOS/Chrome mobile */
 .bottom-nav,
-.bottom-nav .bn-items,
-.bottom-nav .bn-item {
-  transform: translateZ(0);
-  -webkit-transform: translateZ(0);
-  will-change: transform;
-  backface-visibility: hidden;
-  -webkit-backface-visibility: hidden;
-}
+
 .bottom-nav {
   /* Lock position — immune to viewport height changes */
   position: fixed !important;
@@ -1203,36 +1177,11 @@ body.ready{visibility:visible;}
   contain: layout style paint;
 }
 
-.bottom-nav .bn-items {
-  display: flex !important;
-  width: 100% !important;
-  contain: layout style;
-}
-.bottom-nav .bn-item {
-  flex: 1 1 0 !important;
-  min-width: 0 !important;
-  max-width: none !important;
-  display: flex !important;
-  flex-direction: column !important;
-  align-items: center !important;
-  justify-content: center !important;
-  gap: 5px !important;
-  padding: 10px 4px 8px !important;
-  min-height: 56px !important;
-}
-.bottom-nav .bn-icon {
-  width: 26px !important;
-  height: 26px !important;
-  flex-shrink: 0 !important;
-}
-.bottom-nav .bn-item.active .bn-icon {
-  width: 26px !important;
-  height: 26px !important;
-  color: #2563eb !important;
-}
-.bottom-nav .bn-label {
-  display: none !important;
-}
+
+
+
+
+
 
 
 
