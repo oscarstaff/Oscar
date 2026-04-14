@@ -1,0 +1,3592 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Oscars Employee Portal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0f1923;
+  --sidebar:#081420;
+  --card:#16222f;
+  --border:#1f3347;
+  --border-hi:#2d4760;
+  --accent:#4f8ef7;
+  --accent-dim:rgba(79,142,247,.1);
+  --accent-bd:rgba(79,142,247,.25);
+  --warn:#f05c4e;
+  --warn-dim:rgba(255,107,71,.1);
+  --blue:#5ba8ff;
+  --blue-dim:rgba(91,168,255,.1);
+  --gold:#fbbf4a;
+  --gold-dim:rgba(251,191,74,.1);
+  --text:#dde8f5;
+  --text2:#87a8c4;
+  --text3:#496580;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;overflow:hidden;}
+body{
+  background:#f1f5f9;color:#0f172a;
+  font-family:'Inter',system-ui,sans-serif;
+  font-size:14px;display:flex;flex-direction:column;
+  -webkit-text-size-adjust:100%;
+}
+body::before{
+  content:"";position:fixed;inset:0;z-index:-1;
+  background:#f1f5f9;
+}
+
+/* ── AUTH ── */
+#authLayer{
+  display:flex;align-items:center;justify-content:center;
+  min-height:100vh;min-height:100dvh;padding:20px;
+  background:#f1f5f9;
+}
+.auth-box{width:100%;max-width:420px;}
+.auth-logo{
+  font-size:28px;font-weight:900;color:#2563eb;
+  text-align:center;margin-bottom:6px;letter-spacing:-.6px;
+}
+.auth-tagline{
+  font-size:12px;color:#94a3b8;text-align:center;
+  text-transform:uppercase;letter-spacing:1.5px;margin-bottom:32px;
+}
+/* auth-card defined with animation below */
+.auth-link{
+  display:block;text-align:center;background:none;border:none;
+  color:#2563eb;font-size:13px;font-weight:600;
+  cursor:pointer;margin-top:12px;padding:6px;
+  font-family:'Inter',system-ui,sans-serif;
+}
+.auth-link:hover{text-decoration:underline;}
+
+/* ── SHELL ── */
+.shell{display:flex;height:100dvh;overflow:hidden;}
+#hubLayer{visibility:hidden;}
+#hubLayer.ready{visibility:visible;}
+
+/* ── SIDEBAR — desktop only ── */
+.sidebar{
+  width:220px;flex-shrink:0;
+  background:#ffffff;
+  border-right:1px solid #e2e8f0;
+  display:flex;flex-direction:column;
+  box-shadow:1px 0 0 #e2e8f0;
+}
+.sb-brand{padding:28px 18px 16px;border-bottom:1px solid #e2e8f0;}
+.sb-brand-name{font-size:15px;font-weight:800;color:#2563eb;letter-spacing:-.4px;}
+.sb-brand-sub{font-size:11px;color:#94a3b8;margin-top:3px;letter-spacing:.3px;}
+.sb-user{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid #e2e8f0;}
+.sb-avatar{width:32px;height:32px;border-radius:50%;flex-shrink:0;background:linear-gradient(135deg,#2563eb,#7c3aed);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff;}
+.sb-name{font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.sb-role{font-size:10.5px;color:#94a3b8;margin-top:2px;}
+.sb-nav{padding:12px 8px;flex:1;overflow-y:auto;}
+.nav-section-lbl{font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#94a3b8;padding:8px 10px 5px;}
+.nav-icon{width:16px;height:16px;flex-shrink:0;opacity:.75;}
+.nav-item.active .nav-icon{opacity:1;}
+.nav-badge{margin-left:auto;background:#dc2626;color:#fff;border-radius:10px;padding:1px 7px;font-size:9px;font-weight:800;display:none;}
+.sb-foot{padding:14px;border-top:1px solid #e2e8f0;}
+.signout{width:100%;background:transparent;border:1.5px solid #e2e8f0;color:#475569;border-radius:10px;padding:9px 14px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:'Inter',system-ui,sans-serif;transition:all .13s;}
+.signout:hover{border-color:#fca5a5;color:#dc2626;background:#fef2f2;}
+
+/* ── MAIN ── */
+.main{flex:1;overflow-y:auto;background:#f1f5f9;-webkit-overflow-scrolling:touch;}
+.page{display:none;padding:24px 28px;max-width:820px;}
+.page.active{display:block;}
+.page-hd{margin-bottom:24px;}
+.page-title{font-size:20px;font-weight:700;letter-spacing:-.3px;color:#0f172a;}
+.page-sub{font-size:12px;color:#94a3b8;margin-top:4px;}
+
+/* ── BOTTOM NAV — mobile only ── */
+.bottom-nav{
+  display:none;
+  position:fixed;bottom:0;left:0;right:0;
+  background:rgba(255,255,255,.92);
+  backdrop-filter:blur(20px);
+  -webkit-backdrop-filter:blur(20px);
+  border-top:1px solid rgba(226,232,240,.8);
+  z-index:200;
+  padding-bottom:env(safe-area-inset-bottom,0px);
+  box-shadow:0 -1px 0 rgba(0,0,0,.05),0 -4px 20px rgba(0,0,0,.04);
+  min-height:56px;
+}
+.bn-items{display:flex;width:100%;}
+.bn-item{
+  flex:1;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;padding:8px 2px;
+  cursor:pointer;position:relative;min-width:0;
+  -webkit-tap-highlight-color:transparent;
+  user-select:none;
+  min-height:52px;
+}
+.bn-icon{width:22px;height:22px;color:#94a3b8;transition:color .12s;}
+.bn-label{font-size:9px;font-weight:600;color:#94a3b8;letter-spacing:.2px;margin-top:3px;transition:color .12s;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;}
+.bn-item.active .bn-icon,.bn-item.active .bn-label{color:#2563eb;}
+.bn-badge{position:absolute;top:6px;right:calc(50% - 16px);background:#dc2626;color:#fff;border-radius:10px;padding:1px 5px;font-size:8px;font-weight:800;display:none;}
+
+/* ── MOBILE HEADER ── */
+.mobile-header{
+  display:none;
+  background:rgba(255,255,255,.88);
+  backdrop-filter:blur(20px);
+  -webkit-backdrop-filter:blur(20px);
+  border-bottom:1px solid rgba(226,232,240,.7);
+  padding:0 16px;
+  align-items:center;justify-content:space-between;
+  position:sticky;top:0;z-index:50;
+  height:56px;
+  box-shadow:0 1px 4px rgba(0,0,0,.05);
+}
+.mh-logo{font-size:16px;font-weight:800;color:#2563eb;letter-spacing:-.4px;}
+.mh-user{display:flex;align-items:center;gap:8px;}
+.mh-ava{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#2563eb,#7c3aed);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff;flex-shrink:0;}
+.mh-name{font-size:12px;font-weight:600;color:#1e293b;}
+
+/* ── RESPONSIVE ── */
+@media(max-width:700px){
+  /* Core */
+  .sidebar{display:none!important;}
+  .bottom-nav{display:flex;flex-direction:column;}
+  .mobile-header{display:flex;}
+  .shell{display:flex;flex-direction:column;height:100dvh;overflow:hidden;}
+  .main{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding-bottom:calc(72px + env(safe-area-inset-bottom,0px));}
+
+  /* Auth - full clean background, centred card */
+  #authLayer{padding:16px;background:#f1f5f9;align-items:center;}
+  .auth-box{width:100%;max-width:100%;}
+  .auth-card{padding:20px 16px;border-radius:14px;box-shadow:0 2px 16px rgba(0,0,0,.07);}
+  .auth-logo{font-size:24px;margin-bottom:4px;}
+  .auth-tagline{font-size:11px;margin-bottom:20px;}
+
+  /* Pages */
+  .page{padding:14px 12px;max-width:100%;}
+  .page-title{font-size:19px;}
+  .page-sub{font-size:12px;}
+  .page-hd{margin-bottom:14px;}
+
+  /* Cards */
+  .card{padding:14px 12px;border-radius:12px;margin-bottom:10px;}
+  .card:hover{transform:none;box-shadow:none;} /* no hover lift on touch */
+  .card-hd{margin-bottom:12px;}
+
+  /* Stats */
+  .stats-row{grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;}
+  .stat-box{padding:12px 10px;}
+  .stat-box:hover{transform:none;}
+  .stat-val{font-size:24px;letter-spacing:-1px;}
+  .stat-label{font-size:9px;margin-top:4px;}
+
+  /* Inputs — 16px stops iOS zoom */
+  .f-input{font-size:16px;padding:12px 13px;}
+  select.f-input{font-size:16px;}
+  textarea.f-input{font-size:16px;}
+  .field{margin-bottom:12px;}
+  .field-label{font-size:11px;margin-bottom:5px;}
+  .form-grid-2{grid-template-columns:1fr;}
+
+  /* Buttons */
+  .btn{font-size:14px;padding:11px 16px;}
+  .btn-block{padding:13px 16px;}
+  .btn:hover{transform:none;box-shadow:none;}
+
+  /* Availability chips */
+  .avail-day-row{flex-wrap:wrap;gap:6px;}
+  .avail-opts{flex-wrap:wrap;gap:6px;width:100%;}
+  .ao{font-size:13px;padding:9px 14px;flex:1;min-width:0;text-align:center;}
+  .custom-time-row{flex-direction:column;gap:6px;}
+  .time-in{font-size:16px;padding:10px 12px;width:100%;}
+
+  /* Avail summary (home page) */
+  .avail-summary-row{padding:9px 0;}
+  .asr-status{font-size:11px;padding:3px 8px;border-radius:20px;}
+
+  /* Leave */
+  .leave-item-top{flex-wrap:wrap;gap:6px;}
+  .status-tag{font-size:10px;}
+
+  /* Announcements */
+  .ann-card{padding:14px 12px;border-radius:10px;}
+  .ann-title{font-size:14px;}
+  .ann-body{font-size:13px;line-height:1.55;}
+
+  /* Onboarding */
+  .onboard-item{padding:10px 0;}
+  .onboard-text{font-size:13px;}
+
+  /* Timesheet */
+  .ts-day{min-width:52px;font-size:12px;}
+  .ts-shift{font-size:12px;}
+  .ts-hours{font-size:12px;}
+
+  /* Modal — bottom sheet */
+  .modal-overlay{align-items:flex-end;}
+  .modal{
+    width:100%;
+    border-radius:20px 20px 0 0;
+    max-height:88dvh;
+    padding:20px 16px calc(16px + env(safe-area-inset-bottom,0px));
+  }
+
+  /* Dark mode toggle above bottom nav */
+  #dmToggle{
+    bottom:calc(68px + env(safe-area-inset-bottom,0px));
+    right:12px;width:36px;height:36px;font-size:15px;
+  }
+
+  /* Feedback */
+  #fbText{font-size:16px;}
+
+  /* Splash */
+  #splash-logo{font-size:22px;}
+  #splash-sub{font-size:10px;}
+}
+
+
+/* ── CARD ── */
+.card-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;}
+.card-title{font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#475569;}
+.card-action{
+  font-size:12.5px;font-weight:600;color:#2563eb;
+  background:none;border:none;cursor:pointer;
+  font-family:'Inter',system-ui,sans-serif;
+}
+
+/* ── FIELDS ── */
+.field{margin-bottom:16px;}
+.field-label{
+  display:block;font-size:12px;font-weight:600;
+  color:#475569;margin-bottom:7px;
+}
+.field-label .req{color:#dc2626;margin-left:2px;}
+.field-hint{font-size:11px;color:#94a3b8;margin-top:5px;line-height:1.5;}
+.f-input{
+  width:100%;background:#f8fafc;
+  border:1.5px solid #e2e8f0;border-radius:10px;
+  color:#0f172a;padding:11px 14px;font-size:14px;
+  font-weight:500;outline:none;
+  font-family:'Inter',system-ui,sans-serif;
+  -webkit-appearance:none;transition:border-color .13s,background .13s;
+}
+.f-input:focus{border-color:#2563eb;background:rgba(34,212,160,.04);}
+.f-input::placeholder{color:#cbd5e1;}
+.f-input.error{border-color:#dc2626!important;}
+
+/* ── BUTTONS ── */
+
+/* ── ALERTS ── */
+.alert{
+  border-radius:10px;padding:11px 15px;
+  font-size:13px;font-weight:600;margin-bottom:16px;
+  display:none;line-height:1.5;
+}
+.alert.show{display:block;}
+.alert-err{background:#fef2f2;border:1px solid rgba(255,107,71,.3);color:#dc2626;}
+.alert-ok{background:#eff6ff;border:1px solid #bfdbfe;color:#1d4ed8;}
+
+/* ── STATS ── */
+.stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:22px;}
+.stat-val.green{color:#2563eb;}
+.stat-val.blue{color:#0ea5e9;}
+.stat-val.gold{color:#d97706;}
+.stat-label{font-size:10.5px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-top:7px;}
+
+/* ── AVAIL HOME SUMMARY ── */
+.avail-summary-row{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:10px 0;border-bottom:1px solid #e2e8f0;
+}
+.avail-summary-row:last-child{border-bottom:none;}
+.asr-day{font-size:13.5px;font-weight:700;}
+.asr-date{font-size:11px;color:#94a3b8;margin-top:2px;}
+.asr-status{font-size:12px;font-weight:700;font-family:monospace;}
+.asr-green{color:#2563eb;}
+.asr-red{color:#dc2626;}
+.asr-blue{color:#0ea5e9;}
+
+/* ── AVAIL FORM ── */
+.avail-day-row{
+  display:flex;align-items:center;gap:16px;
+  padding:12px 0;border-bottom:1px solid #e2e8f0;
+}
+.avail-day-row:last-child{border-bottom:none;}
+.avail-day-info{flex:1;}
+.avail-day-name{font-size:14px;font-weight:700;}
+.avail-day-date{font-size:11px;color:#94a3b8;margin-top:2px;}
+.avail-opts{display:flex;gap:6px;}
+.ao{
+  padding:7px 13px;border-radius:8px;
+  border:1.5px solid #e2e8f0;
+  background:transparent;color:#94a3b8;
+  font-size:12px;font-weight:700;cursor:pointer;
+  font-family:'Inter',system-ui,sans-serif;
+  transition:all .12s;white-space:nowrap;
+}
+.ao:hover{border-color:#475569;color:#475569;}
+.ao.yes{background:#eff6ff;border-color:#bfdbfe;color:#1d4ed8;font-weight:700;}
+.ao.custom{background:#f0f9ff;border-color:#bae6fd;color:#0284c7;font-weight:700;}
+.ao.no{background:#fef2f2;border-color:rgba(255,107,71,.3);color:#dc2626;}
+.custom-time-row{
+  display:none;align-items:center;gap:10px;
+  padding:4px 0 12px;
+}
+.custom-time-row.open{display:flex;}
+.time-in{
+  flex:1;background:#f1f5f9;
+  border:1.5px solid #e2e8f0;border-radius:8px;
+  color:#0f172a;padding:9px 10px;
+  font-size:14px;font-weight:700;outline:none;
+  text-align:center;font-family:monospace;
+  transition:border-color .12s;
+}
+.time-in:focus{border-color:#0ea5e9;}
+.time-sep{color:#94a3b8;font-weight:700;font-size:14px;}
+.lock-notice{
+  background:#fef2f2;border:1px solid rgba(255,107,71,.25);
+  border-radius:10px;padding:12px 16px;font-size:13px;
+  color:#dc2626;font-weight:600;margin-bottom:18px;display:none;
+}
+
+/* ── ROSTER ── */
+
+
+.wnav-btn:hover{border-color:#2563eb;color:#2563eb;}
+
+
+.roster-day:last-child{border-bottom:none;}
+
+
+
+.shift-pill{
+  display:inline-flex;align-items:center;gap:10px;
+  background:#eff6ff;border:1px solid #bfdbfe;
+  border-radius:9px;padding:9px 14px;margin-bottom:5px;
+}
+.shift-time{font-size:14px;font-weight:800;color:#2563eb;font-family:monospace;}
+.shift-device{font-size:12px;color:#0ea5e9;}
+.leave-pill{
+  display:inline-flex;align-items:center;
+  background:#fef2f2;border:1px solid rgba(255,107,71,.25);
+  border-radius:9px;padding:9px 14px;
+  font-size:13px;font-weight:700;color:#dc2626;
+}
+.no-shift{font-size:12.5px;color:#94a3b8;padding:2px 0;}
+
+.rtotal-box{
+  background:#ffffff;border:1px solid #e2e8f0;
+  border-radius:10px;padding:12px 16px;text-align:center;
+}
+.rtotal-val{font-size:22px;font-weight:800;letter-spacing:-.5px;}
+.rtotal-lbl{font-size:10px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-top:4px;}
+
+/* ── LEAVE ── */
+.leave-item{
+  background:#ffffff;border:1px solid #e2e8f0;
+  border-radius:12px;padding:16px 18px;margin-bottom:10px;
+}
+.leave-item-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;}
+.leave-dates{font-size:14px;font-weight:800;}
+.leave-duration{font-size:12px;color:#94a3b8;margin-top:3px;}
+.leave-reason-txt{font-size:13px;color:#475569;margin-top:8px;line-height:1.6;}
+.status-tag{
+  flex-shrink:0;display:inline-flex;align-items:center;
+  font-size:10.5px;font-weight:800;letter-spacing:.5px;
+  text-transform:uppercase;padding:4px 10px;border-radius:20px;
+  white-space:nowrap;
+}
+.st-pending{background:#fffbeb;border:1px solid rgba(251,191,74,.25);color:#d97706;}
+.st-approved{background:#eff6ff;border:1px solid #bfdbfe;color:#2563eb;}
+.st-declined{background:#fef2f2;border:1px solid rgba(255,107,71,.25);color:#dc2626;}
+.manager-note{
+  background:rgba(255,107,71,.07);border:1px solid rgba(255,107,71,.18);
+  border-radius:8px;padding:10px 13px;margin-top:10px;
+  font-size:12.5px;color:#dc2626;line-height:1.6;
+}
+.form-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+
+/* ── NOTIFICATIONS ── */
+.notif-item{
+  background:rgba(255,107,71,.07);border:1px solid rgba(255,107,71,.2);
+  border-radius:12px;padding:16px 18px;margin-bottom:10px;
+  cursor:pointer;position:relative;transition:opacity .13s;
+}
+.notif-item.read{background:#fafafa;border-color:#e2e8f0;opacity:.6;}
+.notif-dot{position:absolute;top:16px;right:16px;width:8px;height:8px;background:#dc2626;border-radius:50%;}
+.notif-title{font-size:13.5px;font-weight:800;color:#dc2626;}
+.notif-body{font-size:13px;color:#475569;margin-top:5px;line-height:1.6;}
+.notif-mgr{font-size:13px;color:#dc2626;margin-top:6px;line-height:1.6;}
+.notif-time{font-size:11px;color:#94a3b8;margin-top:6px;}
+
+/* ── EMPTY ── */
+.empty{text-align:center;padding:48px 24px;color:#94a3b8;}
+.empty-title{font-size:15px;font-weight:700;color:#475569;margin-bottom:6px;}
+.empty-sub{font-size:13px;line-height:1.7;}
+
+/* ── SPINNER ── */
+.sp{display:inline-block;width:15px;height:15px;border:2.5px solid rgba(37,99,235,.2);border-top-color:#2563eb;border-radius:50%;animation:spin .65s cubic-bezier(.5,0,.5,1) infinite;vertical-align:middle;}
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar{width:4px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:2px;}
+
+/* ── ANTI-FLASH ── */
+body{visibility:hidden;}
+body.ready{visibility:visible;}
+
+
+/* ════════════════════════════════════════════
+   PREMIUM ANIMATIONS — Oscars Employee Portal
+   Add these to your existing <style> block
+════════════════════════════════════════════ */
+
+/* ── Keyframes ── */
+@keyframes spin{to{transform:rotate(360deg);}}
+@keyframes fadeSlideUp{
+  from{opacity:0;transform:translateY(14px);}
+  to{opacity:1;transform:translateY(0);}
+}
+@keyframes fadeIn{
+  from{opacity:0;}
+  to{opacity:1;}
+}
+@keyframes bounceDot{
+  0%,80%,100%{transform:scale(.6);opacity:.35;}
+  40%{transform:scale(1.15);opacity:1;}
+}
+@keyframes splashLogoIn{
+  from{opacity:0;transform:translateY(-10px) scale(.92);}
+  to{opacity:1;transform:translateY(0) scale(1);}
+}
+@keyframes shimmer{
+  0%{background-position:-200% center;}
+  100%{background-position:200% center;}
+}
+@keyframes navBarSlide{
+  from{transform:scaleY(0);opacity:0;}
+  to{transform:scaleY(1);opacity:1;}
+}
+@keyframes cardPop{
+  from{opacity:0;transform:translateY(10px) scale(.98);}
+  to{opacity:1;transform:translateY(0) scale(1);}
+}
+@keyframes statCount{
+  from{opacity:0;transform:translateY(6px);}
+  to{opacity:1;transform:translateY(0);}
+}
+
+/* ── Splash screen — bouncy modern dots ── */
+#splash{
+  position:fixed;inset:0;z-index:9999;
+  background:#f8fafc;
+  display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  transition:opacity .4s cubic-bezier(.4,0,.2,1);
+}
+#splash.fade{opacity:0;pointer-events:none;}
+#splash-logo{
+  font-size:26px;font-weight:900;color:#2563eb;
+  letter-spacing:-.6px;margin-bottom:6px;
+  animation:splashLogoIn .5s cubic-bezier(.34,1.4,.7,1) both;
+}
+#splash-sub{
+  font-size:11px;color:#94a3b8;text-transform:uppercase;
+  letter-spacing:2px;margin-bottom:28px;
+  animation:fadeIn .5s .15s both;
+}
+#splash-dots{display:flex;gap:8px;margin-top:4px;}
+#splash-dots span{
+  width:8px;height:8px;border-radius:50%;
+  background:#2563eb;
+  animation:bounceDot 1.3s ease-in-out infinite;
+}
+#splash-dots span:nth-child(2){animation-delay:.18s;}
+#splash-dots span:nth-child(3){animation-delay:.36s;}
+
+/* ── Page transitions — slide up on enter ── */
+.page.active{
+  display:block;
+  animation:fadeSlideUp .22s cubic-bezier(.25,.8,.4,1) both;
+}
+
+/* ── Cards — staggered fade on page load ── */
+.card{
+  background:#ffffff;border:1px solid #e2e8f0;
+  border-radius:14px;padding:24px;margin-bottom:18px;
+  transition:transform .2s cubic-bezier(.25,.8,.4,1),
+             box-shadow .2s cubic-bezier(.25,.8,.4,1),
+             border-color .15s;
+  will-change:transform;
+}
+.card:hover{
+  transform:translateY(-2px);
+  box-shadow:0 8px 24px rgba(37,99,235,.09),0 2px 8px rgba(0,0,0,.05);
+  border-color:#bfdbfe;
+}
+
+/* ── Stat boxes ── */
+.stat-box{
+  background:#ffffff;border:1px solid #e2e8f0;
+  border-radius:14px;padding:18px 20px;
+  transition:transform .2s cubic-bezier(.25,.8,.4,1),
+             box-shadow .2s cubic-bezier(.25,.8,.4,1);
+  will-change:transform;
+}
+.stat-box:hover{
+  transform:translateY(-2px);
+  box-shadow:0 6px 20px rgba(37,99,235,.1);
+}
+.stat-val{
+  font-size:30px;font-weight:900;letter-spacing:-1.5px;line-height:1;
+  animation:statCount .35s .1s cubic-bezier(.25,.8,.4,1) both;
+}
+
+/* ── Buttons — lift + glow ── */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:7px;
+  padding:12px 22px;border-radius:10px;border:none;
+  font-size:14px;font-weight:700;cursor:pointer;
+  font-family:'Inter',system-ui,sans-serif;
+  transition:transform .18s cubic-bezier(.25,.8,.4,1),
+             box-shadow .18s cubic-bezier(.25,.8,.4,1),
+             filter .15s, background .15s;
+  will-change:transform;
+}
+.btn:active{transform:scale(.97)!important;transition-duration:.08s;}
+.btn-green{
+  background:#2563eb;color:#fff;
+  box-shadow:0 2px 10px rgba(37,99,235,.25);
+}
+.btn-green:hover{
+  transform:translateY(-2px);
+  box-shadow:0 6px 20px rgba(37,99,235,.38);
+  filter:brightness(1.07);
+}
+.btn-green:disabled{opacity:.45;cursor:not-allowed;box-shadow:none;transform:none;}
+.btn-outline{
+  background:transparent;border:1.5px solid #e2e8f0;color:#475569;
+  transition:transform .18s cubic-bezier(.25,.8,.4,1),
+             box-shadow .18s, border-color .15s, background .15s;
+}
+.btn-outline:hover{
+  background:#f1f5f9;color:#0f172a;
+  border-color:#cbd5e1;
+  transform:translateY(-1px);
+  box-shadow:0 3px 10px rgba(0,0,0,.06);
+}
+
+/* ── Nav items — smooth active indicator ── */
+.nav-item{
+  display:flex;align-items:center;gap:10px;
+  padding:10px 12px;border-radius:10px;
+  cursor:pointer;font-size:13px;font-weight:500;color:#475569;
+  transition:background .15s, color .15s, box-shadow .15s;
+  margin-bottom:2px;position:relative;overflow:hidden;
+  -webkit-tap-highlight-color:transparent;
+  user-select:none;
+}
+.nav-item:hover{
+  background:#f1f5f9;color:#1e293b;
+}
+.nav-item.active{
+  background:#eff6ff;color:#2563eb;font-weight:600;
+  box-shadow:inset 0 0 0 1px rgba(37,99,235,.12);
+}
+/* Sliding active bar */
+.nav-item.active::before{
+  content:"";position:absolute;
+  left:0;top:25%;bottom:25%;
+  width:3px;border-radius:0 2px 2px 0;
+  background:#2563eb;
+  animation:navBarSlide .2s cubic-bezier(.34,1.4,.7,1) both;
+  transform-origin:center;
+}
+/* Hover ripple */
+.nav-item::after{
+  content:"";position:absolute;inset:0;
+  background:radial-gradient(circle at var(--x,50%) var(--y,50%),rgba(37,99,235,.07) 0%,transparent 65%);
+  opacity:0;transition:opacity .2s;pointer-events:none;border-radius:10px;
+}
+.nav-item:hover::after{opacity:1;}
+
+/* ── Bottom nav active indicator ── */
+.bn-item{
+  flex:1;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;padding:10px 4px 8px;
+  cursor:pointer;position:relative;
+  transition:transform .15s;
+}
+.bn-item:active{transform:scale(.9);}
+.bn-item.active .bn-icon,.bn-item.active .bn-label{color:#2563eb;}
+.bn-item::after{
+  content:"";position:absolute;
+  bottom:0;left:25%;right:25%;
+  height:2px;border-radius:2px 2px 0 0;
+  background:#2563eb;
+  transform:scaleX(0);
+  transition:transform .22s cubic-bezier(.34,1.4,.7,1);
+}
+.bn-item.active::after{transform:scaleX(1);}
+
+/* ── Spinner ── */
+.sp{
+  display:inline-block;width:15px;height:15px;
+  border:2.5px solid rgba(37,99,235,.2);
+  border-top-color:#2563eb;
+  border-radius:50%;
+  animation:spin .65s cubic-bezier(.5,0,.5,1) infinite;
+  vertical-align:middle;
+}
+
+/* ── Alerts — slide in ── */
+.alert.show{
+  display:block;
+  animation:fadeSlideUp .2s cubic-bezier(.25,.8,.4,1) both;
+}
+
+/* ── Leave/notif items — stagger in ── */
+.leave-item,.notif-item{
+  animation:fadeSlideUp .2s cubic-bezier(.25,.8,.4,1) both;
+}
+.leave-item:nth-child(2),.notif-item:nth-child(2){animation-delay:.05s;}
+.leave-item:nth-child(3),.notif-item:nth-child(3){animation-delay:.1s;}
+.leave-item:nth-child(4),.notif-item:nth-child(4){animation-delay:.15s;}
+
+/* ── Availability chips ── */
+.ao{
+  transition:transform .15s cubic-bezier(.25,.8,.4,1),
+             box-shadow .15s,background .12s,border-color .12s;
+}
+.ao:hover{
+  transform:translateY(-1px);
+  box-shadow:0 3px 8px rgba(0,0,0,.08);
+}
+.ao:active{transform:scale(.95);}
+
+/* ── Lock notice ── */
+.lock-notice{
+  animation:fadeSlideUp .25s cubic-bezier(.25,.8,.4,1) both;
+}
+
+/* ── Modal overlay ── */
+.modal-overlay{
+  position:fixed;inset:0;
+  background:rgba(15,23,42,.45);
+  display:flex;align-items:flex-end;justify-content:center;
+  z-index:100;
+  opacity:0;pointer-events:none;
+  transition:opacity .2s;
+  backdrop-filter:blur(6px);
+}
+.modal-overlay.open{opacity:1;pointer-events:all;}
+.modal{
+  background:#fff;
+  width:100%;max-width:460px;
+  border-radius:20px 20px 0 0;
+  padding:24px 26px 32px;
+  transform:translateY(100%);
+  transition:transform .3s cubic-bezier(.34,1.15,.7,1);
+  max-height:90dvh;overflow-y:auto;
+  box-shadow:0 -8px 40px rgba(0,0,0,.12);
+}
+.modal-overlay.open .modal{transform:translateY(0);}
+
+/* ── Auth card ── */
+.auth-card{
+  background:#fff;border:1px solid #e2e8f0;
+  border-radius:20px;padding:32px;
+  box-shadow:0 8px 32px rgba(37,99,235,.07),0 2px 8px rgba(0,0,0,.04);
+  animation:cardPop .35s cubic-bezier(.34,1.2,.7,1) both;
+}
+
+/* ── Auth logo shimmer ── */
+.auth-logo{
+  font-size:28px;font-weight:900;
+  background:linear-gradient(90deg,#2563eb 0%,#7c3aed 40%,#2563eb 80%);
+  background-size:200% auto;
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  background-clip:text;
+  text-align:center;margin-bottom:6px;letter-spacing:-.6px;
+  animation:shimmer 2.5s linear infinite, splashLogoIn .4s cubic-bezier(.34,1.4,.7,1) both;
+}
+
+/* avail rows */
+
+/* ── Signout button ── */
+.signout{
+  width:100%;background:transparent;
+  border:1.5px solid #e2e8f0;color:#475569;
+  border-radius:10px;padding:9px 14px;
+  font-size:12.5px;font-weight:600;cursor:pointer;
+  font-family:'Inter',system-ui,sans-serif;
+  transition:all .18s cubic-bezier(.25,.8,.4,1);
+}
+.signout:hover{
+  border-color:#fca5a5;color:#dc2626;
+  background:#fef2f2;
+  transform:translateY(-1px);
+  box-shadow:0 3px 10px rgba(220,38,38,.1);
+}
+
+/* ── f-input focus glow ── */
+.f-input{
+  transition:border-color .15s, box-shadow .15s, background .15s;
+}
+.f-input:focus{
+  border-color:#2563eb;
+  background:#fff;
+  box-shadow:0 0 0 3px rgba(37,99,235,.1);
+}
+
+/* ── Page title fade ── */
+.page-title{
+  font-size:20px;font-weight:700;letter-spacing:-.3px;color:#0f172a;
+  animation:fadeSlideUp .2s cubic-bezier(.25,.8,.4,1) both;
+}
+.page-sub{
+  font-size:12px;color:#94a3b8;margin-top:4px;
+  animation:fadeIn .25s .08s both;
+}
+
+/* ── Profile page card pop stagger ── */
+#page-profile .card:nth-child(1){animation-delay:.0s;}
+#page-profile .card:nth-child(2){animation-delay:.06s;}
+#page-profile .card:nth-child(3){animation-delay:.12s;}
+
+/* ── Reduce motion ── */
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{
+    animation-duration:.01ms!important;
+    animation-iteration-count:1!important;
+    transition-duration:.01ms!important;
+  }
+}
+
+/* ── MESSAGES ── */
+.msg-bubble{max-width:80%;padding:10px 14px;border-radius:16px;font-size:13px;line-height:1.55;position:relative;}
+.msg-mine{background:#2563eb;color:#fff;align-self:flex-end;border-bottom-right-radius:4px;}
+.msg-theirs{background:#f1f5f9;color:#0f172a;align-self:flex-start;border-bottom-left-radius:4px;}
+.msg-meta{font-size:10px;margin-top:4px;opacity:.6;}
+.msg-mine .msg-meta{text-align:right;}
+.msg-date-divider{text-align:center;font-size:10px;color:#94a3b8;font-weight:600;letter-spacing:.5px;text-transform:uppercase;margin:6px 0;}
+
+/* ── ANNOUNCEMENTS ── */
+.ann-card{background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:18px 20px;margin-bottom:12px;transition:transform .18s,box-shadow .18s;}
+.ann-card:hover{transform:translateY(-1px);box-shadow:0 4px 16px rgba(37,99,235,.08);}
+.ann-card.pinned{border-color:#bfdbfe;background:#f0f7ff;}
+.ann-pin{font-size:10px;font-weight:700;color:#2563eb;text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px;display:flex;align-items:center;gap:5px;}
+.ann-title{font-size:15px;font-weight:700;color:#0f172a;margin-bottom:6px;}
+.ann-body{font-size:13px;color:#475569;line-height:1.6;}
+.ann-meta{font-size:11px;color:#94a3b8;margin-top:10px;display:flex;align-items:center;justify-content:space-between;}
+.ann-unread-dot{width:8px;height:8px;border-radius:50%;background:#2563eb;display:inline-block;margin-right:6px;flex-shrink:0;}
+
+/* ── ONBOARDING ── */
+.onboard-item{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid #f1f5f9;}
+.onboard-item:last-child{border-bottom:none;}
+.onboard-check{width:22px;height:22px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:11px;}
+.onboard-done{background:#dcfce7;color:#16a34a;}
+.onboard-pending{background:#f1f5f9;color:#94a3b8;border:1.5px solid #e2e8f0;}
+.onboard-text{font-size:13px;font-weight:500;color:#0f172a;}
+.onboard-done-text{color:#94a3b8;text-decoration:line-through;}
+
+/* ── TIMESHEET ── */
+.ts-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #f1f5f9;font-size:13px;}
+.ts-row:last-child{border-bottom:none;}
+.ts-day{font-weight:600;color:#0f172a;min-width:80px;}
+.ts-shift{color:#475569;}
+.ts-hours{font-weight:700;color:#2563eb;min-width:40px;text-align:right;}
+.ts-total{display:flex;justify-content:space-between;padding:12px 0 0;font-size:14px;font-weight:700;color:#0f172a;border-top:2px solid #e2e8f0;margin-top:4px;}
+
+/* ── BIRTHDAY CARD ── */
+.bday-row{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid #f1f5f9;}
+.bday-row:last-child{border-bottom:none;}
+.bday-avatar{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;flex-shrink:0;}
+.bday-name{font-size:13px;font-weight:600;color:#0f172a;}
+.bday-date{font-size:11px;color:#94a3b8;margin-top:2px;}
+.bday-soon{font-size:10px;font-weight:700;color:#d97706;background:#fffbeb;border:1px solid #fde68a;border-radius:20px;padding:2px 8px;margin-left:auto;}
+.bday-today{font-size:10px;font-weight:700;color:#16a34a;background:#dcfce7;border:1px solid #bbf7d0;border-radius:20px;padding:2px 8px;margin-left:auto;}
+
+
+/* ════════════════════════════
+   DARK MODE
+════════════════════════════ */
+[data-theme="dark"] {
+  --dm-bg: #0f172a;
+  --dm-surface: #1e293b;
+  --dm-surface2: #162032;
+  --dm-border: #2d3f55;
+  --dm-text: #e2e8f0;
+  --dm-text2: #94a3b8;
+  --dm-text3: #64748b;
+  --dm-card: #1e293b;
+  --dm-input: #162032;
+}
+[data-theme="dark"] body,
+[data-theme="dark"] .main { background: #0f172a !important; color: #e2e8f0; }
+[data-theme="dark"] .sidebar,
+[data-theme="dark"] .mobile-header { background: rgba(10,16,24,.92) !important; backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px); border-color: rgba(45,71,96,.5) !important; }
+[data-theme="dark"] .bottom-nav { background: rgba(6,11,16,.95) !important; backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px); border-color: rgba(45,71,96,.5) !important; }
+[data-theme="dark"] .sb-brand-name { color: #60a5fa; }
+[data-theme="dark"] .sb-brand-sub,
+[data-theme="dark"] .sb-role,
+[data-theme="dark"] .nav-section-lbl { color: #4b6480; }
+[data-theme="dark"] .nav-item { color: #64748b; }
+[data-theme="dark"] .nav-item:hover { background: #1e293b; color: #94a3b8; }
+[data-theme="dark"] .nav-item.active { background: rgba(96,165,250,.1); color: #60a5fa; }
+[data-theme="dark"] .nav-item.active::before { background: #60a5fa; }
+[data-theme="dark"] .card,
+[data-theme="dark"] .auth-card,
+[data-theme="dark"] .stat-box { background: #1e293b !important; border-color: #2d3f55 !important; color: #e2e8f0; }
+[data-theme="dark"] .card:hover { border-color: #3b5068 !important; box-shadow: 0 8px 24px rgba(0,0,0,.35) !important; }
+[data-theme="dark"] .page-title { color: #f1f5f9; }
+[data-theme="dark"] .page-sub,
+[data-theme="dark"] .card-title,
+[data-theme="dark"] .stat-label { color: #64748b; }
+[data-theme="dark"] .f-input,
+[data-theme="dark"] select.f-input,
+[data-theme="dark"] textarea.f-input { background: #162032 !important; border-color: #2d3f55 !important; color: #e2e8f0 !important; }
+[data-theme="dark"] .f-input:focus { border-color: #60a5fa !important; box-shadow: 0 0 0 3px rgba(96,165,250,.12) !important; }
+[data-theme="dark"] .f-input::placeholder { color: #3d5470 !important; }
+[data-theme="dark"] .btn-outline { background: transparent; border-color: #2d3f55; color: #94a3b8; }
+[data-theme="dark"] .btn-outline:hover { background: #1e293b; border-color: #3b5068; color: #e2e8f0; }
+[data-theme="dark"] .btn-green { background: #2563eb; color: #fff; }
+[data-theme="dark"] .avail-summary-row { border-bottom-color: #1f2d3d; }
+[data-theme="dark"] .avail-summary-row:hover { background: #162032; }
+[data-theme="dark"] .sb-foot { background: #0d1623; border-color: #1f2d3d; }
+[data-theme="dark"] .signout { border-color: #2d3f55; color: #64748b; }
+[data-theme="dark"] .leave-item { border-bottom-color: #1f2d3d; }
+[data-theme="dark"] .leave-dates { color: #e2e8f0; }
+[data-theme="dark"] .notif-item { background: #1e293b !important; border-color: #2d3f55 !important; }
+[data-theme="dark"] .ann-card { background: #1e293b !important; border-color: #2d3f55 !important; }
+[data-theme="dark"] .ann-card.pinned { background: #162032 !important; border-color: #1e3a5f !important; }
+[data-theme="dark"] .ann-title { color: #f1f5f9; }
+[data-theme="dark"] .ann-body { color: #94a3b8; }
+[data-theme="dark"] .msg-theirs { background: #1e293b; color: #e2e8f0; }
+[data-theme="dark"] .bday-row { border-bottom-color: #1f2d3d; }
+[data-theme="dark"] .bday-name { color: #f1f5f9; }
+[data-theme="dark"] .onboard-item { border-bottom-color: #1f2d3d; }
+[data-theme="dark"] .onboard-text { color: #e2e8f0; }
+[data-theme="dark"] .ts-row { border-bottom-color: #1f2d3d; }
+[data-theme="dark"] .ts-total { border-top-color: #2d3f55; color: #f1f5f9; }
+[data-theme="dark"] .stat-val { color: #f1f5f9; }
+[data-theme="dark"] .stat-val.green { color: #60a5fa; }
+[data-theme="dark"] .mh-logo { color: #60a5fa; }
+[data-theme="dark"] .mh-name { color: #e2e8f0; }
+[data-theme="dark"] .bn-label { color: #4b6480; }
+[data-theme="dark"] .bn-item.active .bn-label,
+[data-theme="dark"] .bn-item.active .bn-icon { color: #60a5fa; }
+[data-theme="dark"] .bn-item::after { background: #60a5fa; }
+[data-theme="dark"] .auth-logo { background: linear-gradient(90deg,#60a5fa,#a78bfa,#60a5fa); background-size:200% auto; -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
+[data-theme="dark"] #splash { background: #0f172a; }
+[data-theme="dark"] #splash-logo { color: #60a5fa; }
+[data-theme="dark"] #splash-dots span { background: #60a5fa; }
+[data-theme="dark"] .alert-err { background: #2d1515; border-color: rgba(220,38,38,.3); }
+[data-theme="dark"] .alert-ok { background: #0f1e35; border-color: rgba(96,165,250,.3); }
+[data-theme="dark"] .lock-notice { background: #2d1a0a; border-color: rgba(217,119,6,.3); color: #fbbf24; }
+[data-theme="dark"] .modal-overlay .modal,
+[data-theme="dark"] .modal { background: #1e293b !important; border-color: #2d3f55 !important; }
+[data-theme="dark"] .form-label { color: #64748b; }
+[data-theme="dark"] .ao { background: #162032 !important; border-color: #2d3f55 !important; color: #94a3b8 !important; }
+[data-theme="dark"] .ao.yes { background: rgba(96,165,250,.12) !important; border-color: rgba(96,165,250,.3) !important; color: #60a5fa !important; }
+[data-theme="dark"] .ao.no { background: rgba(220,38,38,.1) !important; border-color: rgba(220,38,38,.25) !important; color: #f87171 !important; }
+[data-theme="dark"] .ao.custom { background: rgba(14,165,233,.1) !important; border-color: rgba(14,165,233,.25) !important; color: #38bdf8 !important; }
+
+/* Dark mode toggle button */
+#dmToggle {
+  position: fixed; bottom: 80px; right: 16px;
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  background: #1e293b;
+  border: 1px solid #2d3f55;
+  color: #94a3b8;
+  font-size: 18px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 4px 12px rgba(0,0,0,.2);
+  z-index: 50;
+  transition: all .2s cubic-bezier(.25,.8,.4,1);
+}
+#dmToggle:hover { transform: scale(1.1); }
+[data-theme="dark"] #dmToggle { background: #334155; border-color: #475569; color: #fbbf24; }
+@media(min-width:701px){ #dmToggle { bottom: 24px; } }
+
+
+/* ── Profile tabs ── */
+.prof-tab{
+  padding:10px 16px;background:none;border:none;cursor:pointer;
+  font-size:13px;font-weight:500;color:#94a3b8;
+  border-bottom:2.5px solid transparent;white-space:nowrap;
+  font-family:'Inter',system-ui,sans-serif;
+  transition:color .18s,border-color .2s cubic-bezier(.34,1.2,.7,1);
+  flex-shrink:0;position:relative;
+}
+.prof-tab:hover{color:#475569;}
+.prof-tab.active{color:#2563eb;border-bottom-color:#2563eb;font-weight:600;}
+.prof-tab::after{
+  content:'';position:absolute;bottom:-1px;left:50%;right:50%;
+  height:2.5px;background:#2563eb;border-radius:2px;
+  transition:left .22s cubic-bezier(.34,1.2,.7,1),right .22s cubic-bezier(.34,1.2,.7,1);
+}
+.prof-tab.active::after{left:0;right:0;}
+[data-theme="dark"] .prof-tab{color:#4b6480;}
+[data-theme="dark"] .prof-tab.active{color:#60a5fa;border-bottom-color:#60a5fa;}
+[data-theme="dark"] .prof-tab::after{background:#60a5fa;}
+
+/* ── DOCUMENTS ── */
+.doc-category{margin-bottom:16px;}
+.doc-cat-header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:11px 14px;background:var(--surface2,#f8fafc);
+  border:1px solid #e2e8f0;border-radius:10px;cursor:pointer;
+  transition:background .12s;user-select:none;
+}
+.doc-cat-header:hover{background:#f1f5f9;}
+.doc-cat-title{font-size:12px;font-weight:700;color:#0f172a;display:flex;align-items:center;gap:8px;}
+.doc-cat-count{font-size:10px;color:#94a3b8;font-weight:500;}
+.doc-cat-chevron{color:#94a3b8;transition:transform .15s;font-size:12px;}
+.doc-cat-chevron.open{transform:rotate(180deg);}
+.doc-cat-items{display:flex;flex-direction:column;gap:6px;margin-top:6px;padding:0 2px;}
+.doc-item{
+  display:flex;align-items:center;gap:12px;
+  padding:12px 14px;background:#fff;
+  border:1px solid #e2e8f0;border-radius:10px;
+  text-decoration:none;color:inherit;
+  transition:border-color .12s,box-shadow .12s;
+  position:relative;
+}
+.doc-item:hover{border-color:#bfdbfe;box-shadow:0 2px 8px rgba(37,99,235,.08);}
+.doc-icon{
+  width:36px;height:36px;border-radius:8px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;font-size:16px;
+}
+.doc-icon-pdf{background:#fef2f2;color:#dc2626;}
+.doc-icon-link{background:#eff6ff;color:#2563eb;}
+.doc-icon-doc{background:#f0fdf4;color:#16a34a;}
+.doc-icon-img{background:#fdf4ff;color:#9333ea;}
+.doc-title{font-size:13px;font-weight:600;color:#0f172a;flex:1;}
+.doc-team-tag{font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;background:#eff6ff;color:#2563eb;margin-left:4px;}
+.doc-badge-new{font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;background:#dcfce7;color:#16a34a;}
+.doc-delete{background:none;border:none;color:#dc2626;cursor:pointer;font-size:11px;font-weight:600;padding:4px 8px;border-radius:6px;font-family:inherit;opacity:0;transition:opacity .12s;}
+.doc-item:hover .doc-delete{opacity:1;}
+[data-theme="dark"] .doc-cat-header{background:#1e293b;border-color:#2d3f55;}
+[data-theme="dark"] .doc-cat-header:hover{background:#253447;}
+[data-theme="dark"] .doc-cat-title{color:#f1f5f9;}
+[data-theme="dark"] .doc-item{background:#1e293b;border-color:#2d3f55;}
+[data-theme="dark"] .doc-title{color:#f1f5f9;}
+
+
+/* ── Skeleton loading ── */
+@keyframes shimmerSkeleton{
+  0%{background-position:-400px 0;}
+  100%{background-position:400px 0;}
+}
+.skeleton{
+  background:linear-gradient(90deg,#f1f5f9 25%,#e2e8f0 50%,#f1f5f9 75%);
+  background-size:400px 100%;
+  animation:shimmerSkeleton 1.4s ease-in-out infinite;
+  border-radius:6px;
+}
+.skeleton-text{height:13px;margin-bottom:8px;}
+.skeleton-text.short{width:40%;}
+.skeleton-text.med{width:65%;}
+.skeleton-text.full{width:100%;}
+.skeleton-title{height:18px;width:55%;margin-bottom:12px;}
+.skeleton-avatar{width:36px;height:36px;border-radius:50%;flex-shrink:0;}
+.skeleton-card{background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:18px;margin-bottom:10px;}
+[data-theme="dark"] .skeleton{background:linear-gradient(90deg,#1e293b 25%,#2d3f55 50%,#1e293b 75%);background-size:400px 100%;}
+[data-theme="dark"] .skeleton-card{background:#1e293b;border-color:#2d3f55;}
+
+
+/* ── Schedule sub-tabs ── */
+.sched-tab{
+  padding:10px 18px;background:none;border:none;cursor:pointer;
+  font-size:13px;font-weight:500;color:#94a3b8;
+  border-bottom:2.5px solid transparent;white-space:nowrap;
+  font-family:'Inter',system-ui,sans-serif;
+  transition:color .15s,border-color .2s cubic-bezier(.34,1.2,.7,1);
+  flex-shrink:0;-webkit-tap-highlight-color:transparent;
+}
+.sched-tab:hover{color:#475569;}
+.sched-tab.active{color:#2563eb;border-bottom-color:#2563eb;font-weight:600;}
+[data-theme="dark"] .sched-tab{color:#4b6480;}
+[data-theme="dark"] .sched-tab.active{color:#60a5fa;border-bottom-color:#60a5fa;}
+
+
+/* ── Engagement sub-tabs ── */
+.eng-tab{
+  padding:10px 18px;background:none;border:none;cursor:pointer;
+  font-size:13px;font-weight:500;color:#94a3b8;
+  border-bottom:2.5px solid transparent;white-space:nowrap;
+  font-family:'Inter',system-ui,sans-serif;
+  transition:color .15s,border-color .2s cubic-bezier(.34,1.2,.7,1);
+  flex-shrink:0;-webkit-tap-highlight-color:transparent;
+}
+.eng-tab:hover{color:#475569;}
+.eng-tab.active{color:#2563eb;border-bottom-color:#2563eb;font-weight:600;}
+[data-theme="dark"] .eng-tab{color:#4b6480;}
+[data-theme="dark"] .eng-tab.active{color:#60a5fa;border-bottom-color:#60a5fa;}
+
+
+[data-theme="dark"] .nav-item.active::before { display: none; }
+[data-theme="dark"] .nav-item.active::after { display: none; }
+
+
+/* ── SQUISH INTERACTIONS ── */
+.bn-item:active { transform: scale(0.92); }
+.nav-item:active { transform: scale(0.96); }
+.btn:active, button:active { transform: scale(0.95); }
+.ao:active { transform: scale(0.93); }
+.card:active { transform: scale(0.99); }
+
+</style>
+</head>
+<body>
+
+<!-- ── AUTH ── -->
+<div id="splash"><div id="splash-logo">Oscars</div><div id="splash-sub">Employee Portal</div><div id="splash-dots"><span></span><span></span><span></span></div></div>
+<div id="authLayer" style="display:none">
+  <div class="auth-box">
+
+    <div id="pg-login">
+      <div class="auth-logo">Oscars</div>
+      <div class="auth-tagline">Employee Portal</div>
+      <div class="auth-card">
+        <div class="alert alert-err" id="loginErr"></div>
+        <div class="field">
+          <label class="field-label">Full Name</label>
+          <input class="f-input" type="text" id="loginName" placeholder="Enter your full name" autocorrect="off">
+        </div>
+        <div class="field" style="margin-bottom:20px">
+          <label class="field-label">Password</label>
+          <input class="f-input" type="password" id="loginPass" placeholder="Enter your password" onkeydown="if(event.key==='Enter')doLogin()">
+        </div>
+        <button class="btn btn-green btn-block" id="loginBtn" onclick="doLogin()">Sign In</button>
+      </div>
+      <button class="auth-link" onclick="showAuth('setpass')">First time? Set your password</button>
+      <button class="auth-link" onclick="showAuth('resetkey')">Forgot password? Answer security questions</button>
+    </div>
+
+    <div id="pg-setpass" style="display:none">
+      <div class="auth-logo">Set Password</div>
+      <div class="auth-tagline">First time setup</div>
+      <div class="auth-card">
+        <div class="alert alert-err" id="spErr"></div>
+        <div class="alert alert-ok" id="spOk"></div>
+        <div class="field"><label class="field-label">Full Name</label><input class="f-input" type="text" id="spName" autocorrect="off" placeholder="Enter your full name"></div>
+        <div class="field"><label class="field-label">New Password</label><input class="f-input" type="password" id="spNew" placeholder="Minimum 4 characters"></div>
+        <div class="field" style="margin-bottom:20px"><label class="field-label">Confirm Password</label><input class="f-input" type="password" id="spConfirm" placeholder="Repeat your password"></div>
+        <div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.8px;margin-bottom:12px;padding-top:4px;border-top:1px solid #e2e8f0;">Security Questions</div>
+        <div class="field">
+          <label class="field-label">Question 1</label>
+          <select class="f-input" id="spQ1" style="cursor:pointer;">
+            <option value="">— Select a question —</option>
+            <option>What was the name of your first pet?</option>
+            <option>What is your mother's maiden name?</option>
+            <option>What city were you born in?</option>
+            <option>What was the name of your primary school?</option>
+            <option>What is your oldest sibling's middle name?</option>
+            <option>What street did you grow up on?</option>
+          </select>
+        </div>
+        <div class="field"><label class="field-label">Answer 1</label><input class="f-input" type="text" id="spA1" autocorrect="off" autocapitalize="off" placeholder="Your answer (not case sensitive)"></div>
+        <div class="field">
+          <label class="field-label">Question 2</label>
+          <select class="f-input" id="spQ2" style="cursor:pointer;">
+            <option value="">— Select a question —</option>
+            <option>What was the make of your first car?</option>
+            <option>What is your favourite childhood movie?</option>
+            <option>What was your childhood nickname?</option>
+            <option>What is the name of the town your nearest sibling lives in?</option>
+            <option>What was the name of your first employer?</option>
+            <option>What was your favourite subject at school?</option>
+          </select>
+        </div>
+        <div class="field" style="margin-bottom:20px"><label class="field-label">Answer 2</label><input class="f-input" type="text" id="spA2" autocorrect="off" autocapitalize="off" placeholder="Your answer (not case sensitive)"></div>
+        <button class="btn btn-green btn-block" id="spBtn" onclick="doSetPass()">Set Password</button>
+        <button class="btn btn-outline btn-block" onclick="showAuth('login')" style="margin-top:8px">Back to Sign In</button>
+      </div>
+    </div>
+
+    <div id="pg-resetkey" style="display:none">
+      <div class="auth-logo">Reset Password</div>
+      <div class="auth-tagline">Answer your security questions</div>
+      <div class="auth-card">
+        <div class="alert alert-err" id="rkErr"></div>
+        <div class="alert alert-ok" id="rkOk"></div>
+        <!-- Step 1: enter name to look up questions -->
+        <div id="rk-step1">
+          <div class="field" style="margin-bottom:20px"><label class="field-label">Full Name</label><input class="f-input" type="text" id="rkName" autocorrect="off" placeholder="Enter your full name"></div>
+          <button class="btn btn-green btn-block" id="rkFindBtn" onclick="doFindQuestions()">Continue</button>
+        </div>
+        <!-- Step 2: answer questions + new password -->
+        <div id="rk-step2" style="display:none">
+          <div class="field">
+            <label class="field-label" id="rkQ1Label">Question 1</label>
+            <input class="f-input" type="text" id="rkA1" autocorrect="off" autocapitalize="off" placeholder="Your answer">
+          </div>
+          <div class="field">
+            <label class="field-label" id="rkQ2Label">Question 2</label>
+            <input class="f-input" type="text" id="rkA2" autocorrect="off" autocapitalize="off" placeholder="Your answer">
+          </div>
+          <div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.8px;margin-bottom:12px;padding-top:4px;border-top:1px solid #e2e8f0;">New Password</div>
+          <div class="field"><label class="field-label">New Password</label><input class="f-input" type="password" id="rkNew" placeholder="Minimum 4 characters"></div>
+          <div class="field" style="margin-bottom:20px"><label class="field-label">Confirm Password</label><input class="f-input" type="password" id="rkConfirm" placeholder="Repeat your password"></div>
+          <button class="btn btn-green btn-block" id="rkBtn" onclick="doResetKey()">Reset Password</button>
+          <button class="btn btn-outline btn-block" onclick="document.getElementById('rk-step1').style.display='';document.getElementById('rk-step2').style.display='none';" style="margin-top:8px">← Back</button>
+        </div>
+        <button class="btn btn-outline btn-block" onclick="showAuth('login')" style="margin-top:8px">Back to Sign In</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ── HUB ── -->
+<div id="hubLayer" class="shell" style="display:none">
+
+  <!-- MOBILE HEADER -->
+  <div class="mobile-header">
+    <div class="mh-logo">Oscars</div>
+    <div class="mh-user">
+      <div class="mh-ava" id="mhAva"></div>
+      <div class="mh-name" id="mhName"></div>
+    </div>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sb-brand">
+      <div class="sb-brand-name">Oscars</div>
+      <div class="sb-brand-sub">Employee Portal</div>
+    </div>
+    <div class="sb-user">
+      <div class="sb-avatar" id="sbAvatar"></div>
+      <div>
+        <div class="sb-name" id="sbName"></div>
+        <div class="sb-role">Staff Member</div>
+      </div>
+    </div>
+    <nav class="sb-nav">
+      <div class="nav-section-lbl">Main</div>
+      <div class="nav-item active" id="nav-home" data-tab="home" onclick="goTo('home')">
+        <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h4v-4h2v4h4a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z"/></svg>
+        Home
+      </div>
+      <div class="nav-item" id="nav-schedule" data-tab="schedule" onclick="goTo('schedule')">
+        <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd"/></svg>
+        Schedule
+      </div>
+      <div class="nav-item" id="nav-announcements" data-tab="announcements" onclick="goTo('announcements')">
+        <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 3a1 1 0 00-1.447-.894L8.763 6H5a3 3 0 000 6h.28l1.771 5.316A1 1 0 008 18h1a1 1 0 001-1v-4.382l6.553 3.276A1 1 0 0018 15V3z" clip-rule="evenodd"/></svg>
+        Announcements
+        <span class="nav-badge" id="annBadge"></span>
+      </div>
+      <div class="nav-item" id="nav-engagement" data-tab="engagement" onclick="goTo('engagement')">
+        <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clip-rule="evenodd"/></svg>
+        Engagement
+      </div>
+      <div class="nav-item" id="nav-documents" data-tab="documents" onclick="goTo('documents')">
+        <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clip-rule="evenodd"/></svg>
+        Documents
+      </div>
+      <div class="nav-item" id="nav-profile" data-tab="profile" onclick="goTo('profile')">
+        <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"/></svg>
+        Profile
+        <span class="nav-badge" id="notifBadge"></span>
+      </div>
+    </nav>
+    <div class="sb-foot">
+      <button class="signout" onclick="doLogout()">Sign Out</button>
+    </div>
+  </aside>
+
+  <main class="main">
+
+    <!-- HOME -->
+    <div class="page active" id="page-home">
+      <div class="page-hd">
+        <div class="page-title" id="homeGreeting">Welcome back</div>
+        <div class="page-sub" id="homeWeekSub"></div>
+      </div>
+
+      <!-- Onboarding checklist (new staff only) -->
+      <div id="onboardCard" class="card" style="display:none;margin-bottom:12px;">
+        <div class="card-hd"><div class="card-title">Getting Started</div></div>
+        <div id="onboardChecklist"></div>
+      </div>
+
+      <!-- Stats -->
+      <div class="stats-row" id="homeStats"></div>
+
+      <!-- Announcements (top) -->
+      <div class="card" style="cursor:pointer;" onclick="if(navigator.vibrate)navigator.vibrate(8);goTo('announcements');">
+        <div class="card-hd">
+          <div class="card-title">Announcements</div>
+          <span style="font-size:12px;color:#2563eb;font-weight:600;">View all</span>
+        </div>
+        <div id="homeAnnPreview"><div style="color:#94a3b8;font-size:13px;">Loading...</div></div>
+      </div>
+
+      <!-- Discussions preview (second) -->
+      <div class="card" style="cursor:pointer;" onclick="if(navigator.vibrate)navigator.vibrate(8);goTo('engagement');setTimeout(function(){showEngagementTab('discussions');},100);">
+        <div class="card-hd">
+          <div class="card-title">Discussions</div>
+          <span style="font-size:12px;color:#2563eb;font-weight:600;">View all</span>
+        </div>
+        <div id="homeDiscPreview"><div style="color:#94a3b8;font-size:13px;">Loading...</div></div>
+      </div>
+
+      <!-- Birthday card (everyone sees it, not just admins) -->
+      <div class="card" id="homeBdayCard">
+        <div class="card-hd">
+          <div class="card-title">Calendar</div>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <button id="calAddEventBtn" onclick="toggleCalEventForm()" style="display:none;font-size:11px;font-weight:600;color:#2563eb;background:none;border:none;cursor:pointer;font-family:inherit;padding:2px 6px;">+ Event</button>
+            <button onclick="bdayPrevMonth()" style="width:24px;height:24px;border:1px solid #e2e8f0;border-radius:6px;background:#fff;cursor:pointer;font-size:11px;display:flex;align-items:center;justify-content:center;color:#475569;">&#8249;</button>
+            <span id="bdayMonthLabel" style="font-size:11px;font-weight:600;color:#0f172a;min-width:90px;text-align:center;"></span>
+            <button onclick="bdayNextMonth()" style="width:24px;height:24px;border:1px solid #e2e8f0;border-radius:6px;background:#fff;cursor:pointer;font-size:11px;display:flex;align-items:center;justify-content:center;color:#475569;">&#8250;</button>
+          </div>
+        </div>
+        <!-- Admin event form (hidden by default) -->
+        <div id="calEventForm" style="display:none;margin-bottom:14px;padding:14px;background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;">
+          <div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Add Event</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
+            <input type="text" id="calEventTitle" class="f-input" placeholder="Event title" style="flex:1;min-width:140px;">
+            <input type="date" id="calEventDate" class="f-input" style="width:140px;">
+          </div>
+          <div style="margin-bottom:10px;">
+            <input type="text" id="calEventDesc" class="f-input" placeholder="Description (optional)">
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-green" onclick="saveCalEvent()" style="padding:8px 16px;font-size:13px;" id="calEventSaveBtn">Add</button>
+            <button class="btn btn-outline" onclick="toggleCalEventForm()" style="padding:8px 14px;">Cancel</button>
+          </div>
+          <div class="alert alert-err" id="calEventErr" style="margin-top:8px;"></div>
+        </div>
+        <div id="birthdayList"></div>
+      </div>
+
+
+    </div>
+
+    <!-- AVAILABILITY (staff sets own; admin sees grid below) -->
+    <!-- SCHEDULE: Leave + Availability combined -->
+    <div class="page" id="page-schedule">
+      <div class="page-hd">
+        <div class="page-title">Schedule</div>
+      </div>
+
+      <!-- Sub-tabs -->
+      <div style="display:flex;gap:0;border-bottom:1px solid #e2e8f0;margin-bottom:18px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;">
+        <button class="sched-tab active" id="stab-leave" onclick="showSchedTab('leave')">Leave</button>
+        <button class="sched-tab" id="stab-availability" onclick="showSchedTab('availability')">Availability</button>
+      </div>
+
+      <!-- LEAVE sub-section -->
+      <div id="ssec-leave">
+<!-- Admin leave approval moved to ShiftOps only -->
+        <div class="card">
+          <div class="card-title" style="margin-bottom:18px">New Request</div>
+          <div class="alert alert-err" id="leaveErr"></div>
+          <div class="alert alert-ok" id="leaveOk"></div>
+          <div class="form-grid-2">
+            <div class="field">
+              <label class="field-label">From <span class="req">*</span></label>
+              <input class="f-input" type="date" id="leaveFrom">
+            </div>
+            <div class="field">
+              <label class="field-label">To <span class="req">*</span></label>
+              <input class="f-input" type="date" id="leaveTo">
+            </div>
+          </div>
+          <div class="field">
+            <label class="field-label">Reason <span class="req">*</span></label>
+            <input class="f-input" type="text" id="leaveReason" placeholder="e.g. Annual leave, Medical appointment">
+          </div>
+          <button class="btn btn-green btn-block" id="leaveBtn" onclick="submitLeave()">Submit Leave Request</button>
+        </div>
+        <div class="card">
+          <div class="card-title" style="margin-bottom:16px">My Leave History</div>
+          <div id="leaveHistory"></div>
+        </div>
+      </div>
+
+      <!-- AVAILABILITY sub-section -->
+      <div id="ssec-availability" style="display:none;">
+        <div class="lock-notice" id="availLock" style="display:none"></div>
+        <div id="availSuccess" style="display:none">
+          <div class="card" style="text-align:center;padding:28px 20px;">
+            <div style="width:44px;height:44px;border-radius:50%;background:#dcfce7;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;color:#16a34a;margin:0 auto 12px;">&#10003;</div>
+            <div style="font-size:16px;font-weight:700;color:#0f172a;margin-bottom:6px;">Availability Saved</div>
+            <div style="font-size:13px;color:#64748b;margin-bottom:8px;line-height:1.6;" id="availSavedPeriod"></div>
+            <button onclick="showAvailForm()" class="btn btn-outline" style="padding:9px 20px;font-size:13px;margin-top:10px;">Edit Availability</button>
+          </div>
+          <div id="availSuccessSummary"></div>
+        </div>
+        <div id="availFormArea">
+          <div class="card" style="margin-bottom:12px">
+            <div class="card-title" style="margin-bottom:12px">Period</div>
+            <div style="display:flex;gap:8px;margin-bottom:12px;">
+              <button id="period-ongoing" onclick="setPeriod('ongoing')" class="ao yes" style="flex:1;padding:9px;font-size:13px;">Ongoing</button>
+              <button id="period-range" onclick="setPeriod('range')" class="ao" style="flex:1;padding:9px;font-size:13px;">Date Range</button>
+            </div>
+            <div id="dateRangeFields" style="display:none;gap:10px;grid-template-columns:1fr 1fr;">
+              <div>
+                <div style="font-size:11px;font-weight:600;color:#94a3b8;margin-bottom:5px;text-transform:uppercase;">From</div>
+                <input type="date" id="availFrom" class="f-input">
+              </div>
+              <div>
+                <div style="font-size:11px;font-weight:600;color:#94a3b8;margin-bottom:5px;text-transform:uppercase;">Until</div>
+                <input type="date" id="availUntil" class="f-input">
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title" style="margin-bottom:16px">Weekly Schedule</div>
+            <div id="availForm"></div>
+          </div>
+          <div class="alert alert-err" id="availErr"></div>
+          <div id="availBtnArea">
+            <button class="btn btn-green btn-block" id="availBtn" onclick="submitAvail()">Save Availability</button>
+          </div>
+        </div>
+        <!-- Admin: all staff availability grid -->
+        <div id="adminAvailSection" style="display:none;margin-top:20px;">
+          <div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;">All Staff Availability</div>
+          <div id="adminContent"><div style="color:#94a3b8;text-align:center;padding:24px;font-size:13px;">Loading...</div></div>
+        </div>
+      </div>
+    </div>
+
+        <!-- DOCUMENTS -->
+    <div class="page" id="page-documents">
+      <div class="page-hd">
+        <div class="page-title">Documents</div>
+        <div class="page-sub" id="docsSub">Resources shared with your team</div>
+      </div>
+
+      <!-- Search -->
+      <div style="position:relative;margin-bottom:14px;">
+        <svg style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#94a3b8;" width="16" height="16" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd"/></svg>
+        <input type="text" id="docsSearch" class="f-input" placeholder="Search documents..." style="padding-left:38px;" oninput="filterDocs()">
+      </div>
+
+      <!-- Admin upload form -->
+      <div id="docsAdminUpload" style="display:none;" class="card">
+        <div class="card-title" style="margin-bottom:14px;">Add Document</div>
+        <div class="field">
+          <label class="field-label">Title <span class="req">*</span></label>
+          <input class="f-input" type="text" id="docTitle" placeholder="e.g. Opening Procedures">
+        </div>
+        <div class="field">
+          <label class="field-label">File <span class="req">*</span></label>
+          <div id="docDropZone" onclick="document.getElementById('docFile').click()" style="border:2px dashed #e2e8f0;border-radius:12px;padding:24px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s;" ondragover="event.preventDefault();this.style.borderColor='#2563eb';this.style.background='#eff6ff'" ondragleave="this.style.borderColor='#e2e8f0';this.style.background=''" ondrop="handleDocDrop(event)">
+            <svg width="28" height="28" viewBox="0 0 20 20" fill="#94a3b8" style="margin:0 auto 8px;display:block;"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM6.293 6.707a1 1 0 010-1.414l3-3a1 1 0 011.414 0l3 3a1 1 0 01-1.414 1.414L11 5.414V13a1 1 0 11-2 0V5.414L7.707 6.707a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
+            <div id="docDropLabel" style="font-size:13px;font-weight:600;color:#475569;">Click to choose a file or drag it here</div>
+            <div style="font-size:11px;color:#94a3b8;margin-top:4px;">PDF, Word, Excel, images — any file up to 50MB</div>
+          </div>
+          <input type="file" id="docFile" style="display:none;" onchange="handleDocFileSelect(this)">
+        </div>
+        <div class="field">
+          <label class="field-label">Visible to Teams</label>
+          <div id="docTeamPicker" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;"></div>
+          <div class="field-hint">Leave all unselected to share with everyone.</div>
+        </div>
+        <div class="alert alert-err" id="docErr"></div>
+        <div class="alert alert-ok" id="docOk"></div>
+        <!-- Upload progress -->
+        <div id="docProgress" style="display:none;margin-bottom:12px;">
+          <div style="font-size:12px;color:#475569;margin-bottom:6px;" id="docProgressLabel">Uploading...</div>
+          <div style="background:#e2e8f0;border-radius:4px;height:6px;overflow:hidden;">
+            <div id="docProgressBar" style="height:100%;background:#2563eb;border-radius:4px;width:0%;transition:width .2s;"></div>
+          </div>
+        </div>
+        <button class="btn btn-green" onclick="uploadDocument()" id="docUploadBtn" style="padding:10px 22px;">Upload Document</button>
+      </div>
+
+      <!-- Document list -->
+      <div id="docsList"><div class="skeleton-card"><div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;"><div class="skeleton skeleton-avatar"></div><div style="flex:1;"><div class="skeleton skeleton-text med"></div><div class="skeleton skeleton-text short"></div></div></div><div class="skeleton skeleton-text full"></div><div class="skeleton skeleton-text med"></div></div><div class="skeleton-card"><div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;"><div class="skeleton skeleton-avatar"></div><div style="flex:1;"><div class="skeleton skeleton-text med"></div><div class="skeleton skeleton-text short"></div></div></div><div class="skeleton skeleton-text full"></div><div class="skeleton skeleton-text med"></div></div><div class="skeleton-card"><div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;"><div class="skeleton skeleton-avatar"></div><div style="flex:1;"><div class="skeleton skeleton-text med"></div><div class="skeleton skeleton-text short"></div></div></div><div class="skeleton skeleton-text full"></div><div class="skeleton skeleton-text med"></div></div></div>
+    </div>
+
+
+    <!-- ANNOUNCEMENTS PAGE (standalone, accessible to all) -->
+    <div class="page" id="page-announcements">
+      <div class="page-hd">
+        <div class="page-title">Announcements</div>
+        <div class="page-sub">Updates from management</div>
+      </div>
+      <!-- Admin post form -->
+      <div id="annAdminPost" style="display:none;" class="card">
+        <div class="card-title" style="margin-bottom:12px;">New Announcement</div>
+        <div class="field"><input class="f-input" type="text" id="annTitle" placeholder="Title"></div>
+        <div class="field"><textarea id="annBody" rows="3" class="f-input" placeholder="Write your announcement..." style="resize:none;"></textarea></div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#475569;cursor:pointer;"><input type="checkbox" id="annPinned"> Pin to top</label>
+          <div style="flex:1;"></div>
+          <button class="btn btn-green" style="padding:9px 18px;" onclick="postAnnouncement()" id="annPostBtn">Post</button>
+        </div>
+      </div>
+      <div id="annList"><div style="text-align:center;color:#94a3b8;padding:32px;font-size:13px;">Loading...</div></div>
+    </div>
+
+    <!-- ENGAGEMENT PAGE: Discussions + Feedback -->
+    <div class="page" id="page-engagement">
+      <div class="page-hd">
+        <div class="page-title">Engagement</div>
+      </div>
+      <!-- Sub-tabs -->
+      <div style="display:flex;gap:0;border-bottom:1px solid #e2e8f0;margin-bottom:16px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;">
+        <button class="eng-tab active" id="etab-discussions" onclick="showEngagementTab('discussions')">Discussions</button>
+        <button class="eng-tab" id="etab-feedback" onclick="showEngagementTab('feedback')">Feedback</button>
+      </div>
+      <!-- DISCUSSIONS -->
+      <div id="esec-discussions">
+        <div class="card" style="margin-bottom:14px;">
+          <div class="card-title" style="margin-bottom:12px;">Start a Discussion</div>
+          <div class="field"><input class="f-input" type="text" id="discTitle" placeholder="What's on your mind?"></div>
+          <div class="field"><textarea id="discBody" rows="3" class="f-input" placeholder="Add more detail (optional)..." style="resize:none;"></textarea></div>
+          <div class="alert alert-err" id="discErr"></div>
+          <div class="alert alert-ok" id="discOk"></div>
+          <button class="btn btn-green" onclick="postDiscussion()" id="discPostBtn" style="padding:9px 18px;">Post</button>
+        </div>
+        <div id="discList"><div style="text-align:center;color:#94a3b8;padding:32px;font-size:13px;">Loading...</div></div>
+      </div>
+      <!-- FEEDBACK -->
+      <div id="esec-feedback" style="display:none;">
+        <div class="card" style="margin-bottom:14px;">
+          <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:13px;color:#0369a1;line-height:1.6;">Your feedback is completely anonymous — no name, no session, no way to trace it back to you.</div>
+          <div class="alert alert-err" id="fbErr"></div>
+          <div class="alert alert-ok" id="fbOk"></div>
+          <div class="field"><label class="field-label">Your Feedback</label><textarea id="fbText" class="f-input" rows="4" placeholder="Share anything — shift scheduling, workplace suggestions, concerns..."></textarea></div>
+          <button class="btn btn-green btn-block" id="fbBtn" onclick="submitFeedback()">Submit Anonymously</button>
+        </div>
+        <!-- Staff: view their own past feedback -->
+        <div id="myFeedbackList"></div>
+      </div>
+    </div>
+
+    <!-- PROFILE -->
+    <div class="page" id="page-profile">
+      <div class="page-hd">
+        <div class="page-title" id="profPageTitle">My Profile</div>
+      </div>
+
+      <!-- Section switcher -->
+      <div style="display:flex;gap:0;overflow-x:auto;border-bottom:1px solid #e2e8f0;margin-bottom:18px;-webkit-overflow-scrolling:touch;scrollbar-width:none;">
+        <button class="prof-tab active" id="ptab-account" onclick="showProfileSection('account')">Account</button>
+        <button class="prof-tab" id="ptab-adminpanel" onclick="showProfileSection('adminpanel')" style="display:none">Admin</button>
+      </div>
+
+      <!-- ACCOUNT section -->
+      <div id="psec-account">
+        <div class="card" style="margin-bottom:12px">
+          <div style="display:flex;align-items:center;gap:14px;">
+            <div style="width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,#2563eb,#7c3aed);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+              <span style="color:#fff;font-size:17px;font-weight:800;" id="profAva">?</span>
+            </div>
+            <div>
+              <div style="font-size:15px;font-weight:700;color:#0f172a;" id="profName"></div>
+              <div style="font-size:12px;color:#94a3b8;margin-top:2px;" id="profRole">Staff</div>
+            </div>
+          </div>
+        </div>
+        <div class="card" style="margin-bottom:12px">
+          <div class="card-hd"><div class="card-title">Password</div><button class="card-action" onclick="toggleSection('profPassSection')">Change</button></div>
+          <div id="profPassSection" style="display:none;margin-top:12px;">
+            <div class="alert alert-err" id="profPassErr" style="margin-bottom:10px;"></div>
+            <div class="alert alert-ok" id="profPassOk" style="margin-bottom:10px;"></div>
+            <div class="field"><label class="field-label">Current Password</label><input class="f-input" type="password" id="profPassCurrent" placeholder="Current password"></div>
+            <div class="field"><label class="field-label">New Password</label><input class="f-input" type="password" id="profPassNew" placeholder="Minimum 4 characters"></div>
+            <div class="field" style="margin-bottom:12px;"><label class="field-label">Confirm</label><input class="f-input" type="password" id="profPassConfirm" placeholder="Repeat new password"></div>
+            <div style="display:flex;gap:8px;"><button class="btn btn-green" style="flex:1;" id="profPassBtn" onclick="changePassword()">Update</button><button class="btn btn-outline" style="padding:10px 14px;" onclick="toggleSection('profPassSection')">Cancel</button></div>
+          </div>
+        </div>
+        <div class="card" style="margin-bottom:12px">
+          <div class="card-hd"><div class="card-title">Security Questions</div><button class="card-action" onclick="toggleSection('profSqSection');loadCurrentQuestions()">Edit</button></div>
+          <div id="profSqStatus" style="font-size:13px;color:#475569;margin-top:2px;"></div>
+          <div id="profSqSection" style="display:none;margin-top:12px;">
+            <div class="alert alert-err" id="profSqErr" style="margin-bottom:10px;"></div>
+            <div class="alert alert-ok" id="profSqOk" style="margin-bottom:10px;"></div>
+            <div class="field"><label class="field-label">Question 1</label><select class="f-input" id="profQ1"><option value="">— Select —</option><option>What was the name of your first pet?</option><option>What is your mother's maiden name?</option><option>What city were you born in?</option><option>What was the name of your primary school?</option><option>What is your oldest sibling's middle name?</option><option>What street did you grow up on?</option></select></div>
+            <div class="field"><label class="field-label">Answer 1</label><input class="f-input" type="text" id="profA1" autocorrect="off" autocapitalize="off" placeholder="Not case sensitive"></div>
+            <div class="field"><label class="field-label">Question 2</label><select class="f-input" id="profQ2"><option value="">— Select —</option><option>What was the make of your first car?</option><option>What is your favourite childhood movie?</option><option>What was your childhood nickname?</option><option>What is the name of the town your nearest sibling lives in?</option><option>What was the name of your first employer?</option><option>What was your favourite subject at school?</option></select></div>
+            <div class="field" style="margin-bottom:12px;"><label class="field-label">Answer 2</label><input class="f-input" type="text" id="profA2" autocorrect="off" autocapitalize="off" placeholder="Not case sensitive"></div>
+            <div style="display:flex;gap:8px;"><button class="btn btn-green" style="flex:1;" id="profSqBtn" onclick="saveSecurityQuestions()">Save</button><button class="btn btn-outline" style="padding:10px 14px;" onclick="toggleSection('profSqSection')">Cancel</button></div>
+          </div>
+        </div>
+        <div class="card" style="margin-bottom:12px">
+          <div class="card-hd"><div class="card-title">Birthday</div></div>
+          <div class="alert alert-err" id="profBdayErr" style="margin-bottom:8px;"></div>
+          <div class="alert alert-ok" id="profBdayOk" style="margin-bottom:8px;"></div>
+          <div style="display:flex;gap:8px;align-items:center;"><input type="date" id="profBirthday" class="f-input" style="flex:1;"><button class="btn btn-green" style="padding:10px 16px;" onclick="saveBirthday()">Save</button></div>
+          <div style="font-size:11px;color:#94a3b8;margin-top:8px;">Only visible to admins.</div>
+        </div>
+        <div class="card" style="margin-bottom:12px">
+          <div class="card-hd"><div class="card-title">Appearance</div></div>
+          <div style="display:flex;align-items:center;justify-content:space-between;">
+            <div><div style="font-size:13px;font-weight:600;color:#0f172a;">Dark Mode</div><div style="font-size:11px;color:#94a3b8;margin-top:2px;">Easier on the eyes at night</div></div>
+            <button onclick="toggleDarkMode()" style="width:48px;height:26px;border-radius:13px;border:none;cursor:pointer;background:#e2e8f0;position:relative;transition:background .2s;" id="dmSwitch"><div style="position:absolute;top:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:left .2s;left:3px;" id="dmSwitchThumb"></div></button>
+          </div>
+        </div>
+        <button class="btn btn-outline btn-block" onclick="doLogout()" style="color:#dc2626;border-color:#fca5a5;">Sign Out</button>
+      </div>
+
+<!-- DISCUSSIONS section -->
+      <!-- ANNOUNCEMENTS section (admin post, all read) -->
+      <div id="psec-announcements" style="display:none;">
+        <div id="annAdminPost" style="display:none;" class="card">
+          <div class="card-title" style="margin-bottom:12px;">New Announcement</div>
+          <div class="field"><input class="f-input" type="text" id="annTitle" placeholder="Title"></div>
+          <div class="field"><textarea id="annBody" rows="3" class="f-input" placeholder="Write your announcement..." style="resize:none;"></textarea></div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#475569;cursor:pointer;"><input type="checkbox" id="annPinned"> Pin to top</label>
+            <div style="flex:1;"></div>
+            <button class="btn btn-green" style="padding:9px 18px;" onclick="postAnnouncement()" id="annPostBtn">Post</button>
+          </div>
+        </div>
+        <div id="annList"><div class="skeleton-card"><div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;"><div class="skeleton skeleton-avatar"></div><div style="flex:1;"><div class="skeleton skeleton-text med"></div><div class="skeleton skeleton-text short"></div></div></div><div class="skeleton skeleton-text full"></div><div class="skeleton skeleton-text med"></div></div><div class="skeleton-card"><div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;"><div class="skeleton skeleton-avatar"></div><div style="flex:1;"><div class="skeleton skeleton-text med"></div><div class="skeleton skeleton-text short"></div></div></div><div class="skeleton skeleton-text full"></div><div class="skeleton skeleton-text med"></div></div><div class="skeleton-card"><div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;"><div class="skeleton skeleton-avatar"></div><div style="flex:1;"><div class="skeleton skeleton-text med"></div><div class="skeleton skeleton-text short"></div></div></div><div class="skeleton skeleton-text full"></div><div class="skeleton skeleton-text med"></div></div></div>
+      </div>
+
+      <!-- DISCUSSIONS section (all staff can post) -->
+      <div id="psec-discussions" style="display:none;">
+        <!-- New discussion form (all staff) -->
+        <div class="card" style="margin-bottom:14px;">
+          <div class="card-title" style="margin-bottom:12px;">Start a Discussion</div>
+          <div class="field"><input class="f-input" type="text" id="discTitle" placeholder="What's on your mind?"></div>
+          <div class="field"><textarea id="discBody" rows="3" class="f-input" placeholder="Add more detail (optional)..." style="resize:none;"></textarea></div>
+          <div class="alert alert-err" id="discErr"></div>
+          <div class="alert alert-ok" id="discOk"></div>
+          <button class="btn btn-green" onclick="postDiscussion()" id="discPostBtn" style="padding:9px 18px;">Post</button>
+        </div>
+        <div id="discList"><div class="skeleton-card"><div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;"><div class="skeleton skeleton-avatar"></div><div style="flex:1;"><div class="skeleton skeleton-text med"></div><div class="skeleton skeleton-text short"></div></div></div><div class="skeleton skeleton-text full"></div><div class="skeleton skeleton-text med"></div></div><div class="skeleton-card"><div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;"><div class="skeleton skeleton-avatar"></div><div style="flex:1;"><div class="skeleton skeleton-text med"></div><div class="skeleton skeleton-text short"></div></div></div><div class="skeleton skeleton-text full"></div><div class="skeleton skeleton-text med"></div></div><div class="skeleton-card"><div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;"><div class="skeleton skeleton-avatar"></div><div style="flex:1;"><div class="skeleton skeleton-text med"></div><div class="skeleton skeleton-text short"></div></div></div><div class="skeleton skeleton-text full"></div><div class="skeleton skeleton-text med"></div></div></div>
+      </div>
+
+      <!-- NOTIFICATIONS section -->
+      <div id="psec-notifications" style="display:none;">
+        <div id="notifList"><div class="skeleton-card"><div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;"><div class="skeleton skeleton-avatar"></div><div style="flex:1;"><div class="skeleton skeleton-text med"></div><div class="skeleton skeleton-text short"></div></div></div><div class="skeleton skeleton-text full"></div><div class="skeleton skeleton-text med"></div></div><div class="skeleton-card"><div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;"><div class="skeleton skeleton-avatar"></div><div style="flex:1;"><div class="skeleton skeleton-text med"></div><div class="skeleton skeleton-text short"></div></div></div><div class="skeleton skeleton-text full"></div><div class="skeleton skeleton-text med"></div></div></div>
+      </div>
+
+      <!-- FEEDBACK section (staff only - anonymous) -->
+      <div id="psec-feedback" style="display:none;">
+        <div class="card">
+          <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:13px;color:#0369a1;line-height:1.6;">Your feedback is completely anonymous — no name, no session, no way to trace it back to you.</div>
+          <div class="alert alert-err" id="fbErr"></div>
+          <div class="alert alert-ok" id="fbOk"></div>
+          <div class="field"><label class="field-label">Your Feedback</label><textarea id="fbText" class="f-input" rows="5" placeholder="Share anything — shift scheduling, workplace suggestions, concerns..."></textarea></div>
+          <button class="btn btn-green btn-block" id="fbBtn" onclick="submitFeedback()">Submit Anonymously</button>
+        </div>
+      </div>
+
+      <!-- ADMIN PANEL section -->
+      <div id="psec-adminpanel" style="display:none;">
+        <div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Staff Availability</div>
+        <div class="card" style="padding:14px;margin-bottom:16px;">
+          <div id="adminContent2"><div style="color:#94a3b8;text-align:center;padding:16px;font-size:13px;">Loading...</div></div>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+          <div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;">Anonymous Feedback</div>
+          <button onclick="loadAdminFeedback2()" style="font-size:12px;font-weight:600;color:#2563eb;background:none;border:none;cursor:pointer;font-family:inherit;">Refresh</button>
+        </div>
+        <div class="card" style="padding:14px;">
+          <div id="adminFeedbackList2"><div style="color:#94a3b8;font-size:13px;text-align:center;padding:12px;">Loading...</div></div>
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- BOTTOM NAV (mobile) -->
+  <nav class="bottom-nav">
+    <div class="bn-items" id="bottomNavGrid">
+      <div class="bn-item active" id="bn-home" data-tab="home" onclick="if(navigator.vibrate)navigator.vibrate(8);goTo('home')">
+        <svg class="bn-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h4v-4h2v4h4a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z"/></svg>
+        <div class="bn-label">Home</div>
+      </div>
+      <div class="bn-item" id="bn-schedule" data-tab="schedule" onclick="if(navigator.vibrate)navigator.vibrate(8);goTo('schedule')">
+        <svg class="bn-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd"/></svg>
+        <div class="bn-label">Schedule</div>
+      </div>
+      <div class="bn-item" id="bn-announcements" data-tab="announcements" onclick="if(navigator.vibrate)navigator.vibrate(8);goTo('announcements')">
+        <svg class="bn-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 3a1 1 0 00-1.447-.894L8.763 6H5a3 3 0 000 6h.28l1.771 5.316A1 1 0 008 18h1a1 1 0 001-1v-4.382l6.553 3.276A1 1 0 0018 15V3z" clip-rule="evenodd"/></svg>
+        <div class="bn-label">News</div>
+        <div class="bn-badge" id="bnAnnBadge"></div>
+      </div>
+      <div class="bn-item" id="bn-engagement" data-tab="engagement" onclick="if(navigator.vibrate)navigator.vibrate(8);goTo('engagement')">
+        <svg class="bn-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clip-rule="evenodd"/></svg>
+        <div class="bn-label">Engage</div>
+      </div>
+      <div class="bn-item" id="bn-documents" data-tab="documents" onclick="if(navigator.vibrate)navigator.vibrate(8);goTo('documents')">
+        <svg class="bn-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clip-rule="evenodd"/></svg>
+        <div class="bn-label">Docs</div>
+      </div>
+      <div class="bn-item" id="bn-profile" data-tab="profile" onclick="if(navigator.vibrate)navigator.vibrate(8);goTo('profile')">
+        <svg class="bn-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"/></svg>
+        <div class="bn-label">Profile</div>
+        <div class="bn-badge" id="bnNotifBadge"></div>
+      </div>
+      <div class="bn-item" id="bn-feedback" data-tab="feedback" style="display:none;"></div>
+      <div class="bn-item" id="bn-admin" data-tab="admin" style="display:none;"></div>
+    </div>
+  </nav>
+
+<button id="dmToggle" onclick="toggleDarkMode()" title="Toggle dark mode">🌙</button>
+</div>
+
+<script>
+const SB="https://jcfgldqrdbfkgbixszds.supabase.co";
+const KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpjZmdsZHFyZGJma2diaXhzemRzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1Nzc3NzEsImV4cCI6MjA5MDE1Mzc3MX0.Wj8cCpnlsoZOPj5sKWeEdfvgjG4Nc-UuTTYgbcrPfeI";
+let STAFF=["Abhishek Karki","Anish Dhodari","Anurag Dahal","Asha Aryal","Bikash Dahal","Kushal Piya","Monika Kawadi","Musica Karki","Nabina Uchchai Thakuri","Nidhi Subedi","Nippu Pokhrel","Pavneet Kaur","Presna Aryal","Prashna Sapkota","Roshana Puri","Sachin Sanwa Limbu","Sagun Panta","Saksham Shrestha","Sami Basnet","Sameekshya Regmi","Sanju Gharti Magar","Sandhya Sangroula","Sanskar Pokharel","Santosh Singh Basnet","Siddhartha Gautam","Supriya Thapa","Tejaswee Bhetwal","Umisha Ghimire","Usam Adhikari"]; // fallback, gets replaced by Supabase
+
+async function loadStaffList(){
+  try{
+    const rows=await sbGet("staff_names","?order=name.asc");
+    if(rows&&rows.length>0){
+      STAFF=rows.map(r=>r.name).filter(Boolean).sort();
+    }
+    // Only keep hardcoded fallback if Supabase returns nothing at all
+  }catch(e){console.warn(e);}
+}
+
+// Separate function that always fetches fresh — used at login to ensure removed staff can't get in
+async function validateStaffName(name){
+  try{
+    const rows=await sbGet("staff_names","?name=ilike."+encodeURIComponent(name.trim()));
+    if(rows&&rows.length>0)return rows[0].name; // return the canonical casing from DB
+    return null;
+  }catch(e){
+    return STAFF.find(n=>n.toLowerCase().trim()===name.toLowerCase().trim())||null;
+  }
+}
+const DAYS=["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
+const DS=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+
+function gMon(d){const r=new Date(d),day=r.getDay();r.setDate(r.getDate()-day+(day===0?-6:1));r.setHours(0,0,0,0);return r;}
+function addD(d,n){const r=new Date(d);r.setDate(r.getDate()+n);return r;}
+function fmt(d){return new Date(d).toLocaleDateString("en-AU",{day:"numeric",month:"short"});}
+function fmtF(d){return new Date(d).toLocaleDateString("en-AU",{day:"numeric",month:"short",year:"numeric"});}
+function iso(d){return new Date(d).toISOString().split("T")[0];}
+function wkL(ws){return fmt(ws)+" \u2013 "+fmt(addD(ws,6));}
+function isLocked(ws){const lk=addD(gMon(ws),-2);lk.setHours(0,0,0,0);return new Date()>=lk;}
+
+let weekStart=gMon(new Date()),rWS=gMon(new Date()),me=null;
+
+
+
+// ── SCHEDULE SUB-TABS ──
+function showSchedTab(tab){
+  ['leave','availability'].forEach(s=>{
+    const el=document.getElementById('ssec-'+s);
+    if(el)el.style.display=s===tab?'block':'none';
+    const t=document.getElementById('stab-'+s);
+    if(t)t.classList.toggle('active',s===tab);
+  });
+  if(tab==='leave'){loadLeaveHistory();}
+  if(tab==='availability'){
+    checkLock();
+    if(myIsAdmin){
+      document.getElementById('adminAvailSection').style.display='block';
+      loadAdminAvailGrid();
+    }else{
+      document.getElementById('adminAvailSection').style.display='none';
+    }
+  }
+}
+
+// ── DOCUMENTS ──
+let myTeam = '';
+let docsData = [];
+
+async function loadDocuments(){
+  const el = document.getElementById('docsList');
+  const adminArea = document.getElementById('docsAdminUpload');
+  const sub = document.getElementById('docsSub');
+  if(!el) return;
+  if(adminArea) adminArea.style.display = myIsAdmin ? 'block' : 'none';
+  el.innerHTML = '<div style="color:#94a3b8;text-align:center;padding:32px;font-size:13px;">Loading...</div>';
+  try{
+    // Get my team — gracefully handle missing column
+    if(!myTeam){
+      try{
+        const creds = await sbGet('staff_credentials','?staff_name=eq.'+encodeURIComponent(me)+'&select=team');
+        myTeam = (creds.length && creds[0] && creds[0].team) ? creds[0].team : '';
+      }catch(e){ myTeam = ''; }
+    }
+    if(sub) sub.textContent = myTeam ? 'Documents for ' + myTeam + ' team' : 'All documents';
+
+    // Fetch documents
+    const r = await fetch(SB+'/rest/v1/documents?order=created_at.desc',{
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Accept':'application/json'}
+    });
+    if(!r.ok){ el.innerHTML='<div style="color:#dc2626;text-align:center;padding:24px;font-size:13px;">Could not load documents ('+r.status+').</div>'; return; }
+    docsData = await r.json();
+
+    // Filter by team
+    const filtered = myIsAdmin ? docsData : docsData.filter(d => {
+      if(!d.teams || d.teams.length === 0) return true; // shared with all
+      if(!myTeam) return false;
+      return Array.isArray(d.teams) ? d.teams.includes(myTeam) : false;
+    });
+
+    renderDocs(filtered);
+    if(myIsAdmin) loadDocTeamPicker();
+  }catch(e){
+    console.warn('loadDocuments error:', e);
+    el.innerHTML = '<div style="color:#dc2626;text-align:center;padding:24px;font-size:13px;">Could not load documents. Check your connection.</div>';
+  }
+}
+
+function renderDocs(docs){
+  const el=document.getElementById('docsList');
+  if(!el)return;
+  if(!docs.length){el.innerHTML='<div style="text-align:center;padding:40px 20px;"><svg width="40" height="40" viewBox="0 0 20 20" fill="#e2e8f0" style="margin:0 auto 12px;display:block;"><path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clip-rule="evenodd"/></svg><div style="font-size:14px;font-weight:600;color:#475569;margin-bottom:6px;">No documents yet</div><div style="font-size:12px;color:#94a3b8;">Documents shared with your team will appear here.</div></div>';return;}
+  const pdfSvg='<svg width="18" height="18" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clip-rule="evenodd"/></svg>';
+  const linkSvg='<svg width="18" height="18" viewBox="0 0 20 20" fill="currentColor"><path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z"/><path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z"/></svg>';
+  el.innerHTML='<div style="display:flex;flex-direction:column;gap:8px;">'+docs.map(function(d){
+    const age=(new Date()-new Date(d.created_at))/(1000*60*60*24);
+    const isNew=age<3;
+    const url=d.url||'#';
+    const ext=url.split('.').pop().toLowerCase();
+    let iconClass='doc-icon-link', iconSvg=linkSvg;
+    if(ext==='pdf'||url.includes('/documents/')){iconClass='doc-icon-pdf';iconSvg=pdfSvg;}
+    else if(['doc','docx'].includes(ext)||url.includes('docs.google')){iconClass='doc-icon-doc';iconSvg=pdfSvg;}
+    else if(['png','jpg','jpeg','gif','webp'].includes(ext)){iconClass='doc-icon-img';iconSvg=linkSvg;}
+    const teamTags=(d.teams&&d.teams.length)?d.teams.map(function(t){return'<span class="doc-team-tag">'+t+'</span>';}).join(''):'';
+    const deleteBtn=myIsAdmin?'<button class="doc-delete" data-id="'+d.id+'" onclick="event.preventDefault();deleteDocument(this.dataset.id)">Delete</button>':'';
+    const isStorageFile=url.includes('/storage/v1/object/public/');
+    const linkAttr=isStorageFile?'href="'+url+'" download':'href="'+url+'" target="_blank" rel="noopener"';
+    return'<a '+linkAttr+' class="doc-item">'+
+      '<div class="doc-icon '+iconClass+'">'+iconSvg+'</div>'+
+      '<div style="flex:1;min-width:0;">'+
+        '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">'+
+          '<span class="doc-title">'+d.title+'</span>'+
+          (isNew?'<span class="doc-badge-new">New</span>':'')+
+        '</div>'+
+        (teamTags?'<div style="margin-top:4px;">'+teamTags+'</div>':'')+
+      '</div>'+deleteBtn+'</a>';
+  }).join('')+'</div>';
+}
+
+function toggleDocCat(header){
+  const items=header.nextElementSibling;
+  const chevron=header.querySelector('.doc-cat-chevron');
+  const isOpen=items.style.display!=='none';
+  items.style.display=isOpen?'none':'flex';
+  chevron.classList.toggle('open',!isOpen);
+}
+
+function filterDocs(){
+  const q=document.getElementById('docsSearch').value.toLowerCase().trim();
+  if(!q){renderDocs(myIsAdmin?docsData:docsData.filter(d=>!d.teams||d.teams.length===0||(myTeam&&d.teams.includes(myTeam))));return;}
+  renderDocs(docsData.filter(d=>d.title.toLowerCase().includes(q)||(d.category||'').toLowerCase().includes(q)));
+}
+
+async function loadDocTeamPicker(){
+  try{
+    const rows=await sbGet('staff_credentials','?select=team&team=not.is.null');
+    const teams=[...new Set(rows.map(r=>r.team).filter(Boolean))].sort();
+    const picker=document.getElementById('docTeamPicker');
+    if(!picker)return;
+    picker.innerHTML=teams.map(t=>'<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;color:#475569;"><input type="checkbox" class="doc-team-cb" value="'+t+'"> '+t+'</label>').join('');
+  }catch(e){console.warn(e);}
+}
+
+let docSelectedFile = null;
+
+function handleDocFileSelect(input){
+  if(input.files&&input.files[0]) setDocFile(input.files[0]);
+}
+function handleDocDrop(e){
+  e.preventDefault();
+  document.getElementById('docDropZone').style.borderColor='#e2e8f0';
+  document.getElementById('docDropZone').style.background='';
+  if(e.dataTransfer.files&&e.dataTransfer.files[0]) setDocFile(e.dataTransfer.files[0]);
+}
+function setDocFile(file){
+  docSelectedFile=file;
+  const label=document.getElementById('docDropLabel');
+  const zone=document.getElementById('docDropZone');
+  if(label){
+    label.textContent=file.name;
+    label.style.color='#2563eb';
+  }
+  zone.style.borderColor='#2563eb';
+  zone.style.background='#eff6ff';
+  // Auto-fill title if empty
+  const titleEl=document.getElementById('docTitle');
+  if(titleEl&&!titleEl.value){
+    titleEl.value=file.name.replace(/\.[^.]+$/,'').replace(/[-_]/g,' ');
+  }
+}
+
+async function uploadDocument(){
+  const title=document.getElementById('docTitle').value.trim();
+  const err=document.getElementById('docErr'),ok=document.getElementById('docOk');
+  const progress=document.getElementById('docProgress');
+  const progressBar=document.getElementById('docProgressBar');
+  const progressLabel=document.getElementById('docProgressLabel');
+  err.classList.remove('show');ok.classList.remove('show');
+  if(!title){err.textContent='Please enter a title.';err.classList.add('show');return;}
+  if(!docSelectedFile){err.textContent='Please select a file to upload.';err.classList.add('show');return;}
+  const teams=Array.from(document.querySelectorAll('.doc-team-cb:checked')).map(cb=>cb.value);
+  const btn=document.getElementById('docUploadBtn');
+  btn.disabled=true;btn.innerHTML='<span class="sp"></span> Uploading...';
+  if(progress)progress.style.display='block';
+  try{
+    // Upload file to Supabase Storage
+    const fileName=Date.now()+'-'+docSelectedFile.name.replace(/[^a-zA-Z0-9._-]/g,'_');
+    if(progressLabel)progressLabel.textContent='Uploading '+docSelectedFile.name+'...';
+    if(progressBar)progressBar.style.width='30%';
+    const uploadRes=await fetch(SB+'/storage/v1/object/documents/'+fileName,{
+      method:'POST',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':docSelectedFile.type||'application/octet-stream'},
+      body:docSelectedFile
+    });
+    if(!uploadRes.ok){
+      const errBody=await uploadRes.text();
+      throw new Error('Upload failed: '+uploadRes.status+' '+errBody);
+    }
+    if(progressBar)progressBar.style.width='70%';
+    // Build public URL
+    const fileUrl=SB+'/storage/v1/object/public/documents/'+fileName;
+    if(progressLabel)progressLabel.textContent='Saving document info...';
+    // Save metadata to documents table
+    const res=await fetch(SB+'/rest/v1/documents',{
+      method:'POST',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({title,category:'General',url:fileUrl,teams,uploaded_by:me,is_new:true})
+    });
+    if(progressBar)progressBar.style.width='100%';
+    if(res.ok||res.status===201){
+      ok.textContent='Document uploaded successfully!';ok.classList.add('show');
+      document.getElementById('docTitle').value='';
+      document.getElementById('docFile').value='';
+      document.getElementById('docDropLabel').textContent='Click to choose a file or drag it here';
+      document.getElementById('docDropLabel').style.color='';
+      document.getElementById('docDropZone').style.borderColor='#e2e8f0';
+      document.getElementById('docDropZone').style.background='';
+      document.querySelectorAll('.doc-team-cb').forEach(cb=>cb.checked=false);
+      docSelectedFile=null;
+      setTimeout(()=>{if(progress)progress.style.display='none';if(progressBar)progressBar.style.width='0%';},800);
+      await loadDocuments();
+    }else throw new Error('Failed to save document info: '+res.status);
+  }catch(e){
+    console.warn(e);
+    err.textContent=e.message||'Upload failed. Please try again.';
+    err.classList.add('show');
+    if(progress)progress.style.display='none';
+    if(progressBar)progressBar.style.width='0%';
+  }finally{
+    btn.disabled=false;btn.textContent='Upload Document';
+  }
+}
+
+async function deleteDocument(id){
+  if(!confirm('Delete this document?'))return;
+  try{
+    await fetch(SB+'/rest/v1/documents?id=eq.'+id,{method:'DELETE',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    await loadDocuments();
+  }catch(e){console.warn(e);alert('Failed to delete.');}
+}
+
+
+
+// ── ENGAGEMENT TAB ──
+function showEngagementTab(tab){
+  ['discussions','feedback'].forEach(s=>{
+    const el=document.getElementById('esec-'+s);
+    if(el)el.style.display=s===tab?'block':'none';
+    const t=document.getElementById('etab-'+s);
+    if(t)t.classList.toggle('active',s===tab);
+  });
+  if(tab==='discussions')loadDiscussions();
+  if(tab==='feedback'){loadMyFeedback();}
+}
+
+async function loadMyFeedback(){
+  const el=document.getElementById('myFeedbackList');
+  if(!el)return;
+  // We store anonymous feedback - staff can't see others but we track by session key
+  const myKey=localStorage.getItem('fb_session_'+me);
+  if(!myKey){
+    el.innerHTML='<div style="text-align:center;color:#94a3b8;font-size:13px;padding:16px;">No feedback submitted yet.</div>';
+    return;
+  }
+  try{
+    const ids=JSON.parse(myKey||'[]');
+    if(!ids.length){el.innerHTML='<div style="text-align:center;color:#94a3b8;font-size:13px;padding:16px;">No feedback submitted yet.</div>';return;}
+    const rows=await sbGet('feedback','?id=in.('+ids.join(',')+')'+'&order=submitted_at.desc');
+    if(!rows.length){el.innerHTML='<div style="text-align:center;color:#94a3b8;font-size:13px;padding:16px;">No feedback submitted yet.</div>';return;}
+    el.innerHTML='<div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Your Previous Feedback</div>'+
+      rows.map(r=>{
+        const d=new Date(r.submitted_at).toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'});
+        return'<div class="ann-card" style="margin-bottom:10px;">'+
+          '<div style="font-size:13px;color:#374151;line-height:1.6;">'+r.body+'</div>'+
+          '<div style="font-size:10px;color:#94a3b8;margin-top:8px;">Submitted '+d+'</div>'+
+        '</div>';
+      }).join('');
+  }catch(e){console.warn(e);}
+}
+
+async function loadHomeDiscPreview(){
+  const el=document.getElementById('homeDiscPreview');
+  if(!el)return;
+  try{
+    const rows=await sbGet('discussions','?order=created_at.desc&limit=2');
+    if(!rows.length){el.innerHTML='<div style="color:#94a3b8;font-size:13px;">No discussions yet. Start one.</div>';return;}
+    el.innerHTML=rows.map(r=>{
+      const ava=r.created_by.split(' ').map(w=>w[0]).join('').slice(0,2);
+      const d=new Date(r.created_at).toLocaleDateString('en-AU',{day:'numeric',month:'short'});
+      return'<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #f1f5f9;">'+
+        '<div style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#2563eb,#7c3aed);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;color:#fff;flex-shrink:0;">'+ava+'</div>'+
+        '<div style="flex:1;min-width:0;">'+
+          '<div style="font-size:13px;font-weight:600;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+r.title+'</div>'+
+          '<div style="font-size:11px;color:#94a3b8;">'+r.created_by+' · '+d+'</div>'+
+        '</div></div>';
+    }).join('');
+  }catch(e){console.warn(e);el.innerHTML='<div style="color:#94a3b8;font-size:13px;">No discussions yet. Start one.</div>';}
+}
+async function loadDiscussions(){
+  const el=document.getElementById('discList');
+  if(!el)return;
+  el.innerHTML='<div style="text-align:center;color:#94a3b8;padding:24px;font-size:13px;">Loading...</div>';
+  try{
+    const rows=await sbGet('discussions','?order=created_at.desc');
+    let allReplies=[];
+    try{allReplies=await sbGet('discussion_replies','?order=created_at.asc');}catch(e){console.warn(e);}
+    if(!rows.length){
+      el.innerHTML='<div style="text-align:center;padding:40px 20px;"><svg width="36" height="36" viewBox="0 0 20 20" fill="#e2e8f0" style="margin:0 auto 10px;display:block;"><path fill-rule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clip-rule="evenodd"/></svg><div style="font-size:13px;font-weight:600;color:#475569;margin-bottom:6px;">No discussions yet</div><div style="font-size:12px;color:#94a3b8;">Be the first to start a conversation above.</div></div>';
+      return;
+    }
+    el.innerHTML=rows.map(function(r){
+      const replies=allReplies.filter(function(x){return x.discussion_id===r.id;});
+      const d=new Date(r.created_at).toLocaleDateString('en-AU',{day:'numeric',month:'short'});
+      const ava=r.created_by.split(' ').map(function(w){return w[0];}).join('').slice(0,2);
+      const isOwn=r.created_by===me;
+      let html='<div class="ann-card" style="margin-bottom:12px;">';
+      html+='<div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:8px;">';
+      html+='<div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#2563eb,#7c3aed);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#fff;flex-shrink:0;">'+ava+'</div>';
+      html+='<div style="flex:1;min-width:0;">';
+      html+='<div style="font-size:13px;font-weight:700;color:#0f172a;">'+r.title+'</div>';
+      html+='<div style="font-size:11px;color:#94a3b8;margin-top:1px;">'+r.created_by+' · '+d+'</div>';
+      html+='</div>';
+      if(isOwn||myIsAdmin){
+        html+='<button data-id="'+r.id+'" onclick="deleteDiscussion(this.dataset.id)" style="background:none;border:none;color:#dc2626;font-size:11px;font-weight:600;cursor:pointer;padding:4px 6px;font-family:inherit;flex-shrink:0;">Delete</button>';
+      }
+      html+='</div>';
+      if(r.body){html+='<div style="font-size:13px;color:#475569;line-height:1.6;margin-bottom:10px;">'+r.body+'</div>';}
+      // Replies
+      if(replies.length){
+        html+='<div style="border-top:1px solid #f1f5f9;padding-top:10px;margin-bottom:10px;display:flex;flex-direction:column;gap:8px;">';
+        replies.forEach(function(rep){
+          const ra=rep.staff_name.split(' ').map(function(w){return w[0];}).join('').slice(0,2);
+          const rt=new Date(rep.created_at).toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit'});
+          const rd=new Date(rep.created_at).toLocaleDateString('en-AU',{day:'numeric',month:'short'});
+          html+='<div style="display:flex;gap:8px;">';
+          html+='<div style="width:24px;height:24px;border-radius:50%;background:#e2e8f0;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:800;color:#475569;flex-shrink:0;">'+ra+'</div>';
+          html+='<div style="flex:1;"><div style="font-size:11px;font-weight:600;color:#0f172a;">'+rep.staff_name+'<span style="font-weight:400;color:#94a3b8;margin-left:5px;">'+rd+' '+rt+'</span></div>';
+          html+='<div style="font-size:12.5px;color:#374151;margin-top:2px;line-height:1.5;">'+rep.body+'</div></div>';
+          html+='</div>';
+        });
+        html+='</div>';
+      }
+      // Reactions
+      const reacts=['👍','❤️','😂','😮'];
+      const myDiscReact=localStorage.getItem('disc_react_'+me+'_'+r.id)||'';
+      html+='<div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;">';
+      reacts.forEach(function(e){
+        const active=myDiscReact===e;
+        html+='<button data-id="'+r.id+'" data-emoji="'+encodeURIComponent(e)+'" onclick="reactToDiscussion(this.dataset.id,decodeURIComponent(this.dataset.emoji))" style="padding:4px 10px;border-radius:20px;border:1px solid '+(active?'#bfdbfe':'#e2e8f0')+';background:'+(active?'#eff6ff':'#f8fafc')+';cursor:pointer;font-size:13px;transition:all .12s;">'+e+'</button>';
+      });
+      html+='</div>';
+      // Reply input
+      html+='<div style="display:flex;gap:8px;margin-top:8px;">';
+      html+='<input data-disc="'+r.id+'" type="text" placeholder="Write a reply..." style="flex:1;border:1.5px solid #e2e8f0;border-radius:8px;padding:8px 12px;font-size:13px;font-family:inherit;outline:none;">';
+      html+='<button data-disc="'+r.id+'" onclick="submitDiscReply(this.dataset.disc)" style="padding:8px 14px;border-radius:8px;background:#2563eb;color:#fff;border:none;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;">Reply</button>';
+      html+='</div>';
+      html+='</div>';
+      return html;
+    }).join('');
+  }catch(e){
+    console.warn(e);
+    el.innerHTML='<div style="color:#dc2626;text-align:center;padding:24px;font-size:13px;">Could not load discussions.</div>';
+  }
+}
+
+async function postDiscussion(){
+  const title=document.getElementById('discTitle').value.trim();
+  const body=document.getElementById('discBody').value.trim();
+  const err=document.getElementById('discErr'),ok=document.getElementById('discOk');
+  err.classList.remove('show');ok.classList.remove('show');
+  if(!title){err.textContent='Please enter a title.';err.classList.add('show');return;}
+  const btn=document.getElementById('discPostBtn');
+  btn.disabled=true;btn.innerHTML='<span class="sp"></span> Posting...';
+  try{
+    await sbPost('discussions',{title,body,created_by:me});
+    document.getElementById('discTitle').value='';
+    document.getElementById('discBody').value='';
+    ok.textContent='Posted!';ok.classList.add('show');
+    setTimeout(function(){ok.classList.remove('show');},2000);
+    await loadDiscussions();
+  }catch(e){
+    console.warn(e);
+    err.textContent='Failed to post.';err.classList.add('show');
+  }finally{
+    btn.disabled=false;btn.textContent='Post';
+  }
+}
+
+async function submitDiscReply(discId){
+  const input=document.querySelector('[data-disc="'+discId+'"]');
+  if(!input||!input.value.trim())return;
+  const body=input.value.trim();
+  try{
+    await sbPost('discussion_replies',{discussion_id:discId,staff_name:me,body});
+    input.value='';
+    await loadDiscussions();
+  }catch(e){console.warn(e);alert('Failed to post reply.');}
+}
+
+async function deleteDiscussion(id){
+  if(!confirm('Delete this discussion?'))return;
+  try{
+    await fetch(SB+'/rest/v1/discussions?id=eq.'+id,{method:'DELETE',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    await loadDiscussions();
+  }catch(e){console.warn(e);}
+}
+
+async function sbGet(t,f){
+  const url=SB+"/rest/v1/"+t+(f||"");
+  const r=await fetch(url,{headers:{"apikey":KEY,"Authorization":"Bearer "+KEY}});
+  if(!r.ok){console.warn("sbGet failed:",t,r.status,await r.text().catch(()=>''));return[];}
+  return r.json();
+}
+async function sbPost(t,b){return fetch(SB+"/rest/v1/"+t,{method:"POST",headers:{"apikey":KEY,"Authorization":"Bearer "+KEY,"Content-Type":"application/json","Prefer":"return=minimal"},body:JSON.stringify(b)});}
+async function hash(p){const e=new TextEncoder().encode(p+"oscar_roster_salt_2024"),b=await crypto.subtle.digest("SHA-256",e);return Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,"0")).join("");}
+
+function showAuth(s){
+  ["login","setpass","resetkey"].forEach(p=>document.getElementById("pg-"+p).style.display="none");
+  document.getElementById("pg-"+s).style.display="block";
+}
+function saveMe(n){me=n;sessionStorage.setItem("ou",n);}
+function loadMe(){const n=sessionStorage.getItem("ou");if(n){me=n;return true;}return false;}
+
+async function doLogin(){
+  const name=document.getElementById("loginName").value.trim();
+  const pass=document.getElementById("loginPass").value;
+  const err=document.getElementById("loginErr");err.classList.remove("show");
+  if(!name){err.textContent="Please enter your name.";err.classList.add("show");return;}
+  if(!pass){err.textContent="Please enter your password.";err.classList.add("show");return;}
+  const btn=document.getElementById("loginBtn");btn.disabled=true;btn.innerHTML='<span class="sp"></span> Signing in...';
+  try{
+    // Always validate against Supabase so removed staff can't log in
+    const m=await validateStaffName(name);
+    if(!m){err.textContent="Name not found. You may have been removed from the system.";err.classList.add("show");btn.disabled=false;btn.textContent="Sign In";return;}
+    const h=await hash(pass);
+    const rows=await sbGet("staff_credentials","?staff_name=eq."+encodeURIComponent(m));
+    if(!rows.length){err.textContent="No password set yet. Use 'Set your password' below.";err.classList.add("show");}
+    else if(rows[0].password_hash!==h){err.textContent="Incorrect password. Please try again.";err.classList.add("show");}
+    else{saveMe(m);enterHub();}
+  }catch(e){err.textContent="Connection error. Please try again.";err.classList.add("show");}
+  finally{btn.disabled=false;btn.textContent="Sign In";}
+}
+
+async function doSetPass(){
+  const name=document.getElementById("spName").value.trim();
+  const pass=document.getElementById("spNew").value;
+  const conf=document.getElementById("spConfirm").value;
+  const err=document.getElementById("spErr"),ok=document.getElementById("spOk");
+  err.classList.remove("show");ok.classList.remove("show");
+  if(!name){err.textContent="Please enter your full name.";err.classList.add("show");return;}
+  if(!pass||pass.length<4){err.textContent="Password must be at least 4 characters.";err.classList.add("show");return;}
+  if(pass!==conf){err.textContent="Passwords do not match.";err.classList.add("show");return;}
+  const btn=document.getElementById("spBtn");btn.disabled=true;btn.innerHTML='<span class="sp"></span>';
+  try{
+    // Validate against Supabase — only current staff can register
+    const m=await validateStaffName(name);
+    if(!m){err.textContent="Name not found. Check your spelling or contact your manager.";err.classList.add("show");btn.disabled=false;btn.textContent="Set Password";return;}
+    const ex=await sbGet("staff_credentials","?staff_name=eq."+encodeURIComponent(m));
+    if(ex.length){err.textContent="Password already set. Ask your manager to reset it.";err.classList.add("show");btn.disabled=false;btn.textContent="Set Password";return;}
+    const h=await hash(pass);
+    const res=await sbPost("staff_credentials",{staff_name:m,password_hash:h});
+    if(res.ok||res.status===201){ok.textContent="Password set! Signing you in...";ok.classList.add("show");saveMe(m);setTimeout(enterHub,1200);}
+    else throw new Error();
+  }catch(e){err.textContent="Failed. Please try again.";err.classList.add("show");}
+  finally{btn.disabled=false;btn.textContent="Set Password";}
+}
+
+async function doFindQuestions(){
+  const name=document.getElementById("rkName").value.trim();
+  const err=document.getElementById("rkErr"),ok=document.getElementById("rkOk");
+  err.classList.remove("show");ok.classList.remove("show");
+  if(!name){err.textContent="Please enter your full name.";err.classList.add("show");return;}
+  const btn=document.getElementById("rkFindBtn");btn.disabled=true;btn.innerHTML='<span class="sp"></span>';
+  try{
+    const m=await validateStaffName(name);
+    if(!m){err.textContent="Name not found. Check your spelling.";err.classList.add("show");btn.disabled=false;btn.textContent="Continue";return;}
+    const rows=await sbGet("staff_credentials","?staff_name=eq."+encodeURIComponent(m)+"&select=sq1_question,sq2_question");
+    if(!rows.length||!rows[0].sq1_question||!rows[0].sq2_question){
+      err.textContent="No security questions set. Ask your manager to reset your password.";err.classList.add("show");btn.disabled=false;btn.textContent="Continue";return;
+    }
+    document.getElementById("rkQ1Label").textContent=rows[0].sq1_question;
+    document.getElementById("rkQ2Label").textContent=rows[0].sq2_question;
+    document.getElementById("rk-step1").style.display="none";
+    document.getElementById("rk-step2").style.display="";
+  }catch(e){err.textContent="Failed. Please try again.";err.classList.add("show");}
+  finally{btn.disabled=false;btn.textContent="Continue";}
+}
+
+async function doResetKey(){
+  const name=document.getElementById("rkName").value.trim();
+  const a1=document.getElementById("rkA1").value.trim().toLowerCase();
+  const a2=document.getElementById("rkA2").value.trim().toLowerCase();
+  const pass=document.getElementById("rkNew").value;
+  const conf=document.getElementById("rkConfirm").value;
+  const err=document.getElementById("rkErr"),ok=document.getElementById("rkOk");
+  err.classList.remove("show");ok.classList.remove("show");
+  if(!a1||!a2){err.textContent="Please answer both security questions.";err.classList.add("show");return;}
+  if(!pass||pass.length<4){err.textContent="Password must be at least 4 characters.";err.classList.add("show");return;}
+  if(pass!==conf){err.textContent="Passwords do not match.";err.classList.add("show");return;}
+  const btn=document.getElementById("rkBtn");btn.disabled=true;btn.innerHTML='<span class="sp"></span>';
+  try{
+    const m=await validateStaffName(name);
+    if(!m){err.textContent="Name not found.";err.classList.add("show");btn.disabled=false;btn.textContent="Reset Password";return;}
+    const [h1,h2]=await Promise.all([hash(a1),hash(a2)]);
+    const rows=await sbGet("staff_credentials","?staff_name=eq."+encodeURIComponent(m));
+    if(!rows.length){err.textContent="Account not found.";err.classList.add("show");btn.disabled=false;btn.textContent="Reset Password";return;}
+    const r=rows[0];
+    if(r.sq1_answer_hash!==h1||r.sq2_answer_hash!==h2){
+      err.textContent="Incorrect answers. Please try again.";err.classList.add("show");btn.disabled=false;btn.textContent="Reset Password";return;
+    }
+    const nh=await hash(pass);
+    await fetch(SB+"/rest/v1/staff_credentials?staff_name=eq."+encodeURIComponent(m),{
+      method:"PATCH",
+      headers:{"apikey":KEY,"Authorization":"Bearer "+KEY,"Content-Type":"application/json","Prefer":"return=minimal"},
+      body:JSON.stringify({password_hash:nh})
+    });
+    ok.textContent="Password reset! Signing you in...";ok.classList.add("show");saveMe(m);setTimeout(enterHub,1500);
+  }catch(e){err.textContent="Failed. Please try again.";err.classList.add("show");}
+  finally{btn.disabled=false;btn.textContent="Reset Password";}
+}
+
+function doLogout(){
+  sessionStorage.removeItem("ou");me=null;
+  document.getElementById("hubLayer").style.display="none";
+  document.getElementById("authLayer").style.display="flex";
+  document.getElementById("loginPass").value="";
+  showAuth("login");
+}
+
+async function enterHub(){
+  await loadStaffList(); // refresh from Supabase in case staff changed
+  document.getElementById("authLayer").style.display="none";
+  document.getElementById("hubLayer").style.display="flex";
+  document.getElementById("hubLayer").classList.add("ready");
+  const first=me.split(" ")[0];
+  await loadMySettings();
+  const ava=me.split(" ").slice(0,2).map(w=>w[0]).join("").toUpperCase();
+  const _el_sbAvatar=document.getElementById("sbAvatar");if(_el_sbAvatar)_el_sbAvatar.textContent=ava;
+  const _el_sbName=document.getElementById("sbName");if(_el_sbName)_el_sbName.textContent=me;
+  const _el_mhAva=document.getElementById("mhAva");if(_el_mhAva)_el_mhAva.textContent=ava;
+  const profAvaEl=document.getElementById("profAva");if(profAvaEl)profAvaEl.textContent=ava;
+  const profNameEl=document.getElementById("profName");if(profNameEl)profNameEl.textContent=me;
+  const _el_mhName=document.getElementById("mhName");if(_el_mhName)_el_mhName.textContent=first;
+  const hr=new Date().getHours();
+  const _el_homeGreeting=document.getElementById("homeGreeting");if(_el_homeGreeting)_el_homeGreeting.textContent=(hr<12?"Good morning":hr<17?"Good afternoon":"Good evening")+", "+first;
+  const _el_homeWeekSub=document.getElementById("homeWeekSub");if(_el_homeWeekSub)_el_homeWeekSub.textContent=wkL(weekStart);
+  const availSubEl=document.getElementById("availSub");if(availSubEl)availSubEl.textContent="Week of "+wkL(weekStart);
+  const today=iso(new Date());
+  document.getElementById("leaveFrom").value=today;
+  document.getElementById("leaveTo").value=today;
+  buildAvailForm();
+  showSchedTab('leave'); // default schedule sub-tab
+  Promise.all([loadHomeData(),loadNotifications(),loadLeaveHistory(),refreshAnnBadge(),loadHomeAnnPreview(),loadHomeDiscPreview(),maybeShowOnboarding()]);
+  loadBirthdays();
+  // Restore from URL hash if present
+  const hash=window.location.hash.replace('#','');
+  const validPages=['home','schedule','profile','documents','announcements','engagement'];
+  const hashMap={leave:'schedule',availability:'schedule'};
+  goTo(validPages.includes(hash)?hash:(hashMap[hash]||'home'));
+  showProfileSection("account");
+}
+
+function goTo(p){
+  // Update URL hash + document title
+  const titles={home:'Home',schedule:'Schedule',profile:'Profile',documents:'Documents',announcements:'Announcements',engagement:'Engagement'};
+  const appName='Oscars Employee Portal';
+  document.title='Oscars — '+(titles[p]||'Oscars');
+  if(history.replaceState)history.replaceState(null,'','#'+p);
+  // Use data-tab for cleaner state management
+  document.querySelectorAll(".page").forEach(pg=>pg.classList.toggle("active",pg.id==="page-"+p));
+  document.querySelectorAll("[data-tab]").forEach(item=>item.classList.toggle("active",item.getAttribute("data-tab")===p));
+  if(p==="leave"||p==="availability"){document.querySelectorAll(".page").forEach(pg=>pg.classList.toggle("active",pg.id==="page-schedule"));document.querySelectorAll("[data-tab]").forEach(item=>item.classList.toggle("active",item.getAttribute("data-tab")==="schedule"));}
+  if(p==="schedule"){showSchedTab("leave");}
+  if(p==="profile")loadProfilePage();
+  if(p==="home")loadHomeData();
+  if(p==="documents")loadDocuments();
+  if(p==="announcements"){loadAnnouncements();}
+  if(p==="engagement"){showEngagementTab('discussions');}
+  const main=document.querySelector(".main");
+  if(main)main.scrollTop=0;
+}
+
+function showProfileSection(sec){
+  ["account","adminpanel"].forEach(s=>{
+    const el=document.getElementById("psec-"+s);
+    if(el)el.style.display=s===sec?"block":"none";
+    const tab=document.getElementById("ptab-"+s);
+    if(tab)tab.classList.toggle("active",s===sec);
+  });
+  if(sec==="adminpanel"){loadAdminAvailGrid2();loadAdminFeedback2();}
+  // Mark notifications read when profile is opened
+  markAllNotificationsRead();
+  const main=document.querySelector(".main");
+  if(main)main.scrollTop=0;
+}
+
+async function loadAdminAvailGrid(){
+  const el=document.getElementById("adminContent");
+  if(!el)return;
+  el.innerHTML='<div style="color:#94a3b8;font-size:13px;text-align:center;padding:16px;">Loading...</div>';
+  let availRows=[];
+  try{const r=await fetch(SB+"/rest/v1/staff_availability?select=*",{headers:{"apikey":KEY,"Authorization":"Bearer "+KEY}});if(r.ok)availRows=await r.json();}catch(e){console.warn(e);}
+  const typeCol={all:"#2563eb",no:"#dc2626",custom:"#0ea5e9"};
+  const typeLbl={all:"Available",no:"Unavail",custom:""};
+  let html='';
+  STAFF.forEach(function(name){
+    const row=availRows.find(function(r){return r.staff_name&&r.staff_name.toLowerCase()===name.toLowerCase();});
+    html+='<div style="display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid #e2e8f0;flex-wrap:wrap">';
+    html+='<div style="font-size:12.5px;font-weight:700;min-width:150px;padding-top:2px">'+name+'</div>';
+    if(!row){html+='<div style="font-size:11px;color:#94a3b8;">Not set</div>';}
+    else{
+      const period=row.is_ongoing?"Ongoing":(row.valid_from?"From "+row.valid_from+(row.valid_until?" – "+row.valid_until:""):"");
+      if(period)html+='<div style="font-size:10px;color:#94a3b8;margin-right:6px;padding-top:3px;">'+period+'</div>';
+      const av=row.availability||{};
+      html+='<div style="display:flex;gap:3px;flex-wrap:wrap">';
+      for(let i=0;i<7;i++){const a=av[i]||av[String(i)]||{type:"all"};const lbl=a.type==="custom"?(a.start.slice(0,5)+"–"+a.end.slice(0,5)):typeLbl[a.type];html+='<div style="font-size:9px;font-weight:700;padding:3px 5px;border-radius:4px;background:#f8fafc;border:1px solid #e2e8f0;color:'+typeCol[a.type]+'">'+DS[i]+' '+lbl+'</div>';}
+      html+='</div>';
+    }
+    html+='</div>';
+  });
+  el.innerHTML=html||'<div style="color:#94a3b8;font-size:13px;padding:12px;">No availability submitted yet.</div>';
+}
+
+
+
+
+// AVAILABILITY — Persistent standing availability
+const dayState={};let fBuilt=false;
+let availPeriod="ongoing";
+
+function setPeriod(type){
+  availPeriod=type;
+  document.getElementById("period-ongoing").className="ao"+(type==="ongoing"?" yes":"");
+  document.getElementById("period-range").className="ao"+(type==="range"?" yes":"");
+  const rf=document.getElementById("dateRangeFields");
+  if(rf)rf.style.display=type==="range"?"grid":"none";
+}
+
+function buildAvailForm(){
+  if(fBuilt)return;
+  const el=document.getElementById("availForm");
+  DAYS.forEach((day,i)=>{
+    dayState[i]={type:"unset"};
+    const wrap=document.createElement("div");
+    wrap.style.cssText="margin-bottom:10px;";
+    wrap.innerHTML=
+      '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #f1f5f9;">'+
+        '<div style="font-size:13px;font-weight:600;color:#1e293b;">'+day+'</div>'+
+        '<div style="display:flex;gap:6px;">'+
+          '<button class="ao" id="ao-yes-'+i+'" onclick="setDay('+i+',\'all\')"> Available</button>'+
+          '<button class="ao" id="ao-custom-'+i+'" onclick="setDay('+i+',\'custom\')">Custom</button>'+
+          '<button class="ao" id="ao-no-'+i+'" onclick="setDay('+i+',\'no\')"> Unavail</button>'+
+        '</div>'+
+      '</div>'+
+      '<div id="ctr-'+i+'" style="display:none;align-items:center;gap:8px;padding:8px 0;">'+
+        '<input type="time" class="f-input" id="cs-'+i+'" value="09:00" style="width:130px;padding:6px 10px;font-size:13px;">'+
+        '<span style="color:#94a3b8;font-size:13px;">to</span>'+
+        '<input type="time" class="f-input" id="ce-'+i+'" value="19:00" style="width:130px;padding:6px 10px;font-size:13px;">'+
+      '</div>';
+    el.appendChild(wrap);
+  });
+  fBuilt=true;
+  loadExistingAvail();
+}
+
+function setDay(i,type){
+  // Optimistic: update UI immediately, then save
+
+  dayState[i]={type};
+  const base="ao";
+  document.getElementById("ao-yes-"+i).className=base+(type==="all"?" yes":"");
+  document.getElementById("ao-custom-"+i).className=base+(type==="custom"?" custom":"");
+  document.getElementById("ao-no-"+i).className=base+(type==="no"?" no":"");
+  const ct=document.getElementById("ctr-"+i);
+  if(ct)ct.style.display=type==="custom"?"flex":"none";
+}
+
+async function loadExistingAvail(){
+  try{
+    const rows=await sbGet("staff_availability","?staff_name=eq."+encodeURIComponent(me)+"&limit=1");
+    if(!rows.length)return;
+    const r=rows[0];
+    // Restore period type
+    if(!r.is_ongoing&&r.valid_from){
+      setPeriod("range");
+      if(document.getElementById("availFrom"))document.getElementById("availFrom").value=r.valid_from;
+      if(document.getElementById("availUntil")&&r.valid_until)document.getElementById("availUntil").value=r.valid_until;
+    }else{
+      setPeriod("ongoing");
+    }
+    // Restore day states
+    const av=r.availability;
+    Object.keys(av).forEach(k=>{
+      const a=av[k];
+      setDay(parseInt(k),a.type);
+      if(a.type==="custom"){
+        const s=document.getElementById("cs-"+k),e=document.getElementById("ce-"+k);
+        if(s&&a.start)s.value=a.start;
+        if(e&&a.end)e.value=a.end;
+      }
+    });
+  }catch(e){console.warn(e);}
+}
+
+async function checkLock(){
+  adminHasSetAvail=false;
+  myCanEditAvail=true;
+  try{
+    const r=await fetch(SB+"/rest/v1/staff_settings?name=eq."+encodeURIComponent(me),{headers:{"apikey":KEY,"Authorization":"Bearer "+KEY}});
+    if(r.ok){
+      const rows=await r.json();
+      if(rows.length){
+        myCanEditAvail=rows[0].can_edit_avail!==false;
+        adminHasSetAvail=true;
+      }
+    }
+  }catch(e){console.warn(e);}
+
+  const locked=adminHasSetAvail&&!myCanEditAvail;
+  const lockEl=document.getElementById("availLock");
+  lockEl.style.display=locked?"block":"none";
+  if(locked)lockEl.textContent="Your availability has been locked by your manager.";
+  document.getElementById("availBtnArea").style.display=locked?"none":"block";
+
+  if(!locked){
+    buildAvailForm();
+    // Show success if already saved
+    try{
+      const existing=await sbGet("staff_availability","?staff_name=eq."+encodeURIComponent(me)+"&limit=1");
+      if(existing.length){
+        showAvailSuccess(existing[0]);
+      }else{
+        showAvailForm();
+      }
+    }catch(e){showAvailForm();}
+  }
+}
+
+function showAvailSuccess(row){
+  document.getElementById("availSuccess").style.display="block";
+  document.getElementById("availFormArea").style.display="none";
+  const avail=row.availability||{};
+  // Period label
+  let period="Ongoing availability";
+  if(!row.is_ongoing&&row.valid_from){
+    period="Valid from "+fmtF(row.valid_from)+(row.valid_until?" until "+fmtF(row.valid_until):"");
+  }
+  const periodEl=document.getElementById("availSavedPeriod");
+  if(periodEl)periodEl.textContent=period;
+  // Day summary
+  const days=["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
+  let html='<div class="card"><div class="card-title" style="margin-bottom:14px">Your Availability</div>';
+  days.forEach((day,i)=>{
+    const a=avail[i]||avail[String(i)]||{type:"unset"};
+    const lbl=a.type==="custom"?(a.start+" – "+a.end):a.type==="all"?"All Day":a.type==="no"?"Unavailable":"Not Set";
+    const col=a.type==="all"?"#16a34a":a.type==="no"?"#dc2626":a.type==="custom"?"#0284c7":"#94a3b8";
+    html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid #f1f5f9;">';
+    html+='<div style="font-size:13px;font-weight:600;color:#1e293b;">'+day+'</div>';
+    html+='<div style="font-size:12px;font-weight:600;color:'+col+'">'+lbl+'</div>';
+    html+='</div>';
+  });
+  html+='</div>';
+  document.getElementById("availSuccessSummary").innerHTML=html;
+}
+
+function showAvailForm(){
+  document.getElementById("availSuccess").style.display="none";
+  document.getElementById("availFormArea").style.display="block";
+}
+
+async function submitAvail(){
+  const avail={},err=document.getElementById("availErr");err.classList.remove("show");
+  for(let i=0;i<7;i++){
+    const s=dayState[i];
+    if(s.type==="custom"){
+      const st=document.getElementById("cs-"+i).value,en=document.getElementById("ce-"+i).value;
+      if(st>=en){err.textContent=DAYS[i]+": end time must be after start time.";err.classList.add("show");return;}
+      avail[i]={type:"custom",start:st,end:en};
+    }else avail[i]={type:s.type};
+  }
+  const isOngoing=availPeriod==="ongoing";
+  const validFrom=isOngoing?null:(document.getElementById("availFrom")?document.getElementById("availFrom").value:null);
+  const validUntil=isOngoing?null:(document.getElementById("availUntil")?document.getElementById("availUntil").value:null);
+  if(!isOngoing&&!validFrom){err.textContent="Please select a start date for the date range.";err.classList.add("show");return;}
+
+  const btn=document.getElementById("availBtn");btn.disabled=true;btn.innerHTML='<span class="sp"></span> Saving...';
+  try{
+    // Check if row already exists
+    const existing=await sbGet("staff_availability","?staff_name=eq."+encodeURIComponent(me)+"&limit=1");
+    const payload={staff_name:me,availability:avail,is_ongoing:isOngoing,valid_from:validFrom||null,valid_until:validUntil||null,updated_at:new Date().toISOString()};
+    let res;
+    if(existing.length){
+      res=await fetch(SB+"/rest/v1/staff_availability?staff_name=eq."+encodeURIComponent(me),{
+        method:"PATCH",
+        headers:{"apikey":KEY,"Authorization":"Bearer "+KEY,"Content-Type":"application/json","Prefer":"return=minimal"},
+        body:JSON.stringify(payload)
+      });
+    }else{
+      res=await sbPost("staff_availability",payload);
+    }
+    if(res.ok||res.status===201||res.status===204){
+      showAvailSuccess({availability:avail,is_ongoing:isOngoing,valid_from:validFrom,valid_until:validUntil});
+      loadHomeData();
+    }else throw new Error("Server error "+res.status);
+  }catch(e){err.textContent="Failed to save. Please check your connection.";err.classList.add("show");}
+  finally{btn.disabled=false;btn.textContent="Save Availability";}
+}
+
+
+// ── DARK MODE ──
+function toggleDarkMode(){
+  const isDark=document.documentElement.getAttribute('data-theme')==='dark';
+  const newTheme=isDark?'light':'dark';
+  document.documentElement.setAttribute('data-theme',newTheme);
+  localStorage.setItem('oscars_theme',newTheme);
+  const btn=document.getElementById('dmToggle');
+  if(btn)btn.textContent=newTheme==='dark'?'☀️':'🌙';
+  updateDmSwitch(newTheme);
+}
+function initTheme(){
+  const saved=localStorage.getItem('oscars_theme')||(window.matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light');
+  document.documentElement.setAttribute('data-theme',saved);
+  const btn=document.getElementById('dmToggle');
+  if(btn)btn.textContent=saved==='dark'?'☀️':'🌙';
+  updateDmSwitch(saved);
+}
+function updateDmSwitch(theme){
+  const sw=document.getElementById('dmSwitch');
+  const th=document.getElementById('dmSwitchThumb');
+  if(sw)sw.style.background=theme==='dark'?'#2563eb':'#e2e8f0';
+  if(th)th.style.left=theme==='dark'?'25px':'3px';
+}
+initTheme();
+
+// ── ANONYMOUS FEEDBACK ──
+async function submitFeedback(){
+  const body=document.getElementById('fbText').value.trim();
+  const err=document.getElementById('fbErr'),ok=document.getElementById('fbOk');
+  err.classList.remove('show');ok.classList.remove('show');
+  if(!body){err.textContent='Please write something before submitting.';err.classList.add('show');return;}
+  const btn=document.getElementById('fbBtn');btn.disabled=true;btn.innerHTML='<span class="sp"></span> Sending...';
+  try{
+    // No staff_name — purely anonymous
+    const res=await fetch(SB+'/rest/v1/feedback',{
+      method:'POST',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({body})
+    });
+    if(res.ok||res.status===201){
+      ok.textContent='Feedback submitted anonymously. Thank you!';ok.classList.add('show');
+      document.getElementById('fbText').value='';
+      // Track submitted IDs locally so staff can view their own
+      try{
+        const rj=await fetch(SB+'/rest/v1/feedback?order=created_at.desc&limit=1',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+        if(rj.ok){const rdata=await rj.json();if(rdata.length){const key='fb_session_'+me;const ids=JSON.parse(localStorage.getItem(key)||'[]');ids.push(rdata[0].id);localStorage.setItem(key,JSON.stringify(ids));}}
+      }catch(e){console.warn(e);}
+    }else throw new Error();
+  }catch(e){err.textContent='Failed to submit. Please try again.';err.classList.add('show');}
+  finally{btn.disabled=false;btn.textContent='Submit Anonymously';}
+}
+
+async function loadAdminFeedback(){
+  const el=document.getElementById('adminFeedbackList');
+  if(!el)return;
+  try{
+    const rows=await sbGet('feedback','?order=submitted_at.desc');
+    if(!rows.length){
+      el.innerHTML='<div style="color:#94a3b8;font-size:13px;text-align:center;padding:16px;">No feedback yet.</div>';
+      return;
+    }
+    // Mark all as read
+    await fetch(SB+'/rest/v1/feedback?read=eq.false',{
+      method:'PATCH',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({read:true})
+    });
+    el.innerHTML=rows.map(r=>{
+      const d=new Date(r.submitted_at).toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+      const isNew=!r.read;
+      return '<div style="padding:14px;border-radius:10px;margin-bottom:8px;background:'+(isNew?'#f0f9ff':'#f8fafc')+';border:1px solid '+(isNew?'#bae6fd':'#e2e8f0')+';">'+
+        (isNew?'<div style="font-size:10px;font-weight:700;color:#0284c7;text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px;">New</div>':'')+
+        '<div style="font-size:13px;color:#1e293b;line-height:1.6;">'+r.body.replace(/\n/g,'<br>')+'</div>'+
+        '<div style="font-size:10px;color:#94a3b8;margin-top:8px;">'+d+'</div>'+
+        '</div>';
+    }).join('');
+  }catch(e){el.innerHTML='<div style="color:#dc2626;font-size:13px;">Could not load feedback.</div>';}
+}
+
+// ── MESSAGES ──
+
+
+
+
+
+
+// ── ANNOUNCEMENTS ──
+
+
+// ── REACTIONS ──
+function reactToDiscussion(id,emoji){
+  const key='disc_react_'+me+'_'+id;
+  const prev=localStorage.getItem(key);
+  if(prev===emoji)localStorage.removeItem(key);
+  else localStorage.setItem(key,emoji);
+  loadDiscussions();
+}
+
+function reactToAnnouncement(id,emoji){
+  const key='ann_react_'+me+'_'+id;
+  const prev=localStorage.getItem(key);
+  if(prev===emoji)localStorage.removeItem(key);
+  else localStorage.setItem(key,emoji);
+  loadAnnouncements();
+}
+
+// ── REPLIES ──
+async function submitReply(annId){
+  const input=document.getElementById('reply-input-'+annId);
+  if(!input||!input.value.trim())return;
+  const body=input.value.trim();
+  const btn=document.getElementById('reply-btn-'+annId);
+  if(btn){btn.disabled=true;btn.textContent='...';}
+  try{
+    await sbPost('announcement_replies',{announcement_id:annId,staff_name:me,body});
+    input.value='';
+    loadAnnouncements();
+  }catch(e){alert('Failed to post reply.');}
+  finally{if(btn){btn.disabled=false;btn.textContent='Reply';}}
+}
+
+// ── PIN TOGGLE ──
+async function togglePin(id,currentPinned){
+  if(!myIsAdmin)return;
+  await fetch(SB+'/rest/v1/announcements?id=eq.'+id,{
+    method:'PATCH',
+    headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+    body:JSON.stringify({pinned:!currentPinned})
+  });
+  loadAnnouncements();
+}
+
+// ── ADMIN PANEL — staff availability grid (profile tab) ──
+async function loadAdminAvailGrid2(){
+  const el=document.getElementById('adminContent2');
+  if(!el)return;
+  el.innerHTML='<div style="color:#94a3b8;text-align:center;padding:12px;font-size:13px;">Loading...</div>';
+  let availRows=[];
+  try{const r=await fetch(SB+'/rest/v1/staff_availability?select=*',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});if(r.ok)availRows=await r.json();}catch(e){console.warn(e);}
+  const typeCol={all:'#2563eb',no:'#dc2626',custom:'#0ea5e9'};
+  const typeLbl={all:'Available',no:'Unavail',custom:''};
+  let html='';
+  STAFF.forEach(function(name){
+    const row=availRows.find(function(r){return r.staff_name&&r.staff_name.toLowerCase()===name.toLowerCase();});
+    html+='<div style="display:flex;align-items:flex-start;gap:8px;padding:9px 0;border-bottom:1px solid #f1f5f9;flex-wrap:wrap;">';
+    html+='<div style="font-size:12px;font-weight:700;min-width:140px;padding-top:2px;">'+name+'</div>';
+    if(!row){html+='<div style="font-size:11px;color:#94a3b8;padding-top:2px;">Not set</div>';}
+    else{
+      const period=row.is_ongoing?'Ongoing':(row.valid_from?'From '+row.valid_from+(row.valid_until?' – '+row.valid_until:''):'');
+      if(period)html+='<div style="font-size:9px;color:#94a3b8;padding-top:4px;margin-right:4px;">'+period+'</div>';
+      const av=row.availability||{};
+      html+='<div style="display:flex;gap:3px;flex-wrap:wrap;">';
+      for(let i=0;i<7;i++){
+        const a=av[i]||av[String(i)]||{type:'unset'};
+        if(a.type==='unset')continue;
+        const lbl=a.type==='custom'?(a.start.slice(0,5)+'–'+a.end.slice(0,5)):typeLbl[a.type];
+        html+='<div style="font-size:9px;font-weight:700;padding:2px 5px;border-radius:4px;background:#f8fafc;border:1px solid #e2e8f0;color:'+typeCol[a.type||'all']+'">'+DS[i]+' '+lbl+'</div>';
+      }
+      html+='</div>';
+    }
+    html+='</div>';
+  });
+  el.innerHTML=html||'<div style="color:#94a3b8;font-size:13px;padding:8px;">No availability submitted yet.</div>';
+}
+
+// ── ADMIN PANEL — feedback inbox (profile tab) ──
+async function loadAdminFeedback2(){
+  const el=document.getElementById('adminFeedbackList2');
+  if(!el)return;
+  try{
+    const rows=await sbGet('feedback','?order=submitted_at.desc');
+    if(!rows.length){el.innerHTML='<div style="color:#94a3b8;font-size:13px;text-align:center;padding:12px;">No feedback yet.</div>';return;}
+    await fetch(SB+'/rest/v1/feedback?read=eq.false',{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({read:true})});
+    el.innerHTML=rows.map(r=>{
+      const d=new Date(r.submitted_at).toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'});
+      const isNew=!r.read;
+      return '<div style="padding:12px;border-radius:10px;margin-bottom:8px;background:'+(isNew?'#f0f9ff':'#f8fafc')+';border:1px solid '+(isNew?'#bae6fd':'#e2e8f0')+';">'+
+        (isNew?'<div style="font-size:9px;font-weight:700;color:#0284c7;text-transform:uppercase;letter-spacing:.8px;margin-bottom:5px;">New</div>':'')+
+        '<div style="font-size:13px;color:#1e293b;line-height:1.6;">'+r.body.replace(/\n/g,'<br>')+'</div>'+
+        '<div style="font-size:10px;color:#94a3b8;margin-top:7px;">'+d+'</div>'+
+        '</div>';
+    }).join('');
+  }catch(e){el.innerHTML='<div style="color:#dc2626;font-size:13px;">Could not load.</div>';}
+}
+
+async function loadAnnouncements(){
+  const el=document.getElementById('annList');
+  const adminArea=document.getElementById('annAdminPost');
+  if(adminArea)adminArea.style.display=myIsAdmin?'block':'none';
+  try{
+    const rows=await sbGet('announcements','?order=pinned.desc,created_at.desc');
+    const readIds=JSON.parse(localStorage.getItem('ann_read_'+me)||'[]');
+    if(!rows.length){
+      el.innerHTML='<div class="card" style="text-align:center;color:#94a3b8;padding:40px;"><div style="font-size:28px;margin-bottom:10px;">📢</div><div style="font-size:14px;font-weight:600;">No announcements yet</div></div>';
+      return;
+    }
+    el.innerHTML=rows.map(r=>{
+      const isRead=readIds.includes(r.id);
+      const d=new Date(r.created_at).toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'});
+      return '<div class="ann-card'+(r.pinned?' pinned':'')+'">'+
+        (r.pinned?'<div class="ann-pin">📌 Pinned'+(myIsAdmin?'<button data-id="'+r.id+'" onclick="togglePin(this.dataset.id,true)" style="margin-left:8px;background:none;border:none;color:#94a3b8;font-size:10px;font-weight:600;cursor:pointer;font-family:inherit;">Unpin</button>':'')+'</div>':'')+
+        (!isRead?'<span class="ann-unread-dot"></span>':'')+
+        '<div class="ann-title">'+r.title+'</div>'+
+        '<div class="ann-body">'+r.body.replace(/\n/g,'<br>')+'</div>'+
+        '<div class="ann-meta"><span>Posted by '+r.created_by+' · '+d+'</span>'+
+        (myIsAdmin?'<button data-id="'+r.id+'" onclick="deleteAnnouncement(this.dataset.id)" style="background:none;border:none;color:#dc2626;font-size:11px;font-weight:600;cursor:pointer;">Delete</button>':'')+'</div>'+
+        '<div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;">'+
+        ['👍','❤️','😂','😮'].map(function(e){
+          const myReact=localStorage.getItem('ann_react_'+me+'_'+r.id)||'';
+          const active=myReact===e;
+          return '<button data-id="'+r.id+'" data-emoji="'+encodeURIComponent(e)+'" onclick="reactToAnnouncement(this.dataset.id,decodeURIComponent(this.dataset.emoji))" style="padding:4px 10px;border-radius:20px;border:1px solid '+(active?'#bfdbfe':'#e2e8f0')+';background:'+(active?'#eff6ff':'#f8fafc')+';cursor:pointer;font-size:13px;transition:all .12s;">'+e+'</button>';
+        }).join('')+
+        '</div>'+
+        '</div>';
+    }).join('');
+    // Mark all as read
+    const allIds=rows.map(r=>r.id);
+    localStorage.setItem('ann_read_'+me,JSON.stringify(allIds));
+    updateAnnBadge(rows,readIds);
+  }catch(e){el.innerHTML='<div style="color:#dc2626;text-align:center;padding:24px;font-size:13px;">Could not load announcements.</div>';}
+}
+
+async function postAnnouncement(){
+  const title=document.getElementById('annTitle').value.trim();
+  const body=document.getElementById('annBody').value.trim();
+  const pinned=document.getElementById('annPinned').checked;
+  if(!title||!body)return alert('Please fill in both title and body.');
+  const btn=document.getElementById('annPostBtn');btn.disabled=true;btn.innerHTML='<span class="sp"></span> Posting...';
+  try{
+    await sbPost('announcements',{title,body,created_by:me,pinned});
+    document.getElementById('annTitle').value='';
+    document.getElementById('annBody').value='';
+    document.getElementById('annPinned').checked=false;
+    await loadAnnouncements();
+  }catch(e){alert('Failed to post.');}
+  finally{btn.disabled=false;btn.textContent='Post';}
+}
+
+async function deleteAnnouncement(id){
+  if(!confirm('Delete this announcement?'))return;
+  await fetch(SB+'/rest/v1/announcements?id=eq.'+id,{method:'DELETE',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+  await loadAnnouncements();
+}
+
+async function updateAnnBadge(rows,readIds){
+  const unread=rows?rows.filter(r=>!readIds.includes(r.id)).length:0;
+  const b1=document.getElementById('annBadge');
+  if(b1){b1.textContent=unread;b1.style.display=unread?'inline':'none';}
+  const b2=document.getElementById('bnAnnBadge');
+  if(b2){b2.textContent=unread;b2.style.display=unread?'block':'none';}
+}
+
+async function refreshAnnBadge(){
+  try{
+    const rows=await sbGet('announcements','?order=created_at.desc');
+    const readIds=JSON.parse(localStorage.getItem('ann_read_'+me)||'[]');
+    updateAnnBadge(rows,readIds);
+  }catch(e){console.warn(e);}
+}
+
+// ── TIMESHEET EXPORT ──
+
+
+
+
+
+
+// ── CALENDAR EVENTS ──
+function toggleCalEventForm(){
+  const form=document.getElementById('calEventForm');
+  if(form){
+    const showing=form.style.display!=='none';
+    form.style.display=showing?'none':'block';
+    if(!showing){
+      // Pre-fill date with today
+      const today=new Date().toISOString().split('T')[0];
+      const dateEl=document.getElementById('calEventDate');
+      if(dateEl&&!dateEl.value)dateEl.value=today;
+    }
+  }
+}
+
+async function saveCalEvent(){
+  const title=document.getElementById('calEventTitle').value.trim();
+  const date=document.getElementById('calEventDate').value;
+  const desc=document.getElementById('calEventDesc').value.trim();
+  const err=document.getElementById('calEventErr');
+  err.classList.remove('show');
+  if(!title){err.textContent='Please enter a title.';err.classList.add('show');return;}
+  if(!date){err.textContent='Please select a date.';err.classList.add('show');return;}
+  const btn=document.getElementById('calEventSaveBtn');
+  btn.disabled=true;btn.innerHTML='<span class="sp"></span>';
+  try{
+    await sbPost('calendar_events',{title,event_date:date,description:desc||null,created_by:me});
+    document.getElementById('calEventTitle').value='';
+    document.getElementById('calEventDate').value='';
+    document.getElementById('calEventDesc').value='';
+    document.getElementById('calEventForm').style.display='none';
+    await loadBirthdays();
+  }catch(e){
+    console.warn(e);
+    err.textContent='Failed to save event.';err.classList.add('show');
+  }finally{
+    btn.disabled=false;btn.textContent='Add';
+  }
+}
+
+async function deleteCalEvent(id){
+  if(!confirm('Delete this event?'))return;
+  try{
+    await fetch(SB+'/rest/v1/calendar_events?id=eq.'+id,{method:'DELETE',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    await loadBirthdays();
+  }catch(e){console.warn(e);}
+}
+
+// ── BIRTHDAY CALENDAR (admin) ──
+let bdayData=[], bdayViewDate=new Date(), calEvents=[];
+
+// Australian public holidays (national + NSW) 2025-2027
+const AU_HOLIDAYS={
+  '2025-01-01':'New Year\'s Day',
+  '2025-01-27':'Australia Day (observed)',
+  '2025-04-18':'Good Friday',
+  '2025-04-19':'Easter Saturday',
+  '2025-04-20':'Easter Sunday',
+  '2025-04-21':'Easter Monday',
+  '2025-04-25':'Anzac Day',
+  '2025-06-09':'King\'s Birthday',
+  '2025-08-04':'Bank Holiday',
+  '2025-10-06':'Labour Day',
+  '2025-12-25':'Christmas Day',
+  '2025-12-26':'Boxing Day',
+  '2026-01-01':'New Year\'s Day',
+  '2026-01-26':'Australia Day',
+  '2026-04-03':'Good Friday',
+  '2026-04-04':'Easter Saturday',
+  '2026-04-05':'Easter Sunday',
+  '2026-04-06':'Easter Monday',
+  '2026-04-25':'Anzac Day',
+  '2026-06-08':'King\'s Birthday',
+  '2026-08-03':'Bank Holiday',
+  '2026-10-05':'Labour Day',
+  '2026-12-25':'Christmas Day',
+  '2026-12-26':'Boxing Day',
+  '2027-01-01':'New Year\'s Day',
+  '2027-01-26':'Australia Day',
+  '2027-03-26':'Good Friday',
+  '2027-03-27':'Easter Saturday',
+  '2027-03-28':'Easter Sunday',
+  '2027-03-29':'Easter Monday',
+  '2027-04-25':'Anzac Day',
+  '2027-06-14':'King\'s Birthday',
+  '2027-08-02':'Bank Holiday',
+  '2027-10-04':'Labour Day',
+  '2027-12-25':'Christmas Day',
+  '2027-12-27':'Boxing Day (observed)',
+};
+
+async function loadBirthdays(){
+  const el=document.getElementById('birthdayList');
+  if(!el)return;
+  bdayViewDate=new Date();
+  try{
+    const [bdRows, evRows]=await Promise.all([
+      sbGet('staff_credentials','?select=staff_name,birthday&birthday=not.is.null'),
+      sbGet('calendar_events','?order=event_date.asc')
+    ]);
+    bdayData=bdRows;
+    calEvents=evRows||[];
+  }catch(e){console.warn(e);}
+  // Show Add Event button for admins
+  const addBtn=document.getElementById('calAddEventBtn');
+  if(addBtn)addBtn.style.display=myIsAdmin?'inline':'none';
+  renderBdayCalendar();
+}
+
+function bdayPrevMonth(){
+  bdayViewDate=new Date(bdayViewDate.getFullYear(),bdayViewDate.getMonth()-1,1);
+  renderBdayCalendar();
+}
+function bdayNextMonth(){
+  bdayViewDate=new Date(bdayViewDate.getFullYear(),bdayViewDate.getMonth()+1,1);
+  renderBdayCalendar();
+}
+
+function renderBdayCalendar(){
+  const el=document.getElementById('birthdayList');
+  const lbl=document.getElementById('bdayMonthLabel');
+  if(!el)return;
+  const today=new Date(); today.setHours(0,0,0,0);
+  const yr=bdayViewDate.getFullYear(), mo=bdayViewDate.getMonth();
+  if(lbl)lbl.textContent=new Date(yr,mo,1).toLocaleDateString('en-AU',{month:'long',year:'numeric'});
+
+  // Build birthday map for this month
+  const bdayMap={};
+  bdayData.forEach(r=>{
+    if(!r.birthday)return;
+    const d=new Date(r.birthday+'T00:00:00');
+    if(d.getMonth()===mo){
+      if(!bdayMap[d.getDate()])bdayMap[d.getDate()]=[];
+      bdayMap[d.getDate()].push({name:r.staff_name,type:'birthday'});
+    }
+  });
+
+  // Build public holiday map for this month
+  const holidayMap={};
+  Object.entries(AU_HOLIDAYS).forEach(([date,name])=>{
+    const d=new Date(date+'T00:00:00');
+    if(d.getFullYear()===yr&&d.getMonth()===mo){
+      holidayMap[d.getDate()]=name;
+    }
+  });
+
+  // Build custom events map for this month
+  const eventMap={};
+  calEvents.forEach(ev=>{
+    if(!ev.event_date)return;
+    const d=new Date(ev.event_date+'T00:00:00');
+    if(d.getFullYear()===yr&&d.getMonth()===mo){
+      if(!eventMap[d.getDate()])eventMap[d.getDate()]=[];
+      eventMap[d.getDate()].push(ev);
+    }
+  });
+
+  const firstDay=new Date(yr,mo,1).getDay();
+  const startOffset=(firstDay===0?6:firstDay-1);
+  const daysInMonth=new Date(yr,mo+1,0).getDate();
+  const colors=['#2563eb','#7c3aed','#059669','#d97706','#dc2626','#0284c7','#be185d'];
+
+  let html='';
+
+  // Legend
+  html+='<div style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap;">';
+  html+='<div style="display:flex;align-items:center;gap:5px;font-size:11px;color:#475569;"><div style="width:10px;height:10px;border-radius:50%;background:#2563eb;"></div>Birthday</div>';
+  html+='<div style="display:flex;align-items:center;gap:5px;font-size:11px;color:#475569;"><div style="width:10px;height:10px;border-radius:3px;background:#dc2626;"></div>Holiday</div>';
+  html+='<div style="display:flex;align-items:center;gap:5px;font-size:11px;color:#475569;"><div style="width:10px;height:10px;border-radius:3px;background:#059669;"></div>Event</div>';
+  html+='<div style="display:flex;align-items:center;gap:5px;font-size:11px;color:#475569;"><div style="width:10px;height:10px;border-radius:2px;background:#eff6ff;border:1.5px solid #2563eb;"></div>Today</div>';
+  html+='</div>';
+
+  // Day headers
+  html+='<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:3px;">';
+  ['Mo','Tu','We','Th','Fr','Sa','Su'].forEach(d=>{
+    html+='<div style="text-align:center;font-size:10px;font-weight:700;color:#94a3b8;padding:3px 0;">'+d+'</div>';
+  });
+  html+='</div>';
+
+  // Calendar grid
+  html+='<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;">';
+  for(let i=0;i<startOffset;i++) html+='<div style="min-height:54px;"></div>';
+
+  for(let d=1;d<=daysInMonth;d++){
+    const isToday=today.getFullYear()===yr&&today.getMonth()===mo&&today.getDate()===d;
+    const bdays=bdayMap[d]||[];
+    const holiday=holidayMap[d];
+    const events=eventMap[d]||[];
+    const isWeekend=((startOffset+d-1)%7)>=5;
+    let bg='#fff', border='#e2e8f0';
+    if(isToday){bg='#eff6ff';border='#2563eb';}
+    else if(holiday){bg='#fef2f2';border='#fecaca';}
+    else if(events.length){bg='#f0fdf4';border='#bbf7d0';}
+    else if(bdays.length){bg='#f0f9ff';border='#bfdbfe';}
+    else if(isWeekend){bg='#fafafa';}
+
+    html+='<div style="min-height:54px;border-radius:7px;padding:4px;border:1px solid '+border+';background:'+bg+';overflow:hidden;">';
+    html+='<div style="font-size:11px;font-weight:'+(isToday?'800':'500')+';color:'+(isToday?'#2563eb':isWeekend?'#94a3b8':'#374151')+';margin-bottom:2px;">'+d+'</div>';
+
+    // Holiday label
+    if(holiday){
+      html+='<div style="font-size:7px;font-weight:700;color:#dc2626;line-height:1.3;word-break:break-word;">'+holiday+'</div>';
+    }
+
+    // Custom event labels
+    events.forEach(ev=>{
+      const shortTitle=ev.title.length>8?ev.title.slice(0,7)+'…':ev.title;
+      const deleteBtn=myIsAdmin?'<span data-id="'+ev.id+'" onclick="event.stopPropagation();deleteCalEvent(this.dataset.id)" style="cursor:pointer;opacity:.5;margin-left:2px;font-size:8px;">×</span>':'';
+      html+='<div style="font-size:7px;font-weight:700;color:#059669;line-height:1.3;word-break:break-word;display:flex;align-items:center;">'+shortTitle+deleteBtn+'</div>';
+    });
+
+    // Birthday dots
+    bdays.forEach(b=>{
+      const col=colors[b.name.charCodeAt(0)%colors.length];
+      const ava=b.name.split(' ').map(w=>w[0]).join('').slice(0,2);
+      html+='<div title="'+b.name+'" style="display:flex;align-items:center;gap:2px;margin-top:2px;">';
+      html+='<div style="width:14px;height:14px;border-radius:50%;background:'+col+';flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:6px;font-weight:800;color:#fff;">'+ava+'</div>';
+      html+='<span style="font-size:7px;font-weight:600;color:#0f172a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:38px;">'+b.name.split(' ')[0]+'</span>';
+      html+='</div>';
+    });
+
+    html+='</div>';
+  }
+  html+='</div>';
+
+  // Upcoming section — birthdays + holidays + custom events in next 30 days
+  const upcoming=[];
+  calEvents.forEach(ev=>{
+    if(!ev.event_date)return;
+    const d=new Date(ev.event_date+'T00:00:00');
+    const diff=Math.round((d-today)/(1000*60*60*24));
+    if(diff>=0&&diff<=30)upcoming.push({label:ev.title,diff,date:d,type:'event',desc:ev.description,id:ev.id});
+  });
+  bdayData.forEach(r=>{
+    if(!r.birthday)return;
+    const d=new Date(r.birthday+'T00:00:00');
+    const thisYear=new Date(today.getFullYear(),d.getMonth(),d.getDate());
+    if(thisYear<today)thisYear.setFullYear(today.getFullYear()+1);
+    const diff=Math.round((thisYear-today)/(1000*60*60*24));
+    if(diff<=30)upcoming.push({label:r.staff_name,diff,date:thisYear,type:'birthday'});
+  });
+  Object.entries(AU_HOLIDAYS).forEach(([date,name])=>{
+    const d=new Date(date+'T00:00:00');
+    const diff=Math.round((d-today)/(1000*60*60*24));
+    if(diff>=0&&diff<=30)upcoming.push({label:name,diff,date:d,type:'holiday'});
+  });
+  upcoming.sort((a,b)=>a.diff-b.diff);
+
+  if(upcoming.length){
+    html+='<div style="margin-top:14px;border-top:1px solid #e2e8f0;padding-top:12px;">';
+    html+='<div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px;">Coming up — next 30 days</div>';
+    upcoming.forEach(u=>{
+      const isBday=u.type==='birthday';const isEvent=u.type==='event';
+      const col=isBday?colors[u.label.charCodeAt(0)%colors.length]:isEvent?'#059669':'#dc2626';
+      const lbl=u.diff===0?'Today':u.diff===1?'Tomorrow':'In '+u.diff+' days';
+      const lblColor=u.diff===0?'#16a34a':u.diff<=3?'#d97706':'#94a3b8';
+      const lblBg=u.diff===0?'#dcfce7':u.diff<=3?'#fffbeb':'#f1f5f9';
+      html+='<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid #f1f5f9;">';
+      if(isBday){
+        const ava=u.label.split(' ').map(w=>w[0]).join('').slice(0,2);
+        html+='<div style="width:28px;height:28px;border-radius:50%;background:'+col+';display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;color:#fff;flex-shrink:0;">'+ava+'</div>';
+      }else if(isEvent){
+        html+='<div style="width:28px;height:28px;border-radius:6px;background:#f0fdf4;border:1px solid #bbf7d0;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="14" height="14" viewBox="0 0 20 20" fill="#059669"><path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd"/></svg></div>';
+      }else{
+        html+='<div style="width:28px;height:28px;border-radius:6px;background:#fef2f2;border:1px solid #fecaca;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="14" height="14" viewBox="0 0 20 20" fill="#dc2626"><path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd"/></svg></div>';
+      }
+      html+='<div style="flex:1;min-width:0;"><div style="font-size:12.5px;font-weight:600;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+u.label+'</div>';
+      html+='<div style="font-size:10px;color:#94a3b8;">'+u.date.toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short'})+'</div></div>';
+      html+='<span style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;background:'+lblBg+';color:'+lblColor+';white-space:nowrap;">'+lbl+'</span>';
+      html+='</div>';
+    });
+    html+='</div>';
+  }
+
+  if(!bdayData.length&&!Object.keys(holidayMap).length){
+    html+='<div style="color:#94a3b8;font-size:13px;text-align:center;padding:16px;">No staff birthdays on file. Staff can add their birthday in Profile.</div>';
+  }
+
+  el.innerHTML=html;
+}
+
+
+// ── ONBOARDING CHECKLIST ──
+async function loadOnboardingChecklist(){
+  const el=document.getElementById('onboardChecklist');
+  if(!el)return;
+  try{
+    const creds=await sbGet('staff_credentials','?staff_name=eq.'+encodeURIComponent(me)+'&select=password_hash,sq1_question,email');
+    const avail=await sbGet('staff_availability','?staff_name=eq.'+encodeURIComponent(me)+'&limit=1');
+    const hasPass=creds.length&&!!creds[0].password_hash;
+    const hasSQ=creds.length&&!!creds[0].sq1_question;
+    const hasAvail=avail.length>0;
+    const items=[
+      {label:'Set your password',done:hasPass,action:"goTo('profile')"},
+      {label:'Set security questions',done:hasSQ,action:"goTo('profile')"},
+      {label:'Submit your availability',done:hasAvail,action:"goTo('schedule');setTimeout(function(){showSchedTab('availability');},50)"},
+    ];
+    const allDone=items.every(i=>i.done);
+    if(allDone){el.innerHTML='<div style="text-align:center;padding:16px 0;"><div style="font-size:28px;margin-bottom:8px;">🎉</div><div style="font-size:14px;font-weight:700;color:#16a34a;">All set. You\'re fully onboarded.</div></div>';return;}
+    el.innerHTML=items.map(item=>'<div class="onboard-item"><div class="onboard-check '+(item.done?'onboard-done':'onboard-pending')+'">'+(item.done?'✓':'')+'</div><div class="onboard-text '+(item.done?'onboard-done-text':'')+'" '+(item.done?'':'style="cursor:pointer;color:#2563eb;" onclick="'+item.action+'"')+'>'+item.label+(item.done?'':'&nbsp;→')+'</div></div>').join('');
+  }catch(e){console.warn(e);}
+}
+
+// ── PROFILE BIRTHDAY ──
+async function loadProfileBirthday(){
+  try{
+    const rows=await sbGet('staff_credentials','?staff_name=eq.'+encodeURIComponent(me)+'&select=birthday');
+    const el=document.getElementById('profBirthday');
+    if(el&&rows.length&&rows[0].birthday)el.value=rows[0].birthday;
+  }catch(e){console.warn(e);}
+}
+
+async function saveBirthday(){
+  const val=document.getElementById('profBirthday').value;
+  const err=document.getElementById('profBdayErr'),ok=document.getElementById('profBdayOk');
+  err.classList.remove('show');ok.classList.remove('show');
+  try{
+    await fetch(SB+'/rest/v1/staff_credentials?staff_name=eq.'+encodeURIComponent(me),{
+      method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({birthday:val||null})
+    });
+    ok.textContent='Birthday saved!';ok.classList.add('show');
+    setTimeout(()=>ok.classList.remove('show'),2000);
+  }catch(e){err.textContent='Failed to save.';err.classList.add('show');}
+}
+
+
+function toggleSection(id){
+  const el=document.getElementById(id);
+  if(el)el.style.display=el.style.display==="none"?"block":"none";
+}
+
+async function loadProfilePage(){
+  // Set avatar and name
+  const ava=me.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase();
+  const profAvaEl=document.getElementById("profAva");if(profAvaEl)profAvaEl.textContent=ava;
+  const profNameEl=document.getElementById("profName");if(profNameEl)profNameEl.textContent=me;
+  const profRoleEl=document.getElementById("profRole");if(profRoleEl)profRoleEl.textContent=myIsAdmin?"Admin":"Staff";
+  loadProfileBirthday();
+  loadOnboardingChecklist();
+  // Load security question status
+  try{
+    const rows=await sbGet("staff_credentials","?staff_name=eq."+encodeURIComponent(me)+"&select=sq1_question,sq2_question");
+    const statusEl=document.getElementById("profSqStatus");
+    if(statusEl){
+      if(rows.length&&rows[0].sq1_question&&rows[0].sq2_question){
+        statusEl.innerHTML='<span style="color:#16a34a;font-size:12px;font-weight:600;">✓ Two security questions set</span>';
+      }else{
+        statusEl.innerHTML='<span style="color:#d97706;font-size:12px;font-weight:600;">⚠ No security questions set — add them so you can reset your password</span>';
+      }
+    }
+  }catch(e){console.warn(e);}
+}
+
+async function loadCurrentQuestions(){
+  try{
+    const rows=await sbGet("staff_credentials","?staff_name=eq."+encodeURIComponent(me)+"&select=sq1_question,sq2_question");
+    if(!rows.length)return;
+    const q1=document.getElementById("profQ1"),q2=document.getElementById("profQ2");
+    if(q1&&rows[0].sq1_question){
+      // Set select to current value
+      for(let o of q1.options)if(o.value===rows[0].sq1_question){o.selected=true;break;}
+    }
+    if(q2&&rows[0].sq2_question){
+      for(let o of q2.options)if(o.value===rows[0].sq2_question){o.selected=true;break;}
+    }
+  }catch(e){console.warn(e);}
+}
+
+async function changePassword(){
+  const curr=document.getElementById("profPassCurrent").value;
+  const newp=document.getElementById("profPassNew").value;
+  const conf=document.getElementById("profPassConfirm").value;
+  const err=document.getElementById("profPassErr"),ok=document.getElementById("profPassOk");
+  err.classList.remove("show");ok.classList.remove("show");
+  if(!curr){err.textContent="Please enter your current password.";err.classList.add("show");return;}
+  if(!newp||newp.length<4){err.textContent="New password must be at least 4 characters.";err.classList.add("show");return;}
+  if(newp!==conf){err.textContent="Passwords do not match.";err.classList.add("show");return;}
+  const btn=document.getElementById("profPassBtn");btn.disabled=true;btn.innerHTML='<span class="sp"></span> Saving...';
+  try{
+    const rows=await sbGet("staff_credentials","?staff_name=eq."+encodeURIComponent(me));
+    if(!rows.length){err.textContent="Account not found.";err.classList.add("show");return;}
+    const currHash=await hash(curr);
+    if(rows[0].password_hash!==currHash){err.textContent="Current password is incorrect.";err.classList.add("show");return;}
+    const newHash=await hash(newp);
+    const res=await fetch(SB+"/rest/v1/staff_credentials?staff_name=eq."+encodeURIComponent(me),{
+      method:"PATCH",
+      headers:{"apikey":KEY,"Authorization":"Bearer "+KEY,"Content-Type":"application/json","Prefer":"return=minimal"},
+      body:JSON.stringify({password_hash:newHash})
+    });
+    if(res.ok||res.status===204){
+      ok.textContent="Password updated successfully!";ok.classList.add("show");
+      document.getElementById("profPassCurrent").value="";
+      document.getElementById("profPassNew").value="";
+      document.getElementById("profPassConfirm").value="";
+      setTimeout(()=>toggleSection("profPassSection"),1500);
+    }else throw new Error();
+  }catch(e){err.textContent="Failed. Please try again.";err.classList.add("show");}
+  finally{btn.disabled=false;btn.textContent="Update Password";}
+}
+
+async function saveSecurityQuestions(){
+  const q1=document.getElementById("profQ1").value;
+  const a1=document.getElementById("profA1").value.trim().toLowerCase();
+  const q2=document.getElementById("profQ2").value;
+  const a2=document.getElementById("profA2").value.trim().toLowerCase();
+  const err=document.getElementById("profSqErr"),ok=document.getElementById("profSqOk");
+  err.classList.remove("show");ok.classList.remove("show");
+  if(!q1){err.textContent="Please select your first security question.";err.classList.add("show");return;}
+  if(!a1){err.textContent="Please answer your first security question.";err.classList.add("show");return;}
+  if(!q2){err.textContent="Please select your second security question.";err.classList.add("show");return;}
+  if(!a2){err.textContent="Please answer your second security question.";err.classList.add("show");return;}
+  if(q1===q2){err.textContent="Please choose two different questions.";err.classList.add("show");return;}
+  const btn=document.getElementById("profSqBtn");btn.disabled=true;btn.innerHTML='<span class="sp"></span> Saving...';
+  try{
+    const [h1,h2]=await Promise.all([hash(a1),hash(a2)]);
+    const res=await fetch(SB+"/rest/v1/staff_credentials?staff_name=eq."+encodeURIComponent(me),{
+      method:"PATCH",
+      headers:{"apikey":KEY,"Authorization":"Bearer "+KEY,"Content-Type":"application/json","Prefer":"return=minimal"},
+      body:JSON.stringify({sq1_question:q1,sq1_answer_hash:h1,sq2_question:q2,sq2_answer_hash:h2})
+    });
+    if(res.ok||res.status===204){
+      ok.textContent="Security questions saved!";ok.classList.add("show");
+      document.getElementById("profA1").value="";
+      document.getElementById("profA2").value="";
+      setTimeout(()=>{toggleSection("profSqSection");loadProfilePage();},1500);
+    }else throw new Error();
+  }catch(e){err.textContent="Failed. Please try again.";err.classList.add("show");}
+  finally{btn.disabled=false;btn.textContent="Save Questions";}
+}
+
+async function loadHomeNotifPreview(){
+  const el=document.getElementById("homeNotifPreview");
+  if(!el)return;
+  try{
+    const rows=await sbGet("leave_submissions","?staff_name=eq."+encodeURIComponent(me)+"&status=in.(approved,declined)&order=submitted_at.desc&limit=3");
+    const read=JSON.parse(localStorage.getItem("oR_"+me)||"[]");
+    if(!rows.length){el.innerHTML='<div style="color:#94a3b8;font-size:13px;">No notifications yet.</div>';return;}
+    el.innerHTML=rows.map(r=>{
+      const isRead=read.includes(r.id);
+      const ok=r.status==="approved";
+      const col=ok?"#16a34a":"#dc2626";
+      const bg=ok?"#dcfce7":"#fef2f2";
+      const lbl=ok?"Approved":"Declined";
+      return'<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #f1f5f9;">'+
+        (!isRead?'<div style="width:7px;height:7px;border-radius:50%;background:'+col+';flex-shrink:0;"></div>':'<div style="width:7px;height:7px;flex-shrink:0;"></div>')+
+        '<div style="flex:1;font-size:12.5px;color:#1e293b;">'+r.staff_name+' — '+fmtF(r.from_date)+'</div>'+
+        '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:'+bg+';color:'+col+'">'+lbl+'</span>'+
+        '</div>';
+    }).join("");
+  }catch(e){console.warn(e);}
+}
+
+async function loadHomeAnnPreview(){
+  const el=document.getElementById('homeAnnPreview');
+  if(!el)return;
+  try{
+    const rows=await sbGet('announcements','?order=pinned.desc,created_at.desc&limit=1');
+    if(!rows.length){el.innerHTML='<div style="color:#94a3b8;font-size:13px;">No announcements yet.</div>';return;}
+    const r=rows[0];
+    el.innerHTML='<div style="font-size:14px;font-weight:700;color:#0f172a;margin-bottom:4px;">'+r.title+'</div><div style="font-size:13px;color:#475569;line-height:1.5;">'+r.body.slice(0,100)+(r.body.length>100?'...':'')+'</div>';
+  }catch(e){console.warn(e);el.innerHTML='<div style="color:#94a3b8;font-size:13px;">No announcements yet.</div>';}
+}
+
+// Show onboarding card only if not fully onboarded
+async function maybeShowOnboarding(){
+  try{
+    const creds=await sbGet('staff_credentials','?staff_name=eq.'+encodeURIComponent(me)+'&select=password_hash,sq1_question');
+    const avail=await sbGet('staff_availability','?staff_name=eq.'+encodeURIComponent(me)+'&limit=1');
+    const allDone=creds.length&&creds[0].password_hash&&creds[0].sq1_question&&avail.length;
+    const card=document.getElementById('onboardCard');
+    if(card){card.style.display=allDone?'none':'block';}
+    if(!allDone){loadOnboardingChecklist();renderTimesheetPreview();}
+    else{renderTimesheetPreview();}
+  }catch(e){renderTimesheetPreview();}
+}
+
+// ── EMAIL UPDATE ──
+async function loadEmailStatus(){
+  try{
+    const rows=await sbGet("staff_credentials","?staff_name=eq."+encodeURIComponent(me)+"&select=email");
+    const statusEl=document.getElementById("emailStatusLine");
+    if(!statusEl)return;
+    if(rows&&rows.length&&rows[0].email){
+      statusEl.innerHTML='Email: <strong>'+rows[0].email+'</strong> <span style="color:#16a34a;font-size:11px;font-weight:600;">✓ Set</span>';
+      const inp=document.getElementById("emailInput");
+      if(inp)inp.value=rows[0].email;
+    }else{
+      statusEl.innerHTML='<span style="color:#94a3b8;font-size:13px;">No email on file.</span>';
+    }
+  }catch(e){console.warn(e);}
+}
+
+function toggleEmailForm(show){
+  document.getElementById("emailUpdateForm").style.display=show?"block":"none";
+  document.getElementById("emailEditBtn").style.display=show?"none":"";
+  document.getElementById("emailErr").classList.remove("show");
+  document.getElementById("emailOk").classList.remove("show");
+}
+
+async function saveEmail(){
+  const email=document.getElementById("emailInput").value.trim().toLowerCase();
+  const err=document.getElementById("emailErr"),ok=document.getElementById("emailOk");
+  err.classList.remove("show");ok.classList.remove("show");
+  if(!email||!email.includes("@")){err.textContent="Please enter a valid email.";err.classList.add("show");return;}
+  const btn=document.getElementById("emailSaveBtn");btn.disabled=true;btn.innerHTML='<span class="sp"></span> Saving...';
+  try{
+    const res=await fetch(SB+"/rest/v1/staff_credentials?staff_name=eq."+encodeURIComponent(me),{
+      method:"PATCH",
+      headers:{"apikey":KEY,"Authorization":"Bearer "+KEY,"Content-Type":"application/json","Prefer":"return=minimal"},
+      body:JSON.stringify({email})
+    });
+    if(res.ok||res.status===204){
+      ok.textContent="Email saved! You can now use it to reset your password.";ok.classList.add("show");
+      toggleEmailForm(false);
+      loadEmailStatus();
+    }else throw new Error();
+  }catch(e){err.textContent="Failed to save. Try again.";err.classList.add("show");}
+  finally{btn.disabled=false;btn.textContent="Save Email";}
+}
+
+// ── ROSTER ──
+
+
+
+// HOME
+async function loadHomeData(){
+  const statsEl=document.getElementById("homeStats"),sumEl=document.getElementById("homeAvailSummary");if(!statsEl)return;
+  try{
+    const [ar,lr]=await Promise.all([
+      sbGet("staff_availability","?staff_name=eq."+encodeURIComponent(me)+"&limit=1"),
+      sbGet("leave_submissions","?staff_name=eq."+encodeURIComponent(me)+"&status=eq.pending")
+    ]);
+    const avDays=ar.length?Object.values(ar[0].availability).filter(a=>a.type!=="no"&&a.type!=="unset").length:0;
+    statsEl.innerHTML=
+      '<div class="stat-box"><div class="stat-val green">'+avDays+'</div><div class="stat-label">Available Days</div></div>'+
+      '<div class="stat-box"><div class="stat-val blue">'+lr.length+'</div><div class="stat-label">Pending Leave</div></div>';
+    if(!ar.length){
+      if(sumEl)sumEl.innerHTML='<div style="text-align:center;padding:20px 0"><div style="font-size:13px;font-weight:600;color:#475569;margin-bottom:6px">No availability set</div><div style="font-size:12px;color:#94a3b8;margin-bottom:16px">Set your availability so your manager can plan the roster.</div><button onclick="goTo(\'availability\')" class="btn btn-green" style="padding:10px 20px;font-size:13px">Set Availability</button></div>';
+      return;
+    }
+    const av=ar[0].availability;
+    const period=ar[0].is_ongoing?"Ongoing":(ar[0].valid_from?"From "+fmtF(ar[0].valid_from)+(ar[0].valid_until?" – "+fmtF(ar[0].valid_until):""):"");
+    if(sumEl)sumEl.innerHTML='<div style="font-size:11px;color:#94a3b8;margin-bottom:10px;font-weight:500;">'+period+'</div>'+
+    DAYS.map((day,i)=>{
+      const a=av[i]||av[String(i)]||{type:"unset"};
+      const lbl=a.type==="custom"?(a.start+" \u2013 "+a.end):a.type==="all"?"Available":a.type==="no"?"Unavailable":"Not Set";
+      const cls=a.type==="no"?"asr-red":a.type==="custom"?"asr-blue":a.type==="all"?"asr-green":"asr-grey";
+      return '<div class="avail-summary-row"><div><div class="asr-day">'+DS[i]+'</div><div class="asr-date">'+fmt(addD(weekStart,i))+'</div></div><div class="asr-status '+cls+'">'+lbl+'</div></div>';
+    }).join("");
+  }catch(e){if(sumEl)sumEl.innerHTML='<div style="padding:12px 0;font-size:12px;color:#94a3b8">Could not load data.</div>';}
+}
+
+// LEAVE
+async function submitLeave(){
+  const from=document.getElementById("leaveFrom").value;
+  const to=document.getElementById("leaveTo").value;
+  const reason=document.getElementById("leaveReason").value.trim();
+  const err=document.getElementById("leaveErr"),ok=document.getElementById("leaveOk");
+  err.classList.remove("show");ok.classList.remove("show");
+  document.getElementById("leaveReason").classList.remove("error");
+  if(!from||!to){err.textContent="Please select your leave dates.";err.classList.add("show");return;}
+  if(from>to){err.textContent="End date must be on or after start date.";err.classList.add("show");return;}
+  if(!reason){
+    err.textContent="Please provide a reason for your leave request — this is required.";
+    err.classList.add("show");
+    document.getElementById("leaveReason").classList.add("error");
+    document.getElementById("leaveReason").focus();
+    return;
+  }
+  const btn=document.getElementById("leaveBtn");btn.disabled=true;btn.innerHTML='<span class="sp"></span> Submitting...';
+  try{
+    const res=await sbPost("leave_submissions",{staff_name:me,from_date:from,to_date:to,reason,status:"pending"});
+    if(res.ok||res.status===201){
+      ok.textContent="Request submitted. Your manager will review it shortly.";ok.classList.add("show");
+      document.getElementById("leaveReason").value="";
+      loadLeaveHistory();loadHomeData();
+    }else throw new Error();
+  }catch(e){err.textContent="Failed to submit. Please check your connection.";err.classList.add("show");}
+  finally{btn.disabled=false;btn.textContent="Submit Leave Request";}
+}
+async function loadLeaveHistory(){
+  const el=document.getElementById("leaveHistory");
+  try{
+    const rows=await sbGet("leave_submissions","?staff_name=eq."+encodeURIComponent(me)+"&order=submitted_at.desc");
+    if(!rows.length){el.innerHTML='<div style="text-align:center;padding:32px 20px;"><svg width="36" height="36" viewBox="0 0 20 20" fill="#e2e8f0" style="margin:0 auto 10px;display:block;"><path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd"/></svg><div style="font-size:13px;font-weight:600;color:#475569;margin-bottom:6px;">No leave requests yet</div><div style="font-size:12px;color:#94a3b8;">Submit a request using the form above.</div></div>';return;}
+    el.innerHTML=rows.map(r=>{
+      const days=Math.round((new Date(r.to_date)-new Date(r.from_date))/(864e5))+1;
+      const sc={pending:"st-pending",approved:"st-approved",declined:"st-declined"}[r.status]||"st-pending";
+      const sl={pending:"Pending",approved:"Approved",declined:"Declined"}[r.status];
+      return '<div class="leave-item">'+
+        '<div class="leave-item-top">'+
+          '<div><div class="leave-dates">'+fmtF(r.from_date)+' \u2014 '+fmtF(r.to_date)+'</div>'+
+          '<div class="leave-duration">'+days+' day'+(days!==1?'s':'')+'</div></div>'+
+          '<div class="status-tag '+sc+'">'+sl+'</div>'+
+        '</div>'+
+        (r.reason?'<div class="leave-reason-txt">'+r.reason+'</div>':'')+
+        (r.status==="declined"&&r.decline_reason?'<div class="manager-note"><strong>Manager note:</strong> '+r.decline_reason+'</div>':'')+
+        '</div>';
+    }).join("");
+  }catch(e){el.innerHTML='<div class="empty" style="padding:12px 0"><div class="empty-sub">Could not load history.</div></div>';}
+}
+
+// NOTIFICATIONS
+async function loadNotifications(){
+  const el=document.getElementById("notifList");
+  const badge=document.getElementById("notifBadge");
+  const bnBadge=document.getElementById("bnNotifBadge");
+  try{
+    const rows=await sbGet("leave_submissions","?staff_name=eq."+encodeURIComponent(me)+"&status=in.(approved,declined)&order=submitted_at.desc");
+    const read=JSON.parse(localStorage.getItem("oR_"+me)||"[]");
+    const unread=rows.filter(r=>!read.includes(r.id));
+    // Update badges
+    if(badge){badge.textContent=unread.length;badge.style.display=unread.length?"inline":"none";}
+    if(bnBadge){bnBadge.textContent=unread.length;bnBadge.style.display=unread.length?"block":"none";}
+    if(!el)return; // element may not be visible yet
+    if(!rows.length){
+      el.innerHTML='<div style="text-align:center;padding:40px 20px;"><svg width="36" height="36" viewBox="0 0 20 20" fill="#e2e8f0" style="margin:0 auto 10px;display:block;"><path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z"/></svg><div style="font-size:13px;font-weight:600;color:#475569;margin-bottom:6px;">No alerts yet</div><div style="font-size:12px;color:#94a3b8;">Leave approvals and declines will appear here.</div></div>';
+      return;
+    }
+    el.innerHTML=rows.map(r=>{
+      const isRead=read.includes(r.id);
+      const isApproved=r.status==="approved";
+      const bg=isRead?"#fff":(isApproved?"#eff6ff":"#fef2f2");
+      const border=isRead?"#e2e8f0":(isApproved?"#bfdbfe":"#fecaca");
+      const titleColor=isApproved?"#1d4ed8":"#dc2626";
+      const title=isApproved?"Leave Approved":"Leave Declined";
+      return '<div class="notif-item'+(isRead?" read":"")+'" style="background:'+bg+';border:1px solid '+border+';border-radius:12px;padding:14px;margin-bottom:10px;">'+
+        (!isRead?'<div style="width:7px;height:7px;border-radius:50%;background:'+(isApproved?"#2563eb":"#dc2626")+';margin-bottom:8px;"></div>':'')+
+        '<div style="font-size:13px;font-weight:700;color:'+titleColor+';margin-bottom:4px;">'+title+'</div>'+
+        '<div style="font-size:12.5px;color:#475569;">'+fmtF(r.from_date)+' \u2013 '+fmtF(r.to_date)+(r.reason?' \u00b7 '+r.reason:'')+'</div>'+
+        (r.status==="declined"&&r.decline_reason?'<div style="font-size:12px;color:#dc2626;margin-top:6px;"><strong>Reason:</strong> '+r.decline_reason+'</div>':'')+
+        '<div style="font-size:11px;color:#94a3b8;margin-top:6px;">'+fmtF(r.submitted_at)+'</div>'+
+        '</div>';
+    }).join("");
+  }catch(e){if(el)el.innerHTML='<div style="color:#dc2626;text-align:center;padding:16px;font-size:13px;">Could not load alerts.</div>';}
+}
+
+function markAllNotificationsRead(){
+  try{
+    // Get all current notification IDs and mark them all read
+    sbGet("leave_submissions","?staff_name=eq."+encodeURIComponent(me)+"&status=in.(approved,declined)").then(rows=>{
+      if(!rows.length)return;
+      const allIds=rows.map(r=>r.id);
+      localStorage.setItem("oR_"+me,JSON.stringify(allIds));
+      // Clear badge immediately
+      const badge=document.getElementById("notifBadge");
+      if(badge){badge.textContent="";badge.style.display="none";}
+      const bnBadge=document.getElementById("bnNotifBadge");
+      if(bnBadge){bnBadge.style.display="none";}
+      // Re-render without dots
+      loadNotifications();
+    });
+  }catch(e){console.warn(e);}
+}
+
+
+// ── SETTINGS ──
+let myCanEditAvail=true;
+let myIsAdmin=false;
+let adminHasSetAvail=false; // true only if admin explicitly set a value in staff_settings
+
+async function loadMySettings(){
+  try{
+    const rows=await sbGet("staff_settings","?name=eq."+encodeURIComponent(me));
+    if(rows&&rows.length){
+      myIsAdmin=rows[0].is_hub_admin===true;
+      myCanEditAvail=myIsAdmin?true:(rows[0].can_edit_avail!==false);
+      adminHasSetAvail=true;
+    }else{
+      myIsAdmin=false;
+      myCanEditAvail=true;
+    }
+  }catch(e){
+    myIsAdmin=false;
+    myCanEditAvail=true;
+  }
+
+  // Update availability lock
+  const locked=adminHasSetAvail&&!myCanEditAvail;
+  if(locked){
+    document.getElementById("availLock").style.display="block";
+    document.getElementById("availLock").textContent="Your availability has been locked by your manager.";
+    document.getElementById("availBtnArea").style.display="none";
+  }else{
+    document.getElementById("availLock").style.display="none";
+    document.getElementById("availBtnArea").style.display="block";
+  }
+
+  // Show/hide admin nav — sidebar and bottom nav
+  const navAdmin=document.getElementById("nav-admin");
+  if(navAdmin)navAdmin.style.display=myIsAdmin?"flex":"none";
+  const bnAdmin=document.getElementById("bn-admin");
+  if(bnAdmin){
+    bnAdmin.style.display=myIsAdmin?"flex":"none";
+  }
+
+  // Show Admin tab in Profile for admins
+  const adminTab=document.getElementById("ptab-adminpanel");
+  if(adminTab)adminTab.style.display=myIsAdmin?"block":"none";
+
+  // Show admin cards on Home for admins
+  if(myIsAdmin){
+    const hbc=document.getElementById("homeBdayCard");if(hbc)hbc.style.display="block";
+    // Load data after elements are shown
+    setTimeout(()=>loadBirthdays(),100);
+  }
+}
+
+// ── ADMIN ──
+async function loadAdminPage(){
+  // Now integrated into tabs — kept for compatibility
+  loadBirthdays();
+  loadAdminFeedback();
+  const el=document.getElementById("adminContent");
+  if(!el){console.error("adminContent div not found");return;}
+  el.innerHTML='<div class="empty"><div class="empty-title">Fetching data...</div></div>';
+
+  const isoWeek=iso(weekStart);
+  let availRows=[], leaveRows=[];
+
+  try{
+    const r=await fetch(SB+"/rest/v1/staff_availability?select=*",{headers:{"apikey":KEY,"Authorization":"Bearer "+KEY}});
+    if(r.ok)availRows=await r.json();
+  }catch(e){console.warn("avail fetch error:",e);}
+
+  try{
+    const r=await fetch(SB+"/rest/v1/leave_submissions?status=eq.pending",{headers:{"apikey":KEY,"Authorization":"Bearer "+KEY}});
+    if(r.ok)leaveRows=await r.json();
+  }catch(e){console.warn("leave fetch error:",e);}
+
+
+
+  const typeCol={all:"#2563eb",no:"#dc2626",custom:"#0ea5e9"};
+  const typeLbl={all:"Available",no:"Unavail",custom:""};
+
+  let html='<div class="card"><div class="card-hd"><div class="card-title">Staff Availability — '+wkL(weekStart)+'</div></div>';
+
+  if(!availRows.length){
+    html+='<div style="color:#94a3b8;font-size:12px;padding:8px 0 12px">No submissions yet for this week.</div>';
+  }
+
+  STAFF.forEach(function(name){
+    const row=availRows.find(function(r){return r.staff_name&&r.staff_name.toLowerCase()===name.toLowerCase();});
+    const encodedName=encodeURIComponent(name);
+
+    html+='<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #e2e8f0;flex-wrap:wrap">';
+    html+='<div style="font-size:12.5px;font-weight:700;min-width:180px">'+name+'</div>';
+
+    // Availability pills
+    if(!row){
+      html+='<div style="font-size:10px;color:#94a3b8;">No availability set</div>';
+    }else{
+      const periodLabel=row.is_ongoing?"Ongoing":(row.valid_from?"From "+row.valid_from+(row.valid_until?" – "+row.valid_until:""):"");
+      if(periodLabel)html+='<div style="font-size:9px;color:#94a3b8;margin-bottom:4px;">'+ periodLabel +'</div>';
+
+      const av=row.availability||{};
+      html+='<div style="display:flex;gap:4px;flex-wrap:wrap">';
+      for(let i=0;i<7;i++){
+        const a=av[i]||av[String(i)]||{type:"all"};
+        const lbl=a.type==="custom"?(a.start.slice(0,5)+"\u2013"+a.end.slice(0,5)):typeLbl[a.type];
+        html+='<div style="font-size:9px;font-weight:700;padding:3px 6px;border-radius:5px;background:#f8fafc;border:1px solid #e2e8f0;color:'+typeCol[a.type]+'">'+DS[i]+' '+lbl+'</div>';
+      }
+      html+='</div>';
+    }
+    html+='</div>';
+  });
+  html+='</div>';
+
+  html+='<div class="card"><div class="card-title" style="margin-bottom:16px">Pending Leave ('+leaveRows.length+')</div>';
+  if(!leaveRows.length){
+    html+='<div class="empty" style="padding:16px 0"><div class="empty-sub">No pending leave requests</div></div>';
+  }else{
+    leaveRows.forEach(function(r){
+      html+='<div class="leave-item"><div class="leave-item-top"><div>'+
+        '<div class="leave-dates">'+r.staff_name+'</div>'+
+        '<div class="leave-duration">'+fmtF(r.from_date)+' \u2014 '+fmtF(r.to_date)+'</div></div>'+
+        '<div class="status-tag st-pending">Pending</div></div>'+
+        (r.reason?'<div class="leave-reason-txt">'+r.reason+'</div>':'')+
+        '</div>';
+    });
+  }
+  html+='</div>';
+
+  el.innerHTML=html;
+
+}
+
+
+function btnStyle(state){
+  if(state==="open")return "background:rgba(34,212,160,.12);color:#2563eb;border:1px solid rgba(34,212,160,.25);";
+  if(state==="locked")return "background:rgba(255,107,71,.12);color:#dc2626;border:1px solid rgba(255,107,71,.25);";
+  return "background:#f1f5f9;color:#475569;border:1px solid #e2e8f0;";
+}
+
+async function adminCycleAvail(ev, encodedName, currentState){
+  const name=decodeURIComponent(encodedName);
+  const nextState=currentState==="auto"?"open":currentState==="open"?"locked":"auto";
+
+  // Update button immediately for instant feedback
+  ev.target.textContent=nextState==="auto"?"Auto":nextState==="open"?"Can Edit":"Locked";
+
+  try{
+    // Always check existing row first
+    const checkR=await fetch(SB+"/rest/v1/staff_settings?name=eq."+encodeURIComponent(name),{
+      headers:{"apikey":KEY,"Authorization":"Bearer "+KEY}
+    });
+    const existing=checkR.ok?await checkR.json():[];
+
+    if(nextState==="auto"){
+      if(existing.length){
+        await fetch(SB+"/rest/v1/staff_settings?name=eq."+encodeURIComponent(name),{
+          method:"DELETE",
+          headers:{"apikey":KEY,"Authorization":"Bearer "+KEY}
+        });
+      }
+    } else {
+      const canEdit=nextState==="open";
+      if(existing.length){
+        await fetch(SB+"/rest/v1/staff_settings?name=eq."+encodeURIComponent(name),{
+          method:"PATCH",
+          headers:{"apikey":KEY,"Authorization":"Bearer "+KEY,"Content-Type":"application/json","Prefer":"return=minimal"},
+          body:JSON.stringify({can_edit_avail:canEdit})
+        });
+      } else {
+        await fetch(SB+"/rest/v1/staff_settings",{
+          method:"POST",
+          headers:{"apikey":KEY,"Authorization":"Bearer "+KEY,"Content-Type":"application/json","Prefer":"return=minimal"},
+          body:JSON.stringify({name:name,can_edit_avail:canEdit})
+        });
+      }
+    }
+
+    // Reload to confirm
+    await loadAdminPage();
+
+  }catch(e){
+    console.warn("cycle failed",e);
+    alert("Failed to update setting: "+e.message);
+    await loadAdminPage(); // reload to restore correct state
+  }
+}
+
+document.fonts.ready.then(function(){
+  document.body.classList.add('ready');
+  var splash = document.getElementById('splash');
+  if(splash){
+    splash.classList.add('fade');
+    setTimeout(function(){
+      splash.style.display='none';
+      // Only show content after splash gone
+      if(loadMe()){
+        enterHub();
+      }else{
+        document.getElementById('authLayer').style.display='flex';
+      }
+    }, 280);
+  } else {
+    if(loadMe()){enterHub();}else{document.getElementById('authLayer').style.display='flex';}
+  }
+});
+</script>
+
+</body>
+</html>
