@@ -930,25 +930,7 @@ body.ready{visibility:visible;}
 
 
 /* ── Profile tabs ── */
-.prof-tab{
-  padding:10px 16px;background:none;border:none;cursor:pointer;
-  font-size:13px;font-weight:500;color:#94a3b8;
-  border-bottom:2.5px solid transparent;white-space:nowrap;
-  font-family:'Inter',system-ui,sans-serif;
-  transition:color .18s,border-color .2s cubic-bezier(.34,1.2,.7,1);
-  flex-shrink:0;position:relative;
-}
-.prof-tab:hover{color:#475569;}
-.prof-tab.active{color:#2563eb;border-bottom-color:#2563eb;font-weight:600;}
-.prof-tab::after{
-  content:'';position:absolute;bottom:-1px;left:50%;right:50%;
-  height:2.5px;background:#2563eb;border-radius:2px;
-  transition:left .22s cubic-bezier(.34,1.2,.7,1),right .22s cubic-bezier(.34,1.2,.7,1);
-}
-.prof-tab.active::after{left:0;right:0;}
-[data-theme="dark"] .prof-tab{color:#4b6480;}
-[data-theme="dark"] .prof-tab.active{color:#60a5fa;border-bottom-color:#60a5fa;}
-[data-theme="dark"] .prof-tab::after{background:#60a5fa;}
+
 
 /* ── DOCUMENTS ── */
 .doc-category{margin-bottom:16px;}
@@ -1016,33 +998,7 @@ body.ready{visibility:visible;}
 
 
 /* ── Schedule sub-tabs ── */
-.sched-tab{
-  padding:10px 18px;background:none;border:none;cursor:pointer;
-  font-size:13px;font-weight:500;color:#94a3b8;
-  border-bottom:2.5px solid transparent;white-space:nowrap;
-  font-family:'Inter',system-ui,sans-serif;
-  transition:color .15s,border-color .2s cubic-bezier(.34,1.2,.7,1);
-  flex-shrink:0;-webkit-tap-highlight-color:transparent;
-}
-.sched-tab:hover{color:#475569;}
-.sched-tab.active{color:#2563eb;border-bottom-color:#2563eb;font-weight:600;}
-[data-theme="dark"] .sched-tab{color:#4b6480;}
-[data-theme="dark"] .sched-tab.active{color:#60a5fa;border-bottom-color:#60a5fa;}
-
-
-/* ── Engagement sub-tabs ── */
-.eng-tab{
-  padding:10px 18px;background:none;border:none;cursor:pointer;
-  font-size:13px;font-weight:500;color:#94a3b8;
-  border-bottom:2.5px solid transparent;white-space:nowrap;
-  font-family:'Inter',system-ui,sans-serif;
-  transition:color .15s,border-color .2s cubic-bezier(.34,1.2,.7,1);
-  flex-shrink:0;-webkit-tap-highlight-color:transparent;
-}
-.eng-tab:hover{color:#475569;}
-.eng-tab.active{color:#2563eb;border-bottom-color:#2563eb;font-weight:600;}
-[data-theme="dark"] .eng-tab{color:#4b6480;}
-[data-theme="dark"] .eng-tab.active{color:#60a5fa;border-bottom-color:#60a5fa;}
+/* sched/eng tabs handled below in unified block */
 
 
 [data-theme="dark"] .nav-item.active::before { display: none; }
@@ -1099,6 +1055,94 @@ body.ready{visibility:visible;}
 [data-theme="dark"] .react-picker{background:#1e293b;border-color:#2d3f55;box-shadow:0 4px 20px rgba(0,0,0,.4);}
 [data-theme="dark"] .react-btn{background:#1e293b;border-color:#2d3f55;color:#94a3b8;}
 [data-theme="dark"] .react-btn.has-react{background:rgba(79,142,247,.15);border-color:#4f8ef7;color:#60a5fa;}
+
+
+/* ═══════════════════════════════════════════
+   TAB BAR — Production Mobile System
+═══════════════════════════════════════════ */
+.tab-bar{
+  display:flex;
+  gap:0;
+  border-bottom:1px solid #e2e8f0;
+  margin-bottom:18px;
+  /* Scroll */
+  overflow-x:auto;
+  overflow-y:hidden;
+  -webkit-overflow-scrolling:touch;
+  overscroll-behavior-x:contain;
+  scroll-snap-type:x proximity;
+  scrollbar-width:none;
+  /* Width containment */
+  width:100%;
+  max-width:100%;
+  box-sizing:border-box;
+  /* Fade right edge = scroll hint */
+  -webkit-mask-image:linear-gradient(to right,#000 80%,transparent 100%);
+  mask-image:linear-gradient(to right,#000 80%,transparent 100%);
+}
+.tab-bar::-webkit-scrollbar{display:none;}
+
+/* ── ALL TABS — unified ── */
+.prof-tab,.sched-tab,.eng-tab{
+  flex:0 0 auto;
+  scroll-snap-align:start;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  white-space:nowrap;
+  min-height:44px;
+  padding:0 16px;
+  box-sizing:border-box;
+  font-family:'Inter',system-ui,sans-serif;
+  font-size:13px;
+  font-weight:500;
+  color:#94a3b8;
+  background:none;
+  border:none;
+  border-bottom:2.5px solid transparent;
+  margin-bottom:-1px;
+  cursor:pointer;
+  touch-action:manipulation;
+  -webkit-tap-highlight-color:transparent;
+  user-select:none;
+  transition:color .15s,border-color .18s cubic-bezier(.34,1.2,.7,1);
+}
+.prof-tab:hover,.sched-tab:hover,.eng-tab:hover{color:#475569;}
+.prof-tab.active,.sched-tab.active,.eng-tab.active{
+  color:#2563eb;
+  border-bottom-color:#2563eb;
+  font-weight:600;
+}
+
+/* Mobile */
+@media(max-width:700px){
+  .tab-bar{
+    width:calc(100% + 32px);
+    margin-left:-16px;
+    padding-left:16px;
+    padding-right:32px;
+    scroll-padding-left:16px;
+  }
+  .prof-tab,.sched-tab,.eng-tab{
+    font-size:12.5px;
+    padding:0 14px;
+  }
+}
+@media(max-width:360px){
+  .prof-tab,.sched-tab,.eng-tab{font-size:12px;padding:0 10px;}
+}
+
+[data-theme="dark"] .tab-bar{
+  border-bottom-color:#1e293b;
+  -webkit-mask-image:linear-gradient(to right,#000 80%,transparent 100%);
+  mask-image:linear-gradient(to right,#000 80%,transparent 100%);
+}
+[data-theme="dark"] .prof-tab,
+[data-theme="dark"] .sched-tab,
+[data-theme="dark"] .eng-tab{color:#4b6480;}
+[data-theme="dark"] .prof-tab.active,
+[data-theme="dark"] .sched-tab.active,
+[data-theme="dark"] .eng-tab.active{color:#60a5fa;border-bottom-color:#60a5fa;}
 
 </style>
 </head>
@@ -1338,7 +1382,7 @@ body.ready{visibility:visible;}
       </div>
 
       <!-- Sub-tabs -->
-      <div style="display:flex;gap:0;border-bottom:1px solid #e2e8f0;margin-bottom:18px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;">
+      <div class="tab-bar">
         <button class="sched-tab active" id="stab-leave" onclick="showSchedTab('leave')">Leave</button>
         <button class="sched-tab" id="stab-availability" onclick="showSchedTab('availability')">Availability</button>
       </div>
@@ -1496,7 +1540,7 @@ body.ready{visibility:visible;}
         <div class="page-title">Engagement</div>
       </div>
       <!-- Sub-tabs -->
-      <div style="display:flex;gap:0;border-bottom:1px solid #e2e8f0;margin-bottom:16px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;">
+      <div class="tab-bar">
         <button class="eng-tab active" id="etab-discussions" onclick="showEngagementTab('discussions')">Discussions</button>
         <button class="eng-tab" id="etab-feedback" onclick="showEngagementTab('feedback')">Feedback</button>
       </div>
@@ -1533,7 +1577,7 @@ body.ready{visibility:visible;}
       </div>
 
       <!-- Section switcher -->
-      <div style="display:flex;gap:0;overflow-x:auto;border-bottom:1px solid #e2e8f0;margin-bottom:18px;-webkit-overflow-scrolling:touch;scrollbar-width:none;">
+      <div class="tab-bar">
         <button class="prof-tab active" id="ptab-account" onclick="showProfileSection('account')">Account</button>
         <button class="prof-tab" id="ptab-adminpanel" onclick="showProfileSection('adminpanel')" style="display:none">Admin</button>
       </div>
