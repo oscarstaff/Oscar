@@ -1043,41 +1043,51 @@ body.ready{visibility:visible;}
 .react-wrap{position:relative;display:inline-block;}
 .react-btn{
   display:flex;align-items:center;gap:5px;
-  padding:5px 14px;border-radius:20px;
+  padding:7px 16px;border-radius:20px;
   border:1px solid #e2e8f0;background:#f8fafc;
-  cursor:pointer;font-size:16px;font-weight:400;
-  color:#64748b;transition:all .15s;
+  cursor:pointer;font-size:18px;font-weight:400;
+  color:#64748b;
   -webkit-tap-highlight-color:transparent;
   user-select:none;font-family:inherit;
+  /* No transition on mobile — instant feel */
+  min-height:44px;min-width:44px;
+  touch-action:manipulation;
 }
-.react-btn:hover,.react-btn.has-react{border-color:#bfdbfe;background:#eff6ff;}
+.react-btn.has-react{border-color:#bfdbfe;background:#eff6ff;}
 .react-picker{
-  position:absolute;bottom:calc(100% + 10px);left:-4px;
+  position:absolute;bottom:calc(100% + 8px);left:-4px;
   background:#fff;border:1px solid #e2e8f0;
-  border-radius:40px;padding:8px 10px;
-  display:flex;gap:2px;align-items:flex-end;
-  box-shadow:0 4px 24px rgba(0,0,0,.14);
+  border-radius:40px;padding:6px 8px;
+  display:flex;gap:0;align-items:flex-end;
+  box-shadow:0 4px 24px rgba(0,0,0,.18);
   opacity:0;pointer-events:none;
-  transform:scale(.7) translateY(12px);
+  transform:scale(.5) translateY(16px);
   transform-origin:bottom left;
-  transition:opacity .18s cubic-bezier(.4,0,.2,1),
-             transform .18s cubic-bezier(.34,1.4,.7,1);
-  z-index:100;white-space:nowrap;
+  transition:opacity .12s ease,transform .12s cubic-bezier(.34,1.5,.7,1);
+  z-index:200;white-space:nowrap;
 }
-.react-picker.open{opacity:1;pointer-events:all;transform:scale(1) translateY(0);}
+.react-picker.open{
+  opacity:1;pointer-events:all;
+  transform:scale(1) translateY(0);
+}
 .react-opt{
-  font-size:22px;cursor:pointer;
-  padding:4px 5px;border-radius:50%;
-  transition:transform .12s cubic-bezier(.34,1.6,.7,1);
+  font-size:26px;cursor:pointer;
+  padding:6px 7px;border-radius:50%;
+  /* Desktop only — scale on hover */
   transform-origin:bottom center;
   display:flex;align-items:center;justify-content:center;
   -webkit-tap-highlight-color:transparent;
   position:relative;
+  min-width:44px;min-height:44px;
+  touch-action:manipulation;
 }
-.react-opt:hover{transform:scale(1.5) translateY(-4px);}
 .react-opt.selected::after{
-  content:'';position:absolute;bottom:-2px;left:50%;transform:translateX(-50%);
+  content:'';position:absolute;bottom:2px;left:50%;transform:translateX(-50%);
   width:4px;height:4px;border-radius:50%;background:#2563eb;
+}
+@media(hover:hover){
+  .react-btn:hover{border-color:#bfdbfe;background:#eff6ff;}
+  .react-opt:hover{transform:scale(1.45) translateY(-4px);transition:transform .1s cubic-bezier(.34,1.6,.7,1);}
 }
 [data-theme="dark"] .react-picker{background:#1e293b;border-color:#2d3f55;box-shadow:0 4px 20px rgba(0,0,0,.4);}
 [data-theme="dark"] .react-btn{background:#1e293b;border-color:#2d3f55;color:#94a3b8;}
@@ -1294,7 +1304,6 @@ body.ready{visibility:visible;}
 
 
 /* Safe tap margins */
-.react-opt{min-width:36px;min-height:36px;}
 .ann-meta button{padding:6px 8px;min-height:32px;}
 
 </style>
@@ -1437,7 +1446,7 @@ body.ready{visibility:visible;}
     <div class="notif-drop-wrap" id="mhBellWrap" style="position:relative;">
       <button onclick="event.stopPropagation();toggleNotifDrop('mhNotifDrop')" id="mhBellBtn" style="position:relative;background:none;border:none;cursor:pointer;padding:8px;-webkit-tap-highlight-color:transparent;display:flex;align-items:center;justify-content:center;">
         <svg width="22" height="22" viewBox="0 0 20 20" fill="#94a3b8"><path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z"/></svg>
-        <div id="mhBellBadge" style="display:none;position:absolute;top:6px;right:6px;width:8px;height:8px;background:#dc2626;border-radius:50%;border:2px solid #fff;"></div>
+        <div id="mhBellBadge" style="display:none;position:absolute;top:2px;right:2px;width:12px;height:12px;background:#dc2626;border-radius:50%;border:2px solid #fff;"></div>
       </button>
       <div class="notif-drop" id="mhNotifDrop" style="right:0;left:auto;">
         <div class="notif-drop-header">Notifications</div>
@@ -1460,7 +1469,7 @@ body.ready{visibility:visible;}
       <div class="notif-drop-wrap" id="sbBellWrap">
         <button onclick="event.stopPropagation();toggleNotifDrop()" style="position:relative;background:none;border:none;cursor:pointer;padding:4px;-webkit-tap-highlight-color:transparent;flex-shrink:0;display:flex;align-items:center;justify-content:center;border-radius:8px;transition:background .12s;" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='none'">
           <svg width="18" height="18" viewBox="0 0 20 20" fill="#94a3b8"><path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z"/></svg>
-          <div id="sbBellBadge" style="display:none;position:absolute;top:2px;right:2px;width:7px;height:7px;background:#dc2626;border-radius:50%;border:2px solid #fff;"></div>
+          <div id="sbBellBadge" style="display:none;position:absolute;top:0px;right:0px;width:10px;height:10px;background:#dc2626;border-radius:50%;border:2px solid #fff;"></div>
         </button>
         <div class="notif-drop" id="notifDrop">
           <div class="notif-drop-header">Notifications</div>
@@ -1976,7 +1985,6 @@ body.ready{visibility:visible;}
 
       <div class="bn-item" id="bn-profile" data-tab="profile" onclick="if(navigator.vibrate)navigator.vibrate(8);goTo('profile')">
         <svg class="bn-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"/></svg>
-        <div class="bn-badge" id="bnNotifBadge"></div>
       </div>
       <div class="bn-item" id="bn-feedback" data-tab="feedback" style="display:none;"></div>
       <div class="bn-item" id="bn-admin" data-tab="admin" style="display:none;"></div>
@@ -2449,7 +2457,7 @@ async function loadDiscussions(){
       if(r.body){html+='<div style="font-size:13px;color:#475569;line-height:1.6;margin-bottom:10px;">'+r.body+'</div>';}
       // Replies
       if(replies.length){
-        html+='<div style="border-top:1px solid #f1f5f9;padding-top:10px;margin-bottom:10px;display:flex;flex-direction:column;gap:8px;">';
+        html+='<div id="replies-'+r.id+'" style="border-top:1px solid #f1f5f9;padding-top:10px;margin-bottom:10px;display:flex;flex-direction:column;gap:8px;">';
         replies.forEach(function(rep){
           const ra=rep.staff_name.split(' ').map(function(w){return w[0];}).join('').slice(0,2);
           const rt=new Date(rep.created_at).toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit'});
@@ -2462,6 +2470,7 @@ async function loadDiscussions(){
         });
         html+='</div>';
       }
+      if(!replies.length)html+='<div id="replies-'+r.id+'" style="display:flex;flex-direction:column;gap:8px;"></div>';
       // Reactions
       html+='<div style="margin-top:10px;">'+makeReactHTML(r.id,'disc')+'</div>';
       // Reply input
@@ -2508,14 +2517,38 @@ async function postDiscussion(){
 }
 
 async function submitDiscReply(discId){
-  const input=document.querySelector('[data-disc="'+discId+'"]');
+  const input=document.querySelector('input[data-disc="'+discId+'"]');
   if(!input||!input.value.trim())return;
   const body=input.value.trim();
+  const btn=document.querySelector('button[data-disc="'+discId+'"]');
+  if(btn){btn.disabled=true;btn.textContent='...';}
   try{
-    await sbPost('discussion_replies',{discussion_id:discId,staff_name:me,body});
+    const res=await sbPost('discussion_replies',{discussion_id:discId,staff_name:me,body});
+    if(!res.ok&&res.status!==201)throw new Error('HTTP '+res.status);
     input.value='';
-    await loadDiscussions();
-  }catch(e){console.warn(e);alert('Failed to post reply.');}
+    // Append reply inline without full reload
+    const repliesContainer=document.getElementById('replies-'+discId);
+    if(repliesContainer){
+      const now=new Date();
+      const t=now.toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit'});
+      const d=now.toLocaleDateString('en-AU',{day:'numeric',month:'short'});
+      const ava=me.split(' ').map(function(w){return w[0];}).join('').slice(0,2);
+      const div=document.createElement('div');
+      div.style.cssText='display:flex;gap:8px;';
+      div.innerHTML='<div style="width:24px;height:24px;border-radius:50%;background:#e2e8f0;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:800;color:#475569;flex-shrink:0;">'+ava+'</div>'+
+        '<div style="flex:1;"><div style="font-size:11px;font-weight:600;color:#0f172a;">'+me+'<span style="font-weight:400;color:#94a3b8;margin-left:5px;">'+d+' '+t+'</span></div>'+
+        '<div style="font-size:12.5px;color:#374151;margin-top:2px;line-height:1.5;">'+body+'</div></div>';
+      repliesContainer.appendChild(div);
+    } else {
+      // Fallback reload if container not found
+      await loadDiscussions();
+    }
+  }catch(e){
+    console.warn(e);
+    showToast('Failed to post reply');
+  }finally{
+    if(btn){btn.disabled=false;btn.textContent='Reply';}
+  }
 }
 
 async function deleteDiscussion(id){
@@ -3015,20 +3048,23 @@ function closeAllReactPickers(){
 }
 
 let _hoverTimer=null;
+const _isTouchDevice=('ontouchstart' in window)||navigator.maxTouchPoints>0;
+
 function openReactPickerHover(id,type){
+  if(_isTouchDevice)return; // no hover on touch
   clearTimeout(_hoverTimer);
   _hoverTimer=setTimeout(function(){
     closeAllReactPickers();
     const picker=document.getElementById('rp-'+type+'-'+id);
     if(picker)picker.classList.add('open');
-  },300);
+  },250);
 }
 function closeReactPickerHover(){
+  if(_isTouchDevice)return;
   clearTimeout(_hoverTimer);
-  _hoverTimer=setTimeout(closeAllReactPickers,200);
+  _hoverTimer=setTimeout(closeAllReactPickers,150);
 }
-function toggleReactPicker(id, type){
-  // For click/tap (mobile)
+function toggleReactPicker(id,type){
   clearTimeout(_hoverTimer);
   const picker=document.getElementById('rp-'+type+'-'+id);
   if(!picker)return;
@@ -3036,12 +3072,17 @@ function toggleReactPicker(id, type){
   closeAllReactPickers();
   if(!isOpen){
     picker.classList.add('open');
+    // Close when tapping outside
     setTimeout(function(){
+      document.addEventListener('touchstart',function handler(e){
+        if(!e.target.closest('.react-wrap')){closeAllReactPickers();}
+        document.removeEventListener('touchstart',handler);
+      },{once:true,passive:true});
       document.addEventListener('click',function handler(e){
         if(!e.target.closest('.react-wrap')){closeAllReactPickers();}
         document.removeEventListener('click',handler);
       },{once:true});
-    },50);
+    },10);
   }
 }
 
@@ -3057,7 +3098,7 @@ function makeReactHTML(id, type){
   const key=(type==='ann'?'ann_react_':'disc_react_')+me+'_'+id;
   const myReact=localStorage.getItem(key)||'';
   const hasReact=!!myReact;
-  const btnLabel=hasReact?myReact:'☺';
+  const btnLabel=hasReact?myReact:'🙂';
 
   // Count reactions from all known keys in localStorage
   const counts={};
@@ -3076,7 +3117,7 @@ function makeReactHTML(id, type){
   let opts='';
   REACT_EMOJIS.forEach(function(e){
     const sel=myReact===e?' selected':'';
-    opts+='<span class="react-opt'+sel+'" data-id="'+id+'" data-type="'+type+'" data-emoji="'+encodeURIComponent(e)+'" onclick="event.stopPropagation();doReact(this.dataset.id,this.dataset.type,this.dataset.emoji)">'+e+'</span>';
+    opts+='<span class="react-opt'+sel+'" data-id="'+id+'" data-type="'+type+'" data-emoji="'+encodeURIComponent(e)+'" onclick="event.stopPropagation();doReact(this.dataset.id,this.dataset.type,this.dataset.emoji)" ontouchend="event.preventDefault();event.stopPropagation();doReact(this.dataset.id,this.dataset.type,this.dataset.emoji)">'+e+'</span>';
   });
 
   return '<div class="react-wrap" data-id="'+id+'" data-type="'+type+'">'+
@@ -3103,53 +3144,48 @@ function pickReaction(id, type, emoji){
   else reactToDiscussion(id, e);
 }
 
-async function reactToDiscussion(id,emoji){
+function reactToDiscussion(id,emoji){
   const key='disc_react_'+me+'_'+id;
   const prev=localStorage.getItem(key);
   const removing=prev===emoji;
   if(removing)localStorage.removeItem(key);
   else localStorage.setItem(key,emoji);
+  // Update UI instantly — no await
   updateReactWrap(id,'disc');
-  // Save to Supabase
-  try{
-    if(removing){
-      await fetch(SB+'/rest/v1/reactions?target_id=eq.'+id+'&target_type=eq.disc&staff_name=eq.'+encodeURIComponent(me),{
-        method:'DELETE',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}
-      });
-    } else {
-      await fetch(SB+'/rest/v1/reactions',{
-        method:'POST',
-        headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates'},
-        body:JSON.stringify({target_id:id,target_type:'disc',staff_name:me,emoji:emoji})
-      });
-    }
-    // Refresh counts from server
-    loadReactCounts(id,'disc');
-  }catch(e){console.warn(e);}
+  // Fire-and-forget to Supabase
+  if(removing){
+    fetch(SB+'/rest/v1/reactions?target_id=eq.'+id+'&target_type=eq.disc&staff_name=eq.'+encodeURIComponent(me),{
+      method:'DELETE',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}
+    }).catch(function(){});
+  } else {
+    fetch(SB+'/rest/v1/reactions',{
+      method:'POST',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates'},
+      body:JSON.stringify({target_id:id,target_type:'disc',staff_name:me,emoji:emoji})
+    }).catch(function(){});
+  }
 }
 
-async function reactToAnnouncement(id,emoji){
+function reactToAnnouncement(id,emoji){
   const key='ann_react_'+me+'_'+id;
   const prev=localStorage.getItem(key);
   const removing=prev===emoji;
   if(removing)localStorage.removeItem(key);
   else localStorage.setItem(key,emoji);
+  // Update UI instantly — no await
   updateReactWrap(id,'ann');
-  // Save to Supabase
-  try{
-    if(removing){
-      await fetch(SB+'/rest/v1/reactions?target_id=eq.'+id+'&target_type=eq.ann&staff_name=eq.'+encodeURIComponent(me),{
-        method:'DELETE',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}
-      });
-    } else {
-      await fetch(SB+'/rest/v1/reactions',{
-        method:'POST',
-        headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates'},
-        body:JSON.stringify({target_id:id,target_type:'ann',staff_name:me,emoji:emoji})
-      });
-    }
-    loadReactCounts(id,'ann');
-  }catch(e){console.warn(e);}
+  // Fire-and-forget to Supabase
+  if(removing){
+    fetch(SB+'/rest/v1/reactions?target_id=eq.'+id+'&target_type=eq.ann&staff_name=eq.'+encodeURIComponent(me),{
+      method:'DELETE',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}
+    }).catch(function(){});
+  } else {
+    fetch(SB+'/rest/v1/reactions',{
+      method:'POST',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates'},
+      body:JSON.stringify({target_id:id,target_type:'ann',staff_name:me,emoji:emoji})
+    }).catch(function(){});
+  }
 }
 
 async function loadReactCounts(id,type){
@@ -3179,7 +3215,7 @@ function updateReactWrap(id,type){
   const hasReact=!!myReact;
   const btn=wrap.querySelector('.react-btn');
   if(btn){
-    btn.textContent=hasReact?myReact:'👍 React';
+    btn.textContent=hasReact?myReact:'🙂';
     btn.classList.toggle('has-react',hasReact);
   }
   wrap.querySelectorAll('.react-opt').forEach(function(opt){
@@ -4109,7 +4145,7 @@ async function loadNotifications(){
     const unread=rows.filter(r=>!read.includes(r.id));
     // Update badges
     if(badge){badge.style.display="none";}
-    if(bnBadge){bnBadge.textContent=unread.length;bnBadge.style.display=unread.length?"block":"none";}
+    if(bnBadge){bnBadge.style.display="none";}
     const bellBadge=document.getElementById("mhBellBadge");if(bellBadge){bellBadge.style.display=unread.length?"block":"none";}
     const sbBellBadge=document.getElementById("sbBellBadge");if(sbBellBadge){sbBellBadge.style.display=unread.length?"block":"none";}
     // Also check meeting invites + reaction notifications
@@ -4122,7 +4158,7 @@ async function loadNotifications(){
       const totalUnread=unread.length+newInv.length+newReacts.length;
       if(bellBadge)bellBadge.style.display=totalUnread?"block":"none";
       if(sbBellBadge)sbBellBadge.style.display=totalUnread?"block":"none";
-      if(bnBadge){bnBadge.textContent=totalUnread;bnBadge.style.display=totalUnread?"block":"none";}
+
 
     }catch(e){}
     if(!el)return; // element may not be visible yet
@@ -4173,8 +4209,7 @@ function markAllNotificationsRead(){
       localStorage.setItem("oR_"+me,JSON.stringify(allIds));
       // Clear badge immediately
 
-      const bnBadge=document.getElementById("bnNotifBadge");
-      if(bnBadge){bnBadge.style.display="none";}
+
       // Re-render without dots
       loadNotifications();
     });
