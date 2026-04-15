@@ -97,7 +97,7 @@ body::before{
 .signout:hover{border-color:#fca5a5;color:#dc2626;background:#fef2f2;}
 
 /* ── MAIN ── */
-.main{flex:1;overflow-y:auto;background:#f1f5f9;-webkit-overflow-scrolling:touch;width:100%;box-sizing:border-box;}
+.main{flex:1;overflow-y:auto;background:#f1f5f9;-webkit-overflow-scrolling:touch;width:100%;box-sizing:border-box;overscroll-behavior-y:contain;}
 .page{display:none;padding:24px 28px;max-width:820px;width:100%;margin:0 auto;box-sizing:border-box;}
 .page.active{display:block;}
 .page-hd{margin-bottom:24px;}
@@ -1043,38 +1043,45 @@ body.ready{visibility:visible;}
 .react-wrap{position:relative;display:inline-block;}
 .react-btn{
   display:flex;align-items:center;gap:5px;
-  padding:5px 12px;border-radius:20px;
+  padding:5px 14px;border-radius:20px;
   border:1px solid #e2e8f0;background:#f8fafc;
-  cursor:pointer;font-size:13px;font-weight:600;
-  color:#64748b;transition:all .12s;
+  cursor:pointer;font-size:16px;font-weight:400;
+  color:#64748b;transition:all .15s;
   -webkit-tap-highlight-color:transparent;
-  user-select:none;
-  font-family:inherit;
+  user-select:none;font-family:inherit;
 }
-.react-btn:hover,.react-btn.has-react{border-color:#bfdbfe;background:#eff6ff;color:#2563eb;}
+.react-btn:hover,.react-btn.has-react{border-color:#bfdbfe;background:#eff6ff;}
 .react-picker{
-  position:absolute;bottom:calc(100% + 8px);left:0;
+  position:absolute;bottom:calc(100% + 10px);left:-4px;
   background:#fff;border:1px solid #e2e8f0;
-  border-radius:40px;padding:6px 8px;
-  display:flex;gap:4px;
-  box-shadow:0 4px 20px rgba(0,0,0,.12);
+  border-radius:40px;padding:8px 10px;
+  display:flex;gap:2px;align-items:flex-end;
+  box-shadow:0 4px 24px rgba(0,0,0,.14);
   opacity:0;pointer-events:none;
-  transform:scale(.8) translateY(8px);
+  transform:scale(.7) translateY(12px);
   transform-origin:bottom left;
-  transition:opacity .15s,transform .15s cubic-bezier(.34,1.4,.7,1);
+  transition:opacity .18s cubic-bezier(.4,0,.2,1),
+             transform .18s cubic-bezier(.34,1.4,.7,1);
   z-index:100;white-space:nowrap;
 }
 .react-picker.open{opacity:1;pointer-events:all;transform:scale(1) translateY(0);}
 .react-opt{
-  font-size:20px;cursor:pointer;padding:4px;border-radius:50%;
-  transition:transform .12s;display:flex;align-items:center;justify-content:center;
+  font-size:22px;cursor:pointer;
+  padding:4px 5px;border-radius:50%;
+  transition:transform .12s cubic-bezier(.34,1.6,.7,1);
+  transform-origin:bottom center;
+  display:flex;align-items:center;justify-content:center;
   -webkit-tap-highlight-color:transparent;
+  position:relative;
 }
-.react-opt:hover{transform:scale(1.35);}
-.react-opt.selected{background:#eff6ff;border-radius:50%;}
+.react-opt:hover{transform:scale(1.5) translateY(-4px);}
+.react-opt.selected::after{
+  content:'';position:absolute;bottom:-2px;left:50%;transform:translateX(-50%);
+  width:4px;height:4px;border-radius:50%;background:#2563eb;
+}
 [data-theme="dark"] .react-picker{background:#1e293b;border-color:#2d3f55;box-shadow:0 4px 20px rgba(0,0,0,.4);}
 [data-theme="dark"] .react-btn{background:#1e293b;border-color:#2d3f55;color:#94a3b8;}
-[data-theme="dark"] .react-btn.has-react{background:rgba(79,142,247,.15);border-color:#4f8ef7;color:#60a5fa;}
+[data-theme="dark"] .react-btn.has-react{background:rgba(79,142,247,.15);border-color:#4f8ef7;}
 
 
 /* ═══════════════════════════════════════════
@@ -1204,6 +1211,92 @@ body.ready{visibility:visible;}
   background: rgba(6,11,16,.95);
 }
 
+
+/* ── TOP NOTIFICATION BANNER ── */
+#notifBanner{
+  position:fixed;top:0;left:0;right:0;z-index:300;
+  transform:translateY(-100%);
+  transition:transform .3s cubic-bezier(.34,1.2,.7,1);
+  pointer-events:none;
+}
+#notifBanner.show{transform:translateY(0);pointer-events:all;}
+.notif-banner-inner{
+  margin:8px 12px;
+  background:#fff;
+  border-radius:16px;
+  padding:12px 16px;
+  display:flex;align-items:center;gap:12px;
+  box-shadow:0 4px 20px rgba(0,0,0,.12);
+  border-left:4px solid #2563eb;
+}
+.notif-banner-inner.success{border-left-color:#16a34a;}
+.notif-banner-inner.warning{border-left-color:#dc2626;}
+.notif-banner-text{flex:1;font-size:13px;font-weight:600;color:#0f172a;}
+.notif-banner-sub{font-size:11px;color:#64748b;margin-top:2px;font-weight:400;}
+.notif-banner-close{background:none;border:none;color:#94a3b8;cursor:pointer;font-size:18px;padding:0 4px;font-family:inherit;line-height:1;}
+[data-theme="dark"] .notif-banner-inner{background:#1e293b;border-left-color:#60a5fa;}
+[data-theme="dark"] .notif-banner-text{color:#f1f5f9;}
+
+
+/* ── NOTIFICATION DROPDOWN ── */
+.notif-drop-wrap{position:relative;}
+.notif-drop{
+  position:absolute;left:0;top:calc(100% + 8px);
+  width:320px;max-height:420px;overflow-y:auto;
+  background:#fff;border:1px solid #e2e8f0;
+  border-radius:16px;
+  box-shadow:0 8px 32px rgba(0,0,0,.12);
+  z-index:500;
+  display:none;
+}
+.notif-drop.open{display:block;}
+.notif-drop-header{
+  padding:14px 16px 10px;
+  font-size:12px;font-weight:700;
+  letter-spacing:.8px;text-transform:uppercase;
+  color:#94a3b8;border-bottom:1px solid #f1f5f9;
+}
+.notif-drop-item{
+  padding:12px 16px;border-bottom:1px solid #f1f5f9;
+  cursor:pointer;transition:background .12s;
+}
+.notif-drop-item:last-child{border-bottom:none;}
+.notif-drop-item:hover{background:#f8fafc;}
+.notif-drop-item.unread{background:#f0f7ff;}
+.notif-drop-item.unread:hover{background:#e8f2ff;}
+.notif-drop-empty{padding:24px 16px;text-align:center;font-size:13px;color:#94a3b8;}
+/* Mobile — full width dropdown */
+@media(max-width:700px){
+  #mhNotifDrop{
+    position:fixed;
+    right:8px;left:auto;
+    width:300px;
+    top:64px;
+  }
+}
+[data-theme="dark"] .notif-drop{background:#1e293b;border-color:#2d3f55;}
+[data-theme="dark"] .notif-drop-item{border-bottom-color:#2d3f55;}
+[data-theme="dark"] .notif-drop-item:hover{background:#253447;}
+[data-theme="dark"] .notif-drop-item.unread{background:#162032;}
+
+
+.ann-card.urgent{border-color:#fecaca!important;border-left:3px solid #dc2626!important;}
+[data-theme="dark"] .ann-card.urgent{border-color:#7f1d1d!important;}
+
+
+.mood-btn{
+  font-size:24px;background:none;border:2px solid #e2e8f0;
+  border-radius:10px;padding:6px 10px;cursor:pointer;
+  transition:all .12s;-webkit-tap-highlight-color:transparent;
+}
+.mood-btn:hover{border-color:#2563eb;transform:scale(1.1);}
+.mood-btn.selected{border-color:#2563eb;background:#eff6ff;}
+
+
+/* Safe tap margins */
+.react-opt{min-width:36px;min-height:36px;}
+.ann-meta button{padding:6px 8px;min-height:32px;}
+
 </style>
 </head>
 <body>
@@ -1220,7 +1313,7 @@ body.ready{visibility:visible;}
         <div class="alert alert-err" id="loginErr"></div>
         <div class="field">
           <label class="field-label">Full Name</label>
-          <input class="f-input" type="text" id="loginName" placeholder="Enter your full name" autocorrect="off">
+          <input class="f-input" type="text" id="loginName" placeholder="Enter your full name" autocorrect="off" autocapitalize="words">
         </div>
         <div class="field" style="margin-bottom:20px">
           <label class="field-label">Password</label>
@@ -1238,7 +1331,7 @@ body.ready{visibility:visible;}
       <div class="auth-card">
         <div class="alert alert-err" id="spErr"></div>
         <div class="alert alert-ok" id="spOk"></div>
-        <div class="field"><label class="field-label">Full Name</label><input class="f-input" type="text" id="spName" autocorrect="off" placeholder="Enter your full name"></div>
+        <div class="field"><label class="field-label">Full Name</label><input class="f-input" type="text" id="spName" autocorrect="off" autocapitalize="words" placeholder="Enter your full name"></div>
         <div class="field"><label class="field-label">New Password</label><input class="f-input" type="password" id="spNew" placeholder="Minimum 4 characters"></div>
         <div class="field" style="margin-bottom:20px"><label class="field-label">Confirm Password</label><input class="f-input" type="password" id="spConfirm" placeholder="Repeat your password"></div>
         <div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.8px;margin-bottom:12px;padding-top:4px;border-top:1px solid #e2e8f0;">Security Questions</div>
@@ -1281,7 +1374,7 @@ body.ready{visibility:visible;}
         <div class="alert alert-ok" id="rkOk"></div>
         <!-- Step 1: enter name to look up questions -->
         <div id="rk-step1">
-          <div class="field" style="margin-bottom:20px"><label class="field-label">Full Name</label><input class="f-input" type="text" id="rkName" autocorrect="off" placeholder="Enter your full name"></div>
+          <div class="field" style="margin-bottom:20px"><label class="field-label">Full Name</label><input class="f-input" type="text" id="rkName" autocorrect="off" autocapitalize="words" placeholder="Enter your full name"></div>
           <button class="btn btn-green btn-block" id="rkFindBtn" onclick="doFindQuestions()">Continue</button>
         </div>
         <!-- Step 2: answer questions + new password -->
@@ -1310,12 +1403,46 @@ body.ready{visibility:visible;}
 <!-- ── HUB ── -->
 <div id="hubLayer" class="shell" style="display:none">
 
+  <!-- TOP NOTIFICATION BANNER -->
+  <div id="notifBanner">
+    <div class="notif-banner-inner" id="notifBannerInner">
+      <div style="flex:1;">
+        <div class="notif-banner-text" id="notifBannerText"></div>
+        <div class="notif-banner-sub" id="notifBannerSub"></div>
+      </div>
+      <button class="notif-banner-close" onclick="hideBanner()">×</button>
+    </div>
+  </div>
+
+  <!-- ONBOARD LOCK OVERLAY -->
+  <div id="onboardLockOverlay" style="display:none;position:fixed;inset:0;z-index:8000;background:rgba(15,23,42,.7);backdrop-filter:blur(6px);align-items:flex-end;justify-content:center;">
+    <div style="background:#fff;border-radius:24px 24px 0 0;padding:28px 24px 40px;width:100%;max-width:520px;">
+      <div style="font-size:22px;margin-bottom:10px;">🔒</div>
+      <div style="font-size:19px;font-weight:800;color:#0f172a;margin-bottom:8px;">Complete Your Profile</div>
+      <div style="font-size:13px;color:#64748b;margin-bottom:6px;line-height:1.5;" id="onboardLockMsg">Please complete your profile before using the portal.</div>
+      <div style="font-size:12px;color:#94a3b8;margin-bottom:20px;">You cannot use the portal until this is done.</div>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <button onclick="goToOnboarding()" class="btn btn-green btn-block" style="padding:13px;">Complete Now →</button>
+      </div>
+    </div>
+  </div>
+
   <!-- MOBILE HEADER -->
   <div class="mobile-header">
-    <div class="mh-logo">Oscars</div>
     <div class="mh-user">
       <div class="mh-ava" id="mhAva"></div>
-      <div class="mh-name" id="mhName"></div>
+      <div class="mh-name" id="mhNameInline" style="font-size:12px;font-weight:600;color:#1e293b;"></div>
+    </div>
+    <div class="mh-logo" style="position:absolute;left:50%;transform:translateX(-50%);">Oscars</div>
+    <div class="notif-drop-wrap" id="mhBellWrap" style="position:relative;">
+      <button onclick="event.stopPropagation();toggleNotifDrop('mhNotifDrop')" id="mhBellBtn" style="position:relative;background:none;border:none;cursor:pointer;padding:8px;-webkit-tap-highlight-color:transparent;display:flex;align-items:center;justify-content:center;">
+        <svg width="22" height="22" viewBox="0 0 20 20" fill="#94a3b8"><path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z"/></svg>
+        <div id="mhBellBadge" style="display:none;position:absolute;top:6px;right:6px;width:8px;height:8px;background:#dc2626;border-radius:50%;border:2px solid #fff;"></div>
+      </button>
+      <div class="notif-drop" id="mhNotifDrop" style="right:0;left:auto;">
+        <div class="notif-drop-header">Notifications</div>
+        <div id="mhNotifDropList"><div class="notif-drop-empty">Loading...</div></div>
+      </div>
     </div>
   </div>
 
@@ -1326,9 +1453,19 @@ body.ready{visibility:visible;}
     </div>
     <div class="sb-user">
       <div class="sb-avatar" id="sbAvatar"></div>
-      <div>
+      <div style="flex:1;min-width:0;">
         <div class="sb-name" id="sbName"></div>
         <div class="sb-role">Staff Member</div>
+      </div>
+      <div class="notif-drop-wrap" id="sbBellWrap">
+        <button onclick="event.stopPropagation();toggleNotifDrop()" style="position:relative;background:none;border:none;cursor:pointer;padding:4px;-webkit-tap-highlight-color:transparent;flex-shrink:0;display:flex;align-items:center;justify-content:center;border-radius:8px;transition:background .12s;" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='none'">
+          <svg width="18" height="18" viewBox="0 0 20 20" fill="#94a3b8"><path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z"/></svg>
+          <div id="sbBellBadge" style="display:none;position:absolute;top:2px;right:2px;width:7px;height:7px;background:#dc2626;border-radius:50%;border:2px solid #fff;"></div>
+        </button>
+        <div class="notif-drop" id="notifDrop">
+          <div class="notif-drop-header">Notifications</div>
+          <div id="notifDropList"><div class="notif-drop-empty">Loading...</div></div>
+        </div>
       </div>
     </div>
     <nav class="sb-nav">
@@ -1354,7 +1491,6 @@ body.ready{visibility:visible;}
       <div class="nav-item" id="nav-profile" data-tab="profile" onclick="goTo('profile')">
         <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"/></svg>
         Profile
-        <span class="nav-badge" id="notifBadge"></span>
       </div>
     </nav>
     <div class="sb-foot">
@@ -1582,9 +1718,15 @@ body.ready{visibility:visible;}
         <div class="card-title" style="margin-bottom:12px;">New Announcement</div>
         <div class="field"><input class="f-input" type="text" id="annTitle" placeholder="Title"></div>
         <div class="field"><textarea id="annBody" rows="3" class="f-input" placeholder="Write your announcement..." style="resize:none;"></textarea></div>
-        <div style="display:flex;gap:8px;align-items:center;">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px;">
           <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#475569;cursor:pointer;"><input type="checkbox" id="annPinned"> Pin to top</label>
-          <div style="flex:1;"></div>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#475569;cursor:pointer;"><input type="checkbox" id="annUrgent"> Urgent</label>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <div style="display:flex;align-items:center;gap:6px;flex:1;min-width:160px;">
+            <label style="font-size:11px;font-weight:600;color:#94a3b8;white-space:nowrap;">Expires</label>
+            <input type="date" id="annExpiry" class="f-input" style="font-size:12px;padding:6px 10px;">
+          </div>
           <button class="btn btn-green" style="padding:9px 18px;" onclick="postAnnouncement()" id="annPostBtn">Post</button>
         </div>
       </div>
@@ -1607,6 +1749,19 @@ body.ready{visibility:visible;}
           <div class="card-title" style="margin-bottom:12px;">Start a Discussion</div>
           <div class="field"><input class="f-input" type="text" id="discTitle" placeholder="What's on your mind?"></div>
           <div class="field"><textarea id="discBody" rows="3" class="f-input" placeholder="Add more detail (optional)..." style="resize:none;"></textarea></div>
+          <div id="discAdminOptions" style="display:none;">
+            <div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px;">Schedule (optional)</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+              <div>
+                <div style="font-size:11px;font-weight:600;color:#94a3b8;margin-bottom:4px;">Opens at</div>
+                <input type="datetime-local" id="discOpenAt" class="f-input" style="font-size:12px;padding:7px 10px;">
+              </div>
+              <div>
+                <div style="font-size:11px;font-weight:600;color:#94a3b8;margin-bottom:4px;">Closes at</div>
+                <input type="datetime-local" id="discCloseAt" class="f-input" style="font-size:12px;padding:7px 10px;">
+              </div>
+            </div>
+          </div>
           <div class="alert alert-err" id="discErr"></div>
           <div class="alert alert-ok" id="discOk"></div>
           <button class="btn btn-green" onclick="postDiscussion()" id="discPostBtn" style="padding:9px 18px;">Post</button>
@@ -1619,6 +1774,28 @@ body.ready{visibility:visible;}
           <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:13px;color:#0369a1;line-height:1.6;">Your feedback is completely anonymous — no name, no session, no way to trace it back to you.</div>
           <div class="alert alert-err" id="fbErr"></div>
           <div class="alert alert-ok" id="fbOk"></div>
+          <div class="field">
+            <label class="field-label">Category</label>
+            <select id="fbCategory" class="f-input">
+              <option value="">— Select a category —</option>
+              <option value="Workplace Culture">Workplace Culture</option>
+              <option value="Shift Scheduling">Shift Scheduling</option>
+              <option value="Process Improvement">Process Improvement</option>
+              <option value="Safety Concern">Safety Concern</option>
+              <option value="Management">Management</option>
+              <option value="General">General</option>
+            </select>
+          </div>
+          <div class="field">
+            <label class="field-label">How are you feeling today?</label>
+            <div style="display:flex;gap:8px;margin-top:4px;">
+              <button type="button" class="mood-btn" data-mood="5" onclick="setMood(5)" title="Great">😄</button>
+              <button type="button" class="mood-btn" data-mood="4" onclick="setMood(4)" title="Good">🙂</button>
+              <button type="button" class="mood-btn" data-mood="3" onclick="setMood(3)" title="Okay">😐</button>
+              <button type="button" class="mood-btn" data-mood="2" onclick="setMood(2)" title="Not great">😕</button>
+              <button type="button" class="mood-btn" data-mood="1" onclick="setMood(1)" title="Bad">😞</button>
+            </div>
+          </div>
           <div class="field"><label class="field-label">Your Feedback</label><textarea id="fbText" class="f-input" rows="4" placeholder="Share anything — shift scheduling, workplace suggestions, concerns..."></textarea></div>
           <button class="btn btn-green btn-block" id="fbBtn" onclick="submitFeedback()">Submit Anonymously</button>
         </div>
@@ -1637,7 +1814,7 @@ body.ready{visibility:visible;}
       <div class="tab-bar">
         <button class="prof-tab active" id="ptab-account" onclick="showProfileSection('account')">Account</button>
         <button class="prof-tab" id="ptab-documents" onclick="showProfileSection('documents')">Documents</button>
-        <button class="prof-tab" id="ptab-adminpanel" onclick="showProfileSection('adminpanel')" style="display:none">Admin</button>
+        <button class="prof-tab" id="ptab-adminpanel" onclick="showProfileSection('adminpanel')" style="display:none">Feedback Collected</button>
       </div>
 
       <!-- ACCOUNT section -->
@@ -1730,16 +1907,6 @@ body.ready{visibility:visible;}
       </div>
 
       <!-- FEEDBACK section (staff only - anonymous) -->
-      <div id="psec-feedback" style="display:none;">
-        <div class="card">
-          <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:13px;color:#0369a1;line-height:1.6;">Your feedback is completely anonymous — no name, no session, no way to trace it back to you.</div>
-          <div class="alert alert-err" id="fbErr"></div>
-          <div class="alert alert-ok" id="fbOk"></div>
-          <div class="field"><label class="field-label">Your Feedback</label><textarea id="fbText" class="f-input" rows="5" placeholder="Share anything — shift scheduling, workplace suggestions, concerns..."></textarea></div>
-          <button class="btn btn-green btn-block" id="fbBtn" onclick="submitFeedback()">Submit Anonymously</button>
-        </div>
-      </div>
-
       <!-- DOCUMENTS section -->
       <div id="psec-documents" style="display:none;">
         <!-- Admin upload form -->
@@ -1777,10 +1944,6 @@ body.ready{visibility:visible;}
 
       <!-- ADMIN PANEL section -->
       <div id="psec-adminpanel" style="display:none;">
-        <div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Staff Availability</div>
-        <div class="card" style="padding:14px;margin-bottom:16px;">
-          <div id="adminContent2"><div style="color:#94a3b8;text-align:center;padding:16px;font-size:13px;">Loading...</div></div>
-        </div>
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
           <div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;">Anonymous Feedback</div>
           <button onclick="loadAdminFeedback2()" style="font-size:12px;font-weight:600;color:#2563eb;background:none;border:none;cursor:pointer;font-family:inherit;">Refresh</button>
@@ -2190,7 +2353,7 @@ function showEngagementTab(tab){
     const t=document.getElementById('etab-'+s);
     if(t)t.classList.toggle('active',s===tab);
   });
-  if(tab==='discussions')loadDiscussions();
+  if(tab==='discussions'){loadDiscussions();const ao=document.getElementById('discAdminOptions');if(ao)ao.style.display=myIsAdmin?'block':'none';}
   if(tab==='feedback'){loadMyFeedback();}
 }
 
@@ -2253,6 +2416,7 @@ async function loadDiscussions(){
   el.innerHTML='<div style="text-align:center;color:#94a3b8;padding:24px;font-size:13px;">Loading...</div>';
   try{
     const rows=await sbGet('discussions','?order=created_at.desc');
+    const nowTs=new Date();
     let allReplies=[];
     try{allReplies=await sbGet('discussion_replies','?order=created_at.asc');}catch(e){console.warn(e);}
     if(!rows.length){
@@ -2264,7 +2428,14 @@ async function loadDiscussions(){
       const d=new Date(r.created_at).toLocaleDateString('en-AU',{day:'numeric',month:'short'});
       const ava=r.created_by.split(' ').map(function(w){return w[0];}).join('').slice(0,2);
       const isOwn=r.created_by===me;
-      let html='<div class="ann-card" style="margin-bottom:12px;">';
+      const isScheduled=r.open_at&&new Date(r.open_at)>nowTs;
+      const isClosed=r.close_at&&new Date(r.close_at)<nowTs;
+      const isOpen=!isScheduled&&!isClosed;
+      // Skip scheduled discussions (not open yet) for non-admins
+      if(isScheduled&&!myIsAdmin)return '';
+      let html='<div class="ann-card" style="margin-bottom:12px;opacity:'+(isClosed?.6:1)+'">'+
+        (isScheduled?'<div style="display:inline-block;background:#f0f9ff;border:1px solid #bae6fd;color:#0284c7;font-size:9px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;padding:2px 8px;border-radius:20px;margin-bottom:6px;">Opens '+new Date(r.open_at).toLocaleDateString('en-AU',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})+'</div>':'')+
+        (isClosed?'<div style="display:inline-block;background:#f8fafc;border:1px solid #e2e8f0;color:#94a3b8;font-size:9px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;padding:2px 8px;border-radius:20px;margin-bottom:6px;">Closed</div>':'');
       html+='<div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:8px;">';
       html+='<div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#2563eb,#7c3aed);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#fff;flex-shrink:0;">'+ava+'</div>';
       html+='<div style="flex:1;min-width:0;">';
@@ -2294,13 +2465,17 @@ async function loadDiscussions(){
       // Reactions
       html+='<div style="margin-top:10px;">'+makeReactHTML(r.id,'disc')+'</div>';
       // Reply input
-      html+='<div style="display:flex;gap:8px;margin-top:8px;">';
+      if(!isClosed)html+='<div style="display:flex;gap:8px;margin-top:8px;">';
+      if(isClosed)html+='<div style="font-size:11px;color:#94a3b8;margin-top:8px;">This discussion is closed.</div>';
+      if(!isClosed){
       html+='<input data-disc="'+r.id+'" type="text" placeholder="Write a reply..." style="flex:1;border:1.5px solid #e2e8f0;border-radius:8px;padding:8px 12px;font-size:13px;font-family:inherit;outline:none;">';
       html+='<button data-disc="'+r.id+'" onclick="submitDiscReply(this.dataset.disc)" style="padding:8px 14px;border-radius:8px;background:#2563eb;color:#fff;border:none;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;">Reply</button>';
       html+='</div>';
+      if(!isClosed)html+='</div>';
+      }
       html+='</div>';
       return html;
-    }).join('');
+    }).filter(Boolean).join('');
   }catch(e){
     console.warn(e);
     el.innerHTML='<div style="color:#dc2626;text-align:center;padding:24px;font-size:13px;">Could not load discussions.</div>';
@@ -2316,7 +2491,9 @@ async function postDiscussion(){
   const btn=document.getElementById('discPostBtn');
   btn.disabled=true;btn.innerHTML='<span class="sp"></span> Posting...';
   try{
-    await sbPost('discussions',{title,body,created_by:me});
+    const openAt=myIsAdmin&&document.getElementById('discOpenAt')&&document.getElementById('discOpenAt').value||null;
+    const closeAt=myIsAdmin&&document.getElementById('discCloseAt')&&document.getElementById('discCloseAt').value||null;
+    await sbPost('discussions',{title,body,created_by:me,open_at:openAt||null,close_at:closeAt||null});
     document.getElementById('discTitle').value='';
     document.getElementById('discBody').value='';
     ok.textContent='Posted!';ok.classList.add('show');
@@ -2485,6 +2662,7 @@ async function enterHub(){
   const profAvaEl=document.getElementById("profAva");if(profAvaEl)profAvaEl.textContent=ava;
   const profNameEl=document.getElementById("profName");if(profNameEl)profNameEl.textContent=me;
   const _el_mhName=document.getElementById("mhName");if(_el_mhName)_el_mhName.textContent=first;
+  const _el_mhNameInline=document.getElementById("mhNameInline");if(_el_mhNameInline)_el_mhNameInline.textContent=first;
   const hr=new Date().getHours();
   const _el_homeGreeting=document.getElementById("homeGreeting");if(_el_homeGreeting)_el_homeGreeting.textContent=(hr<12?"Good morning":hr<17?"Good afternoon":"Good evening")+", "+first;
   const _el_homeWeekSub=document.getElementById("homeWeekSub");if(_el_homeWeekSub)_el_homeWeekSub.textContent=wkL(weekStart);
@@ -2494,7 +2672,7 @@ async function enterHub(){
   document.getElementById("leaveTo").value=today;
   buildAvailForm();
   showSchedTab('leave'); // default schedule sub-tab
-  Promise.all([loadHomeData(),loadNotifications(),loadLeaveHistory(),refreshAnnBadge(),loadHomeAnnPreview(),loadHomeDiscPreview(),maybeShowOnboarding()]);
+  Promise.all([loadHomeData(),loadNotifications(),loadLeaveHistory(),refreshAnnBadge(),loadHomeAnnPreview(),loadHomeDiscPreview(),maybeShowOnboarding(),checkFeedbackInvites(),checkNewNotifications()]);
   loadBirthdays();
   // Restore from URL hash if present
   const hash=window.location.hash.replace('#','');
@@ -2532,7 +2710,7 @@ function showProfileSection(sec){
     const tab=document.getElementById("ptab-"+s);
     if(tab)tab.classList.toggle("active",s===sec);
   });
-  if(sec==="adminpanel"){loadAdminAvailGrid2();loadAdminFeedback2();}
+  if(sec==="adminpanel"){loadAdminFeedback2();}
   if(sec==="documents"){loadDocsProfile();}
   // Mark notifications read when profile is opened
   markAllNotificationsRead();
@@ -2669,16 +2847,17 @@ async function checkLock(){
   document.getElementById("availBtnArea").style.display=locked?"none":"block";
 
   if(!locked){
-    buildAvailForm();
-    // Show success if already saved
+    // Show success if already saved — don't build form yet (lazy load on Edit click)
     try{
       const existing=await sbGet("staff_availability","?staff_name=eq."+encodeURIComponent(me)+"&limit=1");
       if(existing.length){
+        buildAvailForm(); // still build so Edit works
         showAvailSuccess(existing[0]);
       }else{
+        buildAvailForm();
         showAvailForm();
       }
-    }catch(e){showAvailForm();}
+    }catch(e){buildAvailForm();showAvailForm();}
   }
 }
 
@@ -2788,11 +2967,14 @@ async function submitFeedback(){
     const res=await fetch(SB+'/rest/v1/feedback',{
       method:'POST',
       headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=representation'},
-      body:JSON.stringify({body, staff_name:me})
+      body:JSON.stringify({body, staff_name:me, category:document.getElementById('fbCategory')&&document.getElementById('fbCategory').value||null, mood:selectedMood||null})
     });
     if(res.ok||res.status===201){
       ok.textContent='Feedback submitted anonymously. Thank you!';ok.classList.add('show');
       document.getElementById('fbText').value='';
+      selectedMood=0;
+      document.querySelectorAll('.mood-btn').forEach(function(b){b.classList.remove('selected');});
+      if(document.getElementById('fbCategory'))document.getElementById('fbCategory').value='';
       // Track ID so staff can view their own feedback
       try{
         const rdata=await res.json();
@@ -2810,32 +2992,6 @@ async function submitFeedback(){
   finally{btn.disabled=false;btn.textContent='Submit Anonymously';}
 }
 
-async function loadAdminFeedback(){
-  const el=document.getElementById('adminFeedbackList');
-  if(!el)return;
-  try{
-    const rows=await sbGet('feedback','?order=submitted_at.desc');
-    if(!rows.length){
-      el.innerHTML='<div style="color:#94a3b8;font-size:13px;text-align:center;padding:16px;">No feedback yet.</div>';
-      return;
-    }
-    // Mark all as read
-    await fetch(SB+'/rest/v1/feedback?read=eq.false',{
-      method:'PATCH',
-      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
-      body:JSON.stringify({read:true})
-    });
-    el.innerHTML=rows.map(r=>{
-      const d=new Date(r.submitted_at).toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
-      const isNew=!r.read;
-      return '<div style="padding:14px;border-radius:10px;margin-bottom:8px;background:'+(isNew?'#f0f9ff':'#f8fafc')+';border:1px solid '+(isNew?'#bae6fd':'#e2e8f0')+';">'+
-        (isNew?'<div style="font-size:10px;font-weight:700;color:#0284c7;text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px;">New</div>':'')+
-        '<div style="font-size:13px;color:#1e293b;line-height:1.6;">'+r.body.replace(/\n/g,'<br>')+'</div>'+
-        '<div style="font-size:10px;color:#94a3b8;margin-top:8px;">'+d+'</div>'+
-        '</div>';
-    }).join('');
-  }catch(e){el.innerHTML='<div style="color:#dc2626;font-size:13px;">Could not load feedback.</div>';}
-}
 
 // ── MESSAGES ──
 
@@ -2858,7 +3014,22 @@ function closeAllReactPickers(){
   document.querySelectorAll('.react-picker.open').forEach(p=>p.classList.remove('open'));
 }
 
+let _hoverTimer=null;
+function openReactPickerHover(id,type){
+  clearTimeout(_hoverTimer);
+  _hoverTimer=setTimeout(function(){
+    closeAllReactPickers();
+    const picker=document.getElementById('rp-'+type+'-'+id);
+    if(picker)picker.classList.add('open');
+  },300);
+}
+function closeReactPickerHover(){
+  clearTimeout(_hoverTimer);
+  _hoverTimer=setTimeout(closeAllReactPickers,200);
+}
 function toggleReactPicker(id, type){
+  // For click/tap (mobile)
+  clearTimeout(_hoverTimer);
   const picker=document.getElementById('rp-'+type+'-'+id);
   if(!picker)return;
   const isOpen=picker.classList.contains('open');
@@ -2886,7 +3057,21 @@ function makeReactHTML(id, type){
   const key=(type==='ann'?'ann_react_':'disc_react_')+me+'_'+id;
   const myReact=localStorage.getItem(key)||'';
   const hasReact=!!myReact;
-  const btnLabel=hasReact?myReact:'👍 React';
+  const btnLabel=hasReact?myReact:'☺';
+
+  // Count reactions from all known keys in localStorage
+  const counts={};
+  for(let i=0;i<localStorage.length;i++){
+    const k=localStorage.key(i);
+    const prefix=(type==='ann'?'ann_react_':'disc_react_');
+    if(k&&k.startsWith(prefix)&&k.endsWith('_'+id)){
+      const val=localStorage.getItem(k);
+      if(val)counts[val]=(counts[val]||0)+1;
+    }
+  }
+  const countBadges=Object.entries(counts).map(function(entry){
+    return '<span style="font-size:12px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:20px;padding:2px 8px;display:inline-flex;align-items:center;gap:3px;">'+entry[0]+'<span style="font-size:11px;font-weight:700;color:#475569;">'+entry[1]+'</span></span>';
+  }).join('');
 
   let opts='';
   REACT_EMOJIS.forEach(function(e){
@@ -2894,9 +3079,12 @@ function makeReactHTML(id, type){
     opts+='<span class="react-opt'+sel+'" data-id="'+id+'" data-type="'+type+'" data-emoji="'+encodeURIComponent(e)+'" onclick="event.stopPropagation();doReact(this.dataset.id,this.dataset.type,this.dataset.emoji)">'+e+'</span>';
   });
 
-  return '<div class="react-wrap">'+
-    '<button class="react-btn'+(hasReact?' has-react':'')+'" data-id="'+id+'" data-type="'+type+'" onclick="event.stopPropagation();toggleReactPicker(this.dataset.id,this.dataset.type)" onmouseenter="toggleReactPicker(this.dataset.id,this.dataset.type)">'+btnLabel+'</button>'+
-    '<div class="react-picker" id="rp-'+type+'-'+id+'">'+opts+'</div>'+
+  return '<div class="react-wrap" data-id="'+id+'" data-type="'+type+'">'+
+    '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">'+
+    '<button class="react-btn'+(hasReact?' has-react':'')+'" data-id="'+id+'" data-type="'+type+'" onclick="event.stopPropagation();toggleReactPicker(this.dataset.id,this.dataset.type)" onmouseenter="openReactPickerHover(this.dataset.id,this.dataset.type)" onmouseleave="closeReactPickerHover()">'+btnLabel+'</button>'+
+    '<div class="react-counts" id="rc-'+type+'-'+id+'">'+countBadges+'</div>'+
+    '</div>'+
+    '<div class="react-picker" id="rp-'+type+'-'+id+'" onmouseenter="clearTimeout(_hoverTimer)" onmouseleave="closeReactPickerHover()">'+opts+'</div>'+
   '</div>';
 }
 
@@ -2915,20 +3103,106 @@ function pickReaction(id, type, emoji){
   else reactToDiscussion(id, e);
 }
 
-function reactToDiscussion(id,emoji){
+async function reactToDiscussion(id,emoji){
   const key='disc_react_'+me+'_'+id;
   const prev=localStorage.getItem(key);
-  if(prev===emoji)localStorage.removeItem(key);
+  const removing=prev===emoji;
+  if(removing)localStorage.removeItem(key);
   else localStorage.setItem(key,emoji);
-  loadDiscussions();
+  updateReactWrap(id,'disc');
+  // Save to Supabase
+  try{
+    if(removing){
+      await fetch(SB+'/rest/v1/reactions?target_id=eq.'+id+'&target_type=eq.disc&staff_name=eq.'+encodeURIComponent(me),{
+        method:'DELETE',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}
+      });
+    } else {
+      await fetch(SB+'/rest/v1/reactions',{
+        method:'POST',
+        headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates'},
+        body:JSON.stringify({target_id:id,target_type:'disc',staff_name:me,emoji:emoji})
+      });
+    }
+    // Refresh counts from server
+    loadReactCounts(id,'disc');
+  }catch(e){console.warn(e);}
 }
 
-function reactToAnnouncement(id,emoji){
+async function reactToAnnouncement(id,emoji){
   const key='ann_react_'+me+'_'+id;
   const prev=localStorage.getItem(key);
-  if(prev===emoji)localStorage.removeItem(key);
+  const removing=prev===emoji;
+  if(removing)localStorage.removeItem(key);
   else localStorage.setItem(key,emoji);
-  loadAnnouncements();
+  updateReactWrap(id,'ann');
+  // Save to Supabase
+  try{
+    if(removing){
+      await fetch(SB+'/rest/v1/reactions?target_id=eq.'+id+'&target_type=eq.ann&staff_name=eq.'+encodeURIComponent(me),{
+        method:'DELETE',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}
+      });
+    } else {
+      await fetch(SB+'/rest/v1/reactions',{
+        method:'POST',
+        headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates'},
+        body:JSON.stringify({target_id:id,target_type:'ann',staff_name:me,emoji:emoji})
+      });
+    }
+    loadReactCounts(id,'ann');
+  }catch(e){console.warn(e);}
+}
+
+async function loadReactCounts(id,type){
+  try{
+    const rows=await sbGet('reactions','?target_id=eq.'+id+'&target_type=eq.'+type+'&select=emoji,staff_name');
+    const counts={};
+    rows.forEach(function(r){counts[r.emoji]=(counts[r.emoji]||0)+1;});
+    // Also sync localStorage for my reaction
+    const myRow=rows.find(function(r){return r.staff_name===me;});
+    const key=(type==='ann'?'ann_react_':'disc_react_')+me+'_'+id;
+    if(myRow)localStorage.setItem(key,myRow.emoji);
+    else localStorage.removeItem(key);
+    const countEl=document.getElementById('rc-'+type+'-'+id);
+    if(countEl){
+      countEl.innerHTML=Object.entries(counts).map(function(entry){
+        return '<span style="font-size:12px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:20px;padding:2px 8px;display:inline-flex;align-items:center;gap:3px;">'+entry[0]+'<span style="font-size:11px;font-weight:700;color:#475569;">'+entry[1]+'</span></span>';
+      }).join('');
+    }
+  }catch(e){console.warn(e);}
+}
+
+function updateReactWrap(id,type){
+  const wrap=document.querySelector('.react-wrap[data-id="'+id+'"][data-type="'+type+'"]');
+  if(!wrap){if(type==='disc')loadDiscussions();else loadAnnouncements();return;}
+  const key=(type==='ann'?'ann_react_':'disc_react_')+me+'_'+id;
+  const myReact=localStorage.getItem(key)||'';
+  const hasReact=!!myReact;
+  const btn=wrap.querySelector('.react-btn');
+  if(btn){
+    btn.textContent=hasReact?myReact:'👍 React';
+    btn.classList.toggle('has-react',hasReact);
+  }
+  wrap.querySelectorAll('.react-opt').forEach(function(opt){
+    const e=decodeURIComponent(opt.dataset.emoji||'');
+    opt.classList.toggle('selected',e===myReact);
+  });
+  // Update counts
+  const counts={};
+  const prefix=(type==='ann'?'ann_react_':'disc_react_');
+  for(let i=0;i<localStorage.length;i++){
+    const k=localStorage.key(i);
+    if(k&&k.startsWith(prefix)&&k.endsWith('_'+id)){
+      const val=localStorage.getItem(k);
+      if(val)counts[val]=(counts[val]||0)+1;
+    }
+  }
+  const countEl=document.getElementById('rc-'+type+'-'+id);
+  if(countEl){
+    countEl.innerHTML=Object.entries(counts).map(function(entry){
+      return '<span style="font-size:12px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:20px;padding:2px 8px;display:inline-flex;align-items:center;gap:3px;">'+entry[0]+'<span style="font-size:11px;font-weight:700;color:#475569;">'+entry[1]+'</span></span>';
+    }).join('');
+  }
+  closeAllReactPickers();
 }
 
 // ── REPLIES ──
@@ -2992,26 +3266,35 @@ async function loadAdminAvailGrid2(){
 
 // ── ADMIN PANEL — feedback inbox (profile tab) ──
 async function sendMeetingInvite(id){
-  const msg=prompt('Optional message for the staff member:','Your manager would like to meet with you to discuss your feedback.');
-  if(msg===null)return;
+  const msg='Your manager would like to meet with you to discuss your feedback.';
   try{
-    await fetch(SB+'/rest/v1/feedback?id=eq.'+id,{
+    const res=await fetch(SB+'/rest/v1/feedback?id=eq.'+id,{
       method:'PATCH',
       headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
       body:JSON.stringify({meeting_invited:true,meeting_message:msg||'Your manager would like to meet with you to discuss your feedback.'})
     });
-    showToast('📅 Meeting invite sent');
-    loadAdminFeedback2();
-  }catch(e){alert('Failed to send invite.');}
+    if(!res.ok){
+      const txt=await res.text();
+      console.warn('Invite failed:',res.status,txt);
+      showToast('Error '+res.status+': '+txt.slice(0,60));
+      return;
+    }
+    showToast('Invite sent');
+    await loadAdminFeedback2();
+  }catch(e){
+    console.warn(e);
+    showToast('Failed: '+e.message);
+  }
 }
 
 async function loadAdminFeedback2(){
   const el=document.getElementById('adminFeedbackList2');
   if(!el)return;
   try{
-    const rows=await sbGet('feedback','?order=submitted_at.desc');
+    const rows=await sbGet('feedback','?order=submitted_at.desc&select=id,body,submitted_at,read,meeting_invited,meeting_message');
     if(!rows.length){el.innerHTML='<div style="color:#94a3b8;font-size:13px;text-align:center;padding:12px;">No feedback yet.</div>';return;}
-    await fetch(SB+'/rest/v1/feedback?read=eq.false',{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({read:true})});
+    // Mark read — ignore failures
+    fetch(SB+'/rest/v1/feedback?read=eq.false',{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({read:true})}).catch(()=>{});
     el.innerHTML=rows.map(r=>{
       const d=new Date(r.submitted_at).toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'});
       const isNew=!r.read;
@@ -3020,14 +3303,14 @@ async function loadAdminFeedback2(){
         (isNew?'<div style="font-size:9px;font-weight:700;color:#0284c7;text-transform:uppercase;letter-spacing:.8px;margin-bottom:5px;">New</div>':'')+
         '<div style="font-size:13px;color:#1e293b;line-height:1.6;">'+r.body.replace(/\n/g,'<br>')+'</div>'+
         '<div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;">'+
-        '<div style="font-size:10px;color:#94a3b8;">'+d+(r.staff_name?' · '+r.staff_name:'')+'</div>'+
+        '<div style="font-size:10px;color:#94a3b8;">'+d+'</div>'+
         '<button data-id="'+r.id+'" onclick="sendMeetingInvite(this.dataset.id)" style="font-size:11px;font-weight:600;color:'+(invited?'#94a3b8':'#2563eb')+';background:none;border:1px solid '+(invited?'#e2e8f0':'#bfdbfe')+';border-radius:6px;padding:3px 10px;cursor:pointer;font-family:inherit;">'+
-        (invited?'📅 Resend Invite':'📅 Invite to Meeting')+'</button>'+
+        (invited?'Resend Invite':'Invite to Meeting')+'</button>'+
         '</div>'+
         (invited&&r.meeting_message?'<div style="margin-top:6px;font-size:11px;color:#64748b;font-style:italic;">Invite sent: '+r.meeting_message+'</div>':'')+
         '</div>';
     }).join('');
-  }catch(e){el.innerHTML='<div style="color:#dc2626;font-size:13px;">Could not load.</div>';}
+  }catch(e){console.warn(e);el.innerHTML='<div style="color:#dc2626;font-size:13px;">Could not load.</div>';}
 }
 
 async function loadAnnouncements(){
@@ -3035,29 +3318,31 @@ async function loadAnnouncements(){
   const adminArea=document.getElementById('annAdminPost');
   if(adminArea)adminArea.style.display=myIsAdmin?'block':'none';
   try{
-    const rows=await sbGet('announcements','?order=pinned.desc,created_at.desc');
+    const now=new Date().toISOString();
+    const rows=await sbGet('announcements','?order=pinned.desc,created_at.desc').then(r=>r.filter(a=>!a.expires_at||a.expires_at>now));
     const readIds=JSON.parse(localStorage.getItem('ann_read_'+me)||'[]');
     if(!rows.length){
       el.innerHTML='<div class="card" style="text-align:center;color:#94a3b8;padding:40px;"><div style="font-size:28px;margin-bottom:10px;">📢</div><div style="font-size:14px;font-weight:600;">No announcements yet</div></div>';
       return;
     }
+    let _lastGrp='';
     el.innerHTML=rows.map(r=>{
+      const grp=getDateGroup(r.created_at);
+      const grpHdr=grp!==_lastGrp?'<div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:1.2px;padding:14px 0 6px;border-top:'+(grp!==_lastGrp&&_lastGrp?'1px solid #f1f5f9':'none')+';">'+grp+'</div>':'';
+      _lastGrp=grp;
       const isRead=readIds.includes(r.id);
       const d=new Date(r.created_at).toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'});
-      return '<div class="ann-card'+(r.pinned?' pinned':'')+'">'+
+      const isUrgent=r.urgent===true;
+      return grpHdr+
+        '<div class="ann-card'+(r.pinned?' pinned':'')+(isUrgent?' urgent':'')+'">'+
+        (isUrgent?'<div style="display:inline-block;background:#dc2626;color:#fff;font-size:9px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;padding:2px 8px;border-radius:20px;margin-bottom:6px;">Urgent</div>':'')+
         (r.pinned?'<div class="ann-pin">📌 Pinned'+(myIsAdmin?'<button data-id="'+r.id+'" onclick="togglePin(this.dataset.id,true)" style="margin-left:8px;background:none;border:none;color:#94a3b8;font-size:10px;font-weight:600;cursor:pointer;font-family:inherit;">Unpin</button>':'')+'</div>':'')+
         (!isRead?'<span class="ann-unread-dot"></span>':'')+
         '<div class="ann-title">'+r.title+'</div>'+
         '<div class="ann-body">'+r.body.replace(/\n/g,'<br>')+'</div>'+
         '<div class="ann-meta"><span>Posted by '+r.created_by+' · '+d+'</span>'+
         (myIsAdmin?'<button data-id="'+r.id+'" onclick="deleteAnnouncement(this.dataset.id)" style="background:none;border:none;color:#dc2626;font-size:11px;font-weight:600;cursor:pointer;">Delete</button>':'')+'</div>'+
-        '<div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;">'+
-        ['👍','❤️','😂','😮'].map(function(e){
-          const myReact=localStorage.getItem('ann_react_'+me+'_'+r.id)||'';
-          const active=myReact===e;
-          return '<button data-id="'+r.id+'" data-emoji="'+encodeURIComponent(e)+'" onclick="reactToAnnouncement(this.dataset.id,decodeURIComponent(this.dataset.emoji))" style="padding:4px 10px;border-radius:20px;border:1px solid '+(active?'#bfdbfe':'#e2e8f0')+';background:'+(active?'#eff6ff':'#f8fafc')+';cursor:pointer;font-size:13px;transition:all .12s;">'+e+'</button>';
-        }).join('')+
-        '</div>'+
+        '<div style="margin-top:10px;">'+makeReactHTML(r.id,'ann')+'</div>'+
         '</div>';
     }).join('');
     // Mark all as read
@@ -3071,10 +3356,12 @@ async function postAnnouncement(){
   const title=document.getElementById('annTitle').value.trim();
   const body=document.getElementById('annBody').value.trim();
   const pinned=document.getElementById('annPinned').checked;
+  const urgent=document.getElementById('annUrgent')&&document.getElementById('annUrgent').checked;
+  const expiry=document.getElementById('annExpiry')&&document.getElementById('annExpiry').value||null;
   if(!title||!body)return alert('Please fill in both title and body.');
   const btn=document.getElementById('annPostBtn');btn.disabled=true;btn.innerHTML='<span class="sp"></span> Posting...';
   try{
-    await sbPost('announcements',{title,body,created_by:me,pinned});
+    await sbPost('announcements',{title,body,created_by:me,pinned,urgent:urgent||false,expires_at:expiry||null});
     document.getElementById('annTitle').value='';
     document.getElementById('annBody').value='';
     document.getElementById('annPinned').checked=false;
@@ -3399,18 +3686,20 @@ async function loadOnboardingChecklist(){
   const el=document.getElementById('onboardChecklist');
   if(!el)return;
   try{
-    const creds=await sbGet('staff_credentials','?staff_name=eq.'+encodeURIComponent(me)+'&select=password_hash,sq1_question,email');
+    const creds=await sbGet('staff_credentials','?staff_name=eq.'+encodeURIComponent(me)+'&select=password_hash,sq1_question,birthday');
     const avail=await sbGet('staff_availability','?staff_name=eq.'+encodeURIComponent(me)+'&limit=1');
     const hasPass=creds.length&&!!creds[0].password_hash;
     const hasSQ=creds.length&&!!creds[0].sq1_question;
+    const hasDOB=creds.length&&!!creds[0].birthday;
     const hasAvail=avail.length>0;
     const items=[
       {label:'Set your password',done:hasPass,action:"goTo('profile')"},
-      {label:'Set security questions',done:hasSQ,action:"goTo('profile')"},
+      {label:'Set security questions',done:hasSQ,action:"goTo('profile');setTimeout(function(){showProfileSection('account');toggleSection('profSqSection');loadCurrentQuestions();},300)"},
+      {label:'Set date of birth',done:hasDOB,action:"goTo('profile');setTimeout(function(){showProfileSection('account');},300)"},
       {label:'Submit your availability',done:hasAvail,action:"goTo('schedule');setTimeout(function(){showSchedTab('availability');},50)"},
     ];
-    const allDone=items.every(i=>i.done);
-    if(allDone){el.innerHTML='<div style="text-align:center;padding:16px 0;"><div style="font-size:28px;margin-bottom:8px;">🎉</div><div style="font-size:14px;font-weight:700;color:#16a34a;">All set. You\'re fully onboarded.</div></div>';return;}
+    const allDone=hasSQ&&hasDOB&&hasAvail&&hasPass;
+    if(allDone){el.innerHTML='<div style="text-align:center;padding:16px 0;"><div style="font-size:28px;margin-bottom:8px;">🎉</div><div style="font-size:14px;font-weight:700;color:#16a34a;">All set. You\'re fully onboarded.</div></div>';const card=document.getElementById('onboardCard');if(card)card.style.display='none';return;}
     el.innerHTML=items.map(item=>'<div class="onboard-item"><div class="onboard-check '+(item.done?'onboard-done':'onboard-pending')+'">'+(item.done?'✓':'')+'</div><div class="onboard-text '+(item.done?'onboard-done-text':'')+'" '+(item.done?'':'style="cursor:pointer;color:#2563eb;" onclick="'+item.action+'"')+'>'+item.label+(item.done?'':'&nbsp;→')+'</div></div>').join('');
   }catch(e){console.warn(e);}
 }
@@ -3435,6 +3724,7 @@ async function saveBirthday(){
     });
     ok.textContent='Birthday saved!';ok.classList.add('show');
     setTimeout(()=>ok.classList.remove('show'),2000);
+    recheckOnboarding();
   }catch(e){err.textContent='Failed to save.';err.classList.add('show');}
 }
 
@@ -3578,15 +3868,80 @@ async function loadHomeAnnPreview(){
 
 // Show onboarding card only if not fully onboarded
 async function maybeShowOnboarding(){
+  // Skip if already confirmed done this session
+  if(sessionStorage.getItem('onboard_checked_'+me)==='done'){renderTimesheetPreview();return;}
   try{
-    const creds=await sbGet('staff_credentials','?staff_name=eq.'+encodeURIComponent(me)+'&select=password_hash,sq1_question');
+    const creds=await sbGet('staff_credentials','?staff_name=eq.'+encodeURIComponent(me)+'&select=password_hash,sq1_question,birthday');
     const avail=await sbGet('staff_availability','?staff_name=eq.'+encodeURIComponent(me)+'&limit=1');
-    const allDone=creds.length&&creds[0].password_hash&&creds[0].sq1_question&&avail.length;
+    const c=creds.length?creds[0]:{};
+    const hasSQ=!!c.sq1_question;
+    const hasDOB=!!c.birthday;
+    const hasAvail=avail.length>0;
+    const allDone=hasSQ&&hasDOB&&hasAvail;
     const card=document.getElementById('onboardCard');
     if(card){card.style.display=allDone?'none':'block';}
-    if(!allDone){loadOnboardingChecklist();renderTimesheetPreview();}
-    else{renderTimesheetPreview();}
+    if(!allDone){
+      loadOnboardingChecklist();
+      // Show lock overlay if critical items missing
+      if(!hasSQ||!hasDOB){showOnboardLock(hasSQ,hasDOB,hasAvail);}
+    }
+    renderTimesheetPreview();
   }catch(e){renderTimesheetPreview();}
+}
+
+function showOnboardLock(hasSQ,hasDOB,hasAvail){
+  // Show modal requiring completion before using app
+  let missing=[];
+  if(!hasSQ)missing.push('security questions');
+  if(!hasDOB)missing.push('date of birth');
+  const overlay=document.getElementById('onboardLockOverlay');
+  if(overlay){
+    document.getElementById('onboardLockMsg').textContent='Please set your '+missing.join(' and ')+' before using the portal.';
+    overlay.style.display='flex';
+  }
+}
+
+function dismissOnboardLock(){
+  const overlay=document.getElementById('onboardLockOverlay');
+  if(overlay)overlay.style.display='none';
+}
+
+function goToOnboarding(){
+  dismissOnboardLock();
+  goTo('profile');
+  setTimeout(function(){
+    showProfileSection('account');
+    // Show whichever section is needed
+    checkAndHighlightMissing();
+  },300);
+}
+
+async function checkAndHighlightMissing(){
+  try{
+    const creds=await sbGet('staff_credentials','?staff_name=eq.'+encodeURIComponent(me)+'&select=sq1_question,birthday');
+    const c=creds.length?creds[0]:{};
+    if(!c.sq1_question){
+      const s=document.getElementById('profSqSection');
+      if(s&&s.style.display==='none'){toggleSection('profSqSection');loadCurrentQuestions();}
+    } else if(!c.birthday){
+      const b=document.getElementById('profBirthday');
+      if(b)b.focus();
+    }
+  }catch(e){}
+}
+
+async function recheckOnboarding(){
+  // Called after saving SQ or DOB — re-checks and closes overlay if done
+  try{
+    const creds=await sbGet('staff_credentials','?staff_name=eq.'+encodeURIComponent(me)+'&select=sq1_question,birthday');
+    const c=creds.length?creds[0]:{};
+    if(c.sq1_question&&c.birthday){
+      dismissOnboardLock();
+      sessionStorage.setItem('onboard_checked_'+me,'done');
+    } else {
+      showOnboardLock(!!c.sq1_question,!!c.birthday,true);
+    }
+  }catch(e){}
 }
 
 // ── EMAIL UPDATE ──
@@ -3716,23 +4071,82 @@ async function loadLeaveHistory(){
 }
 
 // NOTIFICATIONS
+
+let _reactNotifsCache=null;
+let _reactNotifsCacheTime=0;
+async function loadReactNotifs(){
+  // Cache for 30s to avoid hammering Supabase
+  const now=Date.now();
+  if(_reactNotifsCache&&(now-_reactNotifsCacheTime)<30000)return _reactNotifsCache;
+  try{
+    const [myDiscs,myAnns,allReacts]=await Promise.all([
+      sbGet('discussions','?created_by=eq.'+encodeURIComponent(me)+'&select=id'),
+      sbGet('announcements','?created_by=eq.'+encodeURIComponent(me)+'&select=id'),
+      sbGet('reactions','?staff_name=neq.'+encodeURIComponent(me)+'&order=created_at.desc&limit=30')
+    ]);
+    if(!myDiscs.length&&!myAnns.length){_reactNotifsCache=[];_reactNotifsCacheTime=now;return [];}
+    const discIds=new Set(myDiscs.map(function(d){return d.id;}));
+    const annIds=new Set(myAnns.map(function(a){return a.id;}));
+    const result=allReacts.filter(function(r){
+      return (r.target_type==='disc'&&discIds.has(r.target_id))||
+             (r.target_type==='ann'&&annIds.has(r.target_id));
+    });
+    _reactNotifsCache=result;_reactNotifsCacheTime=now;
+    return result;
+  }catch(e){console.warn(e);return [];}
+}
+
 async function loadNotifications(){
   const el=document.getElementById("notifList");
   const badge=document.getElementById("notifBadge");
   const bnBadge=document.getElementById("bnNotifBadge");
   try{
-    const rows=await sbGet("leave_submissions","?staff_name=eq."+encodeURIComponent(me)+"&status=in.(approved,declined)&order=submitted_at.desc");
+    const [rows, reactNotifs] = await Promise.all([
+      sbGet("leave_submissions","?staff_name=eq."+encodeURIComponent(me)+"&status=in.(approved,declined)&order=submitted_at.desc&limit=20"),
+      loadReactNotifs()
+    ]);
     const read=JSON.parse(localStorage.getItem("oR_"+me)||"[]");
     const unread=rows.filter(r=>!read.includes(r.id));
     // Update badges
-    if(badge){badge.textContent=unread.length;badge.style.display=unread.length?"inline":"none";}
+    if(badge){badge.style.display="none";}
     if(bnBadge){bnBadge.textContent=unread.length;bnBadge.style.display=unread.length?"block":"none";}
+    const bellBadge=document.getElementById("mhBellBadge");if(bellBadge){bellBadge.style.display=unread.length?"block":"none";}
+    const sbBellBadge=document.getElementById("sbBellBadge");if(sbBellBadge){sbBellBadge.style.display=unread.length?"block":"none";}
+    // Also check meeting invites + reaction notifications
+    try{
+      const fbInv=await sbGet('feedback','?staff_name=eq.'+encodeURIComponent(me)+'&meeting_invited=eq.true&select=id,submitted_at');
+      const seenInv=JSON.parse(sessionStorage.getItem('seen_invites_session_'+me)||'[]');
+      const newInv=(fbInv||[]).filter(function(r){return !seenInv.includes(r.id);});
+      const seenReacts=JSON.parse(localStorage.getItem('seen_reacts_'+me)||'[]');
+      const newReacts=(reactNotifs||[]).filter(function(r){return !seenReacts.includes(r.id);});
+      const totalUnread=unread.length+newInv.length+newReacts.length;
+      if(bellBadge)bellBadge.style.display=totalUnread?"block":"none";
+      if(sbBellBadge)sbBellBadge.style.display=totalUnread?"block":"none";
+      if(bnBadge){bnBadge.textContent=totalUnread;bnBadge.style.display=totalUnread?"block":"none";}
+
+    }catch(e){}
     if(!el)return; // element may not be visible yet
-    if(!rows.length){
+    const seenReacts=JSON.parse(localStorage.getItem('seen_reacts_'+me)||'[]');
+    const newReactNotifs=(reactNotifs||[]).filter(function(r){return !seenReacts.includes(r.id);});
+    if(!rows.length&&!newReactNotifs.length){
       el.innerHTML='<div style="text-align:center;padding:40px 20px;"><svg width="36" height="36" viewBox="0 0 20 20" fill="#e2e8f0" style="margin:0 auto 10px;display:block;"><path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z"/></svg><div style="font-size:13px;font-weight:600;color:#475569;margin-bottom:6px;">No alerts yet</div><div style="font-size:12px;color:#94a3b8;">Leave approvals and declines will appear here.</div></div>';
       return;
     }
-    el.innerHTML=rows.map(r=>{
+    // Render reaction notifications first
+    let reactHtml='';
+    newReactNotifs.forEach(function(r){
+      reactHtml+='<div style="background:#fdf4ff;border:1px solid #e9d5ff;border-radius:12px;padding:14px;margin-bottom:10px;">'+
+        '<div style="font-size:13px;font-weight:700;color:#7c3aed;margin-bottom:4px;">'+r.emoji+' Reaction on your post</div>'+
+        '<div style="font-size:12.5px;color:#475569;">'+r.staff_name+' reacted to your '+(r.target_type==='disc'?'discussion':'announcement')+'</div>'+
+        '<div style="font-size:11px;color:#94a3b8;margin-top:4px;">'+fmtF(r.created_at)+'</div>'+
+        '</div>';
+    });
+    // Mark react notifs as seen
+    if(newReactNotifs.length){
+      const allReactIds=(reactNotifs||[]).map(function(r){return r.id;});
+      localStorage.setItem('seen_reacts_'+me,JSON.stringify(allReactIds));
+    }
+    el.innerHTML=reactHtml+rows.map(r=>{
       const isRead=read.includes(r.id);
       const isApproved=r.status==="approved";
       const bg=isRead?"#fff":(isApproved?"#eff6ff":"#fef2f2");
@@ -3747,7 +4161,7 @@ async function loadNotifications(){
         '<div style="font-size:11px;color:#94a3b8;margin-top:6px;">'+fmtF(r.submitted_at)+'</div>'+
         '</div>';
     }).join("");
-  }catch(e){if(el)el.innerHTML='<div style="color:#dc2626;text-align:center;padding:16px;font-size:13px;">Could not load alerts.</div>';}
+  }catch(e){console.warn(e);if(el)el.innerHTML='<div style="color:#dc2626;text-align:center;padding:16px;font-size:13px;">Could not load alerts.</div>';}
 }
 
 function markAllNotificationsRead(){
@@ -3758,8 +4172,7 @@ function markAllNotificationsRead(){
       const allIds=rows.map(r=>r.id);
       localStorage.setItem("oR_"+me,JSON.stringify(allIds));
       // Clear badge immediately
-      const badge=document.getElementById("notifBadge");
-      if(badge){badge.textContent="";badge.style.display="none";}
+
       const bnBadge=document.getElementById("bnNotifBadge");
       if(bnBadge){bnBadge.style.display="none";}
       // Re-render without dots
@@ -3990,6 +4403,203 @@ function toggleMobileSidebar(){
     if(sb) sb.classList.add('sb-hidden');
   }
 })();
+
+
+// ── TOP NOTIFICATION BANNER ──
+let _bannerTimer = null;
+
+function showBanner(text, sub, type){
+  const el=document.getElementById('notifBanner');
+  const inner=document.getElementById('notifBannerInner');
+  const textEl=document.getElementById('notifBannerText');
+  const subEl=document.getElementById('notifBannerSub');
+  if(!el)return;
+  textEl.textContent=text;
+  subEl.textContent=sub||'';
+  inner.className='notif-banner-inner'+(type?' '+type:'');
+  el.classList.add('show');
+  clearTimeout(_bannerTimer);
+  _bannerTimer=setTimeout(hideBanner, 4000);
+}
+
+function hideBanner(){
+  const el=document.getElementById('notifBanner');
+  if(el)el.classList.remove('show');
+}
+
+async function checkNewNotifications(){
+  try{
+    const rows=await sbGet('leave_submissions','?staff_name=eq.'+encodeURIComponent(me)+'&status=in.(approved,declined)&order=submitted_at.desc&limit=5');
+    const read=JSON.parse(localStorage.getItem('oR_'+me)||'[]');
+    const unread=rows.filter(r=>!read.includes(r.id));
+    if(unread.length){
+      const r=unread[0];
+      const approved=r.status==='approved';
+      showBanner(
+        approved ? 'Leave Approved' : 'Leave Declined',
+        fmtF(r.from_date)+' – '+fmtF(r.to_date),
+        approved ? 'success' : 'warning'
+      );
+    }
+    // Check feedback invites
+    const fbRows=await sbGet('feedback','?staff_name=eq.'+encodeURIComponent(me)+'&meeting_invited=eq.true');
+    if(fbRows&&fbRows.length){
+      const seenInvites=JSON.parse(localStorage.getItem('seen_invites_'+me)||'[]');
+      const newInvites=fbRows.filter(r=>!seenInvites.includes(r.id));
+      if(newInvites.length&&!unread.length){
+        showBanner('Meeting Invitation','Your manager wants to meet with you','');
+      }
+    }
+  }catch(e){console.warn(e);}
+}
+
+
+// ── NOTIFICATION DROPDOWN ──
+function toggleNotifDrop(dropId){
+  const id=dropId||'notifDrop';
+  const drop=document.getElementById(id);
+  if(!drop)return;
+  // Close all other drops first
+  document.querySelectorAll('.notif-drop.open').forEach(function(d){if(d.id!==id)d.classList.remove('open');});
+  const isOpen=drop.classList.contains('open');
+  drop.classList.toggle('open',!isOpen);
+  if(!isOpen){
+    loadNotifDrop(id);
+    setTimeout(function(){
+      document.addEventListener('click',function handler(e){
+        if(!e.target.closest('.notif-drop-wrap')){
+          document.querySelectorAll('.notif-drop.open').forEach(function(d){d.classList.remove('open');});
+        }
+        document.removeEventListener('click',handler);
+      },{once:true});
+    },50);
+  }
+}
+
+async function loadNotifDrop(dropId){
+  const listId=dropId==='mhNotifDrop'?'mhNotifDropList':'notifDropList';
+  const el=document.getElementById(listId);
+  if(!el)return;
+  el.innerHTML='<div class="notif-drop-empty">Loading...</div>';
+  try{
+    const rows=await sbGet('leave_submissions','?staff_name=eq.'+encodeURIComponent(me)+'&status=in.(approved,declined)&order=submitted_at.desc&limit=10');
+    const read=JSON.parse(localStorage.getItem('oR_'+me)||'[]');
+    // Check feedback invites
+    const fbRows=await sbGet('feedback','?staff_name=eq.'+encodeURIComponent(me)+'&meeting_invited=eq.true&select=id,meeting_message,submitted_at');
+    const seenInvites=JSON.parse(sessionStorage.getItem('seen_invites_session_'+me)||'[]');
+    const newInvites=(fbRows||[]).filter(r=>!seenInvites.includes(r.id));
+
+    const reactNotifsDrop=await loadReactNotifs();
+    const seenReactsDrop=JSON.parse(localStorage.getItem('seen_reacts_'+me)||'[]');
+    const newReactsDrop=(reactNotifsDrop||[]).filter(function(r){return !seenReactsDrop.includes(r.id);});
+    if(!rows.length&&!newInvites.length&&!newReactsDrop.length){
+      el.innerHTML='<div class="notif-drop-empty">No notifications yet</div>';
+      return;
+    }
+
+    let html='';
+
+    // Reaction notifications
+    newReactsDrop.forEach(function(r){
+      html+='<div class="notif-drop-item unread" onclick="closeAllNotifDrops();">'+
+        '<div style="font-size:12px;font-weight:700;color:#7c3aed;margin-bottom:2px;">'+r.emoji+' Reaction on your post</div>'+
+        '<div style="font-size:12px;color:#475569;">'+r.staff_name+' reacted to your '+(r.target_type==='disc'?'discussion':'announcement')+'</div>'+
+        '</div>';
+    });
+
+    // Meeting invites first
+    newInvites.forEach(function(r){
+      html+='<div class="notif-drop-item unread" data-inv="'+r.id+'" onclick="closeAllNotifDrops();markInviteSeen(this.dataset.inv);goTo(\'engagement\');setTimeout(function(){showEngagementTab(\'feedback\');},120);">'+
+        '<div style="font-size:12px;font-weight:700;color:#2563eb;margin-bottom:2px;">📅 Meeting Invitation</div>'+
+        '<div style="font-size:12px;color:#475569;line-height:1.4;">'+(r.meeting_message||'Your manager would like to meet with you')+'</div>'+
+        '<div style="font-size:10px;color:#94a3b8;margin-top:3px;">Tap to view</div>'+
+        '</div>';
+    });
+
+    // Leave notifications
+    rows.forEach(function(r){
+      const isRead=read.includes(r.id);
+      const approved=r.status==='approved';
+      const col=approved?'#16a34a':'#dc2626';
+      const label=approved?'✓ Leave Approved':'✕ Leave Declined';
+      html+='<div class="notif-drop-item'+(isRead?'':' unread')+'" data-nid="'+r.id+'" onclick="closeAllNotifDrops();markNotifRead(this.dataset.nid);goTo(\'schedule\');setTimeout(function(){showSchedTab(\'leave\');},120);">'+
+        '<div style="font-size:12px;font-weight:700;color:'+col+';margin-bottom:2px;">'+label+'</div>'+
+        '<div style="font-size:12px;color:#475569;">'+fmtF(r.from_date)+' – '+fmtF(r.to_date)+'</div>'+
+        (r.reason?'<div style="font-size:11px;color:#94a3b8;margin-top:2px;">'+r.reason+'</div>':'')+
+        (r.status==='declined'&&r.decline_reason?'<div style="font-size:11px;color:#dc2626;margin-top:2px;">'+r.decline_reason+'</div>':'')+
+        '<div style="font-size:10px;color:#94a3b8;margin-top:3px;">Tap to view leave history</div>'+
+        '</div>';
+    });
+
+    el.innerHTML=html;
+    // Sync to other dropdown if open
+    const otherId=listId==='notifDropList'?'mhNotifDropList':'notifDropList';
+    const other=document.getElementById(otherId);
+    if(other)other.innerHTML=html;
+  }catch(e){
+    el.innerHTML='<div class="notif-drop-empty">Could not load</div>';
+  }
+}
+
+function closeAllNotifDrops(){
+  document.querySelectorAll('.notif-drop.open').forEach(function(d){d.classList.remove('open');});
+}
+
+function markNotifRead(id){
+  const read=JSON.parse(localStorage.getItem('oR_'+me)||'[]');
+  if(!read.includes(id)){read.push(id);localStorage.setItem('oR_'+me,JSON.stringify(read));}
+  loadNotifications(); // refresh badges
+}
+
+function markInviteSeen(id){
+  const seen=JSON.parse(sessionStorage.getItem('seen_invites_session_'+me)||'[]');
+  if(!seen.includes(id)){seen.push(id);sessionStorage.setItem('seen_invites_session_'+me,JSON.stringify(seen));}
+  loadNotifications();
+}
+
+
+let selectedMood=0;
+function setMood(val){
+  selectedMood=val;
+  document.querySelectorAll('.mood-btn').forEach(function(b){
+    b.classList.toggle('selected',parseInt(b.dataset.mood)===val);
+  });
+}
+
+
+function getDateGroup(dateStr){
+  const d=new Date(dateStr);
+  const now=new Date();
+  const today=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+  const yesterday=new Date(today);yesterday.setDate(yesterday.getDate()-1);
+  const weekAgo=new Date(today);weekAgo.setDate(weekAgo.getDate()-7);
+  const postDay=new Date(d.getFullYear(),d.getMonth(),d.getDate());
+  if(postDay>=today)return'Today';
+  if(postDay>=yesterday)return'Yesterday';
+  if(postDay>=weekAgo)return'This Week';
+  return'Earlier';
+}
+
+
+
+
+function showToast(msg){
+  let t=document.getElementById('_toast');
+  if(!t){
+    t=document.createElement('div');
+    t.id='_toast';
+    t.style.cssText='position:fixed;bottom:90px;left:50%;transform:translateX(-50%) translateY(20px);background:#1e293b;color:#fff;padding:10px 18px;border-radius:24px;font-size:13px;font-weight:600;z-index:9999;opacity:0;transition:all .25s cubic-bezier(.34,1.4,.7,1);pointer-events:none;white-space:nowrap;max-width:90vw;text-align:center;';
+    document.body.appendChild(t);
+  }
+  t.textContent=msg;
+  t.style.opacity='1';
+  t.style.transform='translateX(-50%) translateY(0)';
+  clearTimeout(t._timer);
+  t._timer=setTimeout(function(){
+    t.style.opacity='0';
+    t.style.transform='translateX(-50%) translateY(20px)';
+  },2500);
+}
 
 // ── Fix 100dvh reflow on iOS/Android ──
 function setVH(){
