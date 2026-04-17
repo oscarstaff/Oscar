@@ -1877,11 +1877,6 @@ body.ready{visibility:visible;}
           <div style="display:flex;align-items:center;justify-content:space-between;">
             <div><div style="font-size:13px;font-weight:600;color:#0f172a;">Push Notifications</div><div style="font-size:11px;color:#94a3b8;margin-top:2px;" id="pushStatusText">Tap Enable to get notified</div></div>
             <div style="display:flex;gap:6px;">
-              <button id="pushTestBtn" onclick="testPush()" style="display:none;padding:8px 12px;border-radius:10px;background:#f1f5f9;color:#475569;border:1px solid #e2e8f0;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;">Test</button>
-              <button id="pushEnableBtn" onclick="enablePushNotifications()" style="padding:8px 16px;border-radius:10px;background:#2563eb;color:#fff;border:none;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;">Enable</button>
-            </div>
-          </div>
-        </div>
         <div class="card" style="margin-bottom:12px">
           <div class="card-hd"><div class="card-title">Appearance</div></div>
           <div style="display:flex;align-items:center;justify-content:space-between;">
@@ -4518,20 +4513,27 @@ async function checkNewNotifications(){
     const unread=rows.filter(r=>!read.includes(r.id));
     if(unread.length){
       const r=unread[0];
-      const approved=r.status==='approved';
-      showBanner(
-        approved ? 'Leave Approved' : 'Leave Declined',
-        fmtF(r.from_date)+' – '+fmtF(r.to_date),
-        approved ? 'success' : 'warning'
-      );
+      const bannerKey='banner_shown_'+me+'_'+r.id;
+      if(!sessionStorage.getItem(bannerKey)){
+        const approved=r.status==='approved';
+        showBanner(
+          approved ? 'Leave Approved' : 'Leave Declined',
+          fmtF(r.from_date)+' – '+fmtF(r.to_date),
+          approved ? 'success' : 'warning'
+        );
+        localStorage.setItem(bannerKey,'1');
+      }
     }
-    // Check feedback invites
-    const fbRows=await sbGet('feedback','?staff_name=eq.'+encodeURIComponent(me)+'&meeting_invited=eq.true');
-    if(fbRows&&fbRows.length){
-      const seenInvites=JSON.parse(localStorage.getItem('seen_invites_'+me)||'[]');
-      const newInvites=fbRows.filter(r=>!seenInvites.includes(r.id));
-      if(newInvites.length&&!unread.length){
-        showBanner('Meeting Invitation','Your manager wants to meet with you','');
+    // Check feedback invites — only show once per session
+    if(!localStorage.getItem('invite_banner_shown_'+me)){
+      const fbRows=await sbGet('feedback','?staff_name=eq.'+encodeURIComponent(me)+'&meeting_invited=eq.true&select=id');
+      if(fbRows&&fbRows.length){
+        const seenInvites=JSON.parse(sessionStorage.getItem('seen_invites_session_'+me)||'[]');
+        const newInvites=fbRows.filter(r=>!seenInvites.includes(r.id));
+        if(newInvites.length&&!unread.length){
+          showBanner('Meeting Invitation','Your manager wants to meet with you','');
+          localStorage.setItem('invite_banner_shown_'+me,'1');
+        }
       }
     }
   }catch(e){console.warn(e);}
@@ -4715,6 +4717,34 @@ document.addEventListener('visibilitychange', function(){
   if(document.hidden) stopAutoRefresh();
   else { startAutoRefresh(); loadNotifications(); }
 });
+
+
+// ── NOTIFICATION SEEN STATE (synced across devices) ──
+const _seenCache = {};
+
+async function isNotifSeen(key){
+  if(_seenCache[key]) return true;
+  try{
+    const rows = await sbGet('notification_seen','?staff_name=eq.'+encodeURIComponent(me)+'&notif_key=eq.'+encodeURIComponent(key));
+    if(rows && rows.length){ _seenCache[key]=true; return true; }
+    return false;
+  }catch(e){ 
+    // Fallback to localStorage if Supabase fails
+    return !!localStorage.getItem('seen_'+me+'_'+key);
+  }
+}
+
+async function markNotifSeen(key){
+  _seenCache[key] = true;
+  localStorage.setItem('seen_'+me+'_'+key, '1'); // local fallback
+  try{
+    await fetch(SB+'/rest/v1/notification_seen',{
+      method:'POST',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates'},
+      body:JSON.stringify({staff_name:me, notif_key:key})
+    });
+  }catch(e){ console.warn('markNotifSeen failed:',e); }
+}
 
 // ── Fix 100dvh reflow on iOS/Android ──
 function setVH(){
