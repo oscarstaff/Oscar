@@ -132,8 +132,6 @@ body::before{
 
 
 
-.bn-item.active 
-.bn-item.active 
 
 
 
@@ -295,8 +293,6 @@ body::before{
     right:12px;width:36px;height:36px;font-size:15px;
   }
 
-  /* Feedback */
-  #fbText{font-size:16px;}
 
   /* Splash */
   #splash-logo{font-size:22px;}
@@ -902,6 +898,7 @@ body.ready{visibility:visible;}
 [data-theme="dark"] .leave-dates { color: #e2e8f0; }
 [data-theme="dark"] .notif-item { background: #1e293b !important; border-color: #2d3f55 !important; }
 [data-theme="dark"] .ann-card { background: #1e293b !important; border-color: #2d3f55 !important; }
+[data-theme="dark"] { --poll-bg: #162032; --poll-border: #2d3f55; }
 [data-theme="dark"] .ann-card.pinned { background: #162032 !important; border-color: #1e3a5f !important; }
 [data-theme="dark"] .ann-title { color: #f1f5f9; }
 [data-theme="dark"] .ann-body { color: #94a3b8; }
@@ -1378,6 +1375,44 @@ body.ready{visibility:visible;}
   to{opacity:1;transform:translateY(0);}
 }
 
+
+/* ── POLL STYLES ── */
+.poll-container{margin-top:14px;display:flex;flex-direction:column;gap:8px;}
+.poll-opt{
+  position:relative;padding:11px 14px;border-radius:8px;
+  border:1.5px solid #e2e8f0;cursor:pointer;overflow:hidden;
+  transition:border-color .15s,background .15s;
+  font-weight:600;font-size:13px;background:#fff;
+  touch-action:manipulation;-webkit-tap-highlight-color:transparent;
+  font-family:inherit;width:100%;text-align:left;
+}
+.poll-opt:hover{border-color:var(--accent,#2563eb);}
+.poll-opt:active{transform:scale(.98);}
+.poll-opt.voted{border-color:var(--accent,#2563eb);background:#f0f7ff;}
+.poll-fill{
+  position:absolute;left:0;top:0;height:100%;
+  background:var(--accent-dim,rgba(37,99,235,.1));
+  z-index:0;transition:width .5s cubic-bezier(.16,1,.3,1);
+}
+.poll-txt{
+  position:relative;z-index:1;
+  display:flex;justify-content:space-between;align-items:center;
+  pointer-events:none;
+}
+.poll-footer{
+  display:flex;align-items:center;gap:8px;
+  margin-top:8px;font-size:11px;color:#94a3b8;flex-wrap:wrap;
+}
+.poll-footer button{
+  background:none;border:none;font-size:11px;font-weight:600;
+  cursor:pointer;font-family:inherit;padding:0;
+}
+/* Edit poll modal */
+.poll-edit-row{display:flex;gap:6px;margin-bottom:6px;}
+[data-theme="dark"] .poll-opt{background:#1e293b;border-color:#2d3f55;color:#e2e8f0;}
+[data-theme="dark"] .poll-opt.voted{background:rgba(96,165,250,.1);border-color:#60a5fa;}
+[data-theme="dark"] .poll-fill{background:rgba(96,165,250,.12);}
+
 </style>
 </head>
 <body>
@@ -1822,7 +1857,6 @@ body.ready{visibility:visible;}
       <!-- Sub-tabs -->
       <div class="tab-bar">
         <button class="eng-tab active" id="etab-discussions" onclick="showEngagementTab('discussions')">Discussions</button>
-        <button class="eng-tab" id="etab-feedback" onclick="showEngagementTab('feedback')">Feedback</button>
       </div>
       <!-- DISCUSSIONS -->
       <div id="esec-discussions">
@@ -1862,40 +1896,7 @@ body.ready{visibility:visible;}
         </div>
         <div id="discList"><div style="text-align:center;color:#94a3b8;padding:32px;font-size:13px;">Loading...</div></div>
       </div>
-      <!-- FEEDBACK -->
-      <div id="esec-feedback" style="display:none;">
-        <div class="card" style="margin-bottom:14px;">
-          <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:13px;color:#0369a1;line-height:1.6;">Your feedback is completely anonymous — no name, no session, no way to trace it back to you.</div>
-          <div class="alert alert-err" id="fbErr"></div>
-          <div class="alert alert-ok" id="fbOk"></div>
-          <div class="field">
-            <label class="field-label">Category</label>
-            <select id="fbCategory" class="f-input">
-              <option value="">— Select a category —</option>
-              <option value="Workplace Culture">Workplace Culture</option>
-              <option value="Shift Scheduling">Shift Scheduling</option>
-              <option value="Process Improvement">Process Improvement</option>
-              <option value="Safety Concern">Safety Concern</option>
-              <option value="Management">Management</option>
-              <option value="General">General</option>
-            </select>
-          </div>
-          <div class="field">
-            <label class="field-label">How are you feeling today?</label>
-            <div style="display:flex;gap:8px;margin-top:4px;">
-              <button type="button" class="mood-btn" data-mood="5" onclick="setMood(5)" title="Great">😄</button>
-              <button type="button" class="mood-btn" data-mood="4" onclick="setMood(4)" title="Good">🙂</button>
-              <button type="button" class="mood-btn" data-mood="3" onclick="setMood(3)" title="Okay">😐</button>
-              <button type="button" class="mood-btn" data-mood="2" onclick="setMood(2)" title="Not great">😕</button>
-              <button type="button" class="mood-btn" data-mood="1" onclick="setMood(1)" title="Bad">😞</button>
-            </div>
-          </div>
-          <div class="field"><label class="field-label">Your Feedback</label><textarea id="fbText" class="f-input" rows="4" placeholder="Share anything — shift scheduling, workplace suggestions, concerns..."></textarea></div>
-          <button class="btn btn-green btn-block" id="fbBtn" onclick="submitFeedback()">Submit Anonymously</button>
-        </div>
-        <!-- Staff: view their own past feedback -->
-        <div id="myFeedbackList"></div>
-      </div>
+
     </div>
 
     <!-- PROFILE -->
@@ -1908,7 +1909,6 @@ body.ready{visibility:visible;}
       <div class="tab-bar">
         <button class="prof-tab active" id="ptab-account" onclick="showProfileSection('account')">Account</button>
         <button class="prof-tab" id="ptab-documents" onclick="showProfileSection('documents')">Documents</button>
-        <button class="prof-tab" id="ptab-adminpanel" onclick="showProfileSection('adminpanel')" style="display:none">Feedback Collected</button>
       </div>
 
       <!-- ACCOUNT section -->
@@ -2035,17 +2035,6 @@ body.ready{visibility:visible;}
         <div id="docsProfileList"><div style="text-align:center;color:#94a3b8;padding:32px;font-size:13px;">Loading...</div></div>
       </div>
 
-      <!-- ADMIN PANEL section -->
-      <div id="psec-adminpanel" style="display:none;">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-          <div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;">Anonymous Feedback</div>
-          <button onclick="loadAdminFeedback2()" style="font-size:12px;font-weight:600;color:#2563eb;background:none;border:none;cursor:pointer;font-family:inherit;">Refresh</button>
-        </div>
-        <div class="card" style="padding:14px;">
-          <div id="adminFeedbackList2"><div style="color:#94a3b8;font-size:13px;text-align:center;padding:12px;">Loading...</div></div>
-        </div>
-      </div>
-
     </div>
 
   </main>
@@ -2070,7 +2059,6 @@ body.ready{visibility:visible;}
       <div class="bn-item" id="bn-profile" data-tab="profile" onclick="if(navigator.vibrate)navigator.vibrate(8);goTo('profile')">
         <svg class="bn-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"/></svg>
       </div>
-      <div class="bn-item" id="bn-feedback" data-tab="feedback" style="display:none;"></div>
       <div class="bn-item" id="bn-admin" data-tab="admin" style="display:none;"></div>
     </div>
   </nav>
@@ -2440,43 +2428,16 @@ async function deleteDocument(id){
 
 // ── ENGAGEMENT TAB ──
 function showEngagementTab(tab){
-  ['discussions','feedback'].forEach(s=>{
+  ['discussions'].forEach(s=>{
     const el=document.getElementById('esec-'+s);
     if(el)el.style.display=s===tab?'block':'none';
     const t=document.getElementById('etab-'+s);
     if(t)t.classList.toggle('active',s===tab);
   });
   if(tab==='discussions'){loadDiscussions();const ao=document.getElementById('discAdminOptions');if(ao)ao.style.display=myIsAdmin?'block':'none';}
-  if(tab==='feedback'){loadMyFeedback();}
 }
 
-async function loadMyFeedback(){
-  const el=document.getElementById('myFeedbackList');
-  if(!el)return;
-  el.innerHTML='<div style="text-align:center;color:#94a3b8;font-size:13px;padding:16px;">Loading...</div>';
-  try{
-    const rows=await sbGet('feedback','?staff_name=eq.'+encodeURIComponent(me)+'&order=submitted_at.desc');
-    if(!rows||!rows.length){
-      el.innerHTML='<div style="text-align:center;color:#94a3b8;font-size:13px;padding:16px;">No feedback submitted yet.</div>';
-      return;
-    }
-    el.innerHTML='<div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Your Previous Feedback</div>'+
-      rows.map(r=>{
-        const d=new Date(r.submitted_at).toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'});
-        const hasInvite=false;
-        const inviteBanner='';
-        return '<div class="ann-card" style="margin-bottom:10px;">'+
-          (hasInvite?'<div style="width:8px;height:8px;border-radius:50%;background:#2563eb;margin-bottom:8px;"></div>':'')+
-          '<div style="font-size:13px;color:#374151;line-height:1.6;">'+r.body+'</div>'+
-          '<div style="font-size:10px;color:#94a3b8;margin-top:6px;">Submitted '+d+'</div>'+
-          inviteBanner+
-        '</div>';
-      }).join('');
-  }catch(e){
-    console.warn(e);
-    el.innerHTML='<div style="text-align:center;color:#dc2626;font-size:13px;padding:16px;">Could not load feedback.</div>';
-  }
-}
+
 
 async function loadHomeDiscPreview(){
   const el=document.getElementById('homeDiscPreview');
@@ -2509,6 +2470,8 @@ async function loadDiscussions(){
       el.innerHTML='<div style="text-align:center;padding:40px 20px;"><svg width="36" height="36" viewBox="0 0 20 20" fill="#e2e8f0" style="margin:0 auto 10px;display:block;"><path fill-rule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clip-rule="evenodd"/></svg><div style="font-size:13px;font-weight:600;color:#475569;margin-bottom:6px;">No discussions yet</div><div style="font-size:12px;color:#94a3b8;">Be the first to start a conversation above.</div></div>';
       return;
     }
+    // Cache for instant poll updates
+    rows.forEach(function(r){_discCache[r.id]=r;});
     el.innerHTML=rows.map(function(r){
       const replies=allReplies.filter(function(x){return x.discussion_id===r.id;});
       const d=new Date(r.created_at).toLocaleDateString('en-AU',{day:'numeric',month:'short'});
@@ -2836,13 +2799,13 @@ function goTo(p){
 }
 
 function showProfileSection(sec){
-  ["account","documents","adminpanel"].forEach(s=>{
+  ["account","documents"].forEach(s=>{
     const el=document.getElementById("psec-"+s);
     if(el)el.style.display=s===sec?"block":"none";
     const tab=document.getElementById("ptab-"+s);
     if(tab)tab.classList.toggle("active",s===sec);
   });
-  if(sec==="adminpanel"){loadAdminFeedback2();}
+
   if(sec==="documents"){loadDocsProfile();}
   // Mark notifications read when profile is opened
   markAllNotificationsRead();
@@ -3089,40 +3052,7 @@ function updateDmSwitch(theme){
 }
 initTheme();
 
-// ── ANONYMOUS FEEDBACK ──
-async function submitFeedback(){
-  const body=document.getElementById('fbText').value.trim();
-  const err=document.getElementById('fbErr'),ok=document.getElementById('fbOk');
-  if(!body){err.textContent='Please write something before submitting.';err.classList.add('show');return;}
-  const btn=document.getElementById('fbBtn');btn.disabled=true;btn.innerHTML='<span class="sp"></span> Sending...';
-  try{
-    const res=await fetch(SB+'/rest/v1/feedback',{
-      method:'POST',
-      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=representation'},
-      body:JSON.stringify({body, staff_name:me, category:document.getElementById('fbCategory')&&document.getElementById('fbCategory').value||null, mood:selectedMood||null})
-    });
-    if(res.ok||res.status===201){
-      ok.textContent='Feedback submitted anonymously. Thank you!';ok.classList.add('show');
-      document.getElementById('fbText').value='';
-      selectedMood=0;
-      document.querySelectorAll('.mood-btn').forEach(function(b){b.classList.remove('selected');});
-      if(document.getElementById('fbCategory'))document.getElementById('fbCategory').value='';
-      // Track ID so staff can view their own feedback
-      try{
-        const rdata=await res.json();
-        if(rdata&&rdata.length){
-          const key='fb_session_'+me;
-          const ids=JSON.parse(localStorage.getItem(key)||'[]');
-          ids.push(rdata[0].id);
-          localStorage.setItem(key,JSON.stringify(ids));
-        }
-      }catch(e){console.warn(e);}
-      // Refresh list
-      setTimeout(loadMyFeedback, 500);
-    }else throw new Error();
-  }catch(e){err.textContent='Failed to submit. Please try again.';err.classList.add('show');}
-  finally{btn.disabled=false;btn.textContent='Submit Anonymously';}
-}
+
 
 
 // ── MESSAGES ──
@@ -3388,64 +3318,10 @@ async function togglePin(id,currentPinned){
 }
 
 // ── ADMIN PANEL — staff availability grid (profile tab) ──
-async function loadAdminAvailGrid2(){
-  const el=document.getElementById('adminContent2');
-  if(!el)return;
-  el.innerHTML='<div style="color:#94a3b8;text-align:center;padding:12px;font-size:13px;">Loading...</div>';
-  let availRows=[];
-  try{const r=await fetch(SB+'/rest/v1/staff_availability?select=*',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});if(r.ok)availRows=await r.json();}catch(e){console.warn(e);}
-  const typeCol={all:'#2563eb',no:'#dc2626',custom:'#0ea5e9'};
-  const typeLbl={all:'Available',no:'Unavail',custom:''};
-  let html='';
-  STAFF.forEach(function(name){
-    const row=availRows.find(function(r){return r.staff_name&&r.staff_name.toLowerCase()===name.toLowerCase();});
-    html+='<div style="display:flex;align-items:flex-start;gap:8px;padding:9px 0;border-bottom:1px solid #f1f5f9;flex-wrap:wrap;">';
-    html+='<div style="font-size:12px;font-weight:700;min-width:140px;padding-top:2px;">'+name+'</div>';
-    if(!row){html+='<div style="font-size:11px;color:#94a3b8;padding-top:2px;">Not set</div>';}
-    else{
-      const period=row.is_ongoing?'Ongoing':(row.valid_from?'From '+row.valid_from+(row.valid_until?' – '+row.valid_until:''):'');
-      if(period)html+='<div style="font-size:9px;color:#94a3b8;padding-top:4px;margin-right:4px;">'+period+'</div>';
-      const av=row.availability||{};
-      html+='<div style="display:flex;gap:3px;flex-wrap:wrap;">';
-      for(let i=0;i<7;i++){
-        const a=av[i]||av[String(i)]||{type:'unset'};
-        if(a.type==='unset')continue;
-        const lbl=a.type==='custom'?(a.start.slice(0,5)+'–'+a.end.slice(0,5)):typeLbl[a.type];
-        html+='<div style="font-size:9px;font-weight:700;padding:2px 5px;border-radius:4px;background:#f8fafc;border:1px solid #e2e8f0;color:'+typeCol[a.type||'all']+'">'+DS[i]+' '+lbl+'</div>';
-      }
-      html+='</div>';
-    }
-    html+='</div>';
-  });
-  el.innerHTML=html||'<div style="color:#94a3b8;font-size:13px;padding:8px;">No availability submitted yet.</div>';
-}
 
-// ── ADMIN PANEL — feedback inbox (profile tab) ──
 
-async function loadAdminFeedback2(){
-  const el=document.getElementById('adminFeedbackList2');
-  if(!el)return;
-  try{
-    const rows=await sbGet('feedback','?order=submitted_at.desc&select=id,body,submitted_at,read,meeting_invited,meeting_message');
-    if(!rows.length){el.innerHTML='<div style="color:#94a3b8;font-size:13px;text-align:center;padding:12px;">No feedback yet.</div>';return;}
-    // Mark read — ignore failures
-    fetch(SB+'/rest/v1/feedback?read=eq.false',{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({read:true})}).catch(()=>{});
-    el.innerHTML=rows.map(r=>{
-      const d=new Date(r.submitted_at).toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'});
-      const isNew=!r.read;
-      const invited=false;
-      return '<div style="padding:12px;border-radius:10px;margin-bottom:8px;background:'+(isNew?'#f0f9ff':'#f8fafc')+';border:1px solid '+(isNew?'#bae6fd':'#e2e8f0')+';">'+
-        (isNew?'<div style="font-size:9px;font-weight:700;color:#0284c7;text-transform:uppercase;letter-spacing:.8px;margin-bottom:5px;">New</div>':'')+
-        '<div style="font-size:13px;color:#1e293b;line-height:1.6;">'+r.body.replace(/\n/g,'<br>')+'</div>'+
-        '<div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;">'+
-        '<div style="font-size:10px;color:#94a3b8;">'+d+'</div>'+
-        
-        '</div>'+
 
-        '</div>';
-    }).join('');
-  }catch(e){console.warn(e);el.innerHTML='<div style="color:#dc2626;font-size:13px;">Could not load.</div>';}
-}
+
 
 async function loadAnnouncements(){
   const el=document.getElementById('annList');
@@ -4379,83 +4255,7 @@ async function loadMySettings(){
 }
 
 // ── ADMIN ──
-async function loadAdminPage(){
-  // Now integrated into tabs — kept for compatibility
-  loadBirthdays();
-  loadAdminFeedback();
-  const el=document.getElementById("adminContent");
-  if(!el){console.error("adminContent div not found");return;}
-  el.innerHTML='<div class="empty"><div class="empty-title">Fetching data...</div></div>';
 
-  const isoWeek=iso(weekStart);
-  let availRows=[], leaveRows=[];
-
-  try{
-    const r=await fetch(SB+"/rest/v1/staff_availability?select=*",{headers:{"apikey":KEY,"Authorization":"Bearer "+KEY}});
-    if(r.ok)availRows=await r.json();
-  }catch(e){console.warn("avail fetch error:",e);}
-
-  try{
-    const r=await fetch(SB+"/rest/v1/leave_submissions?status=eq.pending",{headers:{"apikey":KEY,"Authorization":"Bearer "+KEY}});
-    if(r.ok)leaveRows=await r.json();
-  }catch(e){console.warn("leave fetch error:",e);}
-
-
-
-  const typeCol={all:"#2563eb",no:"#dc2626",custom:"#0ea5e9"};
-  const typeLbl={all:"Available",no:"Unavail",custom:""};
-
-  let html='<div class="card"><div class="card-hd"><div class="card-title">Staff Availability — '+wkL(weekStart)+'</div></div>';
-
-  if(!availRows.length){
-    html+='<div style="color:#94a3b8;font-size:12px;padding:8px 0 12px">No submissions yet for this week.</div>';
-  }
-
-  STAFF.forEach(function(name){
-    const row=availRows.find(function(r){return r.staff_name&&r.staff_name.toLowerCase()===name.toLowerCase();});
-    const encodedName=encodeURIComponent(name);
-
-    html+='<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #e2e8f0;flex-wrap:wrap">';
-    html+='<div style="font-size:12.5px;font-weight:700;min-width:180px">'+name+'</div>';
-
-    // Availability pills
-    if(!row){
-      html+='<div style="font-size:10px;color:#94a3b8;">No availability set</div>';
-    }else{
-      const periodLabel=row.is_ongoing?"Ongoing":(row.valid_from?"From "+row.valid_from+(row.valid_until?" – "+row.valid_until:""):"");
-      if(periodLabel)html+='<div style="font-size:9px;color:#94a3b8;margin-bottom:4px;">'+ periodLabel +'</div>';
-
-      const av=row.availability||{};
-      html+='<div style="display:flex;gap:4px;flex-wrap:wrap">';
-      for(let i=0;i<7;i++){
-        const a=av[i]||av[String(i)]||{type:"all"};
-        const lbl=a.type==="custom"?(a.start.slice(0,5)+"\u2013"+a.end.slice(0,5)):typeLbl[a.type];
-        html+='<div style="font-size:9px;font-weight:700;padding:3px 6px;border-radius:5px;background:#f8fafc;border:1px solid #e2e8f0;color:'+typeCol[a.type]+'">'+DS[i]+' '+lbl+'</div>';
-      }
-      html+='</div>';
-    }
-    html+='</div>';
-  });
-  html+='</div>';
-
-  html+='<div class="card"><div class="card-title" style="margin-bottom:16px">Pending Leave ('+leaveRows.length+')</div>';
-  if(!leaveRows.length){
-    html+='<div class="empty" style="padding:16px 0"><div class="empty-sub">No pending leave requests</div></div>';
-  }else{
-    leaveRows.forEach(function(r){
-      html+='<div class="leave-item"><div class="leave-item-top"><div>'+
-        '<div class="leave-dates">'+r.staff_name+'</div>'+
-        '<div class="leave-duration">'+fmtF(r.from_date)+' \u2014 '+fmtF(r.to_date)+'</div></div>'+
-        '<div class="status-tag st-pending">Pending</div></div>'+
-        (r.reason?'<div class="leave-reason-txt">'+r.reason+'</div>':'')+
-        '</div>';
-    });
-  }
-  html+='</div>';
-
-  el.innerHTML=html;
-
-}
 
 
 function btnStyle(state){
@@ -4845,78 +4645,216 @@ function getPollOptions(){
 }
 
 function renderPoll(disc){
-  if(!disc.poll_options || !disc.poll_options.length) return '';
-  const votes = disc.poll_votes || {};
-  const total = Object.values(votes).reduce((a,v)=>a+(Array.isArray(v)?v.length:0),0);
-  // Also check localStorage for instant vote feedback
+  if(!disc.poll_options||!disc.poll_options.length) return '';
+  const votes=disc.poll_votes||{};
+  const total=Object.values(votes).reduce(function(a,v){return a+(Array.isArray(v)?v.length:0);},0);
+  const serverVote=Object.keys(votes).find(function(opt){return Array.isArray(votes[opt])&&votes[opt].includes(me);});
   const localVote=localStorage.getItem('poll_vote_'+disc.id);
-  const myVote = Object.entries(votes).find(([opt,voters])=>Array.isArray(voters)&&voters.includes(me)) || (localVote?[localVote,[me]]:null);
-  const myOpt = myVote ? myVote[0] : null;
-  const closed = disc.poll_closed === true;
+  const myOpt=serverVote||localVote||null;
+  const hasVoted=!!myOpt;
+  const closed=disc.poll_closed===true;
+  const isOwner=disc.created_by===me;
 
-  let html = '<div style="margin:10px 0;padding:12px;background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;">';
-  html += '<div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px;">Poll'+(closed?' · Closed':'')+'</div>';
-  
+  let html='<div id="poll-'+disc.id+'" class="poll-container">';
+  html+='<div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">📊 Poll'+(closed?' &nbsp;·&nbsp; <span style=\"color:#dc2626;\">Closed</span>':'')+'</div>';
+
   disc.poll_options.forEach(function(opt){
-    const optVoters = votes[opt] || [];
-    const count = Array.isArray(optVoters) ? optVoters.length : 0;
-    const pct = total ? Math.round(count/total*100) : 0;
-    const isMyVote = opt === myOpt;
-    
-    if(myOpt || closed){
-      // Show results
-      html += '<div style="margin-bottom:8px;">';
-      html += '<div style="display:flex;justify-content:space-between;font-size:12px;font-weight:'+(isMyVote?'700':'500')+';color:'+(isMyVote?'#2563eb':'#374151')+';margin-bottom:3px;">'+
-        '<span>'+(isMyVote?'✓ ':'')+opt+'</span><span>'+count+' ('+pct+'%)</span></div>';
-      html += '<div style="height:6px;background:#e2e8f0;border-radius:3px;overflow:hidden;">'+
-        '<div style="height:100%;background:'+(isMyVote?'#2563eb':'#94a3b8')+';width:'+pct+'%;border-radius:3px;transition:width .3s;"></div></div>';
-      html += '</div>';
+    const optVoters=votes[opt]||[];
+    const count=Array.isArray(optVoters)?optVoters.length:0;
+    const pct=total?Math.round(count/total*100):0;
+    const isMyVote=opt===myOpt;
+    const checkmark=isMyVote?'<svg width=\"13\" height=\"13\" viewBox=\"0 0 20 20\" fill=\"currentColor\" style=\"margin-right:5px;vertical-align:middle;\"><path fill-rule=\"evenodd\" d=\"M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z\" clip-rule=\"evenodd\"/></svg>':'';
+
+    if(closed){
+      // Closed — results only, no clicking
+      html+='<div class="poll-opt'+(isMyVote?' voted':'')+'" style=\"cursor:default;\">';
+      html+='<div class="poll-fill" style=\"width:'+pct+'%\"></div>';
+      html+='<div class="poll-txt"><span>'+checkmark+opt+'</span><span style=\"font-size:12px;color:#64748b;\">'+pct+'% · '+count+'</span></div>';
+      html+='</div>';
+    } else if(hasVoted){
+      // Voted — show results but allow changing
+      html+='<button class="poll-opt'+(isMyVote?' voted':'')+'" data-disc="'+disc.id+'" data-opt="'+encodeURIComponent(opt)+'"';
+      html+=' onclick="event.stopPropagation();castVote(this.dataset.disc,decodeURIComponent(this.dataset.opt))"';
+      html+=' ontouchend="event.preventDefault();event.stopPropagation();castVote(this.dataset.disc,decodeURIComponent(this.dataset.opt))">';
+      html+='<div class="poll-fill" style=\"width:'+pct+'%\"></div>';
+      html+='<div class="poll-txt"><span>'+checkmark+opt+'</span><span style=\"font-size:12px;color:#64748b;\">'+pct+'% · '+count+'</span></div>';
+      html+='</button>';
     } else {
-      // Show vote buttons
-      html += '<button data-disc="'+disc.id+'" data-opt="'+encodeURIComponent(opt)+'" onclick="castVote(this.dataset.disc, decodeURIComponent(this.dataset.opt))" '+
-        'class="poll-vote-btn" style="display:block;width:100%;text-align:left;padding:9px 12px;margin-bottom:6px;border-radius:8px;border:1.5px solid #e2e8f0;background:#fff;font-size:13px;cursor:pointer;font-family:inherit;touch-action:manipulation;" '+
-        'ontouchend="event.preventDefault();castVote(this.dataset.disc, decodeURIComponent(this.dataset.opt))">'+opt+'</button>';
+      // Not voted — clean button
+      html+='<button class="poll-opt" data-disc="'+disc.id+'" data-opt="'+encodeURIComponent(opt)+'"';
+      html+=' onclick="event.stopPropagation();castVote(this.dataset.disc,decodeURIComponent(this.dataset.opt))"';
+      html+=' ontouchend="event.preventDefault();event.stopPropagation();castVote(this.dataset.disc,decodeURIComponent(this.dataset.opt))">';
+      html+='<div class="poll-fill" style=\"width:0%\"></div>';
+      html+='<div class="poll-txt"><span>'+opt+'</span></div>';
+      html+='</button>';
     }
   });
 
-  html += '<div style="font-size:10px;color:#94a3b8;margin-top:6px;">'+total+' vote'+(total!==1?'s':'');
-  if(!closed && myIsAdmin){
-    html += ' · <button data-disc="'+disc.id+'" onclick="closePoll(this.dataset.disc)" style="background:none;border:none;color:#dc2626;font-size:10px;font-weight:600;cursor:pointer;font-family:inherit;">Close Poll</button>';
+  html+='<div class="poll-footer">';
+  html+='<span>'+total+' vote'+(total!==1?'s':'')+'</span>';
+  if(!closed&&(isOwner||myIsAdmin)){
+    html+='<span>·</span><button data-disc="'+disc.id+'" onclick="closePoll(this.dataset.disc)" style=\"color:#dc2626;\">Close Poll</button>';
   }
-  if(!closed && myIsAdmin){
-    html += ' · <button data-disc="'+disc.id+'" onclick="exportPoll(this.dataset.disc)" style="background:none;border:none;color:#2563eb;font-size:10px;font-weight:600;cursor:pointer;font-family:inherit;">Export</button>';
+  if((isOwner||myIsAdmin)&&!closed){
+    html+='<span>·</span><button data-disc="'+disc.id+'" onclick="openEditPoll(this.dataset.disc)" style=\"color:#7c3aed;\">Edit</button>';
   }
-  html += '</div></div>';
+  if(isOwner||myIsAdmin){
+    html+='<span>·</span><button data-disc="'+disc.id+'" onclick="exportPoll(this.dataset.disc)" style=\"color:#2563eb;\">Export CSV</button>';
+  }
+  html+='</div>';
+  html+='</div>';
   return html;
 }
 
+// Cached disc data for instant poll updates
+const _discCache={};
+
 function castVote(discId, option){
-  // Store vote locally for instant UI update
-  const voteKey='poll_vote_'+discId;
-  localStorage.setItem(voteKey, option);
-  // Re-render poll instantly from cached data
-  updatePollUI(discId, option);
-  // Fire-and-forget to Supabase
-  sbGet('discussions','?id=eq.'+discId+'&select=poll_votes').then(function(rows){
-    const votes = (rows.length && rows[0].poll_votes) ? rows[0].poll_votes : {};
+  if(!discId||!option) return;
+  // Check if poll is closed
+  if(_discCache[discId]&&_discCache[discId].poll_closed){showToast('Poll is closed');return;}
+
+  // Unvote if tapping same option
+  const currentVote=localStorage.getItem('poll_vote_'+discId);
+  const isUnvoting=(currentVote===option);
+
+  // 1. Store locally
+  if(isUnvoting) localStorage.removeItem('poll_vote_'+discId);
+  else localStorage.setItem('poll_vote_'+discId,option);
+
+  // 2. Optimistic cache update
+  if(_discCache[discId]){
+    const disc=_discCache[discId];
+    const votes=JSON.parse(JSON.stringify(disc.poll_votes||{}));
     Object.keys(votes).forEach(function(opt){
       if(Array.isArray(votes[opt])) votes[opt]=votes[opt].filter(function(v){return v!==me;});
     });
-    if(!votes[option]) votes[option]=[];
-    votes[option].push(me);
-    fetch(SB+'/rest/v1/discussions?id=eq.'+discId,{
+    if(!isUnvoting){
+      if(!votes[option]) votes[option]=[];
+      votes[option].push(me);
+    }
+    disc.poll_votes=votes;
+    const pollEl=document.getElementById('poll-'+discId);
+    if(pollEl) pollEl.outerHTML=renderPoll(disc);
+  }
+
+  // 3. Fire-and-forget Supabase sync
+  sbGet('discussions','?id=eq.'+discId+'&select=poll_votes,poll_closed').then(function(rows){
+    if(!rows.length) return;
+    if(rows[0].poll_closed){showToast('Poll is closed');return;}
+    const votes=JSON.parse(JSON.stringify(rows[0].poll_votes||{}));
+    Object.keys(votes).forEach(function(opt){
+      if(Array.isArray(votes[opt])) votes[opt]=votes[opt].filter(function(v){return v!==me;});
+    });
+    if(!isUnvoting){
+      if(!votes[option]) votes[option]=[];
+      votes[option].push(me);
+    }
+    return fetch(SB+'/rest/v1/discussions?id=eq.'+discId,{
       method:'PATCH',
       headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
       body:JSON.stringify({poll_votes:votes})
-    }).catch(function(e){console.warn(e);});
-  }).catch(function(e){console.warn(e);});
+    });
+  }).catch(function(e){console.warn('castVote sync:',e);});
 }
 
-function updatePollUI(discId, selectedOpt){
-  // Find the poll container and swap vote buttons for results
-  const disc=document.querySelector('.react-wrap[data-id="'+discId+'"]');
-  // Just reload discussions once - it's fast enough since we removed the await
-  loadDiscussions();
+
+function openEditPoll(discId){
+  const disc=_discCache[discId];
+  if(!disc||!disc.poll_options) return;
+  // Remove any existing overlay
+  const existing=document.getElementById('editPollOverlay');
+  if(existing) existing.remove();
+  const overlay=document.createElement('div');
+  overlay.id='editPollOverlay';
+  overlay.style.cssText='position:fixed;inset:0;z-index:500;background:rgba(15,23,42,.5);display:flex;align-items:flex-end;justify-content:center;backdrop-filter:blur(4px);';
+  const sheet=document.createElement('div');
+  sheet.style.cssText='background:#fff;border-radius:20px 20px 0 0;padding:24px 20px;width:100%;max-width:520px;max-height:80dvh;overflow-y:auto;';
+  sheet.innerHTML=
+    '<div style="font-size:16px;font-weight:700;color:#0f172a;margin-bottom:16px;">Edit Poll</div>'+
+    '<div id="editPollOpts"></div>'+
+    '<button onclick="addEditPollOpt()" style="font-size:12px;font-weight:600;color:#2563eb;background:none;border:none;cursor:pointer;font-family:inherit;margin:4px 0 16px;">+ Add option</button>'+
+    '<div style="display:flex;gap:8px;">'+
+    '<button data-did="'+discId+'" onclick="saveEditPoll(this.dataset.did)" class="btn btn-green" style="flex:1;padding:12px;">Save Changes</button>'+
+    '<button onclick="document.getElementById(&quot;editPollOverlay&quot;).remove()" class="btn btn-outline" style="padding:12px 18px;">Cancel</button>'+
+    '</div>';
+  overlay.appendChild(sheet);
+  document.body.appendChild(overlay);
+  // Populate options
+  const container=document.getElementById('editPollOpts');
+  disc.poll_options.forEach(function(opt){
+    const row=document.createElement('div');
+    row.className='poll-edit-row';
+    const input=document.createElement('input');
+    input.className='f-input edit-poll-opt';
+    input.value=opt;
+    const del=document.createElement('button');
+    del.textContent='×';
+    del.style.cssText='background:none;border:none;color:#dc2626;cursor:pointer;font-size:20px;padding:0 6px;line-height:1;';
+    del.onclick=function(){
+      if(container.querySelectorAll('.edit-poll-opt').length>2) row.remove();
+      else showToast('Minimum 2 options');
+    };
+    row.appendChild(input);
+    row.appendChild(del);
+    container.appendChild(row);
+  });
+}
+
+function addEditPollOpt(){
+  const container=document.getElementById('editPollOpts');
+  if(!container) return;
+  if(container.querySelectorAll('.edit-poll-opt').length>=6){showToast('Max 6 options');return;}
+  const row=document.createElement('div');
+  row.className='poll-edit-row';
+  const input=document.createElement('input');
+  input.className='f-input edit-poll-opt';
+  input.placeholder='New option';
+  const del=document.createElement('button');
+  del.textContent='×';
+  del.style.cssText='background:none;border:none;color:#dc2626;cursor:pointer;font-size:20px;padding:0 6px;line-height:1;';
+  del.onclick=function(){
+    if(container.querySelectorAll('.edit-poll-opt').length>2) row.remove();
+    else showToast('Minimum 2 options');
+  };
+  row.appendChild(input);
+  row.appendChild(del);
+  container.appendChild(row);
+  input.focus();
+}
+
+async function saveEditPoll(discId){
+  const opts=Array.from(document.querySelectorAll('.edit-poll-opt')).map(function(i){return i.value.trim();}).filter(Boolean);
+  if(opts.length<2){showToast('Need at least 2 options');return;}
+  const btn=document.querySelector('#editPollOverlay .btn-green');
+  if(btn){btn.disabled=true;btn.innerHTML='<span class="sp"></span> Saving...';}
+  try{
+    // Keep votes for unchanged options
+    const disc=_discCache[discId]||{};
+    const oldVotes=disc.poll_votes||{};
+    const newVotes={};
+    opts.forEach(function(opt){if(oldVotes[opt])newVotes[opt]=oldVotes[opt];});
+    const res=await fetch(SB+'/rest/v1/discussions?id=eq.'+discId,{
+      method:'PATCH',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({poll_options:opts,poll_votes:newVotes})
+    });
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    // Update cache immediately
+    if(_discCache[discId]){
+      _discCache[discId].poll_options=opts;
+      _discCache[discId].poll_votes=newVotes;
+    }
+    document.getElementById('editPollOverlay').remove();
+    showToast('Poll updated');
+    // Re-render poll in-place
+    const pollEl=document.getElementById('poll-'+discId);
+    if(pollEl&&_discCache[discId]) pollEl.outerHTML=renderPoll(_discCache[discId]);
+    else loadDiscussions();
+  }catch(e){
+    showToast('Failed: '+e.message);
+    if(btn){btn.disabled=false;btn.textContent='Save Changes';}
+  }
 }
 
 async function closePoll(discId){
