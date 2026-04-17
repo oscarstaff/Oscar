@@ -4774,6 +4774,35 @@ async function checkPushStatus() {
   }
 }
 
+
+async function triggerLocalPush(title, body, tag){
+  if(Notification.permission !== 'granted') return;
+  try{
+    if('serviceWorker' in navigator){
+      const reg = await navigator.serviceWorker.getRegistration('/Oscar/sw.js');
+      if(reg && reg.active){
+        await reg.showNotification(title, {
+          body: body, tag: tag||'oscars',
+          icon: 'https://oscarstaff.github.io/Oscar/icon-192.png',
+          vibrate: [100,50,100],
+          data: { url: 'https://oscarstaff.github.io/Oscar/' }
+        });
+        return;
+      }
+    }
+    new Notification(title, { body: body, tag: tag||'oscars' });
+  }catch(e){ console.warn('Push failed:',e.message); }
+}
+
+async function testPush(){
+  console.log('Permission:', Notification.permission);
+  if(Notification.permission !== 'granted'){ showToast('Permission: '+Notification.permission); return; }
+  try{
+    await triggerLocalPush('Test Notification', 'Push is working!', 'test');
+    showToast('Notification sent!');
+  }catch(e){ showToast('Error: '+e.message); console.error(e); }
+}
+
 async function sendPush(staffName, title, body, tag) {
   // Call Supabase Edge Function
   try {
