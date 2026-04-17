@@ -4176,6 +4176,22 @@ async function loadReactNotifs(){
   }catch(e){console.warn(e);return [];}
 }
 
+
+// ── MISSING STUBS ──
+async function checkFeedbackInvites(){
+  try{
+    const rows=await sbGet('feedback','?staff_name=eq.'+encodeURIComponent(me)+'&meeting_invited=eq.true&select=id');
+    const seenInvites=JSON.parse(sessionStorage.getItem('seen_invites_session_'+me)||'[]');
+    const newInvites=(rows||[]).filter(function(r){return !seenInvites.includes(r.id);});
+    const badge=document.getElementById('bnEngBadge');
+    if(badge){badge.textContent=newInvites.length;badge.style.display=newInvites.length?'block':'none';}
+  }catch(e){console.warn(e);}
+}
+
+function renderTimesheetPreview(){
+  // Timesheet preview on home — placeholder (not implemented)
+}
+
 async function loadNotifications(){
   const el=document.getElementById("notifList");
   const badge=document.getElementById("notifBadge");
@@ -4708,56 +4724,71 @@ async function registerPush() {
 }
 
 async function enablePushNotifications() {
-  showToast('Setting up notifications...');
-  // Step 1: check support
-  if (!('serviceWorker' in navigator)) { showToast('No SW support'); return; }
-  if (!('PushManager' in window)) { showToast('No Push support — on iOS, add to Home Screen first'); return; }
-  if (!('Notification' in window)) { showToast('No Notification support'); return; }
-  // Step 2: register SW
-  let reg;
+  const txt = document.getElementById('pushStatusText');
+  const btn = document.getElementById('pushEnableBtn');
+
+  if (!('serviceWorker' in navigator)) { showToast('Not supported on this browser'); return; }
+  if (!('PushManager' in window)) { showToast('On iOS: add to Home Screen first, then try again'); return; }
+
   try {
-    reg = await navigator.serviceWorker.register('/Oscar/sw.js');
-    showToast('SW registered, waiting...');
-    // Wait for ready with timeout
+    // Step 1: register and wait for SW to be fully active
+    if(txt) txt.textContent = 'Registering...';
+    const reg = await navigator.serviceWorker.register('/Oscar/sw.js');
+
+    // Force activation if waiting
+    if(reg.waiting) reg.waiting.postMessage({type:'SKIP_WAITING'});
+    if(reg.installing){
+      await new Promise(resolve => {
+        reg.installing.addEventListener('statechange', function fn(e){
+          if(e.target.state === 'activated'){ reg.installing && reg.installing.removeEventListener('statechange',fn); resolve(); }
+        });
+      });
+    }
+
+    // Wait for ready with 8s timeout
     await Promise.race([
       navigator.serviceWorker.ready,
-      new Promise((_,reject) => setTimeout(() => reject(new Error('SW timeout — try refreshing')), 5000))
+      new Promise((_,rej) => setTimeout(() => rej(new Error('SW timeout')), 8000))
     ]);
-    showToast('SW ready!');
-  } catch(e) {
-    showToast('SW failed: ' + e.message);
-    console.error('SW error:', e);
-    return;
-  }
-  // Step 3: request permission
-  let perm;
-  try {
-    perm = await Notification.requestPermission();
-  } catch(e) { perm = 'denied'; }
-  if (perm !== 'granted') { showToast('Permission denied: ' + perm); return; }
-  showToast('Permission granted!');
-  // Step 4: subscribe
-  try {
-    let sub = await reg.pushManager.getSubscription();
-    if (!sub) {
-      sub = await reg.pushManager.subscribe({
+    if(txt) txt.textContent = 'Requesting permission...';
+
+    // Step 2: permission
+    const perm = await Notification.requestPermission();
+    if(perm !== 'granted'){
+      showToast('Notifications blocked — check browser settings');
+      if(txt) txt.textContent = 'Blocked — enable in settings';
+      return;
+    }
+
+    // Step 3: subscribe
+    if(txt) txt.textContent = 'Subscribing...';
+    const ready = await navigator.serviceWorker.ready;
+    let sub = await ready.pushManager.getSubscription();
+    if(!sub){
+      sub = await ready.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
       });
     }
-    showToast('Subscribed! Saving...');
+
+    // Step 4: save
     await savePushSub(sub);
-    updatePushBtn('enabled');
-    const txt = document.getElementById('pushStatusText');
-    if (txt) txt.textContent = 'Enabled ✓';
+
+    if(txt) txt.textContent = 'Enabled ✓';
+    if(btn){ btn.textContent = 'Enabled'; btn.style.background = '#16a34a'; btn.disabled = true; }
     const testBtn = document.getElementById('pushTestBtn');
-    if (testBtn) testBtn.style.display = 'block';
-    showToast('Push notifications enabled!');
+    if(testBtn) testBtn.style.display = 'inline-block';
+
+    // Show a test notification immediately so they know it worked
+    setTimeout(() => triggerLocalPush('Notifications enabled!', 'You will now receive updates from Oscars'), 500);
+
   } catch(e) {
-    showToast('Subscribe failed: ' + e.message);
-    console.error('Subscribe error:', e);
+    console.error('[Push enable]', e);
+    showToast('Error: ' + e.message);
+    if(txt) txt.textContent = 'Setup failed — try again';
   }
 }
+
 
 
 async function savePushSub(sub) {
@@ -4812,21 +4843,25 @@ async function checkPushStatus() {
 async function triggerLocalPush(title, body, tag){
   if(Notification.permission !== 'granted') return;
   try{
-    if('serviceWorker' in navigator){
-      const reg = await navigator.serviceWorker.getRegistration();
-      if(reg && reg.active){
-        await reg.showNotification(title, {
-          body: body, tag: tag||'oscars',
-          icon: 'https://oscarstaff.github.io/Oscar/icon-192.png',
-          vibrate: [100,50,100],
-          data: { url: 'https://oscarstaff.github.io/Oscar/' }
-        });
-        return;
-      }
-    }
-    new Notification(title, { body: body, tag: tag||'oscars' });
-  }catch(e){ console.warn('Push failed:',e.message); }
+    // Always go through SW — required for iOS, works everywhere
+    const reg = await navigator.serviceWorker.ready;
+    await reg.showNotification(title, {
+      body: body || '',
+      tag: tag || 'oscars',
+      icon: 'https://oscarstaff.github.io/Oscar/icon-192.png',
+      vibrate: [100, 50, 100],
+      renotify: true,
+      data: { url: 'https://oscarstaff.github.io/Oscar/' }
+    });
+    console.log('[Push] Notification shown:', title);
+  }catch(e){
+    console.warn('[Push] Failed:', e.message);
+    // Last resort fallback for desktop browsers
+    try{ new Notification(title, { body: body }); }catch(_){}
+  }
 }
+
+
 
 async function testPush(){
   console.log('Permission:', Notification.permission);
