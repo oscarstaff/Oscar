@@ -1874,7 +1874,10 @@ body.ready{visibility:visible;}
           <div class="card-hd"><div class="card-title">Notifications</div></div>
           <div style="display:flex;align-items:center;justify-content:space-between;">
             <div><div style="font-size:13px;font-weight:600;color:#0f172a;">Push Notifications</div><div style="font-size:11px;color:#94a3b8;margin-top:2px;" id="pushStatusText">Tap Enable to get notified</div></div>
-            <button id="pushEnableBtn" onclick="enablePushNotifications()" style="padding:8px 16px;border-radius:10px;background:#2563eb;color:#fff;border:none;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;">Enable</button>
+            <div style="display:flex;gap:6px;">
+              <button id="pushTestBtn" onclick="testPush()" style="display:none;padding:8px 12px;border-radius:10px;background:#f1f5f9;color:#475569;border:1px solid #e2e8f0;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;">Test</button>
+              <button id="pushEnableBtn" onclick="enablePushNotifications()" style="padding:8px 16px;border-radius:10px;background:#2563eb;color:#fff;border:none;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;">Enable</button>
+            </div>
           </div>
         </div>
         <div class="card" style="margin-bottom:12px">
@@ -4716,6 +4719,7 @@ async function enablePushNotifications() {
     await savePushSub(sub);
     updatePushBtn('enabled');
     showToast('Push notifications enabled!');
+    const testBtn=document.getElementById('pushTestBtn');if(testBtn)testBtn.style.display='block';
   } catch(e) {
     console.warn('Push enable failed:', e.message);
     showToast('Failed: ' + e.message);
@@ -4760,6 +4764,7 @@ async function checkPushStatus() {
     if (sub) {
       if (txt) txt.textContent = 'Enabled ✓';
       if (btn) { btn.textContent = 'Enabled'; btn.style.background = '#16a34a'; btn.disabled = true; }
+      const testBtn = document.getElementById('pushTestBtn'); if(testBtn) testBtn.style.display = 'block';
     } else {
       if (txt) txt.textContent = 'Tap Enable to get notified';
       if (btn) { btn.textContent = 'Enable'; btn.style.background = '#2563eb'; btn.disabled = false; }
