@@ -4828,38 +4828,45 @@ function addEditPollOpt(){
 }
 
 async function saveEditPoll(discId){
-  const opts=Array.from(document.querySelectorAll('.edit-poll-opt')).map(function(i){return i.value.trim();}).filter(Boolean);
-  if(opts.length<2){showToast('Need at least 2 options');return;}
-  const btn=document.querySelector('#editPollOverlay .btn-green');
-  if(btn){btn.disabled=true;btn.innerHTML='<span class="sp"></span> Saving...';}
+  // Get options from overlay specifically
+  const overlay = document.getElementById('editPollOverlay');
+  if(!overlay){ showToast('Error: overlay not found'); return; }
+  const opts = Array.from(overlay.querySelectorAll('.edit-poll-opt'))
+    .map(function(i){ return i.value.trim(); })
+    .filter(Boolean);
+  console.log('[saveEditPoll] discId:', discId, 'opts:', opts);
+  if(opts.length < 2){ showToast('Need at least 2 options'); return; }
+  const btn = overlay.querySelector('.btn-green');
+  if(btn){ btn.disabled = true; btn.innerHTML = '<span class="sp"></span> Saving...'; }
   try{
-    // Keep votes for unchanged options
-    const disc=_discCache[discId]||{};
-    const oldVotes=disc.poll_votes||{};
-    const newVotes={};
-    opts.forEach(function(opt){if(oldVotes[opt])newVotes[opt]=oldVotes[opt];});
-    const res=await fetch(SB+'/rest/v1/discussions?id=eq.'+discId,{
-      method:'PATCH',
-      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
-      body:JSON.stringify({poll_options:opts,poll_votes:newVotes})
+    const disc = _discCache[discId] || {};
+    const oldVotes = disc.poll_votes || {};
+    const newVotes = {};
+    opts.forEach(function(opt){ if(oldVotes[opt]) newVotes[opt] = oldVotes[opt]; });
+    const res = await fetch(SB+'/rest/v1/discussions?id=eq.'+discId, {
+      method: 'PATCH',
+      headers: {'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body: JSON.stringify({poll_options: opts, poll_votes: newVotes})
     });
     if(!res.ok) throw new Error('HTTP '+res.status);
-    // Update cache immediately
+    // Update cache
     if(_discCache[discId]){
-      _discCache[discId].poll_options=opts;
-      _discCache[discId].poll_votes=newVotes;
+      _discCache[discId].poll_options = opts;
+      _discCache[discId].poll_votes = newVotes;
     }
-    document.getElementById('editPollOverlay').remove();
+    overlay.remove();
     showToast('Poll updated');
-    // Re-render poll in-place
-    const pollEl=document.getElementById('poll-'+discId);
-    if(pollEl&&_discCache[discId]) pollEl.outerHTML=renderPoll(_discCache[discId]);
+    // Re-render in-place
+    const pollEl = document.getElementById('poll-'+discId);
+    if(pollEl && _discCache[discId]) pollEl.outerHTML = renderPoll(_discCache[discId]);
     else loadDiscussions();
-  }catch(e){
+  } catch(e){
+    console.error('[saveEditPoll] error:', e);
     showToast('Failed: '+e.message);
-    if(btn){btn.disabled=false;btn.textContent='Save Changes';}
+    if(btn){ btn.disabled = false; btn.textContent = 'Save Changes'; }
   }
 }
+
 
 async function closePoll(discId){
   await fetch(SB+'/rest/v1/discussions?id=eq.'+discId,{
