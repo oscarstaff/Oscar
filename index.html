@@ -2735,6 +2735,7 @@ async function doResetKey(){
 }
 
 function doLogout(){
+  teardownRealtime();
   sessionStorage.removeItem("ou");me=null;
   document.getElementById("hubLayer").style.display="none";
   document.getElementById("authLayer").style.display="flex";
@@ -2768,6 +2769,7 @@ async function enterHub(){
   showSchedTab('leave'); // default schedule sub-tab
   Promise.all([loadHomeData(),loadNotifications(),loadLeaveHistory(),refreshAnnBadge(),loadHomeAnnPreview(),loadHomeDiscPreview(),maybeShowOnboarding(),checkFeedbackInvites(),checkNewNotifications()]);
   startAutoRefresh();
+  initRealtime();
   loadBirthdays();
   // Restore from URL hash if present
   const hash=window.location.hash.replace('#','');
@@ -4649,8 +4651,7 @@ function renderPoll(disc){
   const votes=disc.poll_votes||{};
   const total=Object.values(votes).reduce(function(a,v){return a+(Array.isArray(v)?v.length:0);},0);
   const serverVote=Object.keys(votes).find(function(opt){return Array.isArray(votes[opt])&&votes[opt].includes(me);});
-  const localVote=localStorage.getItem('poll_vote_'+disc.id);
-  const myOpt=serverVote||localVote||null;
+  const myOpt=serverVote||null;
   const hasVoted=!!myOpt;
   const closed=disc.poll_closed===true;
   const isOwner=disc.created_by===me;
@@ -4714,13 +4715,14 @@ function castVote(discId, option){
   // Check if poll is closed
   if(_discCache[discId]&&_discCache[discId].poll_closed){showToast('Poll is closed');return;}
 
-  // Unvote if tapping same option
-  const currentVote=localStorage.getItem('poll_vote_'+discId);
+  // Detect current vote from cache (server) or localStorage
+  const _cachedDisc=_discCache[discId]||{};
+  const _cachedVotes=_cachedDisc.poll_votes||{};
+  const serverVoteCurrent=Object.keys(_cachedVotes).find(function(opt){return Array.isArray(_cachedVotes[opt])&&_cachedVotes[opt].includes(me);});
+  const currentVote=serverVoteCurrent||null;
   const isUnvoting=(currentVote===option);
 
   // 1. Store locally
-  if(isUnvoting) localStorage.removeItem('poll_vote_'+discId);
-  else localStorage.setItem('poll_vote_'+discId,option);
 
   // 2. Optimistic cache update
   if(_discCache[discId]){
@@ -4886,6 +4888,114 @@ async function exportPoll(discId){
     a.href = url; a.download = 'poll-'+discId+'.csv';
     a.click(); URL.revokeObjectURL(url);
   }catch(e){ showToast('Export failed'); }
+}
+
+
+// ── SUPABASE REALTIME ──
+let _realtimeClient = null;
+let _realtimeChannels = [];
+
+function initRealtime(){
+  try{
+    _realtimeClient = window.supabase.createClient(SB, KEY);
+    setupRealtimeChannels();
+    console.log('[Realtime] Connected');
+  }catch(e){ console.warn('[Realtime] Failed to init:', e.message); }
+}
+
+function setupRealtimeChannels(){
+  // Clear existing
+  _realtimeChannels.forEach(function(ch){ try{ _realtimeClient.removeChannel(ch); }catch(e){} });
+  _realtimeChannels = [];
+
+  // Discussions — votes, new posts, replies
+  const discCh = _realtimeClient
+    .channel('discussions-live')
+    .on('postgres_changes', {event:'*', schema:'public', table:'discussions'}, function(payload){
+      console.log('[Realtime] discussions change:', payload.eventType);
+      const active = document.querySelector('#page-engagement.active');
+      if(active){
+        // If only poll_votes changed, update just that poll
+        if(payload.eventType==='UPDATE' && payload.new && payload.old){
+          const discId = payload.new.id;
+          if(_discCache[discId]){
+            _discCache[discId] = Object.assign(_discCache[discId], payload.new);
+            const pollEl = document.getElementById('poll-'+discId);
+            if(pollEl) pollEl.outerHTML = renderPoll(_discCache[discId]);
+            return;
+          }
+        }
+        loadDiscussions();
+      }
+      loadHomeDiscPreview();
+    })
+    .on('postgres_changes', {event:'*', schema:'public', table:'discussion_replies'}, function(payload){
+      console.log('[Realtime] reply change');
+      const active = document.querySelector('#page-engagement.active');
+      if(active) loadDiscussions();
+    })
+    .subscribe();
+  _realtimeChannels.push(discCh);
+
+  // Announcements
+  const annCh = _realtimeClient
+    .channel('announcements-live')
+    .on('postgres_changes', {event:'*', schema:'public', table:'announcements'}, function(payload){
+      console.log('[Realtime] announcements change');
+      const active = document.querySelector('#page-announcements.active');
+      if(active) loadAnnouncements();
+      loadHomeAnnPreview();
+      refreshAnnBadge();
+    })
+    .subscribe();
+  _realtimeChannels.push(annCh);
+
+  // Leave submissions — for notifications
+  const leaveCh = _realtimeClient
+    .channel('leave-live')
+    .on('postgres_changes', {
+      event:'UPDATE', schema:'public', table:'leave_submissions',
+      filter:'staff_name=eq.'+me
+    }, function(payload){
+      console.log('[Realtime] leave update for me');
+      loadNotifications();
+      checkNewNotifications();
+    })
+    .subscribe();
+  _realtimeChannels.push(leaveCh);
+
+  // Reactions
+  const reactCh = _realtimeClient
+    .channel('reactions-live')
+    .on('postgres_changes', {event:'*', schema:'public', table:'reactions'}, function(payload){
+      console.log('[Realtime] reaction change');
+      const id = payload.new && payload.new.target_id || payload.old && payload.old.target_id;
+      const type = payload.new && payload.new.target_type || payload.old && payload.old.target_type;
+      if(id && type) loadReactCounts(id, type);
+      // Check if it's on my post
+      loadNotifications();
+    })
+    .subscribe();
+  _realtimeChannels.push(reactCh);
+
+  // Reply notifications
+  const replyNotifCh = _realtimeClient
+    .channel('reply-notifs-live')
+    .on('postgres_changes', {
+      event:'INSERT', schema:'public', table:'reply_notifications',
+      filter:'recipient=eq.'+me
+    }, function(payload){
+      console.log('[Realtime] new reply notification');
+      loadNotifications();
+      showBanner('New Reply', payload.new.replier+' replied to your discussion', '');
+    })
+    .subscribe();
+  _realtimeChannels.push(replyNotifCh);
+}
+
+function teardownRealtime(){
+  _realtimeChannels.forEach(function(ch){ try{ _realtimeClient.removeChannel(ch); }catch(e){} });
+  _realtimeChannels = [];
 }
 
 // ── Fix 100dvh reflow on iOS/Android ──
