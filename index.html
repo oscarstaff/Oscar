@@ -4740,7 +4740,7 @@ function castVote(discId, option){
     if(pollEl) pollEl.outerHTML=renderPoll(disc);
   }
 
-  // 3. Fire-and-forget Supabase sync
+  // 3. Save to Supabase — await to prevent realtime overwriting optimistic update
   sbGet('discussions','?id=eq.'+discId+'&select=poll_votes,poll_closed').then(function(rows){
     if(!rows.length) return;
     if(rows[0].poll_closed){showToast('Poll is closed');return;}
@@ -4752,6 +4752,8 @@ function castVote(discId, option){
       if(!votes[option]) votes[option]=[];
       votes[option].push(me);
     }
+    // Update cache with final votes before PATCH fires realtime
+    if(_discCache[discId]) _discCache[discId].poll_votes=votes;
     return fetch(SB+'/rest/v1/discussions?id=eq.'+discId,{
       method:'PATCH',
       headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
@@ -4916,12 +4918,14 @@ function setupRealtimeChannels(){
       const active = document.querySelector('#page-engagement.active');
       if(active){
         // If only poll_votes changed, update just that poll
-        if(payload.eventType==='UPDATE' && payload.new && payload.old){
+        if(payload.eventType==='UPDATE' && payload.new){
           const discId = payload.new.id;
-          if(_discCache[discId]){
-            _discCache[discId] = Object.assign(_discCache[discId], payload.new);
-            const pollEl = document.getElementById('poll-'+discId);
-            if(pollEl) pollEl.outerHTML = renderPoll(_discCache[discId]);
+          // Always update cache
+          if(_discCache[discId]) _discCache[discId] = Object.assign({},_discCache[discId],payload.new);
+          // Re-render poll in-place if visible
+          const pollEl = document.getElementById('poll-'+discId);
+          if(pollEl && _discCache[discId]){
+            pollEl.outerHTML = renderPoll(_discCache[discId]);
             return;
           }
         }
