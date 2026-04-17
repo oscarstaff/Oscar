@@ -2465,8 +2465,9 @@ async function loadDiscussions(){
           html+='<div style="display:flex;gap:8px;">';
           html+='<div style="width:24px;height:24px;border-radius:50%;background:#e2e8f0;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:800;color:#475569;flex-shrink:0;">'+ra+'</div>';
           html+='<div style="flex:1;"><div style="font-size:11px;font-weight:600;color:#0f172a;">'+rep.staff_name+'<span style="font-weight:400;color:#94a3b8;margin-left:5px;">'+rd+' '+rt+'</span></div>';
-          html+='<div style="font-size:12.5px;color:#374151;margin-top:2px;line-height:1.5;">'+rep.body+'</div></div>';
-          html+='</div>';
+          html+='<div style="font-size:12.5px;color:#374151;margin-top:2px;line-height:1.5;">'+rep.body+'</div>';
+          html+='<div style="margin-top:4px;">'+makeReactHTML(rep.id,'reply')+'</div>';
+          html+='</div></div>';
         });
         html+='</div>';
       }
@@ -2706,6 +2707,7 @@ async function enterHub(){
   buildAvailForm();
   showSchedTab('leave'); // default schedule sub-tab
   Promise.all([loadHomeData(),loadNotifications(),loadLeaveHistory(),refreshAnnBadge(),loadHomeAnnPreview(),loadHomeDiscPreview(),maybeShowOnboarding(),checkFeedbackInvites(),checkNewNotifications()]);
+  setTimeout(registerPush, 2000);
   loadBirthdays();
   // Restore from URL hash if present
   const hash=window.location.hash.replace('#','');
@@ -2958,7 +2960,7 @@ async function submitAvail(){
     }
     if(res.ok||res.status===201||res.status===204){
       showAvailSuccess({availability:avail,is_ongoing:isOngoing,valid_from:validFrom,valid_until:validUntil});
-      loadHomeData();
+      loadHomeData();loadOnboardingChecklist();
     }else throw new Error("Server error "+res.status);
   }catch(e){err.textContent="Failed to save. Please check your connection.";err.classList.add("show");}
   finally{btn.disabled=false;btn.textContent="Save Availability";}
@@ -3090,12 +3092,13 @@ function doReact(id, type, rawEmoji){
   closeAllReactPickers();
   const emoji=decodeURIComponent(rawEmoji);
   if(type==='ann') reactToAnnouncement(id,emoji);
+  else if(type==='reply') reactToReply(id,emoji);
   else reactToDiscussion(id,emoji);
 }
 
 
 function makeReactHTML(id, type){
-  const key=(type==='ann'?'ann_react_':'disc_react_')+me+'_'+id;
+  const key=(type==='ann'?'ann_react_':type==='reply'?'reply_react_':'disc_react_')+me+'_'+id;
   const myReact=localStorage.getItem(key)||'';
   const hasReact=!!myReact;
   const btnLabel=hasReact?myReact:'🙂';
@@ -3104,7 +3107,7 @@ function makeReactHTML(id, type){
   const counts={};
   for(let i=0;i<localStorage.length;i++){
     const k=localStorage.key(i);
-    const prefix=(type==='ann'?'ann_react_':'disc_react_');
+    const prefix=(type==='ann'?'ann_react_':type==='reply'?'reply_react_':'disc_react_');
     if(k&&k.startsWith(prefix)&&k.endsWith('_'+id)){
       const val=localStorage.getItem(k);
       if(val)counts[val]=(counts[val]||0)+1;
@@ -3144,6 +3147,26 @@ function pickReaction(id, type, emoji){
   else reactToDiscussion(id, e);
 }
 
+
+function reactToReply(id,emoji){
+  const key='reply_react_'+me+'_'+id;
+  const prev=localStorage.getItem(key);
+  const removing=prev===emoji;
+  if(removing)localStorage.removeItem(key);
+  else localStorage.setItem(key,emoji);
+  updateReactWrap(id,'reply');
+  if(removing){
+    fetch(SB+'/rest/v1/reactions?target_id=eq.'+id+'&target_type=eq.reply&staff_name=eq.'+encodeURIComponent(me),{
+      method:'DELETE',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}
+    }).catch(function(){});
+  } else {
+    fetch(SB+'/rest/v1/reactions',{
+      method:'POST',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates'},
+      body:JSON.stringify({target_id:id,target_type:'reply',staff_name:me,emoji:emoji})
+    }).catch(function(){});
+  }
+}
 function reactToDiscussion(id,emoji){
   const key='disc_react_'+me+'_'+id;
   const prev=localStorage.getItem(key);
@@ -3195,7 +3218,7 @@ async function loadReactCounts(id,type){
     rows.forEach(function(r){counts[r.emoji]=(counts[r.emoji]||0)+1;});
     // Also sync localStorage for my reaction
     const myRow=rows.find(function(r){return r.staff_name===me;});
-    const key=(type==='ann'?'ann_react_':'disc_react_')+me+'_'+id;
+    const key=(type==='ann'?'ann_react_':type==='reply'?'reply_react_':'disc_react_')+me+'_'+id;
     if(myRow)localStorage.setItem(key,myRow.emoji);
     else localStorage.removeItem(key);
     const countEl=document.getElementById('rc-'+type+'-'+id);
@@ -3209,8 +3232,8 @@ async function loadReactCounts(id,type){
 
 function updateReactWrap(id,type){
   const wrap=document.querySelector('.react-wrap[data-id="'+id+'"][data-type="'+type+'"]');
-  if(!wrap){if(type==='disc')loadDiscussions();else loadAnnouncements();return;}
-  const key=(type==='ann'?'ann_react_':'disc_react_')+me+'_'+id;
+  if(!wrap){if(type==='ann')loadAnnouncements();else loadDiscussions();return;}
+  const key=(type==='ann'?'ann_react_':type==='reply'?'reply_react_':'disc_react_')+me+'_'+id;
   const myReact=localStorage.getItem(key)||'';
   const hasReact=!!myReact;
   const btn=wrap.querySelector('.react-btn');
@@ -3224,7 +3247,7 @@ function updateReactWrap(id,type){
   });
   // Update counts
   const counts={};
-  const prefix=(type==='ann'?'ann_react_':'disc_react_');
+  const prefix=(type==='ann'?'ann_react_':type==='reply'?'reply_react_':'disc_react_');
   for(let i=0;i<localStorage.length;i++){
     const k=localStorage.key(i);
     if(k&&k.startsWith(prefix)&&k.endsWith('_'+id)){
@@ -3317,6 +3340,11 @@ async function sendMeetingInvite(id){
     }
     showToast('Invite sent');
     await loadAdminFeedback2();
+    // Notify the staff member
+    const fbRow=await sbGet('feedback','?id=eq.'+id+'&select=staff_name');
+    if(fbRow&&fbRow.length&&fbRow[0].staff_name){
+      sendPush(fbRow[0].staff_name,'Meeting Invitation','Your manager would like to meet with you to discuss your feedback.','meeting-invite');
+    }
   }catch(e){
     console.warn(e);
     showToast('Failed: '+e.message);
@@ -3760,7 +3788,7 @@ async function saveBirthday(){
     });
     ok.textContent='Birthday saved!';ok.classList.add('show');
     setTimeout(()=>ok.classList.remove('show'),2000);
-    recheckOnboarding();
+    recheckOnboarding();loadOnboardingChecklist();
   }catch(e){err.textContent='Failed to save.';err.classList.add('show');}
 }
 
@@ -4634,6 +4662,59 @@ function showToast(msg){
     t.style.opacity='0';
     t.style.transform='translateX(-50%) translateY(20px)';
   },2500);
+}
+
+
+// ── PUSH NOTIFICATIONS ──
+const VAPID_PUBLIC_KEY = 'BFoLm2h2XyzORCUsY3hl00mcV2MsRmt5juaJdD5cgGze5XCq_8izDQvAWACqiTVCzxvQ26E9oh6RF-GVLsRases';
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = atob(base64);
+  return new Uint8Array([...rawData].map(c => c.charCodeAt(0)));
+}
+
+async function registerPush() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+  try {
+    const reg = await navigator.serviceWorker.register('/sw.js');
+    await navigator.serviceWorker.ready;
+
+    // Check existing subscription
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) {
+      // Request permission first
+      const perm = await Notification.requestPermission();
+      if (perm !== 'granted') return;
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+      });
+    }
+
+    // Save subscription to Supabase
+    await fetch(SB + '/rest/v1/push_subscriptions', {
+      method: 'POST',
+      headers: {
+        'apikey': KEY, 'Authorization': 'Bearer ' + KEY,
+        'Content-Type': 'application/json',
+        'Prefer': 'resolution=merge-duplicates'
+      },
+      body: JSON.stringify({ staff_name: me, subscription: sub.toJSON() })
+    });
+  } catch(e) { console.warn('Push registration failed:', e); }
+}
+
+async function sendPush(staffName, title, body, tag) {
+  // Call Supabase Edge Function
+  try {
+    await fetch('https://jcfgldqrdbfkgbixszds.supabase.co/functions/v1/send-push', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': KEY, 'Authorization': 'Bearer ' + KEY },
+      body: JSON.stringify({ staff_name: staffName, title, body, tag: tag || 'oscars', url: 'https://oscarstaff.github.io' })
+    });
+  } catch(e) { console.warn('Push send failed:', e); }
 }
 
 // ── Fix 100dvh reflow on iOS/Android ──
