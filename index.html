@@ -2715,6 +2715,7 @@ async function enterHub(){
   showSchedTab('leave'); // default schedule sub-tab
   Promise.all([loadHomeData(),loadNotifications(),loadLeaveHistory(),refreshAnnBadge(),loadHomeAnnPreview(),loadHomeDiscPreview(),maybeShowOnboarding(),checkFeedbackInvites(),checkNewNotifications()]);
   setTimeout(async function(){ await registerPush(); checkPushStatus(); }, 1500);
+  startAutoRefresh();
   loadBirthdays();
   // Restore from URL hash if present
   const hash=window.location.hash.replace('#','');
@@ -4297,12 +4298,9 @@ async function loadMySettings(){
   const adminTab=document.getElementById("ptab-adminpanel");
   if(adminTab)adminTab.style.display=myIsAdmin?"block":"none";
 
-  // Show admin cards on Home for admins
-  if(myIsAdmin){
-    const hbc=document.getElementById("homeBdayCard");if(hbc)hbc.style.display="block";
-    // Load data after elements are shown
-    setTimeout(()=>loadBirthdays(),100);
-  }
+  // Calendar visible to everyone
+  const hbc=document.getElementById("homeBdayCard");if(hbc)hbc.style.display="block";
+  setTimeout(()=>loadBirthdays(),100);
 }
 
 // ── ADMIN ──
@@ -4781,6 +4779,37 @@ async function sendPush(staffName, title, body, tag) {
     });
   } catch(e) { console.warn('Push send failed:', e); }
 }
+
+
+// ── AUTO REFRESH ──
+let _autoRefreshTimer = null;
+function startAutoRefresh(){
+  stopAutoRefresh();
+  _autoRefreshTimer = setInterval(function(){
+    // Only refresh if page is visible
+    if(document.hidden) return;
+    loadNotifications();
+    refreshAnnBadge();
+    checkFeedbackInvites();
+    // Refresh current visible page
+    const active = document.querySelector('.page.active');
+    if(!active) return;
+    if(active.id === 'page-home'){ loadHomeAnnPreview(); loadHomeDiscPreview(); }
+    if(active.id === 'page-announcements') loadAnnouncements();
+    if(active.id === 'page-engagement'){
+      const discActive = document.getElementById('etab-discussions') && document.getElementById('etab-discussions').classList.contains('active');
+      if(discActive) loadDiscussions();
+    }
+  }, 60000); // every 60 seconds
+}
+function stopAutoRefresh(){
+  if(_autoRefreshTimer){ clearInterval(_autoRefreshTimer); _autoRefreshTimer=null; }
+}
+// Pause when tab hidden, resume when visible
+document.addEventListener('visibilitychange', function(){
+  if(document.hidden) stopAutoRefresh();
+  else { startAutoRefresh(); loadNotifications(); }
+});
 
 // ── Fix 100dvh reflow on iOS/Android ──
 function setVH(){
