@@ -1873,8 +1873,8 @@ body.ready{visibility:visible;}
         <div class="card" style="margin-bottom:12px;" id="pushCard">
           <div class="card-hd"><div class="card-title">Notifications</div></div>
           <div style="display:flex;align-items:center;justify-content:space-between;">
-            <div><div style="font-size:13px;font-weight:600;color:#0f172a;">Push Notifications</div><div style="font-size:11px;color:#94a3b8;margin-top:2px;">Get notified about leave and messages</div></div>
-            <button id="pushEnableBtn" onclick="enablePushNotifications()" style="display:none;padding:8px 16px;border-radius:10px;background:#2563eb;color:#fff;border:none;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;align-items:center;gap:6px;">Enable</button>
+            <div><div style="font-size:13px;font-weight:600;color:#0f172a;">Push Notifications</div><div style="font-size:11px;color:#94a3b8;margin-top:2px;" id="pushStatusText">Tap Enable to get notified</div></div>
+            <button id="pushEnableBtn" onclick="enablePushNotifications()" style="padding:8px 16px;border-radius:10px;background:#2563eb;color:#fff;border:none;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;">Enable</button>
           </div>
         </div>
         <div class="card" style="margin-bottom:12px">
@@ -4740,13 +4740,31 @@ function updatePushBtn(state) {
 }
 
 async function checkPushStatus() {
-  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+  const btn = document.getElementById('pushEnableBtn');
+  const txt = document.getElementById('pushStatusText');
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    if (txt) txt.textContent = 'Not supported on this browser';
+    if (btn) btn.style.display = 'none';
+    return;
+  }
+  if (Notification.permission === 'denied') {
+    if (txt) txt.textContent = 'Blocked — enable in browser settings';
+    if (btn) { btn.textContent = 'Blocked'; btn.style.background = '#94a3b8'; btn.disabled = true; }
+    return;
+  }
   try {
     const reg = await navigator.serviceWorker.ready;
     const sub = await reg.pushManager.getSubscription();
-    const btn = document.getElementById('pushEnableBtn');
-    if (btn) btn.style.display = sub ? 'none' : 'flex';
-  } catch(e) {}
+    if (sub) {
+      if (txt) txt.textContent = 'Enabled ✓';
+      if (btn) { btn.textContent = 'Enabled'; btn.style.background = '#16a34a'; btn.disabled = true; }
+    } else {
+      if (txt) txt.textContent = 'Tap Enable to get notified';
+      if (btn) { btn.textContent = 'Enable'; btn.style.background = '#2563eb'; btn.disabled = false; }
+    }
+  } catch(e) {
+    if (txt) txt.textContent = 'Tap Enable to get notified';
+  }
 }
 
 async function sendPush(staffName, title, body, tag) {
