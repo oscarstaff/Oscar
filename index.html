@@ -4742,8 +4742,12 @@ function updatePushBtn(state) {
 async function checkPushStatus() {
   const btn = document.getElementById('pushEnableBtn');
   const txt = document.getElementById('pushStatusText');
-  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-    if (txt) txt.textContent = 'Not supported on this browser';
+  const hasSW = 'serviceWorker' in navigator;
+  const hasPush = 'PushManager' in window;
+  const isHTTPS = location.protocol === 'https:';
+  if (!hasSW || !hasPush || !isHTTPS) {
+    const reason = !isHTTPS ? 'Needs HTTPS' : !hasSW ? 'No SW support' : 'No Push support (iOS: add to Home Screen)';
+    if (txt) txt.textContent = reason;
     if (btn) btn.style.display = 'none';
     return;
   }
