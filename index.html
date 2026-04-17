@@ -1760,7 +1760,7 @@ body.ready{visibility:visible;}
         <div class="card" style="margin-bottom:14px;">
           <div class="card-title" style="margin-bottom:12px;">Start a Discussion</div>
           <div class="field"><input class="f-input" type="text" id="discTitle" placeholder="What's on your mind?"></div>
-          <div class="field"><textarea id="discBody" rows="3" class="f-input" placeholder="Add more detail (optional)..." style="resize:none;"></textarea></div>
+          <div class="field"><textarea id="discBody" rows="6" class="f-input" placeholder="Add more detail (optional)..." style="resize:vertical;min-height:120px;"></textarea></div>
           <div id="discAdminOptions" style="display:none;">
             <div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px;">Schedule (optional)</div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
@@ -1774,9 +1774,22 @@ body.ready{visibility:visible;}
               </div>
             </div>
           </div>
-          <div class="alert alert-err" id="discErr"></div>
-          <div class="alert alert-ok" id="discOk"></div>
-          <button class="btn btn-green" onclick="postDiscussion()" id="discPostBtn" style="padding:9px 18px;">Post</button>
+          <!-- Poll builder -->
+          <div id="pollBuilder" style="display:none;margin-bottom:12px;padding:12px;background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;">
+            <div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px;">Poll Options</div>
+            <div id="pollOptions">
+              <div class="poll-opt-row" style="display:flex;gap:6px;margin-bottom:6px;"><input type="text" class="f-input poll-opt" placeholder="Option 1" style="flex:1;"><button onclick="removePollOpt(this)" style="background:none;border:none;color:#dc2626;cursor:pointer;font-size:16px;padding:0 4px;">×</button></div>
+              <div class="poll-opt-row" style="display:flex;gap:6px;margin-bottom:6px;"><input type="text" class="f-input poll-opt" placeholder="Option 2" style="flex:1;"><button onclick="removePollOpt(this)" style="background:none;border:none;color:#dc2626;cursor:pointer;font-size:16px;padding:0 4px;">×</button></div>
+            </div>
+            <button onclick="addPollOpt()" style="font-size:12px;font-weight:600;color:#2563eb;background:none;border:none;cursor:pointer;font-family:inherit;padding:4px 0;">+ Add option</button>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <button onclick="togglePollBuilder()" id="pollToggleBtn" class="btn btn-outline" style="padding:8px 14px;font-size:12px;">📊 Add Poll</button>
+            <div style="flex:1;"></div>
+            <div class="alert alert-err" id="discErr" style="margin:0;flex:1;"></div>
+            <div class="alert alert-ok" id="discOk" style="margin:0;flex:1;"></div>
+            <button class="btn btn-green" onclick="postDiscussion()" id="discPostBtn" style="padding:9px 18px;">Post</button>
+          </div>
         </div>
         <div id="discList"><div style="text-align:center;color:#94a3b8;padding:32px;font-size:13px;">Loading...</div></div>
       </div>
@@ -1872,11 +1885,6 @@ body.ready{visibility:visible;}
           <div class="alert alert-ok" id="profBdayOk" style="margin-bottom:8px;"></div>
           <div style="display:flex;gap:8px;align-items:center;"><input type="date" id="profBirthday" class="f-input" style="flex:1;"><button class="btn btn-green" style="padding:10px 16px;" onclick="saveBirthday()">Save</button></div>
           <div style="font-size:11px;color:#94a3b8;margin-top:8px;">Only visible to admins.</div>
-        </div>
-        </div>
-          <div style="display:flex;align-items:center;justify-content:space-between;">
-            <div><div style="font-size:13px;font-weight:600;color:#0f172a;">Push Notifications</div><div style="font-size:11px;color:#94a3b8;margin-top:2px;" id="pushStatusText">Tap Enable to get notified</div></div>
-            <div style="display:flex;gap:6px;">
         <div class="card" style="margin-bottom:12px">
           <div class="card-hd"><div class="card-title">Appearance</div></div>
           <div style="display:flex;align-items:center;justify-content:space-between;">
@@ -1909,7 +1917,7 @@ body.ready{visibility:visible;}
         <div class="card" style="margin-bottom:14px;">
           <div class="card-title" style="margin-bottom:12px;">Start a Discussion</div>
           <div class="field"><input class="f-input" type="text" id="discTitle" placeholder="What's on your mind?"></div>
-          <div class="field"><textarea id="discBody" rows="3" class="f-input" placeholder="Add more detail (optional)..." style="resize:none;"></textarea></div>
+          <div class="field"><textarea id="discBody" rows="6" class="f-input" placeholder="Add more detail (optional)..." style="resize:vertical;min-height:120px;"></textarea></div>
           <div class="alert alert-err" id="discErr"></div>
           <div class="alert alert-ok" id="discOk"></div>
           <button class="btn btn-green" onclick="postDiscussion()" id="discPostBtn" style="padding:9px 18px;">Post</button>
@@ -2462,7 +2470,8 @@ async function loadDiscussions(){
         html+='<button data-id="'+r.id+'" onclick="deleteDiscussion(this.dataset.id)" style="background:none;border:none;color:#dc2626;font-size:11px;font-weight:600;cursor:pointer;padding:4px 6px;font-family:inherit;flex-shrink:0;">Delete</button>';
       }
       html+='</div>';
-      if(r.body){html+='<div style="font-size:13px;color:#475569;line-height:1.6;margin-bottom:10px;">'+r.body+'</div>';}
+      if(r.body){html+='<div style="font-size:13px;color:#475569;line-height:1.6;margin-bottom:10px;white-space:pre-wrap;">'+r.body+'</div>';}
+      if(r.poll_options&&r.poll_options.length){html+=renderPoll(r);}
       // Replies
       if(replies.length){
         html+='<div id="replies-'+r.id+'" style="border-top:1px solid #f1f5f9;padding-top:10px;margin-bottom:10px;display:flex;flex-direction:column;gap:8px;">';
@@ -2486,7 +2495,7 @@ async function loadDiscussions(){
       if(!isClosed)html+='<div style="display:flex;gap:8px;margin-top:8px;">';
       if(isClosed)html+='<div style="font-size:11px;color:#94a3b8;margin-top:8px;">This discussion is closed.</div>';
       if(!isClosed){
-      html+='<input data-disc="'+r.id+'" type="text" placeholder="Write a reply..." style="flex:1;border:1.5px solid #e2e8f0;border-radius:8px;padding:8px 12px;font-size:13px;font-family:inherit;outline:none;">';
+      html+='<textarea data-disc="'+r.id+'" placeholder="Write a reply..." rows="2" style="flex:1;border:1.5px solid #e2e8f0;border-radius:8px;padding:8px 12px;font-size:13px;font-family:inherit;outline:none;resize:none;"></textarea>';
       html+='<button data-disc="'+r.id+'" onclick="submitDiscReply(this.dataset.disc)" style="padding:8px 14px;border-radius:8px;background:#2563eb;color:#fff;border:none;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;">Reply</button>';
       html+='</div>';
       if(!isClosed)html+='</div>';
@@ -2511,7 +2520,14 @@ async function postDiscussion(){
   try{
     const openAt=myIsAdmin&&document.getElementById('discOpenAt')&&document.getElementById('discOpenAt').value||null;
     const closeAt=myIsAdmin&&document.getElementById('discCloseAt')&&document.getElementById('discCloseAt').value||null;
-    await sbPost('discussions',{title,body,created_by:me,open_at:openAt||null,close_at:closeAt||null});
+    const pollOpts = getPollOptions();
+    if(pollOpts===false){err.textContent='Please add at least 2 poll options.';err.classList.add('show');return;}
+    await sbPost('discussions',{title,body,created_by:me,open_at:openAt||null,close_at:closeAt||null,poll_options:pollOpts||null,poll_votes:pollOpts?{}:null});
+    // Reset poll
+    _pollActive=false;
+    const pb=document.getElementById('pollBuilder');if(pb)pb.style.display='none';
+    const ptb=document.getElementById('pollToggleBtn');if(ptb)ptb.textContent='📊 Add Poll';
+    document.querySelectorAll('.poll-opt').forEach(i=>i.value='');
     document.getElementById('discTitle').value='';
     document.getElementById('discBody').value='';
     ok.textContent='Posted!';ok.classList.add('show');
@@ -2526,7 +2542,7 @@ async function postDiscussion(){
 }
 
 async function submitDiscReply(discId){
-  const input=document.querySelector('input[data-disc="'+discId+'"]');
+  const input=document.querySelector('[data-disc="'+discId+'"]');
   if(!input||!input.value.trim())return;
   const body=input.value.trim();
   const btn=document.querySelector('button[data-disc="'+discId+'"]');
@@ -4744,6 +4760,144 @@ async function markNotifSeen(key){
       body:JSON.stringify({staff_name:me, notif_key:key})
     });
   }catch(e){ console.warn('markNotifSeen failed:',e); }
+}
+
+
+// ── POLLS ──
+let _pollActive = false;
+
+function togglePollBuilder(){
+  _pollActive = !_pollActive;
+  const builder = document.getElementById('pollBuilder');
+  const btn = document.getElementById('pollToggleBtn');
+  if(builder) builder.style.display = _pollActive ? 'block' : 'none';
+  if(btn) btn.textContent = _pollActive ? '✕ Remove Poll' : '📊 Add Poll';
+}
+
+function addPollOpt(){
+  const container = document.getElementById('pollOptions');
+  if(!container) return;
+  const count = container.querySelectorAll('.poll-opt').length + 1;
+  if(count > 6){ showToast('Max 6 options'); return; }
+  const div = document.createElement('div');
+  div.className = 'poll-opt-row';
+  div.style.cssText = 'display:flex;gap:6px;margin-bottom:6px;';
+  div.innerHTML = '<input type="text" class="f-input poll-opt" placeholder="Option '+count+'" style="flex:1;"><button onclick="removePollOpt(this)" style="background:none;border:none;color:#dc2626;cursor:pointer;font-size:16px;padding:0 4px;">×</button>';
+  container.appendChild(div);
+}
+
+function removePollOpt(btn){
+  const row = btn.closest('.poll-opt-row');
+  const container = document.getElementById('pollOptions');
+  if(container && container.querySelectorAll('.poll-opt-row').length > 2){
+    row.remove();
+  } else {
+    showToast('Minimum 2 options required');
+  }
+}
+
+function getPollOptions(){
+  if(!_pollActive) return null;
+  const opts = Array.from(document.querySelectorAll('.poll-opt')).map(i=>i.value.trim()).filter(Boolean);
+  if(opts.length < 2) return false;
+  return opts;
+}
+
+function renderPoll(disc){
+  if(!disc.poll_options || !disc.poll_options.length) return '';
+  const votes = disc.poll_votes || {};
+  const total = Object.values(votes).reduce((a,v)=>a+(Array.isArray(v)?v.length:0),0);
+  const myVote = Object.entries(votes).find(([opt,voters])=>Array.isArray(voters)&&voters.includes(me));
+  const myOpt = myVote ? myVote[0] : null;
+  const closed = disc.poll_closed === true;
+
+  let html = '<div style="margin:10px 0;padding:12px;background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;">';
+  html += '<div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px;">Poll'+(closed?' · Closed':'')+'</div>';
+  
+  disc.poll_options.forEach(function(opt){
+    const optVoters = votes[opt] || [];
+    const count = Array.isArray(optVoters) ? optVoters.length : 0;
+    const pct = total ? Math.round(count/total*100) : 0;
+    const isMyVote = opt === myOpt;
+    
+    if(myOpt || closed){
+      // Show results
+      html += '<div style="margin-bottom:8px;">';
+      html += '<div style="display:flex;justify-content:space-between;font-size:12px;font-weight:'+(isMyVote?'700':'500')+';color:'+(isMyVote?'#2563eb':'#374151')+';margin-bottom:3px;">'+
+        '<span>'+(isMyVote?'✓ ':'')+opt+'</span><span>'+count+' ('+pct+'%)</span></div>';
+      html += '<div style="height:6px;background:#e2e8f0;border-radius:3px;overflow:hidden;">'+
+        '<div style="height:100%;background:'+(isMyVote?'#2563eb':'#94a3b8')+';width:'+pct+'%;border-radius:3px;transition:width .3s;"></div></div>';
+      html += '</div>';
+    } else {
+      // Show vote buttons
+      html += '<button data-disc="'+disc.id+'" data-opt="'+encodeURIComponent(opt)+'" onclick="castVote(this.dataset.disc, decodeURIComponent(this.dataset.opt))" '+
+        'style="display:block;width:100%;text-align:left;padding:9px 12px;margin-bottom:6px;border-radius:8px;border:1.5px solid #e2e8f0;background:#fff;font-size:13px;cursor:pointer;font-family:inherit;transition:all .12s;" '+
+        'ontouchend="event.preventDefault();castVote(this.dataset.disc, decodeURIComponent(this.dataset.opt))">'+opt+'</button>';
+    }
+  });
+
+  html += '<div style="font-size:10px;color:#94a3b8;margin-top:6px;">'+total+' vote'+(total!==1?'s':'');
+  if(!closed && myIsAdmin){
+    html += ' · <button data-disc="'+disc.id+'" onclick="closePoll(this.dataset.disc)" style="background:none;border:none;color:#dc2626;font-size:10px;font-weight:600;cursor:pointer;font-family:inherit;">Close Poll</button>';
+  }
+  if(!closed && myIsAdmin){
+    html += ' · <button data-disc="'+disc.id+'" onclick="exportPoll(this.dataset.disc)" style="background:none;border:none;color:#2563eb;font-size:10px;font-weight:600;cursor:pointer;font-family:inherit;">Export</button>';
+  }
+  html += '</div></div>';
+  return html;
+}
+
+async function castVote(discId, option){
+  try{
+    // Get current votes
+    const rows = await sbGet('discussions','?id=eq.'+discId+'&select=poll_votes,poll_options');
+    if(!rows.length) return;
+    const votes = rows[0].poll_votes || {};
+    // Remove previous vote
+    Object.keys(votes).forEach(opt=>{ 
+      if(Array.isArray(votes[opt])) votes[opt]=votes[opt].filter(v=>v!==me);
+    });
+    // Add new vote
+    if(!votes[option]) votes[option] = [];
+    votes[option].push(me);
+    await fetch(SB+'/rest/v1/discussions?id=eq.'+discId,{
+      method:'PATCH',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({poll_votes:votes})
+    });
+    loadDiscussions();
+  }catch(e){ console.warn(e); showToast('Failed to vote'); }
+}
+
+async function closePoll(discId){
+  await fetch(SB+'/rest/v1/discussions?id=eq.'+discId,{
+    method:'PATCH',
+    headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+    body:JSON.stringify({poll_closed:true})
+  });
+  loadDiscussions();
+}
+
+async function exportPoll(discId){
+  try{
+    const rows = await sbGet('discussions','?id=eq.'+discId+'&select=title,poll_options,poll_votes,poll_closed');
+    if(!rows.length) return;
+    const disc = rows[0];
+    const votes = disc.poll_votes || {};
+    const total = Object.values(votes).reduce((a,v)=>a+(Array.isArray(v)?v.length:0),0);
+    let csv = 'Option,Votes,Percentage\n';
+    (disc.poll_options||[]).forEach(opt=>{
+      const count = Array.isArray(votes[opt]) ? votes[opt].length : 0;
+      const pct = total ? Math.round(count/total*100) : 0;
+      csv += '"'+opt+'",'+count+','+pct+'%\n';
+    });
+    csv += 'Total,'+total+'\n';
+    const blob = new Blob([csv], {type:'text/csv'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'poll-'+discId+'.csv';
+    a.click(); URL.revokeObjectURL(url);
+  }catch(e){ showToast('Export failed'); }
 }
 
 // ── Fix 100dvh reflow on iOS/Android ──
