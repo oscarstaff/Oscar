@@ -2394,15 +2394,8 @@ async function loadMyFeedback(){
     el.innerHTML='<div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Your Previous Feedback</div>'+
       rows.map(r=>{
         const d=new Date(r.submitted_at).toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'});
-        const hasInvite=r.meeting_invited===true;
-        const inviteBanner=hasInvite?
-          '<div style="margin-top:10px;padding:10px 14px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;display:flex;align-items:flex-start;gap:10px;">'+
-            '<span style="font-size:18px;flex-shrink:0;">📅</span>'+
-            '<div>'+
-              '<div style="font-size:13px;font-weight:700;color:#1d4ed8;margin-bottom:3px;">Meeting Invitation</div>'+
-              '<div style="font-size:12px;color:#374151;line-height:1.5;">'+(r.meeting_message||'Your manager would like to meet with you in person to discuss your feedback.')+'</div>'+
-            '</div>'+
-          '</div>':'';
+        const hasInvite=false;
+        const inviteBanner='';
         return '<div class="ann-card" style="margin-bottom:10px;">'+
           (hasInvite?'<div style="width:8px;height:8px;border-radius:50%;background:#2563eb;margin-bottom:8px;"></div>':'')+
           '<div style="font-size:13px;color:#374151;line-height:1.6;">'+r.body+'</div>'+
@@ -2551,6 +2544,17 @@ async function submitDiscReply(discId){
     const res=await sbPost('discussion_replies',{discussion_id:discId,staff_name:me,body});
     if(!res.ok&&res.status!==201)throw new Error('HTTP '+res.status);
     input.value='';
+    // Save reply notification for discussion owner
+    try{
+      const discRows=await sbGet('discussions','?id=eq.'+discId+'&select=created_by');
+      if(discRows.length && discRows[0].created_by !== me){
+        await fetch(SB+'/rest/v1/reply_notifications',{
+          method:'POST',
+          headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates'},
+          body:JSON.stringify({disc_id:discId,recipient:discRows[0].created_by,replier:me,body:body.slice(0,100),created_at:new Date().toISOString()})
+        });
+      }
+    }catch(e){console.warn('reply notif failed:',e);}
     // Append reply inline without full reload
     const repliesContainer=document.getElementById('replies-'+discId);
     if(repliesContainer){
@@ -3348,27 +3352,6 @@ async function loadAdminAvailGrid2(){
 }
 
 // ── ADMIN PANEL — feedback inbox (profile tab) ──
-async function sendMeetingInvite(id){
-  const msg='Your manager would like to meet with you to discuss your feedback.';
-  try{
-    const res=await fetch(SB+'/rest/v1/feedback?id=eq.'+id,{
-      method:'PATCH',
-      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
-      body:JSON.stringify({meeting_invited:true,meeting_message:msg||'Your manager would like to meet with you to discuss your feedback.'})
-    });
-    if(!res.ok){
-      const txt=await res.text();
-      console.warn('Invite failed:',res.status,txt);
-      showToast('Error '+res.status+': '+txt.slice(0,60));
-      return;
-    }
-    showToast('Invite sent');
-    await loadAdminFeedback2();
-  }catch(e){
-    console.warn(e);
-    showToast('Failed: '+e.message);
-  }
-}
 
 async function loadAdminFeedback2(){
   const el=document.getElementById('adminFeedbackList2');
@@ -3387,10 +3370,9 @@ async function loadAdminFeedback2(){
         '<div style="font-size:13px;color:#1e293b;line-height:1.6;">'+r.body.replace(/\n/g,'<br>')+'</div>'+
         '<div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;">'+
         '<div style="font-size:10px;color:#94a3b8;">'+d+'</div>'+
-        '<button data-id="'+r.id+'" onclick="sendMeetingInvite(this.dataset.id)" style="font-size:11px;font-weight:600;color:'+(invited?'#94a3b8':'#2563eb')+';background:none;border:1px solid '+(invited?'#e2e8f0':'#bfdbfe')+';border-radius:6px;padding:3px 10px;cursor:pointer;font-family:inherit;">'+
-        (invited?'Resend Invite':'Invite to Meeting')+'</button>'+
+        
         '</div>'+
-        (invited&&r.meeting_message?'<div style="margin-top:6px;font-size:11px;color:#64748b;font-style:italic;">Invite sent: '+r.meeting_message+'</div>':'')+
+
         '</div>';
     }).join('');
   }catch(e){console.warn(e);el.innerHTML='<div style="color:#dc2626;font-size:13px;">Could not load.</div>';}
@@ -4181,15 +4163,7 @@ async function loadReactNotifs(){
 
 
 // ── MISSING STUBS ──
-async function checkFeedbackInvites(){
-  try{
-    const rows=await sbGet('feedback','?staff_name=eq.'+encodeURIComponent(me)+'&meeting_invited=eq.true&select=id');
-    const seenInvites=JSON.parse(sessionStorage.getItem('seen_invites_session_'+me)||'[]');
-    const newInvites=(rows||[]).filter(function(r){return !seenInvites.includes(r.id);});
-    const badge=document.getElementById('bnEngBadge');
-    if(badge){badge.textContent=newInvites.length;badge.style.display=newInvites.length?'block':'none';}
-  }catch(e){console.warn(e);}
-}
+function checkFeedbackInvites(){ /* removed */ }
 
 function renderTimesheetPreview(){
   // Timesheet preview on home — placeholder (not implemented)
@@ -4227,10 +4201,28 @@ async function loadNotifications(){
     if(!el)return; // element may not be visible yet
     const seenReacts=JSON.parse(localStorage.getItem('seen_reacts_'+me)||'[]');
     const newReactNotifs=(reactNotifs||[]).filter(function(r){return !seenReacts.includes(r.id);});
-    if(!rows.length&&!newReactNotifs.length){
+    if(!rows.length&&!newReactNotifs.length&&!newRepliesList.length){
       el.innerHTML='<div style="text-align:center;padding:40px 20px;"><svg width="36" height="36" viewBox="0 0 20 20" fill="#e2e8f0" style="margin:0 auto 10px;display:block;"><path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z"/></svg><div style="font-size:13px;font-weight:600;color:#475569;margin-bottom:6px;">No alerts yet</div><div style="font-size:12px;color:#94a3b8;">Leave approvals and declines will appear here.</div></div>';
       return;
     }
+    // Render reply notifications
+    let replyNotifsList=[];
+    try{ replyNotifsList=await sbGet('reply_notifications','?recipient=eq.'+encodeURIComponent(me)+'&order=created_at.desc&limit=10'); }catch(e){}
+    const seenRepliesList=JSON.parse(localStorage.getItem('seen_replies_'+me)||'[]');
+    const newRepliesList=replyNotifsList.filter(r=>!seenRepliesList.includes(r.id));
+    let replyHtml='';
+    newRepliesList.forEach(function(r){
+      replyHtml+='<div style="background:#f0f9ff;border:1px solid #bfdbfe;border-radius:12px;padding:14px;margin-bottom:10px;" data-rid="'+r.id+'" onclick="markReplySeen(this.dataset.rid);goTo(\'engagement\');setTimeout(function(){showEngagementTab(\'discussions\');},120);">'+
+        '<div style="font-size:13px;font-weight:700;color:#2563eb;margin-bottom:4px;">💬 New Reply</div>'+
+        '<div style="font-size:12.5px;color:#475569;">'+r.replier+' replied to your discussion</div>'+
+        '<div style="font-size:11px;color:#94a3b8;margin-top:4px;font-style:italic;">'+r.body+'...</div>'+
+        '</div>';
+    });
+    if(newRepliesList.length){
+      const allReplyIds=replyNotifsList.map(r=>r.id);
+      localStorage.setItem('seen_replies_'+me,JSON.stringify(allReplyIds));
+    }
+
     // Render reaction notifications first
     let reactHtml='';
     newReactNotifs.forEach(function(r){
@@ -4245,7 +4237,7 @@ async function loadNotifications(){
       const allReactIds=(reactNotifs||[]).map(function(r){return r.id;});
       localStorage.setItem('seen_reacts_'+me,JSON.stringify(allReactIds));
     }
-    el.innerHTML=reactHtml+rows.map(r=>{
+    el.innerHTML=replyHtml+reactHtml+rows.map(r=>{
       const isRead=read.includes(r.id);
       const isApproved=r.status==="approved";
       const bg=isRead?"#fff":(isApproved?"#eff6ff":"#fef2f2");
@@ -4587,10 +4579,14 @@ async function loadNotifDrop(dropId){
     const rows=await sbGet('leave_submissions','?staff_name=eq.'+encodeURIComponent(me)+'&status=in.(approved,declined)&order=submitted_at.desc&limit=10');
     const read=JSON.parse(localStorage.getItem('oR_'+me)||'[]');
     // Check feedback invites
-    const fbRows=await sbGet('feedback','?staff_name=eq.'+encodeURIComponent(me)+'&meeting_invited=eq.true&select=id,meeting_message,submitted_at');
-    const seenInvites=JSON.parse(sessionStorage.getItem('seen_invites_session_'+me)||'[]');
-    const newInvites=(fbRows||[]).filter(r=>!seenInvites.includes(r.id));
+    const fbRows=[];
+    const newInvites=[];
 
+    // Reply notifications
+    let replyNotifsRaw=[];
+    try{ replyNotifsRaw=await sbGet('reply_notifications','?recipient=eq.'+encodeURIComponent(me)+'&order=created_at.desc&limit=10'); }catch(e){}
+    const seenReplies=JSON.parse(localStorage.getItem('seen_replies_'+me)||'[]');
+    const newReplies=replyNotifsRaw.filter(r=>!seenReplies.includes(r.id));
     const reactNotifsDrop=await loadReactNotifs();
     const seenReactsDrop=JSON.parse(localStorage.getItem('seen_reacts_'+me)||'[]');
     const newReactsDrop=(reactNotifsDrop||[]).filter(function(r){return !seenReactsDrop.includes(r.id);});
@@ -4601,6 +4597,15 @@ async function loadNotifDrop(dropId){
 
     let html='';
 
+    // Reply notifications
+    newReplies.forEach(function(r){
+      html+='<div class="notif-drop-item unread" onclick="closeAllNotifDrops();markReplySeen(\''+r.id+'\');goTo(\'engagement\');setTimeout(function(){showEngagementTab(\'discussions\');},120);">'+
+        '<div style="font-size:12px;font-weight:700;color:#2563eb;margin-bottom:2px;">💬 New Reply</div>'+
+        '<div style="font-size:12px;color:#475569;">'+r.replier+' replied to your discussion</div>'+
+        '<div style="font-size:11px;color:#94a3b8;margin-top:2px;">'+r.body+'</div>'+
+        '</div>';
+    });
+
     // Reaction notifications
     newReactsDrop.forEach(function(r){
       html+='<div class="notif-drop-item unread" onclick="closeAllNotifDrops();">'+
@@ -4609,14 +4614,7 @@ async function loadNotifDrop(dropId){
         '</div>';
     });
 
-    // Meeting invites first
-    newInvites.forEach(function(r){
-      html+='<div class="notif-drop-item unread" data-inv="'+r.id+'" onclick="closeAllNotifDrops();markInviteSeen(this.dataset.inv);goTo(\'engagement\');setTimeout(function(){showEngagementTab(\'feedback\');},120);">'+
-        '<div style="font-size:12px;font-weight:700;color:#2563eb;margin-bottom:2px;">📅 Meeting Invitation</div>'+
-        '<div style="font-size:12px;color:#475569;line-height:1.4;">'+(r.meeting_message||'Your manager would like to meet with you')+'</div>'+
-        '<div style="font-size:10px;color:#94a3b8;margin-top:3px;">Tap to view</div>'+
-        '</div>';
-    });
+
 
     // Leave notifications
     rows.forEach(function(r){
@@ -4645,6 +4643,11 @@ async function loadNotifDrop(dropId){
 
 function closeAllNotifDrops(){
   document.querySelectorAll('.notif-drop.open').forEach(function(d){d.classList.remove('open');});
+}
+
+function markReplySeen(id){
+  const seen=JSON.parse(localStorage.getItem('seen_replies_'+me)||'[]');
+  if(!seen.includes(id)){seen.push(id);localStorage.setItem('seen_replies_'+me,JSON.stringify(seen));}
 }
 
 function markNotifRead(id){
