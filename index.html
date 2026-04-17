@@ -1870,6 +1870,13 @@ body.ready{visibility:visible;}
           <div style="display:flex;gap:8px;align-items:center;"><input type="date" id="profBirthday" class="f-input" style="flex:1;"><button class="btn btn-green" style="padding:10px 16px;" onclick="saveBirthday()">Save</button></div>
           <div style="font-size:11px;color:#94a3b8;margin-top:8px;">Only visible to admins.</div>
         </div>
+        <div class="card" style="margin-bottom:12px;" id="pushCard">
+          <div class="card-hd"><div class="card-title">Notifications</div></div>
+          <div style="display:flex;align-items:center;justify-content:space-between;">
+            <div><div style="font-size:13px;font-weight:600;color:#0f172a;">Push Notifications</div><div style="font-size:11px;color:#94a3b8;margin-top:2px;">Get notified about leave and messages</div></div>
+            <button id="pushEnableBtn" onclick="enablePushNotifications()" style="display:none;padding:8px 16px;border-radius:10px;background:#2563eb;color:#fff;border:none;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;align-items:center;gap:6px;">Enable</button>
+          </div>
+        </div>
         <div class="card" style="margin-bottom:12px">
           <div class="card-hd"><div class="card-title">Appearance</div></div>
           <div style="display:flex;align-items:center;justify-content:space-between;">
@@ -2707,7 +2714,7 @@ async function enterHub(){
   buildAvailForm();
   showSchedTab('leave'); // default schedule sub-tab
   Promise.all([loadHomeData(),loadNotifications(),loadLeaveHistory(),refreshAnnBadge(),loadHomeAnnPreview(),loadHomeDiscPreview(),maybeShowOnboarding(),checkFeedbackInvites(),checkNewNotifications()]);
-  setTimeout(registerPush, 2000);
+  setTimeout(async function(){ await registerPush(); checkPushStatus(); }, 1500);
   loadBirthdays();
   // Restore from URL hash if present
   const hash=window.location.hash.replace('#','');
@@ -3799,6 +3806,7 @@ function toggleSection(id){
 }
 
 async function loadProfilePage(){
+  checkPushStatus();
   // Set avatar and name
   const ava=me.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase();
   const profAvaEl=document.getElementById("profAva");if(profAvaEl)profAvaEl.textContent=ava;
@@ -4676,34 +4684,69 @@ function urlBase64ToUint8Array(base64String) {
 }
 
 async function registerPush() {
-  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+  if (!('serviceWorker' in navigator)) { console.warn('Push: no serviceWorker support'); return; }
+  if (!('PushManager' in window)) { console.warn('Push: no PushManager support'); return; }
   try {
     const reg = await navigator.serviceWorker.register('/sw.js');
+    console.log('SW registered:', reg.scope);
     await navigator.serviceWorker.ready;
-
-    // Check existing subscription
+    console.log('SW ready');
     let sub = await reg.pushManager.getSubscription();
-    if (!sub) {
-      // Request permission first
-      const perm = await Notification.requestPermission();
-      if (perm !== 'granted') return;
-      sub = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
-      });
+    if (sub) {
+      console.log('Already subscribed, saving to DB');
+      await savePushSub(sub);
+      return;
     }
+    // Don't auto-prompt — wait for user to tap Enable button
+    updatePushBtn('idle');
+  } catch(e) { console.warn('Push registration failed:', e.message); }
+}
 
-    // Save subscription to Supabase
-    await fetch(SB + '/rest/v1/push_subscriptions', {
-      method: 'POST',
-      headers: {
-        'apikey': KEY, 'Authorization': 'Bearer ' + KEY,
-        'Content-Type': 'application/json',
-        'Prefer': 'resolution=merge-duplicates'
-      },
-      body: JSON.stringify({ staff_name: me, subscription: sub.toJSON() })
+async function enablePushNotifications() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    showToast('Push not supported on this browser');
+    return;
+  }
+  try {
+    const perm = await Notification.requestPermission();
+    if (perm !== 'granted') { showToast('Notifications blocked'); return; }
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
     });
-  } catch(e) { console.warn('Push registration failed:', e); }
+    await savePushSub(sub);
+    updatePushBtn('enabled');
+    showToast('Push notifications enabled!');
+  } catch(e) {
+    console.warn('Push enable failed:', e.message);
+    showToast('Failed: ' + e.message);
+  }
+}
+
+async function savePushSub(sub) {
+  await fetch(SB + '/rest/v1/push_subscriptions', {
+    method: 'POST',
+    headers: { 'apikey': KEY, 'Authorization': 'Bearer ' + KEY, 'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates' },
+    body: JSON.stringify({ staff_name: me, subscription: sub.toJSON() })
+  });
+}
+
+function updatePushBtn(state) {
+  const btn = document.getElementById('pushEnableBtn');
+  if (!btn) return;
+  if (state === 'enabled') { btn.style.display = 'none'; return; }
+  btn.style.display = 'flex';
+}
+
+async function checkPushStatus() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.getSubscription();
+    const btn = document.getElementById('pushEnableBtn');
+    if (btn) btn.style.display = sub ? 'none' : 'flex';
+  } catch(e) {}
 }
 
 async function sendPush(staffName, title, body, tag) {
