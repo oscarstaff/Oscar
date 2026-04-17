@@ -2,6 +2,9 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Oscars Employee Portal</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -2005,6 +2008,7 @@ body.ready{visibility:visible;}
 </div>
 
 <script>
+/* v1776396066 */
 const SB="https://jcfgldqrdbfkgbixszds.supabase.co";
 const KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpjZmdsZHFyZGJma2diaXhzemRzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1Nzc3NzEsImV4cCI6MjA5MDE1Mzc3MX0.Wj8cCpnlsoZOPj5sKWeEdfvgjG4Nc-UuTTYgbcrPfeI";
 let STAFF=["Abhishek Karki","Anish Dhodari","Anurag Dahal","Asha Aryal","Bikash Dahal","Kushal Piya","Monika Kawadi","Musica Karki","Nabina Uchchai Thakuri","Nidhi Subedi","Nippu Pokhrel","Pavneet Kaur","Presna Aryal","Prashna Sapkota","Roshana Puri","Sachin Sanwa Limbu","Sagun Panta","Saksham Shrestha","Sami Basnet","Sameekshya Regmi","Sanju Gharti Magar","Sandhya Sangroula","Sanskar Pokharel","Santosh Singh Basnet","Siddhartha Gautam","Supriya Thapa","Tejaswee Bhetwal","Umisha Ghimire","Usam Adhikari"]; // fallback, gets replaced by Supabase
@@ -4704,27 +4708,53 @@ async function registerPush() {
 }
 
 async function enablePushNotifications() {
-  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-    showToast('Push not supported on this browser');
+  showToast('Setting up notifications...');
+  // Step 1: check support
+  if (!('serviceWorker' in navigator)) { showToast('No SW support'); return; }
+  if (!('PushManager' in window)) { showToast('No Push support — on iOS, add to Home Screen first'); return; }
+  if (!('Notification' in window)) { showToast('No Notification support'); return; }
+  // Step 2: register SW
+  let reg;
+  try {
+    reg = await navigator.serviceWorker.register('/Oscar/sw.js', {scope: '/Oscar/'});
+    showToast('SW registered, waiting...');
+    await navigator.serviceWorker.ready;
+    showToast('SW ready!');
+  } catch(e) {
+    showToast('SW failed: ' + e.message);
+    console.error('SW error:', e);
     return;
   }
+  // Step 3: request permission
+  let perm;
   try {
-    const perm = await Notification.requestPermission();
-    if (perm !== 'granted') { showToast('Notifications blocked'); return; }
-    const reg = await navigator.serviceWorker.ready;
-    const sub = await reg.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
-    });
+    perm = await Notification.requestPermission();
+  } catch(e) { perm = 'denied'; }
+  if (perm !== 'granted') { showToast('Permission denied: ' + perm); return; }
+  showToast('Permission granted!');
+  // Step 4: subscribe
+  try {
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) {
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+      });
+    }
+    showToast('Subscribed! Saving...');
     await savePushSub(sub);
     updatePushBtn('enabled');
+    const txt = document.getElementById('pushStatusText');
+    if (txt) txt.textContent = 'Enabled ✓';
+    const testBtn = document.getElementById('pushTestBtn');
+    if (testBtn) testBtn.style.display = 'block';
     showToast('Push notifications enabled!');
-    const testBtn=document.getElementById('pushTestBtn');if(testBtn)testBtn.style.display='block';
   } catch(e) {
-    console.warn('Push enable failed:', e.message);
-    showToast('Failed: ' + e.message);
+    showToast('Subscribe failed: ' + e.message);
+    console.error('Subscribe error:', e);
   }
 }
+
 
 async function savePushSub(sub) {
   await fetch(SB + '/rest/v1/push_subscriptions', {
