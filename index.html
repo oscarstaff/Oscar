@@ -1309,6 +1309,75 @@ body.ready{visibility:visible;}
 /* Safe tap margins */
 .ann-meta button{padding:6px 8px;min-height:32px;}
 
+
+/* ── FACEBOOK-STYLE INTERACTIONS ── */
+
+/* Cards lift on hover */
+.card{
+  transition:transform .2s ease, box-shadow .2s ease, border-color .15s;
+}
+.card:hover{
+  transform:translateY(-2px);
+  box-shadow:0 6px 20px rgba(0,0,0,.1);
+}
+@media(max-width:700px){
+  .card:hover{transform:none;box-shadow:none;}
+  .card:active{transform:scale(.99);transition-duration:.08s;}
+}
+
+/* Buttons feel clicky */
+.btn:active{transform:scale(.95)!important;transition-duration:.08s!important;}
+.btn-green:hover{filter:brightness(1.06);}
+
+/* Like/react pop animation */
+@keyframes reactPop{
+  0%{transform:scale(1);}
+  40%{transform:scale(1.35);}
+  100%{transform:scale(1);}
+}
+.react-btn.has-react{animation:reactPop .25s ease;}
+
+/* Nav items */
+.nav-item{transition:background .15s,color .15s,transform .1s;}
+.nav-item:active{transform:scale(.96);}
+.bn-item:active{opacity:.7;transition:opacity .08s;}
+
+/* Announcement cards */
+.ann-card{
+  transition:transform .18s ease, box-shadow .18s ease;
+}
+.ann-card:hover{
+  transform:translateY(-2px);
+  box-shadow:0 4px 16px rgba(37,99,235,.1);
+}
+@media(max-width:700px){
+  .ann-card:hover{transform:none;box-shadow:none;}
+  .ann-card:active{transform:scale(.99);}
+}
+
+/* Poll option buttons */
+.poll-vote-btn{
+  transition:background .12s, border-color .12s, transform .1s;
+}
+.poll-vote-btn:hover{background:#eff6ff!important;border-color:#bfdbfe!important;}
+.poll-vote-btn:active{transform:scale(.97);}
+
+/* Input focus glow */
+.f-input:focus{
+  border-color:#2563eb;
+  box-shadow:0 0 0 3px rgba(37,99,235,.12);
+  background:#fff;
+}
+
+/* Fade in for page content */
+.page.active > *{
+  animation:fbFadeIn .25s ease both;
+}
+@keyframes fbFadeIn{
+  from{opacity:0;transform:translateY(8px);}
+  to{opacity:1;transform:translateY(0);}
+}
+
 </style>
 </head>
 <body>
@@ -3364,7 +3433,7 @@ async function loadAdminFeedback2(){
     el.innerHTML=rows.map(r=>{
       const d=new Date(r.submitted_at).toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'});
       const isNew=!r.read;
-      const invited=r.meeting_invited===true;
+      const invited=false;
       return '<div style="padding:12px;border-radius:10px;margin-bottom:8px;background:'+(isNew?'#f0f9ff':'#f8fafc')+';border:1px solid '+(isNew?'#bae6fd':'#e2e8f0')+';">'+
         (isNew?'<div style="font-size:9px;font-weight:700;color:#0284c7;text-transform:uppercase;letter-spacing:.8px;margin-bottom:5px;">New</div>':'')+
         '<div style="font-size:13px;color:#1e293b;line-height:1.6;">'+r.body.replace(/\n/g,'<br>')+'</div>'+
@@ -4186,18 +4255,6 @@ async function loadNotifications(){
     const bellBadge=document.getElementById("mhBellBadge");if(bellBadge){bellBadge.style.display=unread.length?"block":"none";}
     const sbBellBadge=document.getElementById("sbBellBadge");if(sbBellBadge){sbBellBadge.style.display=unread.length?"block":"none";}
     // Also check meeting invites + reaction notifications
-    try{
-      const fbInv=await sbGet('feedback','?staff_name=eq.'+encodeURIComponent(me)+'&meeting_invited=eq.true&select=id,submitted_at');
-      const seenInv=JSON.parse(sessionStorage.getItem('seen_invites_session_'+me)||'[]');
-      const newInv=(fbInv||[]).filter(function(r){return !seenInv.includes(r.id);});
-      const seenReacts=JSON.parse(localStorage.getItem('seen_reacts_'+me)||'[]');
-      const newReacts=(reactNotifs||[]).filter(function(r){return !seenReacts.includes(r.id);});
-      const totalUnread=unread.length+newInv.length+newReacts.length;
-      if(bellBadge)bellBadge.style.display=totalUnread?"block":"none";
-      if(sbBellBadge)sbBellBadge.style.display=totalUnread?"block":"none";
-
-
-    }catch(e){}
     if(!el)return; // element may not be visible yet
     const seenReacts=JSON.parse(localStorage.getItem('seen_reacts_'+me)||'[]');
     const newReactNotifs=(reactNotifs||[]).filter(function(r){return !seenReacts.includes(r.id);});
@@ -4532,18 +4589,6 @@ async function checkNewNotifications(){
         localStorage.setItem(bannerKey,'1');
       }
     }
-    // Check feedback invites — only show once per session
-    if(!localStorage.getItem('invite_banner_shown_'+me)){
-      const fbRows=await sbGet('feedback','?staff_name=eq.'+encodeURIComponent(me)+'&meeting_invited=eq.true&select=id');
-      if(fbRows&&fbRows.length){
-        const seenInvites=JSON.parse(sessionStorage.getItem('seen_invites_session_'+me)||'[]');
-        const newInvites=fbRows.filter(r=>!seenInvites.includes(r.id));
-        if(newInvites.length&&!unread.length){
-          showBanner('Meeting Invitation','Your manager wants to meet with you','');
-          localStorage.setItem('invite_banner_shown_'+me,'1');
-        }
-      }
-    }
   }catch(e){console.warn(e);}
 }
 
@@ -4579,8 +4624,6 @@ async function loadNotifDrop(dropId){
     const rows=await sbGet('leave_submissions','?staff_name=eq.'+encodeURIComponent(me)+'&status=in.(approved,declined)&order=submitted_at.desc&limit=10');
     const read=JSON.parse(localStorage.getItem('oR_'+me)||'[]');
     // Check feedback invites
-    const fbRows=[];
-    const newInvites=[];
 
     // Reply notifications
     let replyNotifsRaw=[];
@@ -4590,7 +4633,7 @@ async function loadNotifDrop(dropId){
     const reactNotifsDrop=await loadReactNotifs();
     const seenReactsDrop=JSON.parse(localStorage.getItem('seen_reacts_'+me)||'[]');
     const newReactsDrop=(reactNotifsDrop||[]).filter(function(r){return !seenReactsDrop.includes(r.id);});
-    if(!rows.length&&!newInvites.length&&!newReactsDrop.length){
+    if(!rows.length&&!newReactsDrop.length){
       el.innerHTML='<div class="notif-drop-empty">No notifications yet</div>';
       return;
     }
@@ -4656,11 +4699,6 @@ function markNotifRead(id){
   loadNotifications(); // refresh badges
 }
 
-function markInviteSeen(id){
-  const seen=JSON.parse(sessionStorage.getItem('seen_invites_session_'+me)||'[]');
-  if(!seen.includes(id)){seen.push(id);sessionStorage.setItem('seen_invites_session_'+me,JSON.stringify(seen));}
-  loadNotifications();
-}
 
 
 let selectedMood=0;
@@ -4810,7 +4848,9 @@ function renderPoll(disc){
   if(!disc.poll_options || !disc.poll_options.length) return '';
   const votes = disc.poll_votes || {};
   const total = Object.values(votes).reduce((a,v)=>a+(Array.isArray(v)?v.length:0),0);
-  const myVote = Object.entries(votes).find(([opt,voters])=>Array.isArray(voters)&&voters.includes(me));
+  // Also check localStorage for instant vote feedback
+  const localVote=localStorage.getItem('poll_vote_'+disc.id);
+  const myVote = Object.entries(votes).find(([opt,voters])=>Array.isArray(voters)&&voters.includes(me)) || (localVote?[localVote,[me]]:null);
   const myOpt = myVote ? myVote[0] : null;
   const closed = disc.poll_closed === true;
 
@@ -4834,7 +4874,7 @@ function renderPoll(disc){
     } else {
       // Show vote buttons
       html += '<button data-disc="'+disc.id+'" data-opt="'+encodeURIComponent(opt)+'" onclick="castVote(this.dataset.disc, decodeURIComponent(this.dataset.opt))" '+
-        'style="display:block;width:100%;text-align:left;padding:9px 12px;margin-bottom:6px;border-radius:8px;border:1.5px solid #e2e8f0;background:#fff;font-size:13px;cursor:pointer;font-family:inherit;transition:all .12s;" '+
+        'class="poll-vote-btn" style="display:block;width:100%;text-align:left;padding:9px 12px;margin-bottom:6px;border-radius:8px;border:1.5px solid #e2e8f0;background:#fff;font-size:13px;cursor:pointer;font-family:inherit;touch-action:manipulation;" '+
         'ontouchend="event.preventDefault();castVote(this.dataset.disc, decodeURIComponent(this.dataset.opt))">'+opt+'</button>';
     }
   });
@@ -4850,26 +4890,33 @@ function renderPoll(disc){
   return html;
 }
 
-async function castVote(discId, option){
-  try{
-    // Get current votes
-    const rows = await sbGet('discussions','?id=eq.'+discId+'&select=poll_votes,poll_options');
-    if(!rows.length) return;
-    const votes = rows[0].poll_votes || {};
-    // Remove previous vote
-    Object.keys(votes).forEach(opt=>{ 
-      if(Array.isArray(votes[opt])) votes[opt]=votes[opt].filter(v=>v!==me);
+function castVote(discId, option){
+  // Store vote locally for instant UI update
+  const voteKey='poll_vote_'+discId;
+  localStorage.setItem(voteKey, option);
+  // Re-render poll instantly from cached data
+  updatePollUI(discId, option);
+  // Fire-and-forget to Supabase
+  sbGet('discussions','?id=eq.'+discId+'&select=poll_votes').then(function(rows){
+    const votes = (rows.length && rows[0].poll_votes) ? rows[0].poll_votes : {};
+    Object.keys(votes).forEach(function(opt){
+      if(Array.isArray(votes[opt])) votes[opt]=votes[opt].filter(function(v){return v!==me;});
     });
-    // Add new vote
-    if(!votes[option]) votes[option] = [];
+    if(!votes[option]) votes[option]=[];
     votes[option].push(me);
-    await fetch(SB+'/rest/v1/discussions?id=eq.'+discId,{
+    fetch(SB+'/rest/v1/discussions?id=eq.'+discId,{
       method:'PATCH',
       headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
       body:JSON.stringify({poll_votes:votes})
-    });
-    loadDiscussions();
-  }catch(e){ console.warn(e); showToast('Failed to vote'); }
+    }).catch(function(e){console.warn(e);});
+  }).catch(function(e){console.warn(e);});
+}
+
+function updatePollUI(discId, selectedOpt){
+  // Find the poll container and swap vote buttons for results
+  const disc=document.querySelector('.react-wrap[data-id="'+discId+'"]');
+  // Just reload discussions once - it's fast enough since we removed the await
+  loadDiscussions();
 }
 
 async function closePoll(discId){
