@@ -1873,8 +1873,7 @@ body.ready{visibility:visible;}
           <div style="display:flex;gap:8px;align-items:center;"><input type="date" id="profBirthday" class="f-input" style="flex:1;"><button class="btn btn-green" style="padding:10px 16px;" onclick="saveBirthday()">Save</button></div>
           <div style="font-size:11px;color:#94a3b8;margin-top:8px;">Only visible to admins.</div>
         </div>
-        <div class="card" style="margin-bottom:12px;" id="pushCard">
-          <div class="card-hd"><div class="card-title">Notifications</div></div>
+        </div>
           <div style="display:flex;align-items:center;justify-content:space-between;">
             <div><div style="font-size:13px;font-weight:600;color:#0f172a;">Push Notifications</div><div style="font-size:11px;color:#94a3b8;margin-top:2px;" id="pushStatusText">Tap Enable to get notified</div></div>
             <div style="display:flex;gap:6px;">
@@ -2721,7 +2720,6 @@ async function enterHub(){
   buildAvailForm();
   showSchedTab('leave'); // default schedule sub-tab
   Promise.all([loadHomeData(),loadNotifications(),loadLeaveHistory(),refreshAnnBadge(),loadHomeAnnPreview(),loadHomeDiscPreview(),maybeShowOnboarding(),checkFeedbackInvites(),checkNewNotifications()]);
-  setTimeout(async function(){ await registerPush(); checkPushStatus(); }, 1500);
   startAutoRefresh();
   loadBirthdays();
   // Restore from URL hash if present
@@ -3355,11 +3353,6 @@ async function sendMeetingInvite(id){
     }
     showToast('Invite sent');
     await loadAdminFeedback2();
-    // Notify the staff member
-    const fbRow=await sbGet('feedback','?id=eq.'+id+'&select=staff_name');
-    if(fbRow&&fbRow.length&&fbRow[0].staff_name){
-      sendPush(fbRow[0].staff_name,'Meeting Invitation','Your manager would like to meet with you to discuss your feedback.','meeting-invite');
-    }
   }catch(e){
     console.warn(e);
     showToast('Failed: '+e.message);
@@ -4691,196 +4684,6 @@ function showToast(msg){
     t.style.opacity='0';
     t.style.transform='translateX(-50%) translateY(20px)';
   },2500);
-}
-
-
-// ── PUSH NOTIFICATIONS ──
-const VAPID_PUBLIC_KEY = 'BFoLm2h2XyzORCUsY3hl00mcV2MsRmt5juaJdD5cgGze5XCq_8izDQvAWACqiTVCzxvQ26E9oh6RF-GVLsRases';
-
-function urlBase64ToUint8Array(base64String) {
-  const padding = '='.repeat((4 - base64String.length % 4) % 4);
-  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
-  const rawData = atob(base64);
-  return new Uint8Array([...rawData].map(c => c.charCodeAt(0)));
-}
-
-async function registerPush() {
-  if (!('serviceWorker' in navigator)) { console.warn('Push: no serviceWorker support'); return; }
-  if (!('PushManager' in window)) { console.warn('Push: no PushManager support'); return; }
-  try {
-    const reg = await navigator.serviceWorker.register('/Oscar/sw.js');
-    console.log('SW registered:', reg.scope);
-    await navigator.serviceWorker.ready;
-    console.log('SW ready');
-    let sub = await reg.pushManager.getSubscription();
-    if (sub) {
-      console.log('Already subscribed, saving to DB');
-      await savePushSub(sub);
-      return;
-    }
-    // Don't auto-prompt — wait for user to tap Enable button
-    updatePushBtn('idle');
-  } catch(e) { console.warn('Push registration failed:', e.message); }
-}
-
-async function enablePushNotifications() {
-  const txt = document.getElementById('pushStatusText');
-  const btn = document.getElementById('pushEnableBtn');
-
-  if (!('serviceWorker' in navigator)) { showToast('Not supported on this browser'); return; }
-  if (!('PushManager' in window)) { showToast('On iOS: add to Home Screen first, then try again'); return; }
-
-  try {
-    // Step 1: register and wait for SW to be fully active
-    if(txt) txt.textContent = 'Registering...';
-    const reg = await navigator.serviceWorker.register('/Oscar/sw.js');
-
-    // Force activation if waiting
-    if(reg.waiting) reg.waiting.postMessage({type:'SKIP_WAITING'});
-    if(reg.installing){
-      await new Promise(resolve => {
-        reg.installing.addEventListener('statechange', function fn(e){
-          if(e.target.state === 'activated'){ reg.installing && reg.installing.removeEventListener('statechange',fn); resolve(); }
-        });
-      });
-    }
-
-    // Wait for ready with 8s timeout
-    await Promise.race([
-      navigator.serviceWorker.ready,
-      new Promise((_,rej) => setTimeout(() => rej(new Error('SW timeout')), 8000))
-    ]);
-    if(txt) txt.textContent = 'Requesting permission...';
-
-    // Step 2: permission
-    const perm = await Notification.requestPermission();
-    if(perm !== 'granted'){
-      showToast('Notifications blocked — check browser settings');
-      if(txt) txt.textContent = 'Blocked — enable in settings';
-      return;
-    }
-
-    // Step 3: subscribe
-    if(txt) txt.textContent = 'Subscribing...';
-    const ready = await navigator.serviceWorker.ready;
-    let sub = await ready.pushManager.getSubscription();
-    if(!sub){
-      sub = await ready.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
-      });
-    }
-
-    // Step 4: save
-    await savePushSub(sub);
-
-    if(txt) txt.textContent = 'Enabled ✓';
-    if(btn){ btn.textContent = 'Enabled'; btn.style.background = '#16a34a'; btn.disabled = true; }
-    const testBtn = document.getElementById('pushTestBtn');
-    if(testBtn) testBtn.style.display = 'inline-block';
-
-    // Show a test notification immediately so they know it worked
-    setTimeout(() => triggerLocalPush('Notifications enabled!', 'You will now receive updates from Oscars'), 500);
-
-  } catch(e) {
-    console.error('[Push enable]', e);
-    showToast('Error: ' + e.message);
-    if(txt) txt.textContent = 'Setup failed — try again';
-  }
-}
-
-
-
-async function savePushSub(sub) {
-  await fetch(SB + '/rest/v1/push_subscriptions', {
-    method: 'POST',
-    headers: { 'apikey': KEY, 'Authorization': 'Bearer ' + KEY, 'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates' },
-    body: JSON.stringify({ staff_name: me, subscription: sub.toJSON() })
-  });
-}
-
-function updatePushBtn(state) {
-  const btn = document.getElementById('pushEnableBtn');
-  if (!btn) return;
-  if (state === 'enabled') { btn.style.display = 'none'; return; }
-  btn.style.display = 'flex';
-}
-
-async function checkPushStatus() {
-  const btn = document.getElementById('pushEnableBtn');
-  const txt = document.getElementById('pushStatusText');
-  const hasSW = 'serviceWorker' in navigator;
-  const hasPush = 'PushManager' in window;
-  const isHTTPS = location.protocol === 'https:';
-  if (!hasSW || !hasPush || !isHTTPS) {
-    const reason = !isHTTPS ? 'Needs HTTPS' : !hasSW ? 'No SW support' : 'No Push support (iOS: add to Home Screen)';
-    if (txt) txt.textContent = reason;
-    if (btn) btn.style.display = 'none';
-    return;
-  }
-  if (Notification.permission === 'denied') {
-    if (txt) txt.textContent = 'Blocked — enable in browser settings';
-    if (btn) { btn.textContent = 'Blocked'; btn.style.background = '#94a3b8'; btn.disabled = true; }
-    return;
-  }
-  try {
-    const reg = await navigator.serviceWorker.ready;
-    const sub = await reg.pushManager.getSubscription();
-    if (sub) {
-      if (txt) txt.textContent = 'Enabled ✓';
-      if (btn) { btn.textContent = 'Enabled'; btn.style.background = '#16a34a'; btn.disabled = true; }
-      const testBtn = document.getElementById('pushTestBtn'); if(testBtn) testBtn.style.display = 'block';
-    } else {
-      if (txt) txt.textContent = 'Tap Enable to get notified';
-      if (btn) { btn.textContent = 'Enable'; btn.style.background = '#2563eb'; btn.disabled = false; }
-    }
-  } catch(e) {
-    if (txt) txt.textContent = 'Tap Enable to get notified';
-  }
-}
-
-
-async function triggerLocalPush(title, body, tag){
-  if(Notification.permission !== 'granted') return;
-  try{
-    // Always go through SW — required for iOS, works everywhere
-    const reg = await navigator.serviceWorker.ready;
-    await reg.showNotification(title, {
-      body: body || '',
-      tag: tag || 'oscars',
-      icon: 'https://oscarstaff.github.io/Oscar/icon-192.png',
-      vibrate: [100, 50, 100],
-      renotify: true,
-      data: { url: 'https://oscarstaff.github.io/Oscar/' }
-    });
-    console.log('[Push] Notification shown:', title);
-  }catch(e){
-    console.warn('[Push] Failed:', e.message);
-    // Last resort fallback for desktop browsers
-    try{ new Notification(title, { body: body }); }catch(_){}
-  }
-}
-
-
-
-async function testPush(){
-  console.log('Permission:', Notification.permission);
-  if(Notification.permission !== 'granted'){ showToast('Permission: '+Notification.permission); return; }
-  try{
-    await triggerLocalPush('Test Notification', 'Push is working!', 'test');
-    showToast('Notification sent!');
-  }catch(e){ showToast('Error: '+e.message); console.error(e); }
-}
-
-async function sendPush(staffName, title, body, tag) {
-  // Call Supabase Edge Function
-  try {
-    await fetch('https://jcfgldqrdbfkgbixszds.supabase.co/functions/v1/send-push', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'apikey': KEY, 'Authorization': 'Bearer ' + KEY },
-      body: JSON.stringify({ staff_name: staffName, title, body, tag: tag || 'oscars', url: 'https://oscarstaff.github.io' })
-    });
-  } catch(e) { console.warn('Push send failed:', e); }
 }
 
 
