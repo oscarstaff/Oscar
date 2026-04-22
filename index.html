@@ -1654,6 +1654,26 @@ body.ready{visibility:visible;}
 .slack-convo-row.unread{background:rgba(18,100,163,.05);}
 
 /* Dark mode */
+
+.slack-msg-row{position:relative;}
+.slack-msg-actions{
+  position:absolute;top:-6px;right:18px;
+  background:#fff;border:1px solid #e5e7eb;border-radius:6px;
+  padding:2px;display:none;gap:2px;
+  box-shadow:0 2px 8px rgba(0,0,0,.08);
+  z-index:3;
+}
+.slack-msg-row:hover .slack-msg-actions{display:flex;}
+.slack-msg-action{
+  background:none;border:none;cursor:pointer;
+  padding:4px 8px;border-radius:4px;font-size:13px;
+  color:#475569;transition:background .1s;font-family:inherit;
+}
+.slack-msg-action:hover{background:#f1f5f9;}
+[data-theme="dark"] .slack-msg-actions{background:#2a2d31;border-color:#444;}
+[data-theme="dark"] .slack-msg-action{color:#d1d2d3;}
+[data-theme="dark"] .slack-msg-action:hover{background:#3a3d41;}
+
 [data-theme="dark"] .slack-thread{background:#1a1d21;}
 [data-theme="dark"] .slack-thread-hd{background:#1a1d21;border-color:#333;}
 [data-theme="dark"] .slack-thread-name,[data-theme="dark"] .slack-msg-author,[data-theme="dark"] .slack-msg-text{color:#d1d2d3;}
@@ -2115,6 +2135,7 @@ body.ready{visibility:visible;}
               <div id="msgThreadSub" class="slack-thread-sub">Direct message</div>
             </div>
           </div>
+          <button id="msgSoundToggle" onclick="toggleMsgSound()" title="Toggle sound" style="background:none;border:none;cursor:pointer;padding:6px;border-radius:4px;color:#475569;display:flex;align-items:center;"><svg width="18" height="18" viewBox="0 0 20 20" fill="currentColor"><path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z"/></svg></button>
         </div>
         <div id="msgThreadList" class="slack-msg-list"></div>
         <div class="slack-compose-wrap">
@@ -2137,6 +2158,12 @@ body.ready{visibility:visible;}
         </div>
         <div style="padding:10px 14px;border-bottom:1px solid #f1f5f9;">
           <input type="text" id="newChatSearch" placeholder="Search staff..." class="f-input" oninput="filterNewChatStaff()" style="font-size:13px;">
+        </div>
+        <div style="padding:8px 14px;border-bottom:1px solid #f1f5f9;">
+          <button onclick="openNewGroupPicker()" style="width:100%;background:none;border:1px solid #e5e7eb;border-radius:8px;padding:10px;font-size:13px;font-weight:600;color:#2563eb;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px;">
+            <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor"><path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z"/></svg>
+            Create Group Chat
+          </button>
         </div>
         <div id="newChatStaffList" style="flex:1;overflow-y:auto;padding:6px 8px;"></div>
       </div>
@@ -4136,6 +4163,7 @@ document.addEventListener('keydown', _unlockAudio, {once:true});
 
 // ── MESSAGE SOUND ──
 function playMsgSound(){
+  if(localStorage.getItem('msg_sound_off')==='1') return;
   try{
     // WhatsApp-like two-tone: 880Hz then 1320Hz
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -4160,6 +4188,86 @@ function playMsgSound(){
   }catch(e){}
 }
 
+
+function toggleMsgSound(){
+  const off = localStorage.getItem('msg_sound_off') === '1';
+  if(off){ localStorage.removeItem('msg_sound_off'); showToast('Sound on'); }
+  else { localStorage.setItem('msg_sound_off','1'); showToast('Sound muted'); }
+  updateSoundToggleIcon();
+}
+function updateSoundToggleIcon(){
+  const btn = document.getElementById('msgSoundToggle');
+  if(!btn) return;
+  const off = localStorage.getItem('msg_sound_off') === '1';
+  const bellOn = '<svg width="18" height="18" viewBox="0 0 20 20" fill="currentColor"><path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z"/></svg>';
+  const bellOff = '<svg width="18" height="18" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3.28 2.22a.75.75 0 00-1.06 1.06l14.5 14.5a.75.75 0 101.06-1.06L15 13.94V8a6 6 0 00-6-6 5.97 5.97 0 00-2.73.66L3.28 2.22zm12.22 11.28L4.5 2.5A5.98 5.98 0 004 8v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.5-1.5zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" clip-rule="evenodd"/></svg>';
+  btn.innerHTML = off ? bellOff : bellOn;
+  btn.style.color = off ? '#94a3b8' : '#475569';
+}
+
+
+
+function startEditMsg(id){
+  const msg = _lastThreadRows.find(function(m){return m.id === id;});
+  if(!msg) return;
+  const textEl = document.getElementById('msg-text-'+id);
+  if(!textEl) return;
+  const safeBody = escapeMsg(msg.body);
+  textEl.innerHTML =
+    '<textarea id="edit-input-'+id+'" style="width:100%;border:1.5px solid #1264a3;border-radius:6px;padding:6px 8px;font-size:14.5px;font-family:inherit;resize:vertical;min-height:40px;outline:none;box-sizing:border-box;">'+safeBody+'</textarea>' +
+    '<div style="margin-top:4px;display:flex;gap:6px;align-items:center;">' +
+      '<button data-mid="'+id+'" onclick="saveEditMsg(this.dataset.mid)" style="background:#007a5a;color:#fff;border:none;border-radius:4px;padding:4px 12px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;">Save</button>' +
+      '<button data-mid="'+id+'" onclick="cancelEditMsg(this.dataset.mid)" style="background:none;border:none;color:#1264a3;cursor:pointer;font-size:11px;font-weight:600;font-family:inherit;">Cancel</button>' +
+    '</div>';
+  const input = document.getElementById('edit-input-'+id);
+  input.focus();
+  input.setSelectionRange(input.value.length, input.value.length);
+  input.addEventListener('keydown', function(e){
+    if(e.key === 'Escape'){ e.preventDefault(); cancelEditMsg(id); }
+    if(e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); saveEditMsg(id); }
+  });
+}
+
+function cancelEditMsg(id){
+  renderMsgThread(_lastThreadRows);
+}
+
+async function saveEditMsg(id){
+  const input = document.getElementById('edit-input-'+id);
+  if(!input) return;
+  const newBody = input.value.trim();
+  if(!newBody) return;
+  try{
+    const res = await fetch(SB+'/rest/v1/messages?id=eq.'+id,{
+      method:'PATCH',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=representation'},
+      body:JSON.stringify({body:newBody, edited_at:new Date().toISOString()})
+    });
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const saved = await res.json();
+    const idx = _lastThreadRows.findIndex(function(m){return m.id === id;});
+    if(idx>=0 && Array.isArray(saved) && saved[0]) _lastThreadRows[idx] = saved[0];
+    renderMsgThread(_lastThreadRows);
+  }catch(e){ showToast('Failed to edit'); }
+}
+
+async function unsendMsg(id){
+  if(!confirm('Unsend this message?')) return;
+  try{
+    const res = await fetch(SB+'/rest/v1/messages?id=eq.'+id,{
+      method:'PATCH',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({deleted:true, body:''})
+    });
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const idx = _lastThreadRows.findIndex(function(m){return m.id === id;});
+    if(idx>=0){ _lastThreadRows[idx].deleted = true; _lastThreadRows[idx].body = ''; }
+    renderMsgThread(_lastThreadRows);
+    showToast('Message unsent');
+  }catch(e){ showToast('Failed to unsend'); }
+}
+
+
 // ── MESSAGING ──
 let _msgAllStaff = [];
 let _msgConvos = [];
@@ -4179,14 +4287,35 @@ async function loadMsgConvos(){
   const el = document.getElementById('msgConvoList');
   if(!el) return;
   try{
-    const rows = await sbGet('messages','?or=(sender.eq.'+encodeURIComponent(me)+',recipient.eq.'+encodeURIComponent(me)+')&order=created_at.desc');
-    const convoMap = {};
-    rows.forEach(function(m){
+    // 1. Fetch DM messages
+    const dmRows = await sbGet('messages','?or=(sender.eq.'+encodeURIComponent(me)+',recipient.eq.'+encodeURIComponent(me)+')&group_id=is.null&order=created_at.desc');
+    const dmMap = {};
+    dmRows.forEach(function(m){
       const peer = m.sender === me ? m.recipient : m.sender;
-      if(!convoMap[peer]) convoMap[peer] = {peer:peer, lastMsg:m, unread:0};
-      if(m.sender !== me && !m.read_at) convoMap[peer].unread++;
+      if(!peer) return;
+      if(!dmMap[peer]) dmMap[peer] = {type:'dm', peer:peer, lastMsg:m, unread:0};
+      if(m.sender !== me && !m.read_at) dmMap[peer].unread++;
     });
-    _msgConvos = Object.values(convoMap).sort(function(a,b){
+
+    // 2. Fetch my group memberships
+    const memberships = await sbGet('group_members','?staff_name=eq.'+encodeURIComponent(me)+'&select=group_id');
+    const groupIds = memberships.map(function(m){return m.group_id;});
+    let groupConvos = [];
+    if(groupIds.length){
+      const groupsData = await sbGet('groups','?id=in.('+groupIds.join(',')+')');
+      // Get latest message per group
+      for(const g of groupsData){
+        const msgs = await sbGet('messages','?group_id=eq.'+g.id+'&order=created_at.desc&limit=20');
+        if(!msgs.length) {
+          groupConvos.push({type:'group', groupId:g.id, name:g.name, lastMsg:{body:'Group created', created_at:g.created_at, sender:g.created_by}, unread:0});
+          continue;
+        }
+        const unread = msgs.filter(function(m){return m.sender !== me && !m.read_at;}).length;
+        groupConvos.push({type:'group', groupId:g.id, name:g.name, lastMsg:msgs[0], unread:unread});
+      }
+    }
+
+    _msgConvos = [].concat(Object.values(dmMap), groupConvos).sort(function(a,b){
       return new Date(b.lastMsg.created_at) - new Date(a.lastMsg.created_at);
     });
     renderMsgConvoList(_msgConvos);
@@ -4211,27 +4340,36 @@ function renderMsgConvoList(list){
     return;
   }
   el.innerHTML = list.map(function(c){
-    const ava = c.peer.split(' ').map(function(w){return w[0];}).join('').slice(0,2).toUpperCase();
+    const isGroup = c.type === 'group';
+    const displayName = isGroup ? c.name : c.peer;
+    const clickHandler = isGroup ? 'openGroupThread(\''+c.groupId+'\')' : 'openMsgThread(this.dataset.peer)';
+    const menuPeer = isGroup ? 'group:'+c.groupId : c.peer;
+    const ava = displayName.split(' ').map(function(w){return w[0];}).join('').slice(0,2).toUpperCase();
     const t = new Date(c.lastMsg.created_at + (c.lastMsg.created_at.endsWith('Z') || c.lastMsg.created_at.includes('+') ? '' : 'Z'));
     const now = new Date();
     const isToday = t.toDateString() === now.toDateString();
     const timeStr = isToday ? t.toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit',timeZone:'Australia/Sydney'}) : t.toLocaleDateString('en-AU',{day:'numeric',month:'short',timeZone:'Australia/Sydney'});
     const isMine = c.lastMsg.sender === me;
-    const preview = (isMine ? 'You: ' : '') + escapeMsg((c.lastMsg.body || '').slice(0,70));
+    let preview;
+    if(c.lastMsg.deleted) preview = (isMine?'You: ':'') + '[unsent]';
+    else if(isGroup && !isMine) preview = escapeMsg(c.lastMsg.sender.split(' ')[0]) + ': ' + escapeMsg((c.lastMsg.body||'').slice(0,60));
+    else preview = (isMine ? 'You: ' : '') + escapeMsg((c.lastMsg.body || '').slice(0,70));
     const unreadBadge = c.unread ? '<div style="background:#e01e5a;color:#fff;font-size:10px;font-weight:700;min-width:20px;height:20px;border-radius:10px;padding:0 7px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">'+c.unread+'</div>' : '';
     const unreadCls = c.unread ? ' unread' : '';
-    const color = _avaColor(c.peer);
-    return '<div class="slack-convo-row'+unreadCls+'" data-peer="'+c.peer.replace(/"/g,'&quot;')+'" onclick="openMsgThread(this.dataset.peer)" oncontextmenu="event.preventDefault();showConvoMenu(event, this.dataset.peer)">'+
-      '<div style="width:36px;height:36px;border-radius:6px;background:'+color+';color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">'+ava+'</div>'+
+    const color = _avaColor(displayName);
+    const prefix = isGroup ? '# ' : '@';
+    const groupIcon = isGroup ? '<svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor" style="margin-right:3px;vertical-align:-2px;"><path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z"/></svg>' : '';
+    return '<div class="slack-convo-row'+unreadCls+'" data-peer="'+(isGroup?c.groupId:c.peer.replace(/"/g,'&quot;'))+'" data-type="'+(isGroup?'group':'dm')+'" onclick="'+(isGroup?'openGroupThread(this.dataset.peer)':'openMsgThread(this.dataset.peer)')+'" oncontextmenu="event.preventDefault();showConvoMenu(event, this.dataset.peer, this.dataset.type)">'+
+      '<div style="width:36px;height:36px;border-radius:6px;background:'+color+';color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">'+(isGroup?groupIcon:ava)+'</div>'+
       '<div style="flex:1;min-width:0;">'+
         '<div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;">'+
-          '<div style="font-size:14px;font-weight:'+(c.unread?'900':'600')+';color:#1d1c1d;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">@'+c.peer+'</div>'+
+          '<div style="font-size:14px;font-weight:'+(c.unread?'900':'600')+';color:#1d1c1d;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+prefix+displayName+'</div>'+
           '<div style="font-size:11px;color:#616061;flex-shrink:0;">'+timeStr+'</div>'+
         '</div>'+
         '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:2px;">'+
           '<div style="font-size:13px;color:'+(c.unread?'#1d1c1d':'#616061')+';font-weight:'+(c.unread?'600':'400')+';white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;">'+preview+'</div>'+
           unreadBadge+
-          '<button class="convo-menu-btn" data-peer="'+c.peer.replace(/"/g,'&quot;')+'" onclick="event.stopPropagation();showConvoMenu(event, this.dataset.peer)" style="background:none;border:none;cursor:pointer;padding:4px 6px;border-radius:4px;color:#94a3b8;opacity:0;transition:opacity .15s;">⋯</button>'+
+          '<button class="convo-menu-btn" data-peer="'+(isGroup?c.groupId:c.peer.replace(/"/g,'&quot;'))+'" data-type="'+(isGroup?'group':'dm')+'" onclick="event.stopPropagation();showConvoMenu(event, this.dataset.peer, this.dataset.type)" style="background:none;border:none;cursor:pointer;padding:4px 6px;border-radius:4px;color:#94a3b8;opacity:0;transition:opacity .15s;">⋯</button>'+
         '</div>'+
       '</div>'+
       '</div>';
@@ -4299,6 +4437,7 @@ async function openMsgThread(peer){
   avaEl.textContent = ava;
   avaEl.style.background = _avaColor(peer);
   document.getElementById('msgThreadName').textContent = peer;
+  updateSoundToggleIcon();
   const list = document.getElementById('msgThreadList');
   list.innerHTML = '<div style="text-align:center;color:#94a3b8;padding:20px;font-size:12px;">Loading...</div>';
   try{
@@ -4365,13 +4504,29 @@ function renderMsgThread(rows){
     const color = _avaColor(m.sender);
     const rowCls = 'slack-msg-row' + (grouped ? ' grouped' : '');
     const pendingStyle = m._pending ? ';opacity:.55;' : '';
+    const isMine = m.sender === me;
+    const ageSec = (Date.now() - t.getTime())/1000;
+    const canUnsend = isMine && !m._pending && !m.deleted && ageSec < 300;
+    const canEdit = isMine && !m._pending && !m.deleted && ageSec < 600;
+    const editedBadge = m.edited_at ? '<span style="font-size:10px;color:#94a3b8;margin-left:6px;font-weight:400;">(edited)</span>' : '';
+    let actions = '';
+    if(canEdit || canUnsend){
+      actions = '<div class="slack-msg-actions">';
+      if(canEdit) actions += '<button class="slack-msg-action" title="Edit" data-mid="'+m.id+'" onclick="startEditMsg(this.dataset.mid)"><svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/></svg></button>';
+      if(canUnsend) actions += '<button class="slack-msg-action" title="Unsend" data-mid="'+m.id+'" onclick="unsendMsg(this.dataset.mid)"><svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"/></svg></button>';
+      actions += '</div>';
+    }
+    const msgText = m.deleted
+      ? '<div class="slack-msg-text" style="color:#94a3b8;font-style:italic;">This message was unsent.</div>'
+      : '<div class="slack-msg-text" id="msg-text-'+m.id+'">'+escapeMsg(m.body)+editedBadge+'</div>';
     parts.push(
       '<div class="'+rowCls+'" style="'+pendingStyle+'">'+
         '<div class="slack-msg-ava-wrap"><div class="slack-msg-ava" style="background:'+color+';">'+ava+'</div></div>'+
         '<div class="slack-msg-body">'+
           (grouped ? '' : '<div class="slack-msg-header"><span class="slack-msg-author">'+m.sender+'</span><span class="slack-msg-time">'+timeStr+'</span></div>')+
-          '<div class="slack-msg-text">'+escapeMsg(m.body)+'</div>'+
+          msgText+
         '</div>'+
+        actions+
       '</div>'
     );
   });
@@ -4437,8 +4592,19 @@ async function sendMessage(){
 
 async function updateMsgBadges(){
   try{
-    const rows = await sbGet('messages','?recipient=eq.'+encodeURIComponent(me)+'&read_at=is.null&select=id');
-    const count = rows.length;
+    // Count unread DMs
+    const dms = await sbGet('messages','?recipient=eq.'+encodeURIComponent(me)+'&read_at=is.null&select=id');
+    // Count unread group messages
+    let groupCount = 0;
+    try{
+      const myGroups = await sbGet('group_members','?staff_name=eq.'+encodeURIComponent(me)+'&select=group_id');
+      if(myGroups.length){
+        const gIds = myGroups.map(function(m){return m.group_id;}).join(',');
+        const gMsgs = await sbGet('messages','?group_id=in.('+gIds+')&sender=neq.'+encodeURIComponent(me)+'&read_at=is.null&select=id');
+        groupCount = gMsgs.length;
+      }
+    }catch(e){}
+    const count = dms.length + groupCount;
     const b1 = document.getElementById('msgBadge');
     const b2 = document.getElementById('bnMsgBadge');
     if(b1){ b1.textContent = count; b1.style.display = count ? 'inline' : 'none'; }
@@ -4451,18 +4617,38 @@ function setupMsgRealtime(){
   if(_msgRealtimeCh){ try{ _realtimeClient.removeChannel(_msgRealtimeCh); }catch(e){} }
   _msgRealtimeCh = _realtimeClient
     .channel('messages-live')
-    .on('postgres_changes', {event:'INSERT', schema:'public', table:'messages'}, function(payload){
+    .on('postgres_changes', {event:'UPDATE', schema:'public', table:'messages'}, function(payload){
       const m = payload.new;
       if(!m) return;
       if(m.sender !== me && m.recipient !== me) return;
-      const isIncoming = (m.recipient === me && m.sender !== me);
+      const idx = _lastThreadRows.findIndex(function(r){return r.id === m.id;});
+      if(idx >= 0){
+        _lastThreadRows[idx] = m;
+        if(_msgCurrentPeer && (m.sender === _msgCurrentPeer || m.recipient === _msgCurrentPeer)){
+          renderMsgThread(_lastThreadRows);
+        }
+      }
+      const active = document.querySelector('#page-messages.active');
+      if(active) loadMsgConvos();
+    })
+    .on('postgres_changes', {event:'INSERT', schema:'public', table:'messages'}, function(payload){
+      const m = payload.new;
+      if(!m) return;
+      // Accept DMs involving me OR group messages where I'm a member
+      const isDmForMe = (m.sender === me || m.recipient === me) && !m.group_id;
+      const isGroupForMe = m.group_id && _currentGroupId === m.group_id;
+      const isGroupMessage = !!m.group_id;
+      if(!isDmForMe && !isGroupMessage) return;
+      // If group message but I'm not viewing that group, still update convo list
+      const isIncoming = (m.sender !== me && (isDmForMe || isGroupForMe));
       // Play sound only for incoming
       if(isIncoming) playMsgSound();
       // If viewing that thread, append instantly
-      if(_msgCurrentPeer && (m.sender === _msgCurrentPeer || m.recipient === _msgCurrentPeer)){
-        // Skip echoes of my own just-sent messages (already appended optimistically)
+      const viewingThisConv = (_msgCurrentPeer && (m.sender === _msgCurrentPeer || m.recipient === _msgCurrentPeer) && !m.group_id)
+        || (_currentGroupId && m.group_id === _currentGroupId);
+      if(viewingThisConv){
         if(m.sender === me && _lastThreadRows.some(function(r){return r.id === m.id;})){
-          // already there, nothing to do
+          // already there
         } else {
           appendMsgToThread(m);
         }
@@ -4565,6 +4751,371 @@ async function deleteConvo(){
     if(_msgCurrentPeer === peer) backToConvoList();
     else await loadMsgConvos();
   }catch(e){ showToast('Failed to delete'); }
+}
+
+
+
+// ── GROUP CHATS ──
+let _currentGroupId = null;
+let _currentGroupMembers = [];
+
+async function openGroupThread(groupId){
+  _currentGroupId = groupId;
+  _msgCurrentPeer = null;
+  document.getElementById('msgListView').style.display = 'none';
+  document.getElementById('msgThreadView').style.display = 'flex';
+  try{
+    const [groupData, members] = await Promise.all([
+      sbGet('groups','?id=eq.'+groupId),
+      sbGet('group_members','?group_id=eq.'+groupId+'&select=staff_name')
+    ]);
+    if(!groupData.length){ showToast('Group not found'); backToConvoList(); return; }
+    const g = groupData[0];
+    _currentGroupMembers = members.map(function(m){return m.staff_name;});
+    const ava = g.name.split(' ').map(function(w){return w[0];}).join('').slice(0,2).toUpperCase();
+    const avaEl = document.getElementById('msgThreadAva');
+    avaEl.textContent = ava;
+    avaEl.style.background = _avaColor(g.name);
+    document.getElementById('msgThreadName').textContent = '# ' + g.name;
+    const subEl = document.getElementById('msgThreadSub');
+    subEl.textContent = _currentGroupMembers.length + ' members · ' + _currentGroupMembers.slice(0,3).join(', ') + (_currentGroupMembers.length>3?', ...':'');
+    subEl.style.cursor = 'pointer';
+    subEl.onclick = function(){ openGroupInfoModal(groupId); };
+    updateSoundToggleIcon();
+    // Load messages
+    const rows = await sbGet('messages','?group_id=eq.'+groupId+'&order=created_at.asc');
+    _lastThreadRows = rows;
+    renderMsgThread(rows);
+    // Mark unread as read
+    const unreadIds = rows.filter(function(m){return m.sender !== me && !m.read_at;}).map(function(m){return m.id;});
+    unreadIds.forEach(function(id){
+      fetch(SB+'/rest/v1/messages?id=eq.'+id,{
+        method:'PATCH',
+        headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+        body:JSON.stringify({read_at:new Date().toISOString()})
+      }).catch(function(){});
+    });
+    if(unreadIds.length) setTimeout(updateMsgBadges, 400);
+  }catch(e){
+    console.error('openGroupThread:',e);
+    showToast('Could not open group');
+  }
+}
+
+// Override sendMessage to handle groups
+const _origSendMessage = window.sendMessage;
+async function sendGroupOrDmMessage(){
+  const input = document.getElementById('msgInput');
+  const body = (input.value||'').trim();
+  if(!body) return;
+  const btn = document.getElementById('msgSendBtn');
+  btn.disabled = true;
+  input.value = '';
+  autoGrowMsg(input);
+  const isGroup = !!_currentGroupId;
+  const tempMsg = {
+    id: 'temp-'+Date.now(),
+    sender: me,
+    recipient: isGroup ? null : _msgCurrentPeer,
+    group_id: isGroup ? _currentGroupId : null,
+    body: body,
+    created_at: new Date().toISOString(),
+    _pending: true
+  };
+  appendMsgToThread(tempMsg);
+  try{
+    const payload = isGroup
+      ? {sender:me, group_id:_currentGroupId, body:body}
+      : {sender:me, recipient:_msgCurrentPeer, body:body};
+    const res = await fetch(SB+'/rest/v1/messages',{
+      method:'POST',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=representation'},
+      body:JSON.stringify(payload)
+    });
+    if(!res.ok){ const t=await res.text(); throw new Error('HTTP '+res.status+': '+t); }
+    const saved = await res.json();
+    _lastThreadRows = _lastThreadRows.filter(function(m){return m.id !== tempMsg.id;});
+    if(Array.isArray(saved) && saved[0]){
+      const realId = saved[0].id;
+      if(!_lastThreadRows.some(function(m){return m.id === realId;})) _lastThreadRows.push(saved[0]);
+    }
+    renderMsgThread(_lastThreadRows);
+  }catch(e){
+    console.error('send:',e);
+    _lastThreadRows = _lastThreadRows.filter(function(m){return m.id !== tempMsg.id;});
+    renderMsgThread(_lastThreadRows);
+    input.value = body;
+    showToast('Failed: '+e.message);
+  }finally{
+    btn.disabled = false;
+  }
+}
+// Replace sendMessage
+window.sendMessage = sendGroupOrDmMessage;
+
+// Also update backToConvoList to clear group context
+const _origBack = window.backToConvoList;
+function backToConvoListExt(){
+  _currentGroupId = null;
+  _currentGroupMembers = [];
+  if(_origBack) _origBack();
+  else {
+    _msgCurrentPeer = null;
+    document.getElementById('msgListView').style.display = 'block';
+    document.getElementById('msgThreadView').style.display = 'none';
+    loadMsgConvos();
+  }
+}
+window.backToConvoList = backToConvoListExt;
+
+// ── NEW GROUP CREATION ──
+async function openNewGroupPicker(){
+  closeNewChatPicker();
+  const overlay = document.createElement('div');
+  overlay.id = 'newGroupOverlay';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:9100;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;';
+  overlay.onclick = function(e){ if(e.target===overlay) overlay.remove(); };
+  overlay.innerHTML =
+    '<div style="background:#fff;border-radius:14px;width:94%;max-width:440px;max-height:85dvh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.25);">' +
+      '<div style="padding:14px 16px;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;justify-content:space-between;">' +
+        '<div style="font-size:15px;font-weight:700;color:#0f172a;">New Group</div>' +
+        '<button id="newGroupCloseBtn" style="background:none;border:none;font-size:20px;color:#94a3b8;cursor:pointer;padding:4px 8px;">×</button>' +
+      '</div>' +
+      '<div style="padding:12px 16px;border-bottom:1px solid #f1f5f9;">' +
+        '<input type="text" id="newGroupName" placeholder="Group name" class="f-input" style="margin-bottom:8px;font-size:14px;font-weight:600;">' +
+        '<input type="text" id="newGroupSearch" placeholder="Search members to add..." class="f-input" style="font-size:13px;" oninput="filterNewGroupStaff()">' +
+      '</div>' +
+      '<div id="newGroupStaffList" style="flex:1;overflow-y:auto;padding:6px 8px;"></div>' +
+      '<div style="padding:12px 16px;border-top:1px solid #e5e7eb;display:flex;gap:8px;align-items:center;">' +
+        '<div id="newGroupSelectedCount" style="flex:1;font-size:12px;color:#64748b;">0 selected</div>' +
+        '<button onclick="createNewGroup()" class="btn btn-green" style="padding:9px 18px;">Create</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(overlay);
+  const _ngcb=document.getElementById('newGroupCloseBtn');if(_ngcb)_ngcb.onclick=function(){overlay.remove();};
+  try{
+    const names = await sbGet('staff_names','?order=name.asc');
+    _msgAllStaff = (names||[]).map(function(n){return n.name;}).filter(function(n){return n && n !== me;});
+    _newGroupSelected = new Set();
+    renderNewGroupStaffList(_msgAllStaff);
+  }catch(e){}
+}
+
+let _newGroupSelected = new Set();
+
+function renderNewGroupStaffList(names){
+  const list = document.getElementById('newGroupStaffList');
+  if(!list) return;
+  if(!names.length){ list.innerHTML = '<div style="text-align:center;color:#94a3b8;padding:32px;font-size:13px;">No matches</div>'; return; }
+  list.innerHTML = names.map(function(name){
+    const checked = _newGroupSelected.has(name);
+    const ava = name.split(' ').map(function(w){return w[0];}).join('').slice(0,2).toUpperCase();
+    return '<label data-name="'+name.replace(/"/g,'&quot;')+'" style="display:flex;align-items:center;gap:10px;padding:10px 8px;border-radius:8px;cursor:pointer;" onmouseover="this.style.background=\'#f8fafc\'" onmouseout="this.style.background=\'\'">'+
+      '<input type="checkbox" '+(checked?'checked':'')+' onchange="toggleGroupMember(this.closest(\'[data-name]\').dataset.name, this.checked)" style="cursor:pointer;">'+
+      '<div style="width:30px;height:30px;border-radius:50%;background:'+_avaColor(name)+';color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;">'+ava+'</div>'+
+      '<div style="font-size:13.5px;font-weight:600;color:#0f172a;">'+name+'</div>'+
+      '</label>';
+  }).join('');
+  updateGroupSelectedCount();
+}
+
+function filterNewGroupStaff(){
+  const q = (document.getElementById('newGroupSearch').value||'').trim().toLowerCase();
+  if(!q){ renderNewGroupStaffList(_msgAllStaff); return; }
+  renderNewGroupStaffList(_msgAllStaff.filter(function(n){return n.toLowerCase().includes(q);}));
+}
+
+function toggleGroupMember(name, checked){
+  if(checked) _newGroupSelected.add(name);
+  else _newGroupSelected.delete(name);
+  updateGroupSelectedCount();
+}
+
+function updateGroupSelectedCount(){
+  const el = document.getElementById('newGroupSelectedCount');
+  if(el) el.textContent = _newGroupSelected.size + ' selected';
+}
+
+async function createNewGroup(){
+  const nameInput = document.getElementById('newGroupName');
+  const groupName = (nameInput.value||'').trim();
+  if(!groupName){ showToast('Please enter a group name'); return; }
+  if(_newGroupSelected.size < 2){ showToast('Add at least 2 members'); return; }
+  try{
+    // Create group
+    const res = await fetch(SB+'/rest/v1/groups',{
+      method:'POST',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=representation'},
+      body:JSON.stringify({name:groupName, created_by:me})
+    });
+    if(!res.ok){ const t=await res.text(); throw new Error(t); }
+    const [group] = await res.json();
+    // Add me + members
+    const allMembers = [me].concat(Array.from(_newGroupSelected));
+    await fetch(SB+'/rest/v1/group_members',{
+      method:'POST',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify(allMembers.map(function(n){return {group_id:group.id, staff_name:n};}))
+    });
+    document.getElementById('newGroupOverlay').remove();
+    showToast('Group created');
+    await loadMsgConvos();
+    openGroupThread(group.id);
+  }catch(e){ showToast('Failed: '+e.message); }
+}
+
+async function openGroupInfoModal(groupId){
+  const existing = document.getElementById('groupInfoOverlay');
+  if(existing) existing.remove();
+  const overlay = document.createElement('div');
+  overlay.id = 'groupInfoOverlay';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:9100;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;';
+  overlay.onclick = function(e){ if(e.target===overlay) overlay.remove(); };
+  document.body.appendChild(overlay);
+  try{
+    const [groupData, members] = await Promise.all([
+      sbGet('groups','?id=eq.'+groupId),
+      sbGet('group_members','?group_id=eq.'+groupId+'&select=staff_name,added_at&order=added_at.asc')
+    ]);
+    if(!groupData.length){ overlay.remove(); return; }
+    const g = groupData[0];
+    const isCreator = g.created_by === me;
+    const card = document.createElement('div');
+    card.style.cssText = 'background:#fff;border-radius:14px;width:94%;max-width:420px;max-height:85dvh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.25);';
+    // Header
+    const hd = document.createElement('div');
+    hd.style.cssText = 'padding:14px 16px;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;justify-content:space-between;';
+    hd.innerHTML = '<div style="font-size:15px;font-weight:700;color:#0f172a;">Group Info</div>';
+    const closeBtn = document.createElement('button');
+    closeBtn.textContent = '×';
+    closeBtn.style.cssText = 'background:none;border:none;font-size:20px;color:#94a3b8;cursor:pointer;padding:4px 8px;';
+    closeBtn.onclick = function(){ overlay.remove(); };
+    hd.appendChild(closeBtn);
+    card.appendChild(hd);
+    // Top info
+    const topInfo = document.createElement('div');
+    topInfo.style.cssText = 'padding:16px;text-align:center;';
+    const ava = g.name.split(' ').map(function(w){return w[0];}).join('').slice(0,2).toUpperCase();
+    topInfo.innerHTML = '<div style="width:60px;height:60px;border-radius:12px;background:'+_avaColor(g.name)+';color:#fff;font-size:20px;font-weight:700;display:flex;align-items:center;justify-content:center;margin:0 auto 10px;">'+ava+'</div>'+
+      '<div style="font-size:18px;font-weight:700;color:#0f172a;">'+escapeMsg(g.name)+'</div>'+
+      '<div style="font-size:12px;color:#64748b;margin-top:4px;">Created by '+escapeMsg(g.created_by)+' · '+members.length+' members</div>';
+    card.appendChild(topInfo);
+    // Members list
+    const membersWrap = document.createElement('div');
+    membersWrap.style.cssText = 'padding:0 12px 8px;flex:1;overflow-y:auto;';
+    const heading = document.createElement('div');
+    heading.style.cssText = 'font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.8px;padding:6px 8px;';
+    heading.textContent = 'Members';
+    membersWrap.appendChild(heading);
+    members.forEach(function(m){
+      const isMe = m.staff_name === me;
+      const isGC = m.staff_name === g.created_by;
+      const mAva = m.staff_name.split(' ').map(function(w){return w[0];}).join('').slice(0,2).toUpperCase();
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:8px;';
+      row.innerHTML = '<div style="width:32px;height:32px;border-radius:50%;background:'+_avaColor(m.staff_name)+';color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;">'+mAva+'</div>'+
+        '<div style="flex:1;font-size:13px;font-weight:500;color:#0f172a;">'+escapeMsg(m.staff_name)+(isMe?' <span style="color:#94a3b8;font-weight:400;">(you)</span>':'')+(isGC?' <span style="font-size:10px;background:#fef3c7;color:#92400e;padding:1px 6px;border-radius:10px;font-weight:700;margin-left:4px;">Admin</span>':'')+'</div>';
+      if(isCreator && !isMe && !isGC){
+        const rmBtn = document.createElement('button');
+        rmBtn.textContent = 'Remove';
+        rmBtn.style.cssText = 'background:none;border:none;color:#dc2626;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;';
+        rmBtn.onclick = function(){ removeGroupMember(groupId, m.staff_name); };
+        row.appendChild(rmBtn);
+      }
+      membersWrap.appendChild(row);
+    });
+    card.appendChild(membersWrap);
+    // Footer actions
+    const footer = document.createElement('div');
+    footer.style.cssText = 'padding:12px;border-top:1px solid #e5e7eb;display:flex;gap:8px;';
+    if(isCreator){
+      const addBtn = document.createElement('button');
+      addBtn.className = 'btn btn-outline';
+      addBtn.style.flex = '1';
+      addBtn.textContent = '+ Add Members';
+      addBtn.onclick = function(){ addGroupMembers(groupId); };
+      const delBtn = document.createElement('button');
+      delBtn.style.cssText = 'background:#fef2f2;color:#dc2626;border:none;border-radius:8px;padding:10px 16px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;';
+      delBtn.textContent = 'Delete Group';
+      delBtn.onclick = function(){ deleteGroup(groupId); };
+      footer.appendChild(addBtn);
+      footer.appendChild(delBtn);
+    } else {
+      const leaveBtn = document.createElement('button');
+      leaveBtn.style.cssText = 'width:100%;background:#fef2f2;color:#dc2626;border:none;border-radius:8px;padding:10px 16px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;';
+      leaveBtn.textContent = 'Leave Group';
+      leaveBtn.onclick = function(){ leaveGroup(groupId); };
+      footer.appendChild(leaveBtn);
+    }
+    card.appendChild(footer);
+    overlay.appendChild(card);
+  }catch(e){ console.error(e); showToast('Failed'); overlay.remove(); }
+}
+
+async function removeGroupMember(groupId, staffName){
+  if(!confirm('Remove '+staffName+' from the group?')) return;
+  try{
+    await fetch(SB+'/rest/v1/group_members?group_id=eq.'+groupId+'&staff_name=eq.'+encodeURIComponent(staffName),{
+      method:'DELETE',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}
+    });
+    showToast('Removed');
+    const ov = document.getElementById('groupInfoOverlay');
+    if(ov) ov.remove();
+    openGroupInfoModal(groupId);
+  }catch(e){ showToast('Failed'); }
+}
+
+async function addGroupMembers(groupId){
+  // Simple prompt-based for now — could expand to full picker later
+  try{
+    const [names, existing] = await Promise.all([
+      sbGet('staff_names','?order=name.asc'),
+      sbGet('group_members','?group_id=eq.'+groupId+'&select=staff_name')
+    ]);
+    const existingSet = new Set(existing.map(function(m){return m.staff_name;}));
+    const available = (names||[]).map(function(n){return n.name;}).filter(function(n){return n && !existingSet.has(n);});
+    if(!available.length){ showToast('No one else to add'); return; }
+    const name = prompt('Who to add? Type their full name:\n\nAvailable: '+available.slice(0,10).join(', ')+(available.length>10?'...':''));
+    if(!name) return;
+    const matched = available.find(function(n){return n.toLowerCase() === name.toLowerCase().trim();});
+    if(!matched){ showToast('Not found'); return; }
+    await fetch(SB+'/rest/v1/group_members',{
+      method:'POST',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({group_id:groupId, staff_name:matched})
+    });
+    showToast(matched+' added');
+    const ov = document.getElementById('groupInfoOverlay');
+    if(ov) ov.remove();
+    openGroupInfoModal(groupId);
+  }catch(e){ showToast('Failed'); }
+}
+
+async function deleteGroup(groupId){
+  if(!confirm('Delete this group permanently? All messages will be lost.')) return;
+  try{
+    await fetch(SB+'/rest/v1/groups?id=eq.'+groupId,{
+      method:'DELETE',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}
+    });
+    showToast('Group deleted');
+    const ov = document.getElementById('groupInfoOverlay'); if(ov) ov.remove();
+    backToConvoList();
+  }catch(e){ showToast('Failed'); }
+}
+
+async function leaveGroup(groupId){
+  if(!confirm('Leave this group?')) return;
+  try{
+    await fetch(SB+'/rest/v1/group_members?group_id=eq.'+groupId+'&staff_name=eq.'+encodeURIComponent(me),{
+      method:'DELETE',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}
+    });
+    showToast('Left group');
+    const ov = document.getElementById('groupInfoOverlay'); if(ov) ov.remove();
+    backToConvoList();
+  }catch(e){ showToast('Failed'); }
 }
 
 
