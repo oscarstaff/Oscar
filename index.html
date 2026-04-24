@@ -1844,6 +1844,7 @@ html[data-sb="collapsed"] [id="nav-schedule"]:hover::after{content:"Schedule";}
 html[data-sb="collapsed"] [id="nav-announcements"]:hover::after{content:"Announcements";}
 html[data-sb="collapsed"] [id="nav-engagement"]:hover::after{content:"Engagement";}
 html[data-sb="collapsed"] [id="nav-calendar"]:hover::after{content:"Calendar";}
+html[data-sb="collapsed"] [id="nav-tasks"]:hover::after{content:"Tasks";}
 html[data-sb="collapsed"] [id="nav-documents"]:hover::after{content:"Documents";}
 html[data-sb="collapsed"] [id="nav-messages"]:hover::after{content:"Messages";}
 html[data-sb="collapsed"] [id="nav-profile"]:hover::after{content:"Profile";}
@@ -1877,6 +1878,50 @@ html[data-sb="collapsed"][data-theme="dark"] .sb-brand,
 .font-chip.active{background:var(--accent-dim);border-color:var(--accent);color:var(--accent-text);}
 [data-theme="dark"] .font-chip{background:#1a1d21;border-color:#333;color:#94a3b8;}
 [data-theme="dark"] .font-chip.active{background:rgba(96,165,250,.15);border-color:#60a5fa;color:#60a5fa;}
+
+/* ── TASK LIST ─────────────────────────────────────── */
+.task-item{
+  display:flex;align-items:flex-start;gap:10px;
+  padding:12px 14px;border-radius:10px;
+  background:#fff;border:1px solid #e2e8f0;
+  margin-bottom:8px;transition:all .15s;
+}
+.task-item:hover{border-color:#cbd5e1;}
+.task-item.done{opacity:.6;background:#f8fafc;}
+.task-item.done .task-title{text-decoration:line-through;color:#94a3b8;}
+.task-check{
+  width:20px;height:20px;border-radius:50%;border:2px solid #cbd5e1;
+  flex-shrink:0;cursor:pointer;margin-top:1px;
+  transition:all .15s;display:flex;align-items:center;justify-content:center;
+}
+.task-check:hover{border-color:var(--accent);}
+.task-item.done .task-check{background:var(--accent);border-color:var(--accent);color:#fff;}
+.task-body{flex:1;min-width:0;}
+.task-title{font-size:14px;font-weight:600;color:#0f172a;word-wrap:break-word;}
+.task-meta{display:flex;align-items:center;gap:8px;margin-top:4px;flex-wrap:wrap;}
+.task-chip{
+  display:inline-flex;align-items:center;gap:4px;
+  font-size:11px;font-weight:600;
+  padding:3px 8px;border-radius:10px;
+}
+.task-chip.due{background:#eff6ff;color:#2563eb;}
+.task-chip.due.overdue{background:#fef2f2;color:#dc2626;}
+.task-chip.due.soon{background:#fffbeb;color:#d97706;}
+.task-chip.reminder{background:#f0fdf4;color:#059669;}
+.task-chip.priority-high{background:#fef2f2;color:#dc2626;}
+.task-chip.priority-med{background:#fffbeb;color:#d97706;}
+.task-chip.priority-low{background:#f1f5f9;color:#64748b;}
+.task-del{
+  opacity:0;background:none;border:none;cursor:pointer;
+  color:#94a3b8;padding:4px;font-size:16px;line-height:1;
+  transition:opacity .15s,color .15s;
+}
+.task-item:hover .task-del{opacity:1;}
+.task-del:hover{color:#dc2626;}
+[data-theme="dark"] .task-item{background:#1a2436;border-color:#2d3f55;}
+[data-theme="dark"] .task-item:hover{border-color:#475569;}
+[data-theme="dark"] .task-item.done{background:#0f172a;}
+[data-theme="dark"] .task-title{color:#f1f5f9;}
 /* Right-side status panel on messages page */
 .msg-page-wrap{display:flex;gap:16px;height:100%;}
 .msg-main-col{flex:1;min-width:0;display:flex;flex-direction:column;}
@@ -2366,6 +2411,11 @@ html[data-sb="collapsed"][data-theme="dark"] .sb-brand,
         <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd"/></svg>
         Calendar
       </div>
+      <div class="nav-item" id="nav-tasks" data-tab="tasks" onclick="goTo('tasks')">
+        <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z"/><path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z"/></svg>
+        Tasks
+        <span class="nav-badge" id="taskBadge"></span>
+      </div>
 
       <div class="nav-item" id="nav-profile" data-tab="profile" onclick="goTo('profile')">
         <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"/></svg>
@@ -2420,6 +2470,77 @@ html[data-sb="collapsed"][data-theme="dark"] .sb-brand,
       </div>
 
 
+    </div>
+
+    <!-- TASKS page -->
+    <div class="page" id="page-tasks">
+      <div class="page-hd">
+        <div>
+          <div class="page-title">Tasks</div>
+          <div class="page-sub">Your personal to-do list — reminders appear in the notifications bell</div>
+        </div>
+        <button class="btn btn-green" onclick="openTaskForm()" style="font-size:13px;padding:8px 16px;">+ New Task</button>
+      </div>
+
+      <!-- Add/Edit form -->
+      <div id="taskForm" style="display:none;" class="card">
+        <div class="card-hd"><div class="card-title" id="taskFormTitle">New Task</div></div>
+        <input type="hidden" id="taskEditId">
+        <div style="margin-bottom:10px;">
+          <label style="font-size:12px;font-weight:600;color:#475569;display:block;margin-bottom:4px;">Title</label>
+          <input type="text" id="taskTitle" class="f-input" placeholder="What needs to be done?">
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+          <div style="flex:1;min-width:140px;">
+            <label style="font-size:12px;font-weight:600;color:#475569;display:block;margin-bottom:4px;">Due date</label>
+            <input type="date" id="taskDueDate" class="f-input">
+          </div>
+          <div style="flex:1;min-width:120px;">
+            <label style="font-size:12px;font-weight:600;color:#475569;display:block;margin-bottom:4px;">Due time</label>
+            <input type="time" id="taskDueTime" class="f-input">
+          </div>
+          <div style="flex:1;min-width:120px;">
+            <label style="font-size:12px;font-weight:600;color:#475569;display:block;margin-bottom:4px;">Priority</label>
+            <select id="taskPriority" class="f-input">
+              <option value="low">Low</option>
+              <option value="med" selected>Medium</option>
+              <option value="high">High</option>
+            </select>
+          </div>
+        </div>
+        <div style="margin-bottom:10px;">
+          <label style="font-size:12px;font-weight:600;color:#475569;display:block;margin-bottom:4px;">Remind me</label>
+          <select id="taskRemindBefore" class="f-input">
+            <option value="">No reminder</option>
+            <option value="0">At the due time</option>
+            <option value="15">15 minutes before</option>
+            <option value="30">30 minutes before</option>
+            <option value="60">1 hour before</option>
+            <option value="180">3 hours before</option>
+            <option value="1440">1 day before</option>
+          </select>
+        </div>
+        <div style="margin-bottom:14px;">
+          <label style="font-size:12px;font-weight:600;color:#475569;display:block;margin-bottom:4px;">Notes (optional)</label>
+          <textarea id="taskNotes" class="f-input" rows="2" placeholder="Any extra details"></textarea>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-green" onclick="saveTask()" style="padding:9px 18px;font-size:13px;">Save</button>
+          <button class="btn btn-outline" onclick="closeTaskForm()" style="padding:9px 14px;">Cancel</button>
+        </div>
+      </div>
+
+      <!-- Filters -->
+      <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;" id="taskFilters">
+        <button class="font-chip active" data-filter="open" onclick="setTaskFilter('open')">Open</button>
+        <button class="font-chip" data-filter="today" onclick="setTaskFilter('today')">Due today</button>
+        <button class="font-chip" data-filter="overdue" onclick="setTaskFilter('overdue')">Overdue</button>
+        <button class="font-chip" data-filter="done" onclick="setTaskFilter('done')">Done</button>
+        <button class="font-chip" data-filter="all" onclick="setTaskFilter('all')">All</button>
+      </div>
+
+      <!-- List -->
+      <div id="taskList"><div style="color:#94a3b8;font-size:13px;">Loading...</div></div>
     </div>
 
     <!-- CALENDAR: Full month view -->
@@ -3586,6 +3707,7 @@ async function enterHub(){
   buildAvailForm();
   showSchedTab('leave'); // default schedule sub-tab
   Promise.all([loadHomeData(),loadNotifications(),loadLeaveHistory(),refreshAnnBadge(),loadHomeAnnPreview(),loadHomeDiscPreview(),maybeShowOnboarding(),checkFeedbackInvites(),checkNewNotifications(),updateMsgBadges(),loadAllStatuses(),loadBannedWords()]);
+  loadTasks();updateTaskBadge();scheduleTaskReminders();
   startAutoRefresh();
   initRealtime();
   loadBirthdays();
@@ -3614,6 +3736,7 @@ function goTo(p){
   if(p==="announcements"){loadAnnouncements();}
   if(p==="engagement"){showEngagementTab('discussions');}
   if(p==="documents"){loadDocuments();}
+  if(p==="tasks"){ loadTasks(); renderTasks(); updateTaskBadge(); }
   if(p==="messages"){
     loadAllStatuses();
     applyStatusPanelPref();
@@ -6587,6 +6710,253 @@ function dismissOnboardLock(){
   if(overlay)overlay.style.display='none';
 }
 
+// ══════════════════════════════════════════════════════════════
+// TASKS — personal to-do list with reminders (localStorage only)
+// ══════════════════════════════════════════════════════════════
+let _tasks = [];
+let _taskFilter = 'open';
+let _taskReminderTimer = null;
+
+function taskKey(){ return 'oscar_tasks_' + me; }
+function taskSeenKey(){ return 'oscar_task_seen_' + me; }
+
+function loadTasks(){
+  try{ _tasks = JSON.parse(localStorage.getItem(taskKey()) || '[]'); }
+  catch(e){ _tasks = []; }
+}
+function saveTasks(){
+  try{ localStorage.setItem(taskKey(), JSON.stringify(_tasks)); }catch(e){}
+  updateTaskBadge();
+}
+
+function openTaskForm(editId){
+  const form = document.getElementById('taskForm');
+  if(!form) return;
+  form.style.display = 'block';
+  document.getElementById('taskFormTitle').textContent = editId ? 'Edit Task' : 'New Task';
+  if(editId){
+    const t = _tasks.find(function(x){return x.id===editId;});
+    if(!t) return;
+    document.getElementById('taskEditId').value = t.id;
+    document.getElementById('taskTitle').value = t.title || '';
+    document.getElementById('taskDueDate').value = t.dueDate || '';
+    document.getElementById('taskDueTime').value = t.dueTime || '';
+    document.getElementById('taskPriority').value = t.priority || 'med';
+    document.getElementById('taskRemindBefore').value = (t.remindBefore==null||t.remindBefore===undefined)?'':String(t.remindBefore);
+    document.getElementById('taskNotes').value = t.notes || '';
+  } else {
+    document.getElementById('taskEditId').value = '';
+    document.getElementById('taskTitle').value = '';
+    document.getElementById('taskDueDate').value = '';
+    document.getElementById('taskDueTime').value = '';
+    document.getElementById('taskPriority').value = 'med';
+    document.getElementById('taskRemindBefore').value = '';
+    document.getElementById('taskNotes').value = '';
+  }
+  setTimeout(function(){ document.getElementById('taskTitle').focus(); }, 50);
+}
+function closeTaskForm(){
+  document.getElementById('taskForm').style.display = 'none';
+}
+
+function saveTask(){
+  const title = document.getElementById('taskTitle').value.trim();
+  if(!title){ showToast('Title required'); return; }
+  const editId = document.getElementById('taskEditId').value;
+  const payload = {
+    id: editId || ('t_'+Date.now()+'_'+Math.random().toString(36).slice(2,7)),
+    title: title,
+    dueDate: document.getElementById('taskDueDate').value || null,
+    dueTime: document.getElementById('taskDueTime').value || null,
+    priority: document.getElementById('taskPriority').value || 'med',
+    remindBefore: document.getElementById('taskRemindBefore').value === '' ? null : Number(document.getElementById('taskRemindBefore').value),
+    notes: document.getElementById('taskNotes').value.trim() || null,
+    done: false,
+    createdAt: new Date().toISOString()
+  };
+  if(editId){
+    const idx = _tasks.findIndex(function(t){return t.id===editId;});
+    if(idx>=0){ payload.done = _tasks[idx].done; payload.createdAt = _tasks[idx].createdAt; _tasks[idx] = payload; }
+  } else {
+    _tasks.unshift(payload);
+  }
+  saveTasks();
+  closeTaskForm();
+  renderTasks();
+  scheduleTaskReminders();
+  showToast(editId ? 'Task updated' : 'Task added');
+}
+
+function deleteTask(id){
+  if(!confirm('Delete this task?')) return;
+  _tasks = _tasks.filter(function(t){return t.id!==id;});
+  saveTasks();
+  renderTasks();
+  scheduleTaskReminders();
+}
+
+function toggleTaskDone(id){
+  const t = _tasks.find(function(x){return x.id===id;});
+  if(!t) return;
+  t.done = !t.done;
+  t.doneAt = t.done ? new Date().toISOString() : null;
+  saveTasks();
+  renderTasks();
+}
+
+function setTaskFilter(f){
+  _taskFilter = f;
+  document.querySelectorAll('#taskFilters .font-chip').forEach(function(b){
+    b.classList.toggle('active', b.getAttribute('data-filter')===f);
+  });
+  renderTasks();
+}
+
+function taskDueDate(t){
+  if(!t.dueDate) return null;
+  const timeStr = t.dueTime || '23:59';
+  return new Date(t.dueDate + 'T' + timeStr + ':00');
+}
+
+function renderTasks(){
+  const el = document.getElementById('taskList');
+  if(!el) return;
+  const now = new Date();
+  const today = new Date(); today.setHours(0,0,0,0);
+  const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate()+1);
+
+  let filtered = _tasks.slice();
+  if(_taskFilter==='open') filtered = filtered.filter(function(t){return !t.done;});
+  else if(_taskFilter==='done') filtered = filtered.filter(function(t){return t.done;});
+  else if(_taskFilter==='today') filtered = filtered.filter(function(t){
+    if(t.done||!t.dueDate) return false;
+    const d = new Date(t.dueDate+'T00:00:00');
+    return d.getTime()===today.getTime();
+  });
+  else if(_taskFilter==='overdue') filtered = filtered.filter(function(t){
+    if(t.done) return false;
+    const d = taskDueDate(t); return d && d < now;
+  });
+
+  // Sort: open by due date asc (no due = bottom), then priority; done by most recently done
+  filtered.sort(function(a,b){
+    if(a.done !== b.done) return a.done ? 1 : -1;
+    const da = taskDueDate(a), db = taskDueDate(b);
+    if(da && db) return da - db;
+    if(da) return -1;
+    if(db) return 1;
+    const prio = {high:0, med:1, low:2};
+    return (prio[a.priority]||1) - (prio[b.priority]||1);
+  });
+
+  if(!filtered.length){
+    el.innerHTML = '<div style="text-align:center;padding:40px 20px;color:#94a3b8;font-size:13px;">No tasks here.</div>';
+    return;
+  }
+
+  el.innerHTML = filtered.map(function(t){
+    const due = taskDueDate(t);
+    let dueChip = '';
+    if(due){
+      const diffMs = due - now;
+      const diffH = diffMs/3600000;
+      let cls = 'due';
+      if(!t.done){
+        if(diffMs < 0) cls = 'due overdue';
+        else if(diffH < 24) cls = 'due soon';
+      }
+      const dateStr = due.toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short'});
+      const timeStr = t.dueTime ? (' ' + due.toLocaleTimeString('en-AU',{hour:'numeric',minute:'2-digit',hour12:true})) : '';
+      dueChip = '<span class="task-chip '+cls+'">📅 '+dateStr+timeStr+(diffMs<0&&!t.done?' · overdue':'')+'</span>';
+    }
+    let remChip = '';
+    if(t.remindBefore!=null && due){
+      const lbl = t.remindBefore===0?'At due':(t.remindBefore<60?t.remindBefore+'m before':(t.remindBefore<1440?(t.remindBefore/60)+'h before':(t.remindBefore/1440)+'d before'));
+      remChip = '<span class="task-chip reminder">🔔 '+lbl+'</span>';
+    }
+    const prioLbl = {high:'High', med:'Medium', low:'Low'}[t.priority]||'Medium';
+    const prioChip = '<span class="task-chip priority-'+(t.priority||'med')+'">'+prioLbl+'</span>';
+    const notesHtml = t.notes ? '<div style="font-size:12.5px;color:#64748b;margin-top:4px;white-space:pre-wrap;">'+t.notes.replace(/</g,'&lt;')+'</div>' : '';
+    const checkIcon = t.done ? '<svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>' : '';
+
+    return '<div class="task-item'+(t.done?' done':'')+'" data-id="'+t.id+'">'+
+      '<div class="task-check" onclick="toggleTaskDone(\''+t.id+'\')">'+checkIcon+'</div>'+
+      '<div class="task-body" onclick="openTaskForm(\''+t.id+'\')" style="cursor:pointer;">'+
+        '<div class="task-title">'+t.title.replace(/</g,'&lt;')+'</div>'+
+        notesHtml+
+        '<div class="task-meta">'+dueChip+remChip+prioChip+'</div>'+
+      '</div>'+
+      '<button class="task-del" onclick="deleteTask(\''+t.id+'\')" title="Delete">×</button>'+
+    '</div>';
+  }).join('');
+}
+
+function updateTaskBadge(){
+  const badge = document.getElementById('taskBadge');
+  if(!badge) return;
+  const open = _tasks.filter(function(t){return !t.done;});
+  const now = new Date();
+  const overdueCount = open.filter(function(t){
+    const d = taskDueDate(t); return d && d < now;
+  }).length;
+  if(overdueCount){
+    badge.textContent = overdueCount;
+    badge.style.display = 'inline-block';
+  } else {
+    badge.style.display = 'none';
+  }
+}
+
+// ── Reminder scheduling ──
+// Checks tasks every minute. When a reminder fires it pushes a notification into
+// the portal bell (_extraNotifs) and does not fire again for that task+reminder.
+function scheduleTaskReminders(){
+  // Immediate check
+  checkTaskReminders();
+  if(_taskReminderTimer) clearInterval(_taskReminderTimer);
+  _taskReminderTimer = setInterval(checkTaskReminders, 60000);
+}
+
+function checkTaskReminders(){
+  const now = new Date();
+  let seen = {};
+  try{ seen = JSON.parse(localStorage.getItem(taskSeenKey()) || '{}'); }catch(e){}
+  let added = 0;
+  _tasks.forEach(function(t){
+    if(t.done || t.remindBefore==null || !t.dueDate) return;
+    const due = taskDueDate(t);
+    if(!due) return;
+    const fireAt = new Date(due.getTime() - (t.remindBefore*60000));
+    const key = t.id + '_' + t.remindBefore;
+    if(now >= fireAt && !seen[key]){
+      seen[key] = true;
+      added++;
+      // Add to in-memory notifications list so bell shows it
+      if(typeof _taskNotifications === 'undefined') window._taskNotifications = [];
+      _taskNotifications.unshift({
+        id: 'tr_' + key + '_' + Date.now(),
+        title: '🔔 Reminder: ' + t.title,
+        body: (t.remindBefore===0 ? 'Due now' : (t.remindBefore+' min before due')) + (t.dueTime?' · '+t.dueTime:''),
+        created_at: new Date().toISOString(),
+        taskId: t.id
+      });
+      // Show a banner if the function exists
+      if(typeof showBanner === 'function'){
+        showBanner('Task reminder', t.title, 'info');
+      }
+    }
+  });
+  try{ localStorage.setItem(taskSeenKey(), JSON.stringify(seen)); }catch(e){}
+  if(added && typeof loadNotifDrop === 'function'){
+    // Also bump the bell badge
+    const bellBadges = document.querySelectorAll('#mhBellBadge,#sbBellBadge');
+    bellBadges.forEach(function(b){ if(b) b.style.display='block'; });
+  }
+}
+
+// Initialize on login
+window._taskNotifications = [];
+
 function goToOnboarding(){
   dismissOnboardLock();
   goTo('profile');
@@ -7087,6 +7457,8 @@ function toggleNotifDrop(dropId){
 }
 
 async function loadNotifDrop(dropId){
+  // Ensure any pending task reminders are fired before rendering
+  if(typeof checkTaskReminders==='function') checkTaskReminders();
   const listId=dropId==='mhNotifDrop'?'mhNotifDropList':'notifDropList';
   const el=document.getElementById(listId);
   if(!el)return;
@@ -7104,12 +7476,25 @@ async function loadNotifDrop(dropId){
     const reactNotifsDrop=await loadReactNotifs();
     const seenReactsDrop=JSON.parse(localStorage.getItem('seen_reacts_'+me)||'[]');
     const newReactsDrop=(reactNotifsDrop||[]).filter(function(r){return !seenReactsDrop.includes(r.id);});
-    if(!rows.length&&!newReactsDrop.length){
+    // Task reminders (from in-memory list)
+    const taskNotifsSeen = JSON.parse(localStorage.getItem('seen_task_notifs_'+me)||'[]');
+    const newTaskNotifs = (window._taskNotifications||[]).filter(function(n){return !taskNotifsSeen.includes(n.id);});
+
+    if(!rows.length&&!newReactsDrop.length&&!newReplies.length&&!newTaskNotifs.length){
       el.innerHTML='<div class="notif-drop-empty">No notifications yet</div>';
       return;
     }
 
     let html='';
+
+    // Task reminders
+    newTaskNotifs.forEach(function(n){
+      html+='<div class="notif-drop-item unread" data-nid="'+n.id+'" data-tid="'+(n.taskId||'')+'" onclick="closeAllNotifDrops();markTaskNotifSeen(this.dataset.nid);goTo(\'tasks\');">'+
+        '<div style="font-size:12px;font-weight:700;color:#059669;margin-bottom:2px;">'+n.title+'</div>'+
+        '<div style="font-size:12px;color:#475569;">'+n.body+'</div>'+
+        '<div style="font-size:10px;color:#94a3b8;margin-top:3px;">Tap to view task</div>'+
+        '</div>';
+    });
 
     // Reply notifications
     newReplies.forEach(function(r){
@@ -7157,6 +7542,15 @@ async function loadNotifDrop(dropId){
 
 function closeAllNotifDrops(){
   document.querySelectorAll('.notif-drop.open').forEach(function(d){d.classList.remove('open');});
+}
+
+function markTaskNotifSeen(id){
+  const seen=JSON.parse(localStorage.getItem('seen_task_notifs_'+me)||'[]');
+  if(!seen.includes(id)){seen.push(id);localStorage.setItem('seen_task_notifs_'+me,JSON.stringify(seen));}
+  // Remove from in-memory list
+  if(window._taskNotifications){
+    window._taskNotifications = window._taskNotifications.filter(function(n){return n.id!==id;});
+  }
 }
 
 function markReplySeen(id){
