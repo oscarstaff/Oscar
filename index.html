@@ -1644,7 +1644,8 @@ body.ready{visibility:visible;}
   color:#fff;font-size:12px;font-weight:700;
   display:flex;align-items:center;justify-content:center;flex-shrink:0;
 }
-.ava-wrap{position:relative;flex-shrink:0;}
+.ava-wrap{position:relative;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;}
+.sb-user .ava-wrap{width:32px;height:32px;}
 .status-dot{
   position:absolute;bottom:-2px;right:-2px;
   width:11px;height:11px;border-radius:50%;
@@ -1764,6 +1765,8 @@ html[data-sb="collapsed"] .sb-user{
 }
 html[data-sb="collapsed"] .sb-user .ava-wrap{
   margin:0 auto;
+  width:38px;
+  height:38px;
 }
 html[data-sb="collapsed"] .sb-avatar{
   width:38px;height:38px;
@@ -1844,7 +1847,7 @@ html[data-sb="collapsed"] [id="nav-schedule"]:hover::after{content:"Schedule";}
 html[data-sb="collapsed"] [id="nav-announcements"]:hover::after{content:"Announcements";}
 html[data-sb="collapsed"] [id="nav-engagement"]:hover::after{content:"Engagement";}
 html[data-sb="collapsed"] [id="nav-calendar"]:hover::after{content:"Calendar";}
-html[data-sb="collapsed"] [id="nav-tasks"]:hover::after{content:"Tasks";}
+html[data-sb="collapsed"] [id="nav-tasks"]:hover::after{content:"To Do List";}
 html[data-sb="collapsed"] [id="nav-documents"]:hover::after{content:"Documents";}
 html[data-sb="collapsed"] [id="nav-messages"]:hover::after{content:"Messages";}
 html[data-sb="collapsed"] [id="nav-profile"]:hover::after{content:"Profile";}
@@ -1879,49 +1882,159 @@ html[data-sb="collapsed"][data-theme="dark"] .sb-brand,
 [data-theme="dark"] .font-chip{background:#1a1d21;border-color:#333;color:#94a3b8;}
 [data-theme="dark"] .font-chip.active{background:rgba(96,165,250,.15);border-color:#60a5fa;color:#60a5fa;}
 
-/* ── TASK LIST ─────────────────────────────────────── */
+/* ── TASK LIST (redesigned, cleaner) ─────────────────── */
+.task-section{margin-bottom:24px;}
+.task-section-hd{
+  font-size:11px;font-weight:800;color:#94a3b8;
+  text-transform:uppercase;letter-spacing:.08em;
+  margin:0 0 10px;padding:0 4px;
+  display:flex;align-items:center;justify-content:space-between;
+}
+.task-section-hd .task-count{
+  font-weight:700;background:#f1f5f9;color:#64748b;
+  padding:2px 8px;border-radius:10px;font-size:10px;
+}
 .task-item{
-  display:flex;align-items:flex-start;gap:10px;
-  padding:12px 14px;border-radius:10px;
+  display:flex;align-items:flex-start;gap:14px;
+  padding:14px 16px;border-radius:12px;
   background:#fff;border:1px solid #e2e8f0;
-  margin-bottom:8px;transition:all .15s;
+  margin-bottom:10px;transition:all .15s;
+  position:relative;
 }
-.task-item:hover{border-color:#cbd5e1;}
-.task-item.done{opacity:.6;background:#f8fafc;}
+.task-item:hover{
+  border-color:#cbd5e1;
+  box-shadow:0 1px 3px rgba(0,0,0,.04);
+}
+.task-item.done{opacity:.55;background:#f8fafc;}
 .task-item.done .task-title{text-decoration:line-through;color:#94a3b8;}
+.task-item.overdue:not(.done){border-left:3px solid #dc2626;}
 .task-check{
-  width:20px;height:20px;border-radius:50%;border:2px solid #cbd5e1;
-  flex-shrink:0;cursor:pointer;margin-top:1px;
+  width:22px;height:22px;border-radius:50%;border:2px solid #cbd5e1;
+  flex-shrink:0;cursor:pointer;margin-top:2px;
   transition:all .15s;display:flex;align-items:center;justify-content:center;
+  background:#fff;
 }
-.task-check:hover{border-color:var(--accent);}
+.task-check:hover{border-color:var(--accent);transform:scale(1.05);}
 .task-item.done .task-check{background:var(--accent);border-color:var(--accent);color:#fff;}
-.task-body{flex:1;min-width:0;}
-.task-title{font-size:14px;font-weight:600;color:#0f172a;word-wrap:break-word;}
-.task-meta{display:flex;align-items:center;gap:8px;margin-top:4px;flex-wrap:wrap;}
+.task-body{flex:1;min-width:0;cursor:pointer;}
+.task-title{
+  font-size:14.5px;font-weight:600;color:#0f172a;
+  word-wrap:break-word;line-height:1.4;
+}
+.task-notes{
+  font-size:12.5px;color:#64748b;margin-top:4px;
+  white-space:pre-wrap;line-height:1.45;
+}
+.task-meta{
+  display:flex;align-items:center;gap:6px;
+  margin-top:8px;flex-wrap:wrap;
+}
 .task-chip{
   display:inline-flex;align-items:center;gap:4px;
   font-size:11px;font-weight:600;
-  padding:3px 8px;border-radius:10px;
+  padding:3px 9px;border-radius:10px;line-height:1.4;
 }
 .task-chip.due{background:#eff6ff;color:#2563eb;}
 .task-chip.due.overdue{background:#fef2f2;color:#dc2626;}
 .task-chip.due.soon{background:#fffbeb;color:#d97706;}
 .task-chip.reminder{background:#f0fdf4;color:#059669;}
 .task-chip.priority-high{background:#fef2f2;color:#dc2626;}
-.task-chip.priority-med{background:#fffbeb;color:#d97706;}
-.task-chip.priority-low{background:#f1f5f9;color:#64748b;}
+.task-chip.priority-med{background:#f1f5f9;color:#64748b;}
+.task-chip.priority-low{background:#f1f5f9;color:#94a3b8;}
 .task-del{
   opacity:0;background:none;border:none;cursor:pointer;
-  color:#94a3b8;padding:4px;font-size:16px;line-height:1;
+  color:#94a3b8;padding:4px 8px;font-size:18px;line-height:1;
   transition:opacity .15s,color .15s;
+  align-self:flex-start;
 }
 .task-item:hover .task-del{opacity:1;}
 .task-del:hover{color:#dc2626;}
+
+/* Empty state */
+.task-empty{
+  text-align:center;padding:48px 20px;
+  background:#fff;border:1px dashed #e2e8f0;border-radius:14px;
+}
+.task-empty-icon{font-size:36px;margin-bottom:10px;opacity:.4;}
+.task-empty-title{font-size:14px;font-weight:600;color:#475569;margin-bottom:4px;}
+.task-empty-sub{font-size:12.5px;color:#94a3b8;}
+
 [data-theme="dark"] .task-item{background:#1a2436;border-color:#2d3f55;}
 [data-theme="dark"] .task-item:hover{border-color:#475569;}
 [data-theme="dark"] .task-item.done{background:#0f172a;}
 [data-theme="dark"] .task-title{color:#f1f5f9;}
+[data-theme="dark"] .task-section-hd .task-count{background:#1e293b;color:#94a3b8;}
+[data-theme="dark"] .task-empty{background:#1a2436;border-color:#2d3f55;}
+[data-theme="dark"] .task-check{background:#1a2436;}
+
+/* Task animations */
+@keyframes taskSlideIn {
+  from { opacity:0; transform:translateY(-12px) scale(.96); max-height:0; padding-top:0; padding-bottom:0; margin-bottom:0; }
+  60%  { opacity:1; transform:translateY(2px) scale(1.02); }
+  100% { opacity:1; transform:translateY(0) scale(1); max-height:300px; }
+}
+@keyframes taskSlideOut {
+  0%   { opacity:1; transform:translateX(0) scale(1); max-height:300px; margin-bottom:10px; }
+  60%  { opacity:0; transform:translateX(-30px) scale(.96); }
+  100% { opacity:0; transform:translateX(-30px) scale(.96); max-height:0; padding-top:0; padding-bottom:0; margin:0; border-width:0; }
+}
+@keyframes checkPop {
+  0%   { transform:scale(1); }
+  35%  { transform:scale(1.4); }
+  60%  { transform:scale(.92); }
+  100% { transform:scale(1); }
+}
+@keyframes checkmarkDraw {
+  from { stroke-dashoffset:30; opacity:0; }
+  to   { stroke-dashoffset:0;  opacity:1; }
+}
+@keyframes taskComplete {
+  0%   { background:#fff; }
+  30%  { background:rgba(34,197,94,.18); }
+  100% { background:#f8fafc; }
+}
+@keyframes taskUncomplete {
+  0%   { background:#f8fafc; }
+  100% { background:#fff; }
+}
+
+/* Apply animations */
+.task-item.entering{
+  animation:taskSlideIn .35s cubic-bezier(.34,1.4,.64,1) both;
+}
+.task-item.leaving{
+  animation:taskSlideOut .3s cubic-bezier(.55,0,.55,.2) both;
+  pointer-events:none;
+}
+.task-item.completing{
+  animation:taskComplete .55s ease both;
+}
+.task-item.uncompleting{
+  animation:taskUncomplete .3s ease both;
+}
+.task-item.completing .task-check{
+  animation:checkPop .45s cubic-bezier(.34,1.6,.64,1) both;
+}
+.task-item .task-check svg{
+  stroke-dasharray:30;
+}
+.task-item.completing .task-check svg{
+  animation:checkmarkDraw .35s ease-out .1s both;
+}
+.task-title{
+  transition:color .25s ease, text-decoration-color .25s ease;
+}
+[data-theme="dark"] @keyframes taskComplete {
+  0%   { background:#1a2436; }
+  30%  { background:rgba(34,197,94,.22); }
+  100% { background:#0f172a; }
+}
+
+/* Calendar pill — task variant */
+.cal-pill-task{background:#dbeafe;color:#1e40af;}
+.cal-pill-task.done{background:#f1f5f9;color:#94a3b8;text-decoration:line-through;}
+[data-theme="dark"] .cal-pill-task{background:rgba(37,99,235,.2);color:#93c5fd;}
+[data-theme="dark"] .cal-pill-task.done{background:rgba(100,116,139,.2);color:#64748b;}
 /* Right-side status panel on messages page */
 .msg-page-wrap{display:flex;gap:16px;height:100%;}
 .msg-main-col{flex:1;min-width:0;display:flex;flex-direction:column;}
@@ -2412,8 +2525,8 @@ html[data-sb="collapsed"][data-theme="dark"] .sb-brand,
         Calendar
       </div>
       <div class="nav-item" id="nav-tasks" data-tab="tasks" onclick="goTo('tasks')">
-        <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z"/><path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z"/></svg>
-        Tasks
+        <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/><path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm9.707 5.707a1 1 0 00-1.414-1.414L9 12.586l-1.293-1.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+        To Do List
         <span class="nav-badge" id="taskBadge"></span>
       </div>
 
@@ -2476,7 +2589,7 @@ html[data-sb="collapsed"][data-theme="dark"] .sb-brand,
     <div class="page" id="page-tasks">
       <div class="page-hd">
         <div>
-          <div class="page-title">Tasks</div>
+          <div class="page-title">To Do List</div>
           <div class="page-sub">Your personal to-do list — reminders appear in the notifications bell</div>
         </div>
         <button class="btn btn-green" onclick="openTaskForm()" style="font-size:13px;padding:8px 16px;">+ New Task</button>
@@ -2531,9 +2644,9 @@ html[data-sb="collapsed"][data-theme="dark"] .sb-brand,
       </div>
 
       <!-- Filters -->
-      <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;" id="taskFilters">
+      <div style="display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap;" id="taskFilters">
         <button class="font-chip active" data-filter="open" onclick="setTaskFilter('open')">Open</button>
-        <button class="font-chip" data-filter="today" onclick="setTaskFilter('today')">Due today</button>
+        <button class="font-chip" data-filter="today" onclick="setTaskFilter('today')">Today</button>
         <button class="font-chip" data-filter="overdue" onclick="setTaskFilter('overdue')">Overdue</button>
         <button class="font-chip" data-filter="done" onclick="setTaskFilter('done')">Done</button>
         <button class="font-chip" data-filter="all" onclick="setTaskFilter('all')">All</button>
@@ -4849,6 +4962,19 @@ function renderBdayCalendar(){
     }
   });
 
+  // Build task map (tasks for this month)
+  const taskMap={};
+  if(typeof _tasks !== 'undefined' && _tasks){
+    _tasks.forEach(function(t){
+      if(!t.dueDate) return;
+      const d = new Date(t.dueDate+'T00:00:00');
+      if(d.getFullYear()===yr && d.getMonth()===mo){
+        if(!taskMap[d.getDate()]) taskMap[d.getDate()]=[];
+        taskMap[d.getDate()].push(t);
+      }
+    });
+  }
+
   const firstDay=new Date(yr,mo,1).getDay();
   const startOffset=(firstDay===0?6:firstDay-1);
   const daysInMonth=new Date(yr,mo+1,0).getDate();
@@ -4905,6 +5031,14 @@ function renderBdayCalendar(){
     // Birthday pills (blue with first name)
     bdays.forEach(function(b){
       html+='<div class="cal-pill cal-pill-bday" title="'+b.name+'\'s birthday">🎂 '+b.name.split(' ')[0]+'</div>';
+    });
+    // Task pills (blue, with check or open state)
+    const tasksToday = taskMap[d] || [];
+    tasksToday.forEach(function(t){
+      const doneCls = t.done ? ' done' : '';
+      const timePart = t.dueTime ? t.dueTime.slice(0,5)+' ' : '';
+      const tip = (t.done?'✓ ':'')+'Task: '+t.title.replace(/"/g,'&quot;');
+      html+='<div class="cal-pill cal-pill-task'+doneCls+'" title="'+tip+'" onclick="event.stopPropagation();goTo(\'tasks\');">'+(t.done?'✓ ':'☐ ')+timePart+t.title.replace(/</g,'&lt;')+'</div>';
     });
 
     html+='</div></div>';
@@ -6774,6 +6908,7 @@ function saveTask(){
     done: false,
     createdAt: new Date().toISOString()
   };
+  const isNew = !editId;
   if(editId){
     const idx = _tasks.findIndex(function(t){return t.id===editId;});
     if(idx>=0){ payload.done = _tasks[idx].done; payload.createdAt = _tasks[idx].createdAt; _tasks[idx] = payload; }
@@ -6783,25 +6918,78 @@ function saveTask(){
   saveTasks();
   closeTaskForm();
   renderTasks();
+  // Trigger entrance animation on the new/updated row
+  setTimeout(function(){
+    const row = document.querySelector('.task-item[data-id="'+payload.id+'"]');
+    if(row){
+      row.classList.add('entering');
+      // Smooth scroll into view if off-screen
+      const rect = row.getBoundingClientRect();
+      if(rect.top < 80 || rect.bottom > window.innerHeight){
+        row.scrollIntoView({behavior:'smooth', block:'center'});
+      }
+      setTimeout(function(){ row.classList.remove('entering'); }, 400);
+    }
+  }, 30);
+  if(typeof renderBdayCalendar === 'function') renderBdayCalendar();
+  if(typeof renderCalPreview === 'function') renderCalPreview();
   scheduleTaskReminders();
   showToast(editId ? 'Task updated' : 'Task added');
 }
 
 function deleteTask(id){
   if(!confirm('Delete this task?')) return;
-  _tasks = _tasks.filter(function(t){return t.id!==id;});
-  saveTasks();
-  renderTasks();
-  scheduleTaskReminders();
+  const row = document.querySelector('.task-item[data-id="'+id+'"]');
+  const finishDelete = function(){
+    _tasks = _tasks.filter(function(t){return t.id!==id;});
+    saveTasks();
+    renderTasks();
+    if(typeof renderBdayCalendar === 'function') renderBdayCalendar();
+    if(typeof renderCalPreview === 'function') renderCalPreview();
+    scheduleTaskReminders();
+  };
+  if(row){
+    row.classList.add('leaving');
+    setTimeout(finishDelete, 280);
+  } else {
+    finishDelete();
+  }
 }
 
 function toggleTaskDone(id){
   const t = _tasks.find(function(x){return x.id===id;});
   if(!t) return;
+  const wasDone = t.done;
   t.done = !t.done;
   t.doneAt = t.done ? new Date().toISOString() : null;
   saveTasks();
-  renderTasks();
+  // Animate the row before re-rendering moves it
+  const row = document.querySelector('.task-item[data-id="'+id+'"]');
+  const finishToggle = function(){
+    renderTasks();
+    if(typeof renderBdayCalendar === 'function') renderBdayCalendar();
+    // Highlight the moved row briefly in its new position
+    setTimeout(function(){
+      const newRow = document.querySelector('.task-item[data-id="'+id+'"]');
+      if(newRow){
+        newRow.classList.add('entering');
+        setTimeout(function(){ newRow.classList.remove('entering'); }, 400);
+      }
+    }, 20);
+  };
+  if(row){
+    if(!wasDone){
+      // Just completed — play complete animation, then move
+      row.classList.add('completing');
+      setTimeout(finishToggle, 500);
+    } else {
+      // Un-completing — quick fade then re-render
+      row.classList.add('uncompleting');
+      setTimeout(finishToggle, 250);
+    }
+  } else {
+    finishToggle();
+  }
 }
 
 function setTaskFilter(f){
@@ -6838,23 +7026,59 @@ function renderTasks(){
     const d = taskDueDate(t); return d && d < now;
   });
 
-  // Sort: open by due date asc (no due = bottom), then priority; done by most recently done
-  filtered.sort(function(a,b){
-    if(a.done !== b.done) return a.done ? 1 : -1;
-    const da = taskDueDate(a), db = taskDueDate(b);
-    if(da && db) return da - db;
-    if(da) return -1;
-    if(db) return 1;
-    const prio = {high:0, med:1, low:2};
-    return (prio[a.priority]||1) - (prio[b.priority]||1);
-  });
-
   if(!filtered.length){
-    el.innerHTML = '<div style="text-align:center;padding:40px 20px;color:#94a3b8;font-size:13px;">No tasks here.</div>';
+    el.innerHTML = '<div class="task-empty">'+
+      '<div class="task-empty-icon">📝</div>'+
+      '<div class="task-empty-title">No tasks here</div>'+
+      '<div class="task-empty-sub">Add a new task to get started.</div>'+
+      '</div>';
     return;
   }
 
-  el.innerHTML = filtered.map(function(t){
+  // Group by section: Overdue / Today / Tomorrow / This week / Later / No date / Done
+  const sections = {overdue:[], today:[], tomorrow:[], week:[], later:[], nodate:[], done:[]};
+  const weekEnd = new Date(today); weekEnd.setDate(weekEnd.getDate()+7);
+
+  filtered.forEach(function(t){
+    if(t.done){ sections.done.push(t); return; }
+    const d = taskDueDate(t);
+    if(!d){ sections.nodate.push(t); return; }
+    if(d < now){ sections.overdue.push(t); return; }
+    const dayStart = new Date(d); dayStart.setHours(0,0,0,0);
+    if(dayStart.getTime() === today.getTime()){ sections.today.push(t); return; }
+    if(dayStart.getTime() === tomorrow.getTime()){ sections.tomorrow.push(t); return; }
+    if(d <= weekEnd){ sections.week.push(t); return; }
+    sections.later.push(t);
+  });
+
+  // Sort each section
+  Object.keys(sections).forEach(function(k){
+    sections[k].sort(function(a,b){
+      const da = taskDueDate(a), db = taskDueDate(b);
+      if(da && db) return da - db;
+      const prio = {high:0, med:1, low:2};
+      return (prio[a.priority]||1) - (prio[b.priority]||1);
+    });
+  });
+
+  const sectionDefs = [
+    {key:'overdue', label:'Overdue', show:_taskFilter!=='done'},
+    {key:'today', label:'Today', show:_taskFilter!=='done'},
+    {key:'tomorrow', label:'Tomorrow', show:_taskFilter!=='done'},
+    {key:'week', label:'This week', show:_taskFilter!=='done'},
+    {key:'later', label:'Later', show:_taskFilter!=='done'},
+    {key:'nodate', label:'No due date', show:_taskFilter!=='done'},
+    {key:'done', label:'Completed', show:_taskFilter==='done'||_taskFilter==='all'}
+  ];
+
+  let allHtml = '';
+  sectionDefs.forEach(function(s){
+    if(!s.show) return;
+    const list = sections[s.key];
+    if(!list.length) return;
+    allHtml += '<div class="task-section">';
+    allHtml += '<div class="task-section-hd"><span>'+s.label+'</span><span class="task-count">'+list.length+'</span></div>';
+    allHtml += list.map(function(t){
     const due = taskDueDate(t);
     let dueChip = '';
     if(due){
@@ -6879,16 +7103,20 @@ function renderTasks(){
     const notesHtml = t.notes ? '<div style="font-size:12.5px;color:#64748b;margin-top:4px;white-space:pre-wrap;">'+t.notes.replace(/</g,'&lt;')+'</div>' : '';
     const checkIcon = t.done ? '<svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>' : '';
 
-    return '<div class="task-item'+(t.done?' done':'')+'" data-id="'+t.id+'">'+
-      '<div class="task-check" onclick="toggleTaskDone(\''+t.id+'\')">'+checkIcon+'</div>'+
-      '<div class="task-body" onclick="openTaskForm(\''+t.id+'\')" style="cursor:pointer;">'+
+    const overdueCls = (!t.done && due && (due - now) < 0) ? ' overdue' : '';
+    return '<div class="task-item'+(t.done?' done':'')+overdueCls+'" data-id="'+t.id+'">'+
+      '<div class="task-check" onclick="event.stopPropagation();toggleTaskDone(\''+t.id+'\')">'+checkIcon+'</div>'+
+      '<div class="task-body" onclick="openTaskForm(\''+t.id+'\')">'+
         '<div class="task-title">'+t.title.replace(/</g,'&lt;')+'</div>'+
-        notesHtml+
-        '<div class="task-meta">'+dueChip+remChip+prioChip+'</div>'+
+        (t.notes ? '<div class="task-notes">'+t.notes.replace(/</g,'&lt;')+'</div>' : '')+
+        '<div class="task-meta">'+dueChip+remChip+(t.priority==='high'||t.priority==='low'?prioChip:'')+'</div>'+
       '</div>'+
-      '<button class="task-del" onclick="deleteTask(\''+t.id+'\')" title="Delete">×</button>'+
+      '<button class="task-del" onclick="event.stopPropagation();deleteTask(\''+t.id+'\')" title="Delete">×</button>'+
     '</div>';
   }).join('');
+  allHtml += '</div>';
+  });
+  el.innerHTML = allHtml;
 }
 
 function updateTaskBadge(){
