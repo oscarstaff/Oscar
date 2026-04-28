@@ -2617,6 +2617,18 @@ html[data-sb="collapsed"][data-theme="dark"] .sb-brand,
     border-radius:0 !important;
     background:#fff;
   }
+  /* On big screens, cap thread internal width so messages don't stretch absurdly wide */
+  body.msg-fullscreen #page-messages.active .slack-msg-list,
+  body.msg-fullscreen #page-messages.active .slack-compose-wrap{
+    max-width:920px;
+    width:100%;
+    margin:0 auto;
+  }
+  body.msg-fullscreen #page-messages.active .slack-thread-hd{
+    max-width:920px;
+    width:100%;
+    margin:0 auto;
+  }
   body.msg-fullscreen #page-messages.active .status-panel,
   body.msg-fullscreen #page-messages.active .status-strip{
     border-left:1px solid #e2e8f0;
@@ -3845,6 +3857,10 @@ html[data-sb="collapsed"][data-theme="dark"] .sb-brand,
       <div class="bn-item" id="bn-messages" data-tab="messages" onclick="if(navigator.vibrate)navigator.vibrate(8);goTo('messages')">
         <svg class="bn-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 5v8a2 2 0 01-2 2h-5l-5 4v-4H4a2 2 0 01-2-2V5a2 2 0 012-2h12a2 2 0 012 2zM7 8H5v2h2V8zm2 0h2v2H9V8zm6 0h-2v2h2V8z" clip-rule="evenodd"/></svg>
         <div class="bn-badge" id="bnMsgBadge"></div>
+      </div>
+      <div class="bn-item" id="bn-tasks" data-tab="tasks" onclick="if(navigator.vibrate)navigator.vibrate(8);goTo('tasks')">
+        <svg class="bn-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/><path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm9.707 5.707a1 1 0 00-1.414-1.414L9 12.586l-1.293-1.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+        <div class="bn-badge" id="bnTaskBadge"></div>
       </div>
       <div class="bn-item" id="bn-documents" data-tab="documents" onclick="if(navigator.vibrate)navigator.vibrate(8);goTo('documents')">
         <svg class="bn-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clip-rule="evenodd"/></svg>
@@ -7953,17 +7969,22 @@ function updateTaskStats(){
 
 function updateTaskBadge(){
   const badge = document.getElementById('taskBadge');
-  if(!badge) return;
+  const bnBadge = document.getElementById('bnTaskBadge');
   const open = _tasks.filter(function(t){return !t.done;});
   const now = new Date();
   const overdueCount = open.filter(function(t){
     const d = taskDueDate(t); return d && d < now;
   }).length;
-  if(overdueCount){
-    badge.textContent = overdueCount;
-    badge.style.display = 'inline-block';
-  } else {
-    badge.style.display = 'none';
+  if(badge){
+    if(overdueCount){
+      badge.textContent = overdueCount;
+      badge.style.display = 'inline-block';
+    } else {
+      badge.style.display = 'none';
+    }
+  }
+  if(bnBadge){
+    bnBadge.style.display = overdueCount ? 'block' : 'none';
   }
 }
 
