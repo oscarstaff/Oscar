@@ -1882,101 +1882,624 @@ html[data-sb="collapsed"][data-theme="dark"] .sb-brand,
 [data-theme="dark"] .font-chip{background:#1a1d21;border-color:#333;color:#94a3b8;}
 [data-theme="dark"] .font-chip.active{background:rgba(96,165,250,.15);border-color:#60a5fa;color:#60a5fa;}
 
-/* ── TASK LIST (redesigned, cleaner) ─────────────────── */
-.task-section{margin-bottom:24px;}
-.task-section-hd{
-  font-size:11px;font-weight:800;color:#94a3b8;
-  text-transform:uppercase;letter-spacing:.08em;
-  margin:0 0 10px;padding:0 4px;
+/* ── TASK FORM — Apple Reminders style modal ─────────── */
+.task-form-backdrop{
+  display:none;
+  position:fixed;inset:0;z-index:9000;
+  background:rgba(15,23,42,.4);
+  backdrop-filter:blur(8px);
+  -webkit-backdrop-filter:blur(8px);
+  align-items:center;justify-content:center;
+  padding:16px;
+  animation:taskBackdropFade .25s ease both;
+}
+.task-form-backdrop.open{display:flex;}
+@keyframes taskBackdropFade{from{opacity:0;}to{opacity:1;}}
+
+.task-form{
+  width:100%;max-width:440px;
+  background:#fff;
+  border-radius:18px;
+  box-shadow:0 24px 60px rgba(15,23,42,.25), 0 0 0 1px rgba(15,23,42,.04);
+  overflow:hidden;
+  animation:taskFormPop .35s cubic-bezier(.34,1.4,.64,1) both;
+}
+@keyframes taskFormPop{
+  from{opacity:0;transform:scale(.93) translateY(20px);}
+  to{opacity:1;transform:scale(1) translateY(0);}
+}
+
+.task-form-hd{
   display:flex;align-items:center;justify-content:space-between;
+  padding:14px 16px;
+  background:rgba(248,250,252,.6);
+  border-bottom:1px solid #e7eaf0;
+}
+.task-form-title{
+  font-size:15px;font-weight:700;color:#0f172a;
+  letter-spacing:-.01em;
+}
+.task-form-cancel,.task-form-save{
+  background:none;border:none;cursor:pointer;
+  font-family:inherit;font-size:14px;
+  padding:6px 4px;
+  transition:opacity .2s, color .2s;
+}
+.task-form-cancel{color:#64748b;font-weight:500;}
+.task-form-cancel:hover{color:#0f172a;}
+.task-form-save{color:var(--accent);font-weight:700;}
+.task-form-save:hover{filter:brightness(1.1);}
+.task-form-save:disabled{color:#cbd5e1;cursor:not-allowed;}
+
+.task-form-body{
+  padding:14px 14px 18px;
+  display:flex;flex-direction:column;gap:12px;
+  background:#f8fafc;
+  max-height:calc(100dvh - 100px);
+  overflow-y:auto;
+}
+
+.task-form-group{
+  background:#fff;
+  border-radius:12px;
+  overflow:hidden;
+  box-shadow:0 1px 2px rgba(15,23,42,.04);
+}
+.task-form-divider{
+  height:1px;background:#f1f5f9;margin-left:48px;
+}
+
+/* Plain text fields (title, notes) */
+.task-form-input{
+  width:100%;display:block;
+  border:none;background:transparent;
+  padding:14px 16px;
+  font-family:inherit;font-size:15px;color:#0f172a;
+  outline:none;
+  resize:none;
+}
+.task-form-input::placeholder{color:#94a3b8;}
+.task-form-title-input{
+  font-size:16px;font-weight:600;letter-spacing:-.01em;
+}
+
+/* Row with icon, label, control on the right */
+.task-form-row{
+  display:flex;align-items:center;gap:12px;
+  padding:11px 14px;
+  cursor:pointer;
+  transition:background .2s;
+}
+.task-form-row:hover{background:#fafbfc;}
+.task-form-row-icon{
+  width:28px;height:28px;border-radius:7px;
+  display:flex;align-items:center;justify-content:center;
+  color:#fff;flex-shrink:0;
+  box-shadow:0 1px 2px rgba(15,23,42,.1);
+}
+.task-form-row-icon svg{width:16px;height:16px;}
+.task-form-row-label{
+  flex:1;font-size:14.5px;font-weight:500;color:#0f172a;
+  letter-spacing:-.005em;
+}
+.task-form-row-input{
+  border:none;background:transparent;
+  font-family:inherit;font-size:14px;color:#475569;
+  outline:none;
+  text-align:right;
+  padding:4px 0;
+  min-width:120px;
+  cursor:pointer;
+}
+.task-form-row-input::-webkit-calendar-picker-indicator{
+  cursor:pointer;opacity:.5;
+}
+.task-form-row-input::-webkit-calendar-picker-indicator:hover{opacity:1;}
+
+/* Priority pills */
+.prio-pills{
+  display:flex;gap:4px;
+  background:#f1f5f9;
+  padding:3px;border-radius:8px;
+}
+.prio-pill{
+  background:transparent;border:none;cursor:pointer;
+  font-family:inherit;font-size:12px;font-weight:600;
+  padding:5px 11px;border-radius:6px;
+  color:#64748b;
+  transition:background .2s, color .2s, transform .15s;
+}
+.prio-pill:hover{color:#0f172a;}
+.prio-pill:active{transform:scale(.95);}
+.prio-pill.active{
+  background:#fff;color:#0f172a;
+  box-shadow:0 1px 2px rgba(15,23,42,.08), 0 1px 3px rgba(15,23,42,.06);
+}
+.prio-pill[data-val="low"].active{color:#475569;}
+.prio-pill[data-val="med"].active{color:#d97706;}
+.prio-pill[data-val="high"].active{color:#dc2626;}
+
+/* Dark mode */
+[data-theme="dark"] .task-form{
+  background:#1a2436;
+  box-shadow:0 24px 60px rgba(0,0,0,.5), 0 0 0 1px #2d3f55;
+}
+[data-theme="dark"] .task-form-hd{
+  background:rgba(15,23,42,.5);
+  border-color:#2d3f55;
+}
+[data-theme="dark"] .task-form-title{color:#f1f5f9;}
+[data-theme="dark"] .task-form-cancel{color:#94a3b8;}
+[data-theme="dark"] .task-form-cancel:hover{color:#f1f5f9;}
+[data-theme="dark"] .task-form-body{background:#0f172a;}
+[data-theme="dark"] .task-form-group{
+  background:#1a2436;
+  box-shadow:0 1px 2px rgba(0,0,0,.2);
+}
+[data-theme="dark"] .task-form-divider{background:#2d3f55;}
+[data-theme="dark"] .task-form-input{color:#f1f5f9;}
+[data-theme="dark"] .task-form-input::placeholder{color:#64748b;}
+[data-theme="dark"] .task-form-row:hover{background:#1e293b;}
+[data-theme="dark"] .task-form-row-label{color:#f1f5f9;}
+[data-theme="dark"] .task-form-row-input{color:#cbd5e1;}
+[data-theme="dark"] .prio-pills{background:#0f172a;}
+[data-theme="dark"] .prio-pill{color:#94a3b8;}
+[data-theme="dark"] .prio-pill.active{background:#1e293b;color:#f1f5f9;}
+
+@media(max-width:540px){
+  .task-form{max-width:100%;border-radius:14px;}
+}
+
+/* ── TASK PAGE — HERO HEADER ─────────────────────────── */
+.task-hero{
+  position:relative;margin-bottom:24px;
+  padding:28px 28px 22px;
+  border-radius:20px;
+  background:linear-gradient(180deg, #ffffff 0%, #fafbfd 100%);
+  color:#0f172a;
+  border:1px solid #e7eaf0;
+  overflow:hidden;
+  box-shadow:0 1px 2px rgba(15,23,42,.04), 0 8px 28px rgba(15,23,42,.06);
+  transition:transform .35s cubic-bezier(.34,1.3,.64,1), box-shadow .35s ease;
+}
+.task-hero:hover{
+  box-shadow:0 2px 4px rgba(15,23,42,.05), 0 16px 40px rgba(15,23,42,.09);
+}
+.task-hero-bg{
+  position:absolute;inset:0;
+  background:
+    radial-gradient(circle at 20% -10%, var(--accent-dim) 0%, transparent 45%),
+    radial-gradient(circle at 92% 110%, var(--accent-dim) 0%, transparent 55%);
+  opacity:.7;
+  pointer-events:none;
+}
+.task-hero::after{
+  content:'';position:absolute;top:-40px;right:-40px;
+  width:200px;height:200px;border-radius:50%;
+  background:radial-gradient(circle, var(--accent-dim) 0%, transparent 70%);
+  opacity:.4;
+  pointer-events:none;
+}
+.task-hero-content{
+  position:relative;
+  display:flex;align-items:center;justify-content:space-between;
+  gap:16px;flex-wrap:wrap;
+}
+.task-hero-text{flex:1;min-width:200px;}
+.task-hero-title{
+  font-size:26px;font-weight:800;
+  letter-spacing:-.025em;line-height:1.1;
+  color:#0f172a;
+}
+.task-hero-sub{
+  font-size:13.5px;color:#64748b;
+  margin-top:6px;font-weight:500;
+}
+.task-hero-btn{
+  display:inline-flex;align-items:center;gap:7px;
+  background:linear-gradient(180deg, var(--accent) 0%, var(--accent-text, var(--accent)) 100%);
+  color:#fff;
+  border:none;border-radius:11px;
+  padding:11px 18px;
+  font-size:13.5px;font-weight:700;
+  letter-spacing:-.01em;
+  cursor:pointer;font-family:inherit;
+  box-shadow:0 1px 0 rgba(255,255,255,.2) inset, 0 4px 12px var(--accent-dim);
+  transition:
+    transform .35s cubic-bezier(.34,1.5,.64,1),
+    box-shadow .35s cubic-bezier(.34,1.5,.64,1),
+    filter .25s ease;
+}
+.task-hero-btn:hover{
+  transform:translateY(-3px);
+  filter:brightness(1.08);
+  box-shadow:0 1px 0 rgba(255,255,255,.2) inset, 0 12px 28px var(--accent-dim);
+}
+.task-hero-btn:active{
+  transform:translateY(-1px) scale(.98);
+  transition:transform .12s ease;
+}
+
+/* Stats row inside hero */
+.task-stats{
+  position:relative;display:flex;gap:0;
+  margin-top:22px;padding-top:18px;
+  border-top:1px solid #e7eaf0;
+}
+.task-stat{
+  flex:1;display:flex;flex-direction:column;
+  padding:0 16px;
+  border-right:1px solid #e7eaf0;
+  transition:transform .25s cubic-bezier(.34,1.4,.64,1);
+}
+.task-stat:hover{transform:translateY(-2px);}
+.task-stat:first-child{padding-left:0;}
+.task-stat:last-child{border-right:none;padding-right:0;}
+.task-stat-value{
+  font-size:26px;font-weight:800;
+  letter-spacing:-.025em;line-height:1;
+  color:#0f172a;
+  background:linear-gradient(180deg, #0f172a, #334155);
+  -webkit-background-clip:text;background-clip:text;
+}
+.task-stat-label{
+  font-size:11px;font-weight:700;
+  color:#94a3b8;
+  text-transform:uppercase;letter-spacing:.08em;
+  margin-top:5px;
+}
+
+/* Polish filter chips */
+#taskFilters{
+  display:flex;gap:6px;margin-bottom:20px;
+  flex-wrap:wrap;padding:5px;
+  background:#f1f5f9;border-radius:12px;
+  width:fit-content;
+}
+#taskFilters .font-chip{
+  background:transparent !important;border:1px solid transparent !important;
+  border-radius:9px !important;
+  padding:7px 14px !important;
+  font-size:12.5px !important;
+  color:#64748b !important;
+  transition:
+    background .35s cubic-bezier(.34,1.3,.64,1),
+    color .25s ease,
+    border-color .3s ease,
+    box-shadow .35s ease,
+    transform .25s cubic-bezier(.34,1.4,.64,1) !important;
+}
+#taskFilters .font-chip:active{transform:scale(.95);}
+#taskFilters .font-chip:hover{
+  color:#0f172a !important;
+}
+#taskFilters .font-chip.active{
+  background:#fff !important;
+  color:var(--accent-text, var(--accent)) !important;
+  border-color:#e2e8f0 !important;
+  box-shadow:0 1px 2px rgba(15,23,42,.06), 0 2px 8px rgba(15,23,42,.04) !important;
+}
+[data-theme="dark"] .task-hero{
+  background:linear-gradient(180deg, #1a2436, #16202e);
+  border-color:#2d3f55;
+  box-shadow:0 1px 2px rgba(0,0,0,.3), 0 8px 28px rgba(0,0,0,.4);
+}
+[data-theme="dark"] .task-hero-title{color:#f1f5f9;}
+[data-theme="dark"] .task-hero-sub{color:#94a3b8;}
+[data-theme="dark"] .task-stats{border-color:#2d3f55;}
+[data-theme="dark"] .task-stat{border-color:#2d3f55;}
+[data-theme="dark"] .task-stat-value{
+  color:#f1f5f9;
+  background:linear-gradient(180deg, #f1f5f9, #94a3b8);
+  -webkit-background-clip:text;background-clip:text;
+}
+[data-theme="dark"] .task-stat-label{color:#64748b;}
+[data-theme="dark"] #taskFilters{background:#0f172a;}
+[data-theme="dark"] #taskFilters .font-chip{color:#94a3b8 !important;}
+[data-theme="dark"] #taskFilters .font-chip:hover{color:#f1f5f9 !important;}
+[data-theme="dark"] #taskFilters .font-chip.active{
+  background:#1e293b !important;color:#f1f5f9 !important;
+  border-color:#334155 !important;
+}
+
+/* ── TASK CARD GRID ──────────────────────────────────── */
+.task-section{margin-bottom:32px;animation:taskSectionFade .35s ease both;}
+@keyframes taskSectionFade{
+  from{opacity:0;transform:translateY(6px);}
+  to{opacity:1;transform:translateY(0);}
+}
+.task-section-hd{
+  font-size:13px;font-weight:800;color:#0f172a;
+  letter-spacing:-.015em;
+  margin:0 0 16px;padding:0 4px;
+  display:flex;align-items:center;gap:10px;
+}
+.task-section-hd::before{
+  content:'';width:3px;height:14px;border-radius:2px;
+  background:#cbd5e1;
 }
 .task-section-hd .task-count{
-  font-weight:700;background:#f1f5f9;color:#64748b;
-  padding:2px 8px;border-radius:10px;font-size:10px;
+  font-weight:700;
+  background:#f1f5f9;color:#64748b;
+  padding:2px 10px;border-radius:999px;font-size:11px;
+  letter-spacing:0;
+  border:1px solid #e2e8f0;
 }
+[data-theme="dark"] .task-section-hd::before{background:#475569;}
+[data-theme="dark"] .task-section-hd .task-count{background:#1e293b;color:#94a3b8;border-color:#334155;}
+
+/* Grid container */
+.task-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill, minmax(260px, 1fr));
+  gap:14px;
+}
+
+/* Card — premium look with gradient sheen, glow, and refined shadows */
 .task-item{
-  display:flex;align-items:flex-start;gap:14px;
-  padding:14px 16px;border-radius:12px;
-  background:#fff;border:1px solid #e2e8f0;
-  margin-bottom:10px;transition:all .15s;
   position:relative;
+  display:flex;flex-direction:column;
+  padding:18px 18px 16px;
+  border-radius:16px;
+  background:linear-gradient(180deg, #ffffff 0%, #fbfcfe 100%);
+  border:1px solid #e7eaf0;
+  box-shadow:
+    0 1px 0 rgba(255,255,255,.6) inset,
+    0 1px 2px rgba(15,23,42,.04),
+    0 6px 16px rgba(15,23,42,.05);
+  transition:
+    transform .42s cubic-bezier(.34,1.3,.64,1),
+    box-shadow .42s cubic-bezier(.34,1.3,.64,1),
+    border-color .3s ease,
+    background .3s ease;
+  cursor:pointer;
+  overflow:hidden;
+  isolation:isolate;
+}
+.task-item:active{
+  transform:translateY(-1px) scale(.99);
+  transition:transform .15s ease;
+}
+/* Glow that follows the priority color, fades in on hover */
+.task-item::after{
+  content:'';position:absolute;inset:0;border-radius:inherit;
+  background:radial-gradient(80% 60% at 50% 0%, var(--card-glow, transparent) 0%, transparent 70%);
+  opacity:0;transition:opacity .35s ease;
+  pointer-events:none;z-index:0;
 }
 .task-item:hover{
+  transform:translateY(-3px);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,.6) inset,
+    0 4px 8px rgba(15,23,42,.06),
+    0 16px 32px rgba(15,23,42,.10);
   border-color:#cbd5e1;
-  box-shadow:0 1px 3px rgba(0,0,0,.04);
 }
-.task-item.done{opacity:.55;background:#f8fafc;}
-.task-item.done .task-title{text-decoration:line-through;color:#94a3b8;}
-.task-item.overdue:not(.done){border-left:3px solid #dc2626;}
+.task-item:hover::after{opacity:.55;}
+.task-item > *{position:relative;z-index:1;}
+
+/* Priority accent bar — gradient + subtle glow */
+.task-item::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:3px;
+  background:linear-gradient(90deg, #cbd5e1, #e2e8f0);
+  z-index:2;
+}
+.task-item.priority-high{--card-glow:rgba(220,38,38,.12);}
+.task-item.priority-high::before{background:linear-gradient(90deg, #dc2626, #f87171);box-shadow:0 0 12px rgba(220,38,38,.3);}
+.task-item.priority-med{--card-glow:rgba(245,158,11,.10);}
+.task-item.priority-med::before{background:linear-gradient(90deg, #f59e0b, #fbbf24);}
+.task-item.priority-low{--card-glow:rgba(148,163,184,.10);}
+.task-item.priority-low::before{background:linear-gradient(90deg, #94a3b8, #cbd5e1);}
+
+/* Header row: checkbox + title + delete */
+.task-card-hd{
+  display:flex;align-items:flex-start;gap:11px;
+}
 .task-check{
-  width:22px;height:22px;border-radius:50%;border:2px solid #cbd5e1;
-  flex-shrink:0;cursor:pointer;margin-top:2px;
-  transition:all .15s;display:flex;align-items:center;justify-content:center;
+  width:22px;height:22px;border-radius:50%;
+  border:2px solid #cbd5e1;
+  flex-shrink:0;cursor:pointer;margin-top:1px;
+  transition:
+    background .35s ease,
+    border-color .3s ease,
+    transform .4s cubic-bezier(.34,1.6,.64,1),
+    box-shadow .4s cubic-bezier(.34,1.6,.64,1);
+  display:flex;align-items:center;justify-content:center;
   background:#fff;
+  box-shadow:0 1px 2px rgba(15,23,42,.04);
 }
-.task-check:hover{border-color:var(--accent);transform:scale(1.05);}
-.task-item.done .task-check{background:var(--accent);border-color:var(--accent);color:#fff;}
-.task-body{flex:1;min-width:0;cursor:pointer;}
+.task-check:hover{
+  border-color:var(--accent);
+  transform:scale(1.12);
+  box-shadow:0 0 0 5px var(--accent-dim);
+}
+.task-check:active{
+  transform:scale(.92);
+  transition:transform .12s ease;
+}
+.task-item.done .task-check{
+  background:linear-gradient(135deg, var(--accent), var(--accent));
+  border-color:var(--accent);color:#fff;
+  box-shadow:0 2px 8px var(--accent-dim);
+}
+.task-body{flex:1;min-width:0;}
 .task-title{
-  font-size:14.5px;font-weight:600;color:#0f172a;
+  font-size:15px;font-weight:700;color:#0f172a;
   word-wrap:break-word;line-height:1.4;
+  letter-spacing:-.015em;
+  background:linear-gradient(180deg, #0f172a, #1e293b);
+  -webkit-background-clip:text;
+  background-clip:text;
 }
 .task-notes{
-  font-size:12.5px;color:#64748b;margin-top:4px;
-  white-space:pre-wrap;line-height:1.45;
+  font-size:12.5px;color:#64748b;margin-top:7px;
+  white-space:pre-wrap;line-height:1.55;
+  display:-webkit-box;
+  -webkit-line-clamp:3;
+  -webkit-box-orient:vertical;
+  overflow:hidden;
 }
+
+/* Bottom meta row — separator becomes a soft fade */
 .task-meta{
-  display:flex;align-items:center;gap:6px;
-  margin-top:8px;flex-wrap:wrap;
+  display:flex;align-items:center;gap:7px;
+  margin-top:14px;flex-wrap:wrap;
+  padding-top:13px;
+  border-top:1px solid transparent;
+  background-image:linear-gradient(90deg, transparent 0%, #e7eaf0 20%, #e7eaf0 80%, transparent 100%);
+  background-size:100% 1px;
+  background-repeat:no-repeat;
+  background-position:top;
 }
 .task-chip{
-  display:inline-flex;align-items:center;gap:4px;
+  display:inline-flex;align-items:center;gap:5px;
   font-size:11px;font-weight:600;
-  padding:3px 9px;border-radius:10px;line-height:1.4;
+  padding:4px 10px;border-radius:999px;line-height:1.4;
+  border:1px solid transparent;
 }
-.task-chip.due{background:#eff6ff;color:#2563eb;}
-.task-chip.due.overdue{background:#fef2f2;color:#dc2626;}
-.task-chip.due.soon{background:#fffbeb;color:#d97706;}
-.task-chip.reminder{background:#f0fdf4;color:#059669;}
-.task-chip.priority-high{background:#fef2f2;color:#dc2626;}
-.task-chip.priority-med{background:#f1f5f9;color:#64748b;}
-.task-chip.priority-low{background:#f1f5f9;color:#94a3b8;}
+.task-chip svg{width:11px;height:11px;flex-shrink:0;}
+.task-chip.due{
+  background:linear-gradient(180deg, #eff6ff, #dbeafe);
+  color:#1e40af;border-color:#bfdbfe;
+}
+.task-chip.due.overdue{
+  background:linear-gradient(180deg, #fef2f2, #fee2e2);
+  color:#991b1b;border-color:#fecaca;
+}
+.task-chip.due.soon{
+  background:linear-gradient(180deg, #fffbeb, #fef3c7);
+  color:#92400e;border-color:#fde68a;
+}
+.task-chip.reminder{
+  background:linear-gradient(180deg, #f0fdf4, #dcfce7);
+  color:#15803d;border-color:#bbf7d0;
+}
+.task-chip.priority-high{
+  background:linear-gradient(180deg, #fef2f2, #fee2e2);
+  color:#991b1b;border-color:#fecaca;
+}
+.task-chip.priority-low{
+  background:linear-gradient(180deg, #f8fafc, #f1f5f9);
+  color:#475569;border-color:#e2e8f0;
+}
+
+/* Done state — muted but still readable */
+.task-item.done{
+  opacity:.7;
+  background:linear-gradient(180deg, #fafbfc, #f5f7fa);
+}
+.task-item.done .task-title{
+  text-decoration:line-through;
+  text-decoration-color:#cbd5e1;
+  text-decoration-thickness:2px;
+  color:#94a3b8;
+  -webkit-text-fill-color:#94a3b8;
+}
+.task-item.done::before{background:linear-gradient(90deg, #cbd5e1, #e2e8f0) !important;box-shadow:none !important;}
+
+/* Overdue gets a red tint */
+.task-item.overdue:not(.done){
+  background:linear-gradient(180deg, #fef2f2 0%, #fff 50%);
+  border-color:#fca5a5;
+  box-shadow:
+    0 1px 0 rgba(255,255,255,.6) inset,
+    0 1px 2px rgba(220,38,38,.06),
+    0 6px 20px rgba(220,38,38,.10);
+}
+
+/* Delete button (top-right corner) */
 .task-del{
-  opacity:0;background:none;border:none;cursor:pointer;
-  color:#94a3b8;padding:4px 8px;font-size:18px;line-height:1;
-  transition:opacity .15s,color .15s;
-  align-self:flex-start;
+  position:absolute;top:8px;right:8px;
+  opacity:0;background:rgba(255,255,255,.9);
+  border:1px solid #e7eaf0;border-radius:6px;
+  width:26px;height:26px;cursor:pointer;
+  color:#94a3b8;font-size:14px;line-height:1;
+  display:flex;align-items:center;justify-content:center;
+  transition:opacity .15s, color .15s, transform .15s;
+  z-index:2;
 }
 .task-item:hover .task-del{opacity:1;}
-.task-del:hover{color:#dc2626;}
+.task-del:hover{color:#dc2626;transform:scale(1.05);}
 
-/* Empty state */
+/* Empty state — soft, no big emoji */
 .task-empty{
-  text-align:center;padding:48px 20px;
-  background:#fff;border:1px dashed #e2e8f0;border-radius:14px;
+  grid-column:1/-1;
+  text-align:center;padding:64px 24px;
+  background:linear-gradient(180deg, #fff, #fbfcfe);
+  border:1px dashed #cbd5e1;border-radius:18px;
+  position:relative;overflow:hidden;
 }
-.task-empty-icon{font-size:36px;margin-bottom:10px;opacity:.4;}
-.task-empty-title{font-size:14px;font-weight:600;color:#475569;margin-bottom:4px;}
-.task-empty-sub{font-size:12.5px;color:#94a3b8;}
+.task-empty::before{
+  content:'';position:absolute;inset:0;
+  background:radial-gradient(60% 50% at 50% 0%, rgba(148,163,184,.08) 0%, transparent 70%);
+  pointer-events:none;
+}
+.task-empty > *{position:relative;}
+.task-empty-icon{
+  width:52px;height:52px;border-radius:14px;
+  background:linear-gradient(135deg, #f1f5f9, #e2e8f0);
+  color:#64748b;
+  display:inline-flex;align-items:center;justify-content:center;
+  margin-bottom:14px;
+  box-shadow:0 1px 0 #fff inset, 0 4px 12px rgba(15,23,42,.06);
+}
+.task-empty-icon svg{width:24px;height:24px;}
+.task-empty-title{font-size:15px;font-weight:700;color:#0f172a;margin-bottom:4px;letter-spacing:-.015em;}
+.task-empty-sub{font-size:13px;color:#64748b;}
 
-[data-theme="dark"] .task-item{background:#1a2436;border-color:#2d3f55;}
-[data-theme="dark"] .task-item:hover{border-color:#475569;}
-[data-theme="dark"] .task-item.done{background:#0f172a;}
-[data-theme="dark"] .task-title{color:#f1f5f9;}
-[data-theme="dark"] .task-section-hd .task-count{background:#1e293b;color:#94a3b8;}
-[data-theme="dark"] .task-empty{background:#1a2436;border-color:#2d3f55;}
-[data-theme="dark"] .task-check{background:#1a2436;}
+[data-theme="dark"] .task-item{
+  background:linear-gradient(180deg, #1a2436 0%, #16202e 100%);
+  border-color:#2d3f55;
+  box-shadow:
+    0 1px 0 rgba(255,255,255,.04) inset,
+    0 1px 2px rgba(0,0,0,.3),
+    0 8px 20px rgba(0,0,0,.35);
+}
+[data-theme="dark"] .task-item:hover{
+  border-color:#475569;
+  box-shadow:
+    0 1px 0 rgba(255,255,255,.04) inset,
+    0 4px 8px rgba(0,0,0,.3),
+    0 16px 32px rgba(0,0,0,.45);
+}
+[data-theme="dark"] .task-item.done{background:linear-gradient(180deg, #101723, #0c1118);}
+[data-theme="dark"] .task-item.overdue:not(.done){
+  background:linear-gradient(180deg, rgba(220,38,38,.12) 0%, #1a2436 60%);
+  border-color:#991b1b;
+}
+[data-theme="dark"] .task-title{
+  color:#f1f5f9;background:none;-webkit-text-fill-color:#f1f5f9;
+}
+[data-theme="dark"] .task-meta{
+  background-image:linear-gradient(90deg, transparent 0%, #2d3f55 20%, #2d3f55 80%, transparent 100%);
+}
+[data-theme="dark"] .task-section-hd{color:#f1f5f9;}
+[data-theme="dark"] .task-empty{
+  background:linear-gradient(180deg, #1a2436, #16202e);
+  border-color:#2d3f55;
+}
+[data-theme="dark"] .task-empty-title{color:#f1f5f9;}
+[data-theme="dark"] .task-empty-sub{color:#94a3b8;}
+[data-theme="dark"] .task-check{background:#1a2436;box-shadow:0 1px 2px rgba(0,0,0,.3);}
+[data-theme="dark"] .task-del{background:rgba(26,36,54,.92);border-color:#2d3f55;}
+[data-theme="dark"] .task-chip.due{background:linear-gradient(180deg, rgba(37,99,235,.18), rgba(37,99,235,.10));color:#93c5fd;border-color:rgba(37,99,235,.3);}
+[data-theme="dark"] .task-chip.due.overdue{background:linear-gradient(180deg, rgba(220,38,38,.18), rgba(220,38,38,.10));color:#fca5a5;border-color:rgba(220,38,38,.3);}
+[data-theme="dark"] .task-chip.due.soon{background:linear-gradient(180deg, rgba(217,119,6,.18), rgba(217,119,6,.10));color:#fcd34d;border-color:rgba(217,119,6,.3);}
+[data-theme="dark"] .task-chip.reminder{background:linear-gradient(180deg, rgba(5,150,105,.18), rgba(5,150,105,.10));color:#86efac;border-color:rgba(5,150,105,.3);}
+[data-theme="dark"] .task-chip.priority-high{background:linear-gradient(180deg, rgba(220,38,38,.18), rgba(220,38,38,.10));color:#fca5a5;border-color:rgba(220,38,38,.3);}
+[data-theme="dark"] .task-chip.priority-low{background:linear-gradient(180deg, rgba(100,116,139,.2), rgba(100,116,139,.1));color:#cbd5e1;border-color:rgba(100,116,139,.3);}
 
 /* Task animations */
 @keyframes taskSlideIn {
-  from { opacity:0; transform:translateY(-12px) scale(.96); max-height:0; padding-top:0; padding-bottom:0; margin-bottom:0; }
-  60%  { opacity:1; transform:translateY(2px) scale(1.02); }
-  100% { opacity:1; transform:translateY(0) scale(1); max-height:300px; }
+  from { opacity:0; transform:translateY(-14px) scale(.92); }
+  50%  { opacity:1; transform:translateY(3px) scale(1.025); }
+  80%  { transform:translateY(-1px) scale(.998); }
+  100% { opacity:1; transform:translateY(0) scale(1); }
 }
 @keyframes taskSlideOut {
-  0%   { opacity:1; transform:translateX(0) scale(1); max-height:300px; margin-bottom:10px; }
-  60%  { opacity:0; transform:translateX(-30px) scale(.96); }
-  100% { opacity:0; transform:translateX(-30px) scale(.96); max-height:0; padding-top:0; padding-bottom:0; margin:0; border-width:0; }
+  0%   { opacity:1; transform:scale(1) translateY(0); }
+  40%  { opacity:.7; transform:scale(.96) translateY(-2px); }
+  100% { opacity:0; transform:scale(.82) translateY(-4px); }
 }
 @keyframes checkPop {
   0%   { transform:scale(1); }
@@ -2000,10 +2523,10 @@ html[data-sb="collapsed"][data-theme="dark"] .sb-brand,
 
 /* Apply animations */
 .task-item.entering{
-  animation:taskSlideIn .35s cubic-bezier(.34,1.4,.64,1) both;
+  animation:taskSlideIn .55s cubic-bezier(.34,1.3,.64,1) both;
 }
 .task-item.leaving{
-  animation:taskSlideOut .3s cubic-bezier(.55,0,.55,.2) both;
+  animation:taskSlideOut .42s cubic-bezier(.4,0,.5,.2) both;
   pointer-events:none;
 }
 .task-item.completing{
@@ -2038,6 +2561,84 @@ html[data-sb="collapsed"][data-theme="dark"] .sb-brand,
 /* Right-side status panel on messages page */
 .msg-page-wrap{display:flex;gap:16px;height:100%;}
 .msg-main-col{flex:1;min-width:0;display:flex;flex-direction:column;}
+
+/* ── DESKTOP FULL-SCREEN MESSAGING ─────────────────────── */
+@media(min-width:861px){
+  body.msg-fullscreen .main{
+    padding:0 !important;
+    display:flex !important;
+    flex-direction:column !important;
+    height:100dvh !important;
+    overflow:hidden !important;
+  }
+  body.msg-fullscreen #page-messages.active{
+    display:flex !important;
+    flex-direction:column !important;
+    padding:0 !important;
+    max-width:none !important;
+    width:100% !important;
+    margin:0 !important;
+    flex:1 !important;
+    min-height:0 !important;
+    height:auto !important;
+    overflow:hidden !important;
+    animation:none !important;
+  }
+  body.msg-fullscreen .msg-page-hd{display:none !important;}
+  body.msg-fullscreen #page-messages.active .msg-page-wrap{
+    flex:1;
+    min-height:0;
+    height:100%;
+    gap:0;
+    background:#fff;
+    border-radius:0;
+    overflow:hidden;
+  }
+  body.msg-fullscreen #page-messages.active #msgListView{
+    width:340px;
+    flex-shrink:0;
+    border-right:1px solid #e2e8f0;
+    height:100%;
+    display:flex;
+    flex-direction:column;
+    overflow:hidden;
+  }
+  body.msg-fullscreen #page-messages.active #msgConvoList{
+    flex:1;
+    overflow-y:auto;
+    min-height:0;
+  }
+  body.msg-fullscreen #page-messages.active #msgThreadView{
+    flex:1;
+    height:100%;
+    min-height:0;
+    margin:0 !important;
+    border:none !important;
+    border-radius:0 !important;
+    background:#fff;
+  }
+  body.msg-fullscreen #page-messages.active .status-panel,
+  body.msg-fullscreen #page-messages.active .status-strip{
+    border-left:1px solid #e2e8f0;
+    border-radius:0;
+    height:100%;
+    max-height:none;
+    position:static;
+  }
+  /* Dark mode borders */
+  [data-theme="dark"] body.msg-fullscreen #page-messages.active .msg-page-wrap{
+    background:#0f172a;
+  }
+  [data-theme="dark"] body.msg-fullscreen #page-messages.active #msgListView,
+  [data-theme="dark"] body.msg-fullscreen #page-messages.active .status-panel,
+  [data-theme="dark"] body.msg-fullscreen #page-messages.active .status-strip{
+    border-color:#2d3f55;
+    background:#1a2436;
+  }
+  [data-theme="dark"] body.msg-fullscreen #page-messages.active #msgThreadView{
+    background:#1a2436;
+  }
+}
 
 /* ── FACEBOOK-STYLE CONTACTS RAIL ──────────────────── */
 .status-panel{
@@ -2587,60 +3188,104 @@ html[data-sb="collapsed"][data-theme="dark"] .sb-brand,
 
     <!-- TASKS page -->
     <div class="page" id="page-tasks">
-      <div class="page-hd">
-        <div>
-          <div class="page-title">To Do List</div>
-          <div class="page-sub">Your personal to-do list — reminders appear in the notifications bell</div>
+      <!-- Hero header with stats -->
+      <div class="task-hero">
+        <div class="task-hero-bg"></div>
+        <div class="task-hero-content">
+          <div class="task-hero-text">
+            <div class="task-hero-title">To Do List</div>
+            <div class="task-hero-sub">Stay on top of what matters. Reminders chime in your notifications bell.</div>
+          </div>
+          <button class="task-hero-btn" onclick="openTaskForm()">
+            <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"/></svg>
+            New Task
+          </button>
         </div>
-        <button class="btn btn-green" onclick="openTaskForm()" style="font-size:13px;padding:8px 16px;">+ New Task</button>
+        <div class="task-stats" id="taskStats"></div>
       </div>
 
       <!-- Add/Edit form -->
-      <div id="taskForm" style="display:none;" class="card">
-        <div class="card-hd"><div class="card-title" id="taskFormTitle">New Task</div></div>
-        <input type="hidden" id="taskEditId">
-        <div style="margin-bottom:10px;">
-          <label style="font-size:12px;font-weight:600;color:#475569;display:block;margin-bottom:4px;">Title</label>
-          <input type="text" id="taskTitle" class="f-input" placeholder="What needs to be done?">
-        </div>
-        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
-          <div style="flex:1;min-width:140px;">
-            <label style="font-size:12px;font-weight:600;color:#475569;display:block;margin-bottom:4px;">Due date</label>
-            <input type="date" id="taskDueDate" class="f-input">
+      <!-- Task form modal — Apple Reminders style -->
+      <div id="taskFormBackdrop" class="task-form-backdrop" onclick="if(event.target===this)closeTaskForm()">
+        <div id="taskForm" class="task-form">
+          <input type="hidden" id="taskEditId">
+          <div class="task-form-hd">
+            <button class="task-form-cancel" onclick="closeTaskForm()">Cancel</button>
+            <div class="task-form-title" id="taskFormTitle">New Reminder</div>
+            <button class="task-form-save" onclick="saveTask()" id="taskFormSaveBtn">Add</button>
           </div>
-          <div style="flex:1;min-width:120px;">
-            <label style="font-size:12px;font-weight:600;color:#475569;display:block;margin-bottom:4px;">Due time</label>
-            <input type="time" id="taskDueTime" class="f-input">
+
+          <div class="task-form-body">
+            <!-- Title + notes group -->
+            <div class="task-form-group">
+              <input type="text" id="taskTitle" class="task-form-input task-form-title-input" placeholder="Title">
+              <div class="task-form-divider"></div>
+              <textarea id="taskNotes" class="task-form-input" rows="2" placeholder="Notes"></textarea>
+            </div>
+
+            <!-- Date & time group -->
+            <div class="task-form-group">
+              <label class="task-form-row">
+                <div class="task-form-row-icon" style="background:#3b82f6;">
+                  <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd"/></svg>
+                </div>
+                <div class="task-form-row-label">Date</div>
+                <input type="date" id="taskDueDate" class="task-form-row-input">
+              </label>
+              <div class="task-form-divider"></div>
+              <label class="task-form-row">
+                <div class="task-form-row-icon" style="background:#06b6d4;">
+                  <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/></svg>
+                </div>
+                <div class="task-form-row-label">Time</div>
+                <input type="time" id="taskDueTime" class="task-form-row-input">
+              </label>
+              <div class="task-form-divider"></div>
+              <label class="task-form-row">
+                <div class="task-form-row-icon" style="background:#10b981;">
+                  <svg viewBox="0 0 20 20" fill="currentColor"><path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z"/></svg>
+                </div>
+                <div class="task-form-row-label">Remind me</div>
+                <select id="taskRemindBefore" class="task-form-row-input">
+                  <option value="">None</option>
+                  <option value="0">At due time</option>
+                  <option value="15">15 min before</option>
+                  <option value="30">30 min before</option>
+                  <option value="60">1 hour before</option>
+                  <option value="180">3 hours before</option>
+                  <option value="1440">1 day before</option>
+                </select>
+              </label>
+            </div>
+
+            <!-- Priority pills -->
+            <div class="task-form-group">
+              <div class="task-form-row" style="cursor:default;">
+                <div class="task-form-row-icon" style="background:#f59e0b;">
+                  <svg viewBox="0 0 20 20" fill="currentColor"><path d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z"/></svg>
+                </div>
+                <div class="task-form-row-label">Priority</div>
+                <div class="prio-pills" id="prioPills">
+                  <button type="button" class="prio-pill" data-val="low" onclick="setTaskPrio('low')">Low</button>
+                  <button type="button" class="prio-pill active" data-val="med" onclick="setTaskPrio('med')">Medium</button>
+                  <button type="button" class="prio-pill" data-val="high" onclick="setTaskPrio('high')">High</button>
+                  <input type="hidden" id="taskPriority" value="med">
+                </div>
+              </div>
+            </div>
           </div>
-          <div style="flex:1;min-width:120px;">
-            <label style="font-size:12px;font-weight:600;color:#475569;display:block;margin-bottom:4px;">Priority</label>
-            <select id="taskPriority" class="f-input">
-              <option value="low">Low</option>
-              <option value="med" selected>Medium</option>
-              <option value="high">High</option>
-            </select>
-          </div>
         </div>
-        <div style="margin-bottom:10px;">
-          <label style="font-size:12px;font-weight:600;color:#475569;display:block;margin-bottom:4px;">Remind me</label>
-          <select id="taskRemindBefore" class="f-input">
-            <option value="">No reminder</option>
-            <option value="0">At the due time</option>
-            <option value="15">15 minutes before</option>
-            <option value="30">30 minutes before</option>
-            <option value="60">1 hour before</option>
-            <option value="180">3 hours before</option>
-            <option value="1440">1 day before</option>
-          </select>
+      </div>
+
+      <!-- Notification permission banner -->
+      <div id="notifyPermBanner" style="display:none;background:#fffbeb;border:1px solid #fcd34d;border-radius:10px;padding:12px 14px;margin-bottom:14px;display:none;align-items:center;gap:12px;">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="#d97706" style="flex-shrink:0;"><path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z"/></svg>
+        <div style="flex:1;">
+          <div style="font-size:13px;font-weight:700;color:#92400e;">Get reminders even when this tab isn't open</div>
+          <div style="font-size:12px;color:#a16207;margin-top:2px;">Enable system notifications so reminders pop up at full volume.</div>
         </div>
-        <div style="margin-bottom:14px;">
-          <label style="font-size:12px;font-weight:600;color:#475569;display:block;margin-bottom:4px;">Notes (optional)</label>
-          <textarea id="taskNotes" class="f-input" rows="2" placeholder="Any extra details"></textarea>
-        </div>
-        <div style="display:flex;gap:8px;">
-          <button class="btn btn-green" onclick="saveTask()" style="padding:9px 18px;font-size:13px;">Save</button>
-          <button class="btn btn-outline" onclick="closeTaskForm()" style="padding:9px 14px;">Cancel</button>
-        </div>
+        <button onclick="enableNotifyFromBanner()" style="background:#d97706;color:#fff;border:none;border-radius:6px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;">Enable</button>
+        <button onclick="dismissNotifyBanner()" style="background:none;border:none;color:#a16207;cursor:pointer;padding:6px;font-size:20px;line-height:1;">×</button>
       </div>
 
       <!-- Filters -->
@@ -2834,15 +3479,15 @@ html[data-sb="collapsed"][data-theme="dark"] .sb-brand,
 
     <!-- MESSAGES PAGE (Slack-style) -->
     <div class="page" id="page-messages">
+      <div class="page-hd msg-page-hd">
+        <div class="page-title">Messages</div>
+        <div class="page-sub">Chat with your coworkers</div>
+      </div>
       <div class="msg-page-wrap">
       <div class="msg-main-col">
       <!-- List view (default) -->
       <div id="msgListView">
-        <div class="page-hd">
-          <div class="page-title">Messages</div>
-          <div class="page-sub">Chat with your coworkers</div>
-        </div>
-        <div style="display:flex;gap:8px;margin-bottom:14px;">
+        <div style="display:flex;gap:8px;margin-bottom:14px;padding:14px 14px 0;">
           <div style="position:relative;flex:1;">
             <svg style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#94a3b8;" width="16" height="16" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd"/></svg>
             <input type="text" id="msgSearch" class="f-input" placeholder="Search messages or people..." style="padding-left:38px;" oninput="filterMsgConvos()">
@@ -3795,6 +4440,9 @@ function doLogout(){
 }
 
 async function enterHub(){
+  // Sync body.msg-fullscreen class with current page
+  const currentPage = (location.hash||'').replace('#','') || 'home';
+  document.body.classList.toggle('msg-fullscreen', currentPage==='messages');
   await loadStaffList();
  // refresh from Supabase in case staff changed
   document.getElementById("authLayer").style.display="none";
@@ -3833,6 +4481,8 @@ async function enterHub(){
 }
 
 function goTo(p){
+  // Toggle body class for full-screen messaging on desktop
+  document.body.classList.toggle('msg-fullscreen', p==='messages');
   // Update URL hash + document title
   const titles={home:'Home',schedule:'Schedule',profile:'Profile',announcements:'Announcements',engagement:'Engagement',documents:'Documents',messages:'Messages'};
   const appName='Oscars Employee Portal';
@@ -3849,7 +4499,7 @@ function goTo(p){
   if(p==="announcements"){loadAnnouncements();}
   if(p==="engagement"){showEngagementTab('discussions');}
   if(p==="documents"){loadDocuments();}
-  if(p==="tasks"){ loadTasks(); renderTasks(); updateTaskBadge(); }
+  if(p==="tasks"){ loadTasks(); renderTasks(); updateTaskBadge(); maybeShowNotifyBanner(); }
   if(p==="messages"){
     loadAllStatuses();
     applyStatusPanelPref();
@@ -5037,8 +5687,11 @@ function renderBdayCalendar(){
     tasksToday.forEach(function(t){
       const doneCls = t.done ? ' done' : '';
       const timePart = t.dueTime ? t.dueTime.slice(0,5)+' ' : '';
-      const tip = (t.done?'✓ ':'')+'Task: '+t.title.replace(/"/g,'&quot;');
-      html+='<div class="cal-pill cal-pill-task'+doneCls+'" title="'+tip+'" onclick="event.stopPropagation();goTo(\'tasks\');">'+(t.done?'✓ ':'☐ ')+timePart+t.title.replace(/</g,'&lt;')+'</div>';
+      const tip = (t.done?'Done — ':'')+'Task: '+t.title.replace(/"/g,'&quot;');
+      const taskIcon = t.done
+        ? '<svg width="9" height="9" viewBox="0 0 20 20" fill="currentColor" style="display:inline-block;vertical-align:-1px;margin-right:3px;"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>'
+        : '<svg width="9" height="9" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" style="display:inline-block;vertical-align:-1px;margin-right:3px;"><rect x="3" y="3" width="14" height="14" rx="2"/></svg>';
+      html+='<div class="cal-pill cal-pill-task'+doneCls+'" title="'+tip+'" onclick="event.stopPropagation();goTo(\'tasks\');">'+taskIcon+timePart+t.title.replace(/</g,'&lt;')+'</div>';
     });
 
     html+='</div></div>';
@@ -5172,6 +5825,119 @@ function playMsgSound(){
   }catch(e){}
 }
 
+
+// ── TASK REMINDER SOUND (distinct from message sound) ──
+// Calmer, descending three-note chime — "ding-ding-ding" like a bell
+function playTaskSound(){
+  if(localStorage.getItem('task_sound_off')==='1') return;
+  try{
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const now = ctx.currentTime;
+    function tone(freq, start, dur, vol){
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'triangle'; // softer, bell-like
+      osc.frequency.value = freq;
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      gain.gain.setValueAtTime(0, start);
+      gain.gain.linearRampToValueAtTime(vol||0.18, start + 0.015);
+      gain.gain.exponentialRampToValueAtTime(0.001, start + dur);
+      osc.start(start);
+      osc.stop(start + dur);
+    }
+    // Descending arpeggio: G5 -> E5 -> C5 (a calm bell pattern)
+    tone(784, now,        0.45, 0.18);
+    tone(659, now + 0.18, 0.45, 0.16);
+    tone(523, now + 0.36, 0.65, 0.14);
+    setTimeout(function(){ try{ ctx.close(); }catch(e){} }, 1200);
+  }catch(e){}
+}
+
+// ── SYSTEM NOTIFICATIONS ──
+function canSystemNotify(){
+  return typeof window.Notification !== 'undefined' && Notification.permission === 'granted';
+}
+
+async function requestNotifyPermission(){
+  if(typeof window.Notification === 'undefined'){
+    showToast('Notifications not supported on this browser');
+    return false;
+  }
+  if(Notification.permission === 'granted') return true;
+  if(Notification.permission === 'denied'){
+    showToast('Notifications blocked — enable them in browser settings');
+    return false;
+  }
+  try{
+    const result = await Notification.requestPermission();
+    if(result === 'granted'){
+      showToast('System notifications enabled');
+      return true;
+    } else {
+      showToast('Notifications declined');
+      return false;
+    }
+  }catch(e){ return false; }
+}
+
+function showSystemNotification(title, body, taskId){
+  if(typeof window.Notification === 'undefined'){
+    console.warn('Notifications not supported in this browser');
+    if(typeof showToast==='function') showToast('Notifications not supported');
+    return null;
+  }
+  if(Notification.permission !== 'granted'){
+    console.warn('Notification permission is:', Notification.permission);
+    if(typeof showToast==='function') showToast('Notifications permission: '+Notification.permission);
+    return null;
+  }
+  try{
+    const opts = {
+      body: body,
+      tag: 'task-reminder-' + (taskId||Date.now()),
+      requireInteraction: true, // stays visible until user dismisses
+      silent: false // play system notification sound at OS volume
+    };
+    const n = new Notification(title, opts);
+    n.onclick = function(){
+      window.focus();
+      if(typeof goTo === 'function') goTo('tasks');
+      n.close();
+    };
+    n.onerror = function(e){ console.error('Notification error:', e); };
+    return n;
+  }catch(e){
+    console.error('Failed to create Notification:', e);
+    if(typeof showToast==='function') showToast('Notification failed: '+e.message);
+    return null;
+  }
+}
+
+function maybeShowNotifyBanner(){
+  const banner = document.getElementById('notifyPermBanner');
+  if(!banner) return;
+  const dismissed = localStorage.getItem('notify_banner_dismissed_'+me) === '1';
+  const supported = typeof window.Notification !== 'undefined';
+  const isDefault = supported && Notification.permission === 'default';
+  if(supported && isDefault && !dismissed){
+    banner.style.display = 'flex';
+  } else {
+    banner.style.display = 'none';
+  }
+}
+
+async function enableNotifyFromBanner(){
+  const granted = await requestNotifyPermission();
+  if(granted){
+    document.getElementById('notifyPermBanner').style.display = 'none';
+  }
+}
+
+function dismissNotifyBanner(){
+  localStorage.setItem('notify_banner_dismissed_'+me, '1');
+  document.getElementById('notifyPermBanner').style.display = 'none';
+}
 
 function toggleMsgSound(){
   const off = localStorage.getItem('msg_sound_off') === '1';
@@ -6863,19 +7629,50 @@ function saveTasks(){
   updateTaskBadge();
 }
 
+// Esc closes the form
+document.addEventListener('keydown', function(e){
+  if(e.key === 'Escape'){
+    const bd = document.getElementById('taskFormBackdrop');
+    if(bd && bd.classList.contains('open')) closeTaskForm();
+  }
+});
+
+// Move task form modal to body so position:fixed escapes any transformed parent
+(function moveTaskFormToBody(){
+  function _move(){
+    const bd = document.getElementById('taskFormBackdrop');
+    if(bd && bd.parentNode !== document.body){
+      document.body.appendChild(bd);
+    }
+  }
+  if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', _move);
+  } else {
+    _move();
+  }
+})();
+
+function setTaskPrio(val){
+  document.getElementById('taskPriority').value = val;
+  document.querySelectorAll('#prioPills .prio-pill').forEach(function(b){
+    b.classList.toggle('active', b.getAttribute('data-val') === val);
+  });
+}
+
 function openTaskForm(editId){
-  const form = document.getElementById('taskForm');
-  if(!form) return;
-  form.style.display = 'block';
-  document.getElementById('taskFormTitle').textContent = editId ? 'Edit Task' : 'New Task';
+  const backdrop = document.getElementById('taskFormBackdrop');
+  if(!backdrop) return;
+  backdrop.classList.add('open');
+  document.getElementById('taskFormTitle').textContent = editId ? 'Edit Reminder' : 'New Reminder';
+  document.getElementById('taskFormSaveBtn').textContent = editId ? 'Done' : 'Add';
   if(editId){
     const t = _tasks.find(function(x){return x.id===editId;});
-    if(!t) return;
+    if(!t){ closeTaskForm(); return; }
     document.getElementById('taskEditId').value = t.id;
     document.getElementById('taskTitle').value = t.title || '';
     document.getElementById('taskDueDate').value = t.dueDate || '';
     document.getElementById('taskDueTime').value = t.dueTime || '';
-    document.getElementById('taskPriority').value = t.priority || 'med';
+    setTaskPrio(t.priority || 'med');
     document.getElementById('taskRemindBefore').value = (t.remindBefore==null||t.remindBefore===undefined)?'':String(t.remindBefore);
     document.getElementById('taskNotes').value = t.notes || '';
   } else {
@@ -6883,14 +7680,15 @@ function openTaskForm(editId){
     document.getElementById('taskTitle').value = '';
     document.getElementById('taskDueDate').value = '';
     document.getElementById('taskDueTime').value = '';
-    document.getElementById('taskPriority').value = 'med';
+    setTaskPrio('med');
     document.getElementById('taskRemindBefore').value = '';
     document.getElementById('taskNotes').value = '';
   }
-  setTimeout(function(){ document.getElementById('taskTitle').focus(); }, 50);
+  setTimeout(function(){ document.getElementById('taskTitle').focus(); }, 100);
 }
 function closeTaskForm(){
-  document.getElementById('taskForm').style.display = 'none';
+  const backdrop = document.getElementById('taskFormBackdrop');
+  if(backdrop) backdrop.classList.remove('open');
 }
 
 function saveTask(){
@@ -7009,6 +7807,7 @@ function taskDueDate(t){
 function renderTasks(){
   const el = document.getElementById('taskList');
   if(!el) return;
+  updateTaskStats();
   const now = new Date();
   const today = new Date(); today.setHours(0,0,0,0);
   const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate()+1);
@@ -7028,7 +7827,7 @@ function renderTasks(){
 
   if(!filtered.length){
     el.innerHTML = '<div class="task-empty">'+
-      '<div class="task-empty-icon">📝</div>'+
+      '<div class="task-empty-icon"><svg width="22" height="22" viewBox="0 0 20 20" fill="currentColor"><path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/><path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm9.707 5.707a1 1 0 00-1.414-1.414L9 12.586l-1.293-1.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg></div>'+
       '<div class="task-empty-title">No tasks here</div>'+
       '<div class="task-empty-sub">Add a new task to get started.</div>'+
       '</div>';
@@ -7078,6 +7877,7 @@ function renderTasks(){
     if(!list.length) return;
     allHtml += '<div class="task-section">';
     allHtml += '<div class="task-section-hd"><span>'+s.label+'</span><span class="task-count">'+list.length+'</span></div>';
+    allHtml += '<div class="task-grid">';
     allHtml += list.map(function(t){
     const due = taskDueDate(t);
     let dueChip = '';
@@ -7091,12 +7891,12 @@ function renderTasks(){
       }
       const dateStr = due.toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short'});
       const timeStr = t.dueTime ? (' ' + due.toLocaleTimeString('en-AU',{hour:'numeric',minute:'2-digit',hour12:true})) : '';
-      dueChip = '<span class="task-chip '+cls+'">📅 '+dateStr+timeStr+(diffMs<0&&!t.done?' · overdue':'')+'</span>';
+      dueChip = '<span class="task-chip '+cls+'"><svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd"/></svg>'+dateStr+timeStr+(diffMs<0&&!t.done?' · overdue':'')+'</span>';
     }
     let remChip = '';
     if(t.remindBefore!=null && due){
       const lbl = t.remindBefore===0?'At due':(t.remindBefore<60?t.remindBefore+'m before':(t.remindBefore<1440?(t.remindBefore/60)+'h before':(t.remindBefore/1440)+'d before'));
-      remChip = '<span class="task-chip reminder">🔔 '+lbl+'</span>';
+      remChip = '<span class="task-chip reminder"><svg viewBox="0 0 20 20" fill="currentColor"><path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z"/></svg>'+lbl+'</span>';
     }
     const prioLbl = {high:'High', med:'Medium', low:'Low'}[t.priority]||'Medium';
     const prioChip = '<span class="task-chip priority-'+(t.priority||'med')+'">'+prioLbl+'</span>';
@@ -7104,19 +7904,51 @@ function renderTasks(){
     const checkIcon = t.done ? '<svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>' : '';
 
     const overdueCls = (!t.done && due && (due - now) < 0) ? ' overdue' : '';
-    return '<div class="task-item'+(t.done?' done':'')+overdueCls+'" data-id="'+t.id+'">'+
-      '<div class="task-check" onclick="event.stopPropagation();toggleTaskDone(\''+t.id+'\')">'+checkIcon+'</div>'+
-      '<div class="task-body" onclick="openTaskForm(\''+t.id+'\')">'+
-        '<div class="task-title">'+t.title.replace(/</g,'&lt;')+'</div>'+
-        (t.notes ? '<div class="task-notes">'+t.notes.replace(/</g,'&lt;')+'</div>' : '')+
-        '<div class="task-meta">'+dueChip+remChip+(t.priority==='high'||t.priority==='low'?prioChip:'')+'</div>'+
-      '</div>'+
+    const prioCls = ' priority-' + (t.priority||'med');
+    const hasMeta = !!(dueChip || remChip || (t.priority==='high'||t.priority==='low'));
+    return '<div class="task-item'+(t.done?' done':'')+overdueCls+prioCls+'" data-id="'+t.id+'" onclick="openTaskForm(\''+t.id+'\')">'+
       '<button class="task-del" onclick="event.stopPropagation();deleteTask(\''+t.id+'\')" title="Delete">×</button>'+
+      '<div class="task-card-hd">'+
+        '<div class="task-check" onclick="event.stopPropagation();toggleTaskDone(\''+t.id+'\')">'+checkIcon+'</div>'+
+        '<div class="task-body">'+
+          '<div class="task-title">'+t.title.replace(/</g,'&lt;')+'</div>'+
+          (t.notes ? '<div class="task-notes">'+t.notes.replace(/</g,'&lt;')+'</div>' : '')+
+        '</div>'+
+      '</div>'+
+      (hasMeta ? '<div class="task-meta">'+dueChip+remChip+(t.priority==='high'||t.priority==='low'?prioChip:'')+'</div>' : '')+
     '</div>';
   }).join('');
-  allHtml += '</div>';
+  allHtml += '</div>'; // close task-grid
+  allHtml += '</div>'; // close task-section
   });
   el.innerHTML = allHtml;
+}
+
+function updateTaskStats(){
+  const el = document.getElementById('taskStats');
+  if(!el) return;
+  if(!_tasks.length){ el.style.display='none'; return; }
+  el.style.display='flex';
+  const now = new Date();
+  const today = new Date(); today.setHours(0,0,0,0);
+  const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate()+1);
+
+  const open = _tasks.filter(function(t){return !t.done;});
+  const overdue = open.filter(function(t){
+    const d = taskDueDate(t); return d && d < now;
+  }).length;
+  const todayCount = open.filter(function(t){
+    if(!t.dueDate) return false;
+    const d = new Date(t.dueDate+'T00:00:00');
+    return d.getTime() === today.getTime();
+  }).length;
+  const completed = _tasks.filter(function(t){return t.done;}).length;
+
+  el.innerHTML =
+    '<div class="task-stat"><div class="task-stat-value">'+open.length+'</div><div class="task-stat-label">Open</div></div>'+
+    '<div class="task-stat"><div class="task-stat-value">'+todayCount+'</div><div class="task-stat-label">Due Today</div></div>'+
+    '<div class="task-stat"><div class="task-stat-value">'+overdue+'</div><div class="task-stat-label">Overdue</div></div>'+
+    '<div class="task-stat"><div class="task-stat-value">'+completed+'</div><div class="task-stat-label">Completed</div></div>';
 }
 
 function updateTaskBadge(){
@@ -7168,6 +8000,12 @@ function checkTaskReminders(){
         created_at: new Date().toISOString(),
         taskId: t.id
       });
+      // Play distinct task chime (only for reminders that just fired in this session)
+      if(typeof playTaskSound === 'function') playTaskSound();
+      // System notification (plays at OS volume, works even if tab not focused)
+      const remLbl = (t.remindBefore===0?'Due now':(t.remindBefore<60?t.remindBefore+' min before due':(t.remindBefore<1440?(t.remindBefore/60)+'h before due':(t.remindBefore/1440)+'d before due')));
+      const dueStr = t.dueTime ? ' at '+t.dueTime : '';
+      showSystemNotification('🔔 ' + t.title, remLbl + dueStr + (t.notes?' — '+t.notes.slice(0,60):''), t.id);
       // Show a banner if the function exists
       if(typeof showBanner === 'function'){
         showBanner('Task reminder', t.title, 'info');
