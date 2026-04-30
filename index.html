@@ -1670,16 +1670,85 @@ body.ready{visibility:visible;}
 }
 .cal-upcoming-when{font-size:11px;color:#9ca3af;margin-top:2px;}
 
-/* Mobile — bigger cells, more readable */
+/* Mobile — Apple Calendar style: clean cells with dots only */
 @media(max-width:700px){
-  .cal-day{height:88px;padding:4px 4px 3px;}
-  .cal-date{font-size:13px;font-weight:700;}
-  .cal-date-today{width:22px;height:22px;font-size:12px;}
-  .cal-pill{font-size:10.5px;padding:2px 6px;border-radius:5px;}
-  .cal-pills{gap:2px;}
-  .cal-week-header{padding:4px 0;}
-  .cal-weekday{font-size:10.5px;font-weight:700;}
+  .cal-day{
+    height:auto;min-height:54px;padding:6px 2px 4px;
+    display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:3px;
+  }
+  .cal-date{font-size:15px;font-weight:500;color:#0f172a;}
+  .cal-day-today .cal-date{color:#fff;}
+  .cal-date-today{
+    width:30px;height:30px;font-size:14px;font-weight:600;
+    background:var(--accent);color:#fff;
+    display:flex;align-items:center;justify-content:center;border-radius:50%;
+  }
+  /* Hide text pills, show dots only */
+  .cal-pill{
+    width:5px;height:5px;
+    padding:0;border-radius:50%;
+    color:transparent;font-size:0;
+    overflow:hidden;
+    flex-shrink:0;
+    border:none;
+  }
+  .cal-pill-x{display:none;}
+  .cal-pill-holiday{background:#dc2626;}
+  .cal-pill-bday{background:#db2777;}
+  .cal-pill-event-1,.cal-pill-event-2,.cal-pill-event-3,
+  .cal-pill-event-4,.cal-pill-event-5,.cal-pill-event-6{background:var(--accent);}
+  .cal-pill-task,.cal-pill[class*="task"]{background:#3b82f6;}
+  .cal-pills{
+    display:flex;flex-direction:row;gap:3px;align-items:center;justify-content:center;
+    flex-wrap:wrap;max-height:14px;overflow:hidden;
+  }
+  .cal-week-header{padding:6px 0;background:#f8fafc;border-radius:8px 8px 0 0;}
+  .cal-weekday{font-size:11px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;}
+  .cal-day-prev,.cal-day-next{opacity:.35;}
+  .cal-grid{
+    background:transparent;border:none;gap:0;
+  }
+  .cal-day{background:transparent;border:none;}
+  .cal-day-today{background:transparent;}
+  .cal-day-weekend{background:transparent;}
 }
+[data-theme="dark"] @media(max-width:700px){
+  .cal-week-header{background:#0d1117;}
+  .cal-date{color:#d4d8e0;}
+}
+
+/* ── DYNAMIC POPUP ANIMATIONS ──────────────────── */
+@keyframes backdropFadeIn{from{opacity:0;}to{opacity:1;}}
+@keyframes modalSlideUp{
+  from{opacity:0;transform:translateY(40px) scale(.96);}
+  to{opacity:1;transform:translateY(0) scale(1);}
+}
+@keyframes sheetSlideUp{
+  from{transform:translateY(100%);}
+  to{transform:translateY(0);}
+}
+
+/* Apply to event backdrop */
+#eventViewBackdrop, #annReadersBackdrop, #dayEventBackdrop, #searchBack, #eventModal, #taskFormBackdrop.open{
+  animation:backdropFadeIn .25s ease both;
+}
+#eventViewBackdrop > div, #annReadersBackdrop > div, #searchBack > div{
+  animation:modalSlideUp .35s cubic-bezier(.34,1.3,.64,1) both;
+}
+#dayEventBackdrop > div{
+  animation:sheetSlideUp .4s cubic-bezier(.34,1.3,.64,1) both;
+}
+
+/* Smooth all transitions */
+.btn, .nav-item, .card, .swatch, .accent-swatch{
+  transition: transform .15s cubic-bezier(.4,1.5,.6,1),
+              background .2s ease,
+              box-shadow .2s ease,
+              border-color .2s ease,
+              color .2s ease,
+              filter .2s ease;
+}
+.btn:active{transform:scale(.96);}
 
 /* ── BELL COUNT BADGE ──────────────────── */
 .bell-badge{
@@ -2211,6 +2280,14 @@ html[data-sb="collapsed"][data-theme="dark"] .sb-brand,
 [data-theme="dark"] .font-chip{background:#1a1d21;border-color:#333;color:#94a3b8;}
 [data-theme="dark"] .font-chip.active{background:var(--accent-dim);border-color:var(--accent);color:var(--accent);}
 
+
+/* Discussion reply textareas — let rt-wrap handle the border */
+textarea[id^="discReply-"]{
+  width:100%;border:1.5px solid #e2e8f0;border-radius:8px;
+  padding:8px 12px;font-size:13px;font-family:inherit;outline:none;resize:none;
+  min-height:60px;
+}
+textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
 
 /* ── RICH TEXT EDITOR ──────────────────────────── */
 .rt-wrap{
@@ -4415,10 +4492,15 @@ html[data-sb="collapsed"][data-theme="dark"] .sb-brand,
         <div class="card" style="margin-bottom:12px">
           <div class="card-hd"><div class="card-title">Appearance</div></div>
 
-          <!-- Dark mode -->
-          <div style="display:flex;align-items:center;justify-content:space-between;padding-bottom:14px;border-bottom:1px solid #f1f5f9;">
-            <div><div style="font-size:13px;font-weight:600;">Dark Mode</div><div style="font-size:11px;color:#94a3b8;margin-top:2px;">Easier on the eyes at night</div></div>
-            <button onclick="toggleDarkMode()" style="width:48px;height:26px;border-radius:13px;border:none;cursor:pointer;background:#e2e8f0;position:relative;transition:background .2s;" id="dmSwitch"><div style="position:absolute;top:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:left .2s;left:3px;" id="dmSwitchThumb"></div></button>
+          <!-- Brightness slider -->
+          <div style="padding-bottom:14px;border-bottom:1px solid #f1f5f9;">
+            <div style="font-size:13px;font-weight:600;color:#0f172a;margin-bottom:2px;">Brightness</div>
+            <div style="font-size:11px;color:#94a3b8;margin-bottom:10px;">Adjust how bright the app appears</div>
+            <div style="display:flex;align-items:center;gap:12px;">
+              <svg width="14" height="14" viewBox="0 0 20 20" fill="#94a3b8"><path d="M10 14a4 4 0 100-8 4 4 0 000 8z"/></svg>
+              <input type="range" id="brightnessSlider" min="60" max="110" step="5" value="100" oninput="setBrightness(this.value)" style="flex:1;accent-color:var(--accent);">
+              <svg width="18" height="18" viewBox="0 0 20 20" fill="#94a3b8"><path fill-rule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clip-rule="evenodd"/></svg>
+            </div>
           </div>
 
           <!-- Accent color -->
@@ -4532,7 +4614,7 @@ html[data-sb="collapsed"][data-theme="dark"] .sb-brand,
     </div>
   </nav>
 
-<button id="dmToggle" onclick="toggleDarkMode()" title="Toggle dark mode">🌙</button>
+<button id="dmToggle" style="display:none;"></button>
 </div>
 
 <script>
@@ -4896,14 +4978,20 @@ async function loadDiscussions(){
       if(!isClosed)html+='<div style="display:flex;gap:8px;margin-top:8px;">';
       if(isClosed)html+='<div style="font-size:11px;color:#94a3b8;margin-top:8px;">This discussion is closed.</div>';
       if(!isClosed){
-      html+='<textarea data-disc="'+r.id+'" placeholder="Write a reply..." rows="2" style="flex:1;border:1.5px solid #e2e8f0;border-radius:8px;padding:8px 12px;font-size:13px;font-family:inherit;outline:none;resize:none;"></textarea>';
-      html+='<button data-disc="'+r.id+'" onclick="submitDiscReply(this.dataset.disc)" style="padding:8px 14px;border-radius:8px;background:var(--accent);color:#fff;border:none;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;">Reply</button>';
+      html+='<div style="flex:1;min-width:0;"><textarea id="discReply-'+r.id+'" data-disc="'+r.id+'" placeholder="Write a reply..." rows="2"></textarea></div>';
+      html+='<button data-disc="'+r.id+'" onclick="submitDiscReply(this.dataset.disc)" style="padding:8px 14px;border-radius:8px;background:var(--accent);color:#fff;border:none;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;align-self:flex-start;">Reply</button>';
       html+='</div>';
       if(!isClosed)html+='</div>';
       }
       html+='</div>';
       return html;
     }).filter(Boolean).join('');
+    // Auto-upgrade discussion reply textareas to rich-text
+    setTimeout(function(){
+      document.querySelectorAll('textarea[id^="discReply-"]').forEach(function(ta){
+        if(typeof rtUpgrade === 'function' && ta.id) rtUpgrade(ta.id);
+      });
+    }, 30);
   }catch(e){
     console.warn(e);
     el.innerHTML='<div style="color:#dc2626;text-align:center;padding:24px;font-size:13px;">Could not load discussions.</div>';
@@ -4957,13 +5045,17 @@ async function postDiscussion(){
 }
 
 async function submitDiscReply(discId){
-  const input=document.querySelector('[data-disc="'+discId+'"]');
-  if(!input||!input.value.trim())return;
+  const input=document.getElementById('discReply-'+discId);
+  if(!input) return;
+  // For RT-upgraded, sync first
+  if(input._rtSync) input._rtSync();
+  if(!input.value || !input.value.trim()) return;
   const body=input.value.trim();
+  const replyAtts = (typeof rtGetAttachments==='function') ? rtGetAttachments('discReply-'+discId) : [];
   const btn=document.querySelector('button[data-disc="'+discId+'"]');
   if(btn){btn.disabled=true;btn.textContent='...';}
   try{
-    const res=await sbPost('discussion_replies',{discussion_id:discId,staff_name:me,body});
+    const res=await sbPost('discussion_replies',{discussion_id:discId,staff_name:me,body,attachments:replyAtts});
     if(!res.ok&&res.status!==201)throw new Error('HTTP '+res.status);
     input.value='';
     // Save reply notification for discussion owner
@@ -5170,7 +5262,8 @@ async function enterHub(){
   document.getElementById("leaveTo").value=today;
   buildAvailForm();
   showSchedTab('leave'); // default schedule sub-tab
-  Promise.all([loadHomeData(),loadNotifications(),loadLeaveHistory(),refreshAnnBadge(),loadHomeAnnPreview(),loadHomeDiscPreview(),maybeShowOnboarding(),checkFeedbackInvites(),checkNewNotifications()]);
+  Promise.all([loadHomeData(),loadNotifications(),loadLeaveHistory(),refreshAnnBadge(),loadHomeAnnPreview(),loadHomeDiscPreview(),maybeShowOnboarding(),checkFeedbackInvites(),checkNewNotifications(),loadAnnReads()]);
+  applySavedBrightness();
   setTimeout(rtUpgradeAll, 200);
   setTimeout(startActivityPolling, 4000);
   loadTasks();updateTaskBadge();scheduleTaskReminders();
@@ -5204,7 +5297,13 @@ function goTo(p){
   if(p==="documents"){loadDocuments();}
   if(p==="tasks"){ loadTasks(); renderTasks(); updateTaskBadge(); maybeShowNotifyBanner(); }
   if(p==="announcements" || p==="engagement"){ setTimeout(rtUpgradeAll, 50); }
-  if(p==="profile"){ setTimeout(renderNotifPanel, 50); }
+  if(p==="profile"){
+    setTimeout(renderNotifPanel, 50);
+    setTimeout(function(){
+      const sl = document.getElementById('brightnessSlider');
+      if(sl) sl.value = parseInt(localStorage.getItem('oscars_brightness')||'100');
+    }, 50);
+  }
   
   const main=document.querySelector(".main");
   if(main)main.scrollTop=0;
@@ -5449,11 +5548,9 @@ function toggleDarkMode(){
   updateDmSwitch(newTheme);
 }
 function initTheme(){
-  const saved=localStorage.getItem('oscars_theme')||(window.matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light');
-  document.documentElement.setAttribute('data-theme',saved);
-  const btn=document.getElementById('dmToggle');
-  if(btn)btn.textContent=saved==='dark'?'☀️':'🌙';
-  updateDmSwitch(saved);
+  // Force light always (dark mode removed)
+  document.documentElement.setAttribute('data-theme','light');
+  localStorage.setItem('oscars_theme','light');
 }
 function updateDmSwitch(theme){
   const sw=document.getElementById('dmSwitch');
@@ -5826,6 +5923,8 @@ async function loadAnnouncements(){
     const now=new Date().toISOString();
     const rows=await sbGet('announcements','?order=pinned.desc,created_at.desc').then(r=>r.filter(a=>!a.expires_at||a.expires_at>now));
     const readIds=JSON.parse(localStorage.getItem('ann_read_'+me)||'[]');
+    // Refresh read receipts
+    await loadAnnReads();
     if(!rows.length){
       el.innerHTML='<div class="card" style="text-align:center;color:#94a3b8;padding:40px;"><div style="font-size:28px;margin-bottom:10px;">📢</div><div style="font-size:14px;font-weight:600;">No announcements yet</div></div>';
       return;
@@ -5846,17 +5945,29 @@ async function loadAnnouncements(){
         '<div class="ann-title">'+r.title+'</div>'+
         '<div class="ann-body rt-content">'+mdToHtml(r.body)+'</div>'+attRenderGrid(r.attachments||[])+
         '<div class="ann-meta"><span>Posted by '+r.created_by+' · '+d+'</span>'+
-        '<div style="display:flex;gap:4px;align-items:center;margin-left:auto;">'+
+        '<div style="display:flex;gap:6px;align-items:center;margin-left:auto;flex-wrap:wrap;">'+
+        ((r.created_by===me || myIsAdmin) ? annReadsBadgeHtml(r.id) : '')+
         bmHtml('ann', r.id)+
         (myIsAdmin?'<button data-id="'+r.id+'" onclick="deleteAnnouncement(this.dataset.id)" style="background:none;border:none;color:#dc2626;font-size:11px;font-weight:600;cursor:pointer;">Delete</button>':'')+
         '</div></div>'+
         '<div style="margin-top:10px;">'+makeReactHTML(r.id,'ann')+'</div>'+
         '</div>';
     }).join('');
-    // Mark all as read AFTER render, then refresh badge with new read state
+    // Mark all as read locally + send read receipts to DB
     const allIds=rows.map(r=>r.id);
     localStorage.setItem('ann_read_'+me,JSON.stringify(allIds));
     updateAnnBadge(rows,allIds);
+    // Fire read receipts (only for newly-read items)
+    const newlyRead = rows.filter(function(r){
+      const list = _annReads[r.id] || [];
+      return list.indexOf(me) < 0;
+    }).map(function(r){return r.id;});
+    if(newlyRead.length){
+      markAllAnnsRead(newlyRead).then(function(){
+        // Re-render lightly so the read count updates
+        setTimeout(loadAnnouncements, 800);
+      });
+    }
   }catch(e){el.innerHTML='<div style="color:#dc2626;text-align:center;padding:24px;font-size:13px;">Could not load announcements.</div>';}
 }
 
@@ -5924,13 +6035,18 @@ async function refreshAnnBadge(){
 
 // ── CALENDAR EVENTS ──
 function toggleCalEventForm(){
+  // Use new event modal — anyone can add
+  const today = new Date().toISOString().split('T')[0];
+  if(typeof openNewEventForDate === 'function'){
+    openNewEventForDate(today);
+    return;
+  }
+  // Fallback to old form
   const form=document.getElementById('calEventForm');
   if(form){
     const showing=form.style.display!=='none';
     form.style.display=showing?'none':'block';
     if(!showing){
-      // Pre-fill date with today
-      const today=new Date().toISOString().split('T')[0];
       const dateEl=document.getElementById('calEventDate');
       if(dateEl&&!dateEl.value)dateEl.value=today;
     }
@@ -5984,8 +6100,78 @@ document.addEventListener('click',function(e){
 let _editingEventId = null;
 let _currentViewEvent = null;
 
+// Apple-style day modal — shows ALL items + lets anyone add new
 function openDayEventModal(dateStr){
-  if(!myIsAdmin){showToast('Only admins can add events');return;}
+  const d = new Date(dateStr+'T00:00:00');
+  const items = (typeof calEventsOnDay === 'function') ? calEventsOnDay(d) : [];
+
+  let bd = document.getElementById('dayEventBackdrop');
+  if(!bd){
+    bd = document.createElement('div');
+    bd.id = 'dayEventBackdrop';
+    bd.style.cssText = 'position:fixed;inset:0;z-index:9500;background:rgba(15,23,42,.5);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);display:flex;align-items:flex-end;justify-content:center;padding:0;';
+    document.body.appendChild(bd);
+    bd.addEventListener('click', function(e){ if(e.target===bd) bd.style.display='none'; });
+  }
+
+  const dStr = d.toLocaleDateString('en-AU',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  const isToday = (function(){ const t=new Date(); t.setHours(0,0,0,0); return d.getTime()===t.getTime(); })();
+
+  function renderRow(it){
+    const colors = {event:'var(--accent)', bday:'#db2777', holiday:'#dc2626', task:'#3b82f6'};
+    const labels = {event:'Event', bday:'Birthday', holiday:'Public holiday', task:'Task'};
+    const c = colors[it.type] || '#64748b';
+    const tStr = it.time ? String(it.time).slice(0,5) : (it.type==='holiday' ? 'Holiday' : 'All day');
+    const titleEsc = String(it.title||'').replace(/</g,'&lt;');
+    const evId = (it.type==='event' && it.ev) ? it.ev.id : null;
+    const click = evId ? 'onclick="document.getElementById(\'dayEventBackdrop\').style.display=\'none\';viewEvent(\''+evId+'\',event)" style="cursor:pointer;"' : 'style="cursor:default;"';
+    const doneStyle = it.done ? ';opacity:.5;text-decoration:line-through;' : '';
+    return '<div '+click+' style="display:flex;align-items:flex-start;gap:12px;padding:12px;border-radius:10px;background:#f8fafc;margin-bottom:6px;'+doneStyle+'">'+
+      '<div style="width:4px;align-self:stretch;border-radius:3px;background:'+c+';flex-shrink:0;"></div>'+
+      '<div style="flex:1;min-width:0;">'+
+        '<div style="font-size:14px;font-weight:600;color:#0f172a;">'+titleEsc+'</div>'+
+        '<div style="font-size:11.5px;color:#64748b;margin-top:3px;">'+labels[it.type]+' · '+tStr+'</div>'+
+      '</div>'+
+    '</div>';
+  }
+
+  bd.innerHTML = '<div style="background:#fff;border-radius:18px 18px 0 0;width:100%;max-width:520px;max-height:85dvh;display:flex;flex-direction:column;box-shadow:0 -10px 40px rgba(15,23,42,.2);" onclick="event.stopPropagation()">'+
+    '<div style="padding:14px 16px 8px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #f1f5f9;">'+
+      '<div>'+
+        '<div style="font-size:11px;font-weight:700;color:'+(isToday?'var(--accent)':'#94a3b8')+';text-transform:uppercase;letter-spacing:.06em;">'+(isToday?'Today':d.toLocaleDateString('en-AU',{weekday:'short'}))+'</div>'+
+        '<div style="font-size:17px;font-weight:700;color:#0f172a;letter-spacing:-.01em;margin-top:2px;">'+dStr+'</div>'+
+      '</div>'+
+      '<button onclick="document.getElementById(\'dayEventBackdrop\').style.display=\'none\'" style="background:#f1f5f9;color:#64748b;border:none;width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:18px;line-height:1;">×</button>'+
+    '</div>'+
+    '<div style="padding:14px 16px;flex:1;overflow-y:auto;">'+
+      (items.length ? items.map(renderRow).join('') :
+        '<div style="text-align:center;color:#94a3b8;padding:40px 20px;font-size:13px;">Nothing scheduled.</div>')+
+    '</div>'+
+    '<div style="padding:12px 16px;border-top:1px solid #f1f5f9;">'+
+      '<button onclick="document.getElementById(\'dayEventBackdrop\').style.display=\'none\';openNewEventForDate(\''+dateStr+'\')" style="width:100%;background:var(--accent);color:#fff;border:none;border-radius:10px;padding:11px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;">+ Add new event</button>'+
+    '</div>'+
+  '</div>';
+
+  // Dark mode
+  if(document.documentElement.getAttribute('data-theme')==='dark'){
+    const inner = bd.firstElementChild;
+    inner.style.background = '#131820';
+    inner.style.color = '#d4d8e0';
+    inner.querySelectorAll('div[style*="background:#f8fafc"]').forEach(function(d){
+      d.style.background = '#0d1117';
+    });
+    inner.querySelectorAll('div[style*="color:#0f172a"]').forEach(function(d){
+      d.style.color = '#f1f5f9';
+    });
+    inner.querySelectorAll('div[style*="border-bottom:1px solid #f1f5f9"], div[style*="border-top:1px solid #f1f5f9"]').forEach(function(d){
+      d.style.borderColor = '#1f2530';
+    });
+  }
+
+  bd.style.display='flex';
+}
+
+function openNewEventForDate(dateStr){
   _editingEventId = null;
   document.getElementById('eventModalTitle').textContent = 'New Event';
   document.getElementById('eventModalSaveBtn').textContent = 'Add';
@@ -6809,6 +6995,16 @@ function showSystemNotification(title, body, taskId, typeKey){
   if(typeKey && typeof notifAllowed === 'function' && !notifAllowed(typeKey)){
     return null;
   }
+  // ── DEDUPE: never fire the same tag twice for this user ──
+  const dedupeKey = 'sys_notif_fired_'+(me||'');
+  let firedList = [];
+  try{ firedList = JSON.parse(localStorage.getItem(dedupeKey)||'[]'); }catch(e){}
+  const tag = String(taskId || (title+'-'+body)).slice(0,200);
+  if(firedList.includes(tag)) return null; // already fired before
+  firedList.push(tag);
+  // Cap to last 500 tags so localStorage doesn't grow unbounded
+  if(firedList.length > 500) firedList = firedList.slice(-500);
+  try{ localStorage.setItem(dedupeKey, JSON.stringify(firedList)); }catch(e){}
   try{
     const opts = {
       body: body,
@@ -8365,6 +8561,120 @@ function updateBellBadge(count){
   });
 }
 
+
+// ── ANNOUNCEMENT READ RECEIPTS ──────────
+let _annReads = {}; // {ann_id: [name, name, ...]}
+let _annReadsLoaded = false;
+
+async function loadAnnReads(){
+  try{
+    const rows = await sbGet('announcement_reads', '?select=announcement_id,staff_name&order=read_at.desc&limit=1000');
+    const map = {};
+    (rows||[]).forEach(function(r){
+      if(!map[r.announcement_id]) map[r.announcement_id] = [];
+      map[r.announcement_id].push(r.staff_name);
+    });
+    _annReads = map;
+    _annReadsLoaded = true;
+  }catch(e){console.warn('loadAnnReads:',e);}
+}
+
+async function markAnnRead(annId){
+  if(!annId || !me) return;
+  // Optimistic update
+  if(!_annReads[annId]) _annReads[annId] = [];
+  if(_annReads[annId].indexOf(me) < 0) _annReads[annId].push(me);
+  try{
+    await fetch(SB+'/rest/v1/announcement_reads', {
+      method:'POST',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},
+      body: JSON.stringify({announcement_id: annId, staff_name: me})
+    });
+  }catch(e){console.warn('markAnnRead:',e);}
+}
+
+async function markAllAnnsRead(annIds){
+  if(!annIds || !annIds.length || !me) return;
+  for(const id of annIds){
+    if(!_annReads[id]) _annReads[id] = [];
+    if(_annReads[id].indexOf(me) < 0){
+      _annReads[id].push(me);
+      try{
+        await fetch(SB+'/rest/v1/announcement_reads', {
+          method:'POST',
+          headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},
+          body: JSON.stringify({announcement_id: id, staff_name: me})
+        });
+      }catch(e){}
+    }
+  }
+}
+
+function annReadsBadgeHtml(annId){
+  const reads = (_annReads[annId] || []).filter(function(n){return n && n !== me;});
+  const totalStaff = (typeof STAFF !== 'undefined') ? STAFF.length : 0;
+  const totalReaders = (_annReads[annId] || []).length; // include me
+  if(!totalReaders) return '<span style="font-size:11px;color:#94a3b8;font-weight:500;">No reads yet</span>';
+  const tip = (_annReads[annId] || []).slice(0, 30).join(', ');
+  const pct = totalStaff ? Math.min(100, Math.round(totalReaders/totalStaff*100)) : 0;
+  return '<button onclick="showAnnReaders(\''+annId+'\')" style="background:none;border:none;cursor:pointer;display:inline-flex;align-items:center;gap:5px;padding:2px 7px;border-radius:6px;font-size:11px;color:#10b981;font-weight:600;font-family:inherit;" title="'+tip.replace(/"/g,'&quot;')+'">'+
+    '<svg width="13" height="13" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>'+
+    'Read by '+totalReaders+(totalStaff?' / '+totalStaff:'')+
+  '</button>';
+}
+
+function showAnnReaders(annId){
+  const readers = _annReads[annId] || [];
+  const all = (typeof STAFF !== 'undefined') ? STAFF : [];
+  const unread = all.filter(function(n){return n && readers.indexOf(n) < 0;});
+
+  let bd = document.getElementById('annReadersBackdrop');
+  if(!bd){
+    bd = document.createElement('div');
+    bd.id = 'annReadersBackdrop';
+    bd.style.cssText = 'position:fixed;inset:0;z-index:9550;background:rgba(15,23,42,.5);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;padding:16px;';
+    document.body.appendChild(bd);
+    bd.addEventListener('click', function(e){ if(e.target===bd) bd.style.display='none'; });
+  }
+
+  function nameRow(name, isRead){
+    const initials = name.split(' ').map(function(w){return w[0];}).join('').slice(0,2).toUpperCase();
+    const color = (typeof rtAvaColor==='function') ? rtAvaColor(name) : '#64748b';
+    const icon = isRead
+      ? '<svg width="16" height="16" viewBox="0 0 20 20" fill="#10b981"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>'
+      : '<svg width="16" height="16" viewBox="0 0 20 20" fill="#cbd5e1"><circle cx="10" cy="10" r="8" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>';
+    return '<div style="display:flex;align-items:center;gap:10px;padding:8px 4px;">'+
+      '<div style="width:28px;height:28px;border-radius:50%;background:'+color+';color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;">'+initials+'</div>'+
+      '<div style="flex:1;font-size:13px;font-weight:'+(isRead?'600':'500')+';color:#0f172a;">'+name+'</div>'+
+      icon+
+    '</div>';
+  }
+
+  bd.innerHTML = '<div style="background:#fff;border-radius:14px;width:100%;max-width:380px;max-height:80dvh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 24px 60px rgba(15,23,42,.3);" onclick="event.stopPropagation()">'+
+    '<div style="padding:18px 20px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;justify-content:space-between;">'+
+      '<div><div style="font-size:15px;font-weight:700;color:#0f172a;">Read receipts</div><div style="font-size:12px;color:#64748b;margin-top:2px;">'+readers.length+' read · '+unread.length+' unread</div></div>'+
+      '<button onclick="document.getElementById(\'annReadersBackdrop\').style.display=\'none\'" style="background:none;border:none;font-size:22px;color:#94a3b8;cursor:pointer;padding:4px 8px;border-radius:6px;">×</button>'+
+    '</div>'+
+    '<div style="overflow-y:auto;padding:8px 20px 18px;">'+
+      (readers.length ? '<div style="font-size:11px;font-weight:700;color:#10b981;text-transform:uppercase;letter-spacing:.06em;margin:8px 0 4px;">Read · '+readers.length+'</div>' : '')+
+      readers.map(function(n){return nameRow(n, true);}).join('')+
+      (unread.length ? '<div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.06em;margin:14px 0 4px;">Not yet read · '+unread.length+'</div>' : '')+
+      unread.map(function(n){return nameRow(n, false);}).join('')+
+    '</div>'+
+  '</div>';
+
+  // Dark mode
+  if(document.documentElement.getAttribute('data-theme')==='dark'){
+    const inner = bd.firstElementChild;
+    inner.style.background = '#131820';
+    inner.querySelectorAll('div').forEach(function(d){
+      if(d.style.color === 'rgb(15, 23, 42)') d.style.color = '#f1f5f9';
+    });
+  }
+
+  bd.style.display='flex';
+}
+
 // ── SEARCH (Phase 5) ──────────────────────
 let _searchCache = null;
 let _searchCacheTime = 0;
@@ -9166,21 +9476,48 @@ async function loadNotifications(){
       const allReactIds=(reactNotifs||[]).map(function(r){return r.id;});
       localStorage.setItem('seen_reacts_'+me,JSON.stringify(allReactIds));
     }
-    el.innerHTML=replyHtml+reactHtml+rows.map(r=>{
-      const isRead=read.includes(r.id);
+    // Only show UNREAD leave notifications — viewed = gone
+    const unreadLeave = rows.filter(r => !read.includes(r.id));
+    if(!unreadLeave.length && !newReactNotifs.length && !newRepliesList.length && !newTaskNotifs.length){
+      el.innerHTML='<div style="text-align:center;padding:40px 20px;"><svg width="36" height="36" viewBox="0 0 20 20" fill="#e2e8f0" style="margin:0 auto 10px;display:block;"><path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z"/></svg><div style="font-size:13px;font-weight:600;color:#475569;margin-bottom:6px;">All caught up</div><div style="font-size:12px;color:#94a3b8;">No new notifications.</div></div>';
+      return;
+    }
+    el.innerHTML=replyHtml+reactHtml+unreadLeave.map(r=>{
       const isApproved=r.status==="approved";
-      const bg=isRead?"#fff":(isApproved?"var(--accent-dim)":"#fef2f2");
-      const border=isRead?"#e2e8f0":(isApproved?"var(--accent-bd)":"#fecaca");
+      const bg=isApproved?"var(--accent-dim)":"#fef2f2";
+      const border=isApproved?"var(--accent-bd)":"#fecaca";
       const titleColor=isApproved?"var(--accent-text)":"#dc2626";
       const title=isApproved?"Leave Approved":"Leave Declined";
-      return '<div class="notif-item'+(isRead?" read":"")+'" style="background:'+bg+';border:1px solid '+border+';border-radius:12px;padding:14px;margin-bottom:10px;">'+
-        (!isRead?'<div style="width:7px;height:7px;border-radius:50%;background:'+(isApproved?"var(--accent)":"#dc2626")+';margin-bottom:8px;"></div>':'')+
+      return '<div class="notif-item" style="background:'+bg+';border:1px solid '+border+';border-radius:12px;padding:14px;margin-bottom:10px;">'+
+        '<div style="width:7px;height:7px;border-radius:50%;background:'+(isApproved?"var(--accent)":"#dc2626")+';margin-bottom:8px;"></div>'+
         '<div style="font-size:13px;font-weight:700;color:'+titleColor+';margin-bottom:4px;">'+title+'</div>'+
         '<div style="font-size:12.5px;color:#475569;">'+fmtF(r.from_date)+' \u2013 '+fmtF(r.to_date)+(r.reason?' \u00b7 '+r.reason:'')+'</div>'+
         (r.status==="declined"&&r.decline_reason?'<div style="font-size:12px;color:#dc2626;margin-top:6px;"><strong>Reason:</strong> '+r.decline_reason+'</div>':'')+
         '<div style="font-size:11px;color:#94a3b8;margin-top:6px;">'+fmtF(r.submitted_at)+'</div>'+
         '</div>';
     }).join("");
+
+    // Auto-mark everything as seen the moment the dropdown is rendered
+    if(unreadLeave.length){
+      const allLeaveIds = rows.map(r=>r.id);
+      localStorage.setItem('oR_'+me, JSON.stringify(allLeaveIds));
+    }
+    if(newRepliesList.length){
+      const allReplyIds = replyNotifsList.map(r=>r.id);
+      localStorage.setItem('seen_replies_'+me, JSON.stringify(allReplyIds));
+    }
+    if(newReactNotifs.length){
+      const allReactIds = (reactNotifs||[]).map(r=>r.id);
+      localStorage.setItem('seen_reacts_'+me, JSON.stringify(allReactIds));
+    }
+    if(newTaskNotifs.length){
+      const taskIds = (window._taskNotifications||[]).map(n=>n.id);
+      const seen = JSON.parse(localStorage.getItem('seen_task_notifs_'+me)||'[]');
+      taskIds.forEach(function(id){ if(!seen.includes(id)) seen.push(id); });
+      localStorage.setItem('seen_task_notifs_'+me, JSON.stringify(seen));
+    }
+    // Update bell to 0 since they're now seen
+    setTimeout(function(){ updateBellBadge(0); }, 50);
   }catch(e){console.warn(e);if(el)el.innerHTML='<div style="color:#dc2626;text-align:center;padding:16px;font-size:13px;">Could not load alerts.</div>';}
 }
 
