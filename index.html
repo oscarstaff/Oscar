@@ -8029,8 +8029,10 @@ function mdEscape(s){
 }
 function mdToHtml(src){
   if(!src) return '';
-  // If body looks like HTML (rich-text editor output), sanitize & return
-  if(/^\s*</.test(src) || /<\/(b|i|em|strong|u|s|del|ul|ol|li|p|a|code)>/i.test(src)){
+  // If body contains ANY HTML tag, sanitize and return (rich-text editor output)
+  if(/<(b|i|em|strong|u|s|del|ul|ol|li|p|a|code|br|div|span)\b[^>]*>/i.test(src) ||
+     /<\/(b|i|em|strong|u|s|del|ul|ol|li|p|a|code|div|span)>/i.test(src) ||
+     /<br\s*\/?>/i.test(src)){
     if(typeof rtSanitize==='function') return rtSanitize(src);
   }
 
