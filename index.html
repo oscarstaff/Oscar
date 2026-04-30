@@ -4998,9 +4998,28 @@ async function loadDiscussions(){
   }
 }
 
+function _findVisibleTa(name){
+  // Find the first visible (offsetParent !== null) textarea matching id or rt-upgraded id
+  const all = document.querySelectorAll('textarea[id^="'+name+'"]');
+  for(const ta of all){ if(ta.offsetParent !== null || ta.dataset.rtUpgraded==='1') {
+    // For rt-upgraded textareas, the editor (sibling) is what's visible
+    if(ta.dataset.rtUpgraded==='1' && ta._rtEditor && ta._rtEditor.offsetParent !== null) return ta;
+    if(ta.offsetParent !== null) return ta;
+  }}
+  return all[0] || null;
+}
+
 async function postDiscussion(){
-  const title=document.getElementById('discTitle').value.trim();
-  const body=document.getElementById('discBody').value.trim();
+  // Pick visible discussion form (handle dupe IDs)
+  const _bodyTa = _findVisibleTa('discBody');
+  const _titleEl = (function(){
+    const all = document.querySelectorAll('input[id^="discTitle"]');
+    for(const i of all){ if(i.offsetParent !== null) return i; }
+    return all[0] || null;
+  })();
+  if(_bodyTa && _bodyTa._rtSync) _bodyTa._rtSync();
+  const title=(_titleEl ? _titleEl.value.trim() : '');
+  const body=(_bodyTa ? _bodyTa.value.trim() : '');
   const err=document.getElementById('discErr'),ok=document.getElementById('discOk');
   err.classList.remove('show');ok.classList.remove('show');
   if(!title){err.textContent='Please enter a title.';err.classList.add('show');return;}
@@ -5011,7 +5030,7 @@ async function postDiscussion(){
     const closeAt=myIsAdmin&&document.getElementById('discCloseAt')&&document.getElementById('discCloseAt').value||null;
     const pollOpts = getPollOptions();
     if(pollOpts===false){err.textContent='Please add at least 2 poll options.';err.classList.add('show');return;}
-    const discAtts = (typeof rtGetAttachments==='function') ? rtGetAttachments('discBody') : [];
+    const discAtts = (_bodyTa && typeof rtGetAttachments==='function') ? rtGetAttachments(_bodyTa.id) : [];
     const discResult = await sbPost('discussions',{title,body,created_by:me,open_at:openAt||null,close_at:closeAt||null,poll_options:pollOpts||null,poll_votes:pollOpts?{}:null,attachments:discAtts});
     try{
       const mentions = (typeof rtExtractMentions==='function') ? rtExtractMentions(body) : [];
@@ -5029,10 +5048,10 @@ async function postDiscussion(){
     const pb=document.getElementById('pollBuilder');if(pb)pb.style.display='none';
     const ptb=document.getElementById('pollToggleBtn');if(ptb)ptb.textContent='📊 Add Poll';
     document.querySelectorAll('.poll-opt').forEach(i=>i.value='');
-    document.getElementById('discTitle').value='';
-    document.getElementById('discBody').value='';
-    if(typeof rtReset==='function') rtReset('discBody');
-    if(typeof rtClearAttachments==='function') rtClearAttachments('discBody');
+    if(_titleEl) _titleEl.value='';
+    if(_bodyTa) _bodyTa.value='';
+    if(_bodyTa && typeof rtReset==='function') rtReset(_bodyTa.id);
+    if(_bodyTa && typeof rtClearAttachments==='function') rtClearAttachments(_bodyTa.id);
     ok.textContent='Posted!';ok.classList.add('show');
     setTimeout(function(){ok.classList.remove('show');},2000);
     await loadDiscussions();
@@ -5972,15 +5991,22 @@ async function loadAnnouncements(){
 }
 
 async function postAnnouncement(){
-  const title=document.getElementById('annTitle').value.trim();
-  const body=document.getElementById('annBody').value.trim();
+  const _bodyTa = _findVisibleTa('annBody');
+  const _titleEl = (function(){
+    const all = document.querySelectorAll('input[id^="annTitle"]');
+    for(const i of all){ if(i.offsetParent !== null) return i; }
+    return all[0] || null;
+  })();
+  if(_bodyTa && _bodyTa._rtSync) _bodyTa._rtSync();
+  const title=(_titleEl ? _titleEl.value.trim() : '');
+  const body=(_bodyTa ? _bodyTa.value.trim() : '');
   const pinned=document.getElementById('annPinned').checked;
   const urgent=document.getElementById('annUrgent')&&document.getElementById('annUrgent').checked;
   const expiry=document.getElementById('annExpiry')&&document.getElementById('annExpiry').value||null;
   if(!title||!body)return alert('Please fill in both title and body.');
   const btn=document.getElementById('annPostBtn');btn.disabled=true;btn.innerHTML='<span class="sp"></span> Posting...';
   try{
-    const annAtts = (typeof rtGetAttachments==='function') ? rtGetAttachments('annBody') : [];
+    const annAtts = (_bodyTa && typeof rtGetAttachments==='function') ? rtGetAttachments(_bodyTa.id) : [];
     const annResult = await sbPost('announcements',{title,body,created_by:me,pinned,urgent:urgent||false,expires_at:expiry||null,attachments:annAtts});
     // Save mention notifications
     try{
@@ -5994,10 +6020,10 @@ async function postAnnouncement(){
         }
       }
     }catch(e){console.warn('mention notify failed:', e);}
-    document.getElementById('annTitle').value='';
-    document.getElementById('annBody').value='';
-    if(typeof rtReset==='function') rtReset('annBody');
-    if(typeof rtClearAttachments==='function') rtClearAttachments('annBody');
+    if(_titleEl) _titleEl.value='';
+    if(_bodyTa) _bodyTa.value='';
+    if(_bodyTa && typeof rtReset==='function') rtReset(_bodyTa.id);
+    if(_bodyTa && typeof rtClearAttachments==='function') rtClearAttachments(_bodyTa.id);
     document.getElementById('annPinned').checked=false;
     await loadAnnouncements();
   }catch(e){alert('Failed to post.');}
@@ -7558,7 +7584,9 @@ async function loadHomeAnnPreview(){
     const rows=await sbGet('announcements','?order=pinned.desc,created_at.desc&limit=1');
     if(!rows.length){el.innerHTML='<div style="color:#94a3b8;font-size:13px;">No announcements yet.</div>';return;}
     const r=rows[0];
-    el.innerHTML='<div style="font-size:14px;font-weight:700;color:#0f172a;margin-bottom:4px;">'+r.title+'</div><div style="font-size:13px;color:#475569;line-height:1.5;">'+r.body.slice(0,100)+(r.body.length>100?'...':'')+'</div>';
+    // Strip HTML tags for the preview snippet
+    const _bodyText = (typeof searchText === 'function') ? searchText(r.body) : String(r.body||'').replace(/<[^>]*>/g,' ').replace(/\s+/g,' ').trim();
+    el.innerHTML='<div style="font-size:14px;font-weight:700;color:#0f172a;margin-bottom:4px;">'+r.title+'</div><div style="font-size:13px;color:#475569;line-height:1.5;">'+_bodyText.slice(0,100)+(_bodyText.length>100?'...':'')+'</div>';
   }catch(e){console.warn(e);el.innerHTML='<div style="color:#94a3b8;font-size:13px;">No announcements yet.</div>';}
 }
 
