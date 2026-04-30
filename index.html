@@ -4999,13 +4999,17 @@ async function loadDiscussions(){
 }
 
 function _findVisibleTa(name){
-  // Find the first visible (offsetParent !== null) textarea matching id or rt-upgraded id
+  // Find the textarea whose visible UI (rt-editor or the ta itself) is on screen
   const all = document.querySelectorAll('textarea[id^="'+name+'"]');
-  for(const ta of all){ if(ta.offsetParent !== null || ta.dataset.rtUpgraded==='1') {
-    // For rt-upgraded textareas, the editor (sibling) is what's visible
-    if(ta.dataset.rtUpgraded==='1' && ta._rtEditor && ta._rtEditor.offsetParent !== null) return ta;
-    if(ta.offsetParent !== null) return ta;
-  }}
+  for(const ta of all){
+    // If RT-upgraded, check the editor's visibility (textarea is hidden by design)
+    if(ta.dataset.rtUpgraded==='1'){
+      if(ta._rtEditor && ta._rtEditor.offsetParent !== null) return ta;
+    } else if(ta.offsetParent !== null){
+      return ta;
+    }
+  }
+  // Fallback: first matching, anywhere
   return all[0] || null;
 }
 
