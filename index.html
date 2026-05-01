@@ -3767,6 +3767,85 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
 [data-theme="dark"] .slack-compose textarea{color:#d1d2d3;}
 [data-theme="dark"] .slack-date-label{background:#222529;color:#d1d2d3;border-color:#444;}
 
+
+/* ── FACEBOOK-STYLE REPLIES ── */
+.fb-reply-list{padding:8px 0 4px;display:flex;flex-direction:column;gap:2px;border-top:1px solid #f1f5f9;margin-top:8px;}
+.fb-reply{display:flex;gap:8px;align-items:flex-start;padding:4px 0;}
+.fb-reply-ava{
+  width:28px;height:28px;border-radius:50%;
+  background:linear-gradient(135deg,#2563eb,#7c3aed);
+  color:#fff;font-size:9px;font-weight:800;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+}
+.fb-reply-bubble{
+  background:#f0f2f5;border-radius:18px;
+  padding:8px 12px;max-width:calc(100% - 44px);
+  position:relative;
+}
+.fb-reply-bubble:hover .fb-reply-actions{opacity:1;}
+.fb-reply-author{font-size:12px;font-weight:700;color:#050505;margin-bottom:2px;}
+.fb-reply-body{font-size:13.5px;color:#050505;line-height:1.4;word-break:break-word;}
+.fb-reply-meta{display:flex;align-items:center;gap:6px;margin-top:3px;padding-left:2px;flex-wrap:wrap;}
+.fb-reply-time{font-size:11px;color:#65676b;font-weight:500;}
+.fb-reply-like-btn{
+  font-size:11px;font-weight:700;color:#65676b;
+  background:none;border:none;cursor:pointer;
+  padding:0;font-family:inherit;transition:color .1s;
+}
+.fb-reply-like-btn:hover{color:#1877f2;}
+.fb-reply-like-btn.liked{color:#1877f2;}
+.fb-reply-edit-btn,.fb-reply-del-btn{
+  font-size:11px;font-weight:700;color:#65676b;
+  background:none;border:none;cursor:pointer;
+  padding:0;font-family:inherit;
+}
+.fb-reply-edit-btn:hover{color:#050505;}
+.fb-reply-del-btn:hover{color:#dc2626;}
+.fb-reply-actions{
+  position:absolute;top:-18px;right:8px;
+  background:#fff;border-radius:20px;
+  box-shadow:0 2px 8px rgba(0,0,0,.15);
+  padding:4px 10px;display:none;gap:10px;
+}
+.fb-reply:hover .fb-reply-actions{display:flex;}
+.fb-reply-meta .react-btn{padding:2px 8px;font-size:12px;min-height:24px;min-width:24px;border-radius:12px;}
+.fb-reply-meta .react-counts span{font-size:11px;padding:1px 6px;}
+
+/* Reply input — Facebook style */
+.fb-reply-input-row{display:flex;gap:8px;align-items:flex-end;margin-top:10px;padding-top:8px;border-top:1px solid #f0f2f5;}
+.fb-reply-input-ava{
+  width:28px;height:28px;border-radius:50%;
+  background:linear-gradient(135deg,#2563eb,#7c3aed);
+  color:#fff;font-size:9px;font-weight:800;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+}
+.fb-reply-input-wrap{
+  flex:1;background:#f0f2f5;border-radius:20px;
+  padding:8px 14px;display:flex;align-items:flex-end;gap:6px;
+}
+.fb-reply-input-wrap textarea{
+  flex:1;background:none;border:none;outline:none;
+  font-size:14px;font-family:inherit;resize:none;
+  max-height:100px;line-height:1.4;color:#050505;
+  min-height:20px;
+}
+.fb-reply-input-wrap textarea::placeholder{color:#65676b;}
+.fb-reply-send-btn{
+  background:none;border:none;cursor:pointer;
+  color:#1877f2;padding:2px 4px;
+  display:flex;align-items:center;
+}
+.fb-reply-send-btn:hover{opacity:.8;}
+.fb-edited-badge{font-size:10px;color:#65676b;margin-left:4px;}
+
+[data-theme="dark"] .fb-reply-bubble{background:#3a3b3c;}
+[data-theme="dark"] .fb-reply-author,[data-theme="dark"] .fb-reply-body{color:#e4e6eb;}
+[data-theme="dark"] .fb-reply-time,[data-theme="dark"] .fb-reply-like-btn,[data-theme="dark"] .fb-reply-edit-btn{color:#b0b3b8;}
+[data-theme="dark"] .fb-reply-input-wrap{background:#3a3b3c;}
+[data-theme="dark"] .fb-reply-input-wrap textarea{color:#e4e6eb;}
+[data-theme="dark"] .fb-reply-input-wrap textarea::placeholder{color:#b0b3b8;}
+[data-theme="dark"] .fb-reply-actions{background:#3a3b3c;}
+
 </style>
 </head>
 <body>
@@ -4339,11 +4418,13 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
           <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#475569;cursor:pointer;"><input type="checkbox" id="annPinned"> Pin to top</label>
           <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#475569;cursor:pointer;"><input type="checkbox" id="annUrgent"> Urgent</label>
         </div>
+        <div id="annPostGifPreview" style="display:none;margin-bottom:10px;"></div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
           <div style="display:flex;align-items:center;gap:6px;flex:1;min-width:160px;">
             <label style="font-size:11px;font-weight:600;color:#94a3b8;white-space:nowrap;">Expires</label>
             <input type="date" id="annExpiry" class="f-input" style="font-size:12px;padding:6px 10px;">
           </div>
+          <button type="button" onclick="openGifPicker('ann')" class="btn btn-outline" style="padding:8px 14px;font-size:12px;">GIF</button>
           <button class="btn btn-green" style="padding:9px 18px;" onclick="postAnnouncement()" id="annPostBtn">Post</button>
         </div>
       </div>
@@ -4387,8 +4468,10 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
             </div>
             <button onclick="addPollOpt()" style="font-size:12px;font-weight:600;color:var(--accent);background:none;border:none;cursor:pointer;font-family:inherit;padding:4px 0;">+ Add option</button>
           </div>
+          <div id="discPostGifPreview" style="display:none;margin-bottom:10px;"></div>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
             <button onclick="togglePollBuilder()" id="pollToggleBtn" class="btn btn-outline" style="padding:8px 14px;font-size:12px;">📊 Add Poll</button>
+            <button type="button" onclick="openGifPicker('disc')" class="btn btn-outline" style="padding:8px 14px;font-size:12px;">GIF</button>
             <div style="flex:1;"></div>
             <div class="alert alert-err" id="discErr" style="margin:0;flex:1;"></div>
             <div class="alert alert-ok" id="discOk" style="margin:0;flex:1;"></div>
@@ -4555,6 +4638,7 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
           <div style="display:flex;gap:8px;align-items:center;">
             <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#475569;cursor:pointer;"><input type="checkbox" id="annPinned"> Pin to top</label>
             <div style="flex:1;"></div>
+            <button type="button" onclick="openGifPicker('ann')" class="btn btn-outline" style="padding:8px 14px;font-size:12px;">GIF</button>
             <button class="btn btn-green" style="padding:9px 18px;" onclick="postAnnouncement()" id="annPostBtn">Post</button>
           </div>
         </div>
@@ -4570,7 +4654,11 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
           <div class="field"><textarea id="discBody" rows="6" class="f-input" placeholder="Add more detail (optional)..." style="resize:vertical;min-height:120px;"></textarea></div>
           <div class="alert alert-err" id="discErr"></div>
           <div class="alert alert-ok" id="discOk"></div>
-          <button class="btn btn-green" onclick="postDiscussion()" id="discPostBtn" style="padding:9px 18px;">Post</button>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <button type="button" onclick="openGifPicker('disc')" class="btn btn-outline" style="padding:8px 14px;font-size:12px;">GIF</button>
+            <div style="flex:1;"></div>
+            <button class="btn btn-green" onclick="postDiscussion()" id="discPostBtn" style="padding:9px 18px;">Post</button>
+          </div>
         </div>
         <div id="discList"><div class="skeleton-card"><div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;"><div class="skeleton skeleton-avatar"></div><div style="flex:1;"><div class="skeleton skeleton-text med"></div><div class="skeleton skeleton-text short"></div></div></div><div class="skeleton skeleton-text full"></div><div class="skeleton skeleton-text med"></div></div><div class="skeleton-card"><div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;"><div class="skeleton skeleton-avatar"></div><div style="flex:1;"><div class="skeleton skeleton-text med"></div><div class="skeleton skeleton-text short"></div></div></div><div class="skeleton skeleton-text full"></div><div class="skeleton skeleton-text med"></div></div><div class="skeleton-card"><div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;"><div class="skeleton skeleton-avatar"></div><div style="flex:1;"><div class="skeleton skeleton-text med"></div><div class="skeleton skeleton-text short"></div></div></div><div class="skeleton skeleton-text full"></div><div class="skeleton skeleton-text med"></div></div></div>
       </div>
@@ -4948,6 +5036,7 @@ async function loadDiscussions(){
       html+='<div style="display:flex;gap:4px;align-items:center;flex-shrink:0;">';
       html+=bmHtml('disc', r.id);
       if(isOwn||myIsAdmin){
+        html+='<button data-id="'+r.id+'" onclick="startEditDiscussion(this.dataset.id)" style="background:none;border:none;color:#0284c7;font-size:11px;font-weight:600;cursor:pointer;padding:4px 6px;font-family:inherit;">Edit</button>';
         html+='<button data-id="'+r.id+'" onclick="deleteDiscussion(this.dataset.id)" style="background:none;border:none;color:#dc2626;font-size:11px;font-weight:600;cursor:pointer;padding:4px 6px;font-family:inherit;">Delete</button>';
       }
       html+='</div>';
@@ -4955,33 +5044,58 @@ async function loadDiscussions(){
       if(r.body){html+='<div class="rt-content" style="font-size:13px;color:#475569;line-height:1.6;margin-bottom:10px;">'+mdToHtml(r.body)+'</div>';}
       if(r.attachments && r.attachments.length){html+=attRenderGrid(r.attachments);}
       if(r.poll_options&&r.poll_options.length){html+=renderPoll(r);}
-      // Replies
-      if(replies.length){
-        html+='<div id="replies-'+r.id+'" style="border-top:1px solid #f1f5f9;padding-top:10px;margin-bottom:10px;display:flex;flex-direction:column;gap:8px;">';
-        replies.forEach(function(rep){
-          const ra=rep.staff_name.split(' ').map(function(w){return w[0];}).join('').slice(0,2);
-          const rt=new Date(rep.created_at).toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit'});
-          const rd=new Date(rep.created_at).toLocaleDateString('en-AU',{day:'numeric',month:'short'});
-          html+='<div style="display:flex;gap:8px;">';
-          html+='<div style="width:24px;height:24px;border-radius:50%;background:#e2e8f0;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:800;color:#475569;flex-shrink:0;">'+ra+'</div>';
-          html+='<div style="flex:1;"><div style="font-size:11px;font-weight:600;color:#0f172a;">'+rep.staff_name+'<span style="font-weight:400;color:#94a3b8;margin-left:5px;">'+rd+' '+rt+'</span></div>';
-          html+='<div class="rt-content" style="font-size:12.5px;color:#374151;margin-top:2px;line-height:1.5;">'+mdToHtml(rep.body)+'</div>';
-          html+='<div style="margin-top:4px;">'+makeReactHTML(rep.id,'reply')+'</div>';
-          html+='</div></div>';
-        });
-        html+='</div>';
-      }
-      if(!replies.length)html+='<div id="replies-'+r.id+'" style="display:flex;flex-direction:column;gap:8px;"></div>';
+      // Replies — Facebook style
+      html+='<div id="replies-'+r.id+'" class="fb-reply-list">';
+      replies.forEach(function(rep){
+        const ra=rep.staff_name.split(' ').map(function(w){return w[0];}).join('').slice(0,2).toUpperCase();
+        const rt=new Date(rep.created_at).toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit'});
+        const rd=new Date(rep.created_at).toLocaleDateString('en-AU',{day:'numeric',month:'short'});
+        const isOwn=rep.staff_name===me;
+        const editedBadge=rep.edited_at?'<span class="fb-edited-badge">(edited)</span>':'';
+        const actions=isOwn
+          ?'<div class="fb-reply-actions">'+
+              '<button class="fb-reply-edit-btn" data-rid="'+rep.id+'" data-disc="'+rep.discussion_id+'" onclick="startEditReply(this.dataset.rid,this.dataset.disc)">Edit</button>'+
+              '<button class="fb-reply-del-btn" data-rid="'+rep.id+'" data-disc="'+rep.discussion_id+'" onclick="deleteReply(this.dataset.rid,this.dataset.disc)">Delete</button>'+
+            '</div>'
+          :'';
+        html+='<div class="fb-reply">'+
+          '<div class="fb-reply-ava">'+ra+'</div>'+
+          '<div style="flex:1;min-width:0;">'+
+            '<div class="fb-reply-bubble">'+
+              actions+
+              '<div class="fb-reply-author">'+rep.staff_name+'</div>'+
+              '<div class="fb-reply-body" id="rep-body-'+rep.id+'">'+mdToHtml(rep.body)+editedBadge+'</div>'+
+            '</div>'+
+            '<div class="fb-reply-meta">'+
+              '<span class="fb-reply-time">'+rd+'</span>'+
+              '<span style="color:#65676b;font-size:11px;">·</span>'+
+              makeReactHTML(rep.id,'reply')+
+            '</div>'+
+          '</div>'+
+        '</div>';
+      });
+      html+='</div>';
       // Reactions
       html+='<div style="margin-top:10px;">'+makeReactHTML(r.id,'disc')+'</div>';
-      // Reply input
-      if(!isClosed)html+='<div style="display:flex;gap:8px;margin-top:8px;">';
-      if(isClosed)html+='<div style="font-size:11px;color:#94a3b8;margin-top:8px;">This discussion is closed.</div>';
-      if(!isClosed){
-      html+='<div style="flex:1;min-width:0;"><textarea id="discReply-'+r.id+'" data-disc="'+r.id+'" placeholder="Write a reply..." rows="2"></textarea></div>';
-      html+='<button data-disc="'+r.id+'" onclick="submitDiscReply(this.dataset.disc)" style="padding:8px 14px;border-radius:8px;background:var(--accent);color:#fff;border:none;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;align-self:flex-start;">Reply</button>';
-      html+='</div>';
-      if(!isClosed)html+='</div>';
+      // Reply input — Facebook style
+      if(isClosed){
+        html+='<div style="font-size:11px;color:#94a3b8;margin-top:8px;">This discussion is closed.</div>';
+      } else {
+        const myAva=me.split(' ').map(function(w){return w[0];}).join('').slice(0,2).toUpperCase();
+        html+='<div class="fb-reply-input-row">'+
+          '<div class="fb-reply-input-ava">'+myAva+'</div>'+
+          '<div class="fb-reply-input-wrap" style="flex:1;">'+
+            '<div id="discReplyGifPreview-'+r.id+'" style="display:none;padding:6px 8px 0;"></div>'+
+            '<textarea id="discReply-'+r.id+'" data-disc="'+r.id+'" placeholder="Write a reply..." rows="1" oninput="this.style.height=\'auto\';this.style.height=Math.min(this.scrollHeight,100)+\'px\'" onkeydown="if(event.key===\'Enter\'&&!event.shiftKey){event.preventDefault();submitDiscReply(\''+r.id+'\');}"></textarea>'+
+            '<div style="display:flex;align-items:center;gap:4px;padding:0 6px 4px;">'+
+              '<button type="button" class="fb-reply-gif-btn" data-disc="'+r.id+'" onclick="openGifPicker(\'reply:\'+this.dataset.disc)" title="Add a GIF" style="background:none;border:1px solid #cfd8e3;border-radius:14px;color:#4b5b6c;font-size:11px;font-weight:800;letter-spacing:.6px;cursor:pointer;padding:3px 9px;font-family:inherit;line-height:1;">GIF</button>'+
+              '<div style="flex:1"></div>'+
+              '<button class="fb-reply-send-btn" data-disc="'+r.id+'" ontouchend="event.preventDefault();submitDiscReply(this.dataset.disc)" onclick="submitDiscReply(this.dataset.disc)">'+
+                '<svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor"><path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z"/></svg>'+
+              '</button>'+
+            '</div>'+
+          '</div>'+
+        '</div>';
       }
       html+='</div>';
       return html;
@@ -5035,6 +5149,7 @@ async function postDiscussion(){
     const pollOpts = getPollOptions();
     if(pollOpts===false){err.textContent='Please add at least 2 poll options.';err.classList.add('show');return;}
     const discAtts = (_bodyTa && typeof rtGetAttachments==='function') ? rtGetAttachments(_bodyTa.id) : [];
+    if(window._pendingGif && window._pendingGif['disc']) discAtts.push(window._pendingGif['disc']);
     const discResult = await sbPost('discussions',{title,body,created_by:me,open_at:openAt||null,close_at:closeAt||null,poll_options:pollOpts||null,poll_votes:pollOpts?{}:null,attachments:discAtts});
     try{
       const mentions = (typeof rtExtractMentions==='function') ? rtExtractMentions(body) : [];
@@ -5056,6 +5171,9 @@ async function postDiscussion(){
     if(_bodyTa) _bodyTa.value='';
     if(_bodyTa && typeof rtReset==='function') rtReset(_bodyTa.id);
     if(_bodyTa && typeof rtClearAttachments==='function') rtClearAttachments(_bodyTa.id);
+    if(window._pendingGif) delete window._pendingGif['disc'];
+    const _gp = document.getElementById('discPostGifPreview');
+    if(_gp){ _gp.style.display='none'; _gp.innerHTML=''; }
     ok.textContent='Posted!';ok.classList.add('show');
     setTimeout(function(){ok.classList.remove('show');},2000);
     await loadDiscussions();
@@ -5067,16 +5185,68 @@ async function postDiscussion(){
   }
 }
 
+
+// ── REPLY EDIT / DELETE ──
+function startEditReply(repId, discId){
+  const bodyEl = document.getElementById('rep-body-'+repId);
+  if(!bodyEl) return;
+  const currentText = bodyEl.textContent.replace('(edited)','').trim();
+  bodyEl.innerHTML =
+    '<textarea style="width:100%;background:#e4e6eb;border:none;outline:none;border-radius:8px;padding:6px 8px;font-size:13.5px;font-family:inherit;resize:none;min-height:40px;box-sizing:border-box;color:#050505;" id="rep-edit-'+repId+'" onkeydown="if(event.key===\'Enter\'&&!event.shiftKey){event.preventDefault();saveReplyEdit(\''+repId+'\',\''+discId+'\');}">'+currentText+'</textarea>'+
+    '<div style="display:flex;gap:6px;margin-top:4px;">'+
+      '<button data-rid="'+repId+'" data-disc="'+discId+'" onclick="saveReplyEdit(this.dataset.rid,this.dataset.disc)" style="background:#1877f2;color:#fff;border:none;border-radius:6px;padding:4px 12px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;">Save</button>'+
+      '<button onclick="loadDiscussions()" style="background:none;border:none;color:#65676b;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;">Cancel</button>'+
+    '</div>';
+  const ta = document.getElementById('rep-edit-'+repId);
+  if(ta){ ta.focus(); ta.setSelectionRange(ta.value.length,ta.value.length); }
+}
+
+async function saveReplyEdit(repId, discId){
+  const ta = document.getElementById('rep-edit-'+repId);
+  if(!ta) return;
+  const body = ta.value.trim();
+  if(!body) return;
+  try{
+    const res = await fetch(SB+'/rest/v1/discussion_replies?id=eq.'+repId,{
+      method:'PATCH',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({body:body, edited_at:new Date().toISOString()})
+    });
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    showToast('Reply updated');
+    loadDiscussions();
+  }catch(e){ showToast('Failed: '+e.message); }
+}
+
+async function deleteReply(repId, discId){
+  if(!confirm('Delete this reply?')) return;
+  try{
+    const res = await fetch(SB+'/rest/v1/discussion_replies?id=eq.'+repId,{
+      method:'DELETE',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}
+    });
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    showToast('Reply deleted');
+    const el = document.querySelector('.fb-reply [data-rid="'+repId+'"]');
+    if(el) el.closest('.fb-reply').remove();
+    else loadDiscussions();
+  }catch(e){ showToast('Failed: '+e.message); }
+}
+
 async function submitDiscReply(discId){
   const input=document.getElementById('discReply-'+discId);
   if(!input) return;
   // For RT-upgraded, sync first
   if(input._rtSync) input._rtSync();
-  if(!input.value || !input.value.trim()) return;
-  const body=input.value.trim();
-  const replyAtts = (typeof rtGetAttachments==='function') ? rtGetAttachments('discReply-'+discId) : [];
-  const btn=document.querySelector('button[data-disc="'+discId+'"]');
-  if(btn){btn.disabled=true;btn.textContent='...';}
+  const body=(input.value||'').trim();
+  const rtAtts = (typeof rtGetAttachments==='function') ? rtGetAttachments('discReply-'+discId) : [];
+  const gifKey = 'reply:'+discId;
+  const gifAtt = (window._pendingGif && window._pendingGif[gifKey]) ? [window._pendingGif[gifKey]] : [];
+  const replyAtts = rtAtts.concat(gifAtt);
+  // Need either text OR a gif/attachment to send
+  if(!body && !replyAtts.length) return;
+  const btn=document.querySelector('button.fb-reply-send-btn[data-disc="'+discId+'"]');
+  if(btn){btn.disabled=true;}
   try{
     const res=await sbPost('discussion_replies',{discussion_id:discId,staff_name:me,body,attachments:replyAtts});
     if(!res.ok&&res.status!==201)throw new Error('HTTP '+res.status);
@@ -5104,9 +5274,11 @@ async function submitDiscReply(discId){
         }
       }
     }catch(e){console.warn('reply notif failed:',e);}
-    // Append reply inline without full reload
+    // Append reply inline without full reload (text-only). With attachments, do a full reload.
     const repliesContainer=document.getElementById('replies-'+discId);
-    if(repliesContainer){
+    if(replyAtts.length){
+      await loadDiscussions();
+    } else if(repliesContainer){
       const now=new Date();
       const t=now.toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit'});
       const d=now.toLocaleDateString('en-AU',{day:'numeric',month:'short'});
@@ -5125,7 +5297,11 @@ async function submitDiscReply(discId){
     console.warn(e);
     showToast('Failed to post reply');
   }finally{
-    if(btn){btn.disabled=false;btn.textContent='Reply';}
+    // Clear pending gif for this disc
+    if(window._pendingGif) delete window._pendingGif['reply:'+discId];
+    const prev = document.getElementById('discReplyGifPreview-'+discId);
+    if(prev){ prev.style.display='none'; prev.innerHTML=''; }
+    if(btn){ btn.disabled=false; }
   }
 }
 
@@ -5135,6 +5311,50 @@ async function deleteDiscussion(id){
     await fetch(SB+'/rest/v1/discussions?id=eq.'+id,{method:'DELETE',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
     await loadDiscussions();
   }catch(e){console.warn(e);}
+}
+
+async function startEditDiscussion(id){
+  let row;
+  try{
+    const rows = await sbGet('discussions','?id=eq.'+id);
+    row = rows && rows[0];
+  }catch(e){ showToast('Could not load discussion'); return; }
+  if(!row) return;
+  // Find the rendered card and swap in edit form
+  const btn = document.querySelector('.ann-card button[data-id="'+id+'"][onclick*="startEditDiscussion"]');
+  const cardEl = btn ? btn.closest('.ann-card') : null;
+  if(!cardEl) return;
+  const safeTitle = (row.title||'').replace(/"/g,'&quot;');
+  const safeBody = (row.body||'').replace(/</g,'&lt;');
+  cardEl.innerHTML =
+    '<div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Editing discussion</div>'+
+    '<input id="discEditTitle-'+id+'" value="'+safeTitle+'" style="width:100%;padding:8px 10px;font-size:14px;font-weight:600;border:1px solid #e2e8f0;border-radius:8px;font-family:inherit;margin-bottom:8px;box-sizing:border-box;">'+
+    '<textarea id="discEditBody-'+id+'" rows="5" style="width:100%;padding:8px 10px;font-size:13px;border:1px solid #e2e8f0;border-radius:8px;font-family:inherit;resize:vertical;box-sizing:border-box;">'+safeBody+'</textarea>'+
+    '<div style="display:flex;gap:8px;margin-top:10px;">'+
+      '<button data-id="'+id+'" onclick="saveDiscussionEdit(this.dataset.id)" class="btn btn-green" style="padding:8px 16px;font-size:12px;">Save</button>'+
+      '<button onclick="loadDiscussions()" class="btn btn-outline" style="padding:8px 16px;font-size:12px;">Cancel</button>'+
+    '</div>';
+  const t = document.getElementById('discEditTitle-'+id);
+  if(t) t.focus();
+}
+
+async function saveDiscussionEdit(id){
+  const titleEl = document.getElementById('discEditTitle-'+id);
+  const bodyEl = document.getElementById('discEditBody-'+id);
+  if(!titleEl || !bodyEl) return;
+  const title = titleEl.value.trim();
+  const body = bodyEl.value.trim();
+  if(!title || !body){ alert('Title and body required.'); return; }
+  try{
+    const res = await fetch(SB+'/rest/v1/discussions?id=eq.'+id,{
+      method:'PATCH',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({title:title, body:body, edited_at:new Date().toISOString()})
+    });
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    showToast('Discussion updated');
+    await loadDiscussions();
+  }catch(e){ showToast('Failed: '+e.message); }
 }
 
 async function sbGet(t,f){
@@ -5596,6 +5816,17 @@ function updateAccentSwatches(){
   });
 }
 
+function setBrightness(v){
+  const val = Math.max(60, Math.min(110, parseInt(v)||100));
+  // Apply as CSS filter on the main app surface (not html — affects modals/toasts cleanly)
+  const target = document.querySelector('.main') || document.body;
+  if(target) target.style.filter = 'brightness('+(val/100)+')';
+  // Also dim sidebar so the whole app feels consistent
+  const sb = document.querySelector('.sidebar');
+  if(sb) sb.style.filter = 'brightness('+(val/100)+')';
+  localStorage.setItem('oscars_brightness', String(val));
+}
+
 function setFontSize(size){
   document.documentElement.setAttribute('data-font', size);
   localStorage.setItem('oscars_font', size);
@@ -5638,6 +5869,14 @@ function resetAppearance(){
   localStorage.removeItem('oscars_accent');
   localStorage.removeItem('oscars_font');
   localStorage.removeItem('oscars_sb');
+  localStorage.removeItem('oscars_brightness');
+  // Clear inline brightness filter
+  const target = document.querySelector('.main') || document.body;
+  if(target) target.style.filter = '';
+  const sbEl = document.querySelector('.sidebar');
+  if(sbEl) sbEl.style.filter = '';
+  const slider = document.getElementById('brightnessSlider');
+  if(slider) slider.value = 100;
   document.documentElement.setAttribute('data-theme', 'light');
   document.documentElement.setAttribute('data-accent', 'green');
   document.documentElement.setAttribute('data-font', 'medium');
@@ -5656,6 +5895,11 @@ function initAppearance(){
   document.documentElement.setAttribute('data-accent', accent);
   document.documentElement.setAttribute('data-font', font);
   document.documentElement.setAttribute('data-sb', sb);
+  // Apply saved brightness once DOM ready (.main may not exist yet)
+  const br = parseInt(localStorage.getItem('oscars_brightness')||'100');
+  if(br !== 100){
+    setTimeout(function(){ setBrightness(br); }, 100);
+  }
 }
 initAppearance();
 
@@ -5874,7 +6118,7 @@ async function loadReactCounts(id,type){
 
 function updateReactWrap(id,type){
   const wrap=document.querySelector('.react-wrap[data-id="'+id+'"][data-type="'+type+'"]');
-  if(!wrap){if(type==='ann')loadAnnouncements();else loadDiscussions();return;}
+  if(!wrap){ if(type==='reply'){ loadDiscussions(); return; } if(type==='ann')loadAnnouncements(); else loadDiscussions(); return; }
   const key=(type==='ann'?'ann_react_':type==='reply'?'reply_react_':'disc_react_')+me+'_'+id;
   const myReact=localStorage.getItem(key)||'';
   const hasReact=!!myReact;
@@ -5971,6 +6215,7 @@ async function loadAnnouncements(){
         '<div style="display:flex;gap:6px;align-items:center;margin-left:auto;flex-wrap:wrap;">'+
         ((r.created_by===me || myIsAdmin) ? annReadsBadgeHtml(r.id) : '')+
         bmHtml('ann', r.id)+
+        (myIsAdmin?'<button data-id="'+r.id+'" onclick="startEditAnnouncement(this.dataset.id)" style="background:none;border:none;color:#0284c7;font-size:11px;font-weight:600;cursor:pointer;">Edit</button>':'')+
         (myIsAdmin?'<button data-id="'+r.id+'" onclick="deleteAnnouncement(this.dataset.id)" style="background:none;border:none;color:#dc2626;font-size:11px;font-weight:600;cursor:pointer;">Delete</button>':'')+
         '</div></div>'+
         '<div style="margin-top:10px;">'+makeReactHTML(r.id,'ann')+'</div>'+
@@ -6011,6 +6256,7 @@ async function postAnnouncement(){
   const btn=document.getElementById('annPostBtn');btn.disabled=true;btn.innerHTML='<span class="sp"></span> Posting...';
   try{
     const annAtts = (_bodyTa && typeof rtGetAttachments==='function') ? rtGetAttachments(_bodyTa.id) : [];
+    if(window._pendingGif && window._pendingGif['ann']) annAtts.push(window._pendingGif['ann']);
     const annResult = await sbPost('announcements',{title,body,created_by:me,pinned,urgent:urgent||false,expires_at:expiry||null,attachments:annAtts});
     // Save mention notifications
     try{
@@ -6028,6 +6274,9 @@ async function postAnnouncement(){
     if(_bodyTa) _bodyTa.value='';
     if(_bodyTa && typeof rtReset==='function') rtReset(_bodyTa.id);
     if(_bodyTa && typeof rtClearAttachments==='function') rtClearAttachments(_bodyTa.id);
+    if(window._pendingGif) delete window._pendingGif['ann'];
+    const _agp = document.getElementById('annPostGifPreview');
+    if(_agp){ _agp.style.display='none'; _agp.innerHTML=''; }
     document.getElementById('annPinned').checked=false;
     await loadAnnouncements();
   }catch(e){alert('Failed to post.');}
@@ -6038,6 +6287,51 @@ async function deleteAnnouncement(id){
   if(!confirm('Delete this announcement?'))return;
   await fetch(SB+'/rest/v1/announcements?id=eq.'+id,{method:'DELETE',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
   await loadAnnouncements();
+}
+
+async function startEditAnnouncement(id){
+  // Fetch current row
+  let row;
+  try{
+    const rows = await sbGet('announcements','?id=eq.'+id);
+    row = rows && rows[0];
+  }catch(e){ showToast('Could not load announcement'); return; }
+  if(!row) return;
+  // Replace card with inline edit form
+  const card = document.querySelector('.ann-card button[data-id="'+id+'"]');
+  const cardEl = card ? card.closest('.ann-card') : null;
+  if(!cardEl) return;
+  const safeTitle = (row.title||'').replace(/"/g,'&quot;');
+  const safeBody = (row.body||'').replace(/</g,'&lt;');
+  cardEl.innerHTML =
+    '<div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Editing announcement</div>'+
+    '<input id="annEditTitle-'+id+'" value="'+safeTitle+'" style="width:100%;padding:8px 10px;font-size:14px;font-weight:600;border:1px solid #e2e8f0;border-radius:8px;font-family:inherit;margin-bottom:8px;box-sizing:border-box;">'+
+    '<textarea id="annEditBody-'+id+'" rows="5" style="width:100%;padding:8px 10px;font-size:13px;border:1px solid #e2e8f0;border-radius:8px;font-family:inherit;resize:vertical;box-sizing:border-box;">'+safeBody+'</textarea>'+
+    '<div style="display:flex;gap:8px;margin-top:10px;">'+
+      '<button data-id="'+id+'" onclick="saveAnnouncementEdit(this.dataset.id)" class="btn btn-green" style="padding:8px 16px;font-size:12px;">Save</button>'+
+      '<button onclick="loadAnnouncements()" class="btn btn-outline" style="padding:8px 16px;font-size:12px;">Cancel</button>'+
+    '</div>';
+  const t = document.getElementById('annEditTitle-'+id);
+  if(t) t.focus();
+}
+
+async function saveAnnouncementEdit(id){
+  const titleEl = document.getElementById('annEditTitle-'+id);
+  const bodyEl = document.getElementById('annEditBody-'+id);
+  if(!titleEl || !bodyEl) return;
+  const title = titleEl.value.trim();
+  const body = bodyEl.value.trim();
+  if(!title || !body){ alert('Title and body required.'); return; }
+  try{
+    const res = await fetch(SB+'/rest/v1/announcements?id=eq.'+id,{
+      method:'PATCH',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({title:title, body:body, edited_at:new Date().toISOString()})
+    });
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    showToast('Announcement updated');
+    await loadAnnouncements();
+  }catch(e){ showToast('Failed: '+e.message); }
 }
 
 async function updateAnnBadge(rows,readIds){
@@ -9144,6 +9438,157 @@ function rtClearAttachments(textareaId){
 }
 
 // Render attachment grid for display in cards
+// ── GIF PICKER (KLIPY) ──
+// KLIPY GIF API. Free forever. Tenor + Giphy alternative.
+// Get key (3 min, no credit card): https://klipy.com/developers → "Get API Key" → sign up → create app → copy Test Key.
+// Test key = 100 req/min, plenty for this app.
+const KLIPY_KEY = 'PASTE_YOUR_KLIPY_KEY_HERE';
+const KLIPY_CUSTOMER = 'oscars-portal'; // any stable string identifying your app/user
+// Pending GIF storage keyed by context: 'reply:<discId>' | 'disc' | 'ann'
+window._pendingGif = window._pendingGif || {};
+
+function openGifPicker(ctx){
+  if(!ctx) ctx = 'disc';
+  if(document.getElementById('gifPickerModal')) return;
+  const modal = document.createElement('div');
+  modal.id = 'gifPickerModal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
+  modal.innerHTML =
+    '<div style="background:#fff;border-radius:14px;width:100%;max-width:480px;max-height:85vh;display:flex;flex-direction:column;overflow:hidden;font-family:inherit;">'+
+      '<div style="display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid #f1f5f9;">'+
+        '<div style="font-size:14px;font-weight:700;color:#0f172a;flex:1;">Pick a GIF</div>'+
+        '<button id="gifPickerClose" style="background:none;border:none;font-size:22px;color:#64748b;cursor:pointer;line-height:1;">×</button>'+
+      '</div>'+
+      '<div style="padding:10px 14px;border-bottom:1px solid #f1f5f9;">'+
+        '<input id="gifSearch" placeholder="Search KLIPY..." style="width:100%;padding:9px 12px;border:1px solid #e2e8f0;border-radius:10px;font-size:13px;font-family:inherit;outline:none;box-sizing:border-box;">'+
+      '</div>'+
+      '<div id="gifResults" style="flex:1;overflow-y:auto;padding:10px;display:grid;grid-template-columns:repeat(2,1fr);gap:6px;">'+
+        '<div style="grid-column:1/-1;text-align:center;padding:30px;color:#94a3b8;font-size:12px;">Loading…</div>'+
+      '</div>'+
+      '<div style="padding:6px 14px;border-top:1px solid #f1f5f9;font-size:10px;color:#94a3b8;text-align:center;">Powered by KLIPY</div>'+
+    '</div>';
+  document.body.appendChild(modal);
+  modal.dataset.ctx = ctx;
+  document.getElementById('gifPickerClose').onclick = closeGifPicker;
+  modal.onclick = function(e){ if(e.target===modal) closeGifPicker(); };
+  loadGifs('', ctx);
+  let t;
+  const inp = document.getElementById('gifSearch');
+  inp.oninput = function(){
+    clearTimeout(t);
+    const q = inp.value.trim();
+    t = setTimeout(function(){ loadGifs(q, ctx); }, 300);
+  };
+  setTimeout(function(){ inp.focus(); }, 30);
+}
+
+function closeGifPicker(){
+  const m = document.getElementById('gifPickerModal');
+  if(m) m.remove();
+}
+
+async function loadGifs(query, ctx){
+  const grid = document.getElementById('gifResults');
+  if(!grid) return;
+  // Key-not-set check
+  if(!KLIPY_KEY || KLIPY_KEY === 'PASTE_YOUR_KLIPY_KEY_HERE'){
+    grid.innerHTML =
+      '<div style="grid-column:1/-1;padding:24px 16px;color:#475569;font-size:12px;line-height:1.6;">'+
+        '<div style="font-weight:700;color:#0f172a;margin-bottom:8px;">KLIPY API key not set</div>'+
+        'To enable GIFs, get a free key (3 min):<br>'+
+        '1. Go to <span style="color:#0284c7;">klipy.com/developers</span><br>'+
+        '2. Click "Get API Key" → sign up<br>'+
+        '3. Create an app → copy the <b>Test Key</b><br>'+
+        '4. Paste the key into <code style="background:#f1f5f9;padding:1px 6px;border-radius:4px;">KLIPY_KEY</code> in index.html'+
+      '</div>';
+    return;
+  }
+  grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:30px;color:#94a3b8;font-size:12px;">Loading…</div>';
+  const base = 'https://api.klipy.com/api/v1/'+encodeURIComponent(KLIPY_KEY)+'/gifs';
+  const endpoint = query
+    ? base+'/search?q='+encodeURIComponent(query)+'&per_page=24&customer_id='+encodeURIComponent(KLIPY_CUSTOMER)
+    : base+'/trending?per_page=24&customer_id='+encodeURIComponent(KLIPY_CUSTOMER);
+  try{
+    const r = await fetch(endpoint);
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const data = await r.json();
+    // KLIPY response: { data: { data: [ { file: { gif:{url}, sm:{gif:{url}}, ... }, title } ] } }
+    const results = (data && data.data && Array.isArray(data.data.data)) ? data.data.data
+                  : (data && Array.isArray(data.data)) ? data.data
+                  : (data && Array.isArray(data.results)) ? data.results
+                  : [];
+    if(!results.length){
+      grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:30px;color:#94a3b8;font-size:12px;">No GIFs found.</div>';
+      return;
+    }
+    grid.innerHTML = results.map(function(g){
+      // Try common KLIPY response shapes
+      const f = g.file || g.media || {};
+      const sm = f.sm || f.small || {};
+      const tiny = (sm.gif && sm.gif.url) || (f.gif && f.gif.url) || g.preview || '';
+      const full = (f.gif && f.gif.url) || (f.hd && f.hd.url) || tiny;
+      const title = (g.title || g.slug || 'gif').replace(/"/g,'&quot;');
+      if(!tiny) return '';
+      return '<button type="button" data-full="'+full+'" data-title="'+title+'" data-ctx="'+ctx+'" style="background:#f1f5f9;border:none;border-radius:8px;cursor:pointer;padding:0;overflow:hidden;aspect-ratio:1;display:block;" onclick="pickGif(this.dataset.full,this.dataset.title,this.dataset.ctx)">'+
+        '<img src="'+tiny+'" alt="'+title+'" style="width:100%;height:100%;object-fit:cover;display:block;" loading="lazy">'+
+      '</button>';
+    }).filter(Boolean).join('');
+    if(!grid.innerHTML.trim()){
+      grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:30px;color:#94a3b8;font-size:12px;">No GIFs found.</div>';
+    }
+  }catch(e){
+    console.warn('KLIPY failed:', e);
+    grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:30px;color:#dc2626;font-size:12px;">Could not load GIFs.<br>Check KLIPY API key or network.</div>';
+  }
+}
+
+function pickGif(url, title, ctx){
+  if(!url || !ctx) return;
+  window._pendingGif[ctx] = {
+    url: url,
+    name: title || 'gif',
+    type: 'image/gif',
+    isImage: true,
+    size: 0
+  };
+  // Find the right preview slot for this context
+  let prevId;
+  if(ctx.indexOf('reply:')===0){
+    prevId = 'discReplyGifPreview-'+ctx.slice(6);
+  } else if(ctx==='disc'){
+    prevId = 'discPostGifPreview';
+  } else if(ctx==='ann'){
+    prevId = 'annPostGifPreview';
+  }
+  const prev = prevId ? document.getElementById(prevId) : null;
+  if(prev){
+    prev.style.display = 'block';
+    prev.innerHTML =
+      '<div style="position:relative;display:inline-block;">'+
+        '<img src="'+url+'" alt="" style="max-width:160px;max-height:140px;border-radius:8px;display:block;">'+
+        '<button type="button" data-ctx="'+ctx+'" onclick="clearPendingGif(this.dataset.ctx)" style="position:absolute;top:-6px;right:-6px;background:#0f172a;color:#fff;border:none;width:20px;height:20px;border-radius:50%;font-size:12px;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center;">×</button>'+
+      '</div>';
+  }
+  closeGifPicker();
+}
+
+function clearPendingGif(ctx){
+  if(window._pendingGif) delete window._pendingGif[ctx];
+  let prevId;
+  if(ctx.indexOf('reply:')===0){
+    prevId = 'discReplyGifPreview-'+ctx.slice(6);
+  } else if(ctx==='disc'){
+    prevId = 'discPostGifPreview';
+  } else if(ctx==='ann'){
+    prevId = 'annPostGifPreview';
+  }
+  const prev = prevId ? document.getElementById(prevId) : null;
+  if(prev){ prev.style.display='none'; prev.innerHTML=''; }
+}
+
+// Back-compat for old reply gif clear
+function clearReplyGif(discId){ clearPendingGif('reply:'+discId); }
+
 function attRenderGrid(atts){
   if(!atts || !atts.length) return '';
   let html = '<div class="att-grid">';
