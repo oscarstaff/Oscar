@@ -3821,8 +3821,10 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
 }
 .fb-reply-input-wrap{
   flex:1;background:#f0f2f5;border-radius:20px;
-  padding:8px 14px;display:flex;align-items:flex-end;gap:6px;
+  padding:8px 14px;display:flex;flex-direction:column;gap:6px;
+  min-width:0;
 }
+.fb-reply-input-row-inner{display:flex;align-items:flex-end;gap:6px;width:100%;min-width:0;}
 .fb-reply-input-wrap textarea{
   flex:1;background:none;border:none;outline:none;
   font-size:14px;font-family:inherit;resize:none;
@@ -5034,9 +5036,12 @@ async function loadDiscussions(){
       html+='<div style="font-size:11px;color:#94a3b8;margin-top:1px;">'+r.created_by+' · '+d+'</div>';
       html+='</div>';
       html+='<div style="display:flex;gap:4px;align-items:center;flex-shrink:0;">';
+      html+=makeReactHTML(r.id,'disc');
       html+=bmHtml('disc', r.id);
-      if(isOwn||myIsAdmin){
+      if(isOwn){
         html+='<button data-id="'+r.id+'" onclick="startEditDiscussion(this.dataset.id)" style="background:none;border:none;color:#0284c7;font-size:11px;font-weight:600;cursor:pointer;padding:4px 6px;font-family:inherit;">Edit</button>';
+      }
+      if(isOwn||myIsAdmin){
         html+='<button data-id="'+r.id+'" onclick="deleteDiscussion(this.dataset.id)" style="background:none;border:none;color:#dc2626;font-size:11px;font-weight:600;cursor:pointer;padding:4px 6px;font-family:inherit;">Delete</button>';
       }
       html+='</div>';
@@ -5064,7 +5069,8 @@ async function loadDiscussions(){
             '<div class="fb-reply-bubble">'+
               actions+
               '<div class="fb-reply-author">'+rep.staff_name+'</div>'+
-              '<div class="fb-reply-body" id="rep-body-'+rep.id+'">'+mdToHtml(rep.body)+editedBadge+'</div>'+
+              '<div class="fb-reply-body" id="rep-body-'+rep.id+'">'+mdToHtml(rep.body||'')+editedBadge+'</div>'+
+              ((rep.attachments && rep.attachments.length) ? '<div style="margin-top:6px;">'+attRenderGrid(rep.attachments)+'</div>' : '')+
             '</div>'+
             '<div class="fb-reply-meta">'+
               '<span class="fb-reply-time">'+rd+'</span>'+
@@ -5075,8 +5081,7 @@ async function loadDiscussions(){
         '</div>';
       });
       html+='</div>';
-      // Reactions
-      html+='<div style="margin-top:10px;">'+makeReactHTML(r.id,'disc')+'</div>';
+      // Reactions moved to top-right header
       // Reply input — Facebook style
       if(isClosed){
         html+='<div style="font-size:11px;color:#94a3b8;margin-top:8px;">This discussion is closed.</div>';
@@ -5085,7 +5090,7 @@ async function loadDiscussions(){
         html+='<div class="fb-reply-input-row">'+
           '<div class="fb-reply-input-ava">'+myAva+'</div>'+
           '<div class="fb-reply-input-wrap" style="flex:1;">'+
-            '<div id="discReplyGifPreview-'+r.id+'" style="display:none;padding:6px 8px 0;"></div>'+
+            '<div id="discReplyGifPreview-'+r.id+'" style="display:none;"></div>'+
             '<textarea id="discReply-'+r.id+'" data-disc="'+r.id+'" placeholder="Write a reply..." rows="1" oninput="this.style.height=\'auto\';this.style.height=Math.min(this.scrollHeight,100)+\'px\'" onkeydown="if(event.key===\'Enter\'&&!event.shiftKey){event.preventDefault();submitDiscReply(\''+r.id+'\');}"></textarea>'+
             '<div style="display:flex;align-items:center;gap:4px;padding:0 6px 4px;">'+
               '<button type="button" class="fb-reply-gif-btn" data-disc="'+r.id+'" onclick="openGifPicker(\'reply:\'+this.dataset.disc)" title="Add a GIF" style="background:none;border:1px solid #cfd8e3;border-radius:14px;color:#4b5b6c;font-size:11px;font-weight:800;letter-spacing:.6px;cursor:pointer;padding:3px 9px;font-family:inherit;line-height:1;">GIF</button>'+
@@ -5509,7 +5514,7 @@ async function enterHub(){
   applySavedBrightness();
   setTimeout(rtUpgradeAll, 200);
   setTimeout(startActivityPolling, 4000);
-  loadTasks();updateTaskBadge();scheduleTaskReminders();
+  loadTasks().then(function(){ updateTaskBadge(); scheduleTaskReminders(); });
   startAutoRefresh();
   initRealtime();
   loadBirthdays();
@@ -5538,7 +5543,7 @@ function goTo(p){
   if(p==="announcements"){loadAnnouncements();}
   if(p==="engagement"){showEngagementTab('discussions');}
   if(p==="documents"){loadDocuments();}
-  if(p==="tasks"){ loadTasks(); renderTasks(); updateTaskBadge(); maybeShowNotifyBanner(); }
+  if(p==="tasks"){ loadTasks().then(function(){ renderTasks(); updateTaskBadge(); }); maybeShowNotifyBanner(); }
   if(p==="announcements" || p==="engagement"){ setTimeout(rtUpgradeAll, 50); }
   if(p==="profile"){
     setTimeout(renderNotifPanel, 50);
@@ -5840,27 +5845,12 @@ function updateFontChips(){
 }
 
 function toggleSidebarCompact(){
-  const cur = document.documentElement.getAttribute('data-sb');
-  const isCompact = cur === 'collapsed';
-  const newVal = isCompact ? 'expanded' : 'collapsed';
-
-  // Add an "animating" class so we can apply extra flair during transition
-  const sb = document.querySelector('.sidebar');
-  if(sb){
-    sb.classList.add('sb-animating');
-    setTimeout(function(){ sb.classList.remove('sb-animating'); }, 500);
-  }
-
-  document.documentElement.setAttribute('data-sb', newVal);
-  localStorage.setItem('oscars_sb', newVal);
-  updateSbSwitch();
+  // Compact mode removed — sidebar always expanded
+  document.documentElement.setAttribute('data-sb', 'expanded');
+  localStorage.removeItem('oscars_sb');
 }
 function updateSbSwitch(){
-  const cur = localStorage.getItem('oscars_sb') === 'collapsed';
-  const sw = document.getElementById('sbSwitch');
-  const th = document.getElementById('sbSwitchThumb');
-  if(sw) sw.style.background = cur ? 'var(--accent)' : '#e2e8f0';
-  if(th) th.style.left = cur ? '25px' : '3px';
+  // Compact mode removed; keep no-op to avoid breaking callers
 }
 
 function resetAppearance(){
@@ -5891,10 +5881,11 @@ function resetAppearance(){
 function initAppearance(){
   const accent = localStorage.getItem('oscars_accent') || 'green';
   const font = localStorage.getItem('oscars_font') || 'medium';
-  const sb = localStorage.getItem('oscars_sb') || 'expanded';
   document.documentElement.setAttribute('data-accent', accent);
   document.documentElement.setAttribute('data-font', font);
-  document.documentElement.setAttribute('data-sb', sb);
+  // Sidebar compact mode removed — always expanded
+  document.documentElement.setAttribute('data-sb', 'expanded');
+  localStorage.removeItem('oscars_sb');
   // Apply saved brightness once DOM ready (.main may not exist yet)
   const br = parseInt(localStorage.getItem('oscars_brightness')||'100');
   if(br !== 100){
@@ -6214,11 +6205,11 @@ async function loadAnnouncements(){
         '<div class="ann-meta"><span>Posted by '+r.created_by+' · '+d+'</span>'+
         '<div style="display:flex;gap:6px;align-items:center;margin-left:auto;flex-wrap:wrap;">'+
         ((r.created_by===me || myIsAdmin) ? annReadsBadgeHtml(r.id) : '')+
+        makeReactHTML(r.id,'ann')+
         bmHtml('ann', r.id)+
-        (myIsAdmin?'<button data-id="'+r.id+'" onclick="startEditAnnouncement(this.dataset.id)" style="background:none;border:none;color:#0284c7;font-size:11px;font-weight:600;cursor:pointer;">Edit</button>':'')+
-        (myIsAdmin?'<button data-id="'+r.id+'" onclick="deleteAnnouncement(this.dataset.id)" style="background:none;border:none;color:#dc2626;font-size:11px;font-weight:600;cursor:pointer;">Delete</button>':'')+
+        ((r.created_by===me)?'<button data-id="'+r.id+'" onclick="startEditAnnouncement(this.dataset.id)" style="background:none;border:none;color:#0284c7;font-size:11px;font-weight:600;cursor:pointer;">Edit</button>':'')+
+        ((r.created_by===me || myIsAdmin)?'<button data-id="'+r.id+'" onclick="deleteAnnouncement(this.dataset.id)" style="background:none;border:none;color:#dc2626;font-size:11px;font-weight:600;cursor:pointer;">Delete</button>':'')+
         '</div></div>'+
-        '<div style="margin-top:10px;">'+makeReactHTML(r.id,'ann')+'</div>'+
         '</div>';
     }).join('');
     // Mark all as read locally + send read receipts to DB
@@ -7938,9 +7929,35 @@ let _taskReminderTimer = null;
 function taskKey(){ return 'oscar_tasks_' + me; }
 function taskSeenKey(){ return 'oscar_task_seen_' + me; }
 
-function loadTasks(){
+async function loadTasks(){
   try{ _tasks = JSON.parse(localStorage.getItem(taskKey()) || '[]'); }
   catch(e){ _tasks = []; }
+  // Pull tasks shared with me from DB
+  try{
+    const shared = await sbGet('shared_tasks','?recipient=eq.'+encodeURIComponent(me)+'&order=created_at.desc');
+    if(Array.isArray(shared) && shared.length){
+      // Local cache of accepted shared task ids (so we don't re-add them after deletion)
+      const dismissed = JSON.parse(localStorage.getItem('shared_tasks_dismissed_'+me)||'[]');
+      shared.forEach(function(s){
+        const sid = 'shared-'+s.id;
+        if(dismissed.indexOf(s.id)>=0) return;
+        if(_tasks.find(function(t){return t.id===sid;})) return;
+        _tasks.push({
+          id: sid,
+          shared_id: s.id,
+          shared_by: s.sender,
+          title: s.title || '(shared task)',
+          notes: s.notes || '',
+          dueDate: s.due_date || null,
+          dueTime: s.due_time || null,
+          priority: s.priority || 'med',
+          done: !!s.done,
+          createdAt: s.created_at
+        });
+      });
+      saveTasks();
+    }
+  }catch(e){ console.warn('shared_tasks load failed:', e); }
 }
 function saveTasks(){
   try{ localStorage.setItem(taskKey(), JSON.stringify(_tasks)); }catch(e){}
@@ -8053,10 +8070,108 @@ function saveTask(){
   showToast(editId ? 'Task updated' : 'Task added');
 }
 
+// ── SHARE TASK ──
+async function openShareTask(id){
+  const t = _tasks.find(function(x){return x.id===id;});
+  if(!t) return;
+  if(t.shared_by){ showToast('You can\'t reshare a task shared with you'); return; }
+  let modal = document.getElementById('shareTaskOverlay');
+  if(modal) modal.remove();
+  modal = document.createElement('div');
+  modal.id = 'shareTaskOverlay';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9400;display:flex;align-items:center;justify-content:center;padding:16px;';
+  modal.innerHTML =
+    '<div style="background:#fff;border-radius:14px;width:100%;max-width:380px;display:flex;flex-direction:column;overflow:hidden;font-family:inherit;">'+
+      '<div style="padding:14px 16px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;justify-content:space-between;">'+
+        '<div style="font-size:14px;font-weight:700;color:#0f172a;">Share task</div>'+
+        '<button onclick="closeShareTask()" style="background:none;border:none;font-size:22px;color:#64748b;cursor:pointer;line-height:1;padding:0 4px;">×</button>'+
+      '</div>'+
+      '<div style="padding:14px 16px;">'+
+        '<div style="font-size:12px;color:#64748b;margin-bottom:4px;">Task</div>'+
+        '<div style="font-size:13px;font-weight:600;color:#0f172a;margin-bottom:14px;padding:8px 10px;background:#f8fafc;border-radius:8px;">'+t.title.replace(/</g,'&lt;')+'</div>'+
+        '<div style="font-size:12px;color:#64748b;margin-bottom:4px;">Send to</div>'+
+        '<select id="shareTaskRecipient" class="f-input" style="width:100%;font-size:13px;margin-bottom:12px;">'+
+          '<option value="">Loading staff...</option>'+
+        '</select>'+
+        '<div style="font-size:12px;color:#64748b;margin-bottom:4px;">Optional message</div>'+
+        '<textarea id="shareTaskNote" class="f-input" rows="2" placeholder="Add a note (optional)..." style="width:100%;font-size:13px;resize:vertical;"></textarea>'+
+      '</div>'+
+      '<div style="padding:10px 16px 14px;display:flex;gap:8px;">'+
+        '<button onclick="closeShareTask()" class="btn btn-outline" style="flex:1;font-size:13px;padding:9px 12px;">Cancel</button>'+
+        '<button id="shareTaskSendBtn" onclick="sendSharedTask(\''+id+'\')" class="btn btn-green" style="flex:1;font-size:13px;padding:9px 12px;">Share</button>'+
+      '</div>'+
+    '</div>';
+  document.body.appendChild(modal);
+  modal.onclick = function(e){ if(e.target===modal) closeShareTask(); };
+  try{
+    const names = await sbGet('staff_names','?order=name.asc');
+    const sel = document.getElementById('shareTaskRecipient');
+    sel.innerHTML = '<option value="">Choose a colleague...</option>'+
+      (names||[]).filter(function(n){return n.name && n.name!==me;})
+        .map(function(n){return '<option value="'+n.name.replace(/"/g,'&quot;')+'">'+n.name+'</option>';}).join('');
+  }catch(e){
+    const sel = document.getElementById('shareTaskRecipient');
+    if(sel) sel.innerHTML = '<option value="">Failed to load staff</option>';
+  }
+}
+
+function closeShareTask(){
+  const m = document.getElementById('shareTaskOverlay');
+  if(m) m.remove();
+}
+
+async function sendSharedTask(taskId){
+  const t = _tasks.find(function(x){return x.id===taskId;});
+  if(!t) return;
+  const recipient = (document.getElementById('shareTaskRecipient')||{}).value;
+  const note = ((document.getElementById('shareTaskNote')||{}).value||'').trim();
+  if(!recipient){ alert('Pick a colleague to share with.'); return; }
+  const btn = document.getElementById('shareTaskSendBtn');
+  if(btn){ btn.disabled = true; btn.textContent = 'Sending...'; }
+  try{
+    const payload = {
+      sender: me,
+      recipient: recipient,
+      title: t.title,
+      notes: note ? (note + (t.notes ? '\n\n— Original notes —\n' + t.notes : '')) : (t.notes||''),
+      due_date: t.dueDate || null,
+      due_time: t.dueTime || null,
+      priority: t.priority || 'med',
+      done: false
+    };
+    const res = await sbPost('shared_tasks', payload);
+    if(!res.ok && res.status !== 201) throw new Error('HTTP '+res.status);
+    try{
+      await sbPost('reply_notifications', {
+        recipient: recipient,
+        replier: me,
+        body: me + ' shared a task with you: ' + t.title.slice(0,80),
+        created_at: new Date().toISOString()
+      });
+    }catch(e){ /* ignore */ }
+    showToast('Task shared with ' + recipient.split(' ')[0]);
+    closeShareTask();
+  }catch(e){
+    console.warn('share failed:', e);
+    alert('Failed to share. Make sure the shared_tasks table exists in Supabase.');
+    if(btn){ btn.disabled = false; btn.textContent = 'Share'; }
+  }
+}
+
 function deleteTask(id){
   if(!confirm('Delete this task?')) return;
   const row = document.querySelector('.task-item[data-id="'+id+'"]');
   const finishDelete = function(){
+    // If shared task, remember dismissal so it doesn't re-appear on reload
+    const t = _tasks.find(function(x){return x.id===id;});
+    if(t && t.shared_id){
+      try{
+        const k = 'shared_tasks_dismissed_'+me;
+        const arr = JSON.parse(localStorage.getItem(k)||'[]');
+        if(arr.indexOf(t.shared_id)<0) arr.push(t.shared_id);
+        localStorage.setItem(k, JSON.stringify(arr));
+      }catch(e){}
+    }
     _tasks = _tasks.filter(function(t){return t.id!==id;});
     saveTasks();
     renderTasks();
@@ -8226,6 +8341,7 @@ function renderTasks(){
     const hasMeta = !!(dueChip || remChip || (t.priority==='high'||t.priority==='low'));
     return '<div class="task-item'+(t.done?' done':'')+overdueCls+prioCls+'" data-id="'+t.id+'" onclick="openTaskForm(\''+t.id+'\')">'+
       '<button class="task-del" onclick="event.stopPropagation();deleteTask(\''+t.id+'\')" title="Delete">×</button>'+
+      (t.shared_by ? '<button class="task-share-btn" disabled style="position:absolute;top:8px;right:32px;background:#ede9fe;color:#7c3aed;border:none;font-size:9px;font-weight:700;padding:2px 6px;border-radius:8px;letter-spacing:.4px;text-transform:uppercase;cursor:default;">From '+(t.shared_by.split(" ")[0]||t.shared_by)+'</button>' : '<button class="task-share-btn" onclick="event.stopPropagation();openShareTask(\''+t.id+'\')" title="Share with a colleague" style="position:absolute;top:8px;right:32px;background:none;border:none;color:#7c3aed;cursor:pointer;padding:2px 4px;display:flex;align-items:center;"><svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path d="M15 8a3 3 0 10-2.977-2.63l-4.94 2.47a3 3 0 100 4.319l4.94 2.47a3 3 0 10.895-1.789l-4.94-2.47a3.027 3.027 0 000-.74l4.94-2.47C13.456 7.68 14.19 8 15 8z"/></svg></button>')+
       '<div class="task-card-hd">'+
         '<div class="task-check" onclick="event.stopPropagation();toggleTaskDone(\''+t.id+'\')">'+checkIcon+'</div>'+
         '<div class="task-body">'+
@@ -9454,7 +9570,7 @@ function openGifPicker(ctx){
   modal.id = 'gifPickerModal';
   modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
   modal.innerHTML =
-    '<div style="background:#fff;border-radius:14px;width:100%;max-width:480px;max-height:85vh;display:flex;flex-direction:column;overflow:hidden;font-family:inherit;">'+
+    '<div style="background:#fff;border-radius:14px;width:100%;max-width:480px;max-height:85vh;display:flex;flex-direction:column;overflow:hidden;font-family:inherit;min-width:0;">'+
       '<div style="display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid #f1f5f9;">'+
         '<div style="font-size:14px;font-weight:700;color:#0f172a;flex:1;">Pick a GIF</div>'+
         '<button id="gifPickerClose" style="background:none;border:none;font-size:22px;color:#64748b;cursor:pointer;line-height:1;">×</button>'+
@@ -9462,7 +9578,7 @@ function openGifPicker(ctx){
       '<div style="padding:10px 14px;border-bottom:1px solid #f1f5f9;">'+
         '<input id="gifSearch" placeholder="Search KLIPY..." style="width:100%;padding:9px 12px;border:1px solid #e2e8f0;border-radius:10px;font-size:13px;font-family:inherit;outline:none;box-sizing:border-box;">'+
       '</div>'+
-      '<div id="gifResults" style="flex:1;overflow-y:auto;padding:10px;display:grid;grid-template-columns:repeat(2,1fr);gap:6px;">'+
+      '<div id="gifResults" style="flex:1;overflow-y:auto;padding:10px;display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:6px;align-content:start;">'+
         '<div style="grid-column:1/-1;text-align:center;padding:30px;color:#94a3b8;font-size:12px;">Loading…</div>'+
       '</div>'+
       '<div style="padding:6px 14px;border-top:1px solid #f1f5f9;font-size:10px;color:#94a3b8;text-align:center;">Powered by KLIPY</div>'+
@@ -9529,8 +9645,8 @@ async function loadGifs(query, ctx){
       const full = (f.gif && f.gif.url) || (f.hd && f.hd.url) || tiny;
       const title = (g.title || g.slug || 'gif').replace(/"/g,'&quot;');
       if(!tiny) return '';
-      return '<button type="button" data-full="'+full+'" data-title="'+title+'" data-ctx="'+ctx+'" style="background:#f1f5f9;border:none;border-radius:8px;cursor:pointer;padding:0;overflow:hidden;aspect-ratio:1;display:block;" onclick="pickGif(this.dataset.full,this.dataset.title,this.dataset.ctx)">'+
-        '<img src="'+tiny+'" alt="'+title+'" style="width:100%;height:100%;object-fit:cover;display:block;" loading="lazy">'+
+      return '<button type="button" data-full="'+full+'" data-title="'+title+'" data-ctx="'+ctx+'" style="background:#f1f5f9;border:none;border-radius:8px;cursor:pointer;padding:0;overflow:hidden;display:block;width:100%;min-width:0;" onclick="pickGif(this.dataset.full,this.dataset.title,this.dataset.ctx)">'+
+        '<img src="'+tiny+'" alt="'+title+'" style="width:100%;height:auto;max-height:140px;object-fit:cover;display:block;" loading="lazy">'+
       '</button>';
     }).filter(Boolean).join('');
     if(!grid.innerHTML.trim()){
@@ -9572,10 +9688,11 @@ function pickGif(url, title, ctx){
   const prev = prevId ? document.getElementById(prevId) : null;
   if(prev){
     prev.style.display = 'block';
+    prev.style.marginBottom = '6px';
     prev.innerHTML =
-      '<div style="position:relative;display:inline-block;">'+
-        '<img src="'+url+'" alt="" style="max-width:160px;max-height:140px;border-radius:8px;display:block;">'+
-        '<button type="button" data-ctx="'+ctx+'" onclick="clearPendingGif(this.dataset.ctx)" style="position:absolute;top:-6px;right:-6px;background:#0f172a;color:#fff;border:none;width:20px;height:20px;border-radius:50%;font-size:12px;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center;">×</button>'+
+      '<div style="position:relative;display:inline-block;max-width:100%;">'+
+        '<img src="'+url+'" alt="" style="max-width:140px;max-height:100px;width:auto;height:auto;border-radius:8px;display:block;">'+
+        '<button type="button" data-ctx="'+ctx+'" onclick="clearPendingGif(this.dataset.ctx)" style="position:absolute;top:-6px;right:-6px;background:#0f172a;color:#fff;border:none;width:22px;height:22px;border-radius:50%;font-size:14px;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center;padding:0;z-index:2;">×</button>'+
       '</div>';
   }
   closeGifPicker();
@@ -10769,6 +10886,19 @@ function setupRealtimeChannels(){
   _realtimeChannels.forEach(function(ch){ try{ _realtimeClient.removeChannel(ch); }catch(e){} });
   _realtimeChannels = [];
 
+  // Debounce: batch rapid realtime events into single reload
+  const _rtTimers = {};
+  function debouncedReload(key, fn, delay){
+    delay = delay || 1500;
+    if(_rtTimers[key]) clearTimeout(_rtTimers[key]);
+    _rtTimers[key] = setTimeout(function(){ fn(); delete _rtTimers[key]; }, delay);
+  }
+  // Skip realtime reload if change was triggered by current user (already handled locally)
+  function isFromMe(payload){
+    const row = (payload && (payload.new || payload.old)) || {};
+    return row.created_by === me || row.staff_name === me;
+  }
+
   // Discussions — polls especially
   const discCh = _realtimeClient.channel('discussions-live')
     .on('postgres_changes', {event:'*', schema:'public', table:'discussions'}, function(payload){
@@ -10780,24 +10910,33 @@ function setupRealtimeChannels(){
           if(pollEl){ pollEl.outerHTML = renderPoll(_discCache[id]); return; }
         }
       }
-      const active = document.querySelector('#page-engagement.active');
-      if(active) loadDiscussions();
-      loadHomeDiscPreview();
+      if(isFromMe(payload)) return;
+      debouncedReload('disc', function(){
+        const active = document.querySelector('#page-engagement.active');
+        if(active) loadDiscussions();
+        loadHomeDiscPreview();
+      });
     })
-    .on('postgres_changes', {event:'*', schema:'public', table:'discussion_replies'}, function(){
-      const active = document.querySelector('#page-engagement.active');
-      if(active) loadDiscussions();
+    .on('postgres_changes', {event:'*', schema:'public', table:'discussion_replies'}, function(payload){
+      if(isFromMe(payload)) return;
+      debouncedReload('replies', function(){
+        const active = document.querySelector('#page-engagement.active');
+        if(active) loadDiscussions();
+      });
     })
     .subscribe();
   _realtimeChannels.push(discCh);
 
   // Announcements
   const annCh = _realtimeClient.channel('announcements-live')
-    .on('postgres_changes', {event:'*', schema:'public', table:'announcements'}, function(){
-      const active = document.querySelector('#page-announcements.active');
-      if(active) loadAnnouncements();
-      loadHomeAnnPreview();
-      refreshAnnBadge();
+    .on('postgres_changes', {event:'*', schema:'public', table:'announcements'}, function(payload){
+      if(isFromMe(payload)) return;
+      debouncedReload('ann', function(){
+        const active = document.querySelector('#page-announcements.active');
+        if(active) loadAnnouncements();
+        loadHomeAnnPreview();
+        refreshAnnBadge();
+      });
     })
     .subscribe();
   _realtimeChannels.push(annCh);
