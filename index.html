@@ -8338,10 +8338,12 @@ function renderTasks(){
 
     const overdueCls = (!t.done && due && (due - now) < 0) ? ' overdue' : '';
     const prioCls = ' priority-' + (t.priority||'med');
-    const hasMeta = !!(dueChip || remChip || (t.priority==='high'||t.priority==='low'));
+    const showPrioChip = t.priority==='high'||t.priority==='low';
+    const fromBadge = t.shared_by ? '<span class="task-chip" style="background:#ede9fe;color:#7c3aed;border:none;">From '+(t.shared_by.split(" ")[0]||t.shared_by)+'</span>' : '';
+    const shareChip = !t.shared_by && !t.done ? '<button class="task-chip" onclick="event.stopPropagation();openShareTask(\''+t.id+'\')" style="background:#f1f5f9;color:#475569;border:none;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:4px;"><svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor"><path d="M15 8a3 3 0 10-2.977-2.63l-4.94 2.47a3 3 0 100 4.319l4.94 2.47a3 3 0 10.895-1.789l-4.94-2.47a3.027 3.027 0 000-.74l4.94-2.47C13.456 7.68 14.19 8 15 8z"/></svg>Share</button>' : '';
+    const hasMeta = !!(dueChip || remChip || showPrioChip || fromBadge || shareChip);
     return '<div class="task-item'+(t.done?' done':'')+overdueCls+prioCls+'" data-id="'+t.id+'" onclick="openTaskForm(\''+t.id+'\')">'+
       '<button class="task-del" onclick="event.stopPropagation();deleteTask(\''+t.id+'\')" title="Delete">×</button>'+
-      (t.shared_by ? '<button class="task-share-btn" disabled style="position:absolute;top:8px;right:32px;background:#ede9fe;color:#7c3aed;border:none;font-size:9px;font-weight:700;padding:2px 6px;border-radius:8px;letter-spacing:.4px;text-transform:uppercase;cursor:default;">From '+(t.shared_by.split(" ")[0]||t.shared_by)+'</button>' : '<button class="task-share-btn" onclick="event.stopPropagation();openShareTask(\''+t.id+'\')" title="Share with a colleague" style="position:absolute;top:8px;right:32px;background:none;border:none;color:#7c3aed;cursor:pointer;padding:2px 4px;display:flex;align-items:center;"><svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path d="M15 8a3 3 0 10-2.977-2.63l-4.94 2.47a3 3 0 100 4.319l4.94 2.47a3 3 0 10.895-1.789l-4.94-2.47a3.027 3.027 0 000-.74l4.94-2.47C13.456 7.68 14.19 8 15 8z"/></svg></button>')+
       '<div class="task-card-hd">'+
         '<div class="task-check" onclick="event.stopPropagation();toggleTaskDone(\''+t.id+'\')">'+checkIcon+'</div>'+
         '<div class="task-body">'+
@@ -8349,7 +8351,7 @@ function renderTasks(){
           (t.notes ? '<div class="task-notes">'+t.notes.replace(/</g,'&lt;')+'</div>' : '')+
         '</div>'+
       '</div>'+
-      (hasMeta ? '<div class="task-meta">'+dueChip+remChip+(t.priority==='high'||t.priority==='low'?prioChip:'')+'</div>' : '')+
+      (hasMeta ? '<div class="task-meta">'+fromBadge+dueChip+remChip+(showPrioChip?prioChip:'')+shareChip+'</div>' : '')+
     '</div>';
   }).join('');
   allHtml += '</div>'; // close task-grid
