@@ -1598,42 +1598,70 @@ body.ready{visibility:visible;}
 }
 .cal-grid{
   display:grid;grid-template-columns:repeat(7,1fr);
-  gap:1px;background:#e5e7eb;border-radius:10px;overflow:hidden;
-  border:1px solid #e5e7eb;
+  gap:1px;background:#e8eaf0;border-radius:14px;overflow:hidden;
+  border:1px solid #e8eaf0;
+  box-shadow:0 1px 3px rgba(15,23,42,.04), 0 8px 24px rgba(15,23,42,.04);
 }
 .cal-day{
-  background:#fff;height:92px;padding:6px 6px 4px;
-  display:flex;flex-direction:column;gap:2px;position:relative;
-  transition:background .15s;overflow:hidden;
+  background:#fff;height:96px;padding:8px 6px 6px;
+  display:flex;flex-direction:column;gap:3px;position:relative;
+  cursor:pointer;
+  transition:background .2s ease, transform .15s ease;
+  overflow:hidden;
 }
-.cal-day-weekend{background:#fafbfc;}
-.cal-day-prev,.cal-day-next{background:#fafbfc;}
-.cal-day-prev .cal-date,.cal-day-next .cal-date{color:#cbd5e1;}
-.cal-day-today{background:var(--accent-dim);}
+.cal-day:hover{background:#fbfcfd;}
+.cal-day:active{background:#f5f7fa;transform:scale(.99);}
+.cal-day-weekend{background:#fbfcfd;}
+.cal-day-prev,.cal-day-next{background:#fbfcfd;}
+.cal-day-prev .cal-date,.cal-day-next .cal-date{color:#cbd5e1;font-weight:400;}
+.cal-day-today{
+  background:#fff;
+  position:relative;
+}
+.cal-day-today::before{
+  content:'';position:absolute;inset:0;
+  background:var(--accent-dim);
+  pointer-events:none;
+}
+.cal-day-today > *{position:relative;z-index:1;}
+.cal-day-selected{
+  box-shadow:inset 0 0 0 2px var(--accent);
+  background:#fff;
+}
 .cal-date{
-  font-size:12px;font-weight:500;color:#1f2937;line-height:1;
-  padding:2px 0 2px 2px;
+  font-size:13.5px;font-weight:500;color:#1d1d1f;line-height:1;
+  padding:0 0 0 2px;
+  letter-spacing:-.01em;
 }
-.cal-day-weekend .cal-date{color:#94a3b8;}
+.cal-day-weekend .cal-date{color:#a1a1a6;}
 .cal-date-today{
   display:inline-flex;align-items:center;justify-content:center;
   background:var(--accent);color:#fff;border-radius:50%;
-  width:20px;height:20px;font-size:11px;font-weight:700;
+  width:24px;height:24px;font-size:12.5px;font-weight:700;
+  letter-spacing:-.02em;
+  box-shadow:0 1px 3px rgba(15,23,42,.15);
 }
 .cal-pills{display:flex;flex-direction:column;gap:2px;overflow:hidden;min-height:0;flex:1;}
 .cal-pill{
-  font-size:10px;font-weight:600;padding:2px 6px;border-radius:4px;
+  font-size:10.5px;font-weight:600;padding:2px 6px;border-radius:5px;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
   display:block;line-height:1.4;max-width:100%;
+  letter-spacing:-.005em;
+  position:relative;padding-left:11px;
 }
-.cal-pill-holiday{background:#fee2e2;color:#991b1b;}
-
-.cal-pill-event-1{background:#dcfce7;color:#15803d;}
-.cal-pill-event-2{background:#fef3c7;color:#92400e;}
-.cal-pill-event-3{background:#ede9fe;color:#6d28d9;}
-.cal-pill-event-4{background:#ffe4e6;color:#9f1239;}
-.cal-pill-event-5{background:#cffafe;color:#0e7490;}
-.cal-pill-event-6{background:#fce7f3;color:#be185d;}
+.cal-pill::before{
+  content:'';position:absolute;left:4px;top:50%;transform:translateY(-50%);
+  width:5px;height:5px;border-radius:50%;background:currentColor;
+}
+.cal-pill-holiday{background:rgba(255,59,48,.12);color:#c0362c;}
+.cal-pill-event-1{background:rgba(52,199,89,.12);color:#1f7a3a;}
+.cal-pill-event-2{background:rgba(255,149,0,.12);color:#a35100;}
+.cal-pill-event-3{background:rgba(175,82,222,.12);color:#7128a8;}
+.cal-pill-event-4{background:rgba(255,45,85,.12);color:#a8123c;}
+.cal-pill-event-5{background:rgba(0,199,190,.12);color:#0a7a73;}
+.cal-pill-event-6{background:rgba(255,55,95,.12);color:#a51c46;}
+.cal-pill-task{background:rgba(0,122,255,.12);color:#0040a0;}
+.cal-pill-bday{background:rgba(255,45,85,.12);color:#a8123c;}
 [data-theme="dark"] .cal-pill-event-1{background:rgba(22,163,74,.2);color:#86efac;}
 [data-theme="dark"] .cal-pill-event-2{background:rgba(217,119,6,.2);color:#fcd34d;}
 [data-theme="dark"] .cal-pill-event-3{background:rgba(124,58,237,.2);color:#c4b5fd;}
@@ -1702,8 +1730,8 @@ body.ready{visibility:visible;}
     display:flex;flex-direction:row;gap:3px;align-items:center;justify-content:center;
     flex-wrap:wrap;max-height:14px;overflow:hidden;
   }
-  .cal-week-header{padding:6px 0;background:#f8fafc;border-radius:8px 8px 0 0;}
-  .cal-weekday{font-size:11px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;}
+  .cal-week-header{padding:8px 0;background:transparent;border-radius:0;border-bottom:1px solid #f1f5f9;}
+  .cal-weekday{font-size:10px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:.06em;}
   .cal-day-prev,.cal-day-next{opacity:.35;}
   .cal-grid{
     background:transparent;border:none;gap:0;
@@ -1750,6 +1778,153 @@ body.ready{visibility:visible;}
 }
 .btn:active{transform:scale(.96);}
 
+/* ── TASK SHARE ──────────────────── */
+.task-share{
+  position:absolute;top:8px;right:36px;
+  width:24px;height:24px;border-radius:50%;
+  background:transparent;border:none;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  color:#94a3b8;
+  transition:background .15s, color .15s, transform .15s;
+}
+.task-share:hover{background:var(--accent-dim);color:var(--accent);}
+.task-share:active{transform:scale(.92);}
+.task-shared-tag{
+  position:absolute;top:8px;right:36px;
+  background:var(--accent-dim);color:var(--accent-text);
+  padding:3px 8px;border-radius:6px;
+  font-size:10px;font-weight:700;
+  display:inline-flex;align-items:center;gap:4px;
+  letter-spacing:-.01em;max-width:140px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.task-shared-tag.shared-out{background:#fef3c7;color:#92400e;}
+
+/* Share modal */
+.share-back{
+  position:fixed;inset:0;z-index:9550;
+  background:rgba(15,23,42,.5);backdrop-filter:blur(8px);
+  display:flex;align-items:center;justify-content:center;padding:16px;
+}
+.share-modal{
+  background:#fff;border-radius:14px;width:100%;max-width:380px;
+  max-height:80dvh;display:flex;flex-direction:column;
+  box-shadow:0 24px 60px rgba(15,23,42,.3);
+}
+.share-hd{
+  padding:16px 18px;border-bottom:1px solid #f1f5f9;
+  display:flex;justify-content:space-between;align-items:center;
+}
+.share-hd h3{margin:0;font-size:15px;font-weight:700;color:#0f172a;}
+.share-staff-list{
+  padding:8px;overflow-y:auto;flex:1;
+}
+.share-staff-row{
+  display:flex;align-items:center;gap:10px;
+  padding:9px 10px;border-radius:8px;cursor:pointer;
+  transition:background .15s;
+}
+.share-staff-row:hover{background:#f8fafc;}
+.share-staff-row.selected{background:var(--accent-dim);}
+.share-staff-ava{
+  width:30px;height:30px;border-radius:50%;color:#fff;font-size:10px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+}
+.share-staff-name{flex:1;font-size:13px;font-weight:600;color:#0f172a;}
+.share-check{
+  width:20px;height:20px;border-radius:50%;border:2px solid #cbd5e1;
+  flex-shrink:0;
+}
+.share-staff-row.selected .share-check{
+  background:var(--accent);border-color:var(--accent);
+  display:flex;align-items:center;justify-content:center;
+}
+.share-staff-row.selected .share-check::after{
+  content:'';width:6px;height:11px;border-right:2px solid #fff;border-bottom:2px solid #fff;
+  transform:rotate(45deg) translate(-1px,-1px);
+}
+.share-actions{
+  padding:12px 16px;border-top:1px solid #f1f5f9;
+  display:flex;gap:8px;justify-content:flex-end;
+}
+
+/* ── DARK MODE EXTRA COVERAGE ─────────── */
+[data-theme="dark"] body{background:#0a0e14 !important;color:#d4d8e0;}
+[data-theme="dark"] .main{background:#0a0e14 !important;}
+[data-theme="dark"] .card,
+[data-theme="dark"] .ann-card,
+[data-theme="dark"] .skel-card{
+  background:#131820 !important;
+  border-color:#1f2530 !important;
+  color:#d4d8e0;
+}
+[data-theme="dark"] .sidebar{background:#0d1117 !important;border-right-color:#1c2230 !important;}
+[data-theme="dark"] .nav-item{color:#94a3b8;}
+[data-theme="dark"] .nav-item:hover{background:#181d26;color:#f1f5f9;}
+[data-theme="dark"] .nav-item.active{background:var(--accent-dim);color:var(--accent);}
+[data-theme="dark"] .page-title{color:#f1f5f9 !important;}
+[data-theme="dark"] .card-title{color:#f1f5f9 !important;}
+[data-theme="dark"] .sec-title{color:#f1f5f9 !important;}
+[data-theme="dark"] .f-input,
+[data-theme="dark"] input[type=text],
+[data-theme="dark"] input[type=email],
+[data-theme="dark"] input[type=password],
+[data-theme="dark"] input[type=date],
+[data-theme="dark"] input[type=time],
+[data-theme="dark"] input[type=number],
+[data-theme="dark"] textarea,
+[data-theme="dark"] select{
+  background:#0d1117 !important;
+  border-color:#1f2530 !important;
+  color:#d4d8e0 !important;
+}
+[data-theme="dark"] .f-input::placeholder,
+[data-theme="dark"] input::placeholder,
+[data-theme="dark"] textarea::placeholder{color:#5b6473 !important;}
+[data-theme="dark"] .btn-outline{background:transparent;border-color:#2d3f55;color:#cbd5e1;}
+[data-theme="dark"] .btn-outline:hover{background:#1e293b;}
+[data-theme="dark"] .bottom-nav{background:rgba(8,10,15,.96) !important;border-color:#1f2530 !important;}
+[data-theme="dark"] .mobile-header{background:rgba(10,12,18,.92) !important;border-color:#1f2530 !important;}
+[data-theme="dark"] .ann-meta,[data-theme="dark"] .ann-body{color:#cbd5e1;}
+[data-theme="dark"] .stat-val{color:#f1f5f9;}
+[data-theme="dark"] .stat-label{color:#94a3b8;}
+[data-theme="dark"] .reply-item div[style*="background:#f1f5f9"]{background:#1e293b !important;color:#d4d8e0 !important;}
+[data-theme="dark"] .cal-grid{background:#1f2530;border-color:#1f2530;}
+[data-theme="dark"] .cal-day{background:#131820;}
+[data-theme="dark"] .cal-day:hover{background:#161c25;}
+[data-theme="dark"] .cal-day-weekend,
+[data-theme="dark"] .cal-day-prev,
+[data-theme="dark"] .cal-day-next{background:#0f141c;}
+[data-theme="dark"] .cal-date{color:#d4d8e0;}
+[data-theme="dark"] .cal-toolbar-wrap{
+  background:rgba(13,17,23,.7);
+  border-color:rgba(255,255,255,.05);
+}
+[data-theme="dark"] #bdayMonthLabel{color:#f1f5f9 !important;}
+[data-theme="dark"] .cal-nav-btn{background:rgba(30,41,59,.6) !important;color:#d4d8e0 !important;border-color:rgba(255,255,255,.05) !important;}
+[data-theme="dark"] .cal-nav-btn:hover{background:rgba(30,41,59,.9) !important;}
+[data-theme="dark"] .task-form{background:#131820 !important;}
+[data-theme="dark"] .task-form-hd{background:#0f141c;}
+[data-theme="dark"] .rt-wrap{background:#0d1117;border-color:#1f2530;}
+[data-theme="dark"] .rt-toolbar{background:#0a0e14;border-color:#1f2530;}
+[data-theme="dark"] .rt-editor,[data-theme="dark"] .rt-textarea{color:#d4d8e0;}
+[data-theme="dark"] .skel{
+  background:linear-gradient(90deg,#1e293b 0%,#2d3f55 50%,#1e293b 100%);
+  background-size:200% 100%;
+}
+[data-theme="dark"] .share-modal{background:#131820;color:#d4d8e0;}
+[data-theme="dark"] .share-staff-row:hover{background:#181d26;}
+[data-theme="dark"] .share-staff-name{color:#f1f5f9;}
+[data-theme="dark"] .search-modal{background:#131820;color:#d4d8e0;}
+[data-theme="dark"] .search-input{color:#d4d8e0 !important;}
+[data-theme="dark"] .search-item-title{color:#f1f5f9 !important;}
+[data-theme="dark"] #annReadersBackdrop > div,
+[data-theme="dark"] #dayEventBackdrop > div,
+[data-theme="dark"] #eventViewBackdrop > div{background:#131820;color:#d4d8e0;}
+[data-theme="dark"] .att-chip{background:#1e293b;border-color:#2d3f55;color:#d4d8e0;}
+[data-theme="dark"] .att-file{background:#131820;border-color:#1f2530;color:#d4d8e0;}
+[data-theme="dark"] .bell-badge{border-color:#0d1117;}
+
 /* ── BELL COUNT BADGE ──────────────────── */
 .bell-badge{
   position:absolute;top:0;right:0;
@@ -1775,14 +1950,69 @@ body.ready{visibility:visible;}
 }
 [data-theme="dark"] .bell-badge{border-color:#0d1117;}
 
+/* ── CALENDAR HEADER (Apple-style glass) ─────────── */
+.cal-toolbar-wrap{
+  position:sticky;top:0;z-index:10;
+  background:rgba(255,255,255,.72);
+  backdrop-filter:blur(24px) saturate(180%);
+  -webkit-backdrop-filter:blur(24px) saturate(180%);
+  border-bottom:1px solid rgba(15,23,42,.06);
+  margin:-12px -12px 12px;
+  padding:12px;
+  border-radius:14px 14px 0 0;
+}
+@media(max-width:700px){
+  .cal-toolbar-wrap{
+    margin:-8px -8px 10px;padding:10px 8px;
+    background:rgba(255,255,255,.85);
+  }
+}
+
+/* Refined month label */
+#bdayMonthLabel{
+  font-size:15px !important;font-weight:700 !important;
+  color:#1d1d1f !important;letter-spacing:-.015em !important;
+}
+
+/* Nav arrow buttons — Apple-style soft circles */
+.cal-nav-btn{
+  width:30px !important;height:30px !important;
+  background:rgba(241,245,249,.7) !important;
+  backdrop-filter:blur(8px);
+  border:1px solid rgba(0,0,0,.04) !important;
+  border-radius:8px !important;
+  font-size:15px !important;color:#1d1d1f !important;
+  font-weight:500 !important;
+  transition:background .2s, transform .15s !important;
+  display:flex;align-items:center;justify-content:center;
+}
+.cal-nav-btn:hover{background:rgba(229,231,235,.9) !important;}
+.cal-nav-btn:active{transform:scale(.92);}
+
+/* Today button — pill style */
+.cal-today-btn{
+  background:var(--accent-dim) !important;
+  color:var(--accent-text) !important;
+  border:none !important;
+  border-radius:8px !important;
+  padding:7px 14px !important;
+  font-size:12px !important;font-weight:700 !important;
+  letter-spacing:-.01em;
+  transition:filter .15s, transform .15s !important;
+}
+.cal-today-btn:hover{filter:brightness(1.05);}
+.cal-today-btn:active{transform:scale(.95);}
+
 /* ── CAL VIEW SWITCHER (premium segmented control) ────── */
 .cal-views{
   display:inline-flex;gap:0;
-  background:#f1f5f9;
+  background:rgba(241,245,249,.6);
+  backdrop-filter:blur(20px) saturate(180%);
+  -webkit-backdrop-filter:blur(20px) saturate(180%);
   padding:4px;border-radius:11px;
   position:relative;
-  border:1px solid transparent;
-  box-shadow:0 1px 2px rgba(15,23,42,.04) inset;
+  border:1px solid rgba(0,0,0,.04);
+  box-shadow:0 1px 2px rgba(15,23,42,.04) inset, 0 1px 0 rgba(255,255,255,.6);
 }
 .cal-view-btn{
   background:transparent;border:none;cursor:pointer;
@@ -2242,9 +2472,9 @@ html[data-sb="collapsed"] .nav-item:hover::after{
 }
 /* Strip "nav-" prefix from tooltip — handled by content transform won't work, use JS-friendly attr */
 html[data-sb="collapsed"] [id="nav-home"]:hover::after{content:"Home";}
-html[data-sb="collapsed"] [id="nav-schedule"]:hover::after{content:"Schedule";}
-html[data-sb="collapsed"] [id="nav-announcements"]:hover::after{content:"Announcements";}
-html[data-sb="collapsed"] [id="nav-engagement"]:hover::after{content:"Engagement";}
+html[data-sb="collapsed"] [id="nav-schedule"]:hover::after{content:"Roster";}
+html[data-sb="collapsed"] [id="nav-announcements"]:hover::after{content:"Updates";}
+html[data-sb="collapsed"] [id="nav-engagement"]:hover::after{content:"Community";}
 html[data-sb="collapsed"] [id="nav-calendar"]:hover::after{content:"Calendar";}
 html[data-sb="collapsed"] [id="nav-tasks"]:hover::after{content:"To Do List";}
 html[data-sb="collapsed"] [id="nav-documents"]:hover::after{content:"Documents";}
@@ -3767,87 +3997,6 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
 [data-theme="dark"] .slack-compose textarea{color:#d1d2d3;}
 [data-theme="dark"] .slack-date-label{background:#222529;color:#d1d2d3;border-color:#444;}
 
-
-/* ── FACEBOOK-STYLE REPLIES ── */
-.fb-reply-list{padding:8px 0 4px;display:flex;flex-direction:column;gap:2px;border-top:1px solid #f1f5f9;margin-top:8px;}
-.fb-reply{display:flex;gap:8px;align-items:flex-start;padding:4px 0;}
-.fb-reply-ava{
-  width:28px;height:28px;border-radius:50%;
-  background:linear-gradient(135deg,#2563eb,#7c3aed);
-  color:#fff;font-size:9px;font-weight:800;
-  display:flex;align-items:center;justify-content:center;flex-shrink:0;
-}
-.fb-reply-bubble{
-  background:#f0f2f5;border-radius:18px;
-  padding:8px 12px;max-width:calc(100% - 44px);
-  position:relative;
-}
-.fb-reply-bubble:hover .fb-reply-actions{opacity:1;}
-.fb-reply-author{font-size:12px;font-weight:700;color:#050505;margin-bottom:2px;}
-.fb-reply-body{font-size:13.5px;color:#050505;line-height:1.4;word-break:break-word;}
-.fb-reply-meta{display:flex;align-items:center;gap:6px;margin-top:3px;padding-left:2px;flex-wrap:wrap;}
-.fb-reply-time{font-size:11px;color:#65676b;font-weight:500;}
-.fb-reply-like-btn{
-  font-size:11px;font-weight:700;color:#65676b;
-  background:none;border:none;cursor:pointer;
-  padding:0;font-family:inherit;transition:color .1s;
-}
-.fb-reply-like-btn:hover{color:#1877f2;}
-.fb-reply-like-btn.liked{color:#1877f2;}
-.fb-reply-edit-btn,.fb-reply-del-btn{
-  font-size:11px;font-weight:700;color:#65676b;
-  background:none;border:none;cursor:pointer;
-  padding:0;font-family:inherit;
-}
-.fb-reply-edit-btn:hover{color:#050505;}
-.fb-reply-del-btn:hover{color:#dc2626;}
-.fb-reply-actions{
-  position:absolute;top:-18px;right:8px;
-  background:#fff;border-radius:20px;
-  box-shadow:0 2px 8px rgba(0,0,0,.15);
-  padding:4px 10px;display:none;gap:10px;
-}
-.fb-reply:hover .fb-reply-actions{display:flex;}
-.fb-reply-meta .react-btn{padding:2px 8px;font-size:12px;min-height:24px;min-width:24px;border-radius:12px;}
-.fb-reply-meta .react-counts span{font-size:11px;padding:1px 6px;}
-
-/* Reply input — Facebook style */
-.fb-reply-input-row{display:flex;gap:8px;align-items:flex-end;margin-top:10px;padding-top:8px;border-top:1px solid #f0f2f5;}
-.fb-reply-input-ava{
-  width:28px;height:28px;border-radius:50%;
-  background:linear-gradient(135deg,#2563eb,#7c3aed);
-  color:#fff;font-size:9px;font-weight:800;
-  display:flex;align-items:center;justify-content:center;flex-shrink:0;
-}
-.fb-reply-input-wrap{
-  flex:1;background:#f0f2f5;border-radius:20px;
-  padding:8px 14px;display:flex;flex-direction:column;gap:6px;
-  min-width:0;
-}
-.fb-reply-input-row-inner{display:flex;align-items:flex-end;gap:6px;width:100%;min-width:0;}
-.fb-reply-input-wrap textarea{
-  flex:1;background:none;border:none;outline:none;
-  font-size:14px;font-family:inherit;resize:none;
-  max-height:100px;line-height:1.4;color:#050505;
-  min-height:20px;
-}
-.fb-reply-input-wrap textarea::placeholder{color:#65676b;}
-.fb-reply-send-btn{
-  background:none;border:none;cursor:pointer;
-  color:#1877f2;padding:2px 4px;
-  display:flex;align-items:center;
-}
-.fb-reply-send-btn:hover{opacity:.8;}
-.fb-edited-badge{font-size:10px;color:#65676b;margin-left:4px;}
-
-[data-theme="dark"] .fb-reply-bubble{background:#3a3b3c;}
-[data-theme="dark"] .fb-reply-author,[data-theme="dark"] .fb-reply-body{color:#e4e6eb;}
-[data-theme="dark"] .fb-reply-time,[data-theme="dark"] .fb-reply-like-btn,[data-theme="dark"] .fb-reply-edit-btn{color:#b0b3b8;}
-[data-theme="dark"] .fb-reply-input-wrap{background:#3a3b3c;}
-[data-theme="dark"] .fb-reply-input-wrap textarea{color:#e4e6eb;}
-[data-theme="dark"] .fb-reply-input-wrap textarea::placeholder{color:#b0b3b8;}
-[data-theme="dark"] .fb-reply-actions{background:#3a3b3c;}
-
 </style>
 </head>
 <body>
@@ -4027,11 +4176,11 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
       </div>
       <div class="nav-item" id="nav-schedule" data-tab="schedule" onclick="goTo('schedule')">
         <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd"/></svg>
-        Schedule
+        Roster
       </div>
       <div class="nav-item" id="nav-announcements" data-tab="announcements" onclick="goTo('announcements')">
         <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 3a1 1 0 00-1.447-.894L8.763 6H5a3 3 0 000 6h.28l1.771 5.316A1 1 0 008 18h1a1 1 0 001-1v-4.382l6.553 3.276A1 1 0 0018 15V3z" clip-rule="evenodd"/></svg>
-        Announcements
+        Updates
         <span class="nav-badge" id="annBadge"></span>
       </div>
       <div class="nav-item" id="nav-documents" data-tab="documents" onclick="goTo('documents')">
@@ -4040,7 +4189,7 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
       </div>
       <div class="nav-item" id="nav-engagement" data-tab="engagement" onclick="goTo('engagement')">
         <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clip-rule="evenodd"/></svg>
-        Engagement
+        Community
       </div>
       <div class="nav-item" id="nav-calendar" data-tab="calendar" onclick="goTo('calendar')">
         <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd"/></svg>
@@ -4237,10 +4386,10 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
             <button class="cal-view-btn" data-view="year" onclick="setCalView('year')">Year</button>
           </div>
           <button id="calAddEventBtn" onclick="toggleCalEventForm()" style="display:none;font-size:12px;font-weight:600;color:var(--accent);background:none;border:none;cursor:pointer;font-family:inherit;padding:6px 10px;">+ Event</button>
-          <button onclick="calPrev()" style="width:28px;height:28px;border:1px solid #e2e8f0;border-radius:6px;background:#fff;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;color:#475569;">&#8249;</button>
+          <button class="cal-nav-btn" onclick="calPrev()" style="cursor:pointer;">&#8249;</button>
           <span id="bdayMonthLabel" style="font-size:13px;font-weight:700;color:#0f172a;min-width:120px;text-align:center;"></span>
-          <button onclick="calNext()" style="width:28px;height:28px;border:1px solid #e2e8f0;border-radius:6px;background:#fff;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;color:#475569;">&#8250;</button>
-          <button onclick="calToday()" style="font-size:12px;font-weight:600;color:#475569;background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:6px 12px;cursor:pointer;font-family:inherit;">Today</button>
+          <button class="cal-nav-btn" onclick="calNext()" style="cursor:pointer;">&#8250;</button>
+          <button class="cal-today-btn" onclick="calToday()" style="cursor:pointer;font-family:inherit;">Today</button>
         </div>
       </div>
       <div class="card" style="padding:18px;">
@@ -4268,7 +4417,7 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
     <!-- SCHEDULE: Leave + Availability combined -->
     <div class="page" id="page-schedule">
       <div class="page-hd">
-        <div class="page-title">Schedule</div>
+        <div class="page-title">Roster</div>
       </div>
 
       <!-- Sub-tabs -->
@@ -4408,7 +4557,7 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
     <!-- ANNOUNCEMENTS PAGE (standalone, accessible to all) -->
     <div class="page" id="page-announcements">
       <div class="page-hd">
-        <div class="page-title">Announcements</div>
+        <div class="page-title">Updates</div>
         <div class="page-sub">Updates from management</div>
       </div>
       <!-- Admin post form -->
@@ -4420,13 +4569,11 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
           <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#475569;cursor:pointer;"><input type="checkbox" id="annPinned"> Pin to top</label>
           <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#475569;cursor:pointer;"><input type="checkbox" id="annUrgent"> Urgent</label>
         </div>
-        <div id="annPostGifPreview" style="display:none;margin-bottom:10px;"></div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
           <div style="display:flex;align-items:center;gap:6px;flex:1;min-width:160px;">
             <label style="font-size:11px;font-weight:600;color:#94a3b8;white-space:nowrap;">Expires</label>
             <input type="date" id="annExpiry" class="f-input" style="font-size:12px;padding:6px 10px;">
           </div>
-          <button type="button" onclick="openGifPicker('ann')" class="btn btn-outline" style="padding:8px 14px;font-size:12px;">GIF</button>
           <button class="btn btn-green" style="padding:9px 18px;" onclick="postAnnouncement()" id="annPostBtn">Post</button>
         </div>
       </div>
@@ -4436,7 +4583,7 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
     <!-- ENGAGEMENT PAGE: Discussions + Feedback -->
     <div class="page" id="page-engagement">
       <div class="page-hd">
-        <div class="page-title">Engagement</div>
+        <div class="page-title">Community</div>
       </div>
       <!-- Sub-tabs -->
       <div class="tab-bar">
@@ -4470,10 +4617,8 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
             </div>
             <button onclick="addPollOpt()" style="font-size:12px;font-weight:600;color:var(--accent);background:none;border:none;cursor:pointer;font-family:inherit;padding:4px 0;">+ Add option</button>
           </div>
-          <div id="discPostGifPreview" style="display:none;margin-bottom:10px;"></div>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
             <button onclick="togglePollBuilder()" id="pollToggleBtn" class="btn btn-outline" style="padding:8px 14px;font-size:12px;">📊 Add Poll</button>
-            <button type="button" onclick="openGifPicker('disc')" class="btn btn-outline" style="padding:8px 14px;font-size:12px;">GIF</button>
             <div style="flex:1;"></div>
             <div class="alert alert-err" id="discErr" style="margin:0;flex:1;"></div>
             <div class="alert alert-ok" id="discOk" style="margin:0;flex:1;"></div>
@@ -4577,6 +4722,15 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
         <div class="card" style="margin-bottom:12px">
           <div class="card-hd"><div class="card-title">Appearance</div></div>
 
+          <!-- Theme toggle -->
+          <div style="padding-bottom:14px;border-bottom:1px solid #f1f5f9;margin-bottom:14px;">
+            <div style="font-size:13px;font-weight:600;color:#0f172a;margin-bottom:8px;">Appearance</div>
+            <div style="display:flex;gap:8px;" id="themeChoice">
+              <button class="theme-chip" data-theme="light" onclick="setTheme('light')" style="flex:1;padding:10px;border:1.5px solid #e2e8f0;border-radius:10px;background:#fff;cursor:pointer;font-family:inherit;font-size:12px;font-weight:600;color:#475569;display:flex;align-items:center;justify-content:center;gap:6px;">Light</button>
+              <button class="theme-chip" data-theme="dark" onclick="setTheme('dark')" style="flex:1;padding:10px;border:1.5px solid #e2e8f0;border-radius:10px;background:#fff;cursor:pointer;font-family:inherit;font-size:12px;font-weight:600;color:#475569;display:flex;align-items:center;justify-content:center;gap:6px;">Dark</button>
+            </div>
+          </div>
+
           <!-- Brightness slider -->
           <div style="padding-bottom:14px;border-bottom:1px solid #f1f5f9;">
             <div style="font-size:13px;font-weight:600;color:#0f172a;margin-bottom:2px;">Brightness</div>
@@ -4640,7 +4794,6 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
           <div style="display:flex;gap:8px;align-items:center;">
             <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#475569;cursor:pointer;"><input type="checkbox" id="annPinned"> Pin to top</label>
             <div style="flex:1;"></div>
-            <button type="button" onclick="openGifPicker('ann')" class="btn btn-outline" style="padding:8px 14px;font-size:12px;">GIF</button>
             <button class="btn btn-green" style="padding:9px 18px;" onclick="postAnnouncement()" id="annPostBtn">Post</button>
           </div>
         </div>
@@ -4656,11 +4809,7 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
           <div class="field"><textarea id="discBody" rows="6" class="f-input" placeholder="Add more detail (optional)..." style="resize:vertical;min-height:120px;"></textarea></div>
           <div class="alert alert-err" id="discErr"></div>
           <div class="alert alert-ok" id="discOk"></div>
-          <div style="display:flex;gap:8px;align-items:center;">
-            <button type="button" onclick="openGifPicker('disc')" class="btn btn-outline" style="padding:8px 14px;font-size:12px;">GIF</button>
-            <div style="flex:1;"></div>
-            <button class="btn btn-green" onclick="postDiscussion()" id="discPostBtn" style="padding:9px 18px;">Post</button>
-          </div>
+          <button class="btn btn-green" onclick="postDiscussion()" id="discPostBtn" style="padding:9px 18px;">Post</button>
         </div>
         <div id="discList"><div class="skeleton-card"><div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;"><div class="skeleton skeleton-avatar"></div><div style="flex:1;"><div class="skeleton skeleton-text med"></div><div class="skeleton skeleton-text short"></div></div></div><div class="skeleton skeleton-text full"></div><div class="skeleton skeleton-text med"></div></div><div class="skeleton-card"><div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;"><div class="skeleton skeleton-avatar"></div><div style="flex:1;"><div class="skeleton skeleton-text med"></div><div class="skeleton skeleton-text short"></div></div></div><div class="skeleton skeleton-text full"></div><div class="skeleton skeleton-text med"></div></div><div class="skeleton-card"><div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;"><div class="skeleton skeleton-avatar"></div><div style="flex:1;"><div class="skeleton skeleton-text med"></div><div class="skeleton skeleton-text short"></div></div></div><div class="skeleton skeleton-text full"></div><div class="skeleton skeleton-text med"></div></div></div>
       </div>
@@ -5036,11 +5185,7 @@ async function loadDiscussions(){
       html+='<div style="font-size:11px;color:#94a3b8;margin-top:1px;">'+r.created_by+' · '+d+'</div>';
       html+='</div>';
       html+='<div style="display:flex;gap:4px;align-items:center;flex-shrink:0;">';
-      html+=makeReactHTML(r.id,'disc');
       html+=bmHtml('disc', r.id);
-      if(isOwn){
-        html+='<button data-id="'+r.id+'" onclick="startEditDiscussion(this.dataset.id)" style="background:none;border:none;color:#0284c7;font-size:11px;font-weight:600;cursor:pointer;padding:4px 6px;font-family:inherit;">Edit</button>';
-      }
       if(isOwn||myIsAdmin){
         html+='<button data-id="'+r.id+'" onclick="deleteDiscussion(this.dataset.id)" style="background:none;border:none;color:#dc2626;font-size:11px;font-weight:600;cursor:pointer;padding:4px 6px;font-family:inherit;">Delete</button>';
       }
@@ -5049,58 +5194,24 @@ async function loadDiscussions(){
       if(r.body){html+='<div class="rt-content" style="font-size:13px;color:#475569;line-height:1.6;margin-bottom:10px;">'+mdToHtml(r.body)+'</div>';}
       if(r.attachments && r.attachments.length){html+=attRenderGrid(r.attachments);}
       if(r.poll_options&&r.poll_options.length){html+=renderPoll(r);}
-      // Replies — Facebook style
-      html+='<div id="replies-'+r.id+'" class="fb-reply-list">';
-      replies.forEach(function(rep){
-        const ra=rep.staff_name.split(' ').map(function(w){return w[0];}).join('').slice(0,2).toUpperCase();
-        const rt=new Date(rep.created_at).toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit'});
-        const rd=new Date(rep.created_at).toLocaleDateString('en-AU',{day:'numeric',month:'short'});
-        const isOwn=rep.staff_name===me;
-        const editedBadge=rep.edited_at?'<span class="fb-edited-badge">(edited)</span>':'';
-        const actions=isOwn
-          ?'<div class="fb-reply-actions">'+
-              '<button class="fb-reply-edit-btn" data-rid="'+rep.id+'" data-disc="'+rep.discussion_id+'" onclick="startEditReply(this.dataset.rid,this.dataset.disc)">Edit</button>'+
-              '<button class="fb-reply-del-btn" data-rid="'+rep.id+'" data-disc="'+rep.discussion_id+'" onclick="deleteReply(this.dataset.rid,this.dataset.disc)">Delete</button>'+
-            '</div>'
-          :'';
-        html+='<div class="fb-reply">'+
-          '<div class="fb-reply-ava">'+ra+'</div>'+
-          '<div style="flex:1;min-width:0;">'+
-            '<div class="fb-reply-bubble">'+
-              actions+
-              '<div class="fb-reply-author">'+rep.staff_name+'</div>'+
-              '<div class="fb-reply-body" id="rep-body-'+rep.id+'">'+mdToHtml(rep.body||'')+editedBadge+'</div>'+
-              ((rep.attachments && rep.attachments.length) ? '<div style="margin-top:6px;">'+attRenderGrid(rep.attachments)+'</div>' : '')+
-            '</div>'+
-            '<div class="fb-reply-meta">'+
-              '<span class="fb-reply-time">'+rd+'</span>'+
-              '<span style="color:#65676b;font-size:11px;">·</span>'+
-              makeReactHTML(rep.id,'reply')+
-            '</div>'+
-          '</div>'+
-        '</div>';
-      });
-      html+='</div>';
-      // Reactions moved to top-right header
-      // Reply input — Facebook style
-      if(isClosed){
-        html+='<div style="font-size:11px;color:#94a3b8;margin-top:8px;">This discussion is closed.</div>';
+      // Threaded replies (Facebook-style)
+      if(replies.length){
+        html+='<div id="replies-'+r.id+'" style="border-top:1px solid #f1f5f9;padding-top:12px;margin-bottom:10px;">';
+        html+=renderReplyThread(replies, null, 0, r.id);
+        html+='</div>';
       } else {
-        const myAva=me.split(' ').map(function(w){return w[0];}).join('').slice(0,2).toUpperCase();
-        html+='<div class="fb-reply-input-row">'+
-          '<div class="fb-reply-input-ava">'+myAva+'</div>'+
-          '<div class="fb-reply-input-wrap" style="flex:1;">'+
-            '<div id="discReplyGifPreview-'+r.id+'" style="display:none;"></div>'+
-            '<textarea id="discReply-'+r.id+'" data-disc="'+r.id+'" placeholder="Write a reply..." rows="1" oninput="this.style.height=\'auto\';this.style.height=Math.min(this.scrollHeight,100)+\'px\'" onkeydown="if(event.key===\'Enter\'&&!event.shiftKey){event.preventDefault();submitDiscReply(\''+r.id+'\');}"></textarea>'+
-            '<div style="display:flex;align-items:center;gap:4px;padding:0 6px 4px;">'+
-              '<button type="button" class="fb-reply-gif-btn" data-disc="'+r.id+'" onclick="openGifPicker(\'reply:\'+this.dataset.disc)" title="Add a GIF" style="background:none;border:1px solid #cfd8e3;border-radius:14px;color:#4b5b6c;font-size:11px;font-weight:800;letter-spacing:.6px;cursor:pointer;padding:3px 9px;font-family:inherit;line-height:1;">GIF</button>'+
-              '<div style="flex:1"></div>'+
-              '<button class="fb-reply-send-btn" data-disc="'+r.id+'" ontouchend="event.preventDefault();submitDiscReply(this.dataset.disc)" onclick="submitDiscReply(this.dataset.disc)">'+
-                '<svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor"><path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z"/></svg>'+
-              '</button>'+
-            '</div>'+
-          '</div>'+
-        '</div>';
+        html+='<div id="replies-'+r.id+'" style="display:flex;flex-direction:column;gap:8px;"></div>';
+      }
+      // Reactions
+      html+='<div style="margin-top:10px;">'+makeReactHTML(r.id,'disc')+'</div>';
+      // Reply input
+      if(isClosed){
+        html+='<div style="font-size:11px;color:#94a3b8;margin-top:8px;text-align:center;padding:8px;background:#f8fafc;border-radius:8px;">This discussion is closed.</div>';
+      } else {
+        html+='<div style="display:flex;gap:8px;margin-top:12px;align-items:flex-start;">';
+        html+='<div style="flex:1;min-width:0;"><textarea id="discReply-'+r.id+'" data-disc="'+r.id+'" placeholder="Write a comment..." rows="2"></textarea></div>';
+        html+='<button data-disc="'+r.id+'" onclick="submitDiscReply(this.dataset.disc)" style="padding:9px 16px;border-radius:8px;background:var(--accent);color:#fff;border:none;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;">Comment</button>';
+        html+='</div>';
       }
       html+='</div>';
       return html;
@@ -5115,6 +5226,268 @@ async function loadDiscussions(){
     console.warn(e);
     el.innerHTML='<div style="color:#dc2626;text-align:center;padding:24px;font-size:13px;">Could not load discussions.</div>';
   }
+}
+
+// ── THREADED REPLIES (Facebook-style) ────
+// Recursive renderer: builds nested reply chains.
+// First N children visible, rest collapsed behind "View N more replies"
+function renderReplyThread(allReplies, parentId, depth, discId){
+  const children = allReplies.filter(function(x){
+    if(parentId === null) return !x.parent_id;
+    return x.parent_id === parentId;
+  });
+  if(!children.length) return '';
+  const indent = depth > 0 ? Math.min(depth, 3) * 24 : 0;
+  // Show first 2 at all levels; rest hidden behind "View N more replies"
+  const visible = children.slice(0, 2);
+  const hidden = children.slice(2);
+  let html = '<div style="display:flex;flex-direction:column;gap:10px;'+(indent?'padding-left:'+indent+'px;border-left:2px solid #f1f5f9;margin-left:'+(depth>1?'4px':'14px')+';':'')+'">';
+  visible.forEach(function(rep){
+    html += renderReplyItem(rep, allReplies, depth, discId);
+  });
+  if(hidden.length){
+    const id = 'rep-hidden-'+discId+'-'+(parentId||'root')+'-'+depth;
+    const showLbl = 'View '+hidden.length+' more '+(hidden.length===1?'reply':'replies');
+    const hideLbl = 'Hide '+(hidden.length===1?'reply':'replies');
+    html += '<div id="'+id+'-wrap">';
+    html += '<button id="'+id+'-btn" data-show-lbl="'+showLbl+'" data-hide-lbl="'+hideLbl+'" onclick="toggleHiddenReplies(\''+id+'\')" style="background:none;border:none;cursor:pointer;font-family:inherit;font-size:12px;font-weight:600;color:var(--accent);padding:6px 10px;display:inline-flex;align-items:center;gap:6px;text-align:left;align-self:flex-start;">'+
+      '<svg id="'+id+'-icon" width="12" height="12" viewBox="0 0 20 20" fill="currentColor" style="transition:transform .2s;"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>'+
+      '<span id="'+id+'-lbl">'+showLbl+'</span>'+
+    '</button>';
+    html += '<div id="'+id+'" style="display:none;flex-direction:column;gap:10px;">';
+    hidden.forEach(function(rep){
+      html += renderReplyItem(rep, allReplies, depth, discId);
+    });
+    html += '</div>';
+    html += '</div>';
+  }
+  html += '</div>';
+  return html;
+}
+
+function renderReplyItem(rep, allReplies, depth, discId){
+  const ra=rep.staff_name.split(' ').map(function(w){return w[0];}).join('').slice(0,2);
+  const rt=new Date(rep.created_at).toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit'});
+  const rd=new Date(rep.created_at).toLocaleDateString('en-AU',{day:'numeric',month:'short'});
+  const color = (typeof rtAvaColor==='function') ? rtAvaColor(rep.staff_name) : '#64748b';
+  const canDelete = (rep.staff_name === me) || myIsAdmin;
+  let html = '<div class="reply-item" style="display:flex;gap:10px;" data-rep-id="'+rep.id+'">';
+  html += '<div style="width:30px;height:30px;border-radius:50%;background:'+color+';display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;flex-shrink:0;">'+ra+'</div>';
+  html += '<div style="flex:1;min-width:0;">';
+  html += '<div style="background:#f1f5f9;border-radius:14px;padding:8px 12px;display:inline-block;max-width:100%;">';
+  html += '<div style="font-size:12px;font-weight:700;color:#0f172a;margin-bottom:1px;">'+rep.staff_name+'</div>';
+  html += '<div class="rt-content" style="font-size:13px;color:#0f172a;line-height:1.45;">'+mdToHtml(rep.body)+'</div>';
+  if(rep.attachments && rep.attachments.length){
+    html += attRenderGrid(rep.attachments);
+  }
+  html += '</div>';
+  html += '<div style="display:flex;align-items:center;gap:14px;margin-top:4px;padding-left:8px;font-size:11px;color:#64748b;">';
+  html += '<span>'+rd+' '+rt+'</span>';
+  html += '<button onclick="toggleInlineReply(\''+discId+'\',\''+rep.id+'\')" style="background:none;border:none;cursor:pointer;font-family:inherit;font-size:11px;font-weight:600;color:var(--accent);padding:0;">Reply</button>';
+  if(canDelete) html += '<button onclick="deleteDiscReply(\''+rep.id+'\')" style="background:none;border:none;cursor:pointer;font-family:inherit;font-size:11px;font-weight:500;color:#dc2626;padding:0;">Delete</button>';
+  html += '</div>';
+  html += '<div id="replyForm-'+rep.id+'" style="display:none;margin-top:8px;"></div>';
+  html += '</div></div>';
+  // Recurse: render children of this reply
+  const childThread = renderReplyThread(allReplies, rep.id, depth+1, discId);
+  if(childThread){
+    html = html + '<div style="margin-top:8px;margin-left:0;">'+childThread+'</div>';
+  }
+  return html;
+}
+
+function toggleHiddenReplies(id){
+  const box = document.getElementById(id);
+  const btn = document.getElementById(id+'-btn');
+  const lbl = document.getElementById(id+'-lbl');
+  const icon = document.getElementById(id+'-icon');
+  if(!box || !btn) return;
+  const isOpen = box.style.display !== 'none';
+  if(isOpen){
+    box.style.display = 'none';
+    if(lbl) lbl.textContent = btn.dataset.showLbl;
+    if(icon) icon.style.transform = 'rotate(0deg)';
+  } else {
+    box.style.display = 'flex';
+    if(lbl) lbl.textContent = btn.dataset.hideLbl;
+    if(icon) icon.style.transform = 'rotate(180deg)';
+  }
+}
+
+function toggleInlineReply(discId, parentId){
+  const wrap = document.getElementById('replyForm-'+parentId);
+  if(!wrap) return;
+  if(wrap.style.display === 'none'){
+    const taId = 'replyTo-'+parentId;
+    wrap.style.display = 'block';
+    wrap.innerHTML = '<div style="display:flex;gap:8px;align-items:flex-start;">'+
+      '<textarea id="'+taId+'" placeholder="Write a reply..." rows="2" style="flex:1;"></textarea>'+
+      '<button onclick="submitInlineReply(\''+discId+'\',\''+parentId+'\')" style="padding:8px 14px;border-radius:8px;background:var(--accent);color:#fff;border:none;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;">Reply</button>'+
+      '<button onclick="document.getElementById(\'replyForm-'+parentId+'\').style.display=\'none\'" style="padding:8px 10px;border-radius:8px;background:#f1f5f9;color:#64748b;border:none;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">×</button>'+
+    '</div>';
+    setTimeout(function(){
+      if(typeof rtUpgrade === 'function') rtUpgrade(taId);
+      const ta = document.getElementById(taId);
+      if(ta && ta._rtEditor) ta._rtEditor.focus();
+    }, 30);
+  } else {
+    wrap.style.display = 'none';
+  }
+}
+
+async function submitInlineReply(discId, parentId){
+  const taId = 'replyTo-'+parentId;
+  const ta = document.getElementById(taId);
+  if(!ta) return;
+  if(ta._rtSync) ta._rtSync();
+  const body = (ta.value||'').trim();
+  if(!body) return;
+  const replyAtts = (typeof rtGetAttachments==='function') ? rtGetAttachments(taId) : [];
+  // Optimistic: insert reply DOM immediately
+  const tempId = 'temp_'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
+  const tempReply = {id: tempId, parent_id: parentId, discussion_id: discId, staff_name: me, body, attachments: replyAtts, created_at: new Date().toISOString()};
+  // Hide form
+  const form = document.getElementById('replyForm-'+parentId);
+  if(form) form.style.display = 'none';
+  // Find parent reply DOM and append child
+  const parentItem = document.querySelector('.reply-item[data-rep-id="'+parentId+'"]');
+  if(parentItem){
+    const html = renderReplyItem(tempReply, [], 1, discId);
+    let nestedWrap = parentItem.parentNode.querySelector(':scope > div[data-nested-of="'+parentId+'"]');
+    if(!nestedWrap){
+      nestedWrap = document.createElement('div');
+      nestedWrap.dataset.nestedOf = parentId;
+      nestedWrap.style.cssText = 'margin-top:8px;display:flex;flex-direction:column;gap:10px;padding-left:24px;border-left:2px solid #f1f5f9;margin-left:14px;';
+      parentItem.parentNode.insertBefore(nestedWrap, parentItem.nextSibling);
+    }
+    const tmp = document.createElement('div');
+    tmp.innerHTML = html;
+    while(tmp.firstChild) nestedWrap.appendChild(tmp.firstChild);
+  }
+  // Send to server, then refresh just the thread
+  try{
+    await sbPost('discussion_replies', {discussion_id: discId, parent_id: parentId, staff_name: me, body, attachments: replyAtts});
+    if(typeof rtReset==='function') rtReset(taId);
+    if(typeof rtClearAttachments==='function') rtClearAttachments(taId);
+    // Quietly refetch + replace just this discussion's reply tree
+    setTimeout(function(){ refreshDiscReplies(discId); }, 300);
+  }catch(e){
+    showToast('Failed to post reply');
+  }
+}
+
+// Reload only the replies for one discussion (no full page reload)
+async function refreshDiscReplies(discId){
+  try{
+    const all = await sbGet('discussion_replies','?discussion_id=eq.'+discId+'&order=created_at.asc');
+    const wrap = document.getElementById('replies-'+discId);
+    if(!wrap) return;
+    if(!all || !all.length){
+      wrap.innerHTML = '';
+      wrap.style.display = 'flex';
+      wrap.style.flexDirection = 'column';
+      wrap.style.gap = '8px';
+      return;
+    }
+    wrap.style.borderTop = '1px solid #f1f5f9';
+    wrap.style.paddingTop = '12px';
+    wrap.style.marginBottom = '10px';
+    wrap.innerHTML = renderReplyThread(all, null, 0, discId);
+  }catch(e){console.warn('refresh replies:',e);}
+}
+
+// Recently deleted replies (for undo)
+let _deletedReplies = []; // [{rep, descendants, discId, deletedAt}]
+
+async function deleteDiscReply(repId){
+  try{
+    // Fetch reply + all descendants
+    const allReplies = await sbGet('discussion_replies','?select=*&order=created_at.asc');
+    function collect(parentId){
+      const direct = allReplies.filter(function(r){return r.parent_id===parentId;});
+      let acc = direct.slice();
+      direct.forEach(function(r){
+        acc = acc.concat(collect(r.id));
+      });
+      return acc;
+    }
+    const main = allReplies.find(function(r){return r.id===repId;});
+    if(!main){ showToast('Reply not found'); return; }
+    const descendants = collect(repId);
+    const allToRemove = [main].concat(descendants);
+
+    // Stash for undo (full data so we can restore)
+    _deletedReplies.push({items: allToRemove, discId: main.discussion_id, deletedAt: Date.now()});
+    // Cap to last 5 (clear older)
+    if(_deletedReplies.length > 5) _deletedReplies = _deletedReplies.slice(-5);
+
+    // Hide reply DOM optimistically
+    allToRemove.forEach(function(r){
+      const el = document.querySelector('.reply-item[data-rep-id="'+r.id+'"]');
+      if(el) el.style.display = 'none';
+    });
+
+    // Hard-delete from server
+    for(const r of allToRemove){
+      try{
+        await fetch(SB+'/rest/v1/discussion_replies?id=eq.'+encodeURIComponent(r.id),{
+          method:'DELETE',
+          headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Prefer':'return=minimal'}
+        });
+      }catch(e){}
+    }
+
+    // Show undo toast
+    showUndoToast('Reply deleted', function(){
+      restoreDeletedReply(_deletedReplies[_deletedReplies.length-1]);
+    });
+  }catch(e){
+    showToast('Failed to delete.');
+  }
+}
+
+async function restoreDeletedReply(record){
+  if(!record || !record.items || !record.items.length) return;
+  // Re-insert into DB (preserve original ids if possible — supabase will accept)
+  try{
+    for(const r of record.items){
+      const payload = {};
+      ['id','discussion_id','parent_id','staff_name','body','attachments','created_at'].forEach(function(k){
+        if(r[k] !== undefined && r[k] !== null) payload[k] = r[k];
+      });
+      await fetch(SB+'/rest/v1/discussion_replies', {
+        method:'POST',
+        headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal,resolution=merge-duplicates'},
+        body: JSON.stringify(payload)
+      });
+    }
+    // Remove from undo stack
+    _deletedReplies = _deletedReplies.filter(function(x){return x !== record;});
+    showToast('Reply restored');
+    refreshDiscReplies(record.discId);
+  }catch(e){
+    showToast('Failed to restore');
+  }
+}
+
+// Toast with undo button
+function showUndoToast(text, undoFn){
+  let t = document.getElementById('undoToast');
+  if(t) t.remove();
+  t = document.createElement('div');
+  t.id = 'undoToast';
+  t.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#0f172a;color:#fff;padding:10px 14px;border-radius:10px;display:flex;align-items:center;gap:14px;z-index:9999;font-size:13px;font-weight:500;box-shadow:0 8px 24px rgba(0,0,0,.25);animation:taskBackdropFade .25s ease both;';
+  t.innerHTML = '<span>'+text+'</span><button id="undoBtn" style="background:none;border:none;color:#fbbf24;font-size:13px;font-weight:700;cursor:pointer;text-transform:uppercase;letter-spacing:.04em;padding:0;font-family:inherit;">Undo</button>';
+  document.body.appendChild(t);
+  const btn = document.getElementById('undoBtn');
+  let done = false;
+  btn.onclick = function(){
+    if(done) return;
+    done = true;
+    if(undoFn) undoFn();
+    t.remove();
+  };
+  setTimeout(function(){ if(!done && t.parentNode) t.remove(); }, 8000);
 }
 
 function _findVisibleTa(name){
@@ -5154,7 +5527,6 @@ async function postDiscussion(){
     const pollOpts = getPollOptions();
     if(pollOpts===false){err.textContent='Please add at least 2 poll options.';err.classList.add('show');return;}
     const discAtts = (_bodyTa && typeof rtGetAttachments==='function') ? rtGetAttachments(_bodyTa.id) : [];
-    if(window._pendingGif && window._pendingGif['disc']) discAtts.push(window._pendingGif['disc']);
     const discResult = await sbPost('discussions',{title,body,created_by:me,open_at:openAt||null,close_at:closeAt||null,poll_options:pollOpts||null,poll_votes:pollOpts?{}:null,attachments:discAtts});
     try{
       const mentions = (typeof rtExtractMentions==='function') ? rtExtractMentions(body) : [];
@@ -5176,9 +5548,6 @@ async function postDiscussion(){
     if(_bodyTa) _bodyTa.value='';
     if(_bodyTa && typeof rtReset==='function') rtReset(_bodyTa.id);
     if(_bodyTa && typeof rtClearAttachments==='function') rtClearAttachments(_bodyTa.id);
-    if(window._pendingGif) delete window._pendingGif['disc'];
-    const _gp = document.getElementById('discPostGifPreview');
-    if(_gp){ _gp.style.display='none'; _gp.innerHTML=''; }
     ok.textContent='Posted!';ok.classList.add('show');
     setTimeout(function(){ok.classList.remove('show');},2000);
     await loadDiscussions();
@@ -5190,68 +5559,16 @@ async function postDiscussion(){
   }
 }
 
-
-// ── REPLY EDIT / DELETE ──
-function startEditReply(repId, discId){
-  const bodyEl = document.getElementById('rep-body-'+repId);
-  if(!bodyEl) return;
-  const currentText = bodyEl.textContent.replace('(edited)','').trim();
-  bodyEl.innerHTML =
-    '<textarea style="width:100%;background:#e4e6eb;border:none;outline:none;border-radius:8px;padding:6px 8px;font-size:13.5px;font-family:inherit;resize:none;min-height:40px;box-sizing:border-box;color:#050505;" id="rep-edit-'+repId+'" onkeydown="if(event.key===\'Enter\'&&!event.shiftKey){event.preventDefault();saveReplyEdit(\''+repId+'\',\''+discId+'\');}">'+currentText+'</textarea>'+
-    '<div style="display:flex;gap:6px;margin-top:4px;">'+
-      '<button data-rid="'+repId+'" data-disc="'+discId+'" onclick="saveReplyEdit(this.dataset.rid,this.dataset.disc)" style="background:#1877f2;color:#fff;border:none;border-radius:6px;padding:4px 12px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;">Save</button>'+
-      '<button onclick="loadDiscussions()" style="background:none;border:none;color:#65676b;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;">Cancel</button>'+
-    '</div>';
-  const ta = document.getElementById('rep-edit-'+repId);
-  if(ta){ ta.focus(); ta.setSelectionRange(ta.value.length,ta.value.length); }
-}
-
-async function saveReplyEdit(repId, discId){
-  const ta = document.getElementById('rep-edit-'+repId);
-  if(!ta) return;
-  const body = ta.value.trim();
-  if(!body) return;
-  try{
-    const res = await fetch(SB+'/rest/v1/discussion_replies?id=eq.'+repId,{
-      method:'PATCH',
-      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
-      body:JSON.stringify({body:body, edited_at:new Date().toISOString()})
-    });
-    if(!res.ok) throw new Error('HTTP '+res.status);
-    showToast('Reply updated');
-    loadDiscussions();
-  }catch(e){ showToast('Failed: '+e.message); }
-}
-
-async function deleteReply(repId, discId){
-  if(!confirm('Delete this reply?')) return;
-  try{
-    const res = await fetch(SB+'/rest/v1/discussion_replies?id=eq.'+repId,{
-      method:'DELETE',
-      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}
-    });
-    if(!res.ok) throw new Error('HTTP '+res.status);
-    showToast('Reply deleted');
-    const el = document.querySelector('.fb-reply [data-rid="'+repId+'"]');
-    if(el) el.closest('.fb-reply').remove();
-    else loadDiscussions();
-  }catch(e){ showToast('Failed: '+e.message); }
-}
-
 async function submitDiscReply(discId){
   const input=document.getElementById('discReply-'+discId);
   if(!input) return;
   // For RT-upgraded, sync first
   if(input._rtSync) input._rtSync();
-  const body=(input.value||'').trim();
-  const rtAtts = (typeof rtGetAttachments==='function') ? rtGetAttachments('discReply-'+discId) : [];
-  const gifKey = 'reply:'+discId;
-  const gifAtt = (window._pendingGif && window._pendingGif[gifKey]) ? [window._pendingGif[gifKey]] : [];
-  const replyAtts = rtAtts.concat(gifAtt);
-  // Need either text OR a gif/attachment to send
-  if(!body && !replyAtts.length) return;
-  const btn=document.querySelector('button.fb-reply-send-btn[data-disc="'+discId+'"]');
-  if(btn){btn.disabled=true;}
+  if(!input.value || !input.value.trim()) return;
+  const body=input.value.trim();
+  const replyAtts = (typeof rtGetAttachments==='function') ? rtGetAttachments('discReply-'+discId) : [];
+  const btn=document.querySelector('button[data-disc="'+discId+'"]');
+  if(btn){btn.disabled=true;btn.textContent='...';}
   try{
     const res=await sbPost('discussion_replies',{discussion_id:discId,staff_name:me,body,attachments:replyAtts});
     if(!res.ok&&res.status!==201)throw new Error('HTTP '+res.status);
@@ -5279,11 +5596,10 @@ async function submitDiscReply(discId){
         }
       }
     }catch(e){console.warn('reply notif failed:',e);}
-    // Append reply inline without full reload (text-only). With attachments, do a full reload.
+    // Refresh just this discussion's replies (optimistic)
+    setTimeout(function(){ refreshDiscReplies(discId); }, 200);
     const repliesContainer=document.getElementById('replies-'+discId);
-    if(replyAtts.length){
-      await loadDiscussions();
-    } else if(repliesContainer){
+    if(repliesContainer){
       const now=new Date();
       const t=now.toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit'});
       const d=now.toLocaleDateString('en-AU',{day:'numeric',month:'short'});
@@ -5295,18 +5611,14 @@ async function submitDiscReply(discId){
         '<div style="font-size:12.5px;color:#374151;margin-top:2px;line-height:1.5;">'+body+'</div></div>';
       repliesContainer.appendChild(div);
     } else {
-      // Fallback reload if container not found
-      await loadDiscussions();
+      // Fallback: refresh just this discussion's replies
+      refreshDiscReplies(discId);
     }
   }catch(e){
     console.warn(e);
     showToast('Failed to post reply');
   }finally{
-    // Clear pending gif for this disc
-    if(window._pendingGif) delete window._pendingGif['reply:'+discId];
-    const prev = document.getElementById('discReplyGifPreview-'+discId);
-    if(prev){ prev.style.display='none'; prev.innerHTML=''; }
-    if(btn){ btn.disabled=false; }
+    if(btn){btn.disabled=false;btn.textContent='Reply';}
   }
 }
 
@@ -5316,50 +5628,6 @@ async function deleteDiscussion(id){
     await fetch(SB+'/rest/v1/discussions?id=eq.'+id,{method:'DELETE',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
     await loadDiscussions();
   }catch(e){console.warn(e);}
-}
-
-async function startEditDiscussion(id){
-  let row;
-  try{
-    const rows = await sbGet('discussions','?id=eq.'+id);
-    row = rows && rows[0];
-  }catch(e){ showToast('Could not load discussion'); return; }
-  if(!row) return;
-  // Find the rendered card and swap in edit form
-  const btn = document.querySelector('.ann-card button[data-id="'+id+'"][onclick*="startEditDiscussion"]');
-  const cardEl = btn ? btn.closest('.ann-card') : null;
-  if(!cardEl) return;
-  const safeTitle = (row.title||'').replace(/"/g,'&quot;');
-  const safeBody = (row.body||'').replace(/</g,'&lt;');
-  cardEl.innerHTML =
-    '<div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Editing discussion</div>'+
-    '<input id="discEditTitle-'+id+'" value="'+safeTitle+'" style="width:100%;padding:8px 10px;font-size:14px;font-weight:600;border:1px solid #e2e8f0;border-radius:8px;font-family:inherit;margin-bottom:8px;box-sizing:border-box;">'+
-    '<textarea id="discEditBody-'+id+'" rows="5" style="width:100%;padding:8px 10px;font-size:13px;border:1px solid #e2e8f0;border-radius:8px;font-family:inherit;resize:vertical;box-sizing:border-box;">'+safeBody+'</textarea>'+
-    '<div style="display:flex;gap:8px;margin-top:10px;">'+
-      '<button data-id="'+id+'" onclick="saveDiscussionEdit(this.dataset.id)" class="btn btn-green" style="padding:8px 16px;font-size:12px;">Save</button>'+
-      '<button onclick="loadDiscussions()" class="btn btn-outline" style="padding:8px 16px;font-size:12px;">Cancel</button>'+
-    '</div>';
-  const t = document.getElementById('discEditTitle-'+id);
-  if(t) t.focus();
-}
-
-async function saveDiscussionEdit(id){
-  const titleEl = document.getElementById('discEditTitle-'+id);
-  const bodyEl = document.getElementById('discEditBody-'+id);
-  if(!titleEl || !bodyEl) return;
-  const title = titleEl.value.trim();
-  const body = bodyEl.value.trim();
-  if(!title || !body){ alert('Title and body required.'); return; }
-  try{
-    const res = await fetch(SB+'/rest/v1/discussions?id=eq.'+id,{
-      method:'PATCH',
-      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
-      body:JSON.stringify({title:title, body:body, edited_at:new Date().toISOString()})
-    });
-    if(!res.ok) throw new Error('HTTP '+res.status);
-    showToast('Discussion updated');
-    await loadDiscussions();
-  }catch(e){ showToast('Failed: '+e.message); }
 }
 
 async function sbGet(t,f){
@@ -5510,11 +5778,12 @@ async function enterHub(){
   document.getElementById("leaveTo").value=today;
   buildAvailForm();
   showSchedTab('leave'); // default schedule sub-tab
-  Promise.all([loadHomeData(),loadNotifications(),loadLeaveHistory(),refreshAnnBadge(),loadHomeAnnPreview(),loadHomeDiscPreview(),maybeShowOnboarding(),checkFeedbackInvites(),checkNewNotifications(),loadAnnReads()]);
+  Promise.all([loadHomeData(),loadNotifications(),loadLeaveHistory(),refreshAnnBadge(),loadHomeAnnPreview(),loadHomeDiscPreview(),maybeShowOnboarding(),checkFeedbackInvites(),checkNewNotifications(),loadAnnReads(),loadSharedTasksFromOthers()]);
   applySavedBrightness();
   setTimeout(rtUpgradeAll, 200);
   setTimeout(startActivityPolling, 4000);
-  loadTasks().then(function(){ updateTaskBadge(); scheduleTaskReminders(); });
+  setInterval(loadSharedTasksFromOthers, 60000);
+  loadTasks();updateTaskBadge();scheduleTaskReminders();
   startAutoRefresh();
   initRealtime();
   loadBirthdays();
@@ -5543,7 +5812,7 @@ function goTo(p){
   if(p==="announcements"){loadAnnouncements();}
   if(p==="engagement"){showEngagementTab('discussions');}
   if(p==="documents"){loadDocuments();}
-  if(p==="tasks"){ loadTasks().then(function(){ renderTasks(); updateTaskBadge(); }); maybeShowNotifyBanner(); }
+  if(p==="tasks"){ loadTasks(); renderTasks(); updateTaskBadge(); maybeShowNotifyBanner(); }
   if(p==="announcements" || p==="engagement"){ setTimeout(rtUpgradeAll, 50); }
   if(p==="profile"){
     setTimeout(renderNotifPanel, 50);
@@ -5786,6 +6055,24 @@ async function submitAvail(){
 
 
 // ── DARK MODE ──
+function setTheme(theme){
+  if(theme !== 'light' && theme !== 'dark') theme = 'light';
+  document.documentElement.setAttribute('data-theme', theme);
+  localStorage.setItem('oscars_theme', theme);
+  document.querySelectorAll('.theme-chip').forEach(function(b){
+    const isActive = b.getAttribute('data-theme') === theme;
+    if(isActive){
+      b.style.background = 'var(--accent-dim)';
+      b.style.borderColor = 'var(--accent)';
+      b.style.color = 'var(--accent-text)';
+    } else {
+      b.style.background = '';
+      b.style.borderColor = '';
+      b.style.color = '';
+    }
+  });
+}
+
 function toggleDarkMode(){
   const isDark=document.documentElement.getAttribute('data-theme')==='dark';
   const newTheme=isDark?'light':'dark';
@@ -5796,9 +6083,19 @@ function toggleDarkMode(){
   updateDmSwitch(newTheme);
 }
 function initTheme(){
-  // Force light always (dark mode removed)
-  document.documentElement.setAttribute('data-theme','light');
-  localStorage.setItem('oscars_theme','light');
+  const saved = localStorage.getItem('oscars_theme') || 'light';
+  document.documentElement.setAttribute('data-theme', saved);
+  // Sync chips after DOM ready
+  setTimeout(function(){
+    document.querySelectorAll('.theme-chip').forEach(function(b){
+      const isActive = b.getAttribute('data-theme') === saved;
+      if(isActive){
+        b.style.background = 'var(--accent-dim)';
+        b.style.borderColor = 'var(--accent)';
+        b.style.color = 'var(--accent-text)';
+      }
+    });
+  }, 100);
 }
 function updateDmSwitch(theme){
   const sw=document.getElementById('dmSwitch');
@@ -5821,17 +6118,6 @@ function updateAccentSwatches(){
   });
 }
 
-function setBrightness(v){
-  const val = Math.max(60, Math.min(110, parseInt(v)||100));
-  // Apply as CSS filter on the main app surface (not html — affects modals/toasts cleanly)
-  const target = document.querySelector('.main') || document.body;
-  if(target) target.style.filter = 'brightness('+(val/100)+')';
-  // Also dim sidebar so the whole app feels consistent
-  const sb = document.querySelector('.sidebar');
-  if(sb) sb.style.filter = 'brightness('+(val/100)+')';
-  localStorage.setItem('oscars_brightness', String(val));
-}
-
 function setFontSize(size){
   document.documentElement.setAttribute('data-font', size);
   localStorage.setItem('oscars_font', size);
@@ -5845,12 +6131,27 @@ function updateFontChips(){
 }
 
 function toggleSidebarCompact(){
-  // Compact mode removed — sidebar always expanded
-  document.documentElement.setAttribute('data-sb', 'expanded');
-  localStorage.removeItem('oscars_sb');
+  const cur = document.documentElement.getAttribute('data-sb');
+  const isCompact = cur === 'collapsed';
+  const newVal = isCompact ? 'expanded' : 'collapsed';
+
+  // Add an "animating" class so we can apply extra flair during transition
+  const sb = document.querySelector('.sidebar');
+  if(sb){
+    sb.classList.add('sb-animating');
+    setTimeout(function(){ sb.classList.remove('sb-animating'); }, 500);
+  }
+
+  document.documentElement.setAttribute('data-sb', newVal);
+  localStorage.setItem('oscars_sb', newVal);
+  updateSbSwitch();
 }
 function updateSbSwitch(){
-  // Compact mode removed; keep no-op to avoid breaking callers
+  const cur = localStorage.getItem('oscars_sb') === 'collapsed';
+  const sw = document.getElementById('sbSwitch');
+  const th = document.getElementById('sbSwitchThumb');
+  if(sw) sw.style.background = cur ? 'var(--accent)' : '#e2e8f0';
+  if(th) th.style.left = cur ? '25px' : '3px';
 }
 
 function resetAppearance(){
@@ -5859,14 +6160,6 @@ function resetAppearance(){
   localStorage.removeItem('oscars_accent');
   localStorage.removeItem('oscars_font');
   localStorage.removeItem('oscars_sb');
-  localStorage.removeItem('oscars_brightness');
-  // Clear inline brightness filter
-  const target = document.querySelector('.main') || document.body;
-  if(target) target.style.filter = '';
-  const sbEl = document.querySelector('.sidebar');
-  if(sbEl) sbEl.style.filter = '';
-  const slider = document.getElementById('brightnessSlider');
-  if(slider) slider.value = 100;
   document.documentElement.setAttribute('data-theme', 'light');
   document.documentElement.setAttribute('data-accent', 'green');
   document.documentElement.setAttribute('data-font', 'medium');
@@ -5881,16 +6174,10 @@ function resetAppearance(){
 function initAppearance(){
   const accent = localStorage.getItem('oscars_accent') || 'green';
   const font = localStorage.getItem('oscars_font') || 'medium';
+  const sb = localStorage.getItem('oscars_sb') || 'expanded';
   document.documentElement.setAttribute('data-accent', accent);
   document.documentElement.setAttribute('data-font', font);
-  // Sidebar compact mode removed — always expanded
-  document.documentElement.setAttribute('data-sb', 'expanded');
-  localStorage.removeItem('oscars_sb');
-  // Apply saved brightness once DOM ready (.main may not exist yet)
-  const br = parseInt(localStorage.getItem('oscars_brightness')||'100');
-  if(br !== 100){
-    setTimeout(function(){ setBrightness(br); }, 100);
-  }
+  document.documentElement.setAttribute('data-sb', sb);
 }
 initAppearance();
 
@@ -6109,7 +6396,7 @@ async function loadReactCounts(id,type){
 
 function updateReactWrap(id,type){
   const wrap=document.querySelector('.react-wrap[data-id="'+id+'"][data-type="'+type+'"]');
-  if(!wrap){ if(type==='reply'){ loadDiscussions(); return; } if(type==='ann')loadAnnouncements(); else loadDiscussions(); return; }
+  if(!wrap){if(type==='ann')loadAnnouncements();else loadDiscussions();return;}
   const key=(type==='ann'?'ann_react_':type==='reply'?'reply_react_':'disc_react_')+me+'_'+id;
   const myReact=localStorage.getItem(key)||'';
   const hasReact=!!myReact;
@@ -6205,11 +6492,10 @@ async function loadAnnouncements(){
         '<div class="ann-meta"><span>Posted by '+r.created_by+' · '+d+'</span>'+
         '<div style="display:flex;gap:6px;align-items:center;margin-left:auto;flex-wrap:wrap;">'+
         ((r.created_by===me || myIsAdmin) ? annReadsBadgeHtml(r.id) : '')+
-        makeReactHTML(r.id,'ann')+
         bmHtml('ann', r.id)+
-        ((r.created_by===me)?'<button data-id="'+r.id+'" onclick="startEditAnnouncement(this.dataset.id)" style="background:none;border:none;color:#0284c7;font-size:11px;font-weight:600;cursor:pointer;">Edit</button>':'')+
-        ((r.created_by===me || myIsAdmin)?'<button data-id="'+r.id+'" onclick="deleteAnnouncement(this.dataset.id)" style="background:none;border:none;color:#dc2626;font-size:11px;font-weight:600;cursor:pointer;">Delete</button>':'')+
+        (myIsAdmin?'<button data-id="'+r.id+'" onclick="deleteAnnouncement(this.dataset.id)" style="background:none;border:none;color:#dc2626;font-size:11px;font-weight:600;cursor:pointer;">Delete</button>':'')+
         '</div></div>'+
+        '<div style="margin-top:10px;">'+makeReactHTML(r.id,'ann')+'</div>'+
         '</div>';
     }).join('');
     // Mark all as read locally + send read receipts to DB
@@ -6247,7 +6533,6 @@ async function postAnnouncement(){
   const btn=document.getElementById('annPostBtn');btn.disabled=true;btn.innerHTML='<span class="sp"></span> Posting...';
   try{
     const annAtts = (_bodyTa && typeof rtGetAttachments==='function') ? rtGetAttachments(_bodyTa.id) : [];
-    if(window._pendingGif && window._pendingGif['ann']) annAtts.push(window._pendingGif['ann']);
     const annResult = await sbPost('announcements',{title,body,created_by:me,pinned,urgent:urgent||false,expires_at:expiry||null,attachments:annAtts});
     // Save mention notifications
     try{
@@ -6265,9 +6550,6 @@ async function postAnnouncement(){
     if(_bodyTa) _bodyTa.value='';
     if(_bodyTa && typeof rtReset==='function') rtReset(_bodyTa.id);
     if(_bodyTa && typeof rtClearAttachments==='function') rtClearAttachments(_bodyTa.id);
-    if(window._pendingGif) delete window._pendingGif['ann'];
-    const _agp = document.getElementById('annPostGifPreview');
-    if(_agp){ _agp.style.display='none'; _agp.innerHTML=''; }
     document.getElementById('annPinned').checked=false;
     await loadAnnouncements();
   }catch(e){alert('Failed to post.');}
@@ -6278,51 +6560,6 @@ async function deleteAnnouncement(id){
   if(!confirm('Delete this announcement?'))return;
   await fetch(SB+'/rest/v1/announcements?id=eq.'+id,{method:'DELETE',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
   await loadAnnouncements();
-}
-
-async function startEditAnnouncement(id){
-  // Fetch current row
-  let row;
-  try{
-    const rows = await sbGet('announcements','?id=eq.'+id);
-    row = rows && rows[0];
-  }catch(e){ showToast('Could not load announcement'); return; }
-  if(!row) return;
-  // Replace card with inline edit form
-  const card = document.querySelector('.ann-card button[data-id="'+id+'"]');
-  const cardEl = card ? card.closest('.ann-card') : null;
-  if(!cardEl) return;
-  const safeTitle = (row.title||'').replace(/"/g,'&quot;');
-  const safeBody = (row.body||'').replace(/</g,'&lt;');
-  cardEl.innerHTML =
-    '<div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Editing announcement</div>'+
-    '<input id="annEditTitle-'+id+'" value="'+safeTitle+'" style="width:100%;padding:8px 10px;font-size:14px;font-weight:600;border:1px solid #e2e8f0;border-radius:8px;font-family:inherit;margin-bottom:8px;box-sizing:border-box;">'+
-    '<textarea id="annEditBody-'+id+'" rows="5" style="width:100%;padding:8px 10px;font-size:13px;border:1px solid #e2e8f0;border-radius:8px;font-family:inherit;resize:vertical;box-sizing:border-box;">'+safeBody+'</textarea>'+
-    '<div style="display:flex;gap:8px;margin-top:10px;">'+
-      '<button data-id="'+id+'" onclick="saveAnnouncementEdit(this.dataset.id)" class="btn btn-green" style="padding:8px 16px;font-size:12px;">Save</button>'+
-      '<button onclick="loadAnnouncements()" class="btn btn-outline" style="padding:8px 16px;font-size:12px;">Cancel</button>'+
-    '</div>';
-  const t = document.getElementById('annEditTitle-'+id);
-  if(t) t.focus();
-}
-
-async function saveAnnouncementEdit(id){
-  const titleEl = document.getElementById('annEditTitle-'+id);
-  const bodyEl = document.getElementById('annEditBody-'+id);
-  if(!titleEl || !bodyEl) return;
-  const title = titleEl.value.trim();
-  const body = bodyEl.value.trim();
-  if(!title || !body){ alert('Title and body required.'); return; }
-  try{
-    const res = await fetch(SB+'/rest/v1/announcements?id=eq.'+id,{
-      method:'PATCH',
-      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
-      body:JSON.stringify({title:title, body:body, edited_at:new Date().toISOString()})
-    });
-    if(!res.ok) throw new Error('HTTP '+res.status);
-    showToast('Announcement updated');
-    await loadAnnouncements();
-  }catch(e){ showToast('Failed: '+e.message); }
 }
 
 async function updateAnnBadge(rows,readIds){
@@ -6486,6 +6723,81 @@ function openDayEventModal(dateStr){
   bd.style.display='flex';
 }
 
+// ── NATURAL LANGUAGE PARSER (Apple-style quick add) ──
+function parseNaturalEvent(input){
+  if(!input) return null;
+  let text = String(input).trim();
+  let time = null;
+  let date = null;
+
+  // Time patterns: "at 1pm", "at 13:00", "at 1:30pm", "at noon", "at midnight"
+  const timeRe = /\b(at\s+)?(\d{1,2})(:(\d{2}))?\s*(am|pm|a\.m\.|p\.m\.)\b/i;
+  const time24Re = /\bat\s+(\d{1,2}):(\d{2})\b/;
+  const namedTime = /\b(noon|midnight|midday)\b/i;
+
+  let m = text.match(timeRe);
+  if(m){
+    let h = parseInt(m[2]);
+    const mm = m[4] ? parseInt(m[4]) : 0;
+    const ampm = m[5].toLowerCase().replace(/\./g,'');
+    if(ampm.startsWith('p') && h < 12) h += 12;
+    if(ampm.startsWith('a') && h === 12) h = 0;
+    time = String(h).padStart(2,'0')+':'+String(mm).padStart(2,'0');
+    text = text.replace(m[0], '').trim();
+  } else if((m = text.match(time24Re))){
+    const h = parseInt(m[1]);
+    const mm = parseInt(m[2]);
+    if(h>=0 && h<24){
+      time = String(h).padStart(2,'0')+':'+String(mm).padStart(2,'0');
+      text = text.replace(m[0], '').trim();
+    }
+  } else if((m = text.match(namedTime))){
+    const w = m[1].toLowerCase();
+    if(w === 'midnight') time = '00:00';
+    else time = '12:00';
+    text = text.replace(m[0], '').trim();
+  }
+
+  // Date patterns: "tomorrow", "today", "monday", "next monday", "on 5/15", "may 15"
+  const today = new Date();
+  const tomorrowRe = /\b(tomorrow|tmrw|tmw)\b/i;
+  const todayRe = /\b(today)\b/i;
+  const dayRe = /\b(this\s+|next\s+)?(monday|tuesday|wednesday|thursday|friday|saturday|sunday|mon|tue|tues|wed|thu|thurs|fri|sat|sun)\b/i;
+
+  if((m = text.match(todayRe))){
+    date = today;
+    text = text.replace(m[0], '').trim();
+  } else if((m = text.match(tomorrowRe))){
+    date = new Date(today); date.setDate(date.getDate()+1);
+    text = text.replace(m[0], '').trim();
+  } else if((m = text.match(dayRe))){
+    const days = ['sun','mon','tue','wed','thu','fri','sat'];
+    const longDays = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+    let target = m[2].toLowerCase();
+    let idx = longDays.indexOf(target);
+    if(idx<0) idx = days.indexOf(target.slice(0,3));
+    if(idx<0) idx = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'].indexOf(target);
+    if(idx>=0){
+      const dow = today.getDay();
+      let diff = idx - dow;
+      const isNext = m[1] && /next/i.test(m[1]);
+      if(diff<=0 || isNext) diff += 7;
+      date = new Date(today); date.setDate(date.getDate()+diff);
+      text = text.replace(m[0], '').trim();
+    }
+  }
+
+  // Cleanup connecting words at start/end
+  text = text.replace(/^(at|on)\s+/i,'').replace(/\s+(at|on)$/i,'').trim();
+  text = text.replace(/\s{2,}/g, ' ');
+
+  return {
+    title: text || '(Untitled)',
+    time: time,
+    date: date ? (date.getFullYear()+'-'+String(date.getMonth()+1).padStart(2,'0')+'-'+String(date.getDate()).padStart(2,'0')) : null
+  };
+}
+
 function openNewEventForDate(dateStr){
   _editingEventId = null;
   document.getElementById('eventModalTitle').textContent = 'New Event';
@@ -6498,6 +6810,46 @@ function openNewEventForDate(dateStr){
   document.getElementById('evmTimeRow').style.display = 'none';
   document.getElementById('evmDeleteBtn').style.display = 'none';
   document.getElementById('eventModal').style.display = 'flex';
+  // Hint for natural language
+  const titleEl = document.getElementById('evmTitle');
+  titleEl.placeholder = 'e.g. Lunch with Mom at 1pm';
+  // On title input, parse for time/date and auto-fill
+  if(!titleEl._nlBound){
+    titleEl._nlBound = true;
+    let nlTimer = null;
+    titleEl.addEventListener('input', function(){
+      clearTimeout(nlTimer);
+      nlTimer = setTimeout(function(){
+        const parsed = parseNaturalEvent(titleEl.value);
+        if(!parsed) return;
+        if(parsed.time){
+          document.getElementById('evmTime').value = parsed.time;
+          document.getElementById('evmAllDay').checked = false;
+          document.getElementById('evmTimeRow').style.display = 'block';
+        }
+        if(parsed.date){
+          document.getElementById('evmDate').value = parsed.date;
+        }
+        // Show a small hint
+        let hint = document.getElementById('nlHint');
+        if(!hint){
+          hint = document.createElement('div');
+          hint.id = 'nlHint';
+          hint.style.cssText = 'font-size:11px;color:var(--accent);margin-top:4px;font-weight:600;display:flex;align-items:center;gap:5px;';
+          titleEl.parentNode.appendChild(hint);
+        }
+        const parts = [];
+        if(parsed.time) parts.push(''+parsed.time);
+        if(parsed.date) parts.push(''+parsed.date);
+        if(parts.length){
+          hint.textContent = 'Detected: '+parts.join(' · ');
+          hint.style.display = '';
+        } else {
+          hint.style.display = 'none';
+        }
+      }, 350);
+    });
+  }
   setTimeout(function(){ document.getElementById('evmTitle').focus(); }, 100);
 }
 
@@ -6620,7 +6972,12 @@ function toggleEventTimeFields(){
 }
 
 async function saveEventFromModal(){
-  const title = document.getElementById('evmTitle').value.trim();
+  let title = document.getElementById('evmTitle').value.trim();
+  // If natural language was used, strip parsed time/date keywords from title
+  if(typeof parseNaturalEvent === 'function'){
+    const parsed = parseNaturalEvent(title);
+    if(parsed && parsed.title) title = parsed.title;
+  }
   const desc = document.getElementById('evmDesc').value.trim();
   const date = document.getElementById('evmDate').value;
   const allDay = document.getElementById('evmAllDay').checked;
@@ -7929,35 +8286,9 @@ let _taskReminderTimer = null;
 function taskKey(){ return 'oscar_tasks_' + me; }
 function taskSeenKey(){ return 'oscar_task_seen_' + me; }
 
-async function loadTasks(){
+function loadTasks(){
   try{ _tasks = JSON.parse(localStorage.getItem(taskKey()) || '[]'); }
   catch(e){ _tasks = []; }
-  // Pull tasks shared with me from DB
-  try{
-    const shared = await sbGet('shared_tasks','?recipient=eq.'+encodeURIComponent(me)+'&order=created_at.desc');
-    if(Array.isArray(shared) && shared.length){
-      // Local cache of accepted shared task ids (so we don't re-add them after deletion)
-      const dismissed = JSON.parse(localStorage.getItem('shared_tasks_dismissed_'+me)||'[]');
-      shared.forEach(function(s){
-        const sid = 'shared-'+s.id;
-        if(dismissed.indexOf(s.id)>=0) return;
-        if(_tasks.find(function(t){return t.id===sid;})) return;
-        _tasks.push({
-          id: sid,
-          shared_id: s.id,
-          shared_by: s.sender,
-          title: s.title || '(shared task)',
-          notes: s.notes || '',
-          dueDate: s.due_date || null,
-          dueTime: s.due_time || null,
-          priority: s.priority || 'med',
-          done: !!s.done,
-          createdAt: s.created_at
-        });
-      });
-      saveTasks();
-    }
-  }catch(e){ console.warn('shared_tasks load failed:', e); }
 }
 function saveTasks(){
   try{ localStorage.setItem(taskKey(), JSON.stringify(_tasks)); }catch(e){}
@@ -7998,10 +8329,12 @@ function openTaskForm(editId){
   const backdrop = document.getElementById('taskFormBackdrop');
   if(!backdrop) return;
   backdrop.classList.add('open');
-  document.getElementById('taskFormTitle').textContent = editId ? 'Edit Reminder' : 'New Reminder';
+  const t = editId ? _tasks.find(function(x){return x.id===editId;}) : null;
+  const isShared = t && t.sharedFrom;
+
+  document.getElementById('taskFormTitle').textContent = editId ? (isShared ? 'Shared Task (read-only)' : 'Edit Reminder') : 'New Reminder';
   document.getElementById('taskFormSaveBtn').textContent = editId ? 'Done' : 'Add';
   if(editId){
-    const t = _tasks.find(function(x){return x.id===editId;});
     if(!t){ closeTaskForm(); return; }
     document.getElementById('taskEditId').value = t.id;
     document.getElementById('taskTitle').value = t.title || '';
@@ -8010,7 +8343,45 @@ function openTaskForm(editId){
     setTaskPrio(t.priority || 'med');
     document.getElementById('taskRemindBefore').value = (t.remindBefore==null||t.remindBefore===undefined)?'':String(t.remindBefore);
     document.getElementById('taskNotes').value = t.notes || '';
+    // Lock fields for shared tasks
+    const lockable = ['taskTitle','taskDueDate','taskDueTime','taskRemindBefore','taskNotes'];
+    lockable.forEach(function(id){
+      const el = document.getElementById(id);
+      if(el){ el.readOnly = !!isShared; el.disabled = !!isShared; el.style.opacity = isShared ? '.65' : '1'; }
+    });
+    document.querySelectorAll('#prioPills .prio-pill').forEach(function(b){
+      b.disabled = !!isShared;
+      b.style.opacity = isShared ? '.65' : '1';
+    });
+    // Show shared-from banner
+    let banner = document.getElementById('taskSharedBanner');
+    if(isShared){
+      if(!banner){
+        banner = document.createElement('div');
+        banner.id = 'taskSharedBanner';
+        banner.style.cssText = 'background:var(--accent-dim);border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:12px;color:var(--accent-text);font-weight:600;';
+        const body = document.querySelector('#taskForm .task-form-body');
+        if(body) body.insertBefore(banner, body.firstChild);
+      }
+      banner.innerHTML = '<div style="display:flex;align-items:center;gap:8px;"><svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor"><path d="M15 8a3 3 0 10-2.977-2.63l-4.94 2.47a3 3 0 100 4.319l4.94 2.47a3 3 0 10.895-1.789l-4.94-2.47a3.027 3.027 0 000-.74l4.94-2.47A3 3 0 0015 8z"/></svg>Shared by '+(t.sharedFrom||'someone')+'</div>'+
+        (t.originalNote ? '<div style="margin-top:6px;font-weight:400;color:#475569;font-style:italic;">"'+String(t.originalNote).replace(/</g,'&lt;')+'"</div>' : '');
+      banner.style.display = '';
+      // Hide save button for shared
+      document.getElementById('taskFormSaveBtn').style.display = 'none';
+    } else {
+      if(banner) banner.style.display = 'none';
+      document.getElementById('taskFormSaveBtn').style.display = '';
+    }
   } else {
+    // Reset all lockable fields
+    ['taskTitle','taskDueDate','taskDueTime','taskRemindBefore','taskNotes'].forEach(function(id){
+      const el = document.getElementById(id);
+      if(el){ el.readOnly = false; el.disabled = false; el.style.opacity = '1'; }
+    });
+    document.querySelectorAll('#prioPills .prio-pill').forEach(function(b){ b.disabled=false; b.style.opacity='1'; });
+    const banner = document.getElementById('taskSharedBanner');
+    if(banner) banner.style.display = 'none';
+    document.getElementById('taskFormSaveBtn').style.display = '';
     document.getElementById('taskEditId').value = '';
     document.getElementById('taskTitle').value = '';
     document.getElementById('taskDueDate').value = '';
@@ -8019,7 +8390,39 @@ function openTaskForm(editId){
     document.getElementById('taskRemindBefore').value = '';
     document.getElementById('taskNotes').value = '';
   }
-  setTimeout(function(){ document.getElementById('taskTitle').focus(); }, 100);
+  // Wire NL parser to task title
+  const titleEl = document.getElementById('taskTitle');
+  if(titleEl && !titleEl._nlBound){
+    titleEl._nlBound = true;
+    titleEl.placeholder = 'e.g. Email John tomorrow at 3pm';
+    let tmr = null;
+    titleEl.addEventListener('input', function(){
+      clearTimeout(tmr);
+      tmr = setTimeout(function(){
+        if(typeof parseNaturalEvent !== 'function') return;
+        const parsed = parseNaturalEvent(titleEl.value);
+        if(!parsed) return;
+        if(parsed.time){ document.getElementById('taskDueTime').value = parsed.time; }
+        if(parsed.date){ document.getElementById('taskDueDate').value = parsed.date; }
+        let hint = document.getElementById('taskNlHint');
+        if(!hint){
+          hint = document.createElement('div');
+          hint.id = 'taskNlHint';
+          hint.style.cssText = 'font-size:11px;color:var(--accent);margin-top:5px;font-weight:600;';
+          titleEl.parentNode.appendChild(hint);
+        }
+        const parts = [];
+        if(parsed.time) parts.push(''+parsed.time);
+        if(parsed.date) parts.push(''+parsed.date);
+        if(parts.length){ hint.textContent = 'Detected: '+parts.join(' · '); hint.style.display=''; }
+        else { hint.style.display='none'; }
+      }, 350);
+    });
+  }
+  setTimeout(function(){
+    const ta = document.getElementById('taskTitle');
+    if(ta && !ta.disabled) ta.focus();
+  }, 100);
 }
 function closeTaskForm(){
   const backdrop = document.getElementById('taskFormBackdrop');
@@ -8027,8 +8430,13 @@ function closeTaskForm(){
 }
 
 function saveTask(){
-  const title = document.getElementById('taskTitle').value.trim();
+  let title = document.getElementById('taskTitle').value.trim();
   if(!title){ showToast('Title required'); return; }
+  // Strip NL keywords from title
+  if(typeof parseNaturalEvent === 'function'){
+    const parsed = parseNaturalEvent(title);
+    if(parsed && parsed.title) title = parsed.title;
+  }
   const editId = document.getElementById('taskEditId').value;
   const payload = {
     id: editId || ('t_'+Date.now()+'_'+Math.random().toString(36).slice(2,7)),
@@ -8070,108 +8478,10 @@ function saveTask(){
   showToast(editId ? 'Task updated' : 'Task added');
 }
 
-// ── SHARE TASK ──
-async function openShareTask(id){
-  const t = _tasks.find(function(x){return x.id===id;});
-  if(!t) return;
-  if(t.shared_by){ showToast('You can\'t reshare a task shared with you'); return; }
-  let modal = document.getElementById('shareTaskOverlay');
-  if(modal) modal.remove();
-  modal = document.createElement('div');
-  modal.id = 'shareTaskOverlay';
-  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9400;display:flex;align-items:center;justify-content:center;padding:16px;';
-  modal.innerHTML =
-    '<div style="background:#fff;border-radius:14px;width:100%;max-width:380px;display:flex;flex-direction:column;overflow:hidden;font-family:inherit;">'+
-      '<div style="padding:14px 16px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;justify-content:space-between;">'+
-        '<div style="font-size:14px;font-weight:700;color:#0f172a;">Share task</div>'+
-        '<button onclick="closeShareTask()" style="background:none;border:none;font-size:22px;color:#64748b;cursor:pointer;line-height:1;padding:0 4px;">×</button>'+
-      '</div>'+
-      '<div style="padding:14px 16px;">'+
-        '<div style="font-size:12px;color:#64748b;margin-bottom:4px;">Task</div>'+
-        '<div style="font-size:13px;font-weight:600;color:#0f172a;margin-bottom:14px;padding:8px 10px;background:#f8fafc;border-radius:8px;">'+t.title.replace(/</g,'&lt;')+'</div>'+
-        '<div style="font-size:12px;color:#64748b;margin-bottom:4px;">Send to</div>'+
-        '<select id="shareTaskRecipient" class="f-input" style="width:100%;font-size:13px;margin-bottom:12px;">'+
-          '<option value="">Loading staff...</option>'+
-        '</select>'+
-        '<div style="font-size:12px;color:#64748b;margin-bottom:4px;">Optional message</div>'+
-        '<textarea id="shareTaskNote" class="f-input" rows="2" placeholder="Add a note (optional)..." style="width:100%;font-size:13px;resize:vertical;"></textarea>'+
-      '</div>'+
-      '<div style="padding:10px 16px 14px;display:flex;gap:8px;">'+
-        '<button onclick="closeShareTask()" class="btn btn-outline" style="flex:1;font-size:13px;padding:9px 12px;">Cancel</button>'+
-        '<button id="shareTaskSendBtn" onclick="sendSharedTask(\''+id+'\')" class="btn btn-green" style="flex:1;font-size:13px;padding:9px 12px;">Share</button>'+
-      '</div>'+
-    '</div>';
-  document.body.appendChild(modal);
-  modal.onclick = function(e){ if(e.target===modal) closeShareTask(); };
-  try{
-    const names = await sbGet('staff_names','?order=name.asc');
-    const sel = document.getElementById('shareTaskRecipient');
-    sel.innerHTML = '<option value="">Choose a colleague...</option>'+
-      (names||[]).filter(function(n){return n.name && n.name!==me;})
-        .map(function(n){return '<option value="'+n.name.replace(/"/g,'&quot;')+'">'+n.name+'</option>';}).join('');
-  }catch(e){
-    const sel = document.getElementById('shareTaskRecipient');
-    if(sel) sel.innerHTML = '<option value="">Failed to load staff</option>';
-  }
-}
-
-function closeShareTask(){
-  const m = document.getElementById('shareTaskOverlay');
-  if(m) m.remove();
-}
-
-async function sendSharedTask(taskId){
-  const t = _tasks.find(function(x){return x.id===taskId;});
-  if(!t) return;
-  const recipient = (document.getElementById('shareTaskRecipient')||{}).value;
-  const note = ((document.getElementById('shareTaskNote')||{}).value||'').trim();
-  if(!recipient){ alert('Pick a colleague to share with.'); return; }
-  const btn = document.getElementById('shareTaskSendBtn');
-  if(btn){ btn.disabled = true; btn.textContent = 'Sending...'; }
-  try{
-    const payload = {
-      sender: me,
-      recipient: recipient,
-      title: t.title,
-      notes: note ? (note + (t.notes ? '\n\n— Original notes —\n' + t.notes : '')) : (t.notes||''),
-      due_date: t.dueDate || null,
-      due_time: t.dueTime || null,
-      priority: t.priority || 'med',
-      done: false
-    };
-    const res = await sbPost('shared_tasks', payload);
-    if(!res.ok && res.status !== 201) throw new Error('HTTP '+res.status);
-    try{
-      await sbPost('reply_notifications', {
-        recipient: recipient,
-        replier: me,
-        body: me + ' shared a task with you: ' + t.title.slice(0,80),
-        created_at: new Date().toISOString()
-      });
-    }catch(e){ /* ignore */ }
-    showToast('Task shared with ' + recipient.split(' ')[0]);
-    closeShareTask();
-  }catch(e){
-    console.warn('share failed:', e);
-    alert('Failed to share. Make sure the shared_tasks table exists in Supabase.');
-    if(btn){ btn.disabled = false; btn.textContent = 'Share'; }
-  }
-}
-
 function deleteTask(id){
   if(!confirm('Delete this task?')) return;
   const row = document.querySelector('.task-item[data-id="'+id+'"]');
   const finishDelete = function(){
-    // If shared task, remember dismissal so it doesn't re-appear on reload
-    const t = _tasks.find(function(x){return x.id===id;});
-    if(t && t.shared_id){
-      try{
-        const k = 'shared_tasks_dismissed_'+me;
-        const arr = JSON.parse(localStorage.getItem(k)||'[]');
-        if(arr.indexOf(t.shared_id)<0) arr.push(t.shared_id);
-        localStorage.setItem(k, JSON.stringify(arr));
-      }catch(e){}
-    }
     _tasks = _tasks.filter(function(t){return t.id!==id;});
     saveTasks();
     renderTasks();
@@ -8338,12 +8648,10 @@ function renderTasks(){
 
     const overdueCls = (!t.done && due && (due - now) < 0) ? ' overdue' : '';
     const prioCls = ' priority-' + (t.priority||'med');
-    const showPrioChip = t.priority==='high'||t.priority==='low';
-    const fromBadge = t.shared_by ? '<span class="task-chip" style="background:#ede9fe;color:#7c3aed;border:none;">From '+(t.shared_by.split(" ")[0]||t.shared_by)+'</span>' : '';
-    const shareChip = !t.shared_by && !t.done ? '<button class="task-chip" onclick="event.stopPropagation();openShareTask(\''+t.id+'\')" style="background:#f1f5f9;color:#475569;border:none;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:4px;"><svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor"><path d="M15 8a3 3 0 10-2.977-2.63l-4.94 2.47a3 3 0 100 4.319l4.94 2.47a3 3 0 10.895-1.789l-4.94-2.47a3.027 3.027 0 000-.74l4.94-2.47C13.456 7.68 14.19 8 15 8z"/></svg>Share</button>' : '';
-    const hasMeta = !!(dueChip || remChip || showPrioChip || fromBadge || shareChip);
+    const hasMeta = !!(dueChip || remChip || (t.priority==='high'||t.priority==='low'));
     return '<div class="task-item'+(t.done?' done':'')+overdueCls+prioCls+'" data-id="'+t.id+'" onclick="openTaskForm(\''+t.id+'\')">'+
       '<button class="task-del" onclick="event.stopPropagation();deleteTask(\''+t.id+'\')" title="Delete">×</button>'+
+      (t.sharedFrom ? '<div class="task-shared-tag" title="Shared by '+(t.sharedFrom).replace(/"/g,'&quot;')+'"><svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor"><path d="M15 8a3 3 0 10-2.977-2.63l-4.94 2.47a3 3 0 100 4.319l4.94 2.47a3 3 0 10.895-1.789l-4.94-2.47a3.027 3.027 0 000-.74l4.94-2.47A3 3 0 0015 8z"/></svg> '+(t.sharedFrom)+'</div>' : (t.sharedTo ? '<div class="task-shared-tag shared-out" title="Shared with '+(t.sharedTo||[]).join(', ')+'"><svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor"><path d="M15 8a3 3 0 10-2.977-2.63l-4.94 2.47a3 3 0 100 4.319l4.94 2.47a3 3 0 10.895-1.789l-4.94-2.47a3.027 3.027 0 000-.74l4.94-2.47A3 3 0 0015 8z"/></svg> Shared</div>' : '<button class="task-share" onclick="event.stopPropagation();openShareTask(\''+t.id+'\')" title="Share with team"><svg width="13" height="13" viewBox="0 0 20 20" fill="currentColor"><path d="M15 8a3 3 0 10-2.977-2.63l-4.94 2.47a3 3 0 100 4.319l4.94 2.47a3 3 0 10.895-1.789l-4.94-2.47a3.027 3.027 0 000-.74l4.94-2.47A3 3 0 0015 8z"/></svg></button>'))+
       '<div class="task-card-hd">'+
         '<div class="task-check" onclick="event.stopPropagation();toggleTaskDone(\''+t.id+'\')">'+checkIcon+'</div>'+
         '<div class="task-body">'+
@@ -8351,7 +8659,7 @@ function renderTasks(){
           (t.notes ? '<div class="task-notes">'+t.notes.replace(/</g,'&lt;')+'</div>' : '')+
         '</div>'+
       '</div>'+
-      (hasMeta ? '<div class="task-meta">'+fromBadge+dueChip+remChip+(showPrioChip?prioChip:'')+shareChip+'</div>' : '')+
+      (hasMeta ? '<div class="task-meta">'+dueChip+remChip+(t.priority==='high'||t.priority==='low'?prioChip:'')+'</div>' : '')+
     '</div>';
   }).join('');
   allHtml += '</div>'; // close task-grid
@@ -8446,7 +8754,7 @@ function checkTaskReminders(){
       // System notification (plays at OS volume, works even if tab not focused)
       const remLbl = (t.remindBefore===0?'Due now':(t.remindBefore<60?t.remindBefore+' min before due':(t.remindBefore<1440?(t.remindBefore/60)+'h before due':(t.remindBefore/1440)+'d before due')));
       const dueStr = t.dueTime ? ' at '+t.dueTime : '';
-      showSystemNotification('🔔 ' + t.title, remLbl + dueStr + (t.notes?' — '+t.notes.slice(0,60):''), t.id, 'tasks');
+      showSystemNotification(t.title, remLbl + dueStr + (t.notes?' — '+t.notes.slice(0,60):''), t.id, 'tasks');
       // Show a banner if the function exists
       if(typeof showBanner === 'function'){
         showBanner('Task reminder', t.title, 'info');
@@ -9362,7 +9670,7 @@ async function pollForNewActivity(){
       if(a.created_by === me) return;
       _lastAnnSeen = Math.max(_lastAnnSeen, new Date(a.created_at).getTime());
       showSystemNotification(
-        (a.urgent?'⚡ Urgent: ':'📣 New announcement: ') + (a.title||''),
+        (a.urgent?'Urgent: ':'New announcement: ') + (a.title||''),
         searchText(a.body).slice(0,140) || '(no body)',
         'ann-'+a.id,
         'announcements'
@@ -9375,7 +9683,7 @@ async function pollForNewActivity(){
       if(d.created_by === me) return;
       _lastDiscSeen = Math.max(_lastDiscSeen, new Date(d.created_at).getTime());
       showSystemNotification(
-        '💬 New discussion: ' + (d.title||''),
+        'New discussion: ' + (d.title||''),
         searchText(d.body).slice(0,140) || 'Tap to join the conversation',
         'disc-'+d.id,
         'discussions'
@@ -9419,6 +9727,125 @@ async function markAllNotificationsRead(){
     const badges = document.querySelectorAll('#mhBellBadge,#sbBellBadge');
     badges.forEach(function(b){ if(b) b.style.display='none'; });
   }catch(e){console.warn(e);}
+}
+
+// ── TASK SHARING ──────────────────────
+let _shareTaskId = null;
+
+async function openShareTask(taskId){
+  const t = _tasks.find(function(x){return x.id===taskId;});
+  if(!t) return;
+  if(t.sharedFrom){ showToast('You cannot re-share a shared task'); return; }
+  if(t.sharedTo && t.sharedTo.length){ showToast('Already shared'); return; }
+  _shareTaskId = taskId;
+  let bd = document.getElementById('shareTaskBack');
+  if(!bd){
+    bd = document.createElement('div');
+    bd.id = 'shareTaskBack';
+    bd.className = 'share-back';
+    document.body.appendChild(bd);
+    bd.addEventListener('click', function(e){ if(e.target===bd) closeShareTask(); });
+  }
+  const all = (typeof STAFF !== 'undefined') ? STAFF.filter(function(n){return n && n!==me;}) : [];
+  bd.innerHTML = '<div class="share-modal" onclick="event.stopPropagation()">'+
+    '<div class="share-hd"><h3>Share task with team</h3><button onclick="closeShareTask()" style="background:none;border:none;font-size:22px;color:#94a3b8;cursor:pointer;">×</button></div>'+
+    '<div class="share-staff-list" id="shareStaffList">'+
+      all.map(function(name){
+        const init = name.split(' ').map(function(w){return w[0];}).join('').slice(0,2);
+        const color = (typeof rtAvaColor==='function') ? rtAvaColor(name) : '#64748b';
+        return '<div class="share-staff-row" data-name="'+name.replace(/"/g,'&quot;')+'" onclick="this.classList.toggle(\'selected\')">'+
+          '<div class="share-staff-ava" style="background:'+color+';">'+init.toUpperCase()+'</div>'+
+          '<div class="share-staff-name">'+name+'</div>'+
+          '<div class="share-check"></div>'+
+        '</div>';
+      }).join('')+
+    '</div>'+
+    '<div class="share-actions">'+
+      '<button onclick="closeShareTask()" class="btn btn-outline" style="padding:8px 14px;font-size:12px;">Cancel</button>'+
+      '<button onclick="confirmShareTask()" class="btn btn-green" style="padding:8px 18px;font-size:12px;">Share</button>'+
+    '</div>'+
+  '</div>';
+  bd.style.display='flex';
+}
+
+function closeShareTask(){
+  const bd = document.getElementById('shareTaskBack');
+  if(bd) bd.style.display='none';
+  _shareTaskId = null;
+}
+
+async function confirmShareTask(){
+  if(!_shareTaskId) return;
+  const t = _tasks.find(function(x){return x.id===_shareTaskId;});
+  if(!t) return;
+  const selected = Array.from(document.querySelectorAll('#shareStaffList .share-staff-row.selected')).map(function(r){return r.dataset.name;});
+  if(!selected.length){ showToast('Pick at least one person'); return; }
+
+  const taskCopy = {
+    title: t.title, dueDate: t.dueDate, dueTime: t.dueTime,
+    priority: t.priority, remindBefore: t.remindBefore, notes: t.notes,
+    originalNote: t.notes || ''
+  };
+
+  let okCount = 0, dupCount = 0, failCount = 0;
+  for(const name of selected){
+    try{
+      const res = await fetch(SB+'/rest/v1/shared_tasks', {
+        method:'POST',
+        headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+        body: JSON.stringify({source_id: t.id, from_user: me, to_user: name, task_data: taskCopy})
+      });
+      if(res.ok) okCount++;
+      else if(res.status === 409) dupCount++;
+      else failCount++;
+    }catch(e){failCount++;}
+  }
+
+  // Mark original as shared so it can't be re-shared
+  t.sharedTo = selected;
+  saveTasks();
+  renderTasks();
+
+  closeShareTask();
+  let msg = '';
+  if(okCount) msg += 'Shared with '+okCount+' '+(okCount===1?'person':'people');
+  if(dupCount) msg += (msg?', ':'') + dupCount+' already had it';
+  if(failCount) msg += (msg?', ':'') + failCount+' failed';
+  showToast(msg || 'Shared');
+}
+
+async function loadSharedTasksFromOthers(){
+  if(!me) return;
+  try{
+    const rows = await sbGet('shared_tasks','?to_user=eq.'+encodeURIComponent(me)+'&order=shared_at.desc&limit=200');
+    if(!rows || !rows.length) return;
+    let added = 0;
+    rows.forEach(function(r){
+      const data = r.task_data || {};
+      const localId = 'shared_'+r.id;
+      if(_tasks.find(function(x){return x.id===localId;})) return; // already imported
+      _tasks.push({
+        id: localId,
+        title: data.title || 'Shared task',
+        dueDate: data.dueDate || null,
+        dueTime: data.dueTime || null,
+        priority: data.priority || 'med',
+        remindBefore: data.remindBefore == null ? null : data.remindBefore,
+        notes: data.notes || '',
+        originalNote: data.originalNote || data.notes || '',
+        sharedFrom: r.from_user,
+        done: false,
+        createdAt: r.shared_at
+      });
+      added++;
+    });
+    if(added){
+      saveTasks();
+      if(typeof renderTasks==='function') renderTasks();
+      if(typeof updateTaskBadge==='function') updateTaskBadge();
+      if(typeof showToast==='function') showToast(added+' shared task'+(added===1?'':'s')+' added');
+    }
+  }catch(e){console.warn('loadSharedTasks:',e);}
 }
 
 // ── ATTACHMENTS (Phase 4) ──────────────────
@@ -9556,167 +9983,6 @@ function rtClearAttachments(textareaId){
 }
 
 // Render attachment grid for display in cards
-// ── GIF PICKER (KLIPY) ──
-// KLIPY GIF API. Free forever. Tenor + Giphy alternative.
-// Get key (3 min, no credit card): https://klipy.com/developers → "Get API Key" → sign up → create app → copy Test Key.
-// Test key = 100 req/min, plenty for this app.
-const KLIPY_KEY = 'CMIheTEORZgfgdvWmol9Qi8YCJvw0oUszbYXZfUDLqn4UZ1AnhC9V8eMHWeFjzMa';
-const KLIPY_CUSTOMER = 'oscars-portal'; // any stable string identifying your app/user
-// Pending GIF storage keyed by context: 'reply:<discId>' | 'disc' | 'ann'
-window._pendingGif = window._pendingGif || {};
-
-function openGifPicker(ctx){
-  if(!ctx) ctx = 'disc';
-  if(document.getElementById('gifPickerModal')) return;
-  const modal = document.createElement('div');
-  modal.id = 'gifPickerModal';
-  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
-  modal.innerHTML =
-    '<div style="background:#fff;border-radius:14px;width:100%;max-width:480px;max-height:85vh;display:flex;flex-direction:column;overflow:hidden;font-family:inherit;min-width:0;">'+
-      '<div style="display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid #f1f5f9;">'+
-        '<div style="font-size:14px;font-weight:700;color:#0f172a;flex:1;">Pick a GIF</div>'+
-        '<button id="gifPickerClose" style="background:none;border:none;font-size:22px;color:#64748b;cursor:pointer;line-height:1;">×</button>'+
-      '</div>'+
-      '<div style="padding:10px 14px;border-bottom:1px solid #f1f5f9;">'+
-        '<input id="gifSearch" placeholder="Search KLIPY..." style="width:100%;padding:9px 12px;border:1px solid #e2e8f0;border-radius:10px;font-size:13px;font-family:inherit;outline:none;box-sizing:border-box;">'+
-      '</div>'+
-      '<div id="gifResults" style="flex:1;overflow-y:auto;padding:10px;display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:6px;align-content:start;">'+
-        '<div style="grid-column:1/-1;text-align:center;padding:30px;color:#94a3b8;font-size:12px;">Loading…</div>'+
-      '</div>'+
-      '<div style="padding:6px 14px;border-top:1px solid #f1f5f9;font-size:10px;color:#94a3b8;text-align:center;">Powered by KLIPY</div>'+
-    '</div>';
-  document.body.appendChild(modal);
-  modal.dataset.ctx = ctx;
-  document.getElementById('gifPickerClose').onclick = closeGifPicker;
-  modal.onclick = function(e){ if(e.target===modal) closeGifPicker(); };
-  loadGifs('', ctx);
-  let t;
-  const inp = document.getElementById('gifSearch');
-  inp.oninput = function(){
-    clearTimeout(t);
-    const q = inp.value.trim();
-    t = setTimeout(function(){ loadGifs(q, ctx); }, 300);
-  };
-  setTimeout(function(){ inp.focus(); }, 30);
-}
-
-function closeGifPicker(){
-  const m = document.getElementById('gifPickerModal');
-  if(m) m.remove();
-}
-
-async function loadGifs(query, ctx){
-  const grid = document.getElementById('gifResults');
-  if(!grid) return;
-  // Key-not-set check
-  if(!KLIPY_KEY || KLIPY_KEY === 'PASTE_YOUR_KLIPY_KEY_HERE'){
-    grid.innerHTML =
-      '<div style="grid-column:1/-1;padding:24px 16px;color:#475569;font-size:12px;line-height:1.6;">'+
-        '<div style="font-weight:700;color:#0f172a;margin-bottom:8px;">KLIPY API key not set</div>'+
-        'To enable GIFs, get a free key (3 min):<br>'+
-        '1. Go to <span style="color:#0284c7;">klipy.com/developers</span><br>'+
-        '2. Click "Get API Key" → sign up<br>'+
-        '3. Create an app → copy the <b>Test Key</b><br>'+
-        '4. Paste the key into <code style="background:#f1f5f9;padding:1px 6px;border-radius:4px;">KLIPY_KEY</code> in index.html'+
-      '</div>';
-    return;
-  }
-  grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:30px;color:#94a3b8;font-size:12px;">Loading…</div>';
-  const base = 'https://api.klipy.com/api/v1/'+encodeURIComponent(KLIPY_KEY)+'/gifs';
-  const endpoint = query
-    ? base+'/search?q='+encodeURIComponent(query)+'&per_page=24&customer_id='+encodeURIComponent(KLIPY_CUSTOMER)
-    : base+'/trending?per_page=24&customer_id='+encodeURIComponent(KLIPY_CUSTOMER);
-  try{
-    const r = await fetch(endpoint);
-    if(!r.ok) throw new Error('HTTP '+r.status);
-    const data = await r.json();
-    // KLIPY response: { data: { data: [ { file: { gif:{url}, sm:{gif:{url}}, ... }, title } ] } }
-    const results = (data && data.data && Array.isArray(data.data.data)) ? data.data.data
-                  : (data && Array.isArray(data.data)) ? data.data
-                  : (data && Array.isArray(data.results)) ? data.results
-                  : [];
-    if(!results.length){
-      grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:30px;color:#94a3b8;font-size:12px;">No GIFs found.</div>';
-      return;
-    }
-    grid.innerHTML = results.map(function(g){
-      // Try common KLIPY response shapes
-      const f = g.file || g.media || {};
-      const sm = f.sm || f.small || {};
-      const tiny = (sm.gif && sm.gif.url) || (f.gif && f.gif.url) || g.preview || '';
-      const full = (f.gif && f.gif.url) || (f.hd && f.hd.url) || tiny;
-      const title = (g.title || g.slug || 'gif').replace(/"/g,'&quot;');
-      if(!tiny) return '';
-      return '<button type="button" data-full="'+full+'" data-title="'+title+'" data-ctx="'+ctx+'" style="background:#f1f5f9;border:none;border-radius:8px;cursor:pointer;padding:0;overflow:hidden;display:block;width:100%;min-width:0;" onclick="pickGif(this.dataset.full,this.dataset.title,this.dataset.ctx)">'+
-        '<img src="'+tiny+'" alt="'+title+'" style="width:100%;height:auto;max-height:140px;object-fit:cover;display:block;" loading="lazy">'+
-      '</button>';
-    }).filter(Boolean).join('');
-    if(!grid.innerHTML.trim()){
-      grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:30px;color:#94a3b8;font-size:12px;">No GIFs found.</div>';
-    }
-  }catch(e){
-    console.warn('KLIPY failed:', e);
-    grid.innerHTML =
-      '<div style="grid-column:1/-1;padding:24px 16px;color:#475569;font-size:12px;line-height:1.6;">'+
-        '<div style="font-weight:700;color:#dc2626;margin-bottom:8px;">Could not load GIFs</div>'+
-        'If you see HTTP 403 / 404 in console:<br>'+
-        '1. Go to your <span style="color:#0284c7;">KLIPY Partner Panel</span><br>'+
-        '2. Find your app → <b>Update App Details</b><br>'+
-        '3. Add <code style="background:#f1f5f9;padding:1px 6px;border-radius:4px;">'+(location.hostname||'your-domain.com')+'</code> to the allowed domains/hosts list<br>'+
-        '4. Save and reload this page<br><br>'+
-        'Otherwise check network tab for the exact response.'+
-      '</div>';
-  }
-}
-
-function pickGif(url, title, ctx){
-  if(!url || !ctx) return;
-  window._pendingGif[ctx] = {
-    url: url,
-    name: title || 'gif',
-    type: 'image/gif',
-    isImage: true,
-    size: 0
-  };
-  // Find the right preview slot for this context
-  let prevId;
-  if(ctx.indexOf('reply:')===0){
-    prevId = 'discReplyGifPreview-'+ctx.slice(6);
-  } else if(ctx==='disc'){
-    prevId = 'discPostGifPreview';
-  } else if(ctx==='ann'){
-    prevId = 'annPostGifPreview';
-  }
-  const prev = prevId ? document.getElementById(prevId) : null;
-  if(prev){
-    prev.style.display = 'block';
-    prev.style.marginBottom = '6px';
-    prev.innerHTML =
-      '<div style="position:relative;display:inline-block;max-width:100%;">'+
-        '<img src="'+url+'" alt="" style="max-width:140px;max-height:100px;width:auto;height:auto;border-radius:8px;display:block;">'+
-        '<button type="button" data-ctx="'+ctx+'" onclick="clearPendingGif(this.dataset.ctx)" style="position:absolute;top:-6px;right:-6px;background:#0f172a;color:#fff;border:none;width:22px;height:22px;border-radius:50%;font-size:14px;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center;padding:0;z-index:2;">×</button>'+
-      '</div>';
-  }
-  closeGifPicker();
-}
-
-function clearPendingGif(ctx){
-  if(window._pendingGif) delete window._pendingGif[ctx];
-  let prevId;
-  if(ctx.indexOf('reply:')===0){
-    prevId = 'discReplyGifPreview-'+ctx.slice(6);
-  } else if(ctx==='disc'){
-    prevId = 'discPostGifPreview';
-  } else if(ctx==='ann'){
-    prevId = 'annPostGifPreview';
-  }
-  const prev = prevId ? document.getElementById(prevId) : null;
-  if(prev){ prev.style.display='none'; prev.innerHTML=''; }
-}
-
-// Back-compat for old reply gif clear
-function clearReplyGif(discId){ clearPendingGif('reply:'+discId); }
-
 function attRenderGrid(atts){
   if(!atts || !atts.length) return '';
   let html = '<div class="att-grid">';
@@ -10045,7 +10311,7 @@ async function loadNotifications(){
       if(isMention && !sysSeen.includes(r.id) && typeof showSystemNotification==='function'){
         const fromName = r.replier || 'Someone';
         const bodyText = (r.body || r.reply_body || '').replace(/^mentioned you: ?/i,'').replace(/^mention in (announcement|discussion): ?/i,'');
-        showSystemNotification('@ '+fromName+' mentioned you', bodyText.slice(0,140), 'mention-'+r.id, 'mentions');
+        showSystemNotification(fromName+' mentioned you', bodyText.slice(0,140), 'mention-'+r.id, 'mentions');
         sysSeen.push(r.id);
         sysSeenChanged = true;
       }
@@ -10053,7 +10319,7 @@ async function loadNotifications(){
     if(sysSeenChanged) localStorage.setItem(sysSeenKey, JSON.stringify(sysSeen.slice(-100)));
     newRepliesList.forEach(function(r){
       const isMention = (r.body && r.body.indexOf('mentioned you')>=0) || (r.reply_body && r.reply_body.indexOf('mention')===0);
-      const heading = isMention ? '@ Mentioned You' : '💬 New Reply';
+      const heading = isMention ? 'Mentioned you' : 'New reply';
       const bodyText = (r.body || r.reply_body || '').replace(/^mentioned you: ?/i,'').replace(/^mention in (announcement|discussion): ?/i,'');
       const subText = isMention
         ? r.replier + ' mentioned you'
@@ -10888,19 +11154,6 @@ function setupRealtimeChannels(){
   _realtimeChannels.forEach(function(ch){ try{ _realtimeClient.removeChannel(ch); }catch(e){} });
   _realtimeChannels = [];
 
-  // Debounce: batch rapid realtime events into single reload
-  const _rtTimers = {};
-  function debouncedReload(key, fn, delay){
-    delay = delay || 1500;
-    if(_rtTimers[key]) clearTimeout(_rtTimers[key]);
-    _rtTimers[key] = setTimeout(function(){ fn(); delete _rtTimers[key]; }, delay);
-  }
-  // Skip realtime reload if change was triggered by current user (already handled locally)
-  function isFromMe(payload){
-    const row = (payload && (payload.new || payload.old)) || {};
-    return row.created_by === me || row.staff_name === me;
-  }
-
   // Discussions — polls especially
   const discCh = _realtimeClient.channel('discussions-live')
     .on('postgres_changes', {event:'*', schema:'public', table:'discussions'}, function(payload){
@@ -10912,33 +11165,24 @@ function setupRealtimeChannels(){
           if(pollEl){ pollEl.outerHTML = renderPoll(_discCache[id]); return; }
         }
       }
-      if(isFromMe(payload)) return;
-      debouncedReload('disc', function(){
-        const active = document.querySelector('#page-engagement.active');
-        if(active) loadDiscussions();
-        loadHomeDiscPreview();
-      });
+      const active = document.querySelector('#page-engagement.active');
+      if(active) loadDiscussions();
+      loadHomeDiscPreview();
     })
-    .on('postgres_changes', {event:'*', schema:'public', table:'discussion_replies'}, function(payload){
-      if(isFromMe(payload)) return;
-      debouncedReload('replies', function(){
-        const active = document.querySelector('#page-engagement.active');
-        if(active) loadDiscussions();
-      });
+    .on('postgres_changes', {event:'*', schema:'public', table:'discussion_replies'}, function(){
+      const active = document.querySelector('#page-engagement.active');
+      if(active) loadDiscussions();
     })
     .subscribe();
   _realtimeChannels.push(discCh);
 
   // Announcements
   const annCh = _realtimeClient.channel('announcements-live')
-    .on('postgres_changes', {event:'*', schema:'public', table:'announcements'}, function(payload){
-      if(isFromMe(payload)) return;
-      debouncedReload('ann', function(){
-        const active = document.querySelector('#page-announcements.active');
-        if(active) loadAnnouncements();
-        loadHomeAnnPreview();
-        refreshAnnBadge();
-      });
+    .on('postgres_changes', {event:'*', schema:'public', table:'announcements'}, function(){
+      const active = document.querySelector('#page-announcements.active');
+      if(active) loadAnnouncements();
+      loadHomeAnnPreview();
+      refreshAnnBadge();
     })
     .subscribe();
   _realtimeChannels.push(annCh);
