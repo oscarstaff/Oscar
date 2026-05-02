@@ -6758,11 +6758,21 @@ function parseNaturalEvent(input){
     text = text.replace(m[0], '').trim();
   }
 
-  // Date patterns: "tomorrow", "today", "monday", "next monday", "on 5/15", "may 15"
+  // Date patterns
   const today = new Date();
   const tomorrowRe = /\b(tomorrow|tmrw|tmw)\b/i;
   const todayRe = /\b(today)\b/i;
   const dayRe = /\b(this\s+|next\s+)?(monday|tuesday|wednesday|thursday|friday|saturday|sunday|mon|tue|tues|wed|thu|thurs|fri|sat|sun)\b/i;
+  // Explicit dates
+  const months = {jan:0,january:0,feb:1,february:1,mar:2,march:2,apr:3,april:3,may:4,jun:5,june:5,jul:6,july:6,aug:7,august:7,sep:8,sept:8,september:8,oct:9,october:9,nov:10,november:10,dec:11,december:11};
+  // "4th April", "4 April", "4 Apr", "9th May"
+  const dayMonthRe = /\b(\d{1,2})(st|nd|rd|th)?\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec|january|february|march|april|june|july|august|september|october|november|december)\b/i;
+  // "April 4", "April 4th", "Apr 9"
+  const monthDayRe = /\b(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec|january|february|march|april|june|july|august|september|october|november|december)\s+(\d{1,2})(st|nd|rd|th)?\b/i;
+  // "5/15", "15/5" (assume DD/MM since AU)
+  const slashRe = /\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/;
+  // "15-5" or "2025-05-15"
+  const isoRe = /\b(\d{4})-(\d{1,2})-(\d{1,2})\b/;
 
   if((m = text.match(todayRe))){
     date = today;
@@ -6770,6 +6780,55 @@ function parseNaturalEvent(input){
   } else if((m = text.match(tomorrowRe))){
     date = new Date(today); date.setDate(date.getDate()+1);
     text = text.replace(m[0], '').trim();
+  } else if((m = text.match(isoRe))){
+    const y = parseInt(m[1]), mo = parseInt(m[2])-1, d = parseInt(m[3]);
+    if(y > 1900 && mo>=0 && mo<12 && d>=1 && d<=31){
+      date = new Date(y, mo, d);
+      text = text.replace(m[0], '').trim();
+    }
+  } else if((m = text.match(dayMonthRe))){
+    const d = parseInt(m[1]);
+    const mo = months[m[3].toLowerCase()];
+    if(mo !== undefined && d>=1 && d<=31){
+      let y = today.getFullYear();
+      const candidate = new Date(y, mo, d);
+      // If date already past this year, jump to next year
+      if(candidate < new Date(today.getFullYear(), today.getMonth(), today.getDate()-1)){
+        y++;
+      }
+      date = new Date(y, mo, d);
+      text = text.replace(m[0], '').trim();
+    }
+  } else if((m = text.match(monthDayRe))){
+    const mo = months[m[1].toLowerCase()];
+    const d = parseInt(m[2]);
+    if(mo !== undefined && d>=1 && d<=31){
+      let y = today.getFullYear();
+      const candidate = new Date(y, mo, d);
+      if(candidate < new Date(today.getFullYear(), today.getMonth(), today.getDate()-1)){
+        y++;
+      }
+      date = new Date(y, mo, d);
+      text = text.replace(m[0], '').trim();
+    }
+  } else if((m = text.match(slashRe))){
+    // DD/MM (Australian default)
+    const a = parseInt(m[1]), b = parseInt(m[2]);
+    let y = m[3] ? parseInt(m[3]) : today.getFullYear();
+    if(y < 100) y += 2000;
+    let dd, mo;
+    // If first is >12 it's clearly day; if second is >12 it's day; default DD/MM
+    if(a > 12 && b <= 12){ dd=a; mo=b-1; }
+    else if(b > 12 && a <= 12){ dd=b; mo=a-1; }
+    else { dd=a; mo=b-1; } // default DD/MM
+    if(dd>=1 && dd<=31 && mo>=0 && mo<12){
+      const candidate = new Date(y, mo, dd);
+      if(!m[3] && candidate < new Date(today.getFullYear(), today.getMonth(), today.getDate()-1)){
+        y++;
+      }
+      date = new Date(y, mo, dd);
+      text = text.replace(m[0], '').trim();
+    }
   } else if((m = text.match(dayRe))){
     const days = ['sun','mon','tue','wed','thu','fri','sat'];
     const longDays = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
@@ -6839,8 +6898,17 @@ function openNewEventForDate(dateStr){
           titleEl.parentNode.appendChild(hint);
         }
         const parts = [];
-        if(parsed.time) parts.push(''+parsed.time);
-        if(parsed.date) parts.push(''+parsed.date);
+        if(parsed.time){
+          const [hh,mm] = parsed.time.split(':');
+          const h = parseInt(hh);
+          const ampm = h<12?'am':'pm';
+          const h12 = h%12 || 12;
+          parts.push(h12+(mm!=='00'?':'+mm:'')+ampm);
+        }
+        if(parsed.date){
+          const dd = new Date(parsed.date+'T00:00:00');
+          parts.push(dd.toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short'}));
+        }
         if(parts.length){
           hint.textContent = 'Detected: '+parts.join(' · ');
           hint.style.display = '';
@@ -8412,8 +8480,17 @@ function openTaskForm(editId){
           titleEl.parentNode.appendChild(hint);
         }
         const parts = [];
-        if(parsed.time) parts.push(''+parsed.time);
-        if(parsed.date) parts.push(''+parsed.date);
+        if(parsed.time){
+          const [hh,mm] = parsed.time.split(':');
+          const h = parseInt(hh);
+          const ampm = h<12?'am':'pm';
+          const h12 = h%12 || 12;
+          parts.push(h12+(mm!=='00'?':'+mm:'')+ampm);
+        }
+        if(parsed.date){
+          const dd = new Date(parsed.date+'T00:00:00');
+          parts.push(dd.toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short'}));
+        }
         if(parts.length){ hint.textContent = 'Detected: '+parts.join(' · '); hint.style.display=''; }
         else { hint.style.display='none'; }
       }, 350);
