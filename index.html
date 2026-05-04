@@ -4271,6 +4271,10 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
             <button onclick="setHoursPeriod('month')" id="hp-month" class="hours-tab">This month</button>
           </div>
           <div id="hoursDisplay" style="margin-top:12px;"></div>
+          <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;">
+            <button onclick="openReportsModal()" style="background:#f8fafc;border:1px solid #e2e8f0;cursor:pointer;font-family:inherit;font-size:11.5px;font-weight:600;color:#475569;padding:6px 12px;border-radius:7px;">📊 My Reports</button>
+            <button onclick="toggleGpsBypass()" id="gpsBypassBtn" style="background:#f8fafc;border:1px solid #e2e8f0;cursor:pointer;font-family:inherit;font-size:11.5px;font-weight:600;color:#475569;padding:6px 12px;border-radius:7px;"></button>
+          </div>
         </div>
       </div>
 
@@ -8928,9 +8932,9 @@ function mdEscape(s){
 function mdToHtml(src){
   if(!src) return '';
   // If body contains ANY HTML tag, sanitize and return (rich-text editor output)
-  if(/<(b|i|em|strong|u|s|del|ul|ol|li|p|a|code|br|div|span)\b[^>]*>/i.test(src) ||
+  if(/<(b|i|em|strong|u|s|del|ul|ol|li|p|a|code|br|div|span|img)\b[^>]*>/i.test(src) ||
      /<\/(b|i|em|strong|u|s|del|ul|ol|li|p|a|code|div|span)>/i.test(src) ||
-     /<br\s*\/?>/i.test(src)){
+     /<(br|img)\s*\/?>/i.test(src)){
     if(typeof rtSanitize==='function') return rtSanitize(src);
   }
 
@@ -9009,7 +9013,8 @@ function rtUpgrade(textareaId, opts){
     '<div class="rt-divider"></div>'+
     '<button type="button" class="rt-btn" data-act="clear" title="Clear all formatting from selected text"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 4v3M15 4v3M6 7l3 13h6M14 14l6 6m0-6l-6 6"/></svg></button>'+
     '<div class="rt-divider"></div>'+
-    '<button type="button" class="rt-btn" data-act="attach" title="Attach file or image"><svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8 4a3 3 0 00-3 3v4a5 5 0 0010 0V7a1 1 0 112 0v4a7 7 0 11-14 0V7a5 5 0 0110 0v4a3 3 0 11-6 0V7a1 1 0 012 0v4a1 1 0 102 0V7a3 3 0 00-3-3z" clip-rule="evenodd"/></svg></button>';
+    '<button type="button" class="rt-btn" data-act="attach" title="Attach file or image"><svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8 4a3 3 0 00-3 3v4a5 5 0 0010 0V7a1 1 0 112 0v4a7 7 0 11-14 0V7a5 5 0 0110 0v4a3 3 0 11-6 0V7a1 1 0 012 0v4a1 1 0 102 0V7a3 3 0 00-3-3z" clip-rule="evenodd"/></svg></button>'+
+    '<button type="button" class="rt-btn" data-act="gif" title="Insert GIF" style="font-size:9px;font-weight:800;letter-spacing:.5px;">GIF</button>';
   wrap.appendChild(tb);
 
   // Hidden textarea — keeps form-data sync; existing post fns read from it
@@ -9125,6 +9130,10 @@ function rtAction(ed, act){
   if(act==='ol')        return document.execCommand('insertOrderedList');
   if(act==='clear')     return document.execCommand('removeFormat');
   if(act==='unlink')    return document.execCommand('unlink');
+  if(act==='gif'){
+    openGifPicker(ed);
+    return;
+  }
   if(act==='attach'){
     // Find file input by walking up to wrap
     const wrap = ed.closest('.rt-wrap');
@@ -9167,7 +9176,7 @@ function rtSanitize(html){
   const allowed = {
     'B':1,'STRONG':1,'I':1,'EM':1,'U':1,'S':1,'STRIKE':1,'DEL':1,
     'UL':1,'OL':1,'LI':1,'P':1,'BR':1,'CODE':1,
-    'A':1,'DIV':1,'SPAN':1
+    'A':1,'DIV':1,'SPAN':1,'IMG':1
   };
   function walk(node){
     const kids = Array.from(node.childNodes);
@@ -9186,6 +9195,20 @@ function rtSanitize(html){
       // Strip all attributes
       // Preserve mention chips
       const isMention = (tag==='A' || tag==='SPAN') && n.classList && n.classList.contains('mention');
+      // Preserve IMG src (must be http/https)
+      if(tag === 'IMG'){
+        const src = n.getAttribute('src') || '';
+        Array.from(n.attributes).forEach(function(a){ n.removeAttribute(a.name); });
+        if(/^https?:\/\//i.test(src)){
+          n.setAttribute('src', src);
+          n.setAttribute('style', 'max-width:280px;border-radius:8px;display:block;margin:6px 0;');
+          n.setAttribute('alt', 'GIF');
+        } else {
+          n.remove();
+          return;
+        }
+        return;
+      }
       Array.from(n.attributes).forEach(function(a){
         if(isMention && (a.name==='class' || a.name==='data-name')){
           return; // keep
@@ -9956,17 +9979,68 @@ function renderClockCard(){
   }
 }
 
+// ── GPS / GEOFENCE ──────────────────────
+const OFFICE_LAT = -33.95245;
+const OFFICE_LNG = 151.13856;
+const OFFICE_RADIUS_M = 200; // metres allowed
+
+function distanceMeters(lat1, lng1, lat2, lng2){
+  const R = 6371000;
+  const dLat = (lat2-lat1) * Math.PI/180;
+  const dLng = (lng2-lng1) * Math.PI/180;
+  const a = Math.sin(dLat/2)**2 +
+            Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) *
+            Math.sin(dLng/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+function getCurrentPosition(){
+  return new Promise(function(resolve, reject){
+    if(!navigator.geolocation){ reject(new Error('GPS not available')); return; }
+    navigator.geolocation.getCurrentPosition(
+      function(pos){ resolve(pos); },
+      function(err){ reject(err); },
+      { enableHighAccuracy:true, timeout:10000, maximumAge:0 }
+    );
+  });
+}
+
 async function toggleClock(){
   const btn = document.getElementById('clockBtn');
   if(!btn) return;
   const next = (_clockState === 'in') ? 'out' : 'in';
   btn.disabled = true;
   const prevText = btn.textContent;
+  btn.textContent = 'Locating...';
+
+  let lat = null, lng = null;
+  // Skip GPS check if user disabled it
+  const gpsBypass = localStorage.getItem('oscars_gps_bypass') === '1';
+  if(!gpsBypass){
+    try{
+      const pos = await getCurrentPosition();
+      lat = pos.coords.latitude;
+      lng = pos.coords.longitude;
+      const dist = distanceMeters(lat, lng, OFFICE_LAT, OFFICE_LNG);
+      if(dist > OFFICE_RADIUS_M){
+        const distFmt = dist > 1000 ? (dist/1000).toFixed(1)+'km' : Math.round(dist)+'m';
+        showToast('Too far from office ('+distFmt+'). Cannot punch.');
+        btn.disabled = false;
+        btn.textContent = prevText;
+        return;
+      }
+    }catch(e){
+      console.warn('GPS error:', e);
+      showToast('Location required: enable GPS in browser');
+      btn.disabled = false;
+      btn.textContent = prevText;
+      return;
+    }
+  }
+
   btn.textContent = '...';
   try{
-    // Write to supabase
     await sbPost('clock_log', {staff_name: me, action: next});
-    // Sync to Google Sheets if URL configured
     const DEFAULT_SHEET_URL = 'https://script.google.com/macros/s/AKfycby0Bq97bCZAsmnruXFuJuCqXQE_kOxhYE2KFuJnVzLXtT5CV0Y12k5176dxZbdaYVGE/exec';
     const sheetUrl = localStorage.getItem('oscars_sheet_url') || DEFAULT_SHEET_URL;
     if(sheetUrl){
@@ -9975,7 +10049,13 @@ async function toggleClock(){
           method:'POST',
           mode:'no-cors',
           headers:{'Content-Type':'text/plain;charset=utf-8'},
-          body: JSON.stringify({staff: me, action: next, notes:''})
+          body: JSON.stringify({
+            action:'punch',
+            staff: me,
+            subAction: next,
+            lat: lat, lng: lng,
+            note: ''
+          })
         });
       }catch(e){ console.warn('sheets sync failed:', e); }
     }
@@ -9991,6 +10071,227 @@ async function toggleClock(){
     btn.disabled = false;
   }
 }
+
+// ── KLIPY GIF PICKER ────────────────────
+let _gifEditor = null;
+let _gifQuery = '';
+let _gifPage = 0;
+
+function getKlipyKey(){
+  return localStorage.getItem('klipy_api_key') || '';
+}
+
+function openGifPicker(ed){
+  _gifEditor = ed;
+  _gifPage = 0;
+  let bd = document.getElementById('gifBack');
+  if(!bd){
+    bd = document.createElement('div');
+    bd.id = 'gifBack';
+    bd.style.cssText = 'position:fixed;inset:0;z-index:9560;background:rgba(15,23,42,.55);backdrop-filter:blur(10px);display:flex;align-items:flex-start;justify-content:center;padding:60px 16px 16px;overflow-y:auto;';
+    document.body.appendChild(bd);
+    bd.addEventListener('click', function(e){ if(e.target===bd) bd.style.display='none'; });
+  }
+  bd.innerHTML = '<div style="background:#fff;border-radius:14px;width:100%;max-width:560px;max-height:80dvh;display:flex;flex-direction:column;box-shadow:0 24px 60px rgba(15,23,42,.3);overflow:hidden;" onclick="event.stopPropagation()">'+
+    '<div style="padding:14px 16px;border-bottom:1px solid #f1f5f9;display:flex;gap:10px;align-items:center;">'+
+      '<svg width="18" height="18" viewBox="0 0 20 20" fill="#94a3b8"><path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd"/></svg>'+
+      '<input type="text" id="gifSearch" placeholder="Search GIFs (e.g. happy, party, friday)" style="flex:1;border:none;outline:none;font-family:inherit;font-size:14px;color:#0f172a;background:none;">'+
+      '<button onclick="document.getElementById(\'gifBack\').style.display=\'none\'" style="background:none;border:none;font-size:22px;color:#94a3b8;cursor:pointer;padding:0 4px;">×</button>'+
+    '</div>'+
+    '<div id="gifResults" style="flex:1;overflow-y:auto;padding:12px;"></div>'+
+  '</div>';
+  bd.style.display = 'flex';
+  const inp = document.getElementById('gifSearch');
+  setTimeout(function(){ inp.focus(); }, 30);
+  let timer = null;
+  inp.addEventListener('input', function(){
+    clearTimeout(timer);
+    timer = setTimeout(function(){ searchGifs(inp.value); }, 350);
+  });
+  // Initial: trending
+  searchGifs('');
+}
+
+async function searchGifs(query){
+  const el = document.getElementById('gifResults');
+  const key = getKlipyKey();
+  if(!key){
+    el.innerHTML = '<div style="text-align:center;padding:30px 16px;">'+
+      '<div style="font-size:14px;font-weight:700;color:#0f172a;margin-bottom:6px;">KLIPY API key needed</div>'+
+      '<div style="font-size:12px;color:#64748b;margin-bottom:12px;line-height:1.5;">Get a free key at <a href="https://klipy.com" target="_blank" rel="noopener" style="color:var(--accent);">klipy.com</a> then paste it below.</div>'+
+      '<div style="display:flex;gap:6px;max-width:340px;margin:0 auto;">'+
+        '<input id="klipyKeyIn" placeholder="Your KLIPY API key" style="flex:1;border:1.5px solid #e2e8f0;border-radius:8px;padding:8px 12px;font-size:12px;font-family:inherit;outline:none;">'+
+        '<button onclick="saveKlipyKey()" class="btn btn-green" style="padding:8px 14px;font-size:12px;">Save</button>'+
+      '</div>'+
+    '</div>';
+    return;
+  }
+  el.innerHTML = '<div style="padding:30px;text-align:center;color:#94a3b8;font-size:12px;">Loading...</div>';
+  _gifQuery = query;
+  try{
+    const endpoint = query.trim()
+      ? 'https://api.klipy.co/api/v1/'+encodeURIComponent(key)+'/gifs/search?q='+encodeURIComponent(query)+'&per_page=24'
+      : 'https://api.klipy.co/api/v1/'+encodeURIComponent(key)+'/gifs/trending?per_page=24';
+    const res = await fetch(endpoint);
+    const data = await res.json();
+    if(!data || !data.data || !data.data.data || !data.data.data.length){
+      el.innerHTML = '<div style="padding:30px;text-align:center;color:#94a3b8;font-size:12px;">No GIFs found.</div>';
+      return;
+    }
+    const items = data.data.data;
+    let html = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;">';
+    items.forEach(function(g){
+      const url = (g.file && g.file.md && g.file.md.gif && g.file.md.gif.url) ||
+                  (g.file && g.file.sm && g.file.sm.gif && g.file.sm.gif.url) ||
+                  (g.url) || '';
+      const thumb = (g.file && g.file.sm && g.file.sm.gif && g.file.sm.gif.url) || url;
+      if(!url) return;
+      const safeUrl = url.replace(/"/g,'&quot;');
+      html += '<button type="button" onclick="insertGif(\''+safeUrl+'\')" style="background:none;border:1px solid #e2e8f0;border-radius:8px;cursor:pointer;padding:0;overflow:hidden;aspect-ratio:1;transition:transform .15s,border-color .15s;" onmouseover="this.style.borderColor=\'var(--accent)\';this.style.transform=\'scale(1.03)\'" onmouseout="this.style.borderColor=\'#e2e8f0\';this.style.transform=\'scale(1)\'">'+
+        '<img src="'+thumb+'" style="width:100%;height:100%;object-fit:cover;display:block;" loading="lazy">'+
+      '</button>';
+    });
+    html += '</div>';
+    el.innerHTML = html;
+  }catch(e){
+    console.warn('KLIPY error:', e);
+    el.innerHTML = '<div style="padding:30px;text-align:center;color:#dc2626;font-size:12px;">Could not load GIFs. Check your API key.</div>';
+  }
+}
+
+function saveKlipyKey(){
+  const inp = document.getElementById('klipyKeyIn');
+  if(!inp) return;
+  const k = inp.value.trim();
+  if(!k){ showToast('Paste a key'); return; }
+  localStorage.setItem('klipy_api_key', k);
+  showToast('KLIPY key saved');
+  searchGifs(_gifQuery || '');
+}
+
+function insertGif(url){
+  if(!_gifEditor) return;
+  _gifEditor.focus();
+  const img = '<img src="'+url+'" style="max-width:280px;border-radius:8px;display:block;margin:6px 0;" alt="GIF">';
+  document.execCommand('insertHTML', false, img);
+  _gifEditor.dispatchEvent(new Event('input', {bubbles:true}));
+  document.getElementById('gifBack').style.display='none';
+}
+
+// ── REPORTS MODAL ──────────────────────
+async function openReportsModal(){
+  let bd = document.getElementById('reportsBack');
+  if(!bd){
+    bd = document.createElement('div');
+    bd.id = 'reportsBack';
+    bd.style.cssText = 'position:fixed;inset:0;z-index:9550;background:rgba(15,23,42,.5);backdrop-filter:blur(8px);display:flex;align-items:flex-start;justify-content:center;padding:60px 16px 16px;overflow-y:auto;';
+    document.body.appendChild(bd);
+    bd.addEventListener('click', function(e){ if(e.target===bd) bd.style.display='none'; });
+  }
+  const today = new Date();
+  const start = new Date(today); start.setDate(today.getDate()-13);
+  const fmt = function(d){return d.toISOString().split('T')[0];};
+  bd.innerHTML = '<div style="background:#fff;border-radius:14px;width:100%;max-width:560px;box-shadow:0 24px 60px rgba(15,23,42,.3);overflow:hidden;" onclick="event.stopPropagation()">'+
+    '<div style="padding:16px 18px;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center;">'+
+      '<div><div style="font-size:15px;font-weight:700;color:#0f172a;">My Reports</div><div style="font-size:11.5px;color:#64748b;margin-top:2px;">View timesheet for any range</div></div>'+
+      '<button onclick="document.getElementById(\'reportsBack\').style.display=\'none\'" style="background:none;border:none;font-size:22px;color:#94a3b8;cursor:pointer;">×</button>'+
+    '</div>'+
+    '<div style="padding:16px 18px;border-bottom:1px solid #f1f5f9;display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;">'+
+      '<div style="flex:1;min-width:130px;"><label style="font-size:11px;font-weight:600;color:#64748b;">From</label><input type="date" id="reportStart" value="'+fmt(start)+'" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:8px 12px;font-size:13px;font-family:inherit;outline:none;margin-top:3px;"></div>'+
+      '<div style="flex:1;min-width:130px;"><label style="font-size:11px;font-weight:600;color:#64748b;">To</label><input type="date" id="reportEnd" value="'+fmt(today)+'" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:8px 12px;font-size:13px;font-family:inherit;outline:none;margin-top:3px;"></div>'+
+      '<button onclick="runReport()" class="btn btn-green" style="padding:9px 16px;font-size:12px;">Run report</button>'+
+    '</div>'+
+    '<div id="reportResults" style="padding:16px 18px;max-height:50dvh;overflow-y:auto;">Loading from your supabase log...</div>'+
+  '</div>';
+  bd.style.display='flex';
+  // Auto-run with default range using local supabase data (instant)
+  setTimeout(runReport, 50);
+}
+
+async function runReport(){
+  const startStr = document.getElementById('reportStart').value;
+  const endStr = document.getElementById('reportEnd').value;
+  const el = document.getElementById('reportResults');
+  if(!startStr || !endStr){ el.innerHTML = '<div style="color:#dc2626;">Pick both dates.</div>'; return; }
+  const start = new Date(startStr+'T00:00:00');
+  const end = new Date(endStr+'T23:59:59');
+  // Use already-loaded supabase logs for fast display
+  if(!_hoursLogs.length){ await loadAllClockLogs(); }
+  const logs = _hoursLogs.filter(function(r){
+    const t = new Date(r.ts);
+    return t >= start && t <= end;
+  });
+  if(!logs.length){ el.innerHTML = '<div style="color:#94a3b8;text-align:center;padding:30px;">No clock-ins in this range.</div>'; return; }
+  // Pair in/out per day
+  logs.sort(function(a,b){return new Date(a.ts) - new Date(b.ts);});
+  const byDay = {};
+  let openIn = null;
+  logs.forEach(function(r){
+    const t = new Date(r.ts);
+    const dayKey = t.toLocaleDateString('en-AU',{day:'2-digit',month:'2-digit',year:'numeric'});
+    if(!byDay[dayKey]) byDay[dayKey] = {date:t, in:null, out:null, hours:0};
+    if(r.action === 'in'){ openIn = t; byDay[dayKey].in = t; }
+    else if(r.action === 'out'){
+      byDay[dayKey].out = t;
+      if(openIn){
+        const span = t - openIn;
+        if(span > 0 && span < 24*60*60*1000){
+          byDay[dayKey].hours += span/3600000;
+        }
+        openIn = null;
+      }
+    }
+  });
+  const days = Object.keys(byDay).sort(function(a,b){
+    return byDay[a].date - byDay[b].date;
+  });
+  let totalHours = 0;
+  let html = '<table style="width:100%;border-collapse:collapse;font-size:13px;">'+
+    '<thead><tr style="text-align:left;color:#94a3b8;font-size:11px;text-transform:uppercase;letter-spacing:.05em;">'+
+      '<th style="padding:8px 6px;border-bottom:1px solid #e2e8f0;">Date</th>'+
+      '<th style="padding:8px 6px;border-bottom:1px solid #e2e8f0;">Day</th>'+
+      '<th style="padding:8px 6px;border-bottom:1px solid #e2e8f0;">In</th>'+
+      '<th style="padding:8px 6px;border-bottom:1px solid #e2e8f0;">Out</th>'+
+      '<th style="padding:8px 6px;border-bottom:1px solid #e2e8f0;text-align:right;">Hours</th>'+
+    '</tr></thead><tbody>';
+  days.forEach(function(k){
+    const d = byDay[k];
+    const day = d.date.toLocaleDateString('en-AU',{weekday:'short'});
+    const inS = d.in ? d.in.toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit'}) : '—';
+    const outS = d.out ? d.out.toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit'}) : '—';
+    totalHours += d.hours;
+    html += '<tr><td style="padding:7px 6px;border-bottom:1px solid #f1f5f9;">'+k+'</td>'+
+      '<td style="padding:7px 6px;border-bottom:1px solid #f1f5f9;color:#64748b;">'+day+'</td>'+
+      '<td style="padding:7px 6px;border-bottom:1px solid #f1f5f9;">'+inS+'</td>'+
+      '<td style="padding:7px 6px;border-bottom:1px solid #f1f5f9;">'+outS+'</td>'+
+      '<td style="padding:7px 6px;border-bottom:1px solid #f1f5f9;text-align:right;font-weight:600;font-variant-numeric:tabular-nums;">'+d.hours.toFixed(2)+'h</td></tr>';
+  });
+  html += '<tr><td colspan="4" style="padding:10px 6px;font-weight:700;color:#0f172a;">Total</td>'+
+    '<td style="padding:10px 6px;text-align:right;font-weight:800;color:var(--accent);font-size:15px;">'+totalHours.toFixed(2)+'h</td></tr>';
+  html += '</tbody></table>';
+  el.innerHTML = html;
+}
+
+function toggleGpsBypass(){
+  const cur = localStorage.getItem('oscars_gps_bypass') === '1';
+  if(!cur){
+    if(!confirm('Disable GPS check? Only do this if you have permission to clock in remotely.')) return;
+    localStorage.setItem('oscars_gps_bypass', '1');
+  } else {
+    localStorage.removeItem('oscars_gps_bypass');
+  }
+  updateGpsBypassBtn();
+}
+
+function updateGpsBypassBtn(){
+  const btn = document.getElementById('gpsBypassBtn');
+  if(!btn) return;
+  const off = localStorage.getItem('oscars_gps_bypass') === '1';
+  btn.textContent = off ? '⚠️ GPS off' : '📍 GPS on';
+  btn.style.color = off ? '#dc2626' : '#10b981';
+}
+
+setTimeout(updateGpsBypassBtn, 500);
 
 // ── HOURS SUMMARY ──────────────────────
 let _hoursPeriod = localStorage.getItem('oscars_hours_period') || 'fortnight';
