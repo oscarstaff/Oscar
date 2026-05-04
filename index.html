@@ -4424,6 +4424,7 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
       <div class="tab-bar">
         <button class="sched-tab active" id="stab-leave" onclick="showSchedTab('leave')">Leave</button>
         <button class="sched-tab" id="stab-availability" onclick="showSchedTab('availability')">Availability</button>
+        <button class="sched-tab" id="stab-timeclock" onclick="showSchedTab('timeclock')">Clock In/Out</button>
       </div>
 
       <!-- LEAVE sub-section -->
@@ -4546,6 +4547,44 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
           </div>
         </div>
         <button class="btn btn-green" onclick="uploadDocument()" id="docUploadBtn" style="padding:10px 22px;">Upload Document</button>
+      </div>
+
+
+      <!-- TIMECLOCK sub-section -->
+      <div id="ssec-timeclock" style="display:none;">
+        <div class="card" style="margin-bottom:14px;">
+          <!-- Status indicator -->
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+            <div id="clockStatusDot" style="width:14px;height:14px;border-radius:50%;background:#94a3b8;flex-shrink:0;transition:background .3s;"></div>
+            <div>
+              <div id="clockStatusText" style="font-size:15px;font-weight:700;color:#0f172a;">Not clocked in</div>
+              <div id="clockStatusSub" style="font-size:12px;color:#64748b;margin-top:2px;"></div>
+            </div>
+            <div id="clockLiveTimer" style="margin-left:auto;font-size:22px;font-weight:800;color:#2563eb;font-variant-numeric:tabular-nums;display:none;">00:00:00</div>
+          </div>
+
+          <!-- Clock In / Out button -->
+          <button id="clockBtn" onclick="toggleClock()" style="width:100%;padding:16px;border-radius:12px;border:none;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .2s;background:#22c55e;color:#fff;">
+            Clock In
+          </button>
+
+          <!-- Notes field (shows when clocked in) -->
+          <div id="clockNotesWrap" style="display:none;margin-top:12px;">
+            <input type="text" id="clockNotes" class="f-input" placeholder="Add a note (optional)..." style="font-size:13px;">
+          </div>
+        </div>
+
+        <!-- Today's entries -->
+        <div class="card">
+          <div class="card-hd"><div class="card-title">Today's Log</div></div>
+          <div id="clockTodayLog" style="font-size:13px;color:#64748b;text-align:center;padding:16px 0;">Loading...</div>
+        </div>
+
+        <!-- Recent history -->
+        <div class="card" style="margin-top:14px;">
+          <div class="card-hd"><div class="card-title">Recent History</div><button class="card-action" onclick="loadClockHistory()">Refresh</button></div>
+          <div id="clockHistoryList" style="font-size:13px;color:#64748b;text-align:center;padding:16px 0;">Loading...</div>
+        </div>
       </div>
 
       <!-- Document list -->
@@ -4899,7 +4938,7 @@ let weekStart=gMon(new Date()),rWS=gMon(new Date()),me=null;
 
 // ── SCHEDULE SUB-TABS ──
 function showSchedTab(tab){
-  ['leave','availability'].forEach(s=>{
+  ['leave','availability','timeclock'].forEach(s=>{
     const el=document.getElementById('ssec-'+s);
     if(el)el.style.display=s===tab?'block':'none';
     const t=document.getElementById('stab-'+s);
