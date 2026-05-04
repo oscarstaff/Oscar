@@ -1956,6 +1956,107 @@ body.ready{visibility:visible;}
 .hours-detail{font-size:11.5px;color:#94a3b8;line-height:1.5;}
 [data-theme="dark"] .hours-num{color:#f1f5f9;}
 
+/* ── MOBILE POLISH ──────────── */
+@media(max-width:700px){
+  /* Subtab bars look cleaner with padding + shadow */
+  .tab-bar{
+    padding-bottom:1px;
+  }
+  /* Cards full-width with less margin */
+  .card{
+    padding:14px;
+    border-radius:12px;
+  }
+  /* Page padding */
+  .page{
+    padding:14px 12px 80px;
+  }
+  /* Headings */
+  .page-title{font-size:22px !important;}
+  .card-title{font-size:13.5px;}
+  /* Touch targets */
+  .btn{min-height:42px;font-size:13px;}
+  /* Modal sizing */
+  .task-form{max-width:calc(100vw - 24px);}
+  /* Reply textareas + inputs are 16px to prevent iOS auto-zoom */
+  textarea,input[type=text],input[type=email],input[type=password],input[type=date],input[type=time],input[type=number],input[type=url],input[type=search],select{
+    font-size:16px !important;
+  }
+  /* Calendar tighter */
+  .cal-grid{border-radius:10px;}
+  /* Hours bar chart smaller */
+  #hoursDisplay{font-size:12px;}
+  /* Clock card stacks cleaner */
+  #clockCard{padding:14px !important;}
+  #clockNow{font-size:20px !important;}
+  /* Reaction picker positioned to stay on screen */
+  .react-picker{max-width:calc(100vw - 24px);}
+  /* Bottom nav slightly larger touch target */
+  .bn-item{min-height:62px;}
+  .bn-icon{width:24px;height:24px;}
+  /* Notif drop fits screen */
+  .notif-drop{
+    position:fixed !important;
+    top:auto !important;
+    bottom:78px !important;
+    left:8px !important;
+    right:8px !important;
+    width:auto !important;
+    max-width:none !important;
+    max-height:60dvh !important;
+  }
+  /* Modal backdrops respect safe-area */
+  #eventViewBackdrop,
+  #annReadersBackdrop,
+  #punchEditBack,
+  #shareTaskBack,
+  #reportsBack,
+  #gifBack{
+    padding:env(safe-area-inset-top,16px) 12px env(safe-area-inset-bottom,16px) !important;
+  }
+  /* Fix horizontal scroll on report tables */
+  table{font-size:12.5px;}
+  /* My Reports inputs stacked nicer */
+  #rsec-hours .card,#rsec-manager .card{
+    padding:14px;
+  }
+}
+
+/* ── NAV GROUPS (collapsible) ──────────── */
+.nav-group{display:flex;flex-direction:column;}
+.nav-parent{cursor:pointer;}
+.nav-children{
+  max-height:0;overflow:hidden;
+  transition:max-height .25s ease;
+  display:flex;flex-direction:column;
+  margin-left:0;
+}
+.nav-group.open .nav-children{max-height:200px;}
+.nav-group.open .nav-chevron{transform:rotate(180deg);}
+.nav-child{
+  font-size:13px;font-weight:500;color:#64748b;
+  padding:8px 12px 8px 44px;
+  cursor:pointer;border-radius:8px;
+  transition:background .15s,color .15s;
+  margin:1px 8px;
+  display:flex;align-items:center;
+  position:relative;
+}
+.nav-child::before{
+  content:'';position:absolute;left:30px;top:50%;
+  width:5px;height:5px;border-radius:50%;
+  background:#cbd5e1;transform:translateY(-50%);
+  transition:background .15s;
+}
+.nav-child:hover{background:#f1f5f9;color:#0f172a;}
+.nav-child:hover::before{background:#64748b;}
+.nav-child.active{background:var(--accent-dim);color:var(--accent-text);font-weight:600;}
+.nav-child.active::before{background:var(--accent);}
+[data-theme="dark"] .nav-child{color:#94a3b8;}
+[data-theme="dark"] .nav-child:hover{background:#181d26;color:#f1f5f9;}
+[data-theme="dark"] .nav-child.active{background:var(--accent-dim);color:var(--accent);}
+[data-theme="dark"] .nav-child::before{background:#475569;}
+
 /* ── BELL COUNT BADGE ──────────────────── */
 .bell-badge{
   position:absolute;top:0;right:0;
@@ -2504,10 +2605,10 @@ html[data-sb="collapsed"] .nav-item:hover::after{
 /* Strip "nav-" prefix from tooltip — handled by content transform won't work, use JS-friendly attr */
 html[data-sb="collapsed"] [id="nav-home"]:hover::after{content:"Home";}
 html[data-sb="collapsed"] [id="nav-schedule"]:hover::after{content:"Roster";}
-html[data-sb="collapsed"] [id="nav-announcements"]:hover::after{content:"Updates";}
-html[data-sb="collapsed"] [id="nav-engagement"]:hover::after{content:"Community";}
-html[data-sb="collapsed"] [id="nav-calendar"]:hover::after{content:"Calendar";}
-html[data-sb="collapsed"] [id="nav-tasks"]:hover::after{content:"To Do List";}
+html[data-sb="collapsed"] [id="nav-updates"]:hover::after{content:"Updates";}
+html[data-sb="collapsed"] [id="nav-myreports"]:hover::after{content:"My Reports";}
+html[data-sb="collapsed"] [id="nav-dates"]:hover::after{content:"Dates & Reminders";}
+
 html[data-sb="collapsed"] [id="nav-documents"]:hover::after{content:"Documents";}
 html[data-sb="collapsed"] [id="nav-profile"]:hover::after{content:"Profile";}
 html[data-sb="collapsed"] [id="nav-team"]:hover::after{content:"Team";}
@@ -4205,31 +4306,56 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
         <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h4v-4h2v4h4a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z"/></svg>
         Home
       </div>
-      <div class="nav-item" id="nav-schedule" data-tab="schedule" onclick="goTo('schedule')">
-        <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd"/></svg>
-        Roster
+      <!-- Roster group -->
+      <div class="nav-group" id="navg-roster">
+        <div class="nav-item nav-parent" id="nav-schedule" onclick="toggleNavGroup('roster')">
+          <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd"/></svg>
+          Roster
+          <svg class="nav-chevron" viewBox="0 0 20 20" fill="currentColor" style="width:14px;height:14px;margin-left:auto;transition:transform .2s;"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+        </div>
+        <div class="nav-children">
+          <div class="nav-child" data-tab="schedule-leave" onclick="goTo('schedule');setTimeout(function(){showSchedTab('leave');setActiveNavChild('schedule-leave');},50);">Leave</div>
+          <div class="nav-child" data-tab="schedule-availability" onclick="goTo('schedule');setTimeout(function(){showSchedTab('availability');setActiveNavChild('schedule-availability');},50);">Availability</div>
+        </div>
       </div>
-      <div class="nav-item" id="nav-announcements" data-tab="announcements" onclick="goTo('announcements')">
-        <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 3a1 1 0 00-1.447-.894L8.763 6H5a3 3 0 000 6h.28l1.771 5.316A1 1 0 008 18h1a1 1 0 001-1v-4.382l6.553 3.276A1 1 0 0018 15V3z" clip-rule="evenodd"/></svg>
-        Updates
-        <span class="nav-badge" id="annBadge"></span>
+      <!-- Updates group -->
+      <div class="nav-group" id="navg-updates">
+        <div class="nav-item nav-parent" id="nav-updates" onclick="toggleNavGroup('updates')">
+          <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 3a1 1 0 00-1.447-.894L8.763 6H5a3 3 0 000 6h.28l1.771 5.316A1 1 0 008 18h1a1 1 0 001-1v-4.382l6.553 3.276A1 1 0 0018 15V3z" clip-rule="evenodd"/></svg>
+          Updates
+          <span class="nav-badge" id="annBadge"></span>
+          <svg class="nav-chevron" viewBox="0 0 20 20" fill="currentColor" style="width:14px;height:14px;margin-left:auto;transition:transform .2s;"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+        </div>
+        <div class="nav-children">
+          <div class="nav-child" data-tab="announcements" onclick="goTo('announcements')">Announcements</div>
+          <div class="nav-child" data-tab="engagement" onclick="goTo('engagement')">Discussions</div>
+        </div>
+      </div>
+
+      <!-- Dates & Reminders group -->
+      <div class="nav-group" id="navg-dates">
+        <div class="nav-item nav-parent" id="nav-dates" onclick="toggleNavGroup('dates')">
+          <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd"/></svg>
+          Dates &amp; Reminders
+          <span class="nav-badge" id="taskBadge"></span>
+          <svg class="nav-chevron" viewBox="0 0 20 20" fill="currentColor" style="width:14px;height:14px;margin-left:auto;transition:transform .2s;"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+        </div>
+        <div class="nav-children">
+          <div class="nav-child" data-tab="calendar" onclick="goTo('calendar')">Calendar</div>
+          <div class="nav-child" data-tab="tasks" onclick="goTo('tasks')">Tasks</div>
+        </div>
+      </div>
+
+      <!-- My Reports group -->
+      <div class="nav-group" id="navg-myreports">
+        <div class="nav-item nav-parent" id="nav-myreports" onclick="goTo('myreports')">
+          <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 12a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd"/><path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd"/></svg>
+          My Reports
+        </div>
       </div>
       <div class="nav-item" id="nav-documents" data-tab="documents" onclick="goTo('documents')">
         <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clip-rule="evenodd"/></svg>
         Documents
-      </div>
-      <div class="nav-item" id="nav-engagement" data-tab="engagement" onclick="goTo('engagement')">
-        <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clip-rule="evenodd"/></svg>
-        Community
-      </div>
-      <div class="nav-item" id="nav-calendar" data-tab="calendar" onclick="goTo('calendar')">
-        <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd"/></svg>
-        Calendar
-      </div>
-      <div class="nav-item" id="nav-tasks" data-tab="tasks" onclick="goTo('tasks')">
-        <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/><path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm9.707 5.707a1 1 0 00-1.414-1.414L9 12.586l-1.293-1.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
-        To Do List
-        <span class="nav-badge" id="taskBadge"></span>
       </div>
 
       <div class="nav-item" id="nav-profile" data-tab="profile" onclick="goTo('profile')">
@@ -4318,12 +4444,16 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
 
     <!-- TASKS page -->
     <div class="page" id="page-tasks">
+      <div class="tab-bar" style="margin-bottom:14px;padding:0 4px;">
+        <button class="eng-tab" onclick="goTo('calendar')">Calendar</button>
+        <button class="eng-tab active" onclick="goTo('tasks')">Tasks</button>
+      </div>
       <!-- Hero header with stats -->
       <div class="task-hero">
         <div class="task-hero-bg"></div>
         <div class="task-hero-content">
           <div class="task-hero-text">
-            <div class="task-hero-title">To Do List</div>
+            <div class="task-hero-title">Tasks</div>
             <div class="task-hero-sub">Stay on top of what matters. Reminders chime in your notifications bell.</div>
           </div>
           <button class="task-hero-btn" onclick="openTaskForm()">
@@ -4433,9 +4563,13 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
 
     <!-- CALENDAR: Full month view -->
     <div class="page" id="page-calendar">
+      <div class="tab-bar" style="margin-bottom:14px;padding:0 4px;">
+        <button class="eng-tab active" onclick="goTo('calendar')">Calendar</button>
+        <button class="eng-tab" onclick="goTo('tasks')">Tasks</button>
+      </div>
       <div class="page-hd">
         <div>
-          <div class="page-title">Calendar</div>
+          <div class="page-title">Dates &amp; Reminders</div>
           <div class="page-sub">Events, birthdays, and public holidays</div>
         </div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
@@ -4614,11 +4748,14 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
 
 
     <!-- MESSAGES PAGE (Slack-style) -->
-    <!-- ANNOUNCEMENTS PAGE (standalone, accessible to all) -->
+    <!-- UPDATES PAGE — Announcements subtab -->
     <div class="page" id="page-announcements">
       <div class="page-hd">
         <div class="page-title">Updates</div>
-        <div class="page-sub">Updates from management</div>
+      </div>
+      <div class="tab-bar" style="margin-bottom:14px;">
+        <button class="eng-tab active" onclick="goTo('announcements')">Announcements</button>
+        <button class="eng-tab" onclick="goTo('engagement')">Discussions</button>
       </div>
       <!-- Admin post form -->
       <div id="annAdminPost" style="display:none;" class="card">
@@ -4640,13 +4777,13 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
       <div id="annList"><div class="skel-card"><div class="skel skel-line" style="width:55%;height:14px;"></div><div class="skel skel-line" style="width:90%;"></div><div class="skel skel-line" style="width:75%;"></div><div class="skel skel-line skel-meta"></div></div><div class="skel-card"><div class="skel skel-line" style="width:40%;height:14px;"></div><div class="skel skel-line" style="width:85%;"></div><div class="skel skel-line skel-meta"></div></div></div>
     </div>
 
-    <!-- ENGAGEMENT PAGE: Discussions + Feedback -->
+    <!-- UPDATES PAGE — Discussions subtab -->
     <div class="page" id="page-engagement">
       <div class="page-hd">
-        <div class="page-title">Community</div>
+        <div class="page-title">Updates</div>
       </div>
-      <!-- Sub-tabs -->
-      <div class="tab-bar">
+      <div class="tab-bar" style="margin-bottom:14px;">
+        <button class="eng-tab" onclick="goTo('announcements')">Announcements</button>
         <button class="eng-tab active" id="etab-discussions" onclick="showEngagementTab('discussions')">Discussions</button>
       </div>
       <!-- DISCUSSIONS -->
@@ -4691,6 +4828,42 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
     </div>
 
     <!-- PROFILE -->
+    <!-- MY REPORTS PAGE — clock-in reports + admin timesheet manager -->
+    <div class="page" id="page-myreports">
+      <div class="page-hd">
+        <div class="page-title">My Reports</div>
+      </div>
+      <div class="tab-bar" id="reportsSubtabs" style="margin-bottom:14px;padding:0 4px;">
+        <button class="eng-tab active" id="rtab-hours" onclick="showReportsTab('hours')">Hours</button>
+        <button class="eng-tab" id="rtab-manager" onclick="showReportsTab('manager')" style="display:none;">Timesheet Manager</button>
+      </div>
+      <div id="rsec-hours">
+        <div class="card" style="margin-bottom:14px;">
+          <div class="card-title" style="margin-bottom:12px;">Date range</div>
+          <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;">
+            <div style="flex:1;min-width:130px;"><label style="font-size:11px;font-weight:600;color:#64748b;">From</label><input type="date" id="reportPageStart" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:8px 12px;font-size:13px;font-family:inherit;outline:none;margin-top:3px;"></div>
+            <div style="flex:1;min-width:130px;"><label style="font-size:11px;font-weight:600;color:#64748b;">To</label><input type="date" id="reportPageEnd" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:8px 12px;font-size:13px;font-family:inherit;outline:none;margin-top:3px;"></div>
+            <button onclick="runHoursReport()" class="btn btn-green" style="padding:9px 16px;font-size:12px;">Run</button>
+          </div>
+        </div>
+        <div id="hoursReportResults" class="card" style="padding:16px;">Loading...</div>
+      </div>
+      <div id="rsec-manager" style="display:none;">
+        <div class="card" style="margin-bottom:14px;">
+          <div class="card-title" style="margin-bottom:12px;">Edit any staff member's punches</div>
+          <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;">
+            <div style="flex:1 1 100%;"><label style="font-size:11px;font-weight:600;color:#64748b;">Staff member</label>
+              <select id="mgrStaffSel" onchange="runManagerReport()" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:8px 12px;font-size:13px;font-family:inherit;outline:none;margin-top:3px;background:#fff;"></select>
+            </div>
+            <div style="flex:1;min-width:130px;"><label style="font-size:11px;font-weight:600;color:#64748b;">From</label><input type="date" id="mgrStart" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:8px 12px;font-size:13px;font-family:inherit;outline:none;margin-top:3px;"></div>
+            <div style="flex:1;min-width:130px;"><label style="font-size:11px;font-weight:600;color:#64748b;">To</label><input type="date" id="mgrEnd" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:8px 12px;font-size:13px;font-family:inherit;outline:none;margin-top:3px;"></div>
+            <button onclick="runManagerReport()" class="btn btn-green" style="padding:9px 16px;font-size:12px;">Run</button>
+          </div>
+        </div>
+        <div id="mgrReportResults" class="card" style="padding:16px;">Pick a staff member.</div>
+      </div>
+    </div>
+
     <div class="page" id="page-profile">
       <div class="page-hd">
         <div class="page-title" id="profPageTitle">My Profile</div>
@@ -4882,28 +5055,24 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
   <!-- BOTTOM NAV (mobile) -->
   <nav class="bottom-nav">
     <div class="bn-items" id="bottomNavGrid">
-      <div class="bn-item active" id="bn-home" data-tab="home" onclick="if(navigator.vibrate)navigator.vibrate(8);goTo('home')">
+      <div class="bn-item active" id="bn-home" data-tab="home" onclick="if(navigator.vibrate)navigator.vibrate(8);goTo('home')" aria-label="Home">
         <svg class="bn-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h4v-4h2v4h4a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z"/></svg>
       </div>
-      <div class="bn-item" id="bn-schedule" data-tab="schedule" onclick="if(navigator.vibrate)navigator.vibrate(8);goTo('schedule')">
+      <div class="bn-item" id="bn-schedule" data-tab="schedule" onclick="if(navigator.vibrate)navigator.vibrate(8);goTo('schedule')" aria-label="Roster">
         <svg class="bn-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd"/></svg>
       </div>
-      <div class="bn-item" id="bn-announcements" data-tab="announcements" onclick="if(navigator.vibrate)navigator.vibrate(8);goTo('announcements')">
+      <div class="bn-item" id="bn-announcements" data-tab="announcements" onclick="if(navigator.vibrate)navigator.vibrate(8);goTo('announcements')" aria-label="Updates">
         <svg class="bn-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 3a1 1 0 00-1.447-.894L8.763 6H5a3 3 0 000 6h.28l1.771 5.316A1 1 0 008 18h1a1 1 0 001-1v-4.382l6.553 3.276A1 1 0 0018 15V3z" clip-rule="evenodd"/></svg>
         <div class="bn-badge" id="bnAnnBadge"></div>
       </div>
-      <div class="bn-item" id="bn-engagement" data-tab="engagement" onclick="if(navigator.vibrate)navigator.vibrate(8);goTo('engagement')">
-        <svg class="bn-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clip-rule="evenodd"/></svg>
-      </div>
-
-      <div class="bn-item" id="bn-tasks" data-tab="tasks" onclick="if(navigator.vibrate)navigator.vibrate(8);goTo('tasks')">
-        <svg class="bn-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/><path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm9.707 5.707a1 1 0 00-1.414-1.414L9 12.586l-1.293-1.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+      <div class="bn-item" id="bn-calendar" data-tab="calendar" onclick="if(navigator.vibrate)navigator.vibrate(8);goTo('calendar')" aria-label="Dates &amp; Reminders">
+        <svg class="bn-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd"/></svg>
         <div class="bn-badge" id="bnTaskBadge"></div>
       </div>
-      <div class="bn-item" id="bn-documents" data-tab="documents" onclick="if(navigator.vibrate)navigator.vibrate(8);goTo('documents')">
-        <svg class="bn-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clip-rule="evenodd"/></svg>
+      <div class="bn-item" id="bn-myreports" data-tab="myreports" onclick="if(navigator.vibrate)navigator.vibrate(8);goTo('myreports')" aria-label="My Reports">
+        <svg class="bn-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"/></svg>
       </div>
-      <div class="bn-item" id="bn-profile" data-tab="profile" onclick="if(navigator.vibrate)navigator.vibrate(8);goTo('profile')">
+      <div class="bn-item" id="bn-profile" data-tab="profile" onclick="if(navigator.vibrate)navigator.vibrate(8);goTo('profile')" aria-label="Profile">
         <svg class="bn-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"/></svg>
       </div>
       <div class="bn-item" id="bn-admin" data-tab="admin" style="display:none;"></div>
@@ -4956,6 +5125,8 @@ let weekStart=gMon(new Date()),rWS=gMon(new Date()),me=null;
 
 // ── SCHEDULE SUB-TABS ──
 function showSchedTab(tab){
+  // Sync sidebar child highlight
+  if(typeof setActiveNavChild === 'function') setActiveNavChild('schedule-'+tab);
   ['leave','availability'].forEach(s=>{
     const el=document.getElementById('ssec-'+s);
     if(el)el.style.display=s===tab?'block':'none';
@@ -5828,12 +5999,14 @@ async function doResetKey(){
 }
 
 function doLogout(){
-  teardownRealtime();
-  sessionStorage.removeItem("ou");me=null;
-  document.getElementById("hubLayer").style.display="none";
-  document.getElementById("authLayer").style.display="flex";
-  document.getElementById("loginPass").value="";
-  showAuth("login");
+  try{ teardownRealtime(); }catch(e){}
+  // Stop any running timers
+  if(typeof _clockTickTimer !== 'undefined' && _clockTickTimer){ clearInterval(_clockTickTimer); _clockTickTimer=null; }
+  // Clear session
+  sessionStorage.removeItem("ou");
+  me=null;
+  // Hard reload to ensure all state cleared cleanly
+  window.location.reload();
 }
 
 async function enterHub(){
@@ -5878,7 +6051,51 @@ async function enterHub(){
   showProfileSection("account");
 }
 
+function toggleNavGroup(groupId){
+  const g = document.getElementById('navg-'+groupId);
+  if(!g) return;
+  const wasOpen = g.classList.contains('open');
+  // Close all groups
+  document.querySelectorAll('.nav-group').forEach(function(x){x.classList.remove('open');});
+  if(!wasOpen) g.classList.add('open');
+}
+
+function _setBottomNavActive(page){
+  // Map any sub-page back to its parent bottom-nav button
+  const groupMap = {
+    'engagement':'announcements',  // Updates group
+    'tasks':'calendar',              // Dates group
+    'announcements':'announcements'
+  };
+  const target = groupMap[page] || page;
+  document.querySelectorAll('.bn-item').forEach(function(b){
+    b.classList.toggle('active', b.dataset.tab === target);
+  });
+}
+
+function setActiveNavChild(tab){
+  document.querySelectorAll('.nav-child').forEach(function(c){
+    c.classList.toggle('active', c.dataset.tab === tab);
+  });
+  // Auto-open ONLY if user navigated to a real child route (not via parent click)
+  // Parent click already calls toggleNavGroup; don't fight it.
+  let openedAlready = false;
+  document.querySelectorAll('.nav-child.active').forEach(function(c){
+    const group = c.closest('.nav-group');
+    if(group && !group.classList.contains('open') && !openedAlready){
+      // Only auto-open if NO group is currently open
+      const anyOpen = document.querySelector('.nav-group.open');
+      if(!anyOpen){
+        group.classList.add('open');
+        openedAlready = true;
+      }
+    }
+  });
+}
+
 function goTo(p){
+  setActiveNavChild(p);
+  if(typeof _setBottomNavActive==='function') _setBottomNavActive(p);
   // Update URL hash + document title
   const titles={home:'Home',schedule:'Schedule',profile:'Profile',announcements:'Announcements',engagement:'Engagement',documents:'Documents',messages:'Messages'};
   const appName='Oscars Employee Portal';
@@ -5897,6 +6114,7 @@ function goTo(p){
   if(p==="documents"){loadDocuments();}
   if(p==="tasks"){ loadTasks(); renderTasks(); updateTaskBadge(); maybeShowNotifyBanner(); }
   if(p==="announcements" || p==="engagement"){ setTimeout(rtUpgradeAll, 50); }
+  if(p==="myreports"){ initReportsPage(); }
   if(p==="profile"){
     setTimeout(renderNotifPanel, 50);
     setTimeout(populateSheetUrlField, 50);
@@ -7868,6 +8086,21 @@ function showSystemNotification(title, body, taskId, typeKey){
   // Play sound
   if(localStorage.getItem('oscars_notif_sound') !== '0'){
     playNotifSound(typeKey);
+  }
+  // Push to NotifManager for persistent dropdown
+  if(typeof NotifManager !== 'undefined'){
+    let link = null;
+    if(typeKey === 'announcements') link = 'announcements';
+    else if(typeKey === 'discussions' || typeKey === 'replies' || typeKey === 'mentions') link = 'engagement';
+    else if(typeKey === 'tasks') link = 'tasks';
+    NotifManager.push({
+      id: tag,
+      type: typeKey || 'general',
+      title: title,
+      body: body,
+      ts: Date.now(),
+      link: link
+    });
   }
   try{
     const opts = {
@@ -10288,7 +10521,10 @@ function insertGif(url){
 }
 
 // ── REPORTS MODAL ──────────────────────
+let _reportTargetStaff = null; // null = me
+
 async function openReportsModal(){
+  _reportTargetStaff = null;
   let bd = document.getElementById('reportsBack');
   if(!bd){
     bd = document.createElement('div');
@@ -10300,20 +10536,33 @@ async function openReportsModal(){
   const today = new Date();
   const start = new Date(today); start.setDate(today.getDate()-13);
   const fmt = function(d){return d.toISOString().split('T')[0];};
-  bd.innerHTML = '<div style="background:#fff;border-radius:14px;width:100%;max-width:560px;box-shadow:0 24px 60px rgba(15,23,42,.3);overflow:hidden;" onclick="event.stopPropagation()">'+
+
+  // Admin: show staff picker
+  let staffPicker = '';
+  if(myIsAdmin){
+    const opts = ['<option value="">Me ('+me+')</option>'].concat(
+      (STAFF||[]).filter(function(n){return n && n!==me;}).map(function(n){
+        return '<option value="'+n.replace(/"/g,'&quot;')+'">'+n+'</option>';
+      })
+    ).join('');
+    staffPicker = '<div style="flex:1 1 100%;"><label style="font-size:11px;font-weight:600;color:#64748b;">Staff member</label>'+
+      '<select id="reportStaff" onchange="_reportTargetStaff=this.value||null;runReport()" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:8px 12px;font-size:13px;font-family:inherit;outline:none;margin-top:3px;background:#fff;">'+opts+'</select></div>';
+  }
+
+  bd.innerHTML = '<div style="background:#fff;border-radius:14px;width:100%;max-width:680px;box-shadow:0 24px 60px rgba(15,23,42,.3);overflow:hidden;" onclick="event.stopPropagation()">'+
     '<div style="padding:16px 18px;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center;">'+
-      '<div><div style="font-size:15px;font-weight:700;color:#0f172a;">My Reports</div><div style="font-size:11.5px;color:#64748b;margin-top:2px;">View timesheet for any range</div></div>'+
+      '<div><div style="font-size:15px;font-weight:700;color:#0f172a;">'+(myIsAdmin?'Timesheet Manager':'My Reports')+'</div><div style="font-size:11.5px;color:#64748b;margin-top:2px;">'+(myIsAdmin?'View + edit any staff member\'s punches. Edits sync to Sheet.':'View timesheet for any range')+'</div></div>'+
       '<button onclick="document.getElementById(\'reportsBack\').style.display=\'none\'" style="background:none;border:none;font-size:22px;color:#94a3b8;cursor:pointer;">×</button>'+
     '</div>'+
     '<div style="padding:16px 18px;border-bottom:1px solid #f1f5f9;display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;">'+
+      staffPicker +
       '<div style="flex:1;min-width:130px;"><label style="font-size:11px;font-weight:600;color:#64748b;">From</label><input type="date" id="reportStart" value="'+fmt(start)+'" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:8px 12px;font-size:13px;font-family:inherit;outline:none;margin-top:3px;"></div>'+
       '<div style="flex:1;min-width:130px;"><label style="font-size:11px;font-weight:600;color:#64748b;">To</label><input type="date" id="reportEnd" value="'+fmt(today)+'" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:8px 12px;font-size:13px;font-family:inherit;outline:none;margin-top:3px;"></div>'+
-      '<button onclick="runReport()" class="btn btn-green" style="padding:9px 16px;font-size:12px;">Run report</button>'+
+      '<button onclick="runReport()" class="btn btn-green" style="padding:9px 16px;font-size:12px;">Run</button>'+
     '</div>'+
-    '<div id="reportResults" style="padding:16px 18px;max-height:50dvh;overflow-y:auto;">Loading from your supabase log...</div>'+
+    '<div id="reportResults" style="padding:16px 18px;max-height:55dvh;overflow-y:auto;">Loading...</div>'+
   '</div>';
   bd.style.display='flex';
-  // Auto-run with default range using local supabase data (instant)
   setTimeout(runReport, 50);
 }
 
@@ -10324,9 +10573,15 @@ async function runReport(){
   if(!startStr || !endStr){ el.innerHTML = '<div style="color:#dc2626;">Pick both dates.</div>'; return; }
   const start = new Date(startStr+'T00:00:00');
   const end = new Date(endStr+'T23:59:59');
-  // Use already-loaded supabase logs for fast display
-  if(!_hoursLogs.length){ await loadAllClockLogs(); }
-  const logs = _hoursLogs.filter(function(r){
+  el.innerHTML = '<div style="color:#94a3b8;text-align:center;padding:20px;">Loading...</div>';
+  // Determine target staff
+  const targetStaff = _reportTargetStaff || me;
+  // Fetch logs for target (could be self or other when admin)
+  let logs = [];
+  try{
+    logs = await sbGet('clock_log','?staff_name=eq.'+encodeURIComponent(targetStaff)+'&order=ts.asc&limit=1000');
+  }catch(e){}
+  logs = (logs||[]).filter(function(r){
     const t = new Date(r.ts);
     return t >= start && t <= end;
   });
@@ -10334,14 +10589,15 @@ async function runReport(){
   // Pair in/out per day
   logs.sort(function(a,b){return new Date(a.ts) - new Date(b.ts);});
   const byDay = {};
-  let openIn = null;
+  let openIn = null, openInId = null;
   logs.forEach(function(r){
     const t = new Date(r.ts);
     const dayKey = t.toLocaleDateString('en-AU',{day:'2-digit',month:'2-digit',year:'numeric'});
-    if(!byDay[dayKey]) byDay[dayKey] = {date:t, in:null, out:null, hours:0};
-    if(r.action === 'in'){ openIn = t; byDay[dayKey].in = t; }
+    if(!byDay[dayKey]) byDay[dayKey] = {date:t, in:null, out:null, hours:0, in_id:'', out_id:''};
+    if(r.action === 'in'){ openIn = t; openInId = r.id; byDay[dayKey].in = t; byDay[dayKey].in_id = r.id; }
     else if(r.action === 'out'){
       byDay[dayKey].out = t;
+      byDay[dayKey].out_id = r.id;
       if(openIn){
         const span = t - openIn;
         if(span > 0 && span < 24*60*60*1000){
@@ -10355,13 +10611,14 @@ async function runReport(){
     return byDay[a].date - byDay[b].date;
   });
   let totalHours = 0;
-  let html = '<table style="width:100%;border-collapse:collapse;font-size:13px;">'+
+  const editCol = myIsAdmin ? '<th style="padding:8px 6px;border-bottom:1px solid #e2e8f0;text-align:right;"></th>' : '';
+  let html = '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;">'+
     '<thead><tr style="text-align:left;color:#94a3b8;font-size:11px;text-transform:uppercase;letter-spacing:.05em;">'+
       '<th style="padding:8px 6px;border-bottom:1px solid #e2e8f0;">Date</th>'+
       '<th style="padding:8px 6px;border-bottom:1px solid #e2e8f0;">Day</th>'+
       '<th style="padding:8px 6px;border-bottom:1px solid #e2e8f0;">In</th>'+
       '<th style="padding:8px 6px;border-bottom:1px solid #e2e8f0;">Out</th>'+
-      '<th style="padding:8px 6px;border-bottom:1px solid #e2e8f0;text-align:right;">Hours</th>'+
+      '<th style="padding:8px 6px;border-bottom:1px solid #e2e8f0;text-align:right;">Hours</th>'+editCol+
     '</tr></thead><tbody>';
   days.forEach(function(k){
     const d = byDay[k];
@@ -10369,15 +10626,21 @@ async function runReport(){
     const inS = d.in ? d.in.toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit'}) : '—';
     const outS = d.out ? d.out.toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit'}) : '—';
     totalHours += d.hours;
+    // Build ISO date for edit modal
+    const isoDate = d.date.toISOString().split('T')[0];
+    const inHHMM = d.in ? (String(d.in.getHours()).padStart(2,'0')+':'+String(d.in.getMinutes()).padStart(2,'0')) : '';
+    const outHHMM = d.out ? (String(d.out.getHours()).padStart(2,'0')+':'+String(d.out.getMinutes()).padStart(2,'0')) : '';
+    const editBtn = myIsAdmin ? '<td style="padding:7px 6px;border-bottom:1px solid #f1f5f9;text-align:right;"><button onclick="openPunchEdit(\''+targetStaff.replace(/\'/g,"\\'")+'\',\''+isoDate+'\',\''+inHHMM+'\',\''+outHHMM+'\',\''+d.in_id+'\',\''+d.out_id+'\')" style="background:#f1f5f9;border:none;font-size:11px;padding:4px 10px;border-radius:6px;cursor:pointer;font-family:inherit;font-weight:600;color:var(--accent);">Edit</button></td>' : '';
     html += '<tr><td style="padding:7px 6px;border-bottom:1px solid #f1f5f9;">'+k+'</td>'+
       '<td style="padding:7px 6px;border-bottom:1px solid #f1f5f9;color:#64748b;">'+day+'</td>'+
       '<td style="padding:7px 6px;border-bottom:1px solid #f1f5f9;">'+inS+'</td>'+
       '<td style="padding:7px 6px;border-bottom:1px solid #f1f5f9;">'+outS+'</td>'+
-      '<td style="padding:7px 6px;border-bottom:1px solid #f1f5f9;text-align:right;font-weight:600;font-variant-numeric:tabular-nums;">'+d.hours.toFixed(2)+'h</td></tr>';
+      '<td style="padding:7px 6px;border-bottom:1px solid #f1f5f9;text-align:right;font-weight:600;font-variant-numeric:tabular-nums;">'+d.hours.toFixed(2)+'h</td>'+editBtn+'</tr>';
   });
+  const totalEditCell = myIsAdmin ? '<td></td>' : '';
   html += '<tr><td colspan="4" style="padding:10px 6px;font-weight:700;color:#0f172a;">Total</td>'+
-    '<td style="padding:10px 6px;text-align:right;font-weight:800;color:var(--accent);font-size:15px;">'+totalHours.toFixed(2)+'h</td></tr>';
-  html += '</tbody></table>';
+    '<td style="padding:10px 6px;text-align:right;font-weight:800;color:var(--accent);font-size:15px;">'+totalHours.toFixed(2)+'h</td>'+totalEditCell+'</tr>';
+  html += '</tbody></table></div>';
   el.innerHTML = html;
 }
 
@@ -10401,6 +10664,234 @@ function updateGpsBypassBtn(){
 }
 
 setTimeout(updateGpsBypassBtn, 500);
+
+// ── MY REPORTS PAGE ──────────────────
+function showReportsTab(tab){
+  document.getElementById('rsec-hours').style.display = tab === 'hours' ? '' : 'none';
+  document.getElementById('rsec-manager').style.display = tab === 'manager' ? '' : 'none';
+  document.getElementById('rtab-hours').classList.toggle('active', tab === 'hours');
+  document.getElementById('rtab-manager').classList.toggle('active', tab === 'manager');
+  if(tab === 'manager') populateMgrStaff();
+}
+
+function initReportsPage(){
+  // Show admin tab if admin
+  const mgrBtn = document.getElementById('rtab-manager');
+  if(mgrBtn) mgrBtn.style.display = myIsAdmin ? '' : 'none';
+  // Default dates: last fortnight
+  const today = new Date();
+  const start = new Date(today); start.setDate(today.getDate()-13);
+  const fmt = function(d){return d.toISOString().split('T')[0];};
+  ['reportPageStart','mgrStart'].forEach(function(id){
+    const el = document.getElementById(id);
+    if(el && !el.value) el.value = fmt(start);
+  });
+  ['reportPageEnd','mgrEnd'].forEach(function(id){
+    const el = document.getElementById(id);
+    if(el && !el.value) el.value = fmt(today);
+  });
+  setTimeout(runHoursReport, 100);
+}
+
+function populateMgrStaff(){
+  const sel = document.getElementById('mgrStaffSel');
+  if(!sel) return;
+  if(sel.options.length > 1) return; // already populated
+  const opts = ['<option value="">— Pick staff —</option>'].concat(
+    (STAFF||[]).filter(Boolean).map(function(n){
+      return '<option value="'+n.replace(/"/g,'&quot;')+'">'+n+(n===me?' (me)':'')+'</option>';
+    })
+  );
+  sel.innerHTML = opts.join('');
+}
+
+async function runHoursReport(){
+  const startStr = document.getElementById('reportPageStart').value;
+  const endStr = document.getElementById('reportPageEnd').value;
+  const el = document.getElementById('hoursReportResults');
+  if(!startStr || !endStr){ el.innerHTML = '<div style="color:#dc2626;">Pick both dates.</div>'; return; }
+  el.innerHTML = '<div style="color:#94a3b8;text-align:center;padding:20px;">Loading...</div>';
+  await renderHoursTable(me, startStr, endStr, el, false);
+}
+
+async function runManagerReport(){
+  const staff = document.getElementById('mgrStaffSel').value;
+  const startStr = document.getElementById('mgrStart').value;
+  const endStr = document.getElementById('mgrEnd').value;
+  const el = document.getElementById('mgrReportResults');
+  if(!staff){ el.innerHTML = '<div style="color:#94a3b8;text-align:center;padding:20px;">Pick a staff member to view their punches.</div>'; return; }
+  if(!startStr || !endStr){ el.innerHTML = '<div style="color:#dc2626;">Pick both dates.</div>'; return; }
+  el.innerHTML = '<div style="color:#94a3b8;text-align:center;padding:20px;">Loading...</div>';
+  await renderHoursTable(staff, startStr, endStr, el, true);
+}
+
+async function renderHoursTable(targetStaff, startStr, endStr, el, allowEdit){
+  const start = new Date(startStr+'T00:00:00');
+  const end = new Date(endStr+'T23:59:59');
+  let logs = [];
+  try{
+    logs = await sbGet('clock_log','?staff_name=eq.'+encodeURIComponent(targetStaff)+'&order=ts.asc&limit=2000');
+  }catch(e){}
+  logs = (logs||[]).filter(function(r){ const t = new Date(r.ts); return t >= start && t <= end; });
+  if(!logs.length){ el.innerHTML = '<div style="color:#94a3b8;text-align:center;padding:30px;">No clock-ins in this range.</div>'; return; }
+  logs.sort(function(a,b){return new Date(a.ts) - new Date(b.ts);});
+  const byDay = {};
+  let openIn = null;
+  logs.forEach(function(r){
+    const t = new Date(r.ts);
+    const dayKey = t.toLocaleDateString('en-AU',{day:'2-digit',month:'2-digit',year:'numeric'});
+    if(!byDay[dayKey]) byDay[dayKey] = {date:t, in:null, out:null, hours:0, in_id:'', out_id:''};
+    if(r.action === 'in'){ openIn = t; byDay[dayKey].in = t; byDay[dayKey].in_id = r.id; }
+    else if(r.action === 'out'){
+      byDay[dayKey].out = t; byDay[dayKey].out_id = r.id;
+      if(openIn){
+        const span = t - openIn;
+        if(span > 0 && span < 24*60*60*1000){ byDay[dayKey].hours += span/3600000; }
+        openIn = null;
+      }
+    }
+  });
+  const days = Object.keys(byDay).sort(function(a,b){return byDay[a].date - byDay[b].date;});
+  let totalHours = 0;
+  const editCol = allowEdit ? '<th style="padding:8px 6px;border-bottom:1px solid #e2e8f0;text-align:right;"></th>' : '';
+  let html = '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;">'+
+    '<thead><tr style="text-align:left;color:#94a3b8;font-size:11px;text-transform:uppercase;letter-spacing:.05em;">'+
+      '<th style="padding:8px 6px;border-bottom:1px solid #e2e8f0;">Date</th>'+
+      '<th style="padding:8px 6px;border-bottom:1px solid #e2e8f0;">Day</th>'+
+      '<th style="padding:8px 6px;border-bottom:1px solid #e2e8f0;">In</th>'+
+      '<th style="padding:8px 6px;border-bottom:1px solid #e2e8f0;">Out</th>'+
+      '<th style="padding:8px 6px;border-bottom:1px solid #e2e8f0;text-align:right;">Hours</th>'+editCol+
+    '</tr></thead><tbody>';
+  days.forEach(function(k){
+    const d = byDay[k];
+    const day = d.date.toLocaleDateString('en-AU',{weekday:'short'});
+    const inS = d.in ? d.in.toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit'}) : '—';
+    const outS = d.out ? d.out.toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit'}) : '—';
+    totalHours += d.hours;
+    const isoDate = d.date.toISOString().split('T')[0];
+    const inHHMM = d.in ? (String(d.in.getHours()).padStart(2,'0')+':'+String(d.in.getMinutes()).padStart(2,'0')) : '';
+    const outHHMM = d.out ? (String(d.out.getHours()).padStart(2,'0')+':'+String(d.out.getMinutes()).padStart(2,'0')) : '';
+    const editBtn = allowEdit ? '<td style="padding:7px 6px;border-bottom:1px solid #f1f5f9;text-align:right;"><button onclick="openPunchEdit(\''+targetStaff.replace(/\'/g,"\\'")+'\',\''+isoDate+'\',\''+inHHMM+'\',\''+outHHMM+'\',\''+d.in_id+'\',\''+d.out_id+'\')" style="background:#f1f5f9;border:none;font-size:11px;padding:4px 10px;border-radius:6px;cursor:pointer;font-family:inherit;font-weight:600;color:var(--accent);">Edit</button></td>' : '';
+    html += '<tr><td style="padding:7px 6px;border-bottom:1px solid #f1f5f9;">'+k+'</td>'+
+      '<td style="padding:7px 6px;border-bottom:1px solid #f1f5f9;color:#64748b;">'+day+'</td>'+
+      '<td style="padding:7px 6px;border-bottom:1px solid #f1f5f9;">'+inS+'</td>'+
+      '<td style="padding:7px 6px;border-bottom:1px solid #f1f5f9;">'+outS+'</td>'+
+      '<td style="padding:7px 6px;border-bottom:1px solid #f1f5f9;text-align:right;font-weight:600;font-variant-numeric:tabular-nums;">'+d.hours.toFixed(2)+'h</td>'+editBtn+'</tr>';
+  });
+  const totalEditCell = allowEdit ? '<td></td>' : '';
+  html += '<tr><td colspan="4" style="padding:10px 6px;font-weight:700;color:#0f172a;">Total</td>'+
+    '<td style="padding:10px 6px;text-align:right;font-weight:800;color:var(--accent);font-size:15px;">'+totalHours.toFixed(2)+'h</td>'+totalEditCell+'</tr>';
+  html += '</tbody></table></div>';
+  el.innerHTML = html;
+}
+
+// ── PUNCH EDIT (admin only) ──────────────
+async function openPunchEdit(staff, isoDate, timeIn, timeOut, inId, outId){
+  let bd = document.getElementById('punchEditBack');
+  if(!bd){
+    bd = document.createElement('div');
+    bd.id = 'punchEditBack';
+    bd.style.cssText = 'position:fixed;inset:0;z-index:9560;background:rgba(15,23,42,.55);backdrop-filter:blur(10px);display:flex;align-items:center;justify-content:center;padding:16px;';
+    document.body.appendChild(bd);
+    bd.addEventListener('click', function(e){ if(e.target===bd) bd.style.display='none'; });
+  }
+  const dateObj = new Date(isoDate+'T00:00:00');
+  const dateStr = dateObj.toLocaleDateString('en-AU',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  bd.innerHTML = '<div style="background:#fff;border-radius:14px;width:100%;max-width:420px;box-shadow:0 24px 60px rgba(15,23,42,.3);overflow:hidden;" onclick="event.stopPropagation()">'+
+    '<div style="padding:16px 18px;border-bottom:1px solid #f1f5f9;">'+
+      '<div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">Edit punch</div>'+
+      '<div style="font-size:16px;font-weight:700;color:#0f172a;">'+staff+'</div>'+
+      '<div style="font-size:12.5px;color:#64748b;margin-top:2px;">'+dateStr+'</div>'+
+    '</div>'+
+    '<div style="padding:18px;">'+
+      '<input type="hidden" id="peStaff" value="'+staff.replace(/"/g,'&quot;')+'">'+
+      '<input type="hidden" id="peDate" value="'+isoDate+'">'+
+      '<input type="hidden" id="peInId" value="'+(inId||'')+'">'+
+      '<input type="hidden" id="peOutId" value="'+(outId||'')+'">'+
+      '<div style="display:flex;gap:10px;margin-bottom:12px;">'+
+        '<div style="flex:1;"><label style="font-size:11px;font-weight:600;color:#64748b;">Time In</label><input type="time" id="peTimeIn" value="'+(timeIn||'')+'" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:9px 12px;font-size:14px;font-family:inherit;outline:none;margin-top:3px;"></div>'+
+        '<div style="flex:1;"><label style="font-size:11px;font-weight:600;color:#64748b;">Time Out</label><input type="time" id="peTimeOut" value="'+(timeOut||'')+'" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:9px 12px;font-size:14px;font-family:inherit;outline:none;margin-top:3px;"></div>'+
+      '</div>'+
+      '<div style="display:flex;gap:10px;margin-bottom:12px;">'+
+        '<div style="flex:1;"><label style="font-size:11px;font-weight:600;color:#64748b;">Break (hrs)</label><input type="number" step="0.25" min="0" id="peBreak" placeholder="0.5" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:9px 12px;font-size:14px;font-family:inherit;outline:none;margin-top:3px;"></div>'+
+        '<div style="flex:1;"><label style="font-size:11px;font-weight:600;color:#64748b;">Coffee $</label><input type="text" id="peCoffee" placeholder="" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:9px 12px;font-size:14px;font-family:inherit;outline:none;margin-top:3px;"></div>'+
+      '</div>'+
+      '<div style="font-size:11px;color:#94a3b8;background:#fef3c7;padding:8px 10px;border-radius:7px;line-height:1.5;">⚠ Changes here update both the portal log and the Google Sheet for this staff member.</div>'+
+    '</div>'+
+    '<div style="padding:12px 18px;border-top:1px solid #f1f5f9;display:flex;gap:8px;justify-content:flex-end;">'+
+      '<button onclick="document.getElementById(\'punchEditBack\').style.display=\'none\'" class="btn btn-outline" style="padding:8px 16px;font-size:13px;">Cancel</button>'+
+      '<button onclick="savePunchEdit()" class="btn btn-green" style="padding:8px 18px;font-size:13px;" id="peSaveBtn">Save changes</button>'+
+    '</div>'+
+  '</div>';
+  bd.style.display='flex';
+}
+
+async function savePunchEdit(){
+  const staff = document.getElementById('peStaff').value;
+  const isoDate = document.getElementById('peDate').value;
+  const timeIn = document.getElementById('peTimeIn').value;
+  const timeOut = document.getElementById('peTimeOut').value;
+  const breakHrs = document.getElementById('peBreak').value;
+  const coffee = document.getElementById('peCoffee').value;
+  const inId = document.getElementById('peInId').value;
+  const outId = document.getElementById('peOutId').value;
+  const btn = document.getElementById('peSaveBtn');
+  btn.disabled = true; btn.textContent = 'Saving...';
+
+  // Convert ISO date to DD/MM/YYYY for sheet
+  const [y,mo,d] = isoDate.split('-');
+  const sheetDateStr = d+'/'+mo+'/'+y;
+
+  try{
+    // 1. Update Supabase clock_log (delete old in/out for this date+staff, insert new)
+    // First, fetch all logs for this staff on this date
+    const startTs = isoDate+'T00:00:00.000Z';
+    const endTs = isoDate+'T23:59:59.999Z';
+    const existing = await sbGet('clock_log','?staff_name=eq.'+encodeURIComponent(staff)+'&ts=gte.'+startTs+'&ts=lte.'+endTs);
+    // Delete them all
+    for(const r of (existing||[])){
+      await fetch(SB+'/rest/v1/clock_log?id=eq.'+encodeURIComponent(r.id),{
+        method:'DELETE',
+        headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Prefer':'return=minimal'}
+      });
+    }
+    // Re-insert based on edited values
+    if(timeIn){
+      const inTs = new Date(isoDate+'T'+timeIn+':00').toISOString();
+      await sbPost('clock_log', {staff_name: staff, action: 'in', ts: inTs});
+    }
+    if(timeOut){
+      const outTs = new Date(isoDate+'T'+timeOut+':00').toISOString();
+      await sbPost('clock_log', {staff_name: staff, action: 'out', ts: outTs});
+    }
+    // 2. Update Google Sheet via Apps Script
+    const sheetUrl = 'https://script.google.com/macros/s/AKfycby0Bq97bCZAsmnruXFuJuCqXQE_kOxhYE2KFuJnVzLXtT5CV0Y12k5176dxZbdaYVGE/exec';
+    await fetch(sheetUrl, {
+      method:'POST',
+      headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body: JSON.stringify({
+        action:'updatePunch',
+        staff: staff,
+        date: sheetDateStr,
+        timeIn: timeIn,
+        timeOut: timeOut,
+        breakHrs: breakHrs,
+        coffee: coffee,
+        editor: me
+      })
+    });
+    showToast('Saved · Sheet updated');
+    document.getElementById('punchEditBack').style.display='none';
+    // Refresh report
+    runReport();
+    // Refresh own clock state if editing own
+    if(staff === me){ loadAllClockLogs(); loadClockState(); }
+  }catch(e){
+    console.warn('save punch:', e);
+    showToast('Save failed');
+    btn.disabled = false; btn.textContent = 'Save changes';
+  }
+}
 
 // ── HOURS SUMMARY ──────────────────────
 let _hoursPeriod = localStorage.getItem('oscars_hours_period') || 'fortnight';
@@ -10440,12 +10931,18 @@ function getPeriodRange(period){
     end = new Date(start); end.setDate(end.getDate()+7);
     label = 'Week of '+start.toLocaleDateString('en-AU',{day:'numeric',month:'short'});
   } else if(period === 'fortnight'){
-    // Last 14 days starting from a Monday
-    const dow = today.getDay();
-    const offset = dow === 0 ? -6 : 1-dow;
-    start = new Date(today); start.setDate(today.getDate()+offset-7);
-    end = new Date(start); end.setDate(end.getDate()+14);
-    label = start.toLocaleDateString('en-AU',{day:'numeric',month:'short'})+' – '+(new Date(end-1)).toLocaleDateString('en-AU',{day:'numeric',month:'short'});
+    // Anchored: fortnight cycles align to Mon 4 May 2026
+    const FORT_ANCHOR = new Date(2026, 4, 4); // May 4 2026
+    FORT_ANCHOR.setHours(0,0,0,0);
+    const MS_DAY = 24*60*60*1000;
+    const MS_FORT = 14*MS_DAY;
+    const diffMs = today.getTime() - FORT_ANCHOR.getTime();
+    const fortIdx = Math.floor(diffMs / MS_FORT);
+    start = new Date(FORT_ANCHOR.getTime() + fortIdx * MS_FORT);
+    end = new Date(start.getTime() + MS_FORT);
+    const startLbl = start.toLocaleDateString('en-AU',{day:'numeric',month:'short'});
+    const endLbl = (new Date(end.getTime()-MS_DAY)).toLocaleDateString('en-AU',{day:'numeric',month:'short'});
+    label = 'Fortnight: '+startLbl+' – '+endLbl;
   } else { // month
     start = new Date(now.getFullYear(), now.getMonth(), 1);
     end = new Date(now.getFullYear(), now.getMonth()+1, 1);
@@ -11409,7 +11906,7 @@ function showBanner(text, sub, type){
   inner.className='notif-banner-inner'+(type?' '+type:'');
   el.classList.add('show');
   clearTimeout(_bannerTimer);
-  _bannerTimer=setTimeout(hideBanner, 4000);
+  _bannerTimer=setTimeout(hideBanner, 5000);
 }
 
 function hideBanner(){
@@ -11424,20 +11921,197 @@ async function checkNewNotifications(){
     const unread=rows.filter(r=>!read.includes(r.id));
     if(unread.length){
       const r=unread[0];
+      // Use localStorage (not sessionStorage) so banner doesn't re-fire every login
       const bannerKey='banner_shown_'+me+'_'+r.id;
-      if(!sessionStorage.getItem(bannerKey)){
+      if(!localStorage.getItem(bannerKey)){
         const approved=r.status==='approved';
-        showBanner(
-          approved ? 'Leave Approved' : 'Leave Declined',
-          fmtF(r.from_date)+' – '+fmtF(r.to_date),
-          approved ? 'success' : 'warning'
-        );
+        const title=approved ? 'Leave Approved' : 'Leave Declined';
+        showBanner(title, fmtF(r.from_date)+' – '+fmtF(r.to_date), approved ? 'success' : 'warning');
+        if(typeof NotifManager !== 'undefined' && NotifManager.push){
+          NotifManager.push({
+            id: 'leave-'+r.id,
+            type: approved ? 'leave-approved' : 'leave-declined',
+            title: title,
+            body: fmtF(r.from_date)+' – '+fmtF(r.to_date) + (r.decline_reason?' · '+r.decline_reason:''),
+            ts: Date.now(),
+            link: 'leave'
+          });
+        }
         localStorage.setItem(bannerKey,'1');
       }
     }
   }catch(e){console.warn(e);}
 }
 
+
+// ─────────────────────────────────────
+// NotifManager — central local notification engine
+// Pure local state via localStorage; no external services.
+// ─────────────────────────────────────
+const NotifManager = (function(){
+  const KEY_PREFIX = 'notif_local_';
+  const MAX_STORED = 100;
+
+  function key(){ return KEY_PREFIX + (window.me || 'anon'); }
+
+  function load(){
+    try{ return JSON.parse(localStorage.getItem(key()) || '[]'); }
+    catch(e){ return []; }
+  }
+
+  function save(list){
+    try{
+      const trimmed = list.slice(0, MAX_STORED);
+      localStorage.setItem(key(), JSON.stringify(trimmed));
+    }catch(e){}
+  }
+
+  function push(notif){
+    if(!notif || !notif.id) return;
+    const list = load();
+    if(list.find(function(n){return n.id === notif.id;})) return false; // dedupe
+    list.unshift({
+      id: notif.id,
+      type: notif.type || 'general',
+      title: notif.title || '',
+      body: notif.body || '',
+      ts: notif.ts || Date.now(),
+      link: notif.link || null,
+      read: false
+    });
+    save(list);
+    refreshUI();
+    showBannerOnce(notif);
+    return true;
+  }
+
+  function showBannerOnce(notif){
+    if(typeof showBanner === 'function'){
+      let cls = 'success';
+      if(notif.type && notif.type.indexOf('declined') >= 0) cls = 'warning';
+      else if(notif.type && notif.type.indexOf('mention') >= 0) cls = '';
+      showBanner(notif.title, notif.body, cls);
+    }
+  }
+
+  function markRead(id){
+    const list = load();
+    const item = list.find(function(n){return n.id === id;});
+    if(!item) return;
+    item.read = true;
+    save(list);
+    refreshUI();
+  }
+
+  function markAllRead(){
+    const list = load();
+    list.forEach(function(n){ n.read = true; });
+    save(list);
+    refreshUI();
+  }
+
+  function clearOne(id){
+    let list = load();
+    list = list.filter(function(n){return n.id !== id;});
+    save(list);
+    refreshUI();
+  }
+
+  function clearAll(){
+    save([]);
+    refreshUI();
+  }
+
+  function unreadCount(){
+    return load().filter(function(n){return !n.read;}).length;
+  }
+
+  function getAll(){ return load(); }
+
+  function refreshUI(){
+    updateBadges();
+    repaintDropdown();
+  }
+
+  function updateBadges(){
+    const count = unreadCount();
+    const display = count > 4 ? '4+' : (count > 0 ? String(count) : '');
+    // Bell badges (new notif manager) — and existing legacy ones
+    document.querySelectorAll('.bn-badge, .nav-badge').forEach(function(b){
+      if(count > 0){ b.textContent = display; b.style.display = 'flex'; }
+      else { b.textContent = ''; b.style.display = 'none'; }
+    });
+    // Update existing bell counter via legacy fn if present
+    if(typeof updateBellBadge === 'function') updateBellBadge(count);
+  }
+
+  function repaintDropdown(){
+    document.querySelectorAll('.notif-drop').forEach(function(el){
+      const list = load();
+      if(!list.length){
+        el.innerHTML = '<div class="notif-drop-empty" style="padding:24px;text-align:center;color:#94a3b8;font-size:13px;">All caught up. No notifications.</div>';
+        return;
+      }
+      const html = '<div class="notif-drop-actions" style="display:flex;justify-content:space-between;padding:10px 14px;border-bottom:1px solid #f1f5f9;background:#fafbfc;border-radius:14px 14px 0 0;">'+
+        '<button onclick="NotifManager.markAllRead()" style="background:none;border:none;color:var(--accent);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">Mark all read</button>'+
+        '<button onclick="NotifManager.clearAll()" style="background:none;border:none;color:#dc2626;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">Clear all</button>'+
+      '</div>'+
+      '<div class="notif-drop-list" style="max-height:50dvh;overflow-y:auto;padding:6px 8px;">'+
+        list.map(function(n){
+          const ago = timeAgo(n.ts);
+          const safeTitle = String(n.title||'').replace(/</g,'&lt;');
+          const safeBody = String(n.body||'').replace(/</g,'&lt;');
+          return '<div class="notif-item'+(n.read?' read':'')+'" data-id="'+n.id+'" onclick="NotifManager._handleClick(\''+n.id+'\')" style="position:relative;padding:11px 32px 11px 14px;cursor:pointer;border-radius:10px;'+(n.read?'background:transparent;opacity:.65;':'background:var(--accent-dim);')+'">'+
+            '<button onclick="event.stopPropagation();NotifManager.clearOne(\''+n.id+'\')" title="Dismiss" style="position:absolute;top:8px;right:8px;background:none;border:none;color:#94a3b8;font-size:16px;line-height:1;cursor:pointer;width:20px;height:20px;border-radius:50%;">×</button>'+
+            '<div style="font-size:13px;font-weight:700;color:#0f172a;margin-bottom:2px;line-height:1.3;">'+safeTitle+'</div>'+
+            (safeBody ? '<div style="font-size:12px;color:#64748b;line-height:1.4;">'+safeBody+'</div>' : '')+
+            '<div style="font-size:10.5px;color:#94a3b8;margin-top:4px;">'+ago+'</div>'+
+          '</div>';
+        }).join('')+
+      '</div>';
+      el.innerHTML = html;
+    });
+  }
+
+  function _handleClick(id){
+    const item = load().find(function(n){return n.id === id;});
+    if(!item) return;
+    markRead(id);
+    if(item.link && typeof goTo === 'function'){
+      goTo(item.link);
+    }
+  }
+
+  function timeAgo(ts){
+    const diff = Date.now() - ts;
+    if(diff < 60000) return 'just now';
+    if(diff < 3600000) return Math.floor(diff/60000)+'m ago';
+    if(diff < 86400000) return Math.floor(diff/3600000)+'h ago';
+    if(diff < 604800000) return Math.floor(diff/86400000)+'d ago';
+    return new Date(ts).toLocaleDateString('en-AU',{day:'numeric',month:'short'});
+  }
+
+  return {
+    push: push,
+    markRead: markRead,
+    markAllRead: markAllRead,
+    clearOne: clearOne,
+    clearAll: clearAll,
+    unreadCount: unreadCount,
+    getAll: getAll,
+    refresh: refreshUI,
+    _handleClick: _handleClick
+  };
+})();
+
+// Public helper for triggering notifications from anywhere
+function pushLocalNotif(title, body, type){
+  const id = 'manual-'+Date.now()+'-'+Math.random().toString(36).slice(2,7);
+  return NotifManager.push({id: id, title: title, body: body, type: type || 'general', ts: Date.now()});
+}
+
+// Initialize on load
+setTimeout(function(){ if(typeof NotifManager !== 'undefined') NotifManager.refresh(); }, 1000);
 
 // ── NOTIFICATION DROPDOWN ──
 function toggleNotifDrop(dropId){
