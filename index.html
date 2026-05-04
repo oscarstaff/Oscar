@@ -1780,7 +1780,8 @@ body.ready{visibility:visible;}
 
 /* ── TASK SHARE ──────────────────── */
 .task-share{
-  width:26px;height:26px;border-radius:6px;flex-shrink:0;
+  position:absolute;top:8px;right:36px;
+  width:24px;height:24px;border-radius:50%;
   background:transparent;border:none;cursor:pointer;
   display:flex;align-items:center;justify-content:center;
   color:#94a3b8;
@@ -1789,11 +1790,13 @@ body.ready{visibility:visible;}
 .task-share:hover{background:var(--accent-dim);color:var(--accent);}
 .task-share:active{transform:scale(.92);}
 .task-shared-tag{
+  position:absolute;top:8px;right:36px;
   background:var(--accent-dim);color:var(--accent-text);
   padding:3px 8px;border-radius:6px;
   font-size:10px;font-weight:700;
   display:inline-flex;align-items:center;gap:4px;
-  flex-shrink:0;white-space:nowrap;
+  letter-spacing:-.01em;max-width:140px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
 }
 .task-shared-tag.shared-out{background:#fef3c7;color:#92400e;}
 
@@ -3321,7 +3324,6 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
   overflow:hidden;
   isolation:isolate;
 }
-}
 .task-item:active{
   transform:translateY(-1px) scale(.99);
   transition:transform .15s ease;
@@ -3358,13 +3360,8 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
 .task-item.priority-low::before{background:linear-gradient(90deg, #94a3b8, #cbd5e1);}
 
 /* Header row: checkbox + title + delete */
-/* Header row: checkbox + title + action buttons */
 .task-card-hd{
   display:flex;align-items:flex-start;gap:11px;
-}
-.task-card-actions{
-  display:flex;align-items:center;gap:2px;flex-shrink:0;margin-left:auto;
-  margin-top:-2px;
 }
 .task-check{
   width:22px;height:22px;border-radius:50%;
@@ -3478,14 +3475,18 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
     0 6px 20px rgba(220,38,38,.10);
 }
 
-/* Delete button */
+/* Delete button (top-right corner) */
 .task-del{
-  width:26px;height:26px;border-radius:6px;flex-shrink:0;
-  background:transparent;border:none;cursor:pointer;
-  color:#cbd5e1;font-size:16px;line-height:1;
+  position:absolute;top:8px;right:8px;
+  opacity:0;background:rgba(255,255,255,.9);
+  border:1px solid #e7eaf0;border-radius:6px;
+  width:26px;height:26px;cursor:pointer;
+  color:#94a3b8;font-size:14px;line-height:1;
   display:flex;align-items:center;justify-content:center;
-  transition:color .15s, transform .15s;
+  transition:opacity .15s, color .15s, transform .15s;
+  z-index:2;
 }
+.task-item:hover .task-del{opacity:1;}
 .task-del:hover{color:#dc2626;transform:scale(1.05);}
 
 /* Empty state — soft, no big emoji */
@@ -4216,6 +4217,19 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
         <div class="page-sub" id="homeWeekSub"></div>
       </div>
 
+      <!-- Clock In/Out card -->
+      <div id="clockCard" class="card" style="margin-bottom:12px;padding:18px;display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;">
+        <div style="flex:1;min-width:180px;">
+          <div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">Time clock</div>
+          <div id="clockStatus" style="font-size:18px;font-weight:700;color:#0f172a;letter-spacing:-.01em;">Loading...</div>
+          <div id="clockSubStatus" style="font-size:12px;color:#64748b;margin-top:2px;"></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <div id="clockNow" style="font-size:24px;font-weight:700;color:#0f172a;letter-spacing:-.02em;font-variant-numeric:tabular-nums;"></div>
+          <button id="clockBtn" onclick="toggleClock()" style="padding:12px 22px;border-radius:10px;background:var(--accent);color:#fff;border:none;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;letter-spacing:-.01em;transition:filter .15s,transform .15s;min-width:120px;">Clock In</button>
+        </div>
+      </div>
+
       <!-- Onboarding checklist (new staff only) -->
       <div id="onboardCard" class="card" style="display:none;margin-bottom:12px;">
         <div class="card-hd"><div class="card-title">Getting Started</div></div>
@@ -4423,7 +4437,6 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
       <div class="tab-bar">
         <button class="sched-tab active" id="stab-leave" onclick="showSchedTab('leave')">Leave</button>
         <button class="sched-tab" id="stab-availability" onclick="showSchedTab('availability')">Availability</button>
-        <button class="sched-tab" id="stab-timeclock" onclick="showSchedTab('timeclock')">Clock In/Out</button>
       </div>
 
       <!-- LEAVE sub-section -->
@@ -4546,44 +4559,6 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
           </div>
         </div>
         <button class="btn btn-green" onclick="uploadDocument()" id="docUploadBtn" style="padding:10px 22px;">Upload Document</button>
-      </div>
-
-
-      <!-- TIMECLOCK sub-section -->
-      <div id="ssec-timeclock" style="display:none;">
-        <div class="card" style="margin-bottom:14px;">
-          <!-- Status indicator -->
-          <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
-            <div id="clockStatusDot" style="width:14px;height:14px;border-radius:50%;background:#94a3b8;flex-shrink:0;transition:background .3s;"></div>
-            <div>
-              <div id="clockStatusText" style="font-size:15px;font-weight:700;color:#0f172a;">Not clocked in</div>
-              <div id="clockStatusSub" style="font-size:12px;color:#64748b;margin-top:2px;"></div>
-            </div>
-            <div id="clockLiveTimer" style="margin-left:auto;font-size:22px;font-weight:800;color:#2563eb;font-variant-numeric:tabular-nums;display:none;">00:00:00</div>
-          </div>
-
-          <!-- Clock In / Out button -->
-          <button id="clockBtn" onclick="toggleClock()" style="width:100%;padding:16px;border-radius:12px;border:none;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .2s;background:#22c55e;color:#fff;">
-            Clock In
-          </button>
-
-          <!-- Notes field (shows when clocked in) -->
-          <div id="clockNotesWrap" style="display:none;margin-top:12px;">
-            <input type="text" id="clockNotes" class="f-input" placeholder="Add a note (optional)..." style="font-size:13px;">
-          </div>
-        </div>
-
-        <!-- Today's entries -->
-        <div class="card">
-          <div class="card-hd"><div class="card-title">Today's Log</div></div>
-          <div id="clockTodayLog" style="font-size:13px;color:#64748b;text-align:center;padding:16px 0;">Loading...</div>
-        </div>
-
-        <!-- Recent history -->
-        <div class="card" style="margin-top:14px;">
-          <div class="card-hd"><div class="card-title">Recent History</div><button class="card-action" onclick="loadClockHistory()">Refresh</button></div>
-          <div id="clockHistoryList" style="font-size:13px;color:#64748b;text-align:center;padding:16px 0;">Loading...</div>
-        </div>
       </div>
 
       <!-- Document list -->
@@ -4769,6 +4744,17 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
             </div>
           </div>
 
+          <!-- Time clock sync URL -->
+          <div style="padding-bottom:14px;border-bottom:1px solid #f1f5f9;margin-bottom:14px;">
+            <div style="font-size:13px;font-weight:600;color:#0f172a;margin-bottom:2px;">Time clock — Google Sheet sync</div>
+            <div style="font-size:11px;color:#94a3b8;margin-bottom:8px;">Paste the Apps Script web app URL to sync clock-ins to your sheet</div>
+            <div style="display:flex;gap:6px;">
+              <input type="url" id="sheetUrlInput" placeholder="https://script.google.com/macros/s/.../exec" style="flex:1;border:1.5px solid #e2e8f0;border-radius:8px;padding:8px 12px;font-size:12px;font-family:inherit;outline:none;">
+              <button onclick="saveSheetUrl()" class="btn btn-green" style="padding:8px 14px;font-size:12px;">Save</button>
+            </div>
+            <div id="sheetUrlStatus" style="font-size:11px;color:#10b981;margin-top:6px;display:none;"></div>
+          </div>
+
           <!-- Brightness slider -->
           <div style="padding-bottom:14px;border-bottom:1px solid #f1f5f9;">
             <div style="font-size:13px;font-weight:600;color:#0f172a;margin-bottom:2px;">Brightness</div>
@@ -4937,7 +4923,7 @@ let weekStart=gMon(new Date()),rWS=gMon(new Date()),me=null;
 
 // ── SCHEDULE SUB-TABS ──
 function showSchedTab(tab){
-  ['leave','availability','timeclock'].forEach(s=>{
+  ['leave','availability'].forEach(s=>{
     const el=document.getElementById('ssec-'+s);
     if(el)el.style.display=s===tab?'block':'none';
     const t=document.getElementById('stab-'+s);
@@ -5816,7 +5802,7 @@ async function enterHub(){
   document.getElementById("leaveTo").value=today;
   buildAvailForm();
   showSchedTab('leave'); // default schedule sub-tab
-  Promise.all([loadHomeData(),loadNotifications(),loadLeaveHistory(),refreshAnnBadge(),loadHomeAnnPreview(),loadHomeDiscPreview(),maybeShowOnboarding(),checkFeedbackInvites(),checkNewNotifications(),loadAnnReads(),loadSharedTasksFromOthers()]);
+  Promise.all([loadHomeData(),loadNotifications(),loadLeaveHistory(),refreshAnnBadge(),loadHomeAnnPreview(),loadHomeDiscPreview(),maybeShowOnboarding(),checkFeedbackInvites(),checkNewNotifications(),loadAnnReads(),loadSharedTasksFromOthers(),loadClockState()]);
   applySavedBrightness();
   setTimeout(rtUpgradeAll, 200);
   setTimeout(startActivityPolling, 4000);
@@ -5845,7 +5831,7 @@ function goTo(p){
   if(p==="leave"||p==="availability"){document.querySelectorAll(".page").forEach(pg=>pg.classList.toggle("active",pg.id==="page-schedule"));document.querySelectorAll("[data-tab]").forEach(item=>item.classList.toggle("active",item.getAttribute("data-tab")==="schedule"));}
   if(p==="schedule"){showSchedTab("leave");}
   if(p==="profile")loadProfilePage();
-  if(p==="home")loadHomeData();
+  if(p==="home"){loadHomeData();loadClockState();}
 
   if(p==="announcements"){loadAnnouncements();}
   if(p==="engagement"){showEngagementTab('discussions');}
@@ -5854,6 +5840,7 @@ function goTo(p){
   if(p==="announcements" || p==="engagement"){ setTimeout(rtUpgradeAll, 50); }
   if(p==="profile"){
     setTimeout(renderNotifPanel, 50);
+    setTimeout(populateSheetUrlField, 50);
     setTimeout(function(){
       const sl = document.getElementById('brightnessSlider');
       if(sl) sl.value = parseInt(localStorage.getItem('oscars_brightness')||'100');
@@ -8764,21 +8751,14 @@ function renderTasks(){
     const overdueCls = (!t.done && due && (due - now) < 0) ? ' overdue' : '';
     const prioCls = ' priority-' + (t.priority||'med');
     const hasMeta = !!(dueChip || remChip || (t.priority==='high'||t.priority==='low'));
-    const shareBtn = t.sharedFrom
-      ? '<div class="task-shared-tag"><svg width="11" height="11" viewBox="0 0 20 20" fill="currentColor"><path d="M15 8a3 3 0 10-2.977-2.63l-4.94 2.47a3 3 0 100 4.319l4.94 2.47a3 3 0 10.895-1.789l-4.94-2.47a3.027 3.027 0 000-.74l4.94-2.47A3 3 0 0015 8z"/></svg> '+t.sharedFrom+'</div>'
-      : t.sharedTo
-        ? '<div class="task-shared-tag shared-out"><svg width="11" height="11" viewBox="0 0 20 20" fill="currentColor"><path d="M15 8a3 3 0 10-2.977-2.63l-4.94 2.47a3 3 0 100 4.319l4.94 2.47a3 3 0 10.895-1.789l-4.94-2.47a3.027 3.027 0 000-.74l4.94-2.47A3 3 0 0015 8z"/></svg> Shared</div>'
-        : '<button class="task-share" onclick="event.stopPropagation();openShareTask(\''+t.id+'\')" title="Share"><svg width="13" height="13" viewBox="0 0 20 20" fill="currentColor"><path d="M15 8a3 3 0 10-2.977-2.63l-4.94 2.47a3 3 0 100 4.319l4.94 2.47a3 3 0 10.895-1.789l-4.94-2.47a3.027 3.027 0 000-.74l4.94-2.47A3 3 0 0015 8z"/></svg></button>';
     return '<div class="task-item'+(t.done?' done':'')+overdueCls+prioCls+'" data-id="'+t.id+'" onclick="openTaskForm(\''+t.id+'\')">'+
+      '<button class="task-del" onclick="event.stopPropagation();deleteTask(\''+t.id+'\')" title="Delete">×</button>'+
+      (t.sharedFrom ? '<div class="task-shared-tag" title="Shared by '+(t.sharedFrom).replace(/"/g,'&quot;')+'"><svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor"><path d="M15 8a3 3 0 10-2.977-2.63l-4.94 2.47a3 3 0 100 4.319l4.94 2.47a3 3 0 10.895-1.789l-4.94-2.47a3.027 3.027 0 000-.74l4.94-2.47A3 3 0 0015 8z"/></svg> '+(t.sharedFrom)+'</div>' : (t.sharedTo ? '<div class="task-shared-tag shared-out" title="Shared with '+(t.sharedTo||[]).join(', ')+'"><svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor"><path d="M15 8a3 3 0 10-2.977-2.63l-4.94 2.47a3 3 0 100 4.319l4.94 2.47a3 3 0 10.895-1.789l-4.94-2.47a3.027 3.027 0 000-.74l4.94-2.47A3 3 0 0015 8z"/></svg> Shared</div>' : '<button class="task-share" onclick="event.stopPropagation();openShareTask(\''+t.id+'\')" title="Share with team"><svg width="13" height="13" viewBox="0 0 20 20" fill="currentColor"><path d="M15 8a3 3 0 10-2.977-2.63l-4.94 2.47a3 3 0 100 4.319l4.94 2.47a3 3 0 10.895-1.789l-4.94-2.47a3.027 3.027 0 000-.74l4.94-2.47A3 3 0 0015 8z"/></svg></button>'))+
       '<div class="task-card-hd">'+
         '<div class="task-check" onclick="event.stopPropagation();toggleTaskDone(\''+t.id+'\')">'+checkIcon+'</div>'+
         '<div class="task-body">'+
           '<div class="task-title">'+t.title.replace(/</g,'&lt;')+'</div>'+
           (t.notes ? '<div class="task-notes">'+t.notes.replace(/</g,'&lt;')+'</div>' : '')+
-        '</div>'+
-        '<div class="task-card-actions">'+
-          shareBtn+
-          '<button class="task-del" onclick="event.stopPropagation();deleteTask(\''+t.id+'\')">×</button>'+
         '</div>'+
       '</div>'+
       (hasMeta ? '<div class="task-meta">'+dueChip+remChip+(t.priority==='high'||t.priority==='low'?prioChip:'')+'</div>' : '')+
@@ -9849,6 +9829,98 @@ async function markAllNotificationsRead(){
     const badges = document.querySelectorAll('#mhBellBadge,#sbBellBadge');
     badges.forEach(function(b){ if(b) b.style.display='none'; });
   }catch(e){console.warn(e);}
+}
+
+// ── CLOCK IN/OUT ──────────────────────
+let _clockState = null; // 'in' | 'out' | null
+let _clockSinceTs = null; // timestamp of last clock in/out
+let _clockTickTimer = null;
+
+async function loadClockState(){
+  if(!me) return;
+  try{
+    const rows = await sbGet('clock_log','?staff_name=eq.'+encodeURIComponent(me)+'&order=ts.desc&limit=1');
+    if(rows && rows.length){
+      _clockState = rows[0].action; // 'in' or 'out'
+      _clockSinceTs = new Date(rows[0].ts);
+    } else {
+      _clockState = 'out';
+      _clockSinceTs = null;
+    }
+    renderClockCard();
+  }catch(e){console.warn('loadClock:',e); _clockState='out'; renderClockCard();}
+}
+
+function renderClockCard(){
+  const status = document.getElementById('clockStatus');
+  const sub = document.getElementById('clockSubStatus');
+  const btn = document.getElementById('clockBtn');
+  const now = document.getElementById('clockNow');
+  if(!status || !btn) return;
+
+  if(_clockState === 'in'){
+    status.textContent = 'Clocked in';
+    status.style.color = '#10b981';
+    btn.textContent = 'Clock Out';
+    btn.style.background = '#dc2626';
+    if(_clockSinceTs){
+      sub.textContent = 'Since '+_clockSinceTs.toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit'})+' · '+_clockSinceTs.toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short'});
+    }
+  } else {
+    status.textContent = 'Not clocked in';
+    status.style.color = '#94a3b8';
+    btn.textContent = 'Clock In';
+    btn.style.background = 'var(--accent)';
+    if(_clockSinceTs){
+      sub.textContent = 'Last clock-out: '+_clockSinceTs.toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit'})+' · '+_clockSinceTs.toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short'});
+    } else {
+      sub.textContent = 'You haven\'t clocked in yet today.';
+    }
+  }
+  // Live tick
+  if(now){
+    function tick(){
+      const t = new Date();
+      now.textContent = t.toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit',second:'2-digit',timeZone:'Australia/Sydney'});
+    }
+    tick();
+    if(_clockTickTimer) clearInterval(_clockTickTimer);
+    _clockTickTimer = setInterval(tick, 1000);
+  }
+}
+
+async function toggleClock(){
+  const btn = document.getElementById('clockBtn');
+  if(!btn) return;
+  const next = (_clockState === 'in') ? 'out' : 'in';
+  btn.disabled = true;
+  const prevText = btn.textContent;
+  btn.textContent = '...';
+  try{
+    // Write to supabase
+    await sbPost('clock_log', {staff_name: me, action: next});
+    // Sync to Google Sheets if URL configured
+    const sheetUrl = localStorage.getItem('oscars_sheet_url') || (window.OSCARS_SHEET_URL || '');
+    if(sheetUrl){
+      try{
+        await fetch(sheetUrl, {
+          method:'POST',
+          mode:'no-cors',
+          headers:{'Content-Type':'text/plain;charset=utf-8'},
+          body: JSON.stringify({staff: me, action: next, notes:''})
+        });
+      }catch(e){ console.warn('sheets sync failed:', e); }
+    }
+    _clockState = next;
+    _clockSinceTs = new Date();
+    renderClockCard();
+    showToast(next==='in' ? 'Clocked in' : 'Clocked out');
+  }catch(e){
+    showToast('Failed to record');
+    btn.textContent = prevText;
+  }finally{
+    btn.disabled = false;
+  }
 }
 
 // ── TASK SHARING ──────────────────────
