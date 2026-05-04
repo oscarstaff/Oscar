@@ -5652,7 +5652,10 @@ async function submitDiscReply(discId){
   try{
     const res=await sbPost('discussion_replies',{discussion_id:discId,staff_name:me,body,attachments:replyAtts});
     if(!res.ok&&res.status!==201)throw new Error('HTTP '+res.status);
+    // Clear input — works for both plain textarea and RT-upgraded editors
     input.value='';
+    if(typeof rtReset==='function') rtReset('discReply-'+discId);
+    if(typeof rtClearAttachments==='function') rtClearAttachments('discReply-'+discId);
     // Save reply notification for discussion owner
     try{
       const discRows=await sbGet('discussions','?id=eq.'+discId+'&select=created_by');
