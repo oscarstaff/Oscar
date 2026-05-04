@@ -4343,6 +4343,7 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
         <div class="nav-children">
           <div class="nav-child" data-tab="calendar" onclick="goTo('calendar')">Calendar</div>
           <div class="nav-child" data-tab="tasks" onclick="goTo('tasks')">Tasks</div>
+          <div class="nav-child" data-tab="diary" onclick="goTo('diary')">Diary</div>
         </div>
       </div>
 
@@ -4447,6 +4448,7 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
       <div class="tab-bar" style="margin-bottom:14px;padding:0 4px;">
         <button class="eng-tab" onclick="goTo('calendar')">Calendar</button>
         <button class="eng-tab active" onclick="goTo('tasks')">Tasks</button>
+        <button class="eng-tab" onclick="goTo('diary')">Diary</button>
       </div>
       <!-- Hero header with stats -->
       <div class="task-hero">
@@ -4566,6 +4568,7 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
       <div class="tab-bar" style="margin-bottom:14px;padding:0 4px;">
         <button class="eng-tab active" onclick="goTo('calendar')">Calendar</button>
         <button class="eng-tab" onclick="goTo('tasks')">Tasks</button>
+        <button class="eng-tab" onclick="goTo('diary')">Diary</button>
       </div>
       <div class="page-hd">
         <div>
@@ -4828,6 +4831,25 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
     </div>
 
     <!-- PROFILE -->
+    <!-- DIARY PAGE — personal entries, NOT on shared calendar -->
+    <div class="page" id="page-diary">
+      <div class="tab-bar" style="margin-bottom:14px;padding:0 4px;">
+        <button class="eng-tab" onclick="goTo('calendar')">Calendar</button>
+        <button class="eng-tab" onclick="goTo('tasks')">Tasks</button>
+        <button class="eng-tab active" onclick="goTo('diary')">Diary</button>
+      </div>
+      <div class="page-hd" style="display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:12px;">
+        <div>
+          <div class="page-title">Digital Diary</div>
+          <div class="page-sub">Private entries — only you can see these</div>
+        </div>
+        <button onclick="openDiaryEntry()" class="btn btn-green" style="padding:9px 18px;font-size:13px;">+ New entry</button>
+      </div>
+      <div id="diaryList" style="display:flex;flex-direction:column;gap:14px;">
+        <div style="text-align:center;padding:40px 16px;color:#94a3b8;font-size:13px;">Loading...</div>
+      </div>
+    </div>
+
     <!-- MY REPORTS PAGE — clock-in reports + admin timesheet manager -->
     <div class="page" id="page-myreports">
       <div class="page-hd">
@@ -6034,7 +6056,7 @@ async function enterHub(){
   document.getElementById("leaveTo").value=today;
   buildAvailForm();
   showSchedTab('leave'); // default schedule sub-tab
-  Promise.all([loadHomeData(),loadNotifications(),loadLeaveHistory(),refreshAnnBadge(),loadHomeAnnPreview(),loadHomeDiscPreview(),maybeShowOnboarding(),checkFeedbackInvites(),checkNewNotifications(),loadAnnReads(),loadSharedTasksFromOthers(),loadClockState(),loadAllClockLogs()]);
+  Promise.all([loadHomeData(),loadNotifications(),loadLeaveHistory(),refreshAnnBadge(),loadHomeAnnPreview(),loadHomeDiscPreview(),maybeShowOnboarding(),checkFeedbackInvites(),checkNewNotifications(),loadAnnReads(),loadSharedTasksFromOthers(),loadClockState(),loadAllClockLogs(),loadDiary()]);
   applySavedBrightness();
   setTimeout(rtUpgradeAll, 200);
   setTimeout(startActivityPolling, 4000);
@@ -6115,6 +6137,7 @@ function goTo(p){
   if(p==="tasks"){ loadTasks(); renderTasks(); updateTaskBadge(); maybeShowNotifyBanner(); }
   if(p==="announcements" || p==="engagement"){ setTimeout(rtUpgradeAll, 50); }
   if(p==="myreports"){ initReportsPage(); }
+  if(p==="diary"){ loadDiary(); }
   if(p==="profile"){
     setTimeout(renderNotifPanel, 50);
     setTimeout(populateSheetUrlField, 50);
@@ -10664,6 +10687,231 @@ function updateGpsBypassBtn(){
 }
 
 setTimeout(updateGpsBypassBtn, 500);
+
+// ── DIARY ──────────────────────────────
+let _diaryEntries = [];
+let _diaryEditId = null;
+
+async function loadDiary(){
+  if(!me) return;
+  try{
+    _diaryEntries = await sbGet('diary_entries','?staff_name=eq.'+encodeURIComponent(me)+'&order=entry_date.desc&limit=500');
+  }catch(e){ console.warn('loadDiary:',e); _diaryEntries = []; }
+  renderDiary();
+}
+
+function renderDiary(){
+  const el = document.getElementById('diaryList');
+  if(!el) return;
+  if(!_diaryEntries.length){
+    el.innerHTML = '<div style="background:#f8fafc;border-radius:12px;padding:40px 20px;text-align:center;">'+
+      '<svg width="48" height="48" viewBox="0 0 20 20" fill="#cbd5e1" style="margin:0 auto 10px;display:block;"><path fill-rule="evenodd" d="M5 4a2 2 0 012-2h6a2 2 0 012 2v14l-5-2.5L5 18V4z" clip-rule="evenodd"/></svg>'+
+      '<div style="font-size:14px;font-weight:600;color:#475569;margin-bottom:4px;">No entries yet</div>'+
+      '<div style="font-size:12px;color:#94a3b8;">Tap "+ New entry" to start your diary.</div>'+
+      '</div>';
+    return;
+  }
+  // Group by month
+  const byMonth = {};
+  _diaryEntries.forEach(function(e){
+    const d = new Date(e.entry_date+'T00:00:00');
+    const monthKey = d.toLocaleDateString('en-AU',{year:'numeric',month:'long'});
+    if(!byMonth[monthKey]) byMonth[monthKey] = [];
+    byMonth[monthKey].push({entry:e, date:d});
+  });
+  let html = '';
+  Object.keys(byMonth).forEach(function(monthKey){
+    html += '<div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.06em;margin:8px 4px 4px;">'+monthKey+'</div>';
+    byMonth[monthKey].forEach(function(item){
+      const e = item.entry;
+      const d = item.date;
+      const dayNum = d.getDate();
+      const dayName = d.toLocaleDateString('en-AU',{weekday:'short'});
+      const titleSafe = String(e.title||'(Untitled)').replace(/</g,'&lt;');
+      const bodySafe = String(e.body||'').replace(/</g,'&lt;');
+      const reminder = e.remind_at ? ('<div style="font-size:11px;color:var(--accent);font-weight:600;margin-top:6px;display:inline-flex;align-items:center;gap:5px;background:var(--accent-dim);padding:3px 8px;border-radius:6px;">'+
+        '<svg width="11" height="11" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/></svg>'+
+        'Reminds at '+new Date(e.remind_at).toLocaleString('en-AU',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})+
+      '</div>') : '';
+      const today = new Date(); today.setHours(0,0,0,0);
+      const isToday = d.toDateString() === today.toDateString();
+      html += '<div class="card" data-id="'+e.id+'" onclick="openDiaryEntry(this.dataset.id)" style="padding:14px;cursor:pointer;display:flex;gap:12px;transition:transform .15s, box-shadow .15s;">'+
+        '<div style="width:48px;flex-shrink:0;text-align:center;'+(isToday?'background:var(--accent);color:#fff;':'background:#f1f5f9;color:#475569;')+'border-radius:10px;padding:8px 4px;display:flex;flex-direction:column;justify-content:center;">'+
+          '<div style="font-size:18px;font-weight:800;line-height:1;letter-spacing:-.02em;">'+dayNum+'</div>'+
+          '<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-top:3px;opacity:.85;">'+dayName+'</div>'+
+        '</div>'+
+        '<div style="flex:1;min-width:0;">'+
+          '<div style="font-size:14.5px;font-weight:700;color:#0f172a;margin-bottom:3px;">'+titleSafe+'</div>'+
+          (bodySafe ? '<div style="font-size:12.5px;color:#64748b;line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">'+bodySafe+'</div>' : '')+
+          reminder+
+        '</div>'+
+      '</div>';
+    });
+  });
+  el.innerHTML = html;
+}
+
+function openDiaryEntry(id){
+  _diaryEditId = id || null;
+  let bd = document.getElementById('diaryBack');
+  if(!bd){
+    bd = document.createElement('div');
+    bd.id = 'diaryBack';
+    bd.style.cssText = 'position:fixed;inset:0;z-index:9560;background:rgba(15,23,42,.55);backdrop-filter:blur(10px);display:flex;align-items:center;justify-content:center;padding:16px;';
+    document.body.appendChild(bd);
+    bd.addEventListener('click', function(e){ if(e.target===bd) closeDiaryEntry(); });
+  }
+  const today = new Date().toISOString().split('T')[0];
+  let entry = {entry_date: today, title: '', body: '', remind_at: ''};
+  let titleHd = 'New diary entry';
+  let saveLabel = 'Save';
+  let deleteBtn = '';
+  if(id){
+    const found = _diaryEntries.find(function(x){return x.id===id;});
+    if(found){
+      entry = {
+        entry_date: found.entry_date,
+        title: found.title || '',
+        body: found.body || '',
+        remind_at: found.remind_at ? new Date(found.remind_at).toISOString().slice(0,16) : ''
+      };
+      titleHd = 'Edit entry';
+      saveLabel = 'Update';
+      deleteBtn = '<button onclick="deleteDiaryEntry()" style="background:none;border:none;color:#dc2626;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;padding:8px 14px;">Delete</button>';
+    }
+  }
+  bd.innerHTML = '<div style="background:#fff;border-radius:14px;width:100%;max-width:480px;max-height:90dvh;display:flex;flex-direction:column;box-shadow:0 24px 60px rgba(15,23,42,.3);overflow:hidden;" onclick="event.stopPropagation()">'+
+    '<div style="padding:14px 18px;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center;">'+
+      '<div style="font-size:15px;font-weight:700;color:#0f172a;">'+titleHd+'</div>'+
+      '<button onclick="closeDiaryEntry()" style="background:none;border:none;font-size:22px;color:#94a3b8;cursor:pointer;line-height:1;padding:4px 8px;">×</button>'+
+    '</div>'+
+    '<div style="padding:18px;overflow-y:auto;flex:1;">'+
+      '<div style="margin-bottom:14px;">'+
+        '<label style="font-size:11px;font-weight:600;color:#64748b;">Date</label>'+
+        '<input type="date" id="diDate" value="'+entry.entry_date+'" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:9px 12px;font-size:14px;font-family:inherit;outline:none;margin-top:3px;">'+
+      '</div>'+
+      '<div style="margin-bottom:14px;">'+
+        '<label style="font-size:11px;font-weight:600;color:#64748b;">Title</label>'+
+        '<input type="text" id="diTitle" value="'+String(entry.title).replace(/"/g,'&quot;')+'" placeholder="e.g. Coffee with Jess" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:9px 12px;font-size:14px;font-family:inherit;outline:none;margin-top:3px;">'+
+      '</div>'+
+      '<div style="margin-bottom:14px;">'+
+        '<label style="font-size:11px;font-weight:600;color:#64748b;">Notes</label>'+
+        '<textarea id="diBody" rows="6" placeholder="What\'s on your mind?" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:9px 12px;font-size:14px;font-family:inherit;outline:none;margin-top:3px;resize:vertical;min-height:120px;">'+String(entry.body).replace(/</g,'&lt;')+'</textarea>'+
+      '</div>'+
+      '<div style="margin-bottom:6px;">'+
+        '<label style="font-size:11px;font-weight:600;color:#64748b;display:flex;align-items:center;gap:6px;">'+
+          '<svg width="12" height="12" viewBox="0 0 20 20" fill="#94a3b8"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/></svg>'+
+          'Reminder (optional)'+
+        '</label>'+
+        '<input type="datetime-local" id="diRemind" value="'+entry.remind_at+'" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:9px 12px;font-size:14px;font-family:inherit;outline:none;margin-top:3px;">'+
+        '<div style="font-size:11px;color:#94a3b8;margin-top:4px;">Get a notification at this time. Leave blank for no reminder.</div>'+
+      '</div>'+
+    '</div>'+
+    '<div style="padding:12px 18px;border-top:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center;gap:8px;">'+
+      deleteBtn+
+      '<div style="display:flex;gap:8px;margin-left:auto;">'+
+        '<button onclick="closeDiaryEntry()" class="btn btn-outline" style="padding:8px 16px;font-size:13px;">Cancel</button>'+
+        '<button onclick="saveDiaryEntry()" class="btn btn-green" style="padding:8px 18px;font-size:13px;" id="diSaveBtn">'+saveLabel+'</button>'+
+      '</div>'+
+    '</div>'+
+  '</div>';
+  bd.style.display='flex';
+  setTimeout(function(){ const ti=document.getElementById('diTitle'); if(ti) ti.focus(); }, 50);
+}
+
+function closeDiaryEntry(){
+  const bd = document.getElementById('diaryBack');
+  if(bd) bd.style.display = 'none';
+  _diaryEditId = null;
+}
+
+async function saveDiaryEntry(){
+  const date = document.getElementById('diDate').value;
+  const title = document.getElementById('diTitle').value.trim();
+  const body = document.getElementById('diBody').value.trim();
+  const remind = document.getElementById('diRemind').value;
+  if(!date){ showToast('Pick a date'); return; }
+  if(!title && !body){ showToast('Add a title or notes'); return; }
+
+  const payload = {
+    staff_name: me,
+    entry_date: date,
+    title: title || null,
+    body: body || null,
+    remind_at: remind ? new Date(remind).toISOString() : null,
+    reminded: false,
+    updated_at: new Date().toISOString()
+  };
+  const btn = document.getElementById('diSaveBtn');
+  btn.disabled = true; btn.textContent = '...';
+  try{
+    if(_diaryEditId){
+      await fetch(SB+'/rest/v1/diary_entries?id=eq.'+encodeURIComponent(_diaryEditId), {
+        method:'PATCH',
+        headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+        body: JSON.stringify(payload)
+      });
+    } else {
+      await sbPost('diary_entries', payload);
+    }
+    closeDiaryEntry();
+    showToast(_diaryEditId ? 'Entry updated' : 'Entry saved');
+    loadDiary();
+  }catch(e){
+    showToast('Save failed');
+    btn.disabled = false;
+    btn.textContent = _diaryEditId ? 'Update' : 'Save';
+  }
+}
+
+async function deleteDiaryEntry(){
+  if(!_diaryEditId) return;
+  if(!confirm('Delete this diary entry?')) return;
+  try{
+    await fetch(SB+'/rest/v1/diary_entries?id=eq.'+encodeURIComponent(_diaryEditId), {
+      method:'DELETE',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Prefer':'return=minimal'}
+    });
+    closeDiaryEntry();
+    showToast('Entry deleted');
+    loadDiary();
+  }catch(e){ showToast('Delete failed'); }
+}
+
+// Reminder fire — check every 30s
+function checkDiaryReminders(){
+  if(!_diaryEntries || !_diaryEntries.length) return;
+  const now = new Date();
+  _diaryEntries.forEach(function(e){
+    if(!e.remind_at || e.reminded) return;
+    const remTime = new Date(e.remind_at);
+    if(remTime <= now){
+      // Fire notif via NotifManager
+      if(typeof NotifManager !== 'undefined'){
+        NotifManager.push({
+          id: 'diary-'+e.id,
+          type: 'diary',
+          title: e.title || 'Diary reminder',
+          body: e.body ? e.body.slice(0, 140) : 'Diary entry reminder',
+          ts: Date.now(),
+          link: 'diary'
+        });
+      }
+      // System notif
+      if(typeof showSystemNotification === 'function'){
+        showSystemNotification(e.title || 'Diary reminder', e.body ? e.body.slice(0, 140) : '', 'diary-'+e.id, 'tasks');
+      }
+      // Mark as reminded server-side
+      e.reminded = true;
+      fetch(SB+'/rest/v1/diary_entries?id=eq.'+encodeURIComponent(e.id), {
+        method:'PATCH',
+        headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+        body: JSON.stringify({reminded: true})
+      }).catch(function(){});
+    }
+  });
+}
+setInterval(checkDiaryReminders, 30000);
 
 // ── MY REPORTS PAGE ──────────────────
 function showReportsTab(tab){
