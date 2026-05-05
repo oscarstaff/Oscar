@@ -4871,7 +4871,14 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
         <div id="hoursReportResults" class="card" style="padding:16px;">Loading...</div>
       </div>
       <div id="rsec-manager" style="display:none;">
-        <div class="card" style="margin-bottom:14px;">
+        <div class="card" style="margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+          <div style="flex:1;min-width:200px;">
+            <div style="font-size:14px;font-weight:700;color:#0f172a;margin-bottom:3px;">Manual punch entry</div>
+            <div style="font-size:12px;color:#64748b;line-height:1.5;">Create or overwrite any staff member\'s clock-in/out for any date.</div>
+          </div>
+          <button onclick="openCreateEntry()" class="btn btn-green" style="padding:11px 20px;font-size:13px;font-weight:700;">+ Add manual entry</button>
+        </div>
+<div class="card" style="margin-bottom:14px;">
           <div class="card-title" style="margin-bottom:12px;">Edit any staff member's punches</div>
           <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;">
             <div style="flex:1 1 100%;"><label style="font-size:11px;font-weight:600;color:#64748b;">Staff member</label>
@@ -10349,7 +10356,7 @@ function renderClockCard(){
 // ── GPS / GEOFENCE ──────────────────────
 const OFFICE_LAT = -33.95245;
 const OFFICE_LNG = 151.13856;
-const OFFICE_RADIUS_M = 200; // metres allowed
+const OFFICE_RADIUS_M = 30; // metres allowed
 
 function distanceMeters(lat1, lng1, lat2, lng2){
   const R = 6371000;
@@ -10367,9 +10374,31 @@ function getCurrentPosition(){
     navigator.geolocation.getCurrentPosition(
       function(pos){ resolve(pos); },
       function(err){ reject(err); },
-      { enableHighAccuracy:true, timeout:10000, maximumAge:0 }
+      { enableHighAccuracy:true, timeout:5000, maximumAge:30000 }
     );
   });
+}
+
+function flexClockTime(date){
+  // 7-minute flexibility:
+  //   :00-:07 → :00 (round down)
+  //   :08-:22 → :15
+  //   :23-:37 → :30
+  //   :38-:52 → :45
+  //   :53-:59 → next hour :00
+  const d = new Date(date);
+  const min = d.getMinutes();
+  const sec = d.getSeconds();
+  let newMin;
+  if(min <= 7) newMin = 0;
+  else if(min <= 22) newMin = 15;
+  else if(min <= 37) newMin = 30;
+  else if(min <= 52) newMin = 45;
+  else { newMin = 0; d.setHours(d.getHours()+1); }
+  d.setMinutes(newMin);
+  d.setSeconds(0);
+  d.setMilliseconds(0);
+  return d;
 }
 
 async function toggleClock(){
@@ -10404,24 +10433,25 @@ async function toggleClock(){
 
   btn.textContent = '...';
   try{
-    await sbPost('clock_log', {staff_name: me, action: next});
+    const flexedTs = flexClockTime(new Date()).toISOString();
+    await sbPost('clock_log', {staff_name: me, action: next, ts: flexedTs});
     const DEFAULT_SHEET_URL = 'https://script.google.com/macros/s/AKfycby0Bq97bCZAsmnruXFuJuCqXQE_kOxhYE2KFuJnVzLXtT5CV0Y12k5176dxZbdaYVGE/exec';
     const sheetUrl = localStorage.getItem('oscars_sheet_url') || DEFAULT_SHEET_URL;
     if(sheetUrl){
-      try{
-        await fetch(sheetUrl, {
-          method:'POST',
-          mode:'no-cors',
-          headers:{'Content-Type':'text/plain;charset=utf-8'},
-          body: JSON.stringify({
-            action:'punch',
-            staff: me,
-            subAction: next,
-            lat: lat, lng: lng,
-            note: ''
-          })
-        });
-      }catch(e){ console.warn('sheets sync failed:', e); }
+      // Fire-and-forget — don't block UI
+      fetch(sheetUrl, {
+        method:'POST',
+        mode:'no-cors',
+        headers:{'Content-Type':'text/plain;charset=utf-8'},
+        body: JSON.stringify({
+          action:'punch',
+          staff: me,
+          subAction: next,
+          lat: lat, lng: lng,
+          ts: flexedTs,
+          note: ''
+        })
+      }).catch(function(e){ console.warn('sheets sync failed:', e); });
     }
     _clockState = next;
     _clockSinceTs = new Date();
@@ -10646,8 +10676,8 @@ async function runReport(){
   days.forEach(function(k){
     const d = byDay[k];
     const day = d.date.toLocaleDateString('en-AU',{weekday:'short'});
-    const inS = d.in ? d.in.toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit'}) : '—';
-    const outS = d.out ? d.out.toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit'}) : '—';
+    const inS = d.in ? d.in.toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit',hour12:false}) : '—';
+    const outS = d.out ? d.out.toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit',hour12:false}) : '—';
     totalHours += d.hours;
     // Build ISO date for edit modal
     const isoDate = d.date.toISOString().split('T')[0];
@@ -10773,7 +10803,12 @@ function openDiaryEntry(id){
         entry_date: found.entry_date,
         title: found.title || '',
         body: found.body || '',
-        remind_at: found.remind_at ? new Date(found.remind_at).toISOString().slice(0,16) : ''
+        remind_at: found.remind_at ? (function(iso){
+          const d = new Date(iso);
+          // Convert to local datetime-local format (YYYY-MM-DDTHH:mm)
+          const pad = function(n){return String(n).padStart(2,'0');};
+          return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+'T'+pad(d.getHours())+':'+pad(d.getMinutes());
+        })(found.remind_at) : ''
       };
       titleHd = 'Edit entry';
       saveLabel = 'Update';
@@ -10973,6 +11008,20 @@ async function runManagerReport(){
   await renderHoursTable(staff, startStr, endStr, el, true);
 }
 
+function calcDayExtras(rawHours, customBreak, customCoffee){
+  // Returns {hours, breakHrs, coffeeAllowance}
+  // Auto-rules (override if customBreak/customCoffee given):
+  // - if rawHours > 5.5 → 0.5h break (once)
+  // - if rawHours >= 4 → $5 coffee (once)
+  // - if rawHours < 4 → no break, no coffee
+  let breakHrs = (customBreak !== undefined && customBreak !== null && customBreak !== '') ? parseFloat(customBreak) : (rawHours > 5.5 ? 0.5 : 0);
+  let coffee = (customCoffee !== undefined && customCoffee !== null && customCoffee !== '') ? parseFloat(customCoffee) : (rawHours >= 4 ? 5 : 0);
+  if(isNaN(breakHrs)) breakHrs = 0;
+  if(isNaN(coffee)) coffee = 0;
+  const netHours = Math.max(0, rawHours - breakHrs);
+  return {netHours, breakHrs, coffee};
+}
+
 async function renderHoursTable(targetStaff, startStr, endStr, el, allowEdit){
   const start = new Date(startStr+'T00:00:00');
   const end = new Date(endStr+'T23:59:59');
@@ -11001,6 +11050,13 @@ async function renderHoursTable(targetStaff, startStr, endStr, el, allowEdit){
   });
   const days = Object.keys(byDay).sort(function(a,b){return byDay[a].date - byDay[b].date;});
   let totalHours = 0;
+  // Fetch any custom overrides for this staff/range from clock_overrides table
+  let overrides = {};
+  try{
+    const ov = await sbGet('clock_overrides','?staff_name=eq.'+encodeURIComponent(targetStaff)+'&date=gte.'+startStr+'&date=lte.'+endStr);
+    (ov||[]).forEach(function(r){ overrides[r.date] = r; });
+  }catch(e){}
+
   const editCol = allowEdit ? '<th style="padding:8px 6px;border-bottom:1px solid #e2e8f0;text-align:right;"></th>' : '';
   let html = '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;">'+
     '<thead><tr style="text-align:left;color:#94a3b8;font-size:11px;text-transform:uppercase;letter-spacing:.05em;">'+
@@ -11008,15 +11064,22 @@ async function renderHoursTable(targetStaff, startStr, endStr, el, allowEdit){
       '<th style="padding:8px 6px;border-bottom:1px solid #e2e8f0;">Day</th>'+
       '<th style="padding:8px 6px;border-bottom:1px solid #e2e8f0;">In</th>'+
       '<th style="padding:8px 6px;border-bottom:1px solid #e2e8f0;">Out</th>'+
-      '<th style="padding:8px 6px;border-bottom:1px solid #e2e8f0;text-align:right;">Hours</th>'+editCol+
+      '<th style="padding:8px 6px;border-bottom:1px solid #e2e8f0;text-align:right;">Break</th>'+
+      '<th style="padding:8px 6px;border-bottom:1px solid #e2e8f0;text-align:right;">Hours</th>'+
+      '<th style="padding:8px 6px;border-bottom:1px solid #e2e8f0;text-align:right;">Coffee</th>'+editCol+
     '</tr></thead><tbody>';
+  let totalNet = 0;
+  let totalCoffee = 0;
   days.forEach(function(k){
     const d = byDay[k];
     const day = d.date.toLocaleDateString('en-AU',{weekday:'short'});
-    const inS = d.in ? d.in.toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit'}) : '—';
-    const outS = d.out ? d.out.toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit'}) : '—';
-    totalHours += d.hours;
-    const isoDate = d.date.toISOString().split('T')[0];
+    const inS = d.in ? d.in.toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit',hour12:false}) : '—';
+    const outS = d.out ? d.out.toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit',hour12:false}) : '—';
+    const isoDate = (function(dt){ return dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0'); })(d.date);
+    const ov = overrides[isoDate] || {};
+    const extras = calcDayExtras(d.hours, ov.break_hrs, ov.coffee);
+    totalNet += extras.netHours;
+    totalCoffee += extras.coffee;
     const inHHMM = d.in ? (String(d.in.getHours()).padStart(2,'0')+':'+String(d.in.getMinutes()).padStart(2,'0')) : '';
     const outHHMM = d.out ? (String(d.out.getHours()).padStart(2,'0')+':'+String(d.out.getMinutes()).padStart(2,'0')) : '';
     const editBtn = allowEdit ? '<td style="padding:7px 6px;border-bottom:1px solid #f1f5f9;text-align:right;"><button onclick="openPunchEdit(\''+targetStaff.replace(/\'/g,"\\'")+'\',\''+isoDate+'\',\''+inHHMM+'\',\''+outHHMM+'\',\''+d.in_id+'\',\''+d.out_id+'\')" style="background:#f1f5f9;border:none;font-size:11px;padding:4px 10px;border-radius:6px;cursor:pointer;font-family:inherit;font-weight:600;color:var(--accent);">Edit</button></td>' : '';
@@ -11024,13 +11087,111 @@ async function renderHoursTable(targetStaff, startStr, endStr, el, allowEdit){
       '<td style="padding:7px 6px;border-bottom:1px solid #f1f5f9;color:#64748b;">'+day+'</td>'+
       '<td style="padding:7px 6px;border-bottom:1px solid #f1f5f9;">'+inS+'</td>'+
       '<td style="padding:7px 6px;border-bottom:1px solid #f1f5f9;">'+outS+'</td>'+
-      '<td style="padding:7px 6px;border-bottom:1px solid #f1f5f9;text-align:right;font-weight:600;font-variant-numeric:tabular-nums;">'+d.hours.toFixed(2)+'h</td>'+editBtn+'</tr>';
+      '<td style="padding:7px 6px;border-bottom:1px solid #f1f5f9;text-align:right;font-variant-numeric:tabular-nums;color:#64748b;">'+(extras.breakHrs?extras.breakHrs.toFixed(2)+'h':'—')+'</td>'+
+      '<td style="padding:7px 6px;border-bottom:1px solid #f1f5f9;text-align:right;font-weight:600;font-variant-numeric:tabular-nums;">'+extras.netHours.toFixed(2)+'h</td>'+
+      '<td style="padding:7px 6px;border-bottom:1px solid #f1f5f9;text-align:right;color:'+(extras.coffee?'#10b981':'#cbd5e1')+';font-weight:600;font-variant-numeric:tabular-nums;">'+(extras.coffee?'$'+extras.coffee:'—')+'</td>'+editBtn+'</tr>';
   });
   const totalEditCell = allowEdit ? '<td></td>' : '';
-  html += '<tr><td colspan="4" style="padding:10px 6px;font-weight:700;color:#0f172a;">Total</td>'+
-    '<td style="padding:10px 6px;text-align:right;font-weight:800;color:var(--accent);font-size:15px;">'+totalHours.toFixed(2)+'h</td>'+totalEditCell+'</tr>';
+  html += '<tr><td colspan="5" style="padding:10px 6px;font-weight:700;color:#0f172a;">Total</td>'+
+    '<td style="padding:10px 6px;text-align:right;font-weight:800;color:var(--accent);font-size:15px;">'+totalNet.toFixed(2)+'h</td>'+
+    '<td style="padding:10px 6px;text-align:right;font-weight:700;color:#10b981;">$'+totalCoffee.toFixed(2)+'</td>'+totalEditCell+'</tr>';
   html += '</tbody></table></div>';
   el.innerHTML = html;
+}
+
+// ── DEBUG TOOLS ──────────────────────
+function openCreateEntry(){
+  // Pick staff: from dropdown if set, else show prompt
+  const sel = document.getElementById('mgrStaffSel');
+  let staff = sel ? sel.value : '';
+  if(!staff){
+    // Show a simple staff picker
+    const names = (STAFF||[]).filter(Boolean);
+    if(!names.length){ showToast('No staff loaded'); return; }
+    const choice = prompt('Enter staff name:\n\n'+names.join(', '), me);
+    if(!choice) return;
+    staff = choice;
+    if(sel){
+      // Set dropdown to match for convenience
+      const opt = Array.from(sel.options).find(function(o){return o.value === choice;});
+      if(opt) sel.value = choice;
+    }
+  }
+  const today = new Date().toISOString().split('T')[0];
+  if(typeof openPunchEdit === 'function'){
+    openPunchEdit(staff, today, '', '', '', '');
+  } else {
+    showToast('Edit modal not loaded');
+  }
+}
+
+async function debugClockLog(){
+  const out = document.getElementById('debugOut');
+  if(!out) return;
+  out.style.display = '';
+  const staff = document.getElementById('mgrStaffSel').value || me;
+  const startStr = document.getElementById('mgrStart').value || new Date().toISOString().split('T')[0];
+  const endStr = document.getElementById('mgrEnd').value || new Date().toISOString().split('T')[0];
+  out.innerHTML = '<div style="color:#94a3b8;">Loading...</div>';
+  try{
+    const rows = await sbGet('clock_log','?staff_name=eq.'+encodeURIComponent(staff)+'&order=ts.desc&limit=50');
+    if(!rows.length){ out.innerHTML = '<div>No clock_log rows for '+staff+'.</div>'; return; }
+    let html = '<div style="margin-bottom:6px;font-weight:700;">'+rows.length+' rows for '+staff+':</div>';
+    html += '<div style="max-height:400px;overflow-y:auto;background:#fff;padding:8px;border-radius:6px;border:1px solid #fde68a;">';
+    rows.forEach(function(r){
+      const t = new Date(r.ts);
+      const localStr = t.toLocaleString('en-AU',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});
+      const action = r.action;
+      const color = action === 'in' ? '#10b981' : '#dc2626';
+      html += '<div style="padding:3px 0;border-bottom:1px solid #f1f5f9;">'+
+        '<span style="color:'+color+';font-weight:700;">'+action.toUpperCase()+'</span> · '+
+        localStr+' · <span style="color:#94a3b8;">id='+r.id.slice(0,8)+'...</span> '+
+        '<button onclick="deleteClockLogRow(\''+r.id+'\')" style="background:#dc2626;border:none;color:#fff;font-size:10px;padding:2px 6px;border-radius:4px;cursor:pointer;font-family:inherit;margin-left:6px;">delete</button>'+
+      '</div>';
+    });
+    html += '</div>';
+    out.innerHTML = html;
+  }catch(e){
+    out.innerHTML = '<div style="color:#dc2626;">Error: '+e.message+'</div>';
+  }
+}
+
+async function deleteClockLogRow(id){
+  if(!confirm('Delete this clock_log row?')) return;
+  try{
+    await fetch(SB+'/rest/v1/clock_log?id=eq.'+encodeURIComponent(id),{
+      method:'DELETE',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Prefer':'return=minimal'}
+    });
+    showToast('Row deleted');
+    debugClockLog();
+    if(typeof runManagerReport === 'function') runManagerReport();
+  }catch(e){ showToast('Delete failed'); }
+}
+
+async function wipeAndResyncFromSheet(){
+  const staff = document.getElementById('mgrStaffSel').value;
+  if(!staff){ showToast('Pick staff in dropdown above'); return; }
+  if(!confirm('Wipe ALL clock_log rows for '+staff+'? This cannot be undone. (Sheet data is preserved.)')) return;
+  const out = document.getElementById('debugOut');
+  out.style.display = '';
+  out.innerHTML = '<div style="color:#94a3b8;">Wiping...</div>';
+  try{
+    const rows = await sbGet('clock_log','?staff_name=eq.'+encodeURIComponent(staff)+'&limit=2000');
+    out.innerHTML = '<div>Found '+rows.length+' rows. Deleting...</div>';
+    const dels = rows.map(function(r){
+      return fetch(SB+'/rest/v1/clock_log?id=eq.'+encodeURIComponent(r.id),{
+        method:'DELETE',
+        headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Prefer':'return=minimal'}
+      });
+    });
+    await Promise.all(dels);
+    out.innerHTML = '<div style="color:#10b981;font-weight:700;">Done. '+rows.length+' rows deleted from supabase. Sheet still has all data. Use admin edit to add back correct rows.</div>';
+    showToast('Wiped '+rows.length+' rows');
+    if(typeof runManagerReport === 'function') runManagerReport();
+  }catch(e){
+    out.innerHTML = '<div style="color:#dc2626;">Error: '+e.message+'</div>';
+  }
 }
 
 // ── PUNCH EDIT (admin only) ──────────────
@@ -11049,13 +11210,16 @@ async function openPunchEdit(staff, isoDate, timeIn, timeOut, inId, outId){
     '<div style="padding:16px 18px;border-bottom:1px solid #f1f5f9;">'+
       '<div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">Edit punch</div>'+
       '<div style="font-size:16px;font-weight:700;color:#0f172a;">'+staff+'</div>'+
-      '<div style="font-size:12.5px;color:#64748b;margin-top:2px;">'+dateStr+'</div>'+
+      ''+
     '</div>'+
     '<div style="padding:18px;">'+
       '<input type="hidden" id="peStaff" value="'+staff.replace(/"/g,'&quot;')+'">'+
-      '<input type="hidden" id="peDate" value="'+isoDate+'">'+
       '<input type="hidden" id="peInId" value="'+(inId||'')+'">'+
       '<input type="hidden" id="peOutId" value="'+(outId||'')+'">'+
+      '<div style="margin-bottom:12px;">'+
+        '<label style="font-size:11px;font-weight:600;color:#64748b;">Date</label>'+
+        '<input type="date" id="peDate" value="'+isoDate+'" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:9px 12px;font-size:14px;font-family:inherit;outline:none;margin-top:3px;">'+
+      '</div>'+
       '<div style="display:flex;gap:10px;margin-bottom:12px;">'+
         '<div style="flex:1;"><label style="font-size:11px;font-weight:600;color:#64748b;">Time In</label><input type="time" id="peTimeIn" value="'+(timeIn||'')+'" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:9px 12px;font-size:14px;font-family:inherit;outline:none;margin-top:3px;"></div>'+
         '<div style="flex:1;"><label style="font-size:11px;font-weight:600;color:#64748b;">Time Out</label><input type="time" id="peTimeOut" value="'+(timeOut||'')+'" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:9px 12px;font-size:14px;font-family:inherit;outline:none;margin-top:3px;"></div>'+
@@ -11066,12 +11230,78 @@ async function openPunchEdit(staff, isoDate, timeIn, timeOut, inId, outId){
       '</div>'+
       '<div style="font-size:11px;color:#94a3b8;background:#fef3c7;padding:8px 10px;border-radius:7px;line-height:1.5;">⚠ Changes here update both the portal log and the Google Sheet for this staff member.</div>'+
     '</div>'+
-    '<div style="padding:12px 18px;border-top:1px solid #f1f5f9;display:flex;gap:8px;justify-content:flex-end;">'+
-      '<button onclick="document.getElementById(\'punchEditBack\').style.display=\'none\'" class="btn btn-outline" style="padding:8px 16px;font-size:13px;">Cancel</button>'+
-      '<button onclick="savePunchEdit()" class="btn btn-green" style="padding:8px 18px;font-size:13px;" id="peSaveBtn">Save changes</button>'+
+    '<div style="padding:12px 18px;border-top:1px solid #f1f5f9;display:flex;gap:8px;justify-content:space-between;align-items:center;">'+
+      ((inId || outId) ? '<button onclick="deletePunch()" style="background:none;border:none;color:#dc2626;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;padding:8px 14px;">Delete punch</button>' : '<div></div>')+
+      '<div style="display:flex;gap:8px;">'+
+        '<button onclick="document.getElementById(\'punchEditBack\').style.display=\'none\'" class="btn btn-outline" style="padding:8px 16px;font-size:13px;">Cancel</button>'+
+        '<button onclick="savePunchEdit()" class="btn btn-green" style="padding:8px 18px;font-size:13px;" id="peSaveBtn">Save changes</button>'+
+      '</div>'+
     '</div>'+
   '</div>';
   bd.style.display='flex';
+}
+
+async function deletePunch(){
+  const staff = document.getElementById('peStaff').value;
+  const isoDate = document.getElementById('peDate').value;
+  if(!confirm('Delete the entire punch for '+staff+' on '+isoDate+'?\n\nThis removes both the portal record AND clears the Google Sheet row.')) return;
+  const btn = document.getElementById('peSaveBtn');
+  if(btn){ btn.disabled = true; btn.textContent = 'Deleting...'; }
+  try{
+    // 1. Delete all supabase clock_log rows for that staff/date
+    const [y,mo,d] = isoDate.split('-');
+    const localMidnight = new Date(parseInt(y), parseInt(mo)-1, parseInt(d), 0, 0, 0);
+    const localEnd = new Date(parseInt(y), parseInt(mo)-1, parseInt(d), 23, 59, 59);
+    const startTs = localMidnight.toISOString();
+    const endTs = localEnd.toISOString();
+    const existing = await sbGet('clock_log','?staff_name=eq.'+encodeURIComponent(staff)+'&ts=gte.'+startTs+'&ts=lte.'+endTs);
+    if(existing && existing.length){
+      const dels = existing.map(function(r){
+        return fetch(SB+'/rest/v1/clock_log?id=eq.'+encodeURIComponent(r.id),{
+          method:'DELETE',
+          headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Prefer':'return=minimal'}
+        });
+      });
+      await Promise.all(dels);
+    }
+    // 2. Also delete clock_overrides for that day
+    try{
+      await fetch(SB+'/rest/v1/clock_overrides?staff_name=eq.'+encodeURIComponent(staff)+'&date=eq.'+isoDate,{
+        method:'DELETE',
+        headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Prefer':'return=minimal'}
+      });
+    }catch(e){}
+    // 3. Clear the sheet row — send empty values via updatePunch
+    const sheetDateStr = d+'/'+mo+'/'+y;
+    const sheetUrl = 'https://script.google.com/macros/s/AKfycby0Bq97bCZAsmnruXFuJuCqXQE_kOxhYE2KFuJnVzLXtT5CV0Y12k5176dxZbdaYVGE/exec';
+    fetch(sheetUrl, {
+      method:'POST',
+      headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body: JSON.stringify({
+        action:'updatePunch',
+        staff: staff,
+        date: sheetDateStr,
+        timeIn: '',
+        timeOut: '',
+        breakHrs: '',
+        coffee: '',
+        editor: me + ' (delete)'
+      })
+    });
+    showToast('Punch deleted');
+    document.getElementById('punchEditBack').style.display='none';
+    if(typeof runHoursReport === 'function' && document.getElementById('rsec-hours') && document.getElementById('rsec-hours').style.display !== 'none') runHoursReport();
+    if(typeof runManagerReport === 'function' && document.getElementById('rsec-manager') && document.getElementById('rsec-manager').style.display !== 'none') runManagerReport();
+    if(staff === me){
+      await loadAllClockLogs();
+      await loadClockState();
+      if(typeof renderHours === 'function') renderHours();
+    }
+  }catch(e){
+    console.warn('delete punch:', e);
+    showToast('Delete failed');
+    if(btn){ btn.disabled = false; btn.textContent = 'Save changes'; }
+  }
 }
 
 async function savePunchEdit(){
@@ -11083,6 +11313,23 @@ async function savePunchEdit(){
   const coffee = document.getElementById('peCoffee').value;
   const inId = document.getElementById('peInId').value;
   const outId = document.getElementById('peOutId').value;
+
+  // Persist break/coffee override in clock_overrides table
+  if(breakHrs !== '' || coffee !== ''){
+    try{
+      await fetch(SB+'/rest/v1/clock_overrides',{
+        method:'POST',
+        headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},
+        body: JSON.stringify({
+          staff_name: staff,
+          date: isoDate,
+          break_hrs: breakHrs===''?null:parseFloat(breakHrs),
+          coffee: coffee===''?null:parseFloat(coffee),
+          edited_by: me
+        })
+      });
+    }catch(e){console.warn('override save:',e);}
+  }
   const btn = document.getElementById('peSaveBtn');
   btn.disabled = true; btn.textContent = 'Saving...';
 
@@ -11091,30 +11338,59 @@ async function savePunchEdit(){
   const sheetDateStr = d+'/'+mo+'/'+y;
 
   try{
-    // 1. Update Supabase clock_log (delete old in/out for this date+staff, insert new)
-    // First, fetch all logs for this staff on this date
-    const startTs = isoDate+'T00:00:00.000Z';
-    const endTs = isoDate+'T23:59:59.999Z';
+    // 1. Update Supabase clock_log — use LOCAL Sydney midnight bounds (not UTC)
+    // Build Date objects from local components, then convert to UTC ISO
+    const localMidnight = new Date(parseInt(y), parseInt(mo)-1, parseInt(d), 0, 0, 0);
+    const localEnd = new Date(parseInt(y), parseInt(mo)-1, parseInt(d), 23, 59, 59);
+    const startTs = localMidnight.toISOString();
+    const endTs = localEnd.toISOString();
     const existing = await sbGet('clock_log','?staff_name=eq.'+encodeURIComponent(staff)+'&ts=gte.'+startTs+'&ts=lte.'+endTs);
-    // Delete them all
-    for(const r of (existing||[])){
-      await fetch(SB+'/rest/v1/clock_log?id=eq.'+encodeURIComponent(r.id),{
-        method:'DELETE',
-        headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Prefer':'return=minimal'}
+    // Delete all old in parallel — verify each succeeded
+    if(existing && existing.length){
+      const deletes = existing.map(function(r){
+        return fetch(SB+'/rest/v1/clock_log?id=eq.'+encodeURIComponent(r.id),{
+          method:'DELETE',
+          headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Prefer':'return=minimal'}
+        }).then(function(res){
+          if(!res.ok){ console.warn('Delete failed for', r.id, res.status); }
+          return res;
+        });
       });
+      const results = await Promise.all(deletes);
+      const failed = results.filter(function(r){return !r.ok;}).length;
+      if(failed > 0){
+        console.warn('WARNING:', failed, 'of', results.length, 'delete requests failed');
+        showToast('⚠ '+failed+' old rows could not be deleted');
+      }
+      // Verify by re-querying
+      const stillThere = await sbGet('clock_log','?staff_name=eq.'+encodeURIComponent(staff)+'&ts=gte.'+startTs+'&ts=lte.'+endTs);
+      if(stillThere && stillThere.length > 0){
+        console.warn('CRITICAL:', stillThere.length, 'rows still in DB after delete!');
+        // Force-delete them one more time, sequentially
+        for(const r of stillThere){
+          try{
+            await fetch(SB+'/rest/v1/clock_log?id=eq.'+encodeURIComponent(r.id),{
+              method:'DELETE',
+              headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Prefer':'return=minimal'}
+            });
+          }catch(e){}
+        }
+      }
     }
-    // Re-insert based on edited values
+    // Re-insert in parallel
+    const inserts = [];
     if(timeIn){
       const inTs = new Date(isoDate+'T'+timeIn+':00').toISOString();
-      await sbPost('clock_log', {staff_name: staff, action: 'in', ts: inTs});
+      inserts.push(sbPost('clock_log', {staff_name: staff, action: 'in', ts: inTs}));
     }
     if(timeOut){
       const outTs = new Date(isoDate+'T'+timeOut+':00').toISOString();
-      await sbPost('clock_log', {staff_name: staff, action: 'out', ts: outTs});
+      inserts.push(sbPost('clock_log', {staff_name: staff, action: 'out', ts: outTs}));
     }
-    // 2. Update Google Sheet via Apps Script
+    if(inserts.length) await Promise.all(inserts);
+    // 2. Update Google Sheet via Apps Script — fire-and-forget for speed
     const sheetUrl = 'https://script.google.com/macros/s/AKfycby0Bq97bCZAsmnruXFuJuCqXQE_kOxhYE2KFuJnVzLXtT5CV0Y12k5176dxZbdaYVGE/exec';
-    await fetch(sheetUrl, {
+    fetch(sheetUrl, {
       method:'POST',
       headers:{'Content-Type':'text/plain;charset=utf-8'},
       body: JSON.stringify({
@@ -11130,10 +11406,16 @@ async function savePunchEdit(){
     });
     showToast('Saved · Sheet updated');
     document.getElementById('punchEditBack').style.display='none';
-    // Refresh report
-    runReport();
+    // Refresh ALL relevant views — runReport (old modal), runHoursReport (own page), runManagerReport (admin page)
+    if(typeof runReport === 'function' && document.getElementById('reportsBack') && document.getElementById('reportsBack').style.display !== 'none') runReport();
+    if(typeof runHoursReport === 'function' && document.getElementById('rsec-hours') && document.getElementById('rsec-hours').style.display !== 'none') runHoursReport();
+    if(typeof runManagerReport === 'function' && document.getElementById('rsec-manager') && document.getElementById('rsec-manager').style.display !== 'none') runManagerReport();
     // Refresh own clock state if editing own
-    if(staff === me){ loadAllClockLogs(); loadClockState(); }
+    if(staff === me){
+      await loadAllClockLogs();
+      await loadClockState();
+      if(typeof renderHours === 'function') renderHours();
+    }
   }catch(e){
     console.warn('save punch:', e);
     showToast('Save failed');
