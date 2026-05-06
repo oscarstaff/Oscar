@@ -8309,7 +8309,13 @@ function playNotifSound(typeKey){
   }catch(e){console.warn('sound:', e);}
 }
 
+const _sysNotifFired = new Set();
 function showSystemNotification(title, body, taskId, typeKey){
+  // In-memory dedup for this session to prevent duplicate browser notifications
+  const sigKey = (typeKey||'gen')+':'+(taskId||title||'');
+  if(_sysNotifFired.has(sigKey)) return;
+  _sysNotifFired.add(sigKey);
+
   if(typeof window.Notification === 'undefined'){
     return null;
   }
@@ -10501,11 +10507,13 @@ async function pollForNewActivity(){
   }catch(e){}
 }
 
+let _activityPollTimer = null;
 function startActivityPolling(){
   // Initial baseline
   pollForNewActivity();
-  // Then poll every 60s
-  setInterval(pollForNewActivity, 60000);
+  // Guard: only register interval ONCE
+  if(_activityPollTimer) clearInterval(_activityPollTimer);
+  _activityPollTimer = setInterval(pollForNewActivity, 60000);
 }
 
 // Mark all notifications as read
@@ -13024,7 +13032,13 @@ function toggleMobileSidebar(){
 // ── TOP NOTIFICATION BANNER ──
 let _bannerTimer = null;
 
+const _bannerFiredThisSession = new Set();
 function showBanner(text, sub, type){
+  // Dedupe same banner content within a session
+  const sig = String(text)+':'+String(sub);
+  if(_bannerFiredThisSession.has(sig)) return;
+  _bannerFiredThisSession.add(sig);
+
   const el=document.getElementById('notifBanner');
   const inner=document.getElementById('notifBannerInner');
   const textEl=document.getElementById('notifBannerText');
@@ -13043,23 +13057,49 @@ function hideBanner(){
   if(el)el.classList.remove('show');
 }
 
+// Track last polled timestamp + IDs to prevent duplicate alerts
 async function checkNewDiscussions(){
+  if(!me) return; // Don't poll until user is set
   try{
     const rows = await sbGet('discussions','?order=created_at.desc&limit=20');
     if(!rows || !rows.length) return;
+
+    // FIRST POLL after page load: establish baseline, don't fire alerts
+    const baselineKey = 'disc_baseline_set_'+me;
+    if(!sessionStorage.getItem(baselineKey)){
+      // Mark all current posts as already-notified (don't alert on existing posts)
+      const allIds = rows.map(function(r){return r.id;});
+      const sysSeen = JSON.parse(localStorage.getItem('disc_sys_notified_'+me)||'[]');
+      const merged = sysSeen.concat(allIds.filter(function(id){return !sysSeen.includes(id);}));
+      localStorage.setItem('disc_sys_notified_'+me, JSON.stringify(merged.slice(-500)));
+      sessionStorage.setItem(baselineKey, '1');
+      refreshAnnBadge();
+      return;
+    }
+
     const seenIds = JSON.parse(localStorage.getItem('disc_seen_'+me)||'[]');
     const sysSeen = JSON.parse(localStorage.getItem('disc_sys_notified_'+me)||'[]');
-    // Find brand-new posts (not seen, not by me, not already system-notified this session)
+
+    // Filter: brand-new posts only — fail any of these checks → skip
     const newPosts = rows.filter(function(r){
-      return r.created_by !== me &&
-             !seenIds.includes(r.id) &&
-             !sysSeen.includes(r.id);
+      if(r.created_by === me) return false;       // not my own posts
+      if(seenIds.includes(r.id)) return false;    // already viewed
+      if(sysSeen.includes(r.id)) return false;    // already alerted
+      return true;
     });
-    // Limit to 3 most recent to avoid spam
+
+    if(!newPosts.length){
+      refreshAnnBadge();
+      return;
+    }
+
+    // Limit to 3 to avoid spam
     const toNotify = newPosts.slice(0, 3);
-    let changed = false;
+    // Mark as alerted IMMEDIATELY (before async ops) — prevents race condition
+    const newSysSeen = sysSeen.concat(toNotify.map(function(r){return r.id;}));
+    localStorage.setItem('disc_sys_notified_'+me, JSON.stringify(newSysSeen.slice(-500)));
+
     toNotify.forEach(function(r){
-      // Push to NotifManager
       if(typeof NotifManager !== 'undefined' && NotifManager.push){
         NotifManager.push({
           id: 'disc-'+r.id,
@@ -13070,7 +13110,6 @@ async function checkNewDiscussions(){
           link: 'engagement'
         });
       }
-      // Browser notification (if permitted)
       if(typeof showSystemNotification === 'function'){
         showSystemNotification(
           r.must_read ? 'Must-read · ' + (r.created_by||'Someone') : 'New post · ' + (r.created_by||'Someone'),
@@ -13079,18 +13118,14 @@ async function checkNewDiscussions(){
           'discussions'
         );
       }
-      sysSeen.push(r.id);
-      changed = true;
     });
-    if(changed){
-      localStorage.setItem('disc_sys_notified_'+me, JSON.stringify(sysSeen.slice(-200)));
-    }
-    // Refresh nav badges
+
     refreshAnnBadge();
   }catch(e){ console.warn('checkNewDiscussions:', e); }
 }
 
 async function checkNewNotifications(){
+  if(!me) return;
   // Poll discussions in parallel with leave checks
   checkNewDiscussions();
   try{
@@ -13869,6 +13904,8 @@ let _realtimeClient = null;
 let _realtimeChannels = [];
 
 async function initRealtime(){
+  if(window._realtimeInitialized) return;
+  window._realtimeInitialized = true;
   if(!window.supabase){
     try{
       await new Promise(function(res,rej){
@@ -13949,6 +13986,10 @@ function setupRealtimeChannels(){
   const replyCh = _realtimeClient.channel('reply-notifs-live')
     .on('postgres_changes', {event:'INSERT', schema:'public', table:'reply_notifications'}, function(payload){
       if(payload.new && payload.new.recipient === me){
+        // Dedupe per notification ID using session-storage so reload doesn't re-fire
+        const fireKey = 'rt_reply_'+payload.new.id;
+        if(sessionStorage.getItem(fireKey)) return;
+        sessionStorage.setItem(fireKey, '1');
         loadNotifications();
         showBanner('New Reply', payload.new.replier+' replied to your discussion', '');
       }
