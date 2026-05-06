@@ -4455,6 +4455,9 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
             <button id="clockBtn" onclick="toggleClock()" style="padding:12px 22px;border-radius:10px;background:var(--accent);color:#fff;border:none;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;letter-spacing:-.01em;transition:filter .15s,transform .15s;min-width:120px;">Clock In</button>
             <button id="pwaInstallBtn" onclick="triggerPwaInstall()" style="display:none;padding:12px 16px;border-radius:10px;background:#f1f5f9;color:#0f172a;border:none;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;align-items:center;gap:6px;"> Install</button>
           </div>
+          <div style="margin-top:10px;">
+            <button onclick="openExtraBreakRequest()" style="padding:8px 14px;border-radius:8px;background:transparent;color:#64748b;border:1px solid #e2e8f0;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">+ Request extra break</button>
+          </div>
         </div>
         <!-- Hours summary toggle -->
         <div style="margin-top:14px;border-top:1px solid #f1f5f9;padding-top:12px;">
@@ -4929,6 +4932,10 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
         <div id="hoursReportResults" class="card" style="padding:16px;">Loading...</div>
       </div>
       <div id="rsec-manager" style="display:none;">
+        <div class="card" style="margin-bottom:14px;">
+          <div class="card-title" style="margin-bottom:10px;">Extra break requests</div>
+          <div id="ebrAdminList" style="margin:-6px -6px 0;"><div style="padding:14px;color:#94a3b8;font-size:13px;">Loading...</div></div>
+        </div>
         <div class="card" style="margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
           <div style="flex:1;min-width:200px;">
             <div style="font-size:14px;font-weight:700;color:#0f172a;margin-bottom:3px;">Manual punch entry</div>
@@ -11135,6 +11142,179 @@ async function markTourDone(){
   }catch(e){ /* localStorage fallback already written */ }
 }
 
+// ── EXTRA BREAK REQUESTS ───────────
+function openExtraBreakRequest(){
+  let bd = document.getElementById('extraBreakBack');
+  if(!bd){
+    bd = document.createElement('div');
+    bd.id = 'extraBreakBack';
+    bd.style.cssText = 'position:fixed;inset:0;z-index:9550;background:rgba(15,23,42,.55);backdrop-filter:blur(10px);display:flex;align-items:center;justify-content:center;padding:16px;';
+    document.body.appendChild(bd);
+    bd.addEventListener('click', function(e){ if(e.target===bd) bd.style.display='none'; });
+  }
+  const today = new Date().toISOString().split('T')[0];
+  bd.innerHTML = '<div style="background:#fff;border-radius:14px;width:100%;max-width:420px;display:flex;flex-direction:column;overflow:hidden;" onclick="event.stopPropagation()">'+
+    '<div style="padding:16px 18px;border-bottom:1px solid #f1f5f9;">'+
+      '<div style="font-size:14px;font-weight:700;color:#0f172a;">Request extra break</div>'+
+      '<div style="font-size:12px;color:#64748b;margin-top:2px;">Manager approval required.</div>'+
+    '</div>'+
+    '<div style="padding:18px;">'+
+      '<label style="font-size:11px;font-weight:600;color:#64748b;display:block;margin-bottom:6px;">Date</label>'+
+      '<input type="date" id="ebrDate" value="'+today+'" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:9px 12px;font-size:14px;font-family:inherit;outline:none;margin-bottom:14px;">'+
+      '<label style="font-size:11px;font-weight:600;color:#64748b;display:block;margin-bottom:6px;">Extra break time</label>'+
+      '<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">'+
+        '<input type="range" id="ebrSlider" min="15" max="180" step="15" value="15" oninput="updateExtraBreakLabel(this.value)" style="flex:1;accent-color:var(--accent);">'+
+        '<div id="ebrLabel" style="font-size:14px;font-weight:700;color:#0f172a;min-width:80px;text-align:right;font-variant-numeric:tabular-nums;">+15 min</div>'+
+      '</div>'+
+      '<div style="font-size:10.5px;color:#94a3b8;margin-bottom:14px;">Adds to your standard 30-min break. Pick in 15-min steps.</div>'+
+      '<label style="font-size:11px;font-weight:600;color:#64748b;display:block;margin-bottom:6px;">Reason (optional)</label>'+
+      '<textarea id="ebrReason" rows="2" placeholder="e.g. medical appointment, errand" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;outline:none;resize:vertical;"></textarea>'+
+    '</div>'+
+    '<div style="padding:12px 18px;border-top:1px solid #f1f5f9;display:flex;gap:8px;justify-content:flex-end;">'+
+      '<button onclick="document.getElementById(\'extraBreakBack\').style.display=\'none\'" class="btn btn-outline" style="padding:8px 16px;font-size:13px;">Cancel</button>'+
+      '<button onclick="submitExtraBreakRequest()" class="btn btn-green" style="padding:8px 18px;font-size:13px;" id="ebrSubmitBtn">Submit request</button>'+
+    '</div>'+
+  '</div>';
+  bd.style.display = 'flex';
+}
+
+function updateExtraBreakLabel(val){
+  const v = parseInt(val,10);
+  const h = Math.floor(v/60);
+  const m = v % 60;
+  let label = '+';
+  if(h && m) label += h+'h '+m+'m';
+  else if(h) label += h+'h';
+  else label += m+' min';
+  document.getElementById('ebrLabel').textContent = label;
+}
+
+async function submitExtraBreakRequest(){
+  const date = document.getElementById('ebrDate').value;
+  const minutes = parseInt(document.getElementById('ebrSlider').value, 10);
+  const reason = document.getElementById('ebrReason').value.trim();
+  const btn = document.getElementById('ebrSubmitBtn');
+  if(!date || !minutes){ showToast('Pick a date and duration'); return; }
+  // Enforce 15-min steps
+  if(minutes % 15 !== 0 || minutes < 15 || minutes > 180){ showToast('Must be 15-min steps, 15 min to 3 hr'); return; }
+  btn.disabled = true; btn.textContent = 'Submitting...';
+  try{
+    await fetch(SB+'/rest/v1/extra_break_requests',{
+      method:'POST',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body: JSON.stringify({
+        staff_name: me,
+        request_date: date,
+        minutes: minutes,
+        reason: reason || null,
+        status: 'pending'
+      })
+    });
+    showToast('Request sent to manager');
+    document.getElementById('extraBreakBack').style.display = 'none';
+  }catch(e){
+    showToast('Failed to send request');
+    btn.disabled = false; btn.textContent = 'Submit request';
+  }
+}
+
+// Admin: load pending requests
+async function loadExtraBreakRequests(){
+  const el = document.getElementById('ebrAdminList');
+  if(!el) return;
+  if(!myIsAdmin) return;
+  try{
+    const rows = await sbGet('extra_break_requests','?status=eq.pending&order=created_at.asc&limit=50');
+    if(!rows || !rows.length){
+      el.innerHTML = '<div style="padding:30px 20px;text-align:center;color:#94a3b8;font-size:13px;">No pending requests.</div>';
+      return;
+    }
+    let html = '';
+    rows.forEach(function(r){
+      const d = r.request_date ? new Date(r.request_date).toLocaleDateString('en-AU',{weekday:'short',day:'2-digit',month:'short'}) : '';
+      const h = Math.floor(r.minutes/60);
+      const m = r.minutes % 60;
+      let dur = '';
+      if(h && m) dur = h+'h '+m+'m';
+      else if(h) dur = h+'h';
+      else dur = m+' min';
+      const safeStaff = String(r.staff_name||'').replace(/"/g,'&quot;');
+      html += '<div style="padding:12px 14px;border-bottom:1px solid #f1f5f9;display:flex;flex-wrap:wrap;gap:10px;align-items:flex-start;">'+
+        '<div style="flex:1;min-width:160px;">'+
+          '<div style="font-size:13px;font-weight:700;color:#0f172a;">'+safeStaff+' · +'+dur+'</div>'+
+          '<div style="font-size:11.5px;color:#64748b;margin-top:2px;">'+d+(r.reason?' · '+r.reason:'')+'</div>'+
+        '</div>'+
+        '<div style="display:flex;gap:6px;">'+
+          '<button data-id="'+r.id+'" data-staff="'+safeStaff+'" data-date="'+r.request_date+'" data-min="'+r.minutes+'" onclick="handleApproveBreak(this)" style="padding:6px 12px;background:#10b981;color:#fff;border:none;border-radius:7px;font-size:11.5px;font-weight:700;cursor:pointer;font-family:inherit;">Approve</button>'+
+          '<button data-id="'+r.id+'" onclick="handleDeclineBreak(this)" style="padding:6px 12px;background:#fee2e2;color:#991b1b;border:none;border-radius:7px;font-size:11.5px;font-weight:700;cursor:pointer;font-family:inherit;">Decline</button>'+
+        '</div>'+
+      '</div>';
+    });
+        el.innerHTML = html;
+  }catch(e){
+    el.innerHTML = '<div style="padding:14px;color:#dc2626;">Failed to load.</div>';
+  }
+}
+
+async function approveExtraBreak(id, staff, date, minutes){
+  if(!confirm('Approve '+minutes+' min extra break for '+staff+' on '+date+'?')) return;
+  try{
+    // 1. Mark request approved
+    await fetch(SB+'/rest/v1/extra_break_requests?id=eq.'+encodeURIComponent(id),{
+      method:'PATCH',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body: JSON.stringify({status:'approved', resolved_by: me, resolved_at: new Date().toISOString()})
+    });
+    // 2. Top up break_hrs in clock_overrides — fetch current then add
+    const existing = await sbGet('clock_overrides','?staff_name=eq.'+encodeURIComponent(staff)+'&date=eq.'+date);
+    const currentBreak = (existing && existing.length) ? (parseFloat(existing[0].break_hrs) || 0) : 0.5; // default 0.5 if none
+    const newBreak = currentBreak + (minutes / 60);
+    if(existing && existing.length){
+      await fetch(SB+'/rest/v1/clock_overrides?staff_name=eq.'+encodeURIComponent(staff)+'&date=eq.'+date,{
+        method:'PATCH',
+        headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+        body: JSON.stringify({break_hrs: newBreak, edited_by: me})
+      });
+    } else {
+      await fetch(SB+'/rest/v1/clock_overrides',{
+        method:'POST',
+        headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+        body: JSON.stringify({staff_name: staff, date: date, break_hrs: newBreak, edited_by: me})
+      });
+    }
+    // 3. Sync to Google Sheet
+    const [y,mo,d] = date.split('-');
+    const sheetDate = d+'/'+mo+'/'+y;
+    fetch('https://script.google.com/macros/s/AKfycby0Bq97bCZAsmnruXFuJuCqXQE_kOxhYE2KFuJnVzLXtT5CV0Y12k5176dxZbdaYVGE/exec',{
+      method:'POST',
+      headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body: JSON.stringify({action:'updatePunch', staff:staff, date:sheetDate, breakHrs: newBreak, editor: me+' (extra break +'+minutes+'min)'})
+    }).catch(function(){});
+    showToast('Approved · break updated');
+    loadExtraBreakRequests();
+  }catch(e){ showToast('Approve failed'); }
+}
+
+function handleApproveBreak(btn){
+  approveExtraBreak(btn.dataset.id, btn.dataset.staff, btn.dataset.date, parseInt(btn.dataset.min,10));
+}
+function handleDeclineBreak(btn){
+  declineExtraBreak(btn.dataset.id);
+}
+
+async function declineExtraBreak(id){
+  if(!confirm('Decline this request?')) return;
+  try{
+    await fetch(SB+'/rest/v1/extra_break_requests?id=eq.'+encodeURIComponent(id),{
+      method:'PATCH',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body: JSON.stringify({status:'declined', resolved_by: me, resolved_at: new Date().toISOString()})
+    });
+    showToast('Request declined');
+    loadExtraBreakRequests();
+  }catch(e){ showToast('Decline failed'); }
+}
+
 // ── DISCUSSION ADMIN ─────────────────
 async function toggleDiscPin(id, currentlyPinned){
   if(!myIsAdmin) return;
@@ -11428,7 +11608,7 @@ setInterval(checkDiaryReminders, 30000);
 // ── MY REPORTS PAGE ──────────────────
 function showReportsTab(tab){
   document.getElementById('rsec-hours').style.display = tab === 'hours' ? '' : 'none';
-  document.getElementById('rsec-manager').style.display = tab === 'manager' ? '' : 'none';
+  document.getElementById('rsec-manager').style.display = tab === 'manager' ? '' : 'none'; if(tab === 'manager' && typeof loadExtraBreakRequests === 'function') loadExtraBreakRequests();
   document.getElementById('rtab-hours').classList.toggle('active', tab === 'hours');
   document.getElementById('rtab-manager').classList.toggle('active', tab === 'manager');
   if(tab === 'manager') populateMgrStaff();
