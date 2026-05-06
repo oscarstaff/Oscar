@@ -11946,7 +11946,7 @@ async function openPunchEdit(staff, isoDate, timeIn, timeOut, inId, outId){
       '<div style="font-size:11px;color:#94a3b8;background:#fef3c7;padding:8px 10px;border-radius:7px;line-height:1.5;">⚠ Changes here update both the portal log and the Google Sheet for this staff member.</div>'+
     '</div>'+
     '<div style="padding:12px 18px;border-top:1px solid #f1f5f9;display:flex;gap:8px;justify-content:space-between;align-items:center;">'+
-      ((inId || outId) ? '<button onclick="deletePunch()" style="background:none;border:none;color:#dc2626;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;padding:8px 14px;">Delete punch</button>' : '<div></div>')+
+      ((inId || outId) ? '<div style="display:flex;gap:6px;"><button onclick="nukeBreakOnly()" style="background:none;border:none;color:#a16207;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;padding:8px 12px;">Nuke breaks</button><button onclick="deletePunch()" style="background:none;border:none;color:#dc2626;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;padding:8px 14px;">Delete punch</button></div>' : '<div></div>')+
       '<div style="display:flex;gap:8px;">'+
         '<button onclick="document.getElementById(\'punchEditBack\').style.display=\'none\'" class="btn btn-outline" style="padding:8px 16px;font-size:13px;">Cancel</button>'+
         '<button onclick="savePunchEdit()" class="btn btn-green" style="padding:8px 18px;font-size:13px;" id="peSaveBtn">Save changes</button>'+
@@ -11954,6 +11954,50 @@ async function openPunchEdit(staff, isoDate, timeIn, timeOut, inId, outId){
     '</div>'+
   '</div>';
   bd.style.display='flex';
+}
+
+async function nukeBreakOnly(){
+  const staff = document.getElementById('peStaff').value;
+  const isoDate = document.getElementById('peDate').value;
+  if(!confirm('Nuke ALL break data for '+staff+' on '+isoDate+'?\n\nThis:\n• Wipes break override in portal\n• Resets approved extra-break requests for this day\n• Sets sheet break cell to default auto-rule\n\nClock-in/out times are NOT touched.')) return;
+  try{
+    // 1. Wipe clock_overrides break for this date
+    await fetch(SB+'/rest/v1/clock_overrides?staff_name=eq.'+encodeURIComponent(staff)+'&date=eq.'+isoDate,{
+      method:'DELETE',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Prefer':'return=minimal'}
+    });
+    // 2. Reset any approved extra-break requests for this day
+    await fetch(SB+'/rest/v1/extra_break_requests?staff_name=eq.'+encodeURIComponent(staff)+'&request_date=eq.'+isoDate+'&status=eq.approved',{
+      method:'PATCH',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body: JSON.stringify({status:'declined', resolved_by:me+' (nuked)'})
+    });
+    // 3. Clear the sheet break cell — send blank to trigger auto-rule
+    const [y,mo,d] = isoDate.split('-');
+    const sheetDateStr = d+'/'+mo+'/'+y;
+    fetch('https://script.google.com/macros/s/AKfycby0Bq97bCZAsmnruXFuJuCqXQE_kOxhYE2KFuJnVzLXtT5CV0Y12k5176dxZbdaYVGE/exec', {
+      method:'POST',
+      headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body: JSON.stringify({
+        action:'updatePunch',
+        staff: staff,
+        date: sheetDateStr,
+        breakHrs: '',
+        editor: me + ' (nuke breaks)'
+      })
+    }).catch(function(){});
+    showToast('Break data wiped for '+isoDate);
+    document.getElementById('punchEditBack').style.display='none';
+    // Refresh views
+    if(typeof runHoursReport === 'function') runHoursReport();
+    if(typeof runManagerReport === 'function') runManagerReport();
+    if(staff === me){
+      await loadAllClockLogs();
+      if(typeof renderHours === 'function') renderHours();
+    }
+  }catch(e){
+    showToast('Nuke failed: '+e.message);
+  }
 }
 
 async function deletePunch(){
@@ -11989,6 +12033,14 @@ async function deletePunch(){
       await fetch(SB+'/rest/v1/clock_overrides?staff_name=eq.'+encodeURIComponent(staff)+'&date=eq.'+isoDate,{
         method:'DELETE',
         headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Prefer':'return=minimal'}
+      });
+    }catch(e){}
+    // 2b. Reset any already-approved extra_break_requests for this day so they don't re-apply
+    try{
+      await fetch(SB+'/rest/v1/extra_break_requests?staff_name=eq.'+encodeURIComponent(staff)+'&request_date=eq.'+isoDate+'&status=eq.approved',{
+        method:'PATCH',
+        headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+        body: JSON.stringify({status:'declined', resolved_by:me+' (auto-cleared on punch delete)'})
       });
     }catch(e){}
     // 3. Clear the sheet row — send empty values via updatePunch
