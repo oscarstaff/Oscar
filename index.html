@@ -11272,23 +11272,39 @@ async function approveExtraBreak(id, staff, date, minutes){
       headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
       body: JSON.stringify({status:'approved', resolved_by: me, resolved_at: new Date().toISOString()})
     });
-    // 2. Top up break_hrs in clock_overrides — fetch current then add
+    // 2. Top up break_hrs in clock_overrides — verified write
     const existing = await sbGet('clock_overrides','?staff_name=eq.'+encodeURIComponent(staff)+'&date=eq.'+date);
-    const currentBreak = (existing && existing.length) ? (parseFloat(existing[0].break_hrs) || 0) : 0.5; // default 0.5 if none
+    const currentBreak = (existing && existing.length) ? (parseFloat(existing[0].break_hrs) || 0) : 0.5;
     const newBreak = currentBreak + (minutes / 60);
+    console.log('[approveBreak] staff:', staff, 'date:', date, 'current:', currentBreak, 'add:', minutes/60, 'new:', newBreak);
+    let writeRes;
     if(existing && existing.length){
-      await fetch(SB+'/rest/v1/clock_overrides?staff_name=eq.'+encodeURIComponent(staff)+'&date=eq.'+date,{
+      writeRes = await fetch(SB+'/rest/v1/clock_overrides?staff_name=eq.'+encodeURIComponent(staff)+'&date=eq.'+date,{
         method:'PATCH',
-        headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+        headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=representation'},
         body: JSON.stringify({break_hrs: newBreak, edited_by: me})
       });
     } else {
-      await fetch(SB+'/rest/v1/clock_overrides',{
+      writeRes = await fetch(SB+'/rest/v1/clock_overrides',{
         method:'POST',
-        headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+        headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=representation'},
         body: JSON.stringify({staff_name: staff, date: date, break_hrs: newBreak, edited_by: me})
       });
     }
+    if(!writeRes.ok){
+      const errTxt = await writeRes.text().catch(function(){return '?';});
+      console.error('[approveBreak] supabase WRITE FAILED:', writeRes.status, errTxt);
+      showToast('Supabase write failed: '+writeRes.status);
+      return;
+    }
+    // Verify it actually persisted
+    const verify = await sbGet('clock_overrides','?staff_name=eq.'+encodeURIComponent(staff)+'&date=eq.'+date);
+    if(!verify || !verify.length || Math.abs(parseFloat(verify[0].break_hrs) - newBreak) > 0.001){
+      console.error('[approveBreak] verify failed. Got:', verify);
+      showToast('Write did not persist');
+      return;
+    }
+    console.log('[approveBreak] verified break_hrs in supabase:', verify[0].break_hrs);
     // 3. Sync to Google Sheet
     const [y,mo,d] = date.split('-');
     const sheetDate = d+'/'+mo+'/'+y;
@@ -11297,13 +11313,24 @@ async function approveExtraBreak(id, staff, date, minutes){
       headers:{'Content-Type':'text/plain;charset=utf-8'},
       body: JSON.stringify({action:'updatePunch', staff:staff, date:sheetDate, breakHrs: newBreak, editor: me+' (extra break +'+minutes+'min)'})
     }).catch(function(){});
-    showToast('Approved · break updated');
+    showToast('Approved · break updated to '+newBreak+'h');
     loadExtraBreakRequests();
-    // Refresh report views so admin sees new break immediately
-    if(typeof runHoursReport === 'function') runHoursReport();
-    if(typeof runManagerReport === 'function') runManagerReport();
-    if(typeof loadAllClockLogs === 'function') await loadAllClockLogs();
-    if(typeof renderHours === 'function') renderHours();
+    // Force the manager date range to include the edited date
+    const mgrStart = document.getElementById('mgrStart');
+    const mgrEnd = document.getElementById('mgrEnd');
+    if(mgrStart && mgrEnd){
+      if(date < mgrStart.value) mgrStart.value = date;
+      if(date > mgrEnd.value) mgrEnd.value = date;
+      const mgrSel = document.getElementById('mgrStaffSel');
+      if(mgrSel) mgrSel.value = staff;
+    }
+    // Refresh ALL report views with a small delay for DB consistency
+    setTimeout(async function(){
+      if(typeof runHoursReport === 'function') await runHoursReport();
+      if(typeof runManagerReport === 'function') await runManagerReport();
+      if(typeof loadAllClockLogs === 'function') await loadAllClockLogs();
+      if(typeof renderHours === 'function') renderHours();
+    }, 400);
   }catch(e){ showToast('Approve failed'); }
 }
 
