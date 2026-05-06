@@ -173,19 +173,27 @@ html[data-sb="collapsed"] .sb-user > div:nth-child(2) {
 /* ── BOTTOM NAV — mobile only ── */
 .bottom-nav{
   display:none;
-  position:fixed;bottom:0;left:0;right:0;
-  width:100vw;
+  position:fixed;
+  bottom:0;
+  left:0;
+  right:0;
+  width:100%;
   box-sizing:border-box;
   background:rgba(255,255,255,.93);
   backdrop-filter:blur(20px);
   -webkit-backdrop-filter:blur(20px);
   border-top:1px solid rgba(226,232,240,.7);
   z-index:200;
-  /* Fill bottom safe area only — left/right cause weird gap on iPhones */
-  padding-bottom:env(safe-area-inset-bottom,0px);
-  padding-left:0;
-  padding-right:0;
+  padding:0 0 env(safe-area-inset-bottom,0px) 0 !important;
+  margin:0 !important;
   box-shadow:0 -1px 0 rgba(0,0,0,.05),0 -8px 24px rgba(0,0,0,.05);
+}
+.bn-items{
+  display:flex !important;
+  width:100% !important;
+  margin:0 !important;
+  padding:0 !important;
+  box-sizing:border-box !important;
 }
 
 
@@ -206,10 +214,7 @@ html[data-sb="collapsed"] .sb-user > div:nth-child(2) {
 }
 
 /* ── BOTTOM NAV ITEMS — single source of truth ── */
-.bn-items{
-  display:flex;
-  width:100%;
-}
+/* .bn-items now defined above */
 .bn-item{
   flex:1 1 0;
   min-width:0;
@@ -5131,7 +5136,7 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
           <!-- GEOFENCE ADJUSTER (Sanskar only) -->
           <div id="geofenceAdjuster" style="display:none;padding:14px 0;border-top:1px solid #f1f5f9;margin-top:8px;">
             <div style="font-size:13px;font-weight:700;margin-bottom:4px;color:var(--text,#0f172a);">Geofence radius (admin tool)</div>
-            <div style="font-size:11.5px;color:#64748b;margin-bottom:10px;line-height:1.5;">Adjust how far from the office staff can clock in. Saved per device.</div>
+            <div style="font-size:11.5px;color:#64748b;margin-bottom:10px;line-height:1.5;">Adjust how far from the office staff can clock in. Applies to all staff, all devices.</div>
             <div style="display:flex;align-items:center;gap:10px;">
               <input type="range" id="geofenceSlider" min="5" max="500" step="5" value="15" oninput="onGeofenceSliderInput(this.value)" style="flex:1;accent-color:var(--accent);">
               <div id="geofenceVal" style="font-size:14px;font-weight:700;color:#0f172a;min-width:60px;text-align:right;font-variant-numeric:tabular-nums;">15 m</div>
@@ -5231,7 +5236,7 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
       <div class="bn-item" id="bn-profile" data-tab="profile" onclick="if(navigator.vibrate)navigator.vibrate(8);goTo('profile')" aria-label="Profile">
         <svg class="bn-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"/></svg>
       </div>
-      <div class="bn-item" id="bn-admin" data-tab="admin" style="display:none;"></div>
+      <!-- bn-admin removed (was causing flex spacing issue) -->
     </div>
   </nav>
 
@@ -6235,6 +6240,7 @@ async function enterHub(){
   });
   applySavedBrightness();
   applySavedTextColor();
+  loadGlobalGeofence(); // pull global geofence value at startup
   setTimeout(rtUpgradeAll, 200);
   setTimeout(startActivityPolling, 4000);
   setInterval(loadSharedTasksFromOthers, 60000);
@@ -8353,11 +8359,33 @@ function applySavedTextColor(){
   }, 100);
 }
 
-function onGeofenceSliderInput(val){
+let _geofenceSaveTimer = null;
+async function onGeofenceSliderInput(val){
   const v = parseInt(val,10);
   document.getElementById('geofenceVal').textContent = v + ' m';
-  localStorage.setItem('oscars_geofence_m', String(v));
-  // Live update lock state on clock card
+  // Update cached value immediately for instant UI feedback
+  _globalGeofenceM = v;
+  // Persist to supabase (debounced — wait 400ms after last drag)
+  clearTimeout(_geofenceSaveTimer);
+  _geofenceSaveTimer = setTimeout(async function(){
+    try{
+      // Try update first; if no row exists, insert
+      const upd = await fetch(SB+'/rest/v1/app_settings?key=eq.geofence_radius_m',{
+        method:'PATCH',
+        headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+        body: JSON.stringify({value: String(v), updated_by: me, updated_at: new Date().toISOString()})
+      });
+      // If 0 rows affected, INSERT
+      const r2 = await sbGet('app_settings','?key=eq.geofence_radius_m');
+      if(!r2 || !r2.length){
+        await fetch(SB+'/rest/v1/app_settings',{
+          method:'POST',
+          headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+          body: JSON.stringify({key:'geofence_radius_m', value: String(v), updated_by: me})
+        });
+      }
+    }catch(e){ console.warn('geofence save:', e); }
+  }, 400);
   if(typeof applyGpsLock === 'function') applyGpsLock();
 }
 
@@ -8365,29 +8393,40 @@ function setGeofencePreset(m){
   const slider = document.getElementById('geofenceSlider');
   if(slider) slider.value = m;
   onGeofenceSliderInput(m);
-  showToast('Geofence set to '+m+' m');
+  showToast('Geofence set to '+m+' m for all staff');
 }
 
-function resetGeofence(){
+async function resetGeofence(){
   localStorage.removeItem('oscars_geofence_m');
+  _globalGeofenceM = null;
+  // Delete from supabase so all staff revert
+  try{
+    await fetch(SB+'/rest/v1/app_settings?key=eq.geofence_radius_m',{
+      method:'DELETE',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Prefer':'return=minimal'}
+    });
+  }catch(e){}
   const slider = document.getElementById('geofenceSlider');
   if(slider) slider.value = 15;
   document.getElementById('geofenceVal').textContent = '15 m (default)';
-  showToast('Reset to default 15 m');
+  showToast('Reset to default 15 m for all staff');
+  if(typeof applyGpsLock === 'function') applyGpsLock();
 }
 
-function maybeShowGeofenceAdjuster(){
+async function maybeShowGeofenceAdjuster(){
   const el = document.getElementById('geofenceAdjuster');
   if(!el) return;
   // Admin-only access (also allow Sanskar by name as safety net)
   const isSanskar = me && /^sanskar/i.test(String(me));
   if(myIsAdmin || isSanskar){
     el.style.display = '';
-    const cur = parseInt(localStorage.getItem('oscars_geofence_m')||'15',10);
+    // Load current global value from supabase
+    const globalV = await loadGlobalGeofence();
+    const cur = globalV || 15;
     const slider = document.getElementById('geofenceSlider');
     const val = document.getElementById('geofenceVal');
     if(slider) slider.value = cur;
-    if(val) val.textContent = cur + (localStorage.getItem('oscars_geofence_m') ? ' m' : ' m (default)');
+    if(val) val.textContent = cur + ' m' + (globalV ? '' : ' (default)');
   } else {
     el.style.display = 'none';
   }
@@ -10595,7 +10634,25 @@ function renderClockCard(){
 const OFFICE_LAT = -33.95245;
 const OFFICE_LNG = 151.13856;
 const OFFICE_RADIUS_DEFAULT = 15;
+let _globalGeofenceM = null; // cached after first load
+
+async function loadGlobalGeofence(){
+  try{
+    const rows = await sbGet('app_settings','?key=eq.geofence_radius_m&select=value');
+    if(rows && rows.length){
+      const v = parseInt(rows[0].value, 10);
+      if(v && v >= 5 && v <= 5000){
+        _globalGeofenceM = v;
+        return v;
+      }
+    }
+  }catch(e){}
+  return null;
+}
+
 function getGeofenceRadius(){
+  // Priority: cached global → localStorage personal override → default
+  if(_globalGeofenceM && _globalGeofenceM >= 5 && _globalGeofenceM <= 5000) return _globalGeofenceM;
   const v = parseInt(localStorage.getItem('oscars_geofence_m')||'',10);
   return (v && v >= 5 && v <= 5000) ? v : OFFICE_RADIUS_DEFAULT;
 }
