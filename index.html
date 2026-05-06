@@ -11292,6 +11292,11 @@ async function approveExtraBreak(id, staff, date, minutes){
     }).catch(function(){});
     showToast('Approved · break updated');
     loadExtraBreakRequests();
+    // Refresh report views so admin sees new break immediately
+    if(typeof runHoursReport === 'function') runHoursReport();
+    if(typeof runManagerReport === 'function') runManagerReport();
+    if(typeof loadAllClockLogs === 'function') await loadAllClockLogs();
+    if(typeof renderHours === 'function') renderHours();
   }catch(e){ showToast('Approve failed'); }
 }
 
