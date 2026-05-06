@@ -5539,7 +5539,7 @@ function showEngagementTab(tab){
     const t=document.getElementById('etab-'+s);
     if(t)t.classList.toggle('active',s===tab);
   });
-  if(tab==='discussions'){loadDiscussions();const ao=document.getElementById('discAdminOptions');if(ao)ao.style.display=myIsAdmin?'block':'none';}
+  if(tab==='discussions'){loadDiscussions();markAllDiscussionsSeen();const ao=document.getElementById('discAdminOptions');if(ao)ao.style.display=myIsAdmin?'block':'none';}
 }
 
 
@@ -6302,6 +6302,10 @@ function setActiveNavChild(tab){
 function goTo(p){
   // Announcements deprecated — redirect to discussions
   if(p === 'announcements') p = 'engagement';
+  // When user opens Discussions page, mark all as seen
+  if((p === 'engagement' || p === 'discussions') && typeof markAllDiscussionsSeen === 'function'){
+    setTimeout(markAllDiscussionsSeen, 600);
+  }
   setActiveNavChild(p);
   if(typeof _setBottomNavActive==='function') _setBottomNavActive(p);
   // Update URL hash + document title
@@ -7083,11 +7087,44 @@ async function updateAnnBadge(rows,readIds){
 }
 
 async function refreshAnnBadge(){
+  // Announcements deprecated → use Discussions for badge
   try{
-    const rows=await sbGet('announcements','?order=created_at.desc');
-    const readIds=JSON.parse(localStorage.getItem('ann_read_'+me)||'[]');
-    updateAnnBadge(rows,readIds);
-  }catch(e){console.warn(e);}
+    const rows = await sbGet('discussions','?order=created_at.desc&limit=100');
+    if(!rows){ return; }
+    const readIds = JSON.parse(localStorage.getItem('disc_seen_'+me)||'[]');
+    // Filter to only NEW posts (not authored by me)
+    const unread = rows.filter(function(r){ return r.created_by !== me && !readIds.includes(r.id); });
+    const count = unread.length;
+    // Update sidebar badge
+    const b1 = document.getElementById('discBadge');
+    if(b1){ b1.textContent = count; b1.style.display = count > 0 ? 'inline' : 'none'; }
+    // Update bottom-nav badge
+    const b2 = document.getElementById('bnAnnBadge');
+    if(b2){ b2.textContent = count; b2.style.display = count > 0 ? 'block' : 'none'; }
+    // Legacy badges (if still rendered)
+    const b3 = document.getElementById('annBadge');
+    if(b3){ b3.style.display = 'none'; }
+  }catch(e){ console.warn('discBadge:',e); }
+}
+
+// Mark a discussion as seen by current user (call when they view it)
+function markDiscSeen(id){
+  const seen = JSON.parse(localStorage.getItem('disc_seen_'+me)||'[]');
+  if(!seen.includes(id)){
+    seen.push(id);
+    localStorage.setItem('disc_seen_'+me, JSON.stringify(seen.slice(-500)));
+    refreshAnnBadge();
+  }
+}
+
+// Bulk mark all current discussions as seen (called when user opens Discussions page)
+async function markAllDiscussionsSeen(){
+  try{
+    const rows = await sbGet('discussions','?select=id&limit=100');
+    const ids = (rows||[]).map(function(r){return r.id;});
+    localStorage.setItem('disc_seen_'+me, JSON.stringify(ids.slice(-500)));
+    refreshAnnBadge();
+  }catch(e){}
 }
 
 // ── TIMESHEET EXPORT ──
@@ -13006,7 +13043,56 @@ function hideBanner(){
   if(el)el.classList.remove('show');
 }
 
+async function checkNewDiscussions(){
+  try{
+    const rows = await sbGet('discussions','?order=created_at.desc&limit=20');
+    if(!rows || !rows.length) return;
+    const seenIds = JSON.parse(localStorage.getItem('disc_seen_'+me)||'[]');
+    const sysSeen = JSON.parse(localStorage.getItem('disc_sys_notified_'+me)||'[]');
+    // Find brand-new posts (not seen, not by me, not already system-notified this session)
+    const newPosts = rows.filter(function(r){
+      return r.created_by !== me &&
+             !seenIds.includes(r.id) &&
+             !sysSeen.includes(r.id);
+    });
+    // Limit to 3 most recent to avoid spam
+    const toNotify = newPosts.slice(0, 3);
+    let changed = false;
+    toNotify.forEach(function(r){
+      // Push to NotifManager
+      if(typeof NotifManager !== 'undefined' && NotifManager.push){
+        NotifManager.push({
+          id: 'disc-'+r.id,
+          type: r.must_read ? 'discussion-must-read' : 'discussion',
+          title: r.must_read ? 'Must-read post' : 'New discussion',
+          body: (r.created_by ? r.created_by + ': ' : '') + (r.title || (r.body||'').slice(0,80)),
+          ts: r.created_at ? new Date(r.created_at).getTime() : Date.now(),
+          link: 'engagement'
+        });
+      }
+      // Browser notification (if permitted)
+      if(typeof showSystemNotification === 'function'){
+        showSystemNotification(
+          r.must_read ? 'Must-read · ' + (r.created_by||'Someone') : 'New post · ' + (r.created_by||'Someone'),
+          (r.title || (r.body||'')).slice(0, 140),
+          'disc-'+r.id,
+          'discussions'
+        );
+      }
+      sysSeen.push(r.id);
+      changed = true;
+    });
+    if(changed){
+      localStorage.setItem('disc_sys_notified_'+me, JSON.stringify(sysSeen.slice(-200)));
+    }
+    // Refresh nav badges
+    refreshAnnBadge();
+  }catch(e){ console.warn('checkNewDiscussions:', e); }
+}
+
 async function checkNewNotifications(){
+  // Poll discussions in parallel with leave checks
+  checkNewDiscussions();
   try{
     const rows=await sbGet('leave_submissions','?staff_name=eq.'+encodeURIComponent(me)+'&status=in.(approved,declined)&order=submitted_at.desc&limit=5');
     const read=JSON.parse(localStorage.getItem('oR_'+me)||'[]');
