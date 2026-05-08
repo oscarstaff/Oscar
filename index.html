@@ -8439,29 +8439,49 @@ let _geofenceSaveTimer = null;
 async function onGeofenceSliderInput(val){
   const v = parseInt(val,10);
   document.getElementById('geofenceVal').textContent = v + ' m';
-  // Update cached value immediately for instant UI feedback
   _globalGeofenceM = v;
-  // Persist to supabase (debounced — wait 400ms after last drag)
   clearTimeout(_geofenceSaveTimer);
   _geofenceSaveTimer = setTimeout(async function(){
+    console.log('[geofence] saving', v, 'm to supabase');
     try{
-      // Try update first; if no row exists, insert
-      const upd = await fetch(SB+'/rest/v1/app_settings?key=eq.geofence_radius_m',{
-        method:'PATCH',
-        headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
-        body: JSON.stringify({value: String(v), updated_by: me, updated_at: new Date().toISOString()})
-      });
-      // If 0 rows affected, INSERT
-      const r2 = await sbGet('app_settings','?key=eq.geofence_radius_m');
-      if(!r2 || !r2.length){
-        await fetch(SB+'/rest/v1/app_settings',{
+      // First check if row exists
+      const existing = await sbGet('app_settings','?key=eq.geofence_radius_m');
+      console.log('[geofence] existing row:', existing);
+      let res;
+      if(existing && existing.length){
+        // PATCH
+        res = await fetch(SB+'/rest/v1/app_settings?key=eq.geofence_radius_m',{
+          method:'PATCH',
+          headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=representation'},
+          body: JSON.stringify({value: String(v), updated_by: me, updated_at: new Date().toISOString()})
+        });
+      } else {
+        // INSERT
+        res = await fetch(SB+'/rest/v1/app_settings',{
           method:'POST',
-          headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+          headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=representation'},
           body: JSON.stringify({key:'geofence_radius_m', value: String(v), updated_by: me})
         });
       }
-    }catch(e){ console.warn('geofence save:', e); }
-  }, 400);
+      const txt = await res.text().catch(function(){return '?';});
+      console.log('[geofence] save status:', res.status, 'body:', txt.slice(0,200));
+      if(!res.ok){
+        showToast('⚠ Geofence save failed: '+res.status+' — see console', 'error');
+        return;
+      }
+      // Verify
+      const verify = await sbGet('app_settings','?key=eq.geofence_radius_m');
+      if(verify && verify.length && parseInt(verify[0].value,10) === v){
+        showToast('Geofence saved: '+v+' m for all staff', 'success');
+      } else {
+        showToast('⚠ Save did not persist — check supabase RLS', 'error');
+        console.error('[geofence] verify failed:', verify);
+      }
+    }catch(e){
+      console.error('[geofence] save exception:', e);
+      showToast('Save error: '+e.message, 'error');
+    }
+  }, 600);
   if(typeof applyGpsLock === 'function') applyGpsLock();
 }
 
