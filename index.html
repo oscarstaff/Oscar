@@ -1516,10 +1516,20 @@ button[onclick*="toggleNotifDrop"]:hover{
 /* Mobile — full width dropdown */
 @media(max-width:700px){
   #mhNotifDrop{
-    position:fixed;
-    right:8px;left:auto;
-    width:300px;
-    top:64px;
+    position:fixed !important;
+    right:8px !important;
+    left:8px !important;
+    width:auto !important;
+    max-width:none !important;
+    top:60px !important;
+    max-height:75vh !important;
+  }
+}
+@media(max-width:380px){
+  #mhNotifDrop{
+    right:4px !important;
+    left:4px !important;
+    top:56px !important;
   }
 }
 [data-theme="dark"] .notif-drop{background:#1e293b;border-color:#2d3f55;}
@@ -10849,27 +10859,14 @@ async function pollForNewActivity(){
     }
 
     // Leave decisions (my own leave requests being approved/declined)
+    // Realtime handles new leave events now — this poll is now a safety net only
+    // Use submitted_at as fallback timestamp since resolved_at column doesn't exist
     if(!_lastLeaveSeen){
       try{
-        const l = await sbGet('leave_submissions','?staff_name=eq.'+encodeURIComponent(me)+'&status=in.(approved,declined)&order=resolved_at.desc&limit=1');
-        if(l && l[0] && l[0].resolved_at) _lastLeaveSeen = new Date(l[0].resolved_at).getTime();
+        const l = await sbGet('leave_submissions','?staff_name=eq.'+encodeURIComponent(me)+'&status=in.(approved,declined)&order=submitted_at.desc&limit=1');
+        if(l && l[0]) _lastLeaveSeen = parseSupabaseTs(l[0].submitted_at);
         else _lastLeaveSeen = Date.now();
       }catch(e){ _lastLeaveSeen = Date.now(); }
-    } else {
-      const leaveSince = new Date(_lastLeaveSeen).toISOString();
-      const newLeaves = await sbGet('leave_submissions','?staff_name=eq.'+encodeURIComponent(me)+'&status=in.(approved,declined)&resolved_at=gt.'+encodeURIComponent(leaveSince)+'&order=resolved_at.asc&limit=5');
-      (newLeaves||[]).forEach(function(l){
-        _lastLeaveSeen = Math.max(_lastLeaveSeen, new Date(l.resolved_at).getTime());
-        const approved = l.status === 'approved';
-        NotifManager.push({
-          id: 'leave-'+l.id,
-          type: approved ? 'leave-approved' : 'leave-declined',
-          title: approved ? 'Leave approved' : 'Leave declined',
-          body: (l.from_date||'') + (l.to_date ? ' – '+l.to_date : '') + (l.reason ? ' · '+l.reason : ''),
-          ts: new Date(l.resolved_at).getTime(),
-          link: 'leave'
-        });
-      });
     }
 
     // Availability expiry (if my standing availability hasn't been updated in 30+ days)
@@ -11755,7 +11752,7 @@ async function approveExtraBreak(id, staff, date, minutes){
     await fetch(SB+'/rest/v1/extra_break_requests?id=eq.'+encodeURIComponent(id),{
       method:'PATCH',
       headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
-      body: JSON.stringify({status:'approved', resolved_by: me, resolved_at: new Date().toISOString()})
+      body: JSON.stringify({status:'approved', resolved_by: me})
     });
     // 2. Top up break_hrs in clock_overrides — verified write
     const existing = await sbGet('clock_overrides','?staff_name=eq.'+encodeURIComponent(staff)+'&date=eq.'+date);
@@ -11832,7 +11829,7 @@ async function declineExtraBreak(id){
     await fetch(SB+'/rest/v1/extra_break_requests?id=eq.'+encodeURIComponent(id),{
       method:'PATCH',
       headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
-      body: JSON.stringify({status:'declined', resolved_by: me, resolved_at: new Date().toISOString()})
+      body: JSON.stringify({status:'declined', resolved_by: me})
     });
     showToast('Request declined');
     loadExtraBreakRequests();
@@ -14263,11 +14260,51 @@ function toggleNotifDrop(dropId){
 }
 
 async function loadNotifDrop(dropId){
-  // Ensure any pending task reminders are fired before rendering
+  // Use NotifManager (modern source) if it has entries
+  const listId = dropId==='mhNotifDrop'?'mhNotifDropList':'notifDropList';
+  const el = document.getElementById(listId);
+  if(el && typeof NotifManager !== 'undefined' && NotifManager.getAll){
+    try{
+      const allNotifs = NotifManager.getAll();
+      if(allNotifs && allNotifs.length){
+        let html = '';
+        allNotifs.forEach(function(n){
+          const t = n.ts || Date.now();
+          const diff = Date.now() - t;
+          let timeStr = 'just now';
+          if(diff > 60000 && diff < 3600000) timeStr = Math.floor(diff/60000)+'m ago';
+          else if(diff > 3600000 && diff < 86400000) timeStr = Math.floor(diff/3600000)+'h ago';
+          else if(diff > 86400000) timeStr = Math.floor(diff/86400000)+'d ago';
+          const unreadDot = n.read ? '' : '<span style="display:inline-block;width:7px;height:7px;background:#8b5cf6;border-radius:50%;margin-right:6px;flex-shrink:0;"></span>';
+          html += '<div class="notif-drop-item'+(n.read?'':' unread')+'" data-notif-id="'+n.id+'" style="display:block;cursor:pointer;">'+
+            '<div style="display:flex;align-items:start;gap:6px;">'+unreadDot+
+            '<div style="flex:1;min-width:0;">'+
+              '<div style="font-size:13px;font-weight:'+(n.read?'500':'700')+';color:#0f172a;margin-bottom:2px;">'+(n.title||'').replace(/</g,'&lt;')+'</div>'+
+              '<div style="font-size:12px;color:#475569;line-height:1.4;margin-bottom:3px;white-space:normal;">'+(n.body||'').replace(/</g,'&lt;')+'</div>'+
+              '<div style="font-size:11px;color:#94a3b8;">'+timeStr+'</div>'+
+            '</div></div></div>';
+        });
+        el.innerHTML = html;
+        // Wire clicks to mark-read + navigate
+        el.querySelectorAll('[data-notif-id]').forEach(function(item){
+          item.addEventListener('click', function(){
+            const id = item.getAttribute('data-notif-id');
+            NotifManager.markRead(id);
+            const notif = NotifManager.getAll().find(function(n){return n.id===id;});
+            if(notif && notif.link){
+              const drop = document.getElementById(dropId);
+              if(drop) drop.classList.remove('open');
+              if(typeof goTo === 'function') goTo(notif.link);
+            }
+          });
+        });
+        return;
+      }
+    }catch(e){ console.warn('NotifManager render failed:', e); }
+  }
+  // Fall back to legacy data sources
   if(typeof checkTaskReminders==='function') checkTaskReminders();
-  const listId=dropId==='mhNotifDrop'?'mhNotifDropList':'notifDropList';
-  const el=document.getElementById(listId);
-  if(!el)return;
+  if(!el) return;
   el.innerHTML='<div class="notif-drop-empty">Loading...</div>';
   try{
     const rows=await sbGet('leave_submissions','?staff_name=eq.'+encodeURIComponent(me)+'&status=in.(approved,declined)&order=submitted_at.desc&limit=10');
@@ -14935,7 +14972,7 @@ function setupRealtimeChannels(){
               type: l.status === 'approved' ? 'leave-approved' : 'leave-declined',
               title: l.status === 'approved' ? 'Leave approved' : 'Leave declined',
               body: (l.from_date||'') + (l.to_date ? ' to '+l.to_date : '') + (l.reason ? ' · '+l.reason : ''),
-              ts: parseSupabaseTs(l.resolved_at),
+              ts: parseSupabaseTs(l.resolved_at || l.submitted_at),
               link: 'leave'
             });
           }
