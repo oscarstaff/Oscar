@@ -6393,8 +6393,7 @@ async function enterHub(){
       maybeShowTour();
     }, 300);
   });
-  applySavedBrightness();
-  applySavedTextColor();
+  if(typeof applySavedTextColor === 'function') applySavedTextColor();
   loadGlobalGeofence(); // pull global geofence value at startup
   setTimeout(rtUpgradeAll, 200);
   setTimeout(startActivityPolling, 4000);
@@ -8370,6 +8369,7 @@ async function loadOnboardingChecklist(){
 
 
 
+let _audioUnlocked = false;
 function _unlockAudio(){
   if(_audioUnlocked) return;
   try{
@@ -10725,6 +10725,7 @@ let _lastDiscSeen = 0;
 
 async function pollForNewActivity(){
   if(!me) return;
+  console.log('[poll] tick at', new Date().toISOString());
   if(typeof showSystemNotification !== 'function') return;
   // First call — just establish baseline, don't fire notifs
   if(!_lastAnnSeen){
@@ -10756,16 +10757,139 @@ async function pollForNewActivity(){
     (newDisc||[]).forEach(function(d){
       if(d.created_by === me) return;
       _lastDiscSeen = Math.max(_lastDiscSeen, new Date(d.created_at).getTime());
-      showSystemNotification(
-        'New discussion: ' + (d.title||''),
-        searchText(d.body).slice(0,140) || 'Tap to join the conversation',
-        'disc-'+d.id,
-        'discussions'
-      );
+      NotifManager.push({
+        id: 'disc-'+d.id,
+        type: d.must_read ? 'discussion-must-read' : 'discussion',
+        title: d.must_read ? 'Must-read post' : 'New discussion',
+        body: (d.created_by||'Someone') + ': ' + (d.title || searchText(d.body).slice(0,80)),
+        ts: new Date(d.created_at).getTime(),
+        link: 'engagement'
+      });
     });
+
+    // New replies (reply_notifications where I'm recipient)
+    if(!_lastReplySeen){
+      try{
+        const r = await sbGet('reply_notifications','?recipient=eq.'+encodeURIComponent(me)+'&order=created_at.desc&limit=1');
+        if(r && r[0]) _lastReplySeen = new Date(r[0].created_at).getTime();
+        else _lastReplySeen = Date.now();
+      }catch(e){ _lastReplySeen = Date.now(); }
+    } else {
+      const replySince = new Date(_lastReplySeen).toISOString();
+      const newReplies = await sbGet('reply_notifications','?recipient=eq.'+encodeURIComponent(me)+'&created_at=gt.'+encodeURIComponent(replySince)+'&order=created_at.asc&limit=5');
+      (newReplies||[]).forEach(function(r){
+        if(r.replied_by === me) return;
+        _lastReplySeen = Math.max(_lastReplySeen, new Date(r.created_at).getTime());
+        NotifManager.push({
+          id: 'reply-'+r.id,
+          type: 'reply',
+          title: (r.replied_by||'Someone') + ' replied',
+          body: (r.reply_body||'').slice(0,140),
+          ts: new Date(r.created_at).getTime(),
+          link: 'engagement'
+        });
+      });
+    }
+
+    // New reactions — schema: target_id, target_type ('disc'|'reply'|'ann'), staff_name, emoji, created_at
+    if(!_lastReactSeen){
+      try{
+        const r = await sbGet('reactions','?order=created_at.desc&limit=1');
+        if(r && r[0] && r[0].created_at) _lastReactSeen = new Date(r[0].created_at).getTime();
+        else _lastReactSeen = Date.now();
+        console.log('[poll] reaction baseline:', new Date(_lastReactSeen).toISOString());
+      }catch(e){ _lastReactSeen = Date.now(); console.warn('[poll] react baseline failed:', e); }
+    } else {
+      const reactSince = new Date(_lastReactSeen).toISOString();
+      let newReacts = [];
+      try{
+        newReacts = await sbGet('reactions','?created_at=gt.'+encodeURIComponent(reactSince)+'&order=created_at.asc&limit=20') || [];
+      }catch(e){ console.warn('[poll] reactions fetch failed:', e); }
+      console.log('[poll] reactions since', reactSince, '→ found', newReacts.length);
+      for(let i=0; i<newReacts.length; i++){
+        const r = newReacts[i];
+        if(r.staff_name === me) continue; // skip my own reactions
+        if(r.created_at) _lastReactSeen = Math.max(_lastReactSeen, new Date(r.created_at).getTime());
+        // Determine if I authored the target — schema uses 'disc' / 'reply' / 'ann'
+        let isMyContent = false;
+        let targetLabel = 'content';
+        try{
+          if(r.target_type === 'disc'){
+            const d = await sbGet('discussions','?id=eq.'+r.target_id+'&select=created_by');
+            if(d && d[0] && d[0].created_by === me){ isMyContent = true; targetLabel = 'post'; }
+          } else if(r.target_type === 'reply'){
+            const rp = await sbGet('discussion_replies','?id=eq.'+r.target_id+'&select=replied_by,replier');
+            const author = rp && rp[0] ? (rp[0].replied_by || rp[0].replier) : null;
+            if(author === me){ isMyContent = true; targetLabel = 'reply'; }
+          }
+        }catch(e){ console.warn('[poll] react author check:', e); }
+        console.log('[poll] react from', r.staff_name, 'on', r.target_type, '— mine?', isMyContent);
+        if(isMyContent){
+          NotifManager.push({
+            id: 'react-'+r.id,
+            type: 'reaction',
+            title: (r.staff_name||'Someone') + ' reacted ' + (r.emoji||'👍'),
+            body: 'On your '+targetLabel,
+            ts: r.created_at ? new Date(r.created_at).getTime() : Date.now(),
+            link: 'engagement'
+          });
+        }
+      }
+    }
+
+    // Leave decisions (my own leave requests being approved/declined)
+    if(!_lastLeaveSeen){
+      try{
+        const l = await sbGet('leave_submissions','?staff_name=eq.'+encodeURIComponent(me)+'&status=in.(approved,declined)&order=resolved_at.desc&limit=1');
+        if(l && l[0] && l[0].resolved_at) _lastLeaveSeen = new Date(l[0].resolved_at).getTime();
+        else _lastLeaveSeen = Date.now();
+      }catch(e){ _lastLeaveSeen = Date.now(); }
+    } else {
+      const leaveSince = new Date(_lastLeaveSeen).toISOString();
+      const newLeaves = await sbGet('leave_submissions','?staff_name=eq.'+encodeURIComponent(me)+'&status=in.(approved,declined)&resolved_at=gt.'+encodeURIComponent(leaveSince)+'&order=resolved_at.asc&limit=5');
+      (newLeaves||[]).forEach(function(l){
+        _lastLeaveSeen = Math.max(_lastLeaveSeen, new Date(l.resolved_at).getTime());
+        const approved = l.status === 'approved';
+        NotifManager.push({
+          id: 'leave-'+l.id,
+          type: approved ? 'leave-approved' : 'leave-declined',
+          title: approved ? 'Leave approved' : 'Leave declined',
+          body: (l.from_date||'') + (l.to_date ? ' – '+l.to_date : '') + (l.reason ? ' · '+l.reason : ''),
+          ts: new Date(l.resolved_at).getTime(),
+          link: 'leave'
+        });
+      });
+    }
+
+    // Availability expiry (if my standing availability hasn't been updated in 30+ days)
+    try{
+      const av = await sbGet('staff_availability','?staff_name=eq.'+encodeURIComponent(me)+'&limit=1');
+      if(av && av[0] && av[0].updated_at){
+        const lastUpdate = new Date(av[0].updated_at).getTime();
+        const daysOld = (Date.now() - lastUpdate) / (1000*60*60*24);
+        if(daysOld > 30){
+          // Push once per session (sessionStorage)
+          const expKey = 'avail_expiry_warned_'+me;
+          if(!sessionStorage.getItem(expKey)){
+            sessionStorage.setItem(expKey, '1');
+            NotifManager.push({
+              id: 'avail-expiry-'+Math.floor(lastUpdate/86400000),
+              type: 'availability-expiry',
+              title: 'Update your availability',
+              body: 'Your availability hasn\'t been updated in over '+Math.floor(daysOld)+' days. Please refresh it.',
+              ts: Date.now(),
+              link: 'availability'
+            });
+          }
+        }
+      }
+    }catch(e){}
   }catch(e){}
 }
 
+let _lastReplySeen = null;
+let _lastReactSeen = null;
+let _lastLeaveSeen = null;
 let _activityPollTimer = null;
 function startActivityPolling(){
   // Initial baseline
@@ -12910,7 +13034,14 @@ async function confirmShareTask(){
 async function loadSharedTasksFromOthers(){
   if(!me) return;
   try{
-    const rows = await sbGet('shared_tasks','?to_user=eq.'+encodeURIComponent(me)+'&order=shared_at.desc&limit=200');
+    let rows = null;
+    try{
+      rows = await sbGet('shared_tasks','?to_user=eq.'+encodeURIComponent(me)+'&order=shared_at.desc&limit=200');
+    }catch(e){
+      // Column might be named differently — try alternatives, or table may not exist
+      try{ rows = await sbGet('shared_tasks','?recipient=eq.'+encodeURIComponent(me)+'&order=shared_at.desc&limit=200'); }catch(e2){}
+      if(!rows) rows = [];
+    }
     if(!rows || !rows.length) return;
     let added = 0;
     rows.forEach(function(r){
@@ -13880,6 +14011,7 @@ async function checkNewNotifications(){
       // Use localStorage (not sessionStorage) so banner doesn't re-fire every login
       const bannerKey='banner_shown_'+me+'_'+r.id;
       if(!localStorage.getItem(bannerKey)){
+        if(typeof triggerBellPulse === 'function') triggerBellPulse();
         const approved=r.status==='approved';
         const title=approved ? 'Leave Approved' : 'Leave Declined';
         showBanner(title, fmtF(r.from_date)+' – '+fmtF(r.to_date), approved ? 'success' : 'warning');
@@ -13926,6 +14058,8 @@ const NotifManager = (function(){
     if(!notif || !notif.id) return;
     const list = load();
     if(list.find(function(n){return n.id === notif.id;})) return false; // dedupe
+    // Pulse the bell for any new notification
+    if(typeof triggerBellPulse === 'function') triggerBellPulse();
     list.unshift({
       id: notif.id,
       type: notif.type || 'general',
@@ -13991,10 +14125,21 @@ const NotifManager = (function(){
 
   function updateBadges(){
     const count = unreadCount();
-    const display = count > 4 ? '4+' : (count > 0 ? String(count) : '');
-    // Bell badges (new notif manager) — and existing legacy ones
+    const display = count > 99 ? '99+' : String(count);
+    // Bell badges (header + sidebar)
+    ['mhBellBadge','sbBellBadge'].forEach(function(id){
+      const b = document.getElementById(id);
+      if(!b) return;
+      if(count > 0){
+        b.textContent = display;
+        b.style.display = 'flex';
+      } else {
+        b.style.display = 'none';
+      }
+    });
+    // Other badges (bottom nav, sidebar nav items)
     document.querySelectorAll('.bn-badge, .nav-badge').forEach(function(b){
-      if(count > 0){ b.textContent = display; b.style.display = 'flex'; }
+      if(count > 0){ b.textContent = (count > 4 ? '4+' : String(count)); b.style.display = 'flex'; }
       else { b.textContent = ''; b.style.display = 'none'; }
     });
     // Update existing bell counter via legacy fn if present
@@ -14749,10 +14894,10 @@ function setupRealtimeChannels(){
   const replyCh = _realtimeClient.channel('reply-notifs-live')
     .on('postgres_changes', {event:'INSERT', schema:'public', table:'reply_notifications'}, function(payload){
       if(payload.new && payload.new.recipient === me){
-        // Dedupe per notification ID using session-storage so reload doesn't re-fire
         const fireKey = 'rt_reply_'+payload.new.id;
         if(sessionStorage.getItem(fireKey)) return;
         sessionStorage.setItem(fireKey, '1');
+        if(typeof triggerBellPulse === 'function') triggerBellPulse();
         loadNotifications();
         showBanner('New Reply', payload.new.replier+' replied to your discussion', '');
       }
