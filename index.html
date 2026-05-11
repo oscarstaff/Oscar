@@ -14850,9 +14850,25 @@ function setupRealtimeChannels(){
   _realtimeChannels.forEach(function(ch){ try{ _realtimeClient.removeChannel(ch); }catch(e){} });
   _realtimeChannels = [];
 
-  // Discussions — polls especially
+  // Discussions — polls + new post notifications
   const discCh = _realtimeClient.channel('discussions-live')
     .on('postgres_changes', {event:'*', schema:'public', table:'discussions'}, function(payload){
+      // Fire notif for INSERT events (new post by someone else)
+      if(payload.eventType==='INSERT' && payload.new && payload.new.created_by !== me){
+        const d = payload.new;
+        const fireKey = 'rt_disc_'+d.id;
+        if(!sessionStorage.getItem(fireKey)){
+          sessionStorage.setItem(fireKey, '1');
+          if(typeof NotifManager !== 'undefined') NotifManager.push({
+            id: 'disc-'+d.id,
+            type: d.must_read ? 'discussion-must-read' : 'discussion',
+            title: d.must_read ? 'Must-read post' : 'New discussion',
+            body: (d.created_by||'Someone') + ': ' + (d.title || String(d.body||'').slice(0,80)),
+            ts: d.created_at ? new Date(d.created_at).getTime() : Date.now(),
+            link: 'engagement'
+          });
+        }
+      }
       if(payload.eventType==='UPDATE' && payload.new){
         const id = payload.new.id;
         if(_discCache[id]){
@@ -14883,23 +14899,69 @@ function setupRealtimeChannels(){
     .subscribe();
   _realtimeChannels.push(annCh);
 
-  // Leave updates for me
+  // Leave decisions for me
   const leaveCh = _realtimeClient.channel('leave-live')
     .on('postgres_changes', {event:'UPDATE', schema:'public', table:'leave_submissions'}, function(payload){
       if(payload.new && payload.new.staff_name === me){
+        const l = payload.new;
+        // Only fire if status moved to approved/declined
+        if(l.status === 'approved' || l.status === 'declined'){
+          const fireKey = 'rt_leave_'+l.id+'_'+l.status;
+          if(!sessionStorage.getItem(fireKey)){
+            sessionStorage.setItem(fireKey, '1');
+            if(typeof NotifManager !== 'undefined') NotifManager.push({
+              id: 'leave-'+l.id,
+              type: l.status === 'approved' ? 'leave-approved' : 'leave-declined',
+              title: l.status === 'approved' ? 'Leave approved' : 'Leave declined',
+              body: (l.from_date||'') + (l.to_date ? ' to '+l.to_date : '') + (l.reason ? ' · '+l.reason : ''),
+              ts: l.resolved_at ? new Date(l.resolved_at).getTime() : Date.now(),
+              link: 'leave'
+            });
+          }
+        }
         loadNotifications();
-        checkNewNotifications();
       }
     })
     .subscribe();
   _realtimeChannels.push(leaveCh);
 
-  // Reactions
+  // Reactions + notify when someone reacts to my content
   const reactCh = _realtimeClient.channel('reactions-live')
-    .on('postgres_changes', {event:'*', schema:'public', table:'reactions'}, function(payload){
+    .on('postgres_changes', {event:'*', schema:'public', table:'reactions'}, async function(payload){
       const id = (payload.new && payload.new.target_id) || (payload.old && payload.old.target_id);
       const type = (payload.new && payload.new.target_type) || (payload.old && payload.old.target_type);
       if(id && type) loadReactCounts(id, type);
+      
+      // Fire notif on INSERT if reaction is on my content
+      if(payload.eventType === 'INSERT' && payload.new && payload.new.staff_name !== me){
+        const r = payload.new;
+        const fireKey = 'rt_react_'+r.id;
+        if(sessionStorage.getItem(fireKey)) return;
+        // Check if I authored the target
+        try{
+          let isMine = false;
+          let label = 'content';
+          if(r.target_type === 'disc'){
+            const d = await sbGet('discussions','?id=eq.'+r.target_id+'&select=created_by');
+            if(d && d[0] && d[0].created_by === me){ isMine = true; label = 'post'; }
+          } else if(r.target_type === 'reply'){
+            const rp = await sbGet('discussion_replies','?id=eq.'+r.target_id+'&select=replied_by,replier');
+            const author = rp && rp[0] ? (rp[0].replied_by || rp[0].replier) : null;
+            if(author === me){ isMine = true; label = 'reply'; }
+          }
+          if(isMine){
+            sessionStorage.setItem(fireKey, '1');
+            if(typeof NotifManager !== 'undefined') NotifManager.push({
+              id: 'react-'+r.id,
+              type: 'reaction',
+              title: (r.staff_name||'Someone') + ' reacted ' + (r.emoji||'👍'),
+              body: 'On your '+label,
+              ts: r.created_at ? new Date(r.created_at).getTime() : Date.now(),
+              link: 'engagement'
+            });
+          }
+        }catch(e){ console.warn('[rt react]:', e); }
+      }
       loadNotifications();
     })
     .subscribe();
