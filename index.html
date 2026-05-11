@@ -4490,6 +4490,65 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
       <!-- Stats -->
       <div class="stats-row" id="homeStats"></div>
 
+      <!-- Who's Working (only visible when current user is clocked in) -->
+      <div class="card" id="whoWorkingCard" style="display:none;">
+        <div class="card-hd" style="border-bottom:1px solid #f1f5f9;padding-bottom:10px;margin-bottom:12px;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <div class="card-title">Who\'s working</div>
+            <div id="wwOnlineCount" style="background:#10b981;color:#fff;font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:9px;letter-spacing:.02em;">0</div>
+          </div>
+          <div style="font-size:11px;color:#64748b;font-weight:500;">Live now</div>
+        </div>
+        <div style="margin-bottom:10px;">
+          <input type="search" id="wwSearch" placeholder="Search team..." oninput="filterWhosWorking(this.value)" style="width:100%;border:1.5px solid #e2e8f0;border-radius:9px;padding:8px 12px;font-size:13px;font-family:inherit;outline:none;background:#f8fafc;transition:border-color .15s,background .15s;">
+        </div>
+        <div id="whoWorkingList" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;max-height:280px;overflow-y:auto;">
+          <div style="color:#94a3b8;font-size:13px;padding:20px;text-align:center;grid-column:1/-1;">Loading...</div>
+        </div>
+      </div>
+      <style>
+        .ww-card{
+          display:flex;align-items:center;gap:10px;
+          padding:9px 11px;
+          background:#fff;
+          border:1px solid #e2e8f0;
+          border-radius:11px;
+          transition:border-color .15s,transform .15s;
+        }
+        .ww-card:hover{border-color:#cbd5e1;transform:translateY(-1px);}
+        [data-theme="dark"] .ww-card{background:#0d1117;border-color:#1f2530;}
+        [data-theme="dark"] .ww-card:hover{border-color:#334155;}
+        .ww-avatar{
+          width:32px;height:32px;border-radius:50%;
+          background:#1e293b;color:#fff;
+          display:flex;align-items:center;justify-content:center;
+          font-size:12px;font-weight:700;flex-shrink:0;letter-spacing:-.02em;
+          position:relative;
+        }
+        .ww-avatar::after{
+          content:"";
+          position:absolute;bottom:-1px;right:-1px;
+          width:11px;height:11px;
+          background:#10b981;
+          border:2px solid #fff;border-radius:50%;
+          box-shadow:0 0 0 1px rgba(16,185,129,.25);
+        }
+        [data-theme="dark"] .ww-avatar::after{border-color:#0d1117;}
+        .ww-name{font-size:12.5px;font-weight:600;color:#0f172a;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:-.01em;}
+        [data-theme="dark"] .ww-name{color:#e2e8f0;}
+        #wwSearch:focus{border-color:#1e293b;background:#fff;}
+        [data-theme="dark"] #wwSearch:focus{border-color:#94a3b8;background:#0d1117;}
+        #wwSearch::-webkit-search-cancel-button{appearance:none;}
+        /* Empty state */
+        .ww-empty{
+          grid-column:1/-1;
+          padding:24px 16px;text-align:center;
+          color:#94a3b8;font-size:12.5px;
+          background:#f8fafc;border-radius:10px;border:1px dashed #e2e8f0;
+        }
+        [data-theme="dark"] .ww-empty{background:#0d1117;border-color:#1f2530;color:#64748b;}
+      </style>
+
 <!-- Discussions preview (second) -->
       <div class="card" style="cursor:pointer;" onclick="if(navigator.vibrate)navigator.vibrate(8);goTo('engagement');setTimeout(function(){showEngagementTab('discussions');},100);">
         <div class="card-hd">
@@ -6270,7 +6329,7 @@ async function enterHub(){
   document.getElementById("leaveTo").value=today;
   buildAvailForm();
   showSchedTab('leave'); // default schedule sub-tab
-  Promise.all([loadHomeData(),loadNotifications(),loadLeaveHistory(),refreshAnnBadge(),loadHomeDiscPreview(),maybeShowOnboarding(),checkFeedbackInvites(),checkNewNotifications(),loadAnnReads(),loadSharedTasksFromOthers(),loadClockState(),loadAllClockLogs(),loadDiary()]).then(function(){
+  startBackgroundLocation();Promise.all([loadHomeData(),loadNotifications(),loadLeaveHistory(),refreshAnnBadge(),loadHomeDiscPreview(),maybeShowOnboarding(),checkFeedbackInvites(),checkNewNotifications(),loadAnnReads(),loadSharedTasksFromOthers(),loadClockState(),loadAllClockLogs(),loadDiary(),loadWhosWorking()]).then(function(){
     setTimeout(function(){
       maybeShowTour();
     }, 300);
@@ -6356,7 +6415,7 @@ function goTo(p){
   if(p==="leave"||p==="availability"){document.querySelectorAll(".page").forEach(pg=>pg.classList.toggle("active",pg.id==="page-schedule"));document.querySelectorAll("[data-tab]").forEach(item=>item.classList.toggle("active",item.getAttribute("data-tab")==="schedule"));}
   if(p==="schedule"){showSchedTab("leave");}
   if(p==="profile")loadProfilePage();
-  if(p==="home"){loadHomeData();loadClockState();}
+  if(p==="home"){loadHomeData();loadClockState();loadWhosWorking();}
 
   if(p==="announcements"){loadAnnouncements();}
   if(p==="engagement"){showEngagementTab('discussions');}
@@ -10834,14 +10893,108 @@ function distanceMeters(lat1, lng1, lat2, lng2){
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 }
 
+// Cached background position — refreshed every 15s while app open
+let _bgPosition = null;
+let _bgWatchId = null;
+
+function startBackgroundLocation(){
+  if(!navigator.geolocation) return;
+  if(_bgWatchId !== null) return; // already running
+  _bgWatchId = navigator.geolocation.watchPosition(
+    function(pos){
+      // Only accept high-accuracy readings (under 50m accuracy circle)
+      if(pos.coords.accuracy <= 50){
+        _bgPosition = { coords: pos.coords, ts: Date.now() };
+      } else if(!_bgPosition || (Date.now() - _bgPosition.ts) > 60000){
+        // Fall back to less accurate if no good one in 60s
+        _bgPosition = { coords: pos.coords, ts: Date.now() };
+      }
+    },
+    function(err){ console.warn('[gps bg]', err.message); },
+    { enableHighAccuracy:true, timeout:15000, maximumAge:0 }
+  );
+}
+
+function stopBackgroundLocation(){
+  if(_bgWatchId !== null){
+    navigator.geolocation.clearWatch(_bgWatchId);
+    _bgWatchId = null;
+  }
+}
+
+// Get a FRESH high-accuracy position — multiple attempts, picks best reading
 function getCurrentPosition(){
   return new Promise(function(resolve, reject){
     if(!navigator.geolocation){ reject(new Error('GPS not available')); return; }
-    navigator.geolocation.getCurrentPosition(
-      function(pos){ resolve(pos); },
-      function(err){ reject(err); },
-      { enableHighAccuracy:true, timeout:5000, maximumAge:30000 }
-    );
+    
+    // If we have a recent (<8s) high-accuracy background reading, use it
+    if(_bgPosition && _bgPosition.coords.accuracy <= 30 && (Date.now() - _bgPosition.ts) < 8000){
+      console.log('[gps] using cached bg position, accuracy:', _bgPosition.coords.accuracy+'m');
+      resolve({ coords: _bgPosition.coords });
+      return;
+    }
+    
+    // Otherwise sample 3 fresh readings and pick the most accurate
+    const readings = [];
+    let attempts = 0;
+    const maxAttempts = 3;
+    let timer = null;
+    
+    function tryRead(){
+      attempts++;
+      navigator.geolocation.getCurrentPosition(
+        function(pos){
+          readings.push(pos);
+          console.log('[gps] attempt', attempts, 'accuracy:', pos.coords.accuracy+'m');
+          
+          // If this reading is excellent (≤15m), use immediately
+          if(pos.coords.accuracy <= 15){
+            if(timer) clearTimeout(timer);
+            resolve(pos);
+            return;
+          }
+          
+          // If we've hit max attempts or accumulated enough samples, pick best
+          if(attempts >= maxAttempts){
+            if(timer) clearTimeout(timer);
+            // Sort by accuracy ascending, pick best
+            readings.sort(function(a,b){ return a.coords.accuracy - b.coords.accuracy; });
+            resolve(readings[0]);
+            return;
+          }
+          
+          // Try again after short delay
+          setTimeout(tryRead, 800);
+        },
+        function(err){
+          console.warn('[gps] attempt', attempts, 'failed:', err.message);
+          if(attempts >= maxAttempts){
+            if(readings.length > 0){
+              // Use whatever we got
+              readings.sort(function(a,b){ return a.coords.accuracy - b.coords.accuracy; });
+              resolve(readings[0]);
+            } else {
+              reject(err);
+            }
+          } else {
+            setTimeout(tryRead, 800);
+          }
+        },
+        { enableHighAccuracy:true, timeout:12000, maximumAge:0 }
+      );
+    }
+    
+    // Master timeout — 18s for the whole multi-attempt process
+    timer = setTimeout(function(){
+      if(readings.length > 0){
+        readings.sort(function(a,b){ return a.coords.accuracy - b.coords.accuracy; });
+        resolve(readings[0]);
+      } else {
+        reject(new Error('GPS timeout — please ensure location services are enabled and accurate'));
+      }
+    }, 18000);
+    
+    tryRead();
   });
 }
 
@@ -10873,7 +11026,7 @@ async function toggleClock(){
   const next = (_clockState === 'in') ? 'out' : 'in';
   btn.disabled = true;
   const prevText = btn.textContent;
-  btn.textContent = 'Locating...';
+  btn.textContent = _bgPosition ? 'Verifying...' : 'Locating GPS...';
 
   let lat = null, lng = null;
   // GPS check always required — no bypass
@@ -10882,9 +11035,14 @@ async function toggleClock(){
     lat = pos.coords.latitude;
     lng = pos.coords.longitude;
     const dist = distanceMeters(lat, lng, OFFICE_LAT, OFFICE_LNG);
-    if(dist > getGeofenceRadius()){
+    const acc = pos.coords.accuracy;
+    console.log('[gps] final position:', lat, lng, 'accuracy:', acc+'m', 'distance from office:', Math.round(dist)+'m');
+    // Subtract GPS accuracy buffer — if your reading is "20m off but ±50m accurate" you might actually be inside
+    const effectiveDist = Math.max(0, dist - acc);
+    if(effectiveDist > getGeofenceRadius()){
       const distFmt = dist > 1000 ? (dist/1000).toFixed(1)+'km' : Math.round(dist)+'m';
-      showToast('Too far from office ('+distFmt+'). Cannot punch.');
+      const accFmt = Math.round(acc)+'m';
+      showToast('Too far ('+distFmt+', ±'+accFmt+' accuracy). Move closer or wait for better GPS.', 'warning');
       btn.disabled = false;
       btn.textContent = prevText;
       return;
@@ -13019,6 +13177,92 @@ async function saveEmail(){
 
 
 // HOME
+// ── WHO'S WORKING ────────────
+let _wwStaffData = []; // cached list
+
+async function loadWhosWorking(){
+  const card = document.getElementById('whoWorkingCard');
+  const list = document.getElementById('whoWorkingList');
+  const cnt = document.getElementById('wwOnlineCount');
+  if(!card || !list) return;
+
+  // Only show if current user is clocked in (has open clock_log without matching out)
+  try{
+    const myToday = await sbGet('clock_log','?staff_name=eq.'+encodeURIComponent(me)+'&order=ts.desc&limit=5');
+    let amIIn = false;
+    if(myToday && myToday.length){
+      // Latest entry is type=in with no matching out today
+      const todayISO = new Date().toISOString().slice(0,10);
+      const todayEntries = myToday.filter(function(r){ return r.ts && r.ts.slice(0,10) === todayISO; });
+      const ins = todayEntries.filter(function(r){ return r.type === 'in'; }).length;
+      const outs = todayEntries.filter(function(r){ return r.type === 'out'; }).length;
+      amIIn = ins > outs;
+    }
+    if(!amIIn){
+      card.style.display = 'none';
+      return;
+    }
+    card.style.display = '';
+  }catch(e){ card.style.display = 'none'; return; }
+
+  // Fetch everyone clocked in today (last clock_log per staff = type 'in' with no later 'out')
+  try{
+    const today = new Date().toISOString().slice(0,10);
+    const tomorrow = new Date(Date.now()+86400000).toISOString().slice(0,10);
+    const allToday = await sbGet('clock_log','?ts=gte.'+today+'&ts=lt.'+tomorrow+'&order=ts.asc&limit=500');
+    
+    // Group by staff_name, take latest entry
+    const latestByStaff = {};
+    (allToday||[]).forEach(function(r){
+      const s = r.staff_name;
+      if(!latestByStaff[s] || r.ts > latestByStaff[s].ts){
+        latestByStaff[s] = r;
+      }
+    });
+    
+    // Staff currently in = latest entry is type=in
+    const onlineStaff = [];
+    Object.keys(latestByStaff).forEach(function(s){
+      if(latestByStaff[s].type === 'in') onlineStaff.push(s);
+    });
+    onlineStaff.sort();
+    
+    _wwStaffData = onlineStaff;
+    cnt.textContent = onlineStaff.length;
+    renderWhosWorking(onlineStaff);
+  }catch(e){
+    list.innerHTML = '<div class="ww-empty">Could not load team list.</div>';
+  }
+}
+
+function renderWhosWorking(names){
+  const list = document.getElementById('whoWorkingList');
+  if(!list) return;
+  if(!names || !names.length){
+    list.innerHTML = '<div class="ww-empty">No one else is clocked in right now.</div>';
+    return;
+  }
+  // Color palette for avatars (deep navy / slate variations)
+  const palette = ['#1e293b','#0f172a','#334155','#475569','#1e3a8a','#1e40af'];
+  let html = '';
+  names.forEach(function(n,i){
+    const initials = String(n||'').split(/\s+/).map(function(p){return p[0]||'';}).join('').slice(0,2).toUpperCase();
+    const bg = palette[i % palette.length];
+    html += '<div class="ww-card">'+
+      '<div class="ww-avatar" style="background:'+bg+'">'+initials+'</div>'+
+      '<div class="ww-name">'+(n === me ? 'You' : n)+'</div>'+
+    '</div>';
+  });
+  list.innerHTML = html;
+}
+
+function filterWhosWorking(q){
+  q = (q||'').toLowerCase().trim();
+  if(!q){ renderWhosWorking(_wwStaffData); return; }
+  const filtered = _wwStaffData.filter(function(n){ return String(n).toLowerCase().includes(q); });
+  renderWhosWorking(filtered);
+}
+
 async function loadHomeData(){
   const statsEl=document.getElementById("homeStats"),sumEl=document.getElementById("homeAvailSummary");if(!statsEl)return;
   try{
@@ -13069,7 +13313,7 @@ async function submitLeave(){
     if(res.ok||res.status===201){
       ok.textContent="Request submitted. Your manager will review it shortly.";ok.classList.add("show");
       document.getElementById("leaveReason").value="";
-      loadLeaveHistory();loadHomeData();
+      loadLeaveHistory();loadHomeData();loadWhosWorking();
     }else throw new Error();
   }catch(e){err.textContent="Failed to submit. Please check your connection.";err.classList.add("show");}
   finally{btn.disabled=false;btn.textContent="Submit Leave Request";}
