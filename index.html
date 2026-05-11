@@ -1521,8 +1521,15 @@ button[onclick*="toggleNotifDrop"]:hover{
     left:8px !important;
     width:auto !important;
     max-width:none !important;
-    top:60px !important;
+    top:62px !important;
     max-height:75vh !important;
+    z-index:9999 !important;
+    overflow-y:auto !important;
+    -webkit-overflow-scrolling:touch !important;
+  }
+  /* Ensure bell wrapper allows fixed drop to escape */
+  #mhBellWrap{
+    position:static !important;
   }
 }
 @media(max-width:380px){
@@ -4421,11 +4428,11 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
     </div>
     <div class="mh-logo" style="position:absolute;left:50%;transform:translateX(-50%);font-weight:800;letter-spacing:-.02em;">Nexus</div>
     <div class="notif-drop-wrap" id="mhBellWrap" style="position:relative;">
-      <button onclick="event.stopPropagation();toggleNotifDrop('mhNotifDrop')" id="mhBellBtn" style="position:relative;background:none;border:none;cursor:pointer;padding:8px;-webkit-tap-highlight-color:transparent;display:flex;align-items:center;justify-content:center;">
+      <button onclick="handleMobileBell(event)" id="mhBellBtn" style="position:relative;background:none;border:none;cursor:pointer;padding:10px;margin:-2px;-webkit-tap-highlight-color:transparent;display:flex;align-items:center;justify-content:center;touch-action:manipulation;min-width:44px;min-height:44px;">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="bell-svg"><path d="M15 17H20L18.5951 15.5951C18.2141 15.2141 18 14.6973 18 14.1585V11C18 8.38757 16.3304 6.16509 14 5.34142V5C14 3.89543 13.1046 3 12 3C10.8954 3 10 3.89543 10 5V5.34142C7.66962 6.16509 6 8.38757 6 11V14.1585C6 14.6973 5.78595 15.2141 5.40493 15.5951L4 17H9M15 17V18C15 19.6569 13.6569 21 12 21C10.3431 21 9 19.6569 9 18V17M15 17H9"/></svg>
         <div id="mhBellBadge" class="bell-badge" style="display:none;">0</div>
       </button>
-      <div class="notif-drop" id="mhNotifDrop" style="right:0;left:auto;">
+      <div class="notif-drop" id="mhNotifDrop" style="right:8px;left:auto;">
         <div class="notif-drop-header">Notifications</div>
         <div id="mhNotifDropList"><div class="notif-drop-empty">Loading...</div></div>
       </div>
@@ -10851,7 +10858,7 @@ async function pollForNewActivity(){
             type: 'reaction',
             title: (r.staff_name||'Someone') + ' reacted ' + (r.emoji||'👍'),
             body: 'On your '+targetLabel,
-            ts: r.created_at ? new Date(r.created_at).getTime() : Date.now(),
+            ts: Date.now(),
             link: 'engagement'
           });
         }
@@ -14003,7 +14010,7 @@ async function checkNewDiscussions(){
           type: r.must_read ? 'discussion-must-read' : 'discussion',
           title: r.must_read ? 'Must-read post' : 'New discussion',
           body: (r.created_by ? r.created_by + ': ' : '') + (r.title || (r.body||'').slice(0,80)),
-          ts: r.created_at ? new Date(r.created_at).getTime() : Date.now(),
+          ts: Date.now(),
           link: 'engagement'
         });
       }
@@ -14238,6 +14245,11 @@ function pushLocalNotif(title, body, type){
 setTimeout(function(){ if(typeof NotifManager !== 'undefined') NotifManager.refresh(); }, 1000);
 
 // ── NOTIFICATION DROPDOWN ──
+function handleMobileBell(e){
+  if(e){ e.preventDefault(); e.stopPropagation(); }
+  toggleNotifDrop('mhNotifDrop');
+}
+
 function toggleNotifDrop(dropId){
   const id=dropId||'notifDrop';
   const drop=document.getElementById(id);
@@ -14270,11 +14282,11 @@ async function loadNotifDrop(dropId){
         let html = '';
         allNotifs.forEach(function(n){
           const t = n.ts || Date.now();
-          const diff = Date.now() - t;
+          const diff = Math.max(0, Date.now() - t); // clamp negative future-timestamps to 0
           let timeStr = 'just now';
-          if(diff > 60000 && diff < 3600000) timeStr = Math.floor(diff/60000)+'m ago';
-          else if(diff > 3600000 && diff < 86400000) timeStr = Math.floor(diff/3600000)+'h ago';
-          else if(diff > 86400000) timeStr = Math.floor(diff/86400000)+'d ago';
+          if(diff >= 60000 && diff < 3600000) timeStr = Math.floor(diff/60000)+'m ago';
+          else if(diff >= 3600000 && diff < 86400000) timeStr = Math.floor(diff/3600000)+'h ago';
+          else if(diff >= 86400000) timeStr = Math.floor(diff/86400000)+'d ago';
           const unreadDot = n.read ? '' : '<span style="display:inline-block;width:7px;height:7px;background:#8b5cf6;border-radius:50%;margin-right:6px;flex-shrink:0;"></span>';
           html += '<div class="notif-drop-item'+(n.read?'':' unread')+'" data-notif-id="'+n.id+'" style="display:block;cursor:pointer;">'+
             '<div style="display:flex;align-items:start;gap:6px;">'+unreadDot+
@@ -14921,7 +14933,7 @@ function setupRealtimeChannels(){
             type: d.must_read ? 'discussion-must-read' : 'discussion',
             title: d.must_read ? 'Must-read post' : 'New discussion',
             body: (d.created_by||'Someone') + ': ' + (d.title || String(d.body||'').slice(0,80)),
-            ts: parseSupabaseTs(d.created_at),
+            ts: Date.now(),
             link: 'engagement'
           });
         }
@@ -14972,7 +14984,7 @@ function setupRealtimeChannels(){
               type: l.status === 'approved' ? 'leave-approved' : 'leave-declined',
               title: l.status === 'approved' ? 'Leave approved' : 'Leave declined',
               body: (l.from_date||'') + (l.to_date ? ' to '+l.to_date : '') + (l.reason ? ' · '+l.reason : ''),
-              ts: parseSupabaseTs(l.resolved_at || l.submitted_at),
+              ts: Date.now(), // notif fired right now, regardless of submission time
               link: 'leave'
             });
           }
@@ -15015,7 +15027,7 @@ function setupRealtimeChannels(){
               type: 'reaction',
               title: (r.staff_name||'Someone') + ' reacted ' + (r.emoji||'👍'),
               body: 'On your '+label,
-              ts: parseSupabaseTs(r.created_at),
+              ts: Date.now(),
               link: 'engagement'
             });
           }
