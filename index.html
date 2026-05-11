@@ -14827,23 +14827,31 @@ let _realtimeClient = null;
 let _realtimeChannels = [];
 
 async function initRealtime(){
+  console.log('[Realtime] initRealtime called, alreadyInit=', !!window._realtimeInitialized);
   if(window._realtimeInitialized) return;
   window._realtimeInitialized = true;
   if(!window.supabase){
+    console.log('[Realtime] supabase-js not loaded yet, fetching from CDN...');
     try{
       await new Promise(function(res,rej){
         const s=document.createElement('script');
         s.src='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js';
-        s.onload=res; s.onerror=rej;
+        s.onload=function(){ console.log('[Realtime] supabase-js loaded'); res(); };
+        s.onerror=function(err){ console.error('[Realtime] CDN load FAILED:', err); rej(err); };
         document.head.appendChild(s);
       });
-    }catch(e){ console.warn('Could not load supabase-js:',e); return; }
+    }catch(e){ console.error('[Realtime] Could not load supabase-js:',e); return; }
+  }
+  if(!window.supabase || !window.supabase.createClient){
+    console.error('[Realtime] window.supabase exists but createClient missing');
+    return;
   }
   try{
     _realtimeClient = window.supabase.createClient(SB, KEY);
+    console.log('[Realtime] client created:', !!_realtimeClient);
     setupRealtimeChannels();
-    console.log('[Realtime] ready');
-  }catch(e){ console.warn('[Realtime] init failed:',e); }
+    console.log('[Realtime] channels set up, count:', _realtimeChannels.length);
+  }catch(e){ console.error('[Realtime] init failed:', e); }
 }
 
 function setupRealtimeChannels(){
