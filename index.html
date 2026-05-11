@@ -8481,6 +8481,17 @@ function playNotifSound(typeKey){
 }
 
 const _sysNotifFired = new Set();
+function parseSupabaseTs(s){
+  if(!s) return Date.now();
+  // Supabase 'timestamp without time zone' is UTC but lacks Z suffix.
+  // Force UTC parsing by appending Z if missing.
+  if(typeof s === 'string' && !/Z$|[+-]\d{2}:?\d{2}$/.test(s)){
+    s = s + 'Z';
+  }
+  const t = new Date(s).getTime();
+  return isNaN(t) ? Date.now() : t;
+}
+
 function triggerBellPulse(){
   // Pulse both bells if present
   ['mhBellBtn','sbBellWrap'].forEach(function(id){
@@ -14873,7 +14884,7 @@ function setupRealtimeChannels(){
             type: d.must_read ? 'discussion-must-read' : 'discussion',
             title: d.must_read ? 'Must-read post' : 'New discussion',
             body: (d.created_by||'Someone') + ': ' + (d.title || String(d.body||'').slice(0,80)),
-            ts: d.created_at ? new Date(d.created_at).getTime() : Date.now(),
+            ts: parseSupabaseTs(d.created_at),
             link: 'engagement'
           });
         }
@@ -14924,7 +14935,7 @@ function setupRealtimeChannels(){
               type: l.status === 'approved' ? 'leave-approved' : 'leave-declined',
               title: l.status === 'approved' ? 'Leave approved' : 'Leave declined',
               body: (l.from_date||'') + (l.to_date ? ' to '+l.to_date : '') + (l.reason ? ' · '+l.reason : ''),
-              ts: l.resolved_at ? new Date(l.resolved_at).getTime() : Date.now(),
+              ts: parseSupabaseTs(l.resolved_at),
               link: 'leave'
             });
           }
@@ -14967,7 +14978,7 @@ function setupRealtimeChannels(){
               type: 'reaction',
               title: (r.staff_name||'Someone') + ' reacted ' + (r.emoji||'👍'),
               body: 'On your '+label,
-              ts: r.created_at ? new Date(r.created_at).getTime() : Date.now(),
+              ts: parseSupabaseTs(r.created_at),
               link: 'engagement'
             });
           }
