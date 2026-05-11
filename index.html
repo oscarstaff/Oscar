@@ -11100,6 +11100,7 @@ let _bgWatchId = null;
 function startBackgroundLocation(){
   if(!navigator.geolocation) return;
   if(_bgWatchId !== null) return; // already running
+  if(!me) return; // don't start until user is logged in
   _bgWatchId = navigator.geolocation.watchPosition(
     function(pos){
       // Only accept high-accuracy readings (under 50m accuracy circle)
@@ -13033,14 +13034,28 @@ async function confirmShareTask(){
 
 async function loadSharedTasksFromOthers(){
   if(!me) return;
+  if(window._sharedTasksDisabled) return; // permanently disabled if schema mismatch
   try{
     let rows = null;
-    try{
-      rows = await sbGet('shared_tasks','?to_user=eq.'+encodeURIComponent(me)+'&order=shared_at.desc&limit=200');
-    }catch(e){
-      // Column might be named differently — try alternatives, or table may not exist
-      try{ rows = await sbGet('shared_tasks','?recipient=eq.'+encodeURIComponent(me)+'&order=shared_at.desc&limit=200'); }catch(e2){}
-      if(!rows) rows = [];
+    // Try multiple column names to find what schema has
+    const colNames = ['to_user','recipient','to_staff','assigned_to','target_user'];
+    let foundCol = null;
+    for(const col of colNames){
+      try{
+        const resp = await fetch(SB+'/rest/v1/shared_tasks?'+col+'=eq.'+encodeURIComponent(me)+'&order=shared_at.desc&limit=200',{
+          headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}
+        });
+        if(resp.ok){
+          rows = await resp.json();
+          foundCol = col;
+          break;
+        }
+      }catch(e){}
+    }
+    if(!foundCol){
+      // No matching column found — disable feature permanently this session
+      window._sharedTasksDisabled = true;
+      return;
     }
     if(!rows || !rows.length) return;
     let added = 0;
