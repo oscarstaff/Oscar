@@ -14861,6 +14861,7 @@ function setupRealtimeChannels(){
   // Discussions — polls + new post notifications
   const discCh = _realtimeClient.channel('discussions-live')
     .on('postgres_changes', {event:'*', schema:'public', table:'discussions'}, function(payload){
+      console.log('[RT disc event]', payload.eventType, payload.new && payload.new.created_by, 'me:', me);
       // Fire notif for INSERT events (new post by someone else)
       if(payload.eventType==='INSERT' && payload.new && payload.new.created_by !== me){
         const d = payload.new;
@@ -14910,6 +14911,7 @@ function setupRealtimeChannels(){
   // Leave decisions for me
   const leaveCh = _realtimeClient.channel('leave-live')
     .on('postgres_changes', {event:'UPDATE', schema:'public', table:'leave_submissions'}, function(payload){
+      console.log('[RT leave event]', payload.eventType, payload.new && payload.new.staff_name, payload.new && payload.new.status);
       if(payload.new && payload.new.staff_name === me){
         const l = payload.new;
         // Only fire if status moved to approved/declined
@@ -14936,6 +14938,7 @@ function setupRealtimeChannels(){
   // Reactions + notify when someone reacts to my content
   const reactCh = _realtimeClient.channel('reactions-live')
     .on('postgres_changes', {event:'*', schema:'public', table:'reactions'}, async function(payload){
+      console.log('[RT react event]', payload.eventType, payload.new);
       const id = (payload.new && payload.new.target_id) || (payload.old && payload.old.target_id);
       const type = (payload.new && payload.new.target_type) || (payload.old && payload.old.target_type);
       if(id && type) loadReactCounts(id, type);
