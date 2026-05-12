@@ -4570,26 +4570,17 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
       <!-- Stats -->
       <div class="stats-row" id="homeStats"></div>
 
-      <!-- Onboarding card (only visible until complete or dismissed) -->
-      <div id="homeOnboardingCard" class="card" style="display:none;cursor:pointer;margin-bottom:14px;transition:transform .15s,box-shadow .15s;" onclick="openOnboardingPanel()" onmouseover="this.style.transform='translateY(-1px)';this.style.boxShadow='0 8px 24px rgba(15,23,42,.08)'" onmouseout="this.style.transform='';this.style.boxShadow=''">
-        <div style="padding:18px 20px;">
-          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;gap:12px;">
-            <div style="flex:1;min-width:0;">
-              <div style="display:flex;align-items:center;gap:7px;margin-bottom:5px;">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-                <div style="font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#64748b;">Get started with Nexus</div>
-              </div>
-              <div style="font-size:16px;font-weight:700;letter-spacing:-.01em;color:#0f172a;">Complete your setup</div>
-            </div>
-            <div id="homeOnboardingCount" style="background:#f1f5f9;color:#475569;font-size:11px;font-weight:700;padding:5px 11px;border-radius:12px;flex-shrink:0;">0 left</div>
+      <!-- Onboarding card — compact strip style -->
+      <div id="homeOnboardingCard" style="display:none;cursor:pointer;margin-bottom:12px;background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:10px 14px;display:none;align-items:center;gap:12px;transition:border-color .15s,background .15s;" onclick="openOnboardingPanel()" onmouseover="this.style.borderColor='#cbd5e1';this.style.background='#fafbfc'" onmouseout="this.style.borderColor='#e2e8f0';this.style.background='#fff'">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+        <div style="flex:1;min-width:0;">
+          <div id="homeOnboardingNext" style="font-size:12.5px;font-weight:600;color:#0f172a;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;">Complete your setup</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
+          <div style="background:#f1f5f9;width:50px;height:4px;border-radius:2px;overflow:hidden;">
+            <div id="homeOnboardingProgress" style="background:#10b981;height:100%;width:0%;transition:width .4s ease;border-radius:2px;"></div>
           </div>
-          <div style="background:#f1f5f9;height:6px;border-radius:3px;overflow:hidden;margin-bottom:10px;">
-            <div id="homeOnboardingProgress" style="background:#10b981;height:100%;width:0%;transition:width .4s ease;border-radius:3px;"></div>
-          </div>
-          <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;">
-            <div id="homeOnboardingNext" style="font-size:12px;color:#64748b;flex:1;min-width:0;text-overflow:ellipsis;overflow:hidden;white-space:nowrap;">Tap to see your checklist</div>
-            <div style="font-size:11px;font-weight:700;color:#0f172a;flex-shrink:0;">View →</div>
-          </div>
+          <div id="homeOnboardingCount" style="font-size:11px;font-weight:700;color:#64748b;min-width:32px;text-align:right;font-variant-numeric:tabular-nums;">0/5</div>
         </div>
       </div>
 
@@ -6410,7 +6401,7 @@ function doLogout(){
 async function enterHub(){
   // Clear any old 'anon' NotifManager bucket so legacy notifs don't surface
   try{ localStorage.removeItem('notif_local_anon'); }catch(e){}
-  // Also clear any session-storage realtime dedupe keys from previous user
+  // Also clear any session-storage realtime dedupe keys (per-tab anyway, just being safe)
   try{
     for(let i = sessionStorage.length - 1; i >= 0; i--){
       const k = sessionStorage.key(i);
@@ -6419,6 +6410,8 @@ async function enterHub(){
       }
     }
   }catch(e){}
+  // Sync window.me for any code that uses window.me
+  try{ window.me = me; }catch(e){}
   await loadStaffList();
  // refresh from Supabase in case staff changed
   document.getElementById("authLayer").style.display="none";
@@ -11798,6 +11791,64 @@ async function renderOnboardingChecklist(){
   el.innerHTML = html;
 }
 
+function showOnboardingConfetti(){
+  // Create container
+  const container = document.createElement('div');
+  container.id = 'confettiContainer';
+  container.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:99999;overflow:hidden;';
+  document.body.appendChild(container);
+  
+  // Inject CSS if not already
+  if(!document.getElementById('confettiStyle')){
+    const style = document.createElement('style');
+    style.id = 'confettiStyle';
+    style.textContent = `
+      @keyframes confettiFall {
+        0% { transform: translateY(-20px) rotate(0deg); opacity: 1; }
+        100% { transform: translateY(105vh) rotate(720deg); opacity: 0; }
+      }
+      @keyframes confettiSway {
+        0%,100% { margin-left: 0; }
+        50% { margin-left: 30px; }
+      }
+      .confetti-piece {
+        position: absolute;
+        top: -20px;
+        width: 9px;
+        height: 14px;
+        border-radius: 2px;
+        animation-name: confettiFall, confettiSway;
+        animation-timing-function: ease-in, ease-in-out;
+        animation-iteration-count: 1, infinite;
+        animation-fill-mode: forwards;
+      }
+    `;
+    document.head.appendChild(style);
+  }
+  
+  const colors = ['#10b981','#3b82f6','#f59e0b','#ec4899','#8b5cf6','#ef4444','#06b6d4','#84cc16','#fbbf24','#f43f5e'];
+  const count = 60;
+  for(let i = 0; i < count; i++){
+    const piece = document.createElement('div');
+    piece.className = 'confetti-piece';
+    piece.style.left = (Math.random() * 100) + 'vw';
+    piece.style.background = colors[Math.floor(Math.random() * colors.length)];
+    piece.style.transform = 'rotate(' + (Math.random() * 360) + 'deg)';
+    const fallDuration = 2.5 + Math.random() * 2; // 2.5-4.5s
+    const swayDuration = 1 + Math.random() * 2; // 1-3s
+    piece.style.animationDuration = fallDuration + 's,' + swayDuration + 's';
+    piece.style.animationDelay = (Math.random() * 1.2) + 's,0s';
+    piece.style.width = (7 + Math.random() * 5) + 'px';
+    piece.style.height = (12 + Math.random() * 8) + 'px';
+    container.appendChild(piece);
+  }
+  
+  // Cleanup after 6s
+  setTimeout(function(){
+    if(container && container.parentNode) container.parentNode.removeChild(container);
+  }, 6000);
+}
+
 function handleOnboardingAction(taskId){
   const task = ONBOARDING_TASKS.find(t => t.id === taskId);
   if(!task) return;
@@ -11883,14 +11934,18 @@ async function refreshHomeOnboardingCard(){
   const pct = Math.round((done/total)*100);
   const remaining = total - done;
   const nextTask = ONBOARDING_TASKS.find(t => !_onboardingProgress[t.id]);
-  document.getElementById('homeOnboardingCount').textContent = done === total ? 'Done!' : (remaining + ' left');
+  document.getElementById('homeOnboardingCount').textContent = done + '/' + total;
   document.getElementById('homeOnboardingProgress').style.width = pct + '%';
-  document.getElementById('homeOnboardingNext').textContent = nextTask ? 'Next: ' + nextTask.title : 'You\'re all set — welcome aboard!';
-  // If complete — mark done permanently AND sync to supabase
+  document.getElementById('homeOnboardingNext').textContent = nextTask ? nextTask.title : 'You\'re all set — welcome aboard!';
+  // If complete — celebrate + mark done permanently AND sync to supabase
   if(done === total){
+    // Only fire confetti once
+    if(!sessionStorage.getItem('nexus_onboarding_confetti_fired')){
+      sessionStorage.setItem('nexus_onboarding_confetti_fired', '1');
+      if(typeof showOnboardingConfetti === 'function') showOnboardingConfetti();
+    }
     setTimeout(function(){
       localStorage.setItem('nexus_onboarding_done_'+me, '1');
-      // Write to supabase so other devices know
       try{
         fetch(SB+'/rest/v1/staff_settings?name=eq.'+encodeURIComponent(me),{
           method:'PATCH',
@@ -14535,8 +14590,28 @@ setTimeout(function(){ if(typeof NotifManager !== 'undefined') NotifManager.refr
 // ── NOTIFICATION DROPDOWN ──
 function handleMobileBell(e){
   if(e){ e.preventDefault(); e.stopPropagation(); }
-  const drop = document.getElementById('mhNotifDrop');
-  if(!drop){ console.warn('[mobile-bell] mhNotifDrop missing'); return; }
+  let drop = document.getElementById('mhNotifDrop');
+  if(!drop){
+    // Try to create it if missing
+    const wrap = document.getElementById('mhBellWrap');
+    if(wrap){
+      drop = document.createElement('div');
+      drop.className = 'notif-drop';
+      drop.id = 'mhNotifDrop';
+      drop.style.cssText = 'right:8px;left:auto;';
+      drop.innerHTML = '<div class="notif-drop-header">Notifications</div><div id="mhNotifDropList"><div class="notif-drop-empty" style="color:#64748b;padding:30px 16px;text-align:center;">Loading notifications...</div></div>';
+      wrap.appendChild(drop);
+    } else {
+      return;
+    }
+  }
+  // Also ensure list element exists
+  if(!document.getElementById('mhNotifDropList')){
+    const list = document.createElement('div');
+    list.id = 'mhNotifDropList';
+    list.innerHTML = '<div class="notif-drop-empty">Loading...</div>';
+    drop.appendChild(list);
+  }
   toggleNotifDrop('mhNotifDrop');
 }
 
@@ -14635,13 +14710,20 @@ async function loadNotifDrop(dropId){
   if(!el) return;
   el.innerHTML='<div class="notif-drop-empty" style="color:#64748b;padding:30px 16px;text-align:center;">Loading notifications...</div>';
   try{
-    const rows=await sbGet('leave_submissions','?staff_name=eq.'+encodeURIComponent(me)+'&status=in.(approved,declined)&order=submitted_at.desc&limit=10');
+    // Re-read me at query moment to avoid stale captures
+    const _currentMe = me || sessionStorage.getItem('ou') || window.me;
+    if(!_currentMe){ el.innerHTML='<div class="notif-drop-empty">Sign in to see notifications</div>'; return; }
+    const rows=(await sbGet('leave_submissions','?staff_name=eq.'+encodeURIComponent(_currentMe)+'&status=in.(approved,declined)&order=submitted_at.desc&limit=10'))
+      .filter(function(r){ return r.staff_name === _currentMe; }); // belt + braces verification
     const read=JSON.parse(localStorage.getItem('oR_'+me)||'[]');
     // Check feedback invites
 
     // Reply notifications
     let replyNotifsRaw=[];
-    try{ replyNotifsRaw=await sbGet('reply_notifications','?recipient=eq.'+encodeURIComponent(me)+'&order=created_at.desc&limit=10'); }catch(e){}
+    try{ 
+      replyNotifsRaw=(await sbGet('reply_notifications','?recipient=eq.'+encodeURIComponent(_currentMe)+'&order=created_at.desc&limit=10'))
+        .filter(function(r){ return r.recipient === _currentMe; });
+    }catch(e){}
     const seenReplies=JSON.parse(localStorage.getItem('seen_replies_'+me)||'[]');
     const newReplies=replyNotifsRaw.filter(r=>!seenReplies.includes(r.id));
     const reactNotifsDrop=await loadReactNotifs();
