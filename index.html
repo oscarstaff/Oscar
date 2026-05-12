@@ -11832,13 +11832,21 @@ function dismissOnboardingCard(){
   const card = document.getElementById('homeOnboardingCard');
   if(card) card.style.display = 'none';
   closeOnboardingPanel();
+  // Sync to supabase so dismiss applies across devices
+  try{
+    fetch(SB+'/rest/v1/staff_settings?name=eq.'+encodeURIComponent(me),{
+      method:'PATCH',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body: JSON.stringify({nexus_tour_done: true})
+    }).catch(function(){});
+  }catch(e){}
 }
 
 async function refreshHomeOnboardingCard(){
   if(!me) return;
   const card = document.getElementById('homeOnboardingCard');
   if(!card) return;
-  // ONE-TIME ONLY: if completed or dismissed before, never show again
+  // Local fast-path: if either flag is set locally, hide instantly without DB hit
   if(localStorage.getItem('nexus_onboarding_done_'+me) === '1'){
     card.style.display = 'none';
     return;
@@ -11847,6 +11855,16 @@ async function refreshHomeOnboardingCard(){
     card.style.display = 'none';
     return;
   }
+  // Cross-device check — has user completed onboarding on ANY device?
+  try{
+    const rows = await sbGet('staff_settings','?name=eq.'+encodeURIComponent(me)+'&select=nexus_tour_done');
+    if(rows && rows.length && rows[0].nexus_tour_done === true){
+      // Mark local too so we never re-query
+      localStorage.setItem('nexus_onboarding_done_'+me,'1');
+      card.style.display = 'none';
+      return;
+    }
+  }catch(e){ /* fall through to show card */ }
   await loadOnboardingProgress();
   const total = ONBOARDING_TASKS.length;
   const done = ONBOARDING_TASKS.filter(t => _onboardingProgress[t.id]).length;
@@ -11857,10 +11875,18 @@ async function refreshHomeOnboardingCard(){
   document.getElementById('homeOnboardingCount').textContent = done === total ? 'Done!' : (remaining + ' left');
   document.getElementById('homeOnboardingProgress').style.width = pct + '%';
   document.getElementById('homeOnboardingNext').textContent = nextTask ? 'Next: ' + nextTask.title : 'You\'re all set — welcome aboard!';
-  // If complete — mark done permanently after a short celebration
+  // If complete — mark done permanently AND sync to supabase
   if(done === total){
     setTimeout(function(){
       localStorage.setItem('nexus_onboarding_done_'+me, '1');
+      // Write to supabase so other devices know
+      try{
+        fetch(SB+'/rest/v1/staff_settings?name=eq.'+encodeURIComponent(me),{
+          method:'PATCH',
+          headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+          body: JSON.stringify({nexus_tour_done: true})
+        }).catch(function(){});
+      }catch(e){}
     }, 4000);
   }
 }
