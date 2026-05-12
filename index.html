@@ -1515,6 +1515,7 @@ button[onclick*="toggleNotifDrop"]:hover{
 .notif-drop-empty{padding:24px 16px;text-align:center;font-size:13px;color:#94a3b8;}
 /* Mobile — full width dropdown */
 @media(max-width:700px){
+  #mhBellWrap{ display:none !important; }
   #mhNotifDrop{
     position:fixed !important;
     right:8px !important;
@@ -4593,14 +4594,25 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
           </div>
           <div style="font-size:11px;color:#64748b;font-weight:500;">Live now</div>
         </div>
-        <div style="margin-bottom:10px;">
-          <input type="search" id="wwSearch" placeholder="Search team..." oninput="filterWhosWorking(this.value)" style="width:100%;border:1.5px solid #e2e8f0;border-radius:9px;padding:8px 12px;font-size:13px;font-family:inherit;outline:none;background:#f8fafc;transition:border-color .15s,background .15s;">
+        <div style="margin-bottom:8px;">
+          <input type="search" id="wwSearch" placeholder="Search team..." oninput="filterWhosWorking()" style="width:100%;border:1.5px solid #e2e8f0;border-radius:9px;padding:8px 12px;font-size:13px;font-family:inherit;outline:none;background:#f8fafc;transition:border-color .15s,background .15s;">
         </div>
+        <div id="wwTeamFilters" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;"></div>
         <div id="whoWorkingList" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;max-height:280px;overflow-y:auto;">
           <div style="color:#94a3b8;font-size:13px;padding:20px;text-align:center;grid-column:1/-1;">Loading...</div>
         </div>
       </div>
       <style>
+        .ww-chip{
+          background:#f1f5f9;color:#475569;border:1px solid #e2e8f0;
+          border-radius:14px;padding:4px 12px;font-size:11.5px;
+          font-weight:600;cursor:pointer;font-family:inherit;
+          transition:background .15s,border-color .15s,color .15s;
+        }
+        .ww-chip:hover{ background:#e2e8f0; }
+        .ww-chip.active{
+          background:#0f172a;color:#fff;border-color:#0f172a;
+        }
         .ww-card{
           display:flex;align-items:center;gap:10px;
           padding:9px 11px;
@@ -5075,6 +5087,19 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
     </div>
 
     <!-- MY REPORTS PAGE — clock-in reports + admin timesheet manager -->
+    <div class="page" id="page-notifs">
+      <div class="page-hd">
+        <div>
+          <div class="page-title">Notifications</div>
+          <div class="page-sub">Reactions, replies, leave updates, and more</div>
+        </div>
+        <button onclick="markAllNotifsRead()" style="background:none;border:1px solid #e2e8f0;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:600;color:#475569;cursor:pointer;font-family:inherit;">Mark all read</button>
+      </div>
+      <div id="notifsPageList" style="margin-top:8px;">
+        <div style="padding:40px 16px;text-align:center;color:#94a3b8;font-size:13px;">Loading...</div>
+      </div>
+    </div>
+
     <div class="page" id="page-myreports">
       <div class="page-hd">
         <div class="page-title">My Reports</div>
@@ -5416,9 +5441,9 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
         <svg class="bn-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 3a1 1 0 00-1.447-.894L8.763 6H5a3 3 0 000 6h.28l1.771 5.316A1 1 0 008 18h1a1 1 0 001-1v-4.382l6.553 3.276A1 1 0 0018 15V3z" clip-rule="evenodd"/></svg>
         <div class="bn-badge" id="bnAnnBadge"></div>
       </div>
-      <div class="bn-item" id="bn-calendar" data-tab="calendar" onclick="if(navigator.vibrate)navigator.vibrate(8);goTo('calendar')" aria-label="Dates &amp; Reminders">
-        <svg class="bn-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd"/></svg>
-        <div class="bn-badge" id="bnTaskBadge"></div>
+      <div class="bn-item" id="bn-notifs" data-tab="notifs" onclick="if(navigator.vibrate)navigator.vibrate(8);goTo('notifs')" aria-label="Notifications">
+        <svg class="bn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 17H20L18.5951 15.5951C18.2141 15.2141 18 14.6973 18 14.1585V11C18 8.38757 16.3304 6.16509 14 5.34142V5C14 3.89543 13.1046 3 12 3C10.8954 3 10 3.89543 10 5V5.34142C7.66962 6.16509 6 8.38757 6 11V14.1585C6 14.6973 5.78595 15.2141 5.40493 15.5951L4 17H9M15 17V18C15 19.6569 13.6569 21 12 21C10.3431 21 9 19.6569 9 18V17M15 17H9"/></svg>
+        <div class="bn-badge" id="bnNotifBadge"></div>
       </div>
       <div class="bn-item" id="bn-myreports" data-tab="myreports" onclick="if(navigator.vibrate)navigator.vibrate(8);goTo('myreports')" aria-label="My Reports">
         <svg class="bn-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"/></svg>
@@ -6529,6 +6554,7 @@ function goTo(p){
   if(p==="schedule"){showSchedTab("leave");}
   if(p==="profile")loadProfilePage();
   if(p==="home"){loadHomeData();loadClockState();loadWhosWorking();refreshHomeOnboardingCard();}
+  if(p==="notifs"){renderNotifsPage();}
 
   if(p==="announcements"){loadAnnouncements();}
   if(p==="engagement"){showEngagementTab('discussions');}
@@ -11604,6 +11630,91 @@ function updateGpsBypassBtn(){
 
 setTimeout(updateGpsBypassBtn, 500);
 
+// ── FULL-PAGE NOTIFICATIONS (mobile-friendly) ──────────
+async function renderNotifsPage(){
+  const el = document.getElementById('notifsPageList');
+  if(!el) return;
+  if(typeof NotifManager === 'undefined'){
+    el.innerHTML = '<div style="padding:40px 16px;text-align:center;color:#94a3b8;font-size:13px;">Notification system not ready.</div>';
+    return;
+  }
+  const all = NotifManager.getAll() || [];
+  if(!all.length){
+    el.innerHTML = '<div style="padding:60px 16px;text-align:center;">'+
+      '<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin:0 auto 12px;display:block;"><path d="M15 17H20L18.5951 15.5951C18.2141 15.2141 18 14.6973 18 14.1585V11C18 8.38757 16.3304 6.16509 14 5.34142V5C14 3.89543 13.1046 3 12 3C10.8954 3 10 3.89543 10 5V5.34142C7.66962 6.16509 6 8.38757 6 11V14.1585C6 14.6973 5.78595 15.2141 5.40493 15.5951L4 17H9M15 17V18C15 19.6569 13.6569 21 12 21C10.3431 21 9 19.6569 9 18V17M15 17H9"/></svg>'+
+      '<div style="font-size:15px;font-weight:700;color:#475569;margin-bottom:4px;">No notifications yet</div>'+
+      '<div style="font-size:12.5px;color:#94a3b8;">When something happens you\'ll see it here.</div>'+
+      '</div>';
+    return;
+  }
+  let html = '';
+  all.forEach(function(n){
+    const t = n.ts || Date.now();
+    const diff = Math.max(0, Date.now() - t);
+    let timeStr = 'just now';
+    if(diff >= 60000 && diff < 3600000) timeStr = Math.floor(diff/60000) + 'm ago';
+    else if(diff >= 3600000 && diff < 86400000) timeStr = Math.floor(diff/3600000) + 'h ago';
+    else if(diff >= 86400000) timeStr = Math.floor(diff/86400000) + 'd ago';
+    // Icon by type
+    let icon = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>';
+    let iconBg = '#f1f5f9';
+    if(n.type && n.type.indexOf('reaction') >= 0){
+      icon = '<span style="font-size:18px;">'+(n.title.match(/[\u{1F300}-\u{1FAFF}]/u) || ['👍'])[0]+'</span>';
+      iconBg = '#faf5ff';
+    } else if(n.type && n.type.indexOf('discussion') >= 0){
+      icon = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>';
+      iconBg = '#eff6ff';
+    } else if(n.type && n.type.indexOf('reply') >= 0){
+      icon = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0891b2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>';
+      iconBg = '#ecfeff';
+    } else if(n.type && n.type.indexOf('leave-approved') >= 0){
+      icon = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+      iconBg = '#ecfdf5';
+    } else if(n.type && n.type.indexOf('leave-declined') >= 0){
+      icon = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+      iconBg = '#fef2f2';
+    } else if(n.type && n.type.indexOf('task') >= 0){
+      icon = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>';
+      iconBg = '#f0fdf4';
+    }
+    const unreadDot = n.read ? '' : '<span style="width:8px;height:8px;background:#3b82f6;border-radius:50%;flex-shrink:0;margin-top:7px;"></span>';
+    html += '<div class="notif-row" data-nid="'+n.id+'" data-link="'+(n.link||'')+'" style="display:flex;align-items:flex-start;gap:12px;padding:14px 16px;border-bottom:1px solid #f1f5f9;cursor:pointer;background:'+(n.read?'#fff':'#f8faff')+';transition:background .15s;" onclick="handleNotifClick(\''+n.id+'\',\''+(n.link||'')+'\')">'+
+      '<div style="width:40px;height:40px;border-radius:50%;background:'+iconBg+';display:flex;align-items:center;justify-content:center;flex-shrink:0;">'+icon+'</div>'+
+      '<div style="flex:1;min-width:0;">'+
+        '<div style="font-size:13.5px;font-weight:'+(n.read?'600':'700')+';color:#0f172a;margin-bottom:2px;">'+(n.title||'').replace(/</g,'&lt;')+'</div>'+
+        '<div style="font-size:12.5px;color:#64748b;line-height:1.4;margin-bottom:4px;">'+(n.body||'').replace(/</g,'&lt;')+'</div>'+
+        '<div style="font-size:11px;color:#94a3b8;font-weight:500;">'+timeStr+'</div>'+
+      '</div>'+
+      unreadDot+
+    '</div>';
+  });
+  el.innerHTML = html;
+  // Mark all as read after viewing (after 1.5s so user can see the unread dots first)
+  setTimeout(function(){
+    if(document.querySelector('#page-notifs.active')){
+      NotifManager.markAllRead();
+    }
+  }, 1500);
+}
+
+function handleNotifClick(id, link){
+  if(typeof NotifManager !== 'undefined' && NotifManager.markRead) NotifManager.markRead(id);
+  if(link) goTo(link);
+}
+
+function markAllNotifsRead(){
+  if(typeof NotifManager !== 'undefined' && NotifManager.markAllRead){
+    NotifManager.markAllRead();
+    setTimeout(renderNotifsPage, 100);
+    showToast('All notifications marked as read');
+  }
+}
+
+// Wire bnNotifBadge to update on every push
+const _origUpdateBadges = (function(){
+  return null; // placeholder
+})();
+
 // ── INTERACTIVE ONBOARDING CHECKLIST ──────────
 const ONBOARDING_TASKS = [
   {
@@ -13806,10 +13917,39 @@ async function loadWhosWorking(){
     
     _wwStaffData = onlineStaff;
     cnt.textContent = onlineStaff.length;
-    renderWhosWorking(onlineStaff);
+    // Fetch team membership for all online staff
+    try{
+      const teamRows = await sbGet('staff_credentials','?select=staff_name,team&staff_name=in.('+onlineStaff.map(function(n){return '"'+n.replace(/"/g,'\\"')+'"';}).join(',')+')');
+      _wwTeams = {};
+      (teamRows||[]).forEach(function(r){ if(r.team) _wwTeams[r.staff_name] = r.team; });
+    }catch(e){ _wwTeams = {}; }
+    renderWwFilters();
+    renderWhosWorking(_wwStaffData);
   }catch(e){
     list.innerHTML = '<div class="ww-empty">Could not load team list.</div>';
   }
+}
+
+let _wwTeams = {}; // {staff_name: team}
+let _wwActiveTeam = 'all';
+
+function renderWwFilters(){
+  const el = document.getElementById('wwTeamFilters');
+  if(!el) return;
+  const teams = [...new Set(Object.values(_wwTeams).filter(Boolean))].sort();
+  if(!teams.length){ el.innerHTML = ''; el.style.display = 'none'; return; }
+  el.style.display = 'flex';
+  let html = '<button class="ww-chip'+(_wwActiveTeam==='all'?' active':'')+'" onclick="setWwTeam(\'all\')">All</button>';
+  teams.forEach(function(t){
+    html += '<button class="ww-chip'+(_wwActiveTeam===t?' active':'')+'" onclick="setWwTeam(\''+t.replace(/'/g,"\\'")+'\')">'+t+'</button>';
+  });
+  el.innerHTML = html;
+}
+
+function setWwTeam(t){
+  _wwActiveTeam = t;
+  renderWwFilters();
+  filterWhosWorking();
 }
 
 function renderWhosWorking(names){
@@ -13833,10 +13973,18 @@ function renderWhosWorking(names){
   list.innerHTML = html;
 }
 
-function filterWhosWorking(q){
-  q = (q||'').toLowerCase().trim();
-  if(!q){ renderWhosWorking(_wwStaffData); return; }
-  const filtered = _wwStaffData.filter(function(n){ return String(n).toLowerCase().includes(q); });
+function filterWhosWorking(){
+  const qEl = document.getElementById('wwSearch');
+  const q = qEl ? qEl.value.toLowerCase().trim() : '';
+  let filtered = _wwStaffData.slice();
+  // Team filter first
+  if(_wwActiveTeam && _wwActiveTeam !== 'all'){
+    filtered = filtered.filter(function(n){ return _wwTeams[n] === _wwActiveTeam; });
+  }
+  // Search filter
+  if(q){
+    filtered = filtered.filter(function(n){ return String(n).toLowerCase().includes(q); });
+  }
   renderWhosWorking(filtered);
 }
 
@@ -14510,6 +14658,16 @@ const NotifManager = (function(){
         b.style.display = 'none';
       }
     });
+    // Also update bottom-nav notif badge
+    const bnBadge = document.getElementById('bnNotifBadge');
+    if(bnBadge){
+      if(count > 0){
+        bnBadge.textContent = count > 9 ? '9+' : String(count);
+        bnBadge.style.display = 'flex';
+      } else {
+        bnBadge.style.display = 'none';
+      }
+    }
     // Other badges (bottom nav, sidebar nav items)
     document.querySelectorAll('.bn-badge, .nav-badge').forEach(function(b){
       if(count > 0){ b.textContent = (count > 4 ? '4+' : String(count)); b.style.display = 'flex'; }
@@ -14590,29 +14748,50 @@ setTimeout(function(){ if(typeof NotifManager !== 'undefined') NotifManager.refr
 // ── NOTIFICATION DROPDOWN ──
 function handleMobileBell(e){
   if(e){ e.preventDefault(); e.stopPropagation(); }
-  let drop = document.getElementById('mhNotifDrop');
-  if(!drop){
-    // Try to create it if missing
-    const wrap = document.getElementById('mhBellWrap');
-    if(wrap){
-      drop = document.createElement('div');
-      drop.className = 'notif-drop';
-      drop.id = 'mhNotifDrop';
-      drop.style.cssText = 'right:8px;left:auto;';
-      drop.innerHTML = '<div class="notif-drop-header">Notifications</div><div id="mhNotifDropList"><div class="notif-drop-empty" style="color:#64748b;padding:30px 16px;text-align:center;">Loading notifications...</div></div>';
-      wrap.appendChild(drop);
-    } else {
-      return;
+  // Build a body-level modal overlay (independent of bell wrapper / mobile header)
+  let overlay = document.getElementById('mhNotifModal');
+  if(overlay){
+    overlay.remove();
+    // Restore original ID
+    const orig = document.getElementById('mhNotifDropList_orig');
+    if(orig) orig.id = 'mhNotifDropList';
+    return;
+  }
+  overlay = document.createElement('div');
+  overlay.id = 'mhNotifModal';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(15,23,42,.4);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);display:flex;align-items:flex-start;justify-content:flex-end;padding:60px 8px 8px;';
+  overlay.addEventListener('click', function(ev){
+    if(ev.target === overlay) overlay.remove();
+  });
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  const bg = isDark ? '#1e293b' : '#fff';
+  const border = isDark ? '#2d3f55' : '#e5e7eb';
+  const txtPrimary = isDark ? '#f1f5f9' : '#0f172a';
+  // Remove the original hidden mhNotifDropList from mobile-header temporarily so getElementById hits ours
+  const originalMhList = document.getElementById('mhNotifDropList');
+  if(originalMhList){ originalMhList.id = 'mhNotifDropList_orig'; }
+  overlay.innerHTML = '<div style="background:'+bg+';border:1px solid '+border+';border-radius:14px;width:100%;max-width:380px;max-height:80vh;overflow-y:auto;-webkit-overflow-scrolling:touch;box-shadow:0 20px 50px rgba(15,23,42,.2);" onclick="event.stopPropagation()">'+
+    '<div class="notif-drop-header" style="padding:14px 16px;font-size:14px;font-weight:700;color:'+txtPrimary+';border-bottom:1px solid '+border+';position:sticky;top:0;background:'+bg+';z-index:1;display:flex;align-items:center;justify-content:space-between;">'+
+      '<span>Notifications</span>'+
+      '<button onclick="document.getElementById(\'mhNotifModal\') && (document.getElementById(\'mhNotifModal\').remove(), document.getElementById(\'mhNotifDropList_orig\') && (document.getElementById(\'mhNotifDropList_orig\').id=\'mhNotifDropList\'))" style="background:none;border:none;font-size:20px;line-height:1;color:#94a3b8;cursor:pointer;padding:0 4px;">×</button>'+
+    '</div>'+
+    '<div id="mhNotifDropList"><div class="notif-drop-empty" style="color:#64748b;padding:30px 16px;text-align:center;">Loading notifications...</div></div>'+
+  '</div>';
+  document.body.appendChild(overlay);
+  // Restore original ID when overlay is removed (outside click)
+  const restoreId = function(){
+    const orig = document.getElementById('mhNotifDropList_orig');
+    if(orig) orig.id = 'mhNotifDropList';
+  };
+  // Wrap overlay click to restore
+  overlay.addEventListener('click', function(ev){
+    if(ev.target === overlay){
+      overlay.remove();
+      restoreId();
     }
-  }
-  // Also ensure list element exists
-  if(!document.getElementById('mhNotifDropList')){
-    const list = document.createElement('div');
-    list.id = 'mhNotifDropList';
-    list.innerHTML = '<div class="notif-drop-empty">Loading...</div>';
-    drop.appendChild(list);
-  }
-  toggleNotifDrop('mhNotifDrop');
+  });
+  // Populate using the same loader
+  if(typeof loadNotifDrop === 'function') loadNotifDrop('mhNotifDrop');
 }
 
 function toggleNotifDrop(dropId){
