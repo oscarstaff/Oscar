@@ -1540,6 +1540,10 @@ button[onclick*="toggleNotifDrop"]:hover{
   }
 }
 [data-theme="dark"] .notif-drop{background:#1e293b;border-color:#2d3f55;}
+[data-theme="dark"] .notif-drop-item{color:#e2e8f0 !important;}
+[data-theme="dark"] .notif-drop-item div{color:#e2e8f0 !important;}
+[data-theme="dark"] .notif-drop-empty{color:#94a3b8 !important;}
+[data-theme="dark"] .notif-drop-header{color:#f1f5f9 !important;background:#1e293b !important;}
 [data-theme="dark"] .notif-drop-item{border-bottom-color:#2d3f55;}
 [data-theme="dark"] .notif-drop-item:hover{background:#253447;}
 [data-theme="dark"] .notif-drop-item.unread{background:#162032;}
@@ -4434,7 +4438,7 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
       </button>
       <div class="notif-drop" id="mhNotifDrop" style="right:8px;left:auto;">
         <div class="notif-drop-header">Notifications</div>
-        <div id="mhNotifDropList"><div class="notif-drop-empty">Loading...</div></div>
+        <div id="mhNotifDropList"><div class="notif-drop-empty" style="color:#64748b;padding:30px 16px;text-align:center;">Loading notifications...</div></div>
       </div>
     </div>
   </div>
@@ -4457,7 +4461,7 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
         </button>
         <div class="notif-drop" id="notifDrop">
           <div class="notif-drop-header">Notifications</div>
-          <div id="notifDropList"><div class="notif-drop-empty">Loading...</div></div>
+          <div id="notifDropList"><div class="notif-drop-empty" style="color:#64748b;padding:30px 16px;text-align:center;">Loading notifications...</div></div>
         </div>
       </div>
     </div>
@@ -13421,48 +13425,58 @@ async function loadWhosWorking(){
   const card = document.getElementById('whoWorkingCard');
   const list = document.getElementById('whoWorkingList');
   const cnt = document.getElementById('wwOnlineCount');
-  if(!card || !list) return;
+  if(!card || !list){ console.warn('[ww] card or list missing'); return; }
 
-  // Only show if current user is clocked in (has open clock_log without matching out)
+  // Helper: get local Sydney date string YYYY-MM-DD
+  function localDateStr(d){
+    const dt = d || new Date();
+    const y = dt.getFullYear();
+    const m = String(dt.getMonth()+1).padStart(2,'0');
+    const day = String(dt.getDate()).padStart(2,'0');
+    return y+'-'+m+'-'+day;
+  }
+
+  // Check if I'm clocked in (look at recent entries — be loose with date filter)
   try{
-    const myToday = await sbGet('clock_log','?staff_name=eq.'+encodeURIComponent(me)+'&order=ts.desc&limit=5');
+    // Wider window: last 30 hours to catch overnight shifts
+    const since = new Date(Date.now() - 30*3600*1000).toISOString();
+    const myToday = await sbGet('clock_log','?staff_name=eq.'+encodeURIComponent(me)+'&ts=gte.'+encodeURIComponent(since)+'&order=ts.asc&limit=20');
+    console.log('[ww] my recent entries:', myToday && myToday.length);
     let amIIn = false;
     if(myToday && myToday.length){
-      // Latest entry is type=in with no matching out today
-      const todayISO = new Date().toISOString().slice(0,10);
-      const todayEntries = myToday.filter(function(r){ return r.ts && r.ts.slice(0,10) === todayISO; });
-      const ins = todayEntries.filter(function(r){ return r.type === 'in'; }).length;
-      const outs = todayEntries.filter(function(r){ return r.type === 'out'; }).length;
+      // Compare count of ins vs outs — if more ins, currently in
+      const ins = myToday.filter(function(r){ return r.type === 'in'; }).length;
+      const outs = myToday.filter(function(r){ return r.type === 'out'; }).length;
       amIIn = ins > outs;
+      console.log('[ww] amIIn?', amIIn, '(ins:', ins, 'outs:', outs, ')');
     }
     if(!amIIn){
+      console.log('[ww] hiding card — not clocked in');
       card.style.display = 'none';
       return;
     }
     card.style.display = '';
-  }catch(e){ card.style.display = 'none'; return; }
+  }catch(e){ console.warn('[ww] my status check failed:', e); card.style.display = 'none'; return; }
 
-  // Fetch everyone clocked in today (last clock_log per staff = type 'in' with no later 'out')
+  // Fetch everyone's entries from last 30 hours
   try{
-    const today = new Date().toISOString().slice(0,10);
-    const tomorrow = new Date(Date.now()+86400000).toISOString().slice(0,10);
-    const allToday = await sbGet('clock_log','?ts=gte.'+today+'&ts=lt.'+tomorrow+'&order=ts.asc&limit=500');
+    const since = new Date(Date.now() - 30*3600*1000).toISOString();
+    const allToday = await sbGet('clock_log','?ts=gte.'+encodeURIComponent(since)+'&order=ts.asc&limit=500');
+    console.log('[ww] all recent entries across staff:', allToday && allToday.length);
     
-    // Group by staff_name, take latest entry
-    const latestByStaff = {};
+    // Count ins vs outs per staff
+    const byStaff = {};
     (allToday||[]).forEach(function(r){
-      const s = r.staff_name;
-      if(!latestByStaff[s] || r.ts > latestByStaff[s].ts){
-        latestByStaff[s] = r;
-      }
+      if(!byStaff[r.staff_name]) byStaff[r.staff_name] = {ins:0, outs:0};
+      if(r.type === 'in') byStaff[r.staff_name].ins++;
+      else if(r.type === 'out') byStaff[r.staff_name].outs++;
     });
-    
-    // Staff currently in = latest entry is type=in
-    const onlineStaff = [];
-    Object.keys(latestByStaff).forEach(function(s){
-      if(latestByStaff[s].type === 'in') onlineStaff.push(s);
+    // Online = ins > outs (means latest action was clock-in)
+    const onlineStaff = Object.keys(byStaff).filter(function(s){
+      return byStaff[s].ins > byStaff[s].outs;
     });
     onlineStaff.sort();
+    console.log('[ww] online staff:', onlineStaff);
     
     _wwStaffData = onlineStaff;
     cnt.textContent = onlineStaff.length;
@@ -14070,7 +14084,10 @@ const NotifManager = (function(){
   const KEY_PREFIX = 'notif_local_';
   const MAX_STORED = 100;
 
-  function key(){ return KEY_PREFIX + (window.me || 'anon'); }
+  function key(){ 
+    const u = window.me || (typeof me !== 'undefined' && me) || sessionStorage.getItem('ou') || 'anon';
+    return KEY_PREFIX + u;
+  }
 
   function load(){
     try{ return JSON.parse(localStorage.getItem(key()) || '[]'); }
@@ -14272,9 +14289,22 @@ function toggleNotifDrop(dropId){
 }
 
 async function loadNotifDrop(dropId){
-  // Use NotifManager (modern source) if it has entries
+  console.log('[notif-drop] loading', dropId);
   const listId = dropId==='mhNotifDrop'?'mhNotifDropList':'notifDropList';
-  const el = document.getElementById(listId);
+  let el = document.getElementById(listId);
+  if(!el){
+    // Element missing — try to create it inside the drop wrapper
+    const drop = document.getElementById(dropId);
+    if(drop){
+      console.log('[notif-drop] creating missing list element');
+      el = document.createElement('div');
+      el.id = listId;
+      drop.appendChild(el);
+    } else {
+      console.warn('[notif-drop] BOTH drop and list missing:', dropId, listId);
+      return;
+    }
+  }
   if(el && typeof NotifManager !== 'undefined' && NotifManager.getAll){
     try{
       const allNotifs = NotifManager.getAll();
@@ -14317,7 +14347,7 @@ async function loadNotifDrop(dropId){
   // Fall back to legacy data sources
   if(typeof checkTaskReminders==='function') checkTaskReminders();
   if(!el) return;
-  el.innerHTML='<div class="notif-drop-empty">Loading...</div>';
+  el.innerHTML='<div class="notif-drop-empty" style="color:#64748b;padding:30px 16px;text-align:center;">Loading notifications...</div>';
   try{
     const rows=await sbGet('leave_submissions','?staff_name=eq.'+encodeURIComponent(me)+'&status=in.(approved,declined)&order=submitted_at.desc&limit=10');
     const read=JSON.parse(localStorage.getItem('oR_'+me)||'[]');
