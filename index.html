@@ -6408,6 +6408,17 @@ function doLogout(){
 }
 
 async function enterHub(){
+  // Clear any old 'anon' NotifManager bucket so legacy notifs don't surface
+  try{ localStorage.removeItem('notif_local_anon'); }catch(e){}
+  // Also clear any session-storage realtime dedupe keys from previous user
+  try{
+    for(let i = sessionStorage.length - 1; i >= 0; i--){
+      const k = sessionStorage.key(i);
+      if(k && (k.startsWith('rt_leave_') || k.startsWith('rt_react_') || k.startsWith('rt_disc_') || k.startsWith('rt_reply_'))){
+        sessionStorage.removeItem(k);
+      }
+    }
+  }catch(e){}
   await loadStaffList();
  // refresh from Supabase in case staff changed
   document.getElementById("authLayer").style.display="none";
@@ -15272,25 +15283,26 @@ function setupRealtimeChannels(){
   // Leave decisions for me
   const leaveCh = _realtimeClient.channel('leave-live')
     .on('postgres_changes', {event:'UPDATE', schema:'public', table:'leave_submissions'}, function(payload){
-      if(payload.new && payload.new.staff_name === me){
-        const l = payload.new;
-        // Only fire if status moved to approved/declined
-        if(l.status === 'approved' || l.status === 'declined'){
-          const fireKey = 'rt_leave_'+l.id+'_'+l.status;
-          if(!sessionStorage.getItem(fireKey)){
-            sessionStorage.setItem(fireKey, '1');
-            if(typeof NotifManager !== 'undefined') NotifManager.push({
-              id: 'leave-'+l.id,
-              type: l.status === 'approved' ? 'leave-approved' : 'leave-declined',
-              title: l.status === 'approved' ? 'Leave approved' : 'Leave declined',
-              body: (l.from_date||'') + (l.to_date ? ' to '+l.to_date : '') + (l.reason ? ' · '+l.reason : ''),
-              ts: Date.now(), // notif fired right now, regardless of submission time
-              link: 'leave'
-            });
-          }
+      // Guard: me must be a non-empty string AND match exactly
+      if(!me || typeof me !== 'string') return;
+      if(!payload.new || !payload.new.staff_name) return;
+      if(payload.new.staff_name !== me) return; // hard equality on staff_name
+      const l = payload.new;
+      if(l.status === 'approved' || l.status === 'declined'){
+        const fireKey = 'rt_leave_'+l.id+'_'+l.status;
+        if(!sessionStorage.getItem(fireKey)){
+          sessionStorage.setItem(fireKey, '1');
+          if(typeof NotifManager !== 'undefined') NotifManager.push({
+            id: 'leave-'+l.id,
+            type: l.status === 'approved' ? 'leave-approved' : 'leave-declined',
+            title: l.status === 'approved' ? 'Leave approved' : 'Leave declined',
+            body: (l.from_date||'') + (l.to_date ? ' to '+l.to_date : '') + (l.reason ? ' · '+l.reason : ''),
+            ts: Date.now(),
+            link: 'leave'
+          });
         }
-        loadNotifications();
       }
+      loadNotifications();
     })
     .subscribe();
   _realtimeChannels.push(leaveCh);
