@@ -13444,9 +13444,9 @@ async function loadWhosWorking(){
     console.log('[ww] my recent entries:', myToday && myToday.length);
     let amIIn = false;
     if(myToday && myToday.length){
-      // Compare count of ins vs outs — if more ins, currently in
-      const ins = myToday.filter(function(r){ return r.type === 'in'; }).length;
-      const outs = myToday.filter(function(r){ return r.type === 'out'; }).length;
+      console.log('[ww] sample entry:', myToday[0]); // debug log
+      const ins = myToday.filter(function(r){ return r.action === 'in' || r.type === 'in'; }).length;
+      const outs = myToday.filter(function(r){ return r.action === 'out' || r.type === 'out'; }).length;
       amIIn = ins > outs;
       console.log('[ww] amIIn?', amIIn, '(ins:', ins, 'outs:', outs, ')');
     }
@@ -13464,12 +13464,13 @@ async function loadWhosWorking(){
     const allToday = await sbGet('clock_log','?ts=gte.'+encodeURIComponent(since)+'&order=ts.asc&limit=500');
     console.log('[ww] all recent entries across staff:', allToday && allToday.length);
     
-    // Count ins vs outs per staff
+    // Count ins vs outs per staff (column is 'action' in schema)
     const byStaff = {};
     (allToday||[]).forEach(function(r){
       if(!byStaff[r.staff_name]) byStaff[r.staff_name] = {ins:0, outs:0};
-      if(r.type === 'in') byStaff[r.staff_name].ins++;
-      else if(r.type === 'out') byStaff[r.staff_name].outs++;
+      const act = r.action || r.type;
+      if(act === 'in') byStaff[r.staff_name].ins++;
+      else if(act === 'out') byStaff[r.staff_name].outs++;
     });
     // Online = ins > outs (means latest action was clock-in)
     const onlineStaff = Object.keys(byStaff).filter(function(s){
