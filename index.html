@@ -4432,7 +4432,7 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
     </div>
     <div class="mh-logo" style="position:absolute;left:50%;transform:translateX(-50%);font-weight:800;letter-spacing:-.02em;">Nexus</div>
     <div class="notif-drop-wrap" id="mhBellWrap" style="position:relative;">
-      <button onclick="handleMobileBell(event)" id="mhBellBtn" style="position:relative;background:none;border:none;cursor:pointer;padding:10px;margin:-2px;-webkit-tap-highlight-color:transparent;display:flex;align-items:center;justify-content:center;touch-action:manipulation;min-width:44px;min-height:44px;">
+      <button onclick="handleMobileBell(event)" ontouchend="handleMobileBell(event)" id="mhBellBtn" style="position:relative;background:none;border:none;cursor:pointer;padding:10px;margin:-2px;-webkit-tap-highlight-color:transparent;display:flex;align-items:center;justify-content:center;touch-action:manipulation;min-width:44px;min-height:44px;">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="bell-svg"><path d="M15 17H20L18.5951 15.5951C18.2141 15.2141 18 14.6973 18 14.1585V11C18 8.38757 16.3304 6.16509 14 5.34142V5C14 3.89543 13.1046 3 12 3C10.8954 3 10 3.89543 10 5V5.34142C7.66962 6.16509 6 8.38757 6 11V14.1585C6 14.6973 5.78595 15.2141 5.40493 15.5951L4 17H9M15 17V18C15 19.6569 13.6569 21 12 21C10.3431 21 9 19.6569 9 18V17M15 17H9"/></svg>
         <div id="mhBellBadge" class="bell-badge" style="display:none;">0</div>
       </button>
@@ -14264,28 +14264,50 @@ setTimeout(function(){ if(typeof NotifManager !== 'undefined') NotifManager.refr
 
 // ── NOTIFICATION DROPDOWN ──
 function handleMobileBell(e){
+  console.log('[mobile-bell] tap detected');
   if(e){ e.preventDefault(); e.stopPropagation(); }
+  const drop = document.getElementById('mhNotifDrop');
+  if(!drop){ console.warn('[mobile-bell] mhNotifDrop missing'); return; }
+  console.log('[mobile-bell] currently open?', drop.classList.contains('open'));
   toggleNotifDrop('mhNotifDrop');
+  console.log('[mobile-bell] after toggle open?', drop.classList.contains('open'));
+  console.log('[mobile-bell] computed display:', getComputedStyle(drop).display);
+  console.log('[mobile-bell] computed position:', getComputedStyle(drop).position);
 }
 
 function toggleNotifDrop(dropId){
-  const id=dropId||'notifDrop';
-  const drop=document.getElementById(id);
-  if(!drop)return;
-  // Close all other drops first
-  document.querySelectorAll('.notif-drop.open').forEach(function(d){if(d.id!==id)d.classList.remove('open');});
-  const isOpen=drop.classList.contains('open');
-  drop.classList.toggle('open',!isOpen);
-  if(!isOpen){
+  const id = dropId || 'notifDrop';
+  const drop = document.getElementById(id);
+  if(!drop){ console.warn('[notif] drop missing:', id); return; }
+  // Close all other drops
+  document.querySelectorAll('.notif-drop').forEach(function(d){
+    if(d.id !== id){
+      d.classList.remove('open');
+      d.style.display = 'none';
+    }
+  });
+  const isOpen = drop.classList.contains('open');
+  console.log('[notif] toggling', id, 'isOpen?', isOpen);
+  if(isOpen){
+    drop.classList.remove('open');
+    drop.style.display = 'none';
+  } else {
+    drop.classList.add('open');
+    drop.style.display = 'block';
     loadNotifDrop(id);
+    // Register outside click handler with delay
     setTimeout(function(){
-      document.addEventListener('click',function handler(e){
-        if(!e.target.closest('.notif-drop-wrap')){
-          document.querySelectorAll('.notif-drop.open').forEach(function(d){d.classList.remove('open');});
+      function outsideHandler(e){
+        if(!e.target.closest('.notif-drop-wrap') && !e.target.closest('.notif-drop')){
+          drop.classList.remove('open');
+          drop.style.display = 'none';
+          document.removeEventListener('click', outsideHandler, true);
+          document.removeEventListener('touchend', outsideHandler, true);
         }
-        document.removeEventListener('click',handler);
-      },{once:true});
-    },50);
+      }
+      document.addEventListener('click', outsideHandler, true);
+      document.addEventListener('touchend', outsideHandler, true);
+    }, 100);
   }
 }
 
