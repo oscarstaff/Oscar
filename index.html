@@ -11188,7 +11188,7 @@ function startBackgroundLocation(){
       }
     },
     function(err){ console.warn('[gps bg]', err.message); },
-    { enableHighAccuracy:true, timeout:15000, maximumAge:0 }
+    { enableHighAccuracy:true, timeout:20000, maximumAge:30000 }
   );
 }
 
@@ -11257,19 +11257,30 @@ function getCurrentPosition(){
             setTimeout(tryRead, 800);
           }
         },
-        { enableHighAccuracy:true, timeout:12000, maximumAge:0 }
+        { enableHighAccuracy:true, timeout:18000, maximumAge:30000 }
       );
     }
     
-    // Master timeout — 18s for the whole multi-attempt process
+    // Master timeout — 28s for high-accuracy phase
     timer = setTimeout(function(){
       if(readings.length > 0){
         readings.sort(function(a,b){ return a.coords.accuracy - b.coords.accuracy; });
         resolve(readings[0]);
-      } else {
-        reject(new Error('GPS timeout — please ensure location services are enabled and accurate'));
+        return;
       }
-    }, 18000);
+      // Last-ditch: try standard (network-based) location with shorter timeout
+      console.log('[gps] falling back to low-accuracy network location...');
+      navigator.geolocation.getCurrentPosition(
+        function(pos){
+          console.log('[gps] network fallback succeeded, accuracy:', pos.coords.accuracy+'m');
+          resolve(pos);
+        },
+        function(err2){
+          reject(new Error('GPS timeout — please ensure location services are enabled and accurate'));
+        },
+        { enableHighAccuracy:false, timeout:8000, maximumAge:300000 }
+      );
+    }, 28000);
     
     tryRead();
   });
