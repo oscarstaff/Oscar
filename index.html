@@ -11083,17 +11083,41 @@ async function applyGpsLock(){
 async function loadClockState(){
   if(!me) return;
   applyGpsLock();
+  // INSTANT render from cached state — avoids "disappears" flash on refresh
+  try{
+    const cached = localStorage.getItem('clock_state_'+me);
+    if(cached){
+      const obj = JSON.parse(cached);
+      if(obj && obj.state){
+        _clockState = obj.state;
+        _clockSinceTs = obj.ts ? new Date(obj.ts) : null;
+        renderClockCard();
+      }
+    }
+  }catch(e){}
+  // Then fetch fresh data from supabase
   try{
     const rows = await sbGet('clock_log','?staff_name=eq.'+encodeURIComponent(me)+'&order=ts.desc&limit=1');
     if(rows && rows.length){
-      _clockState = rows[0].action; // 'in' or 'out'
+      _clockState = rows[0].action;
       _clockSinceTs = new Date(rows[0].ts);
     } else {
       _clockState = 'out';
       _clockSinceTs = null;
     }
+    // Save to cache for next page-load instant render
+    try{
+      localStorage.setItem('clock_state_'+me, JSON.stringify({
+        state: _clockState,
+        ts: _clockSinceTs ? _clockSinceTs.toISOString() : null
+      }));
+    }catch(e){}
     renderClockCard();
-  }catch(e){console.warn('loadClock:',e); _clockState='out'; renderClockCard();}
+  }catch(e){
+    console.warn('loadClock:',e);
+    // Only fall to 'out' if NO cached state was used
+    if(_clockState === null){ _clockState='out'; renderClockCard(); }
+  }
 }
 
 function renderClockCard(){
@@ -11377,6 +11401,13 @@ async function toggleClock(){
     }
     _clockState = next;
     _clockSinceTs = new Date();
+    // Cache for instant render on next page load
+    try{
+      localStorage.setItem('clock_state_'+me, JSON.stringify({
+        state: next,
+        ts: _clockSinceTs.toISOString()
+      }));
+    }catch(e){}
     renderClockCard();
     showToast(next==='in' ? 'Clocked in' : 'Clocked out');
     loadAllClockLogs();
@@ -13227,6 +13258,8 @@ async function savePunchEdit(){
     });
     showToast('Saved · Sheet updated');
     document.getElementById('punchEditBack').style.display='none';
+    // Refresh Who's Working immediately so the just-clocked-in staff appears
+    if(typeof loadWhosWorking === 'function') setTimeout(loadWhosWorking, 300);
     // Refresh ALL relevant views — always, in case they're rendered offscreen
     setTimeout(function(){
       if(typeof runReport === 'function' && document.getElementById('reportsBack') && document.getElementById('reportsBack').style.display !== 'none') runReport();
@@ -13896,11 +13929,12 @@ async function loadWhosWorking(){
     const myToday = await sbGet('clock_log','?staff_name=eq.'+encodeURIComponent(me)+'&ts=gte.'+encodeURIComponent(since)+'&order=ts.asc&limit=20');
     let amIIn = false;
     if(myToday && myToday.length){
-      const ins = myToday.filter(function(r){ return r.action === 'in' || r.type === 'in'; }).length;
-      const outs = myToday.filter(function(r){ return r.action === 'out' || r.type === 'out'; }).length;
-      amIIn = ins > outs;
+      // Sort by ts asc (should already be) then take last action
+      const sorted = myToday.slice().sort(function(a,b){ return (a.ts||'').localeCompare(b.ts||''); });
+      const lastAction = sorted[sorted.length-1].action || sorted[sorted.length-1].type;
+      amIIn = lastAction === 'in';
     }
-    if(!amIIn){
+    if(!amIIn && !myIsAdmin){
       card.style.display = 'none';
       return;
     }
@@ -13912,17 +13946,17 @@ async function loadWhosWorking(){
     const since = new Date(Date.now() - 30*3600*1000).toISOString();
     const allToday = await sbGet('clock_log','?ts=gte.'+encodeURIComponent(since)+'&order=ts.asc&limit=500');
     
-    // Count ins vs outs per staff (column is 'action' in schema)
-    const byStaff = {};
+    // Track LATEST action per staff (since allToday is ordered by ts asc, the last seen action wins)
+    const latestAction = {};
     (allToday||[]).forEach(function(r){
-      if(!byStaff[r.staff_name]) byStaff[r.staff_name] = {ins:0, outs:0};
       const act = r.action || r.type;
-      if(act === 'in') byStaff[r.staff_name].ins++;
-      else if(act === 'out') byStaff[r.staff_name].outs++;
+      if(act === 'in' || act === 'out'){
+        latestAction[r.staff_name] = act;
+      }
     });
-    // Online = ins > outs (means latest action was clock-in)
-    const onlineStaff = Object.keys(byStaff).filter(function(s){
-      return byStaff[s].ins > byStaff[s].outs;
+    // Online = latest action is 'in'
+    const onlineStaff = Object.keys(latestAction).filter(function(s){
+      return latestAction[s] === 'in';
     });
     onlineStaff.sort();
     
@@ -15620,6 +15654,20 @@ function setupRealtimeChannels(){
     })
     .subscribe();
   _realtimeChannels.push(reactCh);
+
+  // Clock log changes — refresh Who's Working when anyone clocks in/out (manual or auto)
+  const clockCh = _realtimeClient.channel('clock-live')
+    .on('postgres_changes', {event:'*', schema:'public', table:'clock_log'}, function(payload){
+      // Debounce — refresh after 500ms in case of bulk updates
+      if(window._wwRefreshTimer) clearTimeout(window._wwRefreshTimer);
+      window._wwRefreshTimer = setTimeout(function(){
+        if(typeof loadWhosWorking === 'function' && document.getElementById('whoWorkingCard')){
+          loadWhosWorking();
+        }
+      }, 500);
+    })
+    .subscribe();
+  _realtimeChannels.push(clockCh);
 
   // Reply notifications
   const replyCh = _realtimeClient.channel('reply-notifs-live')
