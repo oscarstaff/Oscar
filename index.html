@@ -4570,6 +4570,29 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
       <!-- Stats -->
       <div class="stats-row" id="homeStats"></div>
 
+      <!-- Onboarding card (only visible until complete or dismissed) -->
+      <div id="homeOnboardingCard" class="card" style="display:none;cursor:pointer;margin-bottom:14px;transition:transform .15s,box-shadow .15s;" onclick="openOnboardingPanel()" onmouseover="this.style.transform='translateY(-1px)';this.style.boxShadow='0 8px 24px rgba(15,23,42,.08)'" onmouseout="this.style.transform='';this.style.boxShadow=''">
+        <div style="padding:18px 20px;">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;gap:12px;">
+            <div style="flex:1;min-width:0;">
+              <div style="display:flex;align-items:center;gap:7px;margin-bottom:5px;">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                <div style="font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#64748b;">Get started with Nexus</div>
+              </div>
+              <div style="font-size:16px;font-weight:700;letter-spacing:-.01em;color:#0f172a;">Complete your setup</div>
+            </div>
+            <div id="homeOnboardingCount" style="background:#f1f5f9;color:#475569;font-size:11px;font-weight:700;padding:5px 11px;border-radius:12px;flex-shrink:0;">0 left</div>
+          </div>
+          <div style="background:#f1f5f9;height:6px;border-radius:3px;overflow:hidden;margin-bottom:10px;">
+            <div id="homeOnboardingProgress" style="background:#10b981;height:100%;width:0%;transition:width .4s ease;border-radius:3px;"></div>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;">
+            <div id="homeOnboardingNext" style="font-size:12px;color:#64748b;flex:1;min-width:0;text-overflow:ellipsis;overflow:hidden;white-space:nowrap;">Tap to see your checklist</div>
+            <div style="font-size:11px;font-weight:700;color:#0f172a;flex-shrink:0;">View →</div>
+          </div>
+        </div>
+      </div>
+
       <!-- Who's Working (only visible when current user is clocked in) -->
       <div class="card" id="whoWorkingCard" style="display:none;">
         <div class="card-hd" style="border-bottom:1px solid #f1f5f9;padding-bottom:10px;margin-bottom:12px;">
@@ -6409,7 +6432,7 @@ async function enterHub(){
   document.getElementById("leaveTo").value=today;
   buildAvailForm();
   showSchedTab('leave'); // default schedule sub-tab
-  startBackgroundLocation();Promise.all([loadHomeData(),loadNotifications(),loadLeaveHistory(),refreshAnnBadge(),loadHomeDiscPreview(),maybeShowOnboarding(),checkFeedbackInvites(),checkNewNotifications(),loadAnnReads(),loadSharedTasksFromOthers(),loadClockState(),loadAllClockLogs(),loadDiary(),loadWhosWorking()]).then(function(){
+  startBackgroundLocation();Promise.all([loadHomeData(),loadNotifications(),loadLeaveHistory(),refreshAnnBadge(),loadHomeDiscPreview(),maybeShowOnboarding(),checkFeedbackInvites(),checkNewNotifications(),loadAnnReads(),loadSharedTasksFromOthers(),loadClockState(),loadAllClockLogs(),loadDiary(),loadWhosWorking(),refreshHomeOnboardingCard()]).then(function(){
     setTimeout(function(){
       maybeShowTour();
     }, 300);
@@ -6481,6 +6504,13 @@ function goTo(p){
   if((p === 'engagement' || p === 'discussions') && typeof markAllDiscussionsSeen === 'function'){
     setTimeout(markAllDiscussionsSeen, 600);
   }
+  // Track onboarding visits
+  const myName = window.me || (typeof me !== 'undefined' && me) || null;
+  if(myName){
+    if(p === 'engagement') localStorage.setItem('nexus_visited_engagement_'+myName,'1');
+    if(p === 'myreports' || p === 'reports') localStorage.setItem('nexus_visited_reports_'+myName,'1');
+    setTimeout(function(){ if(typeof refreshHomeOnboardingCard === 'function') refreshHomeOnboardingCard(); }, 300);
+  }
   setActiveNavChild(p);
   if(typeof _setBottomNavActive==='function') _setBottomNavActive(p);
   // Update URL hash + document title
@@ -6494,7 +6524,7 @@ function goTo(p){
   if(p==="leave"||p==="availability"){document.querySelectorAll(".page").forEach(pg=>pg.classList.toggle("active",pg.id==="page-schedule"));document.querySelectorAll("[data-tab]").forEach(item=>item.classList.toggle("active",item.getAttribute("data-tab")==="schedule"));}
   if(p==="schedule"){showSchedTab("leave");}
   if(p==="profile")loadProfilePage();
-  if(p==="home"){loadHomeData();loadClockState();loadWhosWorking();}
+  if(p==="home"){loadHomeData();loadClockState();loadWhosWorking();refreshHomeOnboardingCard();}
 
   if(p==="announcements"){loadAnnouncements();}
   if(p==="engagement"){showEngagementTab('discussions');}
@@ -10829,7 +10859,6 @@ async function pollForNewActivity(){
         const r = await sbGet('reactions','?order=created_at.desc&limit=1');
         if(r && r[0] && r[0].created_at) _lastReactSeen = new Date(r[0].created_at).getTime();
         else _lastReactSeen = Date.now();
-        console.log('[poll] reaction baseline:', new Date(_lastReactSeen).toISOString());
       }catch(e){ _lastReactSeen = Date.now(); console.warn('[poll] react baseline failed:', e); }
     } else {
       const reactSince = new Date(_lastReactSeen).toISOString();
@@ -10837,7 +10866,6 @@ async function pollForNewActivity(){
       try{
         newReacts = await sbGet('reactions','?created_at=gt.'+encodeURIComponent(reactSince)+'&order=created_at.asc&limit=20') || [];
       }catch(e){ console.warn('[poll] reactions fetch failed:', e); }
-      console.log('[poll] reactions since', reactSince, '→ found', newReacts.length);
       for(let i=0; i<newReacts.length; i++){
         const r = newReacts[i];
         if(r.staff_name === me) continue; // skip my own reactions
@@ -10855,7 +10883,6 @@ async function pollForNewActivity(){
             if(author === me){ isMyContent = true; targetLabel = 'reply'; }
           }
         }catch(e){ console.warn('[poll] react author check:', e); }
-        console.log('[poll] react from', r.staff_name, 'on', r.target_type, '— mine?', isMyContent);
         if(isMyContent){
           NotifManager.push({
             id: 'react-'+r.id,
@@ -11277,24 +11304,34 @@ async function toggleClock(){
 
   btn.textContent = '...';
   try{
-    const flexedTs = flexClockTime(new Date()).toISOString();
+    const flexedDate = flexClockTime(new Date());
+    const flexedTs = flexedDate.toISOString();
     await sbPost('clock_log', {staff_name: me, action: next, ts: flexedTs});
     const DEFAULT_SHEET_URL = 'https://script.google.com/macros/s/AKfycby0Bq97bCZAsmnruXFuJuCqXQE_kOxhYE2KFuJnVzLXtT5CV0Y12k5176dxZbdaYVGE/exec';
     const sheetUrl = localStorage.getItem('oscars_sheet_url') || DEFAULT_SHEET_URL;
     if(sheetUrl){
-      // Fire-and-forget — don't block UI
+      // Format date as DD/MM/YYYY and time as HH:MM (local Sydney time)
+      const dd = String(flexedDate.getDate()).padStart(2,'0');
+      const mm = String(flexedDate.getMonth()+1).padStart(2,'0');
+      const yyyy = flexedDate.getFullYear();
+      const sheetDateStr = dd+'/'+mm+'/'+yyyy;
+      const hh = String(flexedDate.getHours()).padStart(2,'0');
+      const mn = String(flexedDate.getMinutes()).padStart(2,'0');
+      const timeStr = hh+':'+mn;
+      // Send as updatePunch (proven format) — only set timeIn OR timeOut depending on action
+      const payload = {
+        action: 'updatePunch',
+        staff: me,
+        date: sheetDateStr,
+        editor: me + ' (auto-clock)'
+      };
+      if(next === 'in') payload.timeIn = timeStr;
+      else payload.timeOut = timeStr;
       fetch(sheetUrl, {
         method:'POST',
         mode:'no-cors',
         headers:{'Content-Type':'text/plain;charset=utf-8'},
-        body: JSON.stringify({
-          action:'punch',
-          staff: me,
-          subAction: next,
-          lat: lat, lng: lng,
-          ts: flexedTs,
-          note: ''
-        })
+        body: JSON.stringify(payload)
       }).catch(function(e){ console.warn('sheets sync failed:', e); });
     }
     _clockState = next;
@@ -11563,12 +11600,75 @@ function updateGpsBypassBtn(){
 
 setTimeout(updateGpsBypassBtn, 500);
 
-// ── ONBOARDING TOUR ──────────
+// ── INTERACTIVE ONBOARDING CHECKLIST ──────────
+const ONBOARDING_TASKS = [
+  {
+    id: 'dob',
+    title: 'Set your date of birth',
+    body: 'So we can wish you happy birthday — shown in the calendar.',
+    cta: 'Set DOB',
+    action: "goTo('profile');setTimeout(function(){showProfileSection('account');var el=document.getElementById('profBirthday');if(el)el.focus();},400)",
+    check: async function(){
+      try{
+        const rows = await sbGet('staff_credentials','?staff_name=eq.'+encodeURIComponent(me)+'&select=birthday');
+        return !!(rows && rows[0] && rows[0].birthday);
+      }catch(e){ return false; }
+    }
+  },
+  {
+    id: 'security_questions',
+    title: 'Set your security questions',
+    body: 'So you can reset your own password if you forget it.',
+    cta: 'Set questions',
+    action: "goTo('profile');setTimeout(function(){showProfileSection('account');var el=document.getElementById('profSqSection');if(el){toggleSection('profSqSection');loadCurrentQuestions();}},400)",
+    check: async function(){
+      try{
+        // Schema uses sq1_answer_hash (not sq1_answer)
+        const rows = await sbGet('staff_credentials','?staff_name=eq.'+encodeURIComponent(me)+'&select=sq1_question,sq2_question,sq1_answer_hash,sq2_answer_hash');
+        return !!(rows && rows[0] && rows[0].sq1_question && rows[0].sq2_question && rows[0].sq1_answer_hash && rows[0].sq2_answer_hash);
+      }catch(e){ return false; }
+    }
+  },
+  {
+    id: 'availability',
+    title: 'Set your availability',
+    body: 'Tell us when you can work so shifts match your schedule.',
+    cta: 'Set availability',
+    page: 'availability',
+    check: async function(){
+      try{
+        const rows = await sbGet('staff_availability','?staff_name=eq.'+encodeURIComponent(me)+'&select=staff_name&limit=1');
+        return !!(rows && rows.length > 0);
+      }catch(e){ return false; }
+    }
+  },
+  {
+    id: 'check_discussions',
+    title: 'Check the discussions board',
+    body: 'Team announcements, polls, and chat live here.',
+    cta: 'Open Discussions',
+    page: 'engagement',
+    check: function(){
+      return localStorage.getItem('nexus_visited_engagement_'+me) === '1';
+    }
+  },
+  {
+    id: 'check_report',
+    title: 'Check My Report',
+    body: 'See your fortnightly hours, breaks, and coffee allowances.',
+    cta: 'View Reports',
+    page: 'myreports',
+    check: function(){
+      return localStorage.getItem('nexus_visited_reports_'+me) === '1';
+    }
+  }
+];
+
 const TOUR_STEPS = [
-  {emoji:'', title:'Welcome to Nexus', body:'Your team\'s digital workspace. Let me show you around in 30 seconds.'},
-  {emoji:'', title:'Clock in & out', body:'Tap the green button on Home to start your shift. GPS-locked to the office.'},
-  {emoji:'', title:'Stay connected', body:'Discussions for team chat. Calendar for events. Diary for personal notes.'},
-  {emoji:'', title:'Track your hours', body:'My Reports shows fortnightly hours, breaks, and coffee allowances.'}
+  {emoji:'WELCOME', title:'Welcome to Nexus', body:'Your team\'s digital workspace. Let me show you around in 30 seconds.'},
+  {emoji:'BASICS', title:'Clock in & out', body:'Tap the green button on Home to start your shift. GPS-locked to the office.'},
+  {emoji:'CONNECT', title:'Stay connected', body:'Discussions for team chat. Calendar for events. Diary for personal notes.'},
+  {emoji:'TRACK', title:'Track your hours', body:'My Reports shows fortnightly hours, breaks, and coffee allowances.'}
 ];
 let _tourStep = 0;
 
@@ -11607,7 +11707,8 @@ function skipTour(){
 
 async function maybeShowTour(){
   if(!me) return;
-  // Local check first — if user has done it on this device, never show again
+  // DISABLED — replaced by interactive onboarding checklist
+  return;
   if(localStorage.getItem('nexus_tour_done_'+me) === '1') return;
   // Cross-device check via supabase
   try{
@@ -11634,6 +11735,144 @@ async function markTourDone(){
     });
   }catch(e){ /* localStorage fallback already written */ }
 }
+
+// ── ONBOARDING CHECKLIST RENDER ──────────
+let _onboardingProgress = {};
+
+async function loadOnboardingProgress(){
+  _onboardingProgress = {};
+  // Check each task asynchronously
+  for(const task of ONBOARDING_TASKS){
+    try{
+      const result = task.check.constructor.name === 'AsyncFunction' ? await task.check() : task.check();
+      _onboardingProgress[task.id] = !!result;
+    }catch(e){ _onboardingProgress[task.id] = false; }
+  }
+}
+
+async function renderOnboardingChecklist(){
+  await loadOnboardingProgress();
+  const el = document.getElementById('onboardingChecklist');
+  if(!el) return;
+  const total = ONBOARDING_TASKS.length;
+  const done = ONBOARDING_TASKS.filter(t => _onboardingProgress[t.id]).length;
+  const pct = Math.round((done/total)*100);
+  let html = '<div style="margin-bottom:14px;">'+
+    '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;">'+
+      '<div style="font-size:13px;font-weight:700;color:#0f172a;">Setup progress</div>'+
+      '<div style="font-size:11.5px;font-weight:600;color:#64748b;font-variant-numeric:tabular-nums;">'+done+' of '+total+' · '+pct+'%</div>'+
+    '</div>'+
+    '<div style="background:#e2e8f0;height:6px;border-radius:3px;overflow:hidden;">'+
+      '<div style="background:linear-gradient(90deg,#10b981,#059669);height:100%;width:'+pct+'%;transition:width .4s ease;border-radius:3px;"></div>'+
+    '</div>'+
+  '</div>';
+  ONBOARDING_TASKS.forEach(function(task){
+    const isDone = _onboardingProgress[task.id];
+    html += '<div style="display:flex;align-items:start;gap:11px;padding:11px 12px;border-radius:10px;margin-bottom:6px;background:'+(isDone?'rgba(16,185,129,.06)':'#f8fafc')+';border:1px solid '+(isDone?'rgba(16,185,129,.18)':'#e2e8f0')+';transition:all .2s;">'+
+      '<div style="flex-shrink:0;width:22px;height:22px;border-radius:50%;background:'+(isDone?'#10b981':'#fff')+';border:2px solid '+(isDone?'#10b981':'#cbd5e1')+';display:flex;align-items:center;justify-content:center;margin-top:1px;">'+
+        (isDone ? '<svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M2 6.5L4.5 9L10 3" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>' : '')+
+      '</div>'+
+      '<div style="flex:1;min-width:0;">'+
+        '<div style="font-size:13px;font-weight:'+(isDone?'600':'700')+';color:'+(isDone?'#64748b':'#0f172a')+';margin-bottom:2px;'+(isDone?'text-decoration:line-through;':'')+'">'+task.title+'</div>'+
+        '<div style="font-size:11.5px;color:#94a3b8;line-height:1.4;margin-bottom:'+(isDone?'0':'8px')+';">'+task.body+'</div>'+
+        (isDone ? '' : '<button onclick="handleOnboardingAction(\''+task.id+'\')" style="background:#0f172a;color:#fff;border:none;border-radius:7px;padding:7px 14px;font-size:11.5px;font-weight:700;cursor:pointer;font-family:inherit;transition:background .15s;" onmouseover="this.style.background=\'#1e293b\'" onmouseout="this.style.background=\'#0f172a\'">'+task.cta+' →</button>')+
+      '</div>'+
+    '</div>';
+  });
+  if(done === total){
+    html += '<div style="text-align:center;padding:18px 12px 4px;color:#10b981;font-size:14px;font-weight:700;">All set — welcome aboard!</div>'+
+            '<div style="text-align:center;padding:0 12px 8px;color:#64748b;font-size:11.5px;">You can dismiss this card anytime.</div>'+
+            '<button onclick="dismissOnboardingCard()" style="margin:8px auto 0;display:block;background:none;border:1px solid #e2e8f0;color:#64748b;border-radius:8px;padding:7px 16px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">Dismiss card</button>';
+  }
+  el.innerHTML = html;
+}
+
+function handleOnboardingAction(taskId){
+  const task = ONBOARDING_TASKS.find(t => t.id === taskId);
+  if(!task) return;
+  closeOnboardingPanel();
+  if(task.action){
+    try{ eval(task.action); }catch(e){ console.warn('onboarding action:', e); }
+  } else if(task.page){
+    goTo(task.page);
+  }
+}
+
+function closeOnboardingPanel(){
+  const bd = document.getElementById('onboardingBack');
+  if(bd) bd.style.display = 'none';
+}
+
+function openOnboardingPanel(){
+  let bd = document.getElementById('onboardingBack');
+  if(!bd){
+    bd = document.createElement('div');
+    bd.id = 'onboardingBack';
+    bd.style.cssText = 'position:fixed;inset:0;z-index:9555;background:rgba(15,23,42,.55);backdrop-filter:blur(10px);display:flex;align-items:center;justify-content:center;padding:16px;overflow-y:auto;';
+    document.body.appendChild(bd);
+    bd.addEventListener('click', function(e){ if(e.target===bd) closeOnboardingPanel(); });
+  }
+  bd.innerHTML = '<div style="background:#fff;border-radius:16px;width:100%;max-width:480px;max-height:88vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 24px 60px rgba(15,23,42,.3);" onclick="event.stopPropagation()">'+
+    '<div style="padding:18px 22px;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:flex-start;">'+
+      '<div>'+
+        '<div style="font-size:17px;font-weight:800;color:#0f172a;letter-spacing:-.01em;">Get started with Nexus</div>'+
+        '<div style="font-size:12px;color:#64748b;margin-top:3px;">Complete these to make the most of your portal.</div>'+
+      '</div>'+
+      '<button onclick="closeOnboardingPanel()" style="background:none;border:none;font-size:22px;line-height:1;color:#94a3b8;cursor:pointer;padding:0 0 0 12px;">×</button>'+
+    '</div>'+
+    '<div id="onboardingChecklist" style="padding:18px 22px;overflow-y:auto;flex:1;"></div>'+
+  '</div>';
+  bd.style.display = 'flex';
+  renderOnboardingChecklist();
+}
+
+function dismissOnboardingCard(){
+  localStorage.setItem('nexus_onboarding_dismissed_'+me, '1');
+  localStorage.setItem('nexus_onboarding_done_'+me, '1');
+  const card = document.getElementById('homeOnboardingCard');
+  if(card) card.style.display = 'none';
+  closeOnboardingPanel();
+}
+
+async function refreshHomeOnboardingCard(){
+  if(!me) return;
+  const card = document.getElementById('homeOnboardingCard');
+  if(!card) return;
+  // ONE-TIME ONLY: if completed or dismissed before, never show again
+  if(localStorage.getItem('nexus_onboarding_done_'+me) === '1'){
+    card.style.display = 'none';
+    return;
+  }
+  if(localStorage.getItem('nexus_onboarding_dismissed_'+me) === '1'){
+    card.style.display = 'none';
+    return;
+  }
+  await loadOnboardingProgress();
+  const total = ONBOARDING_TASKS.length;
+  const done = ONBOARDING_TASKS.filter(t => _onboardingProgress[t.id]).length;
+  card.style.display = '';
+  const pct = Math.round((done/total)*100);
+  const remaining = total - done;
+  const nextTask = ONBOARDING_TASKS.find(t => !_onboardingProgress[t.id]);
+  document.getElementById('homeOnboardingCount').textContent = done === total ? 'Done!' : (remaining + ' left');
+  document.getElementById('homeOnboardingProgress').style.width = pct + '%';
+  document.getElementById('homeOnboardingNext').textContent = nextTask ? 'Next: ' + nextTask.title : 'You\'re all set — welcome aboard!';
+  // If complete — mark done permanently after a short celebration
+  if(done === total){
+    setTimeout(function(){
+      localStorage.setItem('nexus_onboarding_done_'+me, '1');
+    }, 4000);
+  }
+}
+
+// Track page visits for the "browse" tasks (per user)
+window.addEventListener('hashchange', function(){
+  if(!me) return;
+  const hash = location.hash.replace('#','');
+  if(hash === 'engagement') localStorage.setItem('nexus_visited_engagement_'+me,'1');
+  if(hash === 'reports') localStorage.setItem('nexus_visited_reports_'+me,'1');
+  if(typeof refreshHomeOnboardingCard === 'function') refreshHomeOnboardingCard();
+});
 
 // ── EXTRA BREAK REQUESTS ───────────
 function openExtraBreakRequest(){
@@ -13441,17 +13680,13 @@ async function loadWhosWorking(){
     // Wider window: last 30 hours to catch overnight shifts
     const since = new Date(Date.now() - 30*3600*1000).toISOString();
     const myToday = await sbGet('clock_log','?staff_name=eq.'+encodeURIComponent(me)+'&ts=gte.'+encodeURIComponent(since)+'&order=ts.asc&limit=20');
-    console.log('[ww] my recent entries:', myToday && myToday.length);
     let amIIn = false;
     if(myToday && myToday.length){
-      console.log('[ww] sample entry:', myToday[0]); // debug log
       const ins = myToday.filter(function(r){ return r.action === 'in' || r.type === 'in'; }).length;
       const outs = myToday.filter(function(r){ return r.action === 'out' || r.type === 'out'; }).length;
       amIIn = ins > outs;
-      console.log('[ww] amIIn?', amIIn, '(ins:', ins, 'outs:', outs, ')');
     }
     if(!amIIn){
-      console.log('[ww] hiding card — not clocked in');
       card.style.display = 'none';
       return;
     }
@@ -13462,7 +13697,6 @@ async function loadWhosWorking(){
   try{
     const since = new Date(Date.now() - 30*3600*1000).toISOString();
     const allToday = await sbGet('clock_log','?ts=gte.'+encodeURIComponent(since)+'&order=ts.asc&limit=500');
-    console.log('[ww] all recent entries across staff:', allToday && allToday.length);
     
     // Count ins vs outs per staff (column is 'action' in schema)
     const byStaff = {};
@@ -13477,7 +13711,6 @@ async function loadWhosWorking(){
       return byStaff[s].ins > byStaff[s].outs;
     });
     onlineStaff.sort();
-    console.log('[ww] online staff:', onlineStaff);
     
     _wwStaffData = onlineStaff;
     cnt.textContent = onlineStaff.length;
@@ -14264,15 +14497,10 @@ setTimeout(function(){ if(typeof NotifManager !== 'undefined') NotifManager.refr
 
 // ── NOTIFICATION DROPDOWN ──
 function handleMobileBell(e){
-  console.log('[mobile-bell] tap detected');
   if(e){ e.preventDefault(); e.stopPropagation(); }
   const drop = document.getElementById('mhNotifDrop');
   if(!drop){ console.warn('[mobile-bell] mhNotifDrop missing'); return; }
-  console.log('[mobile-bell] currently open?', drop.classList.contains('open'));
   toggleNotifDrop('mhNotifDrop');
-  console.log('[mobile-bell] after toggle open?', drop.classList.contains('open'));
-  console.log('[mobile-bell] computed display:', getComputedStyle(drop).display);
-  console.log('[mobile-bell] computed position:', getComputedStyle(drop).position);
 }
 
 function toggleNotifDrop(dropId){
@@ -14287,7 +14515,6 @@ function toggleNotifDrop(dropId){
     }
   });
   const isOpen = drop.classList.contains('open');
-  console.log('[notif] toggling', id, 'isOpen?', isOpen);
   if(isOpen){
     drop.classList.remove('open');
     drop.style.display = 'none';
@@ -14312,7 +14539,6 @@ function toggleNotifDrop(dropId){
 }
 
 async function loadNotifDrop(dropId){
-  console.log('[notif-drop] loading', dropId);
   const listId = dropId==='mhNotifDrop'?'mhNotifDropList':'notifDropList';
   let el = document.getElementById(listId);
   if(!el){
@@ -14944,12 +15170,11 @@ async function initRealtime(){
   if(window._realtimeInitialized) return;
   window._realtimeInitialized = true;
   if(!window.supabase){
-    console.log('[Realtime] supabase-js not loaded yet, fetching from CDN...');
     try{
       await new Promise(function(res,rej){
         const s=document.createElement('script');
         s.src='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js';
-        s.onload=function(){ console.log('[Realtime] supabase-js loaded'); res(); };
+        s.onload=res;
         s.onerror=function(err){ console.error('[Realtime] CDN load FAILED:', err); rej(err); };
         document.head.appendChild(s);
       });
@@ -14961,9 +15186,7 @@ async function initRealtime(){
   }
   try{
     _realtimeClient = window.supabase.createClient(SB, KEY);
-    console.log('[Realtime] client created:', !!_realtimeClient);
     setupRealtimeChannels();
-    console.log('[Realtime] channels set up, count:', _realtimeChannels.length);
   }catch(e){ console.error('[Realtime] init failed:', e); }
 }
 
@@ -14974,7 +15197,6 @@ function setupRealtimeChannels(){
   // Discussions — polls + new post notifications
   const discCh = _realtimeClient.channel('discussions-live')
     .on('postgres_changes', {event:'*', schema:'public', table:'discussions'}, function(payload){
-      console.log('[RT disc event]', payload.eventType, payload.new && payload.new.created_by, 'me:', me);
       // Fire notif for INSERT events (new post by someone else)
       if(payload.eventType==='INSERT' && payload.new && payload.new.created_by !== me){
         const d = payload.new;
@@ -15024,7 +15246,6 @@ function setupRealtimeChannels(){
   // Leave decisions for me
   const leaveCh = _realtimeClient.channel('leave-live')
     .on('postgres_changes', {event:'UPDATE', schema:'public', table:'leave_submissions'}, function(payload){
-      console.log('[RT leave event]', payload.eventType, payload.new && payload.new.staff_name, payload.new && payload.new.status);
       if(payload.new && payload.new.staff_name === me){
         const l = payload.new;
         // Only fire if status moved to approved/declined
@@ -15051,7 +15272,6 @@ function setupRealtimeChannels(){
   // Reactions + notify when someone reacts to my content
   const reactCh = _realtimeClient.channel('reactions-live')
     .on('postgres_changes', {event:'*', schema:'public', table:'reactions'}, async function(payload){
-      console.log('[RT react event]', payload.eventType, payload.new);
       const id = (payload.new && payload.new.target_id) || (payload.old && payload.old.target_id);
       const type = (payload.new && payload.new.target_type) || (payload.old && payload.old.target_type);
       if(id && type) loadReactCounts(id, type);
