@@ -6081,6 +6081,15 @@ async function postDiscussion(){
     if(_bodyTa && typeof rtClearAttachments==='function') rtClearAttachments(_bodyTa.id);
     ok.textContent='Posted!';ok.classList.add('show');
     setTimeout(function(){ok.classList.remove('show');},2000);
+    // PUSH: broadcast to all subscribers (skip self)
+    try{
+      sendPushTo(null, 'New discussion from '+me, title.slice(0,120), {
+        url: './#engagement',
+        tag: 'disc-'+Date.now(),
+        broadcast: true,
+        exclude: me
+      });
+    }catch(e){ console.warn('push fail:', e); }
     await loadDiscussions();
   }catch(e){
     console.warn(e);
@@ -6116,6 +6125,13 @@ async function submitDiscReply(discId){
           headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates'},
           body:JSON.stringify({disc_id:discId,recipient:discRows[0].created_by,replier:me,body:body.slice(0,100),created_at:new Date().toISOString()})
         });
+        // PUSH to discussion owner
+        try{
+          sendPushTo(discRows[0].created_by, me+' replied to your post', body.slice(0,140), {
+            url: './#engagement',
+            tag: 'reply-'+discId
+          });
+        }catch(e){ console.warn('push fail:', e); }
       }
       // Mention notifications
       const mentions = (typeof rtExtractMentions==='function') ? rtExtractMentions(body) : [];
@@ -6127,6 +6143,8 @@ async function submitDiscReply(discId){
             headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates'},
             body:JSON.stringify({disc_id:discId,recipient:mname,replier:me,body:'mentioned you: '+body.slice(0,80),created_at:new Date().toISOString()})
           });
+          // PUSH to mentioned user
+          try{ sendPushTo(mname, me+' mentioned you', body.slice(0,140), {url:'./#engagement', tag:'mention-'+discId}); }catch(e){}
         }
       }
     }catch(e){console.warn('reply notif failed:',e);}
@@ -6963,6 +6981,15 @@ function reactToReply(id,emoji){
       method:'POST',
       headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates'},
       body:JSON.stringify({target_id:id,target_type:'reply',staff_name:me,emoji:emoji})
+    }).then(function(){
+      try{
+        sbGet('discussion_replies','?id=eq.'+id+'&select=staff_name,replied_by,replier').then(function(rows){
+          const author = rows && rows[0] ? (rows[0].staff_name || rows[0].replied_by || rows[0].replier) : null;
+          if(author && author !== me){
+            sendPushTo(author, me+' reacted '+emoji, 'On your reply', {url:'./#engagement', tag:'react-'+id});
+          }
+        });
+      }catch(e){}
     }).catch(function(){});
   }
 }
@@ -6984,6 +7011,15 @@ function reactToDiscussion(id,emoji){
       method:'POST',
       headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates'},
       body:JSON.stringify({target_id:id,target_type:'disc',staff_name:me,emoji:emoji})
+    }).then(function(){
+      // PUSH to discussion author
+      try{
+        sbGet('discussions','?id=eq.'+id+'&select=created_by').then(function(rows){
+          if(rows && rows[0] && rows[0].created_by !== me){
+            sendPushTo(rows[0].created_by, me+' reacted '+emoji, 'On your post', {url:'./#engagement', tag:'react-'+id});
+          }
+        });
+      }catch(e){}
     }).catch(function(){});
   }
 }
@@ -14644,7 +14680,8 @@ async function sendPushTo(staffName, title, body, options){
         body: body,
         url: options.url || './',
         tag: options.tag || ('nexus-'+Date.now()),
-        broadcast: !!options.broadcast
+        broadcast: !!options.broadcast,
+        exclude: options.exclude || null
       })
     });
     if(!resp.ok){
