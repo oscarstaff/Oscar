@@ -77,7 +77,11 @@ self.addEventListener('push', function(event) {
 // CLICK HANDLER — open the portal when notification is tapped
 self.addEventListener('notificationclick', function(event) {
   event.notification.close();
-  const targetUrl = (event.notification.data && event.notification.data.url) || './';
+  let targetUrl = (event.notification.data && event.notification.data.url) || './';
+  // Handle action buttons
+  if(event.action === 'clockin'){
+    targetUrl = './#home';
+  }
   
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(clientList) {

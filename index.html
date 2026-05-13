@@ -11124,17 +11124,67 @@ function startBackgroundLocation(){
   if(!me) return; // don't start until user is logged in
   _bgWatchId = navigator.geolocation.watchPosition(
     function(pos){
+      const wasInside = _bgPosition && checkInsideGeofence(_bgPosition.coords);
       // Only accept high-accuracy readings (under 50m accuracy circle)
       if(pos.coords.accuracy <= 50){
         _bgPosition = { coords: pos.coords, ts: Date.now() };
       } else if(!_bgPosition || (Date.now() - _bgPosition.ts) > 60000){
-        // Fall back to less accurate if no good one in 60s
         _bgPosition = { coords: pos.coords, ts: Date.now() };
+      }
+      // ENTRY DETECTION: was outside, now inside → fire "Clock in now" notif
+      const nowInside = checkInsideGeofence(_bgPosition.coords);
+      if(!wasInside && nowInside && _clockState !== 'in'){
+        maybeShowClockInPrompt();
       }
     },
     function(err){ console.warn('[gps bg]', err.message); },
     { enableHighAccuracy:true, timeout:20000, maximumAge:30000 }
   );
+}
+
+function checkInsideGeofence(coords){
+  if(!coords) return false;
+  const dist = distanceMeters(coords.latitude, coords.longitude, OFFICE_LAT, OFFICE_LNG);
+  const acc = coords.accuracy || 0;
+  return Math.max(0, dist - acc) <= getGeofenceRadius();
+}
+
+function maybeShowClockInPrompt(){
+  // Don't show if already clocked in
+  if(_clockState === 'in') return;
+  // Throttle — once per 30 minutes max
+  const lastKey = 'gf_clockin_prompt_'+me;
+  const last = parseInt(sessionStorage.getItem(lastKey)||'0', 10);
+  if(Date.now() - last < 30*60*1000) return;
+  sessionStorage.setItem(lastKey, String(Date.now()));
+  // Show local notification via SW (only if permission granted)
+  if('Notification' in window && Notification.permission === 'granted'){
+    navigator.serviceWorker.getRegistration().then(function(reg){
+      if(reg){
+        reg.showNotification('You\'re at the office', {
+          body: 'Tap to clock in now',
+          icon: './icon-192.png',
+          badge: './icon-192.png',
+          tag: 'clockin-prompt',
+          data: { url: './#home' },
+          vibrate: [200, 100, 200],
+          actions: [
+            { action: 'clockin', title: 'Clock in' }
+          ]
+        });
+      }
+    });
+  }
+  // Also show in-app toast if portal is open
+  if(typeof showToast === 'function'){
+    showToast('You\'re inside the office. Tap Clock In to start your shift.', 'info');
+  }
+  // Pulse the clock button to draw attention
+  const btn = document.getElementById('clockBtn');
+  if(btn){
+    btn.style.animation = 'pulse 2s ease-in-out 3';
+    setTimeout(function(){ if(btn) btn.style.animation = ''; }, 6500);
+  }
 }
 
 function stopBackgroundLocation(){
@@ -15938,6 +15988,11 @@ window.addEventListener('resize', function(){
 <style>
 .tour-dot{width:7px;height:7px;border-radius:50%;background:#e2e8f0;transition:background .25s,width .25s;}
 .tour-dot.active{background:var(--accent);width:22px;border-radius:5px;}
+
+@keyframes pulse {
+  0%,100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(16,185,129,.6); }
+  50% { transform: scale(1.06); box-shadow: 0 0 0 14px rgba(16,185,129,0); }
+}
 </style>
 </body>
 </html>
