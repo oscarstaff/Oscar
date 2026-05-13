@@ -10985,13 +10985,29 @@ async function checkGpsPermission(){
   }
 }
 
+async function retryGpsCheck(){
+  // Force a fresh GPS prompt by calling getCurrentPosition
+  navigator.geolocation.getCurrentPosition(
+    function(){ applyGpsLock(); }, // success — re-check permission
+    function(){ applyGpsLock(); }, // error — re-check too (permission may have changed)
+    { timeout:5000, maximumAge:0 }
+  );
+}
+
+// Re-check GPS permission when page becomes visible again (user may have changed settings)
+document.addEventListener('visibilitychange', function(){
+  if(!document.hidden && typeof applyGpsLock === 'function'){
+    applyGpsLock();
+  }
+});
+
 async function applyGpsLock(){
   const btn = document.getElementById('clockBtn');
   if(!btn) return;
-  // Clear any old bypass setting
   localStorage.removeItem('oscars_gps_bypass');
   const state = await checkGpsPermission();
-  if(state === 'denied'){
+  // If user is currently clocked in, clock-out should ALWAYS work — never disable
+  if(state === 'denied' && _clockState !== 'in'){
     btn.disabled = true;
     btn.style.opacity = '.45';
     btn.style.cursor = 'not-allowed';
@@ -11003,7 +11019,8 @@ async function applyGpsLock(){
       banner.id = 'gpsBanner';
       banner.style.cssText = 'background:#fef3c7;color:#92400e;border:1px solid #fde68a;border-radius:8px;padding:8px 12px;margin-top:10px;font-size:12px;font-weight:600;display:flex;align-items:center;gap:8px;';
       banner.innerHTML = '<svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>'+
-        '<span>Location permission denied. <a href="#" onclick="alert(\'Open browser settings → Site settings → Allow location for this site, then reload\');return false;" style="color:#92400e;text-decoration:underline;">How to fix</a></span>';
+        '<span style="flex:1;">Location permission denied.</span>'+
+        '<button onclick="retryGpsCheck()" style="background:#92400e;color:#fff;border:none;border-radius:5px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;">Try again</button>';
       const card = document.getElementById('clockCard');
       if(card) card.appendChild(banner);
     }
@@ -11279,30 +11296,43 @@ async function toggleClock(){
   btn.textContent = _bgPosition ? 'Verifying...' : 'Locating GPS...';
 
   let lat = null, lng = null;
-  // GPS check always required — no bypass
-  try{
-    const pos = await getCurrentPosition();
-    lat = pos.coords.latitude;
-    lng = pos.coords.longitude;
-    const dist = distanceMeters(lat, lng, OFFICE_LAT, OFFICE_LNG);
-    const acc = pos.coords.accuracy;
-    console.log('[gps] final position:', lat, lng, 'accuracy:', acc+'m', 'distance from office:', Math.round(dist)+'m');
-    // Subtract GPS accuracy buffer — if your reading is "20m off but ±50m accurate" you might actually be inside
-    const effectiveDist = Math.max(0, dist - acc);
-    if(effectiveDist > getGeofenceRadius()){
-      const distFmt = dist > 1000 ? (dist/1000).toFixed(1)+'km' : Math.round(dist)+'m';
-      const accFmt = Math.round(acc)+'m';
-      showToast('Too far ('+distFmt+', ±'+accFmt+' accuracy). Move closer or wait for better GPS.', 'warning');
+  // Clock-OUT: no geofence — staff can clock out from anywhere
+  if(next === 'out'){
+    // Try to get GPS for logging purposes only, but don't fail if unavailable
+    try{
+      const pos = await Promise.race([
+        getCurrentPosition(),
+        new Promise(function(_, rej){ setTimeout(function(){ rej(new Error('timeout')); }, 3000); })
+      ]);
+      lat = pos.coords.latitude;
+      lng = pos.coords.longitude;
+    }catch(e){
+      // Silent — clock-out proceeds without GPS
+    }
+  } else {
+    // Clock-IN: enforce geofence
+    try{
+      const pos = await getCurrentPosition();
+      lat = pos.coords.latitude;
+      lng = pos.coords.longitude;
+      const dist = distanceMeters(lat, lng, OFFICE_LAT, OFFICE_LNG);
+      const acc = pos.coords.accuracy;
+      const effectiveDist = Math.max(0, dist - acc);
+      if(effectiveDist > getGeofenceRadius()){
+        const distFmt = dist > 1000 ? (dist/1000).toFixed(1)+'km' : Math.round(dist)+'m';
+        const accFmt = Math.round(acc)+'m';
+        showToast('Too far ('+distFmt+', ±'+accFmt+' accuracy). Move closer or wait for better GPS.', 'warning');
+        btn.disabled = false;
+        btn.textContent = prevText;
+        return;
+      }
+    }catch(e){
+      console.warn('GPS error:', e);
+      showToast('Location required: enable GPS in browser settings');
       btn.disabled = false;
       btn.textContent = prevText;
       return;
     }
-  }catch(e){
-    console.warn('GPS error:', e);
-    showToast('Location required: enable GPS in browser settings');
-    btn.disabled = false;
-    btn.textContent = prevText;
-    return;
   }
 
   btn.textContent = '...';
