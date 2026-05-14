@@ -1483,8 +1483,10 @@ button[onclick*="toggleNotifDrop"]:hover{
 
 .notif-drop-wrap{position:relative;}
 .notif-drop{
-  position:absolute;left:0;top:calc(100% + 8px);
-  width:340px;max-height:440px;overflow-y:auto;
+  position:fixed;
+  top:60px;
+  left:230px;  /* Just to the right of the sidebar */
+  width:340px;max-width:calc(100vw - 240px);max-height:440px;overflow-y:auto;
   background:#fff;border:1px solid #e5e7eb;
   border-radius:14px;
   box-shadow:0 12px 32px rgba(15,23,42,.12),0 4px 12px rgba(15,23,42,.06);
@@ -1492,6 +1494,11 @@ button[onclick*="toggleNotifDrop"]:hover{
   display:none;
   scrollbar-width:thin;
   scrollbar-color:#cbd5e1 transparent;
+}
+/* When sidebar is collapsed (mini icon mode), drop sits closer */
+html[data-sb="collapsed"] .notif-drop{
+  left:80px;
+  max-width:calc(100vw - 90px);
 }
 .notif-drop::-webkit-scrollbar{ width:6px; }
 .notif-drop::-webkit-scrollbar-thumb{ background:#cbd5e1; border-radius:3px; }
@@ -1521,7 +1528,15 @@ button[onclick*="toggleNotifDrop"]:hover{
     right:8px !important;
     left:8px !important;
     width:auto !important;
-    max-width:none !important;
+    max-
+  /* On mobile, notif-drop reverts to centered overlay (bell unused) */
+  .notif-drop{
+    position:fixed;
+    top:60px;
+    left:8px;right:8px;
+    width:auto;max-width:none;
+  }
+width:none !important;
     top:62px !important;
     max-height:75vh !important;
     z-index:9999 !important;
@@ -1540,7 +1555,7 @@ button[onclick*="toggleNotifDrop"]:hover{
     top:56px !important;
   }
 }
-[data-theme="dark"] .notif-drop{background:#1e293b;border-color:#2d3f55;}
+[data-theme="dark"] .notif-drop{background:#1e293b;border-color:#2d3f55;right:0;left:auto;}
 [data-theme="dark"] .notif-drop-item{color:#e2e8f0 !important;}
 [data-theme="dark"] .notif-drop-item div{color:#e2e8f0 !important;}
 [data-theme="dark"] .notif-drop-empty{color:#94a3b8 !important;}
@@ -4859,6 +4874,22 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
         <div class="page-sub" id="docsSub">Resources shared with your team</div>
       </div>
 
+      <!-- TRAINING QUIZ STRIP -->
+      <div id="quizStrip" style="display:none;margin-bottom:14px;background:#fff;border:1.5px solid #e2e8f0;border-radius:12px;padding:14px 18px;align-items:center;gap:14px;cursor:pointer;transition:border-color .15s,background .15s;" onclick="openTrainingQuiz()" onmouseover="this.style.borderColor='#3b82f6';this.style.background='#f8faff'" onmouseout="this.style.borderColor='#e2e8f0';this.style.background='#fff'">
+        <div id="quizStripIcon" style="width:42px;height:42px;border-radius:10px;background:#eff6ff;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="15" x2="15" y2="15"/><line x1="9" y1="11" x2="15" y2="11"/></svg>
+        </div>
+        <div style="flex:1;min-width:0;">
+          <div id="quizStripTitle" style="font-size:14px;font-weight:700;color:#0f172a;margin-bottom:2px;">Standard Knowledge Quiz — Oscars</div>
+          <div id="quizStripSub" style="font-size:12px;color:#64748b;">Complete once to verify your understanding of the training material</div>
+        </div>
+        <div id="quizStripStatus" style="font-size:12px;font-weight:700;padding:5px 12px;border-radius:14px;background:#3b82f6;color:#fff;flex-shrink:0;">Start →</div>
+        <button id="quizEditBtn" onclick="event.stopPropagation();openQuizEditor()" style="display:none;background:#0f172a;color:#fff;border:none;border-radius:8px;padding:5px 10px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;flex-shrink:0;margin-left:6px;">Edit quiz</button>
+      </div>
+
+      <!-- ADMIN: Non-compliant staff alert -->
+      <div id="quizAdminPanel" style="display:none;margin-bottom:14px;"></div>
+
       <!-- Search -->
       <div style="position:relative;margin-bottom:14px;">
         <svg style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#94a3b8;" width="16" height="16" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd"/></svg>
@@ -4894,6 +4925,13 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
           <div style="background:#e2e8f0;border-radius:4px;height:6px;overflow:hidden;">
             <div id="docProgressBar" style="height:100%;background:var(--accent);border-radius:4px;width:0%;transition:width .2s;"></div>
           </div>
+        </div>
+        <div class="field" style="margin-bottom:14px;">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:#475569;font-weight:600;">
+            <input type="checkbox" id="docAttachQuiz" style="width:16px;height:16px;cursor:pointer;accent-color:var(--accent);">
+            <span>Attach a compliance quiz to this document</span>
+          </label>
+          <div style="font-size:11px;color:#94a3b8;margin-top:4px;padding-left:24px;">After upload, you'll be prompted to build the quiz questions.</div>
         </div>
         <button class="btn btn-green" onclick="uploadDocument()" id="docUploadBtn" style="padding:10px 22px;">Upload Document</button>
       </div>
@@ -4971,7 +5009,7 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
           <div class="page-title">Digital Diary</div>
           <div class="page-sub">Private entries — only you can see these</div>
         </div>
-        <button onclick="openDiaryEntry()" class="btn btn-green" style="padding:9px 18px;font-size:13px;">+ New entry</button>
+        <button onclick="startNewDiaryPage()" class="btn btn-green" style="padding:9px 18px;font-size:13px;">+ New page</button>
       </div>
       <div id="diaryList" style="display:flex;flex-direction:column;gap:14px;">
         <div style="text-align:center;padding:40px 16px;color:#94a3b8;font-size:13px;">Loading...</div>
@@ -5297,27 +5335,37 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
   <!-- BOTTOM NAV (mobile) -->
   <nav class="bottom-nav">
     <div class="bn-items" id="bottomNavGrid">
+      <!-- HOME -->
       <div class="bn-item active" id="bn-home" data-tab="home" onclick="if(navigator.vibrate)navigator.vibrate(8);goTo('home')" aria-label="Home">
         <svg class="bn-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h4v-4h2v4h4a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z"/></svg>
       </div>
+      <!-- ROSTER — people icon (matches sidebar) -->
       <div class="bn-item" id="bn-schedule" data-tab="schedule" onclick="if(navigator.vibrate)navigator.vibrate(8);goTo('schedule')" aria-label="Roster">
-        <svg class="bn-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd"/></svg>
+        <svg class="bn-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"/></svg>
       </div>
+      <!-- DATES & REMINDERS — calendar icon -->
+      <div class="bn-item" id="bn-dates" data-tab="tasks" onclick="if(navigator.vibrate)navigator.vibrate(8);goTo('tasks')" aria-label="Dates & Reminders">
+        <svg class="bn-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd"/></svg>
+        <div class="bn-badge" id="bnTaskBadge"></div>
+      </div>
+      <!-- DISCUSSIONS — speech icon (matches sidebar) -->
       <div class="bn-item" id="bn-engagement" data-tab="engagement" onclick="if(navigator.vibrate)navigator.vibrate(8);goTo('engagement')" aria-label="Discussions">
         <svg class="bn-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 3a1 1 0 00-1.447-.894L8.763 6H5a3 3 0 000 6h.28l1.771 5.316A1 1 0 008 18h1a1 1 0 001-1v-4.382l6.553 3.276A1 1 0 0018 15V3z" clip-rule="evenodd"/></svg>
         <div class="bn-badge" id="bnAnnBadge"></div>
       </div>
+      <!-- NOTIFICATIONS — bell icon (kept) -->
       <div class="bn-item" id="bn-notifs" data-tab="notifs" onclick="if(navigator.vibrate)navigator.vibrate(8);goTo('notifs')" aria-label="Notifications">
         <svg class="bn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 17H20L18.5951 15.5951C18.2141 15.2141 18 14.6973 18 14.1585V11C18 8.38757 16.3304 6.16509 14 5.34142V5C14 3.89543 13.1046 3 12 3C10.8954 3 10 3.89543 10 5V5.34142C7.66962 6.16509 6 8.38757 6 11V14.1585C6 14.6973 5.78595 15.2141 5.40493 15.5951L4 17H9M15 17V18C15 19.6569 13.6569 21 12 21C10.3431 21 9 19.6569 9 18V17M15 17H9"/></svg>
         <div class="bn-badge" id="bnNotifBadge"></div>
       </div>
+      <!-- MY REPORTS — eye icon (matches sidebar) -->
       <div class="bn-item" id="bn-myreports" data-tab="myreports" onclick="if(navigator.vibrate)navigator.vibrate(8);goTo('myreports')" aria-label="My Reports">
-        <svg class="bn-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"/></svg>
+        <svg class="bn-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 12a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd"/><path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd"/></svg>
       </div>
+      <!-- PROFILE — person icon (matches sidebar) -->
       <div class="bn-item" id="bn-profile" data-tab="profile" onclick="if(navigator.vibrate)navigator.vibrate(8);goTo('profile')" aria-label="Profile">
         <svg class="bn-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"/></svg>
       </div>
-      <!-- bn-admin removed (was causing flex spacing issue) -->
     </div>
   </nav>
 
@@ -5390,12 +5438,20 @@ function showSchedTab(tab){
 // ── DOCUMENTS ──
 let myTeam = '';
 let docsData = [];
+let _lastUploadedDocId = null;
+let _quizBuilder = null;
 
 
 
 
 let docSelectedFileP=null;
 async function loadDocuments(){
+  // Pre-fetch custom quizzes so renderDocs can show "Take quiz" buttons
+  try{
+    window._docQuizzes = await sbGet('custom_quizzes', '?order=created_at.desc');
+    window._myCustomQuizResults = await sbGet('custom_quiz_results', '?staff_name=eq.'+encodeURIComponent(me));
+  }catch(e){ window._docQuizzes = []; window._myCustomQuizResults = []; }
+
   const el = document.getElementById('docsList');
   const adminArea = document.getElementById('docsAdminUpload');
   const sub = document.getElementById('docsSub');
@@ -5451,6 +5507,26 @@ function renderDocs(docs){
     else if(['png','jpg','jpeg','gif','webp'].includes(ext)){iconClass='doc-icon-img';iconSvg=linkSvg;}
     const teamTags=(d.teams&&d.teams.length)?d.teams.map(function(t){return'<span class="doc-team-tag">'+t+'</span>';}).join(''):'';
     const deleteBtn=myIsAdmin?'<button class="doc-delete" data-id="'+d.id+'" onclick="event.preventDefault();deleteDocument(this.dataset.id)">Delete</button>':'';
+    // Find attached quiz (if any)
+    const quizzes = (window._docQuizzes||[]).filter(function(q){return q.document_id===d.id;});
+    let quizBtn = '';
+    if(quizzes.length){
+      const quiz = quizzes[0];
+      const myResult = (window._myCustomQuizResults||[]).find(function(r){return r.quiz_id===quiz.id;});
+      if(myResult){
+        if(myResult.passed){
+          quizBtn = '<button onclick="event.preventDefault();event.stopPropagation();" style="background:#d1fae5;color:#065f46;border:none;border-radius:6px;padding:4px 10px;font-size:10px;font-weight:700;font-family:inherit;cursor:default;margin-right:6px;">Quiz passed ✓</button>';
+        } else {
+          quizBtn = '<button onclick="event.preventDefault();event.stopPropagation();" style="background:#fee2e2;color:#991b1b;border:none;border-radius:6px;padding:4px 10px;font-size:10px;font-weight:700;font-family:inherit;cursor:default;margin-right:6px;">Quiz failed</button>';
+        }
+      } else {
+        quizBtn = '<button onclick="event.preventDefault();event.stopPropagation();takeCustomQuiz(\''+quiz.id+'\')" style="background:#3b82f6;color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;margin-right:6px;">Take quiz</button>';
+      }
+      if(myIsAdmin){
+        const results = '<button onclick="event.preventDefault();event.stopPropagation();viewCustomQuizResults(\''+quiz.id+'\',\''+quiz.title.replace(/'/g,"\\'")+'\')" style="background:#0f172a;color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:10px;font-weight:700;font-family:inherit;cursor:pointer;margin-right:6px;">Quiz results</button>';
+        quizBtn = results + quizBtn;
+      }
+    }
     const isStorageFile=url.includes('/storage/v1/object/public/');
     const linkAttr=isStorageFile?'href="'+url+'" download':'href="'+url+'" target="_blank" rel="noopener"';
     return'<a '+linkAttr+' class="doc-item">'+
@@ -5461,7 +5537,7 @@ function renderDocs(docs){
           (isNew?'<span class="doc-badge-new">New</span>':'')+
         '</div>'+
         (teamTags?'<div style="margin-top:4px;display:flex;flex-wrap:wrap;gap:3px;max-height:24px;overflow:hidden;">'+teamTags+'</div>':'')+
-      '</div>'+deleteBtn+'</a>';
+      '</div>'+quizBtn+deleteBtn+'</a>';
   }).join('')+'</div>';
 }
 
@@ -5574,12 +5650,22 @@ async function uploadDocument(){
     // Save metadata to documents table
     const res=await fetch(SB+'/rest/v1/documents',{
       method:'POST',
-      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=representation'},
       body:JSON.stringify({title,category:'General',url:fileUrl,teams,uploaded_by:me,is_new:true})
     });
     if(progressBar)progressBar.style.width='100%';
     if(res.ok||res.status===201){
+      try{
+        const created = await res.json();
+        if(created && created[0]) _lastUploadedDocId = created[0].id;
+      }catch(e){}
       ok.textContent='Document uploaded successfully!';ok.classList.add('show');
+      // Check if admin wants to attach a quiz
+      const attachQuizCb = document.getElementById('docAttachQuiz');
+      if(attachQuizCb && attachQuizCb.checked && _lastUploadedDocId){
+        openQuizBuilder(_lastUploadedDocId, document.getElementById('docTitle').value);
+        attachQuizCb.checked = false;
+      }
       document.getElementById('docTitle').value='';
       document.getElementById('docFile').value='';
       document.getElementById('docDropLabel').textContent='Click to choose a file or drag it here';
@@ -6357,7 +6443,7 @@ async function enterHub(){
   setTimeout(rtUpgradeAll, 200);
   setTimeout(startActivityPolling, 4000);
   // setInterval(loadSharedTasksFromOthers, 60000); // disabled — feature not in use
-  loadTasks();updateTaskBadge();scheduleTaskReminders();
+  await loadTasks();updateTaskBadge();scheduleTaskReminders();
   startAutoRefresh();
   initRealtime();
   loadBirthdays();
@@ -6444,8 +6530,8 @@ function goTo(p){
 
   if(p==="announcements"){loadAnnouncements();}
   if(p==="engagement"){showEngagementTab('discussions');}
-  if(p==="documents"){loadDocuments();}
-  if(p==="tasks"){ loadTasks(); renderTasks(); updateTaskBadge(); maybeShowNotifyBanner(); }
+  if(p==="documents"){loadDocuments();refreshQuizStrip();}
+  if(p==="tasks"){ loadTasks().then(function(){ renderTasks(); updateTaskBadge(); maybeShowNotifyBanner(); }); }
   if(p==="announcements" || p==="engagement"){ setTimeout(rtUpgradeAll, 50); }
   if(p==="myreports"){ initReportsPage(); }
   if(p==="diary"){ loadDiary(); }
@@ -8950,11 +9036,19 @@ async function openStaffDirectory(){
   document.getElementById('staffDirList').innerHTML='<div style="text-align:center;color:#94a3b8;padding:32px;font-size:13px;">Loading...</div>';
   try{
     // Fetch staff list from staff_names, then credentials for team/pronouns, then settings for admin
-    const [names, creds, settings] = await Promise.all([
+    const [names, creds, settings, quizAccess, quizResults] = await Promise.all([
       sbGet('staff_names','?order=name.asc'),
       sbGet('staff_credentials','?select=staff_name,team,pronouns'),
-      sbGet('staff_settings','?select=name,is_hub_admin')
+      sbGet('staff_settings','?select=name,is_hub_admin'),
+      myIsAdmin ? sbGet('quiz_access','?quiz_id=eq.checklist_v1') : Promise.resolve([]),
+      myIsAdmin ? sbGet('training_quiz_results','?quiz_id=eq.checklist_v1&order=created_at.desc') : Promise.resolve([])
     ]);
+    // Build maps for quiz access + latest result per staff
+    const quizAccessSet = new Set((quizAccess||[]).map(function(q){return q.staff_name;}));
+    const quizResultMap = {};
+    (quizResults||[]).forEach(function(r){ if(!quizResultMap[r.staff_name]) quizResultMap[r.staff_name] = r; });
+    window._sdQuizAccess = quizAccessSet;
+    window._sdQuizResults = quizResultMap;
     const credMap={};
     (creds||[]).forEach(function(c){ credMap[c.staff_name]=c; });
     const settMap={};
@@ -9004,10 +9098,26 @@ function renderStaffDirectory(list){
         const ava=p.staff_name.split(' ').map(function(w){return w[0];}).join('').slice(0,2).toUpperCase();
         const pron=p.pronouns?' <span style="font-size:10px;color:#94a3b8;font-weight:400;">('+p.pronouns+')</span>':'';
         const badge=p.is_admin?' <span style="font-size:9px;background:#fef3c7;color:#92400e;padding:1px 6px;border-radius:10px;font-weight:700;">ADMIN</span>':'';
+        // Quiz access UI (admin only)
+        let quizBlock = '';
+        if(myIsAdmin){
+          const hasAccess = (window._sdQuizAccess && window._sdQuizAccess.has(p.staff_name));
+          const result = (window._sdQuizResults && window._sdQuizResults[p.staff_name]);
+          let statusBadge = '';
+          if(result){
+            const badgeStyle = result.passed
+              ? 'font-size:9px;font-weight:700;color:#059669;background:#d1fae5;padding:2px 6px;border-radius:8px;margin-left:4px;cursor:pointer;border:none;font-family:inherit;'
+              : 'font-size:9px;font-weight:700;color:#991b1b;background:#fee2e2;padding:2px 6px;border-radius:8px;margin-left:4px;cursor:pointer;border:none;font-family:inherit;';
+            statusBadge = '<button onclick="event.stopPropagation();viewQuizAttemptDetail(\''+p.staff_name.replace(/'/g,"\\'")+'\','+result.id+')" title="Review this attempt" style="'+badgeStyle+'">'+(result.passed?'✓ ':'✕ ')+result.score+'/'+result.total+'</button>';
+          }
+          const toggleBtn = '<button onclick="event.stopPropagation();toggleQuizAccess(\''+p.staff_name.replace(/'/g,"\\'")+'\',\'checklist_v1\','+(!hasAccess)+');setTimeout(openStaffDirectory,400);" title="'+(hasAccess?'Revoke quiz access':'Grant quiz access')+'" style="background:'+(hasAccess?'#dc2626':'#10b981')+';color:#fff;border:none;border-radius:6px;padding:3px 8px;font-size:10px;font-weight:700;cursor:pointer;font-family:inherit;flex-shrink:0;">'+(hasAccess?'Revoke quiz':'Give quiz')+'</button>';
+          quizBlock = '<div style="display:flex;align-items:center;gap:4px;flex-shrink:0;">'+statusBadge+toggleBtn+'</div>';
+        }
         return '<div onclick="viewStaffProfile(\''+p.staff_name.replace(/'/g,"&#39;")+'\')" style="display:flex;align-items:center;gap:10px;padding:8px 8px;border-radius:8px;cursor:pointer;transition:background .1s;" onmouseover="this.style.background=\'#f8fafc\'" onmouseout="this.style.background=\'\'" >'+
           '<div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--accent),#7c3aed);display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700;flex-shrink:0;">'+ava+'</div>'+
           '<div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:600;color:#0f172a;">'+p.staff_name+pron+badge+'</div></div>'+
-          '<svg width="14" height="14" viewBox="0 0 20 20" fill="#cbd5e1"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>'+
+          quizBlock+
+          (myIsAdmin?'':'<svg width="14" height="14" viewBox="0 0 20 20" fill="#cbd5e1"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>')+
           '</div>';
       }).join('');
   }).join('');
@@ -9328,13 +9438,75 @@ let _taskReminderTimer = null;
 function taskKey(){ return 'oscar_tasks_' + me; }
 function taskSeenKey(){ return 'oscar_task_seen_' + me; }
 
-function loadTasks(){
+async function loadTasks(){
+  // Try supabase first, fall back to localStorage
+  if(!me){ _tasks = []; return; }
+  try{
+    const rows = await sbGet('staff_tasks', '?staff_name=eq.'+encodeURIComponent(me)+'&order=created_at.asc');
+    if(rows){
+      _tasks = rows.map(function(r){
+        return {
+          id: r.id,
+          title: r.title,
+          dueDate: r.due_date,
+          dueTime: r.due_time,
+          priority: r.priority,
+          remindBefore: r.remind_before,
+          notes: r.notes,
+          done: r.done,
+          createdAt: r.created_at
+        };
+      });
+      // Cache to localStorage for offline + instant render
+      try{ localStorage.setItem(taskKey(), JSON.stringify(_tasks)); }catch(e){}
+      return;
+    }
+  }catch(e){ console.warn('loadTasks supabase:', e); }
+  // Fallback: localStorage
   try{ _tasks = JSON.parse(localStorage.getItem(taskKey()) || '[]'); }
   catch(e){ _tasks = []; }
 }
-function saveTasks(){
+
+async function saveTasks(){
+  // Cache to localStorage instantly
   try{ localStorage.setItem(taskKey(), JSON.stringify(_tasks)); }catch(e){}
   updateTaskBadge();
+  // Don't await — fire and forget to supabase
+  if(!me) return;
+  // We don't need to push the whole array; saveTask/deleteTask handle individual rows
+}
+
+// Push a single task to supabase
+async function pushTaskToSupabase(t){
+  if(!me) return;
+  const payload = {
+    id: t.id,
+    staff_name: me,
+    title: t.title,
+    due_date: t.dueDate || null,
+    due_time: t.dueTime || null,
+    priority: t.priority || 'med',
+    remind_before: (t.remindBefore == null ? null : t.remindBefore),
+    notes: t.notes || '',
+    done: !!t.done,
+    created_at: t.createdAt || new Date().toISOString()
+  };
+  try{
+    await fetch(SB+'/rest/v1/staff_tasks',{
+      method:'POST',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},
+      body: JSON.stringify(payload)
+    });
+  }catch(e){ console.warn('pushTask:', e); }
+}
+
+async function deleteTaskFromSupabase(taskId){
+  try{
+    await fetch(SB+'/rest/v1/staff_tasks?id=eq.'+encodeURIComponent(taskId),{
+      method:'DELETE',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}
+    });
+  }catch(e){}
 }
 
 // Esc closes the form
@@ -9480,7 +9652,7 @@ function closeTaskForm(){
   if(backdrop) backdrop.classList.remove('open');
 }
 
-function saveTask(){
+async function saveTask(){
   let title = document.getElementById('taskTitle').value.trim();
   if(!title){ showToast('Title required'); return; }
   // Strip NL keywords from title
@@ -9806,6 +9978,22 @@ function checkTaskReminders(){
       const remLbl = (t.remindBefore===0?'Due now':(t.remindBefore<60?t.remindBefore+' min before due':(t.remindBefore<1440?(t.remindBefore/60)+'h before due':(t.remindBefore/1440)+'d before due')));
       const dueStr = t.dueTime ? ' at '+t.dueTime : '';
       showSystemNotification(t.title, remLbl + dueStr + (t.notes?' — '+t.notes.slice(0,60):''), t.id, 'tasks');
+      // WEB PUSH — respect 7pm cutoff + no-Sunday rule
+      try{
+        const sydneyNow = new Date();
+        const sydHour = parseInt(sydneyNow.toLocaleString('en-AU',{timeZone:'Australia/Sydney',hour:'2-digit',hour12:false}), 10);
+        const sydDay = sydneyNow.toLocaleDateString('en-AU',{timeZone:'Australia/Sydney',weekday:'short'}); // 'Sun', 'Mon', ...
+        const quietHours = (sydHour >= 19); // 7pm or later
+        const isSunday = (sydDay === 'Sun');
+        if(!quietHours && !isSunday && typeof sendPushTo === 'function'){
+          sendPushTo(me, 'Task: '+t.title, remLbl + dueStr, {
+            url: './#tasks',
+            tag: 'taskreminder-'+t.id
+          });
+        } else {
+          console.log('[task push] suppressed — quietHours:', quietHours, 'sunday:', isSunday);
+        }
+      }catch(e){}
       // Show a banner if the function exists
       if(typeof showBanner === 'function'){
         showBanner('Task reminder', t.title, 'info');
@@ -12419,53 +12607,218 @@ async function loadDiary(){
 function renderDiary(){
   const el = document.getElementById('diaryList');
   if(!el) return;
-  if(!_diaryEntries.length){
-    el.innerHTML = '<div style="background:#f8fafc;border-radius:12px;padding:40px 20px;text-align:center;">'+
-      '<svg width="48" height="48" viewBox="0 0 20 20" fill="#cbd5e1" style="margin:0 auto 10px;display:block;"><path fill-rule="evenodd" d="M5 4a2 2 0 012-2h6a2 2 0 012 2v14l-5-2.5L5 18V4z" clip-rule="evenodd"/></svg>'+
-      '<div style="font-size:14px;font-weight:600;color:#475569;margin-bottom:4px;">No entries yet</div>'+
-      '<div style="font-size:12px;color:#94a3b8;">Tap "+ New entry" to start your diary.</div>'+
-      '</div>';
+  el.style.cssText = 'display:block;background:transparent;padding:24px 0;';
+  
+  // Build all pages in a flipbook
+  const allPages = [];
+  if(_diaryNewPageOpen){
+    allPages.push({id:'new', entry_date: new Date().toISOString().split('T')[0], title:'', body:'', remind_at:'', isNew:true});
+  }
+  _diaryEntries.forEach(function(e){ allPages.push(e); });
+  
+  if(!allPages.length){
+    el.innerHTML = '<div class="diary-flipbook">'+
+      '<div class="diary-a4 diary-a4-empty-state" onclick="startNewDiaryPage()">'+
+        '<div class="diary-a4-empty-text">📔 Tap to start your first page</div>'+
+      '</div>'+
+    '</div>';
     return;
   }
-  // Group by month
-  const byMonth = {};
-  _diaryEntries.forEach(function(e){
-    const d = new Date(e.entry_date+'T00:00:00');
-    const monthKey = d.toLocaleDateString('en-AU',{year:'numeric',month:'long'});
-    if(!byMonth[monthKey]) byMonth[monthKey] = [];
-    byMonth[monthKey].push({entry:e, date:d});
+  
+  if(_diaryFlipIndex >= allPages.length) _diaryFlipIndex = 0;
+  if(_diaryFlipIndex < 0) _diaryFlipIndex = allPages.length - 1;
+  
+  let html = '<div class="diary-flipbook">';
+  // Page nav
+  html += '<div class="diary-nav">';
+  html += '<button class="diary-nav-btn" onclick="flipDiary(-1)" title="Previous page" '+(_diaryFlipIndex===0?'disabled':'')+'>‹ Prev</button>';
+  html += '<div class="diary-nav-info">Page '+(_diaryFlipIndex+1)+' of '+allPages.length+'</div>';
+  html += '<button class="diary-nav-btn" onclick="flipDiary(1)" title="Next page" '+(_diaryFlipIndex>=allPages.length-1?'disabled':'')+'>Next ›</button>';
+  html += '</div>';
+  // The flipping page stack
+  html += '<div class="diary-page-stack" id="diaryPageStack">';
+  allPages.forEach(function(p, idx){
+    const cls = idx === _diaryFlipIndex ? 'diary-page-current' : (idx < _diaryFlipIndex ? 'diary-page-prev' : 'diary-page-next');
+    html += '<div class="diary-page-slot '+cls+'" data-idx="'+idx+'">'+renderDiaryPage(p, p.isNew)+'</div>';
   });
-  let html = '';
-  Object.keys(byMonth).forEach(function(monthKey){
-    html += '<div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.06em;margin:8px 4px 4px;">'+monthKey+'</div>';
-    byMonth[monthKey].forEach(function(item){
-      const e = item.entry;
-      const d = item.date;
-      const dayNum = d.getDate();
-      const dayName = d.toLocaleDateString('en-AU',{weekday:'short'});
-      const titleSafe = String(e.title||'(Untitled)').replace(/</g,'&lt;');
-      const bodySafe = String(e.body||'').replace(/</g,'&lt;');
-      const reminder = e.remind_at ? ('<div style="font-size:11px;color:var(--accent);font-weight:600;margin-top:6px;display:inline-flex;align-items:center;gap:5px;background:var(--accent-dim);padding:3px 8px;border-radius:6px;">'+
-        '<svg width="11" height="11" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/></svg>'+
-        'Reminds at '+new Date(e.remind_at).toLocaleString('en-AU',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})+
-      '</div>') : '';
-      const today = new Date(); today.setHours(0,0,0,0);
-      const isToday = d.toDateString() === today.toDateString();
-      html += '<div class="card" data-id="'+e.id+'" onclick="openDiaryEntry(this.dataset.id)" style="padding:14px;cursor:pointer;display:flex;gap:12px;transition:transform .15s, box-shadow .15s;">'+
-        '<div style="width:48px;flex-shrink:0;text-align:center;'+(isToday?'background:var(--accent);color:#fff;':'background:#f1f5f9;color:#475569;')+'border-radius:10px;padding:8px 4px;display:flex;flex-direction:column;justify-content:center;">'+
-          '<div style="font-size:18px;font-weight:800;line-height:1;letter-spacing:-.02em;">'+dayNum+'</div>'+
-          '<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-top:3px;opacity:.85;">'+dayName+'</div>'+
-        '</div>'+
-        '<div style="flex:1;min-width:0;">'+
-          '<div style="font-size:14.5px;font-weight:700;color:#0f172a;margin-bottom:3px;">'+titleSafe+'</div>'+
-          (bodySafe ? '<div style="font-size:12.5px;color:#64748b;line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">'+bodySafe+'</div>' : '')+
-          reminder+
-        '</div>'+
-      '</div>';
-    });
-  });
+  html += '</div>';
+  html += '</div>';
   el.innerHTML = html;
 }
+
+function flipDiary(delta){
+  _diaryFlipIndex += delta;
+  renderDiary();
+}
+
+let _diaryFlipIndex = 0;
+
+
+function renderDiaryPage(e, isNew){
+  const d = new Date(e.entry_date+'T00:00:00');
+  const dayMonth = d.toLocaleDateString('en-AU',{day:'numeric',month:'long'});
+  const year = d.getFullYear();
+  const idAttr = e.id ? ('data-id="'+e.id+'"') : 'data-new="1"';
+  const dayName = d.toLocaleDateString('en-AU',{weekday:'long'});
+  const titleSafe = String(e.title||'').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+  const bodySafe = String(e.body||'').replace(/</g,'&lt;');
+  const reminderDisplay = e.remind_at ? new Date(e.remind_at).toLocaleString('en-AU',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : '';
+  const reminderIso = e.remind_at ? (function(iso){
+    const d2 = new Date(iso);
+    const pad = function(n){return String(n).padStart(2,'0');};
+    return d2.getFullYear()+'-'+pad(d2.getMonth()+1)+'-'+pad(d2.getDate())+'T'+pad(d2.getHours())+':'+pad(d2.getMinutes());
+  })(e.remind_at) : '';
+  
+  return '<div class="diary-a4 diary-a4-editable" '+idAttr+'>'+
+    '<div class="diary-a4-header">'+
+      '<div class="diary-a4-date">'+
+        '<div class="diary-a4-day-month">'+dayMonth+'</div>'+
+        '<div class="diary-a4-year">'+year+'</div>'+
+        '<input type="date" class="diary-a4-date-input" value="'+e.entry_date+'" onchange="updateDiaryField(this,\''+(e.id||'new')+'\',\'entry_date\')" title="Change date">'+
+      '</div>'+
+      '<div class="diary-a4-note">'+
+        '<div class="diary-a4-note-label">Note:</div>'+
+        '<input type="datetime-local" class="diary-a4-reminder-input" placeholder="Set reminder…" value="'+reminderIso+'" onchange="updateDiaryField(this,\''+(e.id||'new')+'\',\'remind_at\')" title="Set reminder">'+
+        (reminderDisplay ? '<div class="diary-a4-reminder-display">⏰ '+reminderDisplay+'</div>' : '<div class="diary-a4-note-hint">Tap above to set a reminder</div>')+
+      '</div>'+
+    '</div>'+
+    '<div class="diary-a4-divider"></div>'+
+    '<div class="diary-a4-subject-row">'+
+      '<span class="diary-a4-subject-label">Subject:</span>'+
+      '<input type="text" class="diary-a4-subject-input" placeholder="What\'s this entry about?" value="'+titleSafe+'" oninput="updateDiaryField(this,\''+(e.id||'new')+'\',\'title\')">'+
+    '</div>'+
+    '<div class="diary-a4-subject-line"></div>'+
+    '<textarea class="diary-a4-body-editor" placeholder="Write your entry here…&#10;The paper will hold as many lines as you need." oninput="updateDiaryField(this,\''+(e.id||'new')+'\',\'body\');autoGrow(this)">'+bodySafe+'</textarea>'+
+    '<div class="diary-a4-bottom">'+
+      (e.id ? '<button class="diary-a4-delete" onclick="event.stopPropagation();deleteDiaryPageInline(\''+e.id+'\')">Delete this page</button>' : '')+
+      '<div class="diary-a4-signature">'+
+        '<div class="diary-a4-sig-line"></div>'+
+        '<div class="diary-a4-sig-label">— '+dayName+' —</div>'+
+      '</div>'+
+    '</div>'+
+  '</div>';
+}
+
+let _diaryNewPageOpen = false;
+let _diaryDraft = {}; // {id: {field: value}}
+let _diarySaveTimer = null;
+
+function startNewDiaryPage(){
+  _diaryNewPageOpen = true;
+  _diaryDraft.new = {entry_date: new Date().toISOString().split('T')[0], title: '', body: '', remind_at: ''};
+  renderDiary();
+  // Focus on the subject input of the new page
+  setTimeout(function(){
+    const inp = document.querySelector('.diary-a4[data-new="1"] .diary-a4-subject-input');
+    if(inp) inp.focus();
+  }, 100);
+}
+
+function updateDiaryField(input, id, field){
+  if(!_diaryDraft[id]) _diaryDraft[id] = {};
+  _diaryDraft[id][field] = input.value;
+  // Debounced save (1.5s after last input)
+  if(_diarySaveTimer) clearTimeout(_diarySaveTimer);
+  _diarySaveTimer = setTimeout(function(){ persistDiaryDraft(id); }, 1500);
+}
+
+async function persistDiaryDraft(id){
+  const draft = _diaryDraft[id];
+  if(!draft || !me) return;
+  // Convert remind_at to ISO if present
+  const payload = {
+    staff_name: me,
+    entry_date: draft.entry_date,
+    title: draft.title || '',
+    body: draft.body || ''
+  };
+  if(draft.remind_at){
+    try{ payload.remind_at = new Date(draft.remind_at).toISOString(); }catch(e){}
+  } else if(draft.hasOwnProperty('remind_at')){
+    payload.remind_at = null;
+  }
+  
+  try{
+    if(id === 'new'){
+      const created = await sbPost('diary_entries', payload, true);
+      if(created && created[0]){
+        // Replace 'new' with real ID in draft + DOM
+        _diaryDraft[created[0].id] = draft;
+        delete _diaryDraft.new;
+        _diaryNewPageOpen = false;
+        const newPage = document.querySelector('.diary-a4[data-new="1"]');
+        if(newPage){
+          newPage.setAttribute('data-id', created[0].id);
+          newPage.removeAttribute('data-new');
+          // Update inline onchange handlers to use real ID
+          newPage.querySelectorAll('[onchange*="\'new\'"], [oninput*="\'new\'"]').forEach(function(el){
+            ['onchange','oninput'].forEach(function(attr){
+              const v = el.getAttribute(attr);
+              if(v) el.setAttribute(attr, v.replace(/'new'/g, "'"+created[0].id+"'"));
+            });
+          });
+          // Add delete button
+          const bottom = newPage.querySelector('.diary-a4-bottom');
+          if(bottom && !bottom.querySelector('.diary-a4-delete')){
+            const delBtn = document.createElement('button');
+            delBtn.className = 'diary-a4-delete';
+            delBtn.textContent = 'Delete this page';
+            delBtn.onclick = function(ev){ ev.stopPropagation(); deleteDiaryPageInline(created[0].id); };
+            bottom.insertBefore(delBtn, bottom.firstChild);
+          }
+        }
+        // Reload entries in background
+        loadDiary();
+      }
+    } else {
+      await fetch(SB+'/rest/v1/diary_entries?id=eq.'+encodeURIComponent(id), {
+        method:'PATCH',
+        headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+        body: JSON.stringify(payload)
+      });
+      // Update local cache so re-render preserves edits
+      const cached = _diaryEntries.find(function(x){return x.id===id;});
+      if(cached){ Object.assign(cached, payload); }
+    }
+    flashSavedIndicator();
+  }catch(e){ console.warn('diary save:', e); }
+}
+
+function flashSavedIndicator(){
+  let ind = document.getElementById('diarySavedInd');
+  if(!ind){
+    ind = document.createElement('div');
+    ind.id = 'diarySavedInd';
+    ind.style.cssText = 'position:fixed;top:80px;right:20px;background:#10b981;color:#fff;padding:6px 14px;border-radius:20px;font-size:12px;font-weight:600;z-index:9999;box-shadow:0 4px 14px rgba(16,185,129,.3);opacity:0;transition:opacity .25s;font-family:inherit;';
+    ind.textContent = '✓ Saved';
+    document.body.appendChild(ind);
+  }
+  ind.style.opacity = '1';
+  clearTimeout(ind._timer);
+  ind._timer = setTimeout(function(){ ind.style.opacity = '0'; }, 1800);
+}
+
+async function deleteDiaryPageInline(id){
+  if(!confirm('Delete this diary page? This cannot be undone.')) return;
+  try{
+    await fetch(SB+'/rest/v1/diary_entries?id=eq.'+encodeURIComponent(id), {
+      method:'DELETE',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}
+    });
+    _diaryEntries = _diaryEntries.filter(function(x){return x.id !== id;});
+    delete _diaryDraft[id];
+    renderDiary();
+    showToast('Page deleted');
+  }catch(e){ showToast('Delete failed','error'); }
+}
+
+function autoGrow(textarea){
+  textarea.style.height = 'auto';
+  textarea.style.height = Math.max(280, textarea.scrollHeight) + 'px';
+}
+
+
+
 
 function openDiaryEntry(id){
   _diaryEditId = id || null;
@@ -13607,7 +13960,7 @@ async function loadSharedTasksFromOthers(){
 
 // ── ATTACHMENTS (Phase 4) ──────────────────
 const ATT_BUCKET = 'attachments';
-const ATT_MAX_BYTES = 10 * 1024 * 1024; // 10MB per file
+const ATT_MAX_BYTES = 6 * 1024 * 1024; // 6MB per file
 
 function attFmtSize(b){
   if(b<1024) return b+' B';
@@ -13626,7 +13979,35 @@ async function rtAddAttachment(textareaId, file){
   const ta = document.getElementById(textareaId);
   if(!ta) return;
   if(file.size > ATT_MAX_BYTES){
-    if(typeof showToast==='function') showToast('File too large (max 10MB)');
+    // Show visual error chip in attachments zone
+    const att = document.getElementById(textareaId + '-attzone');
+    if(att){
+      att.classList.add('has-files');
+      const errChip = document.createElement('div');
+      errChip.className = 'att-chip att-error-chip';
+      const sizeMB = (file.size/1024/1024).toFixed(1);
+      errChip.innerHTML = 
+        '<div class="att-chip-thumb att-error-icon">'+
+          '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>'+
+        '</div>'+
+        '<div class="att-chip-name">'+
+          '<div style="color:#dc2626;font-weight:700;font-size:11px;line-height:1.2;">Too large (max 6MB)</div>'+
+          '<div style="color:#7c2d12;font-size:10px;line-height:1.2;margin-top:2px;">'+(file.name||'file').slice(0,30)+' · '+sizeMB+'MB</div>'+
+        '</div>'+
+        '<button type="button" class="att-chip-x" onclick="this.parentElement.remove();if(this.parentElement&&this.parentElement.parentElement&&this.parentElement.parentElement.children.length===0)this.parentElement.parentElement.classList.remove(\'has-files\');">×</button>';
+      att.appendChild(errChip);
+      // Auto-remove after 5s
+      setTimeout(function(){
+        if(errChip.parentNode){
+          errChip.style.opacity = '0';
+          setTimeout(function(){
+            if(errChip.parentNode) errChip.remove();
+            if(att.children.length===0) att.classList.remove('has-files');
+          }, 300);
+        }
+      }, 5000);
+    }
+    if(typeof showToast==='function') showToast('File too large — max 6MB', 'warning');
     return;
   }
   const att = document.getElementById(textareaId + '-attzone');
@@ -13651,63 +14032,64 @@ async function rtAddAttachment(textareaId, file){
     '<div class="att-chip-prog" style="width:8%"></div>';
   att.appendChild(chip);
 
-  // Upload to Supabase storage
+  // Upload via Apps Script (same Drive folder as Documents)
   try{
-    const ext = (file.name||'bin').split('.').pop().toLowerCase();
-    const safeName = (file.name||'file').replace(/[^a-zA-Z0-9._-]/g,'_').slice(-60);
-    const path = (me||'unknown').replace(/[^a-zA-Z0-9_-]/g,'_') + '/' +
-                 Date.now() + '_' + Math.random().toString(36).slice(2,7) + '_' + safeName;
-
-    const url = SB + '/storage/v1/object/' + ATT_BUCKET + '/' + encodeURIComponent(path);
-    const xhr = new XMLHttpRequest();
-    xhr.open('POST', url);
-    xhr.setRequestHeader('apikey', KEY);
-    xhr.setRequestHeader('Authorization','Bearer '+KEY);
-    xhr.setRequestHeader('x-upsert','true');
-    if(file.type) xhr.setRequestHeader('Content-Type', file.type);
-
-    xhr.upload.onprogress = function(e){
-      if(e.lengthComputable){
-        const pct = Math.round(e.loaded/e.total*100);
-        const prog = chip.querySelector('.att-chip-prog');
-        if(prog) prog.style.width = pct + '%';
+    const safeName = (file.name||'file').replace(/[^a-zA-Z0-9._\- ]/g,'_').slice(-80);
+    
+    // Convert file to base64
+    const reader = new FileReader();
+    reader.onload = async function(){
+      const base64 = String(reader.result).split(',')[1] || '';
+      const progEl = chip.querySelector('.att-chip-prog');
+      if(progEl) progEl.style.width = '40%';
+      
+      try{
+        const resp = await fetch(window.APPS_SCRIPT_URL || 'https://script.google.com/macros/s/AKfycby0Bq97bCZAsmnruXFuJuCqXQE_kOxhYE2KFuJnVzLXtT5CV0Y12k5176dxZbdaYVGE/exec', {
+          method: 'POST',
+          headers: {'Content-Type':'text/plain'},
+          body: JSON.stringify({
+            action: 'uploadDoc',
+            filename: safeName,
+            mime: file.type || 'application/octet-stream',
+            base64: base64
+          })
+        });
+        if(progEl) progEl.style.width = '90%';
+        const data = await resp.json();
+        if(data.error) throw new Error(data.error);
+        if(progEl) progEl.style.width = '100%';
+        
+        // Store the Drive URL as the attachment
+        if(!ta._rtAttachments) ta._rtAttachments = [];
+        ta._rtAttachments.push({
+          id: tmpId,
+          name: file.name || 'file',
+          size: file.size,
+          type: file.type || '',
+          url: data.url,
+          path: data.id,
+          isImage: isImg
+        });
+        // Update chip — replace with final state
+        setTimeout(function(){
+          chip.classList.remove('uploading');
+          if(progEl) progEl.style.display = 'none';
+        }, 200);
+      }catch(err){
+        if(progEl) progEl.style.background = '#dc2626';
+        chip.classList.add('upload-error');
+        if(typeof showToast === 'function') showToast('Upload failed: '+err.message, 'error');
+        setTimeout(function(){ chip.remove(); }, 2000);
       }
     };
-
-    const result = await new Promise(function(resolve, reject){
-      xhr.onload = function(){
-        if(xhr.status >= 200 && xhr.status < 300){
-          resolve();
-        } else {
-          reject(new Error('HTTP '+xhr.status+': '+xhr.responseText));
-        }
-      };
-      xhr.onerror = function(){ reject(new Error('Network error')); };
-      xhr.send(file);
-    });
-
-    const publicUrl = SB + '/storage/v1/object/public/' + ATT_BUCKET + '/' + encodeURIComponent(path);
-    const meta = {
-      id: tmpId,
-      url: publicUrl,
-      path: path,
-      name: file.name||'file',
-      size: file.size||0,
-      type: file.type||'',
-      isImage: isImg
-    };
-    if(!ta._rtAttachments) ta._rtAttachments = [];
-    ta._rtAttachments.push(meta);
-
-    // Mark chip as complete
-    chip.classList.remove('uploading');
-    const prog = chip.querySelector('.att-chip-prog');
-    if(prog) prog.remove();
+    reader.readAsDataURL(file);
+    return;
   }catch(e){
-    console.warn('upload failed:', e);
+    if(typeof showToast === 'function') showToast('Upload error: '+e.message, 'error');
     chip.remove();
-    if(typeof showToast==='function') showToast('Upload failed: '+(e.message||'unknown'));
+    return;
   }
+  
 }
 
 function rtRemoveAttachment(textareaId, attId){
@@ -14608,6 +14990,899 @@ async function checkNewNotifications(){
     }
   }catch(e){console.warn(e);}
 }
+
+
+
+// ─────────────────────────────────────
+// TRAINING QUIZ — Checklist Team
+// ─────────────────────────────────────
+const TRAINING_QUIZ = {
+  id: 'checklist_v1',
+  title: 'Standard Knowledge Quiz — Oscars',
+  pass_pct: 80,
+  questions: [
+    {
+      q: 'A student calls asking about Cert III Individual Support. What is the standard price you should quote?',
+      type: 'single',
+      options: ['$1000', '$1180', '$1300', '$1500'],
+      correct: 2
+    },
+    {
+      q: 'Maximum discount you can offer for Cert III Individual Support is:',
+      type: 'single',
+      options: ['$1100', '$1180', '$1280', 'Any amount if student insists'],
+      correct: 1
+    },
+    {
+      q: 'A student from Tasmania asks for a discount. What should you do?',
+      type: 'single',
+      options: [
+        'Give the same discount as Sydney students',
+        'NO discount — regional placement areas like Tasmania/Darwin/Canberra get no discount (except self-placement/groups or first aid done there)',
+        'Give them 20% off',
+        'Refer them to the placement team for pricing'
+      ],
+      correct: 1
+    },
+    {
+      q: 'How many points of ID does a student need to provide for enrolment?',
+      type: 'single',
+      options: ['50 points', '75 points', '100 points', '150 points'],
+      correct: 2
+    },
+    {
+      q: 'When asking for visa documents, which group should you NOT ask?',
+      type: 'single',
+      options: ['Student visa holders', 'Bridging visa holders', 'Australian/New Zealand citizens', 'PR holders'],
+      correct: 2
+    },
+    {
+      q: 'How long is First AID certificate valid for?',
+      type: 'single',
+      options: ['1 year', '2 years', '3 years', '5 years'],
+      correct: 2
+    },
+    {
+      q: 'How long is CPR certificate valid for?',
+      type: 'single',
+      options: ['1 year', '2 years', '3 years', '5 years'],
+      correct: 0
+    },
+    {
+      q: 'When should you book a class for a Sydney-based student?',
+      type: 'single',
+      options: [
+        'Wait for them to ask',
+        'Book the earliest available class — try to book ASAP',
+        'Only book after payment',
+        'Only book after documents are completed'
+      ],
+      correct: 1
+    },
+    {
+      q: 'A call is not answered. What is the correct follow-up?',
+      type: 'single',
+      options: [
+        'Send one email and wait',
+        'Call again within 1 hour, then again at 6-7 PM, record all attempts',
+        'Wait 24 hours then try once more',
+        'Mark them as uninterested'
+      ],
+      correct: 1
+    },
+    {
+      q: 'Placement is required for which certificates?',
+      type: 'single',
+      options: [
+        'All certifications',
+        'Aged care & disability certifications only',
+        'Only Cert IV',
+        'No certificates require placement'
+      ],
+      correct: 1
+    },
+    {
+      q: 'How long is the placement (in hours)?',
+      type: 'single',
+      options: ['80 hours', '100 hours', '120 hours', '160 hours'],
+      correct: 2
+    },
+    {
+      q: 'When is "conversion" considered complete for a lead?',
+      type: 'single',
+      options: [
+        'When they reply to the email',
+        'When they confirm interest',
+        'When they take class AND make payment',
+        'When they submit documents'
+      ],
+      correct: 2
+    },
+    {
+      q: 'A student urgently needs their certificate before an interview. What do you do?',
+      type: 'single',
+      options: [
+        'Promise them you will deliver it tomorrow',
+        'Inform the processing team about the urgency immediately and keep a note',
+        'Tell them it cannot be done faster',
+        'Issue the certificate yourself'
+      ],
+      correct: 1
+    },
+    {
+      q: 'After payment for First Aid CPR (cash), what must you do?',
+      type: 'single',
+      options: [
+        'Just verbally confirm to the student',
+        'Note in sheet only',
+        'Count money, note student details (Name, number, email, amount, received by), send acknowledgement email, and note in first aid booking sheet',
+        'Send a text message confirmation'
+      ],
+      correct: 2
+    },
+    {
+      q: 'For online payment, what is COMPULSORY before you let the student leave?',
+      type: 'single',
+      options: [
+        'A signed receipt',
+        'A screenshot of the payment',
+        'A bank statement',
+        'A verbal confirmation'
+      ],
+      correct: 1
+    }
+  ]
+};
+
+let _quizState = { 
+  started: false,
+  current: 0,
+  answers: {},
+  result: null
+};
+
+async function refreshQuizStrip(){
+  const strip = document.getElementById('quizStrip');
+  if(!strip) return;
+  // Admin: always show the admin panel
+  if(myIsAdmin){
+    renderQuizAdminPanel();
+  }
+  // EVERYONE (admin or not): check if THIS user has access — if so, show the strip
+  try{
+    const access = await sbGet('quiz_access', '?staff_name=eq.'+encodeURIComponent(me)+'&quiz_id=eq.'+TRAINING_QUIZ.id);
+    if(!access || !access.length){
+      // No access granted → hide strip (admin still sees panel below)
+      strip.style.display = 'none';
+      return;
+    }
+  }catch(e){ strip.style.display = 'none'; return; }
+  strip.style.display = 'flex';
+  // Show edit button for admins
+  const editBtn = document.getElementById('quizEditBtn');
+  if(editBtn) editBtn.style.display = myIsAdmin ? 'inline-block' : 'none';
+  // Check if user has already taken it
+  try{
+    const results = await sbGet('training_quiz_results', '?staff_name=eq.'+encodeURIComponent(me)+'&quiz_id=eq.'+TRAINING_QUIZ.id+'&order=created_at.desc&limit=1');
+    if(results && results.length){
+      const r = results[0];
+      const title = document.getElementById('quizStripTitle');
+      const sub = document.getElementById('quizStripSub');
+      const status = document.getElementById('quizStripStatus');
+      const icon = document.getElementById('quizStripIcon');
+      if(r.passed){
+        title.textContent = 'Standard Knowledge Quiz: Passed ✓';
+        sub.textContent = 'Score: '+r.score+'/'+r.total+' ('+Math.round(r.score/r.total*100)+'%) — Completed';
+        status.textContent = 'Completed';
+        status.style.background = '#10b981';
+        icon.style.background = '#d1fae5';
+        icon.innerHTML = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+        strip.style.cursor = 'default';
+        strip.onclick = function(){ showToast('You\'ve already passed the quiz', 'info'); };
+      } else {
+        title.textContent = 'Standard Knowledge Quiz: Needs review';
+        sub.textContent = 'Score: '+r.score+'/'+r.total+' ('+Math.round(r.score/r.total*100)+'%) — Speak with your manager';
+        status.textContent = 'Non-compliant';
+        status.style.background = '#dc2626';
+        icon.style.background = '#fee2e2';
+        icon.innerHTML = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>';
+        strip.style.cursor = 'default';
+        strip.onclick = function(){ showToast('Quiz already submitted. Speak with your manager about retaking.', 'info'); };
+      }
+    }
+  }catch(e){ console.warn('quiz strip:', e); }
+}
+
+async function renderQuizAdminPanel(){
+  const panel = document.getElementById('quizAdminPanel');
+  if(!panel || !myIsAdmin) return;
+  panel.style.display = 'block';
+  try{
+    // Compact panel: just show failed staff count + link to manage in Staff Directory
+    const results = await sbGet('training_quiz_results', '?quiz_id=eq.'+TRAINING_QUIZ.id+'&order=created_at.desc&limit=200');
+    
+    // De-dupe results to latest per staff
+    const latestByStaff = {};
+    (results||[]).forEach(function(r){ if(!latestByStaff[r.staff_name]) latestByStaff[r.staff_name] = r; });
+    const failed = Object.values(latestByStaff).filter(function(r){return !r.passed;});
+    const passed = Object.values(latestByStaff).filter(function(r){return r.passed;});
+    
+    let html = '<div style="background:#fff;border:1.5px solid #e2e8f0;border-radius:12px;padding:14px 16px;">'+
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:'+(failed.length?'12':'0')+'px;flex-wrap:wrap;gap:10px;">'+
+        '<div style="font-size:13.5px;font-weight:700;color:#0f172a;">📋 Standard Knowledge Quiz — Oscars</div>'+
+        '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">'+
+          '<div style="background:#d1fae5;color:#065f46;font-size:11px;font-weight:700;padding:3px 9px;border-radius:10px;">'+passed.length+' passed</div>'+
+          '<div style="background:#fee2e2;color:#991b1b;font-size:11px;font-weight:700;padding:3px 9px;border-radius:10px;">'+failed.length+' need review</div>'+
+          '<button onclick="openStaffDirectory()" style="background:#0f172a;color:#fff;border:none;border-radius:8px;padding:5px 12px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;">Manage access →</button>'+
+        '</div>'+
+      '</div>';
+    if(failed.length){
+      html += '<div style="max-height:200px;overflow-y:auto;">';
+      failed.forEach(function(r){
+        const dt = new Date(r.created_at).toLocaleDateString('en-AU',{day:'numeric',month:'short'});
+        html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid #f1f5f9;">'+
+          '<div><div style="font-size:12.5px;font-weight:600;color:#0f172a;">'+r.staff_name+'</div>'+
+          '<div style="font-size:10.5px;color:#64748b;">Score '+r.score+'/'+r.total+' · '+dt+'</div></div>'+
+          '<div style="display:flex;gap:5px;">'+
+            '<button onclick="viewQuizAttemptDetail(\''+r.staff_name.replace(/'/g,"\\'")+'\','+r.id+')" style="background:#0f172a;color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:10px;font-weight:600;cursor:pointer;font-family:inherit;">Review</button>'+
+            '<button onclick="resetStaffQuiz(\''+r.staff_name.replace(/'/g,"\\'")+'\','+r.id+')" style="background:#3b82f6;color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:10px;font-weight:600;cursor:pointer;font-family:inherit;">Allow retake</button>'+
+          '</div>'+
+        '</div>';
+      });
+      html += '</div>';
+    }
+    html += '</div>';
+    panel.innerHTML = html;
+  }catch(e){ console.warn('quiz admin:', e); panel.innerHTML = '<div style="padding:14px;background:#fee2e2;border-radius:10px;color:#991b1b;font-size:12px;">Failed to load: '+e.message+'</div>'; }
+}
+
+function filterQuizAdminList(q){ /* admin search moved to Staff Directory */ }
+
+async function toggleQuizAccess(staffName, quizId, grant){
+  try{
+    if(grant){
+      await sbPost('quiz_access', {staff_name: staffName, quiz_id: quizId, granted_by: me});
+      showToast('Access granted to '+staffName);
+    } else {
+      await fetch(SB+'/rest/v1/quiz_access?staff_name=eq.'+encodeURIComponent(staffName)+'&quiz_id=eq.'+quizId, {
+        method:'DELETE',
+        headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}
+      });
+      showToast('Access revoked for '+staffName);
+    }
+    renderQuizAdminPanel();
+  }catch(e){ showToast('Failed: '+e.message, 'error'); }
+}
+
+async function resetStaffQuiz(staffName, resultId){
+  if(!confirm('Delete this quiz attempt for '+staffName+'? They will be able to retake.')) return;
+  try{
+    await fetch(SB+'/rest/v1/training_quiz_results?id=eq.'+resultId, {
+      method:'DELETE',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}
+    });
+    showToast(staffName+' can now retake the quiz');
+    renderQuizAdminPanel();
+  }catch(e){ showToast('Failed: '+e.message, 'error'); }
+}
+
+function openTrainingQuiz(){
+  _quizState = { started: true, current: 0, answers: {}, result: null };
+  let bd = document.getElementById('quizBack');
+  if(!bd){
+    bd = document.createElement('div');
+    bd.id = 'quizBack';
+    bd.style.cssText = 'position:fixed;inset:0;z-index:9700;background:rgba(15,23,42,.65);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;padding:16px;';
+    document.body.appendChild(bd);
+  }
+  renderQuizModal();
+}
+
+function renderQuizModal(){
+  const bd = document.getElementById('quizBack');
+  if(!bd) return;
+  const total = TRAINING_QUIZ.questions.length;
+  
+  // Results view
+  if(_quizState.result){
+    const r = _quizState.result;
+    const pct = Math.round(r.score/total*100);
+    const passed = pct >= TRAINING_QUIZ.pass_pct;
+    bd.innerHTML = '<div style="background:#fff;border-radius:16px;width:100%;max-width:540px;padding:36px 28px;text-align:center;box-shadow:0 24px 60px rgba(15,23,42,.3);">'+
+      (passed ?
+        '<svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin:0 auto 12px;display:block;"><circle cx="12" cy="12" r="10"/><polyline points="9 12 12 15 17 10"/></svg>'+
+        '<div style="font-size:22px;font-weight:800;color:#10b981;margin-bottom:6px;">Passed! 🎉</div>'
+        :
+        '<svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin:0 auto 12px;display:block;"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>'+
+        '<div style="font-size:22px;font-weight:800;color:#dc2626;margin-bottom:6px;">Needs review</div>'
+      )+
+      '<div style="font-size:30px;font-weight:900;color:#0f172a;margin-bottom:6px;letter-spacing:-.02em;">'+r.score+' / '+total+'</div>'+
+      '<div style="font-size:14px;color:#64748b;margin-bottom:22px;">Score: '+pct+'% — Pass mark: '+TRAINING_QUIZ.pass_pct+'%</div>'+
+      (passed ?
+        '<div style="font-size:13px;color:#475569;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:14px;margin-bottom:18px;text-align:left;">Great work! You can now proceed with checklist team tasks. This result is recorded.</div>'
+        :
+        '<div style="font-size:13px;color:#475569;background:#fef2f2;border:1px solid #fecaca;border-radius:10px;padding:14px;margin-bottom:18px;text-align:left;">Your manager has been notified to review the training material with you. They can re-open the quiz for you to retake once you\'re ready.</div>'
+      )+
+      '<button onclick="closeQuizModal()" class="btn btn-green" style="padding:11px 28px;font-size:14px;">Done</button>'+
+    '</div>';
+    return;
+  }
+  
+  // Question view
+  const i = _quizState.current;
+  const q = TRAINING_QUIZ.questions[i];
+  const selected = _quizState.answers[i];
+  const pct = Math.round((i+1)/total*100);
+  
+  let html = '<div style="background:#fff;border-radius:16px;width:100%;max-width:600px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 24px 60px rgba(15,23,42,.3);overflow:hidden;">';
+  
+  // Header
+  html += '<div style="padding:18px 22px;border-bottom:1px solid #f1f5f9;">';
+  html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">';
+  html += '<div style="font-size:15px;font-weight:700;color:#0f172a;">'+TRAINING_QUIZ.title+'</div>';
+  html += '<div style="font-size:12px;color:#64748b;font-weight:600;">Question '+(i+1)+' of '+total+'</div>';
+  html += '</div>';
+  html += '<div style="background:#f1f5f9;height:5px;border-radius:3px;overflow:hidden;"><div style="background:#3b82f6;height:100%;width:'+pct+'%;transition:width .3s;"></div></div>';
+  html += '</div>';
+  
+  // Question
+  html += '<div style="padding:24px 22px;overflow-y:auto;flex:1;">';
+  html += '<div style="font-size:15px;font-weight:600;color:#0f172a;line-height:1.5;margin-bottom:18px;">'+q.q.replace(/</g,'&lt;')+'</div>';
+  
+  q.options.forEach(function(opt, idx){
+    const isSelected = selected === idx;
+    html += '<div onclick="selectQuizAnswer('+idx+')" style="border:1.5px solid '+(isSelected?'#3b82f6':'#e2e8f0')+';background:'+(isSelected?'#eff6ff':'#fff')+';border-radius:10px;padding:13px 16px;margin-bottom:8px;cursor:pointer;transition:all .15s;display:flex;align-items:flex-start;gap:11px;">';
+    html += '<div style="width:18px;height:18px;border-radius:50%;border:2px solid '+(isSelected?'#3b82f6':'#cbd5e1')+';flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;">';
+    if(isSelected) html += '<div style="width:8px;height:8px;border-radius:50%;background:#3b82f6;"></div>';
+    html += '</div>';
+    html += '<div style="font-size:13.5px;color:#0f172a;line-height:1.45;flex:1;">'+opt.replace(/</g,'&lt;')+'</div>';
+    html += '</div>';
+  });
+  
+  html += '</div>';
+  
+  // Footer
+  html += '<div style="padding:14px 22px;border-top:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center;gap:8px;">';
+  html += '<button onclick="closeQuizModal()" style="background:none;border:none;color:#64748b;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">Cancel</button>';
+  html += '<div style="display:flex;gap:8px;">';
+  if(i > 0){
+    html += '<button onclick="prevQuizQ()" class="btn btn-outline" style="padding:9px 18px;font-size:13px;">← Back</button>';
+  }
+  if(i < total - 1){
+    html += '<button onclick="nextQuizQ()" '+(selected === undefined?'disabled':'')+' class="btn btn-green" style="padding:9px 18px;font-size:13px;'+(selected === undefined?'opacity:.5;cursor:not-allowed;':'')+'">Next →</button>';
+  } else {
+    html += '<button onclick="submitQuiz()" '+(selected === undefined?'disabled':'')+' class="btn btn-green" style="padding:9px 18px;font-size:13px;'+(selected === undefined?'opacity:.5;cursor:not-allowed;':'')+'">Submit</button>';
+  }
+  html += '</div></div>';
+  
+  html += '</div>';
+  bd.innerHTML = html;
+}
+
+function selectQuizAnswer(idx){
+  _quizState.answers[_quizState.current] = idx;
+  renderQuizModal();
+}
+
+function nextQuizQ(){ if(_quizState.answers[_quizState.current] !== undefined){ _quizState.current++; renderQuizModal(); } }
+function prevQuizQ(){ if(_quizState.current > 0){ _quizState.current--; renderQuizModal(); } }
+
+async function submitQuiz(){
+  // Score it
+  let score = 0;
+  TRAINING_QUIZ.questions.forEach(function(q, i){
+    if(_quizState.answers[i] === q.correct) score++;
+  });
+  const total = TRAINING_QUIZ.questions.length;
+  const pct = score/total*100;
+  const passed = pct >= TRAINING_QUIZ.pass_pct;
+  
+  _quizState.result = { score: score, total: total };
+  
+  // Save to supabase
+  try{
+    await sbPost('training_quiz_results', {
+      staff_name: me,
+      quiz_id: TRAINING_QUIZ.id,
+      score: score,
+      total: total,
+      passed: passed,
+      answers: _quizState.answers
+    });
+    if(!passed){
+      // Notify admins via push (broadcast to admins is tricky — use a discussions broadcast instead)
+      try{
+        if(typeof sendPushTo === 'function'){
+          // Send push to all subscribed admins via broadcast filtering server-side won't work without admin marker
+          // For now, just create an in-app notification by inserting a flagged row admins can see
+        }
+      }catch(e){}
+    }
+  }catch(e){
+    console.warn('quiz save:', e);
+    showToast('Failed to save results — please try again', 'error');
+    return;
+  }
+  
+  renderQuizModal();
+  refreshQuizStrip();
+}
+
+function closeQuizModal(){
+  const bd = document.getElementById('quizBack');
+  if(bd) bd.remove();
+}
+
+
+// ─────────────────────────────────────
+// CUSTOM QUIZ BUILDER (admin-created quizzes attached to documents)
+// ─────────────────────────────────────
+
+function openQuizBuilder(docId, docTitle){
+  _quizBuilder = {
+    docId: docId,
+    title: 'Quiz: '+ (docTitle || 'Untitled'),
+    pass_pct: 80,
+    questions: [
+      { q: '', options: ['', '', '', ''], correct: 0 }
+    ]
+  };
+  renderQuizBuilder();
+}
+
+function renderQuizBuilder(){
+  let bd = document.getElementById('quizBuilderBack');
+  if(!bd){
+    bd = document.createElement('div');
+    bd.id = 'quizBuilderBack';
+    bd.style.cssText = 'position:fixed;inset:0;z-index:9700;background:rgba(15,23,42,.65);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;padding:16px;';
+    document.body.appendChild(bd);
+  }
+  const qb = _quizBuilder;
+  
+  let html = '<div style="background:#fff;border-radius:16px;width:100%;max-width:720px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 24px 60px rgba(15,23,42,.3);overflow:hidden;">';
+  
+  // Header
+  html += '<div style="padding:16px 22px;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center;">';
+  html += '<div><div style="font-size:15px;font-weight:700;color:#0f172a;">Build Quiz</div><div style="font-size:11px;color:#64748b;margin-top:2px;">Add questions for this document</div></div>';
+  html += '<button onclick="closeQuizBuilder()" style="background:none;border:none;font-size:22px;color:#94a3b8;cursor:pointer;line-height:1;padding:4px 10px;">×</button>';
+  html += '</div>';
+  
+  // Body
+  html += '<div style="padding:18px 22px;overflow-y:auto;flex:1;">';
+  
+  // Quiz settings
+  html += '<div style="margin-bottom:18px;background:#f8fafc;border:1px solid #f1f5f9;border-radius:10px;padding:14px;">';
+  html += '<div style="display:grid;grid-template-columns:1fr 110px;gap:10px;align-items:end;">';
+  html += '<div><label style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.06em;">Quiz title</label>';
+  html += '<input type="text" value="'+qb.title.replace(/"/g,'&quot;')+'" oninput="_quizBuilder.title=this.value" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:8px 12px;font-size:13px;font-family:inherit;outline:none;margin-top:4px;"></div>';
+  html += '<div><label style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.06em;">Pass %</label>';
+  html += '<input type="number" min="50" max="100" value="'+qb.pass_pct+'" oninput="_quizBuilder.pass_pct=parseInt(this.value||80,10)" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:8px 12px;font-size:13px;font-family:inherit;outline:none;margin-top:4px;"></div>';
+  html += '</div></div>';
+  
+  // Questions list
+  qb.questions.forEach(function(q, qi){
+    html += '<div style="margin-bottom:16px;border:1.5px solid #e2e8f0;border-radius:12px;padding:14px;background:#fff;">';
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">';
+    html += '<div style="font-size:11px;font-weight:700;color:#3b82f6;text-transform:uppercase;letter-spacing:.08em;">Question '+(qi+1)+'</div>';
+    if(qb.questions.length > 1){
+      html += '<button onclick="removeQuizBuilderQ('+qi+')" style="background:none;border:none;color:#dc2626;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;">Remove</button>';
+    }
+    html += '</div>';
+    html += '<textarea oninput="updateQuizBuilderQ('+qi+',\'q\',this.value)" placeholder="Enter the question..." rows="2" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:9px 12px;font-size:13.5px;font-family:inherit;outline:none;resize:vertical;margin-bottom:10px;">'+q.q.replace(/</g,'&lt;')+'</textarea>';
+    
+    q.options.forEach(function(opt, oi){
+      const isCorrect = q.correct === oi;
+      html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">';
+      html += '<label style="display:flex;align-items:center;cursor:pointer;flex-shrink:0;" title="Mark as correct answer">';
+      html += '<input type="radio" name="qb_correct_'+qi+'" '+(isCorrect?'checked':'')+' onchange="updateQuizBuilderQ('+qi+',\'correct\','+oi+')" style="width:18px;height:18px;cursor:pointer;accent-color:#10b981;">';
+      html += '</label>';
+      html += '<input type="text" value="'+opt.replace(/"/g,'&quot;')+'" placeholder="Option '+(oi+1)+'" oninput="updateQuizBuilderOpt('+qi+','+oi+',this.value)" style="flex:1;border:1.5px solid '+(isCorrect?'#10b981':'#e2e8f0')+';background:'+(isCorrect?'#f0fdf4':'#fff')+';border-radius:8px;padding:8px 12px;font-size:13px;font-family:inherit;outline:none;">';
+      if(q.options.length > 2){
+        html += '<button onclick="removeQuizBuilderOpt('+qi+','+oi+')" style="background:none;border:none;color:#94a3b8;font-size:18px;cursor:pointer;padding:0 6px;line-height:1;">×</button>';
+      }
+      html += '</div>';
+    });
+    
+    if(q.options.length < 4){
+      html += '<button onclick="addQuizBuilderOpt('+qi+')" style="background:none;border:1px dashed #cbd5e1;color:#64748b;border-radius:6px;padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;margin-top:4px;">+ Add option</button>';
+    }
+    html += '</div>';
+  });
+  
+  html += '<button onclick="addQuizBuilderQ()" style="width:100%;background:#eff6ff;color:#3b82f6;border:1.5px dashed #93c5fd;border-radius:10px;padding:10px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">+ Add another question</button>';
+  
+  html += '</div>'; // /body
+  
+  // Footer
+  html += '<div style="padding:12px 22px;border-top:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center;gap:8px;">';
+  html += '<div style="font-size:11px;color:#64748b;">'+qb.questions.length+' question'+(qb.questions.length===1?'':'s')+' · Pass at '+qb.pass_pct+'%</div>';
+  html += '<div style="display:flex;gap:8px;">';
+  html += '<button onclick="closeQuizBuilder()" class="btn btn-outline" style="padding:8px 16px;font-size:13px;">Cancel</button>';
+  html += '<button onclick="saveCustomQuiz()" class="btn btn-green" style="padding:8px 18px;font-size:13px;">Save quiz</button>';
+  html += '</div></div>';
+  
+  html += '</div>';
+  bd.innerHTML = html;
+}
+
+function updateQuizBuilderQ(qi, field, val){ _quizBuilder.questions[qi][field] = val; if(field==='correct') renderQuizBuilder(); }
+function updateQuizBuilderOpt(qi, oi, val){ _quizBuilder.questions[qi].options[oi] = val; }
+function addQuizBuilderQ(){ _quizBuilder.questions.push({q:'',options:['',''],correct:0}); renderQuizBuilder(); }
+function removeQuizBuilderQ(qi){ if(_quizBuilder.questions.length > 1){ _quizBuilder.questions.splice(qi,1); renderQuizBuilder(); }}
+function addQuizBuilderOpt(qi){ if(_quizBuilder.questions[qi].options.length < 4){ _quizBuilder.questions[qi].options.push(''); renderQuizBuilder(); }}
+function removeQuizBuilderOpt(qi, oi){ 
+  if(_quizBuilder.questions[qi].options.length > 2){ 
+    _quizBuilder.questions[qi].options.splice(oi,1);
+    if(_quizBuilder.questions[qi].correct >= _quizBuilder.questions[qi].options.length) _quizBuilder.questions[qi].correct = 0;
+    renderQuizBuilder();
+  }
+}
+
+async function saveCustomQuiz(){
+  const qb = _quizBuilder;
+  // Validate
+  for(let i = 0; i < qb.questions.length; i++){
+    const q = qb.questions[i];
+    if(!q.q.trim()){ showToast('Question '+(i+1)+' is empty', 'warning'); return; }
+    if(q.options.some(function(o){return !o.trim();})){ showToast('Question '+(i+1)+' has empty options', 'warning'); return; }
+  }
+  if(!qb.title.trim()){ showToast('Quiz title is required', 'warning'); return; }
+  
+  try{
+    await sbPost('custom_quizzes', {
+      document_id: qb.docId,
+      title: qb.title,
+      pass_pct: qb.pass_pct,
+      questions: qb.questions,
+      created_by: me
+    });
+    showToast('Quiz saved');
+    closeQuizBuilder();
+    loadDocuments();
+  }catch(e){
+    showToast('Save failed: '+e.message, 'error');
+  }
+}
+
+function closeQuizBuilder(){
+  const bd = document.getElementById('quizBuilderBack');
+  if(bd) bd.remove();
+  _quizBuilder = null;
+}
+
+// TAKE A CUSTOM QUIZ (staff-facing)
+async function takeCustomQuiz(quizId){
+  try{
+    const rows = await sbGet('custom_quizzes', '?id=eq.'+quizId);
+    if(!rows || !rows[0]){ showToast('Quiz not found', 'error'); return; }
+    const quiz = rows[0];
+    // Check if already taken
+    const prev = await sbGet('custom_quiz_results', '?quiz_id=eq.'+quizId+'&staff_name=eq.'+encodeURIComponent(me)+'&limit=1');
+    if(prev && prev.length){
+      const r = prev[0];
+      showToast(r.passed ? 'You already passed this quiz' : 'You already attempted this quiz — speak with admin to retake', 'info');
+      return;
+    }
+    // Open quiz modal using same UI as Standard quiz
+    _customQuizState = {
+      quizId: quizId,
+      title: quiz.title,
+      pass_pct: quiz.pass_pct,
+      questions: quiz.questions,
+      current: 0,
+      answers: {},
+      result: null
+    };
+    renderCustomQuizModal();
+  }catch(e){ showToast('Failed to load: '+e.message, 'error'); }
+}
+
+let _customQuizState = null;
+
+function renderCustomQuizModal(){
+  let bd = document.getElementById('customQuizBack');
+  if(!bd){
+    bd = document.createElement('div');
+    bd.id = 'customQuizBack';
+    bd.style.cssText = 'position:fixed;inset:0;z-index:9700;background:rgba(15,23,42,.65);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;padding:16px;';
+    document.body.appendChild(bd);
+  }
+  const cq = _customQuizState;
+  const total = cq.questions.length;
+  
+  if(cq.result){
+    const r = cq.result;
+    const pct = Math.round(r.score/total*100);
+    const passed = pct >= cq.pass_pct;
+    bd.innerHTML = '<div style="background:#fff;border-radius:16px;width:100%;max-width:540px;padding:36px 28px;text-align:center;box-shadow:0 24px 60px rgba(15,23,42,.3);">'+
+      (passed ?
+        '<svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin:0 auto 12px;display:block;"><circle cx="12" cy="12" r="10"/><polyline points="9 12 12 15 17 10"/></svg>'+
+        '<div style="font-size:22px;font-weight:800;color:#10b981;margin-bottom:6px;">Passed! 🎉</div>'
+        :
+        '<svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin:0 auto 12px;display:block;"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>'+
+        '<div style="font-size:22px;font-weight:800;color:#dc2626;margin-bottom:6px;">Needs review</div>'
+      )+
+      '<div style="font-size:30px;font-weight:900;color:#0f172a;margin-bottom:6px;letter-spacing:-.02em;">'+r.score+' / '+total+'</div>'+
+      '<div style="font-size:14px;color:#64748b;margin-bottom:22px;">Score: '+pct+'% — Pass: '+cq.pass_pct+'%</div>'+
+      '<button onclick="closeCustomQuiz()" class="btn btn-green" style="padding:11px 28px;font-size:14px;">Done</button>'+
+    '</div>';
+    return;
+  }
+  
+  const i = cq.current;
+  const q = cq.questions[i];
+  const selected = cq.answers[i];
+  const pct = Math.round((i+1)/total*100);
+  
+  let html = '<div style="background:#fff;border-radius:16px;width:100%;max-width:600px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 24px 60px rgba(15,23,42,.3);overflow:hidden;">';
+  html += '<div style="padding:18px 22px;border-bottom:1px solid #f1f5f9;">';
+  html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">';
+  html += '<div style="font-size:15px;font-weight:700;color:#0f172a;">'+cq.title.replace(/</g,'&lt;')+'</div>';
+  html += '<div style="font-size:12px;color:#64748b;font-weight:600;">'+(i+1)+'/'+total+'</div>';
+  html += '</div>';
+  html += '<div style="background:#f1f5f9;height:5px;border-radius:3px;overflow:hidden;"><div style="background:#3b82f6;height:100%;width:'+pct+'%;transition:width .3s;"></div></div>';
+  html += '</div>';
+  html += '<div style="padding:24px 22px;overflow-y:auto;flex:1;">';
+  html += '<div style="font-size:15px;font-weight:600;color:#0f172a;line-height:1.5;margin-bottom:18px;">'+q.q.replace(/</g,'&lt;')+'</div>';
+  q.options.forEach(function(opt, idx){
+    const isSel = selected === idx;
+    html += '<div onclick="selectCustomQuizAnswer('+idx+')" style="border:1.5px solid '+(isSel?'#3b82f6':'#e2e8f0')+';background:'+(isSel?'#eff6ff':'#fff')+';border-radius:10px;padding:13px 16px;margin-bottom:8px;cursor:pointer;display:flex;align-items:flex-start;gap:11px;">';
+    html += '<div style="width:18px;height:18px;border-radius:50%;border:2px solid '+(isSel?'#3b82f6':'#cbd5e1')+';flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;">';
+    if(isSel) html += '<div style="width:8px;height:8px;border-radius:50%;background:#3b82f6;"></div>';
+    html += '</div><div style="font-size:13.5px;color:#0f172a;line-height:1.45;flex:1;">'+opt.replace(/</g,'&lt;')+'</div></div>';
+  });
+  html += '</div>';
+  html += '<div style="padding:14px 22px;border-top:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center;gap:8px;">';
+  html += '<button onclick="closeCustomQuiz()" style="background:none;border:none;color:#64748b;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">Cancel</button>';
+  html += '<div style="display:flex;gap:8px;">';
+  if(i > 0) html += '<button onclick="prevCustomQuizQ()" class="btn btn-outline" style="padding:9px 18px;font-size:13px;">← Back</button>';
+  if(i < total - 1) html += '<button onclick="nextCustomQuizQ()" '+(selected===undefined?'disabled':'')+' class="btn btn-green" style="padding:9px 18px;font-size:13px;'+(selected===undefined?'opacity:.5;cursor:not-allowed;':'')+'">Next →</button>';
+  else html += '<button onclick="submitCustomQuiz()" '+(selected===undefined?'disabled':'')+' class="btn btn-green" style="padding:9px 18px;font-size:13px;'+(selected===undefined?'opacity:.5;cursor:not-allowed;':'')+'">Submit</button>';
+  html += '</div></div></div>';
+  bd.innerHTML = html;
+}
+
+function selectCustomQuizAnswer(idx){ _customQuizState.answers[_customQuizState.current] = idx; renderCustomQuizModal(); }
+function nextCustomQuizQ(){ if(_customQuizState.answers[_customQuizState.current] !== undefined){ _customQuizState.current++; renderCustomQuizModal(); }}
+function prevCustomQuizQ(){ if(_customQuizState.current > 0){ _customQuizState.current--; renderCustomQuizModal(); }}
+
+async function submitCustomQuiz(){
+  let score = 0;
+  _customQuizState.questions.forEach(function(q, i){ if(_customQuizState.answers[i] === q.correct) score++; });
+  const total = _customQuizState.questions.length;
+  const passed = (score/total*100) >= _customQuizState.pass_pct;
+  _customQuizState.result = { score: score, total: total };
+  try{
+    await sbPost('custom_quiz_results', {
+      quiz_id: _customQuizState.quizId,
+      staff_name: me,
+      score: score,
+      total: total,
+      passed: passed,
+      answers: _customQuizState.answers
+    });
+  }catch(e){ showToast('Save failed: '+e.message, 'error'); return; }
+  renderCustomQuizModal();
+}
+
+function closeCustomQuiz(){ const bd = document.getElementById('customQuizBack'); if(bd) bd.remove(); _customQuizState = null; loadDocuments(); }
+
+
+
+
+async function viewCustomQuizResults(quizId, quizTitle){
+  let bd = document.getElementById('quizResultsBack');
+  if(!bd){
+    bd = document.createElement('div');
+    bd.id = 'quizResultsBack';
+    bd.style.cssText = 'position:fixed;inset:0;z-index:9650;background:rgba(15,23,42,.55);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;padding:16px;';
+    bd.onclick = function(e){ if(e.target===bd){ bd.remove(); }};
+    document.body.appendChild(bd);
+  }
+  bd.innerHTML = '<div style="background:#fff;border-radius:14px;width:100%;max-width:520px;max-height:80vh;display:flex;flex-direction:column;overflow:hidden;" onclick="event.stopPropagation()"><div style="padding:14px 18px;border-bottom:1px solid #f1f5f9;"><div style="font-size:14px;font-weight:700;color:#0f172a;">Results — '+quizTitle.replace(/</g,'&lt;')+'</div></div><div id="qrBody" style="padding:18px;overflow-y:auto;flex:1;">Loading...</div></div>';
+  try{
+    const results = await sbGet('custom_quiz_results', '?quiz_id=eq.'+quizId+'&order=created_at.desc');
+    let html = '';
+    if(!results.length){
+      html = '<div style="text-align:center;padding:30px;color:#94a3b8;font-size:13px;">No one has attempted this quiz yet.</div>';
+    } else {
+      results.forEach(function(r){
+        const dt = new Date(r.created_at).toLocaleDateString('en-AU',{day:'numeric',month:'short'});
+        html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #f1f5f9;">'+
+          '<div><div style="font-size:13px;font-weight:600;color:#0f172a;">'+r.staff_name+'</div><div style="font-size:11px;color:#64748b;">'+dt+'</div></div>'+
+          '<div style="display:flex;align-items:center;gap:8px;">'+
+            (r.passed
+              ? '<span style="font-size:11px;font-weight:700;color:#065f46;background:#d1fae5;padding:4px 10px;border-radius:8px;">'+r.score+'/'+r.total+' ✓</span>'
+              : '<span style="font-size:11px;font-weight:700;color:#991b1b;background:#fee2e2;padding:4px 10px;border-radius:8px;">'+r.score+'/'+r.total+'</span>')+
+            (!r.passed ? '<button onclick="resetCustomQuizAttempt('+r.id+',\''+quizId+'\',\''+quizTitle.replace(/'/g,"\\'")+'\')" style="background:#3b82f6;color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:10px;font-weight:600;cursor:pointer;font-family:inherit;">Allow retake</button>' : '')+
+          '</div></div>';
+      });
+    }
+    document.getElementById('qrBody').innerHTML = html;
+  }catch(e){ document.getElementById('qrBody').innerHTML = '<div style="color:#dc2626;">Failed: '+e.message+'</div>'; }
+}
+
+async function resetCustomQuizAttempt(resultId, quizId, quizTitle){
+  if(!confirm('Allow this staff to retake the quiz?')) return;
+  try{
+    await fetch(SB+'/rest/v1/custom_quiz_results?id=eq.'+resultId,{method:'DELETE',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    showToast('Retake allowed');
+    viewCustomQuizResults(quizId, quizTitle);
+  }catch(e){ showToast('Failed: '+e.message,'error'); }
+}
+
+
+// EDIT THE STANDARD KNOWLEDGE QUIZ (admin only)
+async function openQuizEditor(){
+  if(!myIsAdmin) return;
+  // Load current questions — first check supabase override, else use hardcoded TRAINING_QUIZ
+  let qs = JSON.parse(JSON.stringify(TRAINING_QUIZ.questions));
+  let passPct = TRAINING_QUIZ.pass_pct;
+  try{
+    const rows = await sbGet('quiz_overrides', '?quiz_id=eq.'+TRAINING_QUIZ.id+'&limit=1');
+    if(rows && rows[0] && rows[0].questions){
+      qs = rows[0].questions;
+      if(rows[0].pass_pct) passPct = rows[0].pass_pct;
+    }
+  }catch(e){}
+  
+  _quizBuilder = {
+    docId: null, // signal: this is the Standard Knowledge Quiz
+    isStandardQuiz: true,
+    title: TRAINING_QUIZ.title,
+    pass_pct: passPct,
+    questions: qs
+  };
+  renderQuizBuilder();
+}
+
+// Override saveCustomQuiz to handle the Standard Knowledge Quiz path
+const _origSaveCustomQuiz = (typeof saveCustomQuiz === 'function') ? saveCustomQuiz : null;
+async function saveCustomQuiz(){
+  const qb = _quizBuilder;
+  // Validate
+  for(let i = 0; i < qb.questions.length; i++){
+    const q = qb.questions[i];
+    if(!q.q.trim()){ showToast('Question '+(i+1)+' is empty', 'warning'); return; }
+    if(q.options.some(function(o){return !o.trim();})){ showToast('Question '+(i+1)+' has empty options', 'warning'); return; }
+  }
+  if(!qb.title.trim()){ showToast('Quiz title is required', 'warning'); return; }
+  
+  try{
+    if(qb.isStandardQuiz){
+      // Upsert into quiz_overrides table
+      const existing = await sbGet('quiz_overrides', '?quiz_id=eq.'+TRAINING_QUIZ.id+'&limit=1');
+      if(existing && existing[0]){
+        await fetch(SB+'/rest/v1/quiz_overrides?id=eq.'+existing[0].id, {
+          method:'PATCH',
+          headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+          body: JSON.stringify({questions: qb.questions, pass_pct: qb.pass_pct, updated_at: new Date().toISOString(), updated_by: me})
+        });
+      } else {
+        await sbPost('quiz_overrides', {
+          quiz_id: TRAINING_QUIZ.id,
+          questions: qb.questions,
+          pass_pct: qb.pass_pct,
+          updated_by: me
+        });
+      }
+      // Update local copy
+      TRAINING_QUIZ.questions = qb.questions;
+      TRAINING_QUIZ.pass_pct = qb.pass_pct;
+      showToast('Standard Knowledge Quiz updated');
+    } else {
+      // Custom quiz attached to document
+      await sbPost('custom_quizzes', {
+        document_id: qb.docId,
+        title: qb.title,
+        pass_pct: qb.pass_pct,
+        questions: qb.questions,
+        created_by: me
+      });
+      showToast('Quiz saved');
+      loadDocuments();
+    }
+    closeQuizBuilder();
+  }catch(e){
+    showToast('Save failed: '+e.message, 'error');
+  }
+}
+
+// On boot: load any override of the Standard Knowledge Quiz so staff see the latest version
+async function loadStandardQuizOverride(){
+  try{
+    const rows = await sbGet('quiz_overrides', '?quiz_id=eq.'+TRAINING_QUIZ.id+'&limit=1');
+    if(rows && rows[0]){
+      if(rows[0].questions) TRAINING_QUIZ.questions = rows[0].questions;
+      if(rows[0].pass_pct) TRAINING_QUIZ.pass_pct = rows[0].pass_pct;
+    }
+  }catch(e){}
+}
+
+// ─────────────────────────────────────
+// UNI-STYLE: View each staff's wrong answers
+// ─────────────────────────────────────
+async function viewQuizAttemptDetail(staffName, resultId){
+  let bd = document.getElementById('quizDetailBack');
+  if(!bd){
+    bd = document.createElement('div');
+    bd.id = 'quizDetailBack';
+    bd.style.cssText = 'position:fixed;inset:0;z-index:9750;background:rgba(15,23,42,.65);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;padding:16px;';
+    bd.onclick = function(e){ if(e.target===bd) bd.remove(); };
+    document.body.appendChild(bd);
+  }
+  bd.innerHTML = '<div style="background:#fff;border-radius:16px;width:100%;max-width:680px;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 24px 60px rgba(15,23,42,.3);overflow:hidden;" onclick="event.stopPropagation()"><div style="padding:14px 18px;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center;"><div><div style="font-size:14px;font-weight:700;color:#0f172a;">Quiz Review — '+staffName+'</div><div style="font-size:11px;color:#64748b;margin-top:2px;">Loading...</div></div><button onclick="this.closest(\'#quizDetailBack\').remove()" style="background:none;border:none;font-size:22px;color:#94a3b8;cursor:pointer;line-height:1;padding:4px 10px;">×</button></div><div id="qdBody" style="padding:18px;overflow-y:auto;flex:1;">Loading...</div></div>';
+  
+  try{
+    const rows = await sbGet('training_quiz_results', '?id=eq.'+resultId);
+    if(!rows || !rows[0]){ document.getElementById('qdBody').innerHTML = '<div style="color:#dc2626;">Result not found</div>'; return; }
+    const r = rows[0];
+    const answers = r.answers || {};
+    // Use TRAINING_QUIZ.questions (latest version, possibly overridden)
+    let html = '<div style="margin-bottom:16px;padding:12px 14px;background:'+(r.passed?'#f0fdf4':'#fef2f2')+';border:1px solid '+(r.passed?'#bbf7d0':'#fecaca')+';border-radius:10px;display:flex;justify-content:space-between;align-items:center;">'+
+      '<div><div style="font-size:13px;font-weight:700;color:'+(r.passed?'#065f46':'#991b1b')+';">'+(r.passed?'Passed ✓':'Failed ✕')+'</div>'+
+      '<div style="font-size:11px;color:'+(r.passed?'#065f46':'#991b1b')+';">Submitted '+new Date(r.created_at).toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'})+'</div></div>'+
+      '<div style="font-size:22px;font-weight:900;color:'+(r.passed?'#10b981':'#dc2626')+';">'+r.score+'/'+r.total+'</div></div>';
+    
+    TRAINING_QUIZ.questions.forEach(function(q, i){
+      const userAns = answers[String(i)] !== undefined ? answers[String(i)] : answers[i];
+      const isCorrect = userAns === q.correct;
+      const userOpt = (userAns !== undefined && q.options[userAns]) ? q.options[userAns] : '(no answer)';
+      const correctOpt = q.options[q.correct];
+      html += '<div style="margin-bottom:14px;padding:12px 14px;border:1.5px solid '+(isCorrect?'#bbf7d0':'#fecaca')+';background:'+(isCorrect?'#f0fdf4':'#fef2f2')+';border-radius:10px;">'+
+        '<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;">'+
+        '<div style="background:'+(isCorrect?'#10b981':'#dc2626')+';color:#fff;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;margin-top:1px;">'+(isCorrect?'✓':'✕')+'</div>'+
+        '<div style="font-size:13px;font-weight:600;color:#0f172a;line-height:1.45;">Q'+(i+1)+'. '+q.q.replace(/</g,'&lt;')+'</div>'+
+        '</div>'+
+        '<div style="font-size:12px;color:#475569;margin-bottom:4px;padding-left:30px;"><b>Their answer:</b> '+userOpt.replace(/</g,'&lt;')+'</div>'+
+        (!isCorrect ? '<div style="font-size:12px;color:#065f46;padding-left:30px;"><b>Correct answer:</b> '+correctOpt.replace(/</g,'&lt;')+'</div>' : '')+
+        '</div>';
+    });
+    document.getElementById('qdBody').innerHTML = html;
+  }catch(e){ document.getElementById('qdBody').innerHTML = '<div style="color:#dc2626;">Failed: '+e.message+'</div>'; }
+}
+
+
+
+async function bulkQuizAccess(grant){
+  const action = grant ? 'GRANT access to ALL staff' : 'REVOKE access from ALL staff';
+  if(!confirm('Are you sure you want to '+action+' for the Standard Knowledge Quiz?')) return;
+  const btns = document.querySelectorAll('#sdQuizBulkBar button');
+  btns.forEach(function(b){b.disabled=true;b.style.opacity='.5';});
+  try{
+    if(grant){
+      // Insert one row per staff who doesn't already have access
+      const allNames = (_staffDirData||[]).map(function(p){return p.staff_name;}).filter(Boolean);
+      const existing = window._sdQuizAccess || new Set();
+      const toAdd = allNames.filter(function(n){return !existing.has(n);});
+      if(toAdd.length){
+        const payload = toAdd.map(function(n){return {staff_name:n, quiz_id:'checklist_v1', granted_by: me};});
+        await fetch(SB+'/rest/v1/quiz_access',{
+          method:'POST',
+          headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},
+          body: JSON.stringify(payload)
+        });
+      }
+      showToast('Access granted to '+toAdd.length+' staff');
+    } else {
+      // Delete all rows for this quiz
+      await fetch(SB+'/rest/v1/quiz_access?quiz_id=eq.checklist_v1',{
+        method:'DELETE',
+        headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}
+      });
+      showToast('Access revoked from all');
+    }
+    setTimeout(openStaffDirectory, 400);
+  }catch(e){ showToast('Failed: '+e.message,'error'); }
+  finally{ btns.forEach(function(b){b.disabled=false;b.style.opacity='';}); }
+}
+
+// QUIZ ACCESS MANAGEMENT (admin)
+// loadQuizAccessForStaff removed — no edit-staff modal in portal
+
+
+
 
 
 // ─────────────────────────────────────
@@ -15698,6 +16973,7 @@ async function initRealtime(){
   }catch(e){ console.error('[Realtime] init failed:', e); }
 }
 
+if(typeof loadStandardQuizOverride === 'function') loadStandardQuizOverride();
 function setupRealtimeChannels(){
   _realtimeChannels.forEach(function(ch){ try{ _realtimeClient.removeChannel(ch); }catch(e){} });
   _realtimeChannels = [];
@@ -15868,6 +17144,10 @@ window.addEventListener('resize', function(){
         <div style="font-size:15px;font-weight:700;color:#0f172a;">Team Directory</div>
         <button onclick="closeStaffDirectory()" style="background:none;border:none;font-size:20px;line-height:1;color:#94a3b8;cursor:pointer;padding:4px 8px;">×</button>
       </div>
+      <div id="sdQuizBulkBar" style="display:none;padding:8px 14px;border-bottom:1px solid #f1f5f9;background:#f8fafc;gap:6px;">
+        <button onclick="bulkQuizAccess(true)" style="background:#10b981;color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;flex:1;">Give quiz access to all</button>
+        <button onclick="bulkQuizAccess(false)" style="background:#dc2626;color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;flex:1;">Revoke from all</button>
+      </div>
       <div style="padding:10px 14px;border-bottom:1px solid #f1f5f9;">
         <input type="text" id="staffDirSearch" placeholder="Search by name or team..." class="f-input" oninput="filterStaffDirectory()" style="font-size:13px;">
       </div>
@@ -15993,6 +17273,453 @@ window.addEventListener('resize', function(){
   0%,100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(16,185,129,.6); }
   50% { transform: scale(1.06); box-shadow: 0 0 0 14px rgba(16,185,129,0); }
 }
+
+  .diary-title { font-size: 15px; }
+  .diary-text { font-size: 13px; }
+}
+
+
+/* ── A4 Paper Diary look ── */
+.diary-a4 {
+  background: #fefefe;
+  border: 1px solid #d4d4d8;
+  border-radius: 2px;
+  box-shadow:
+    0 8px 24px rgba(0,0,0,.12),
+    0 2px 6px rgba(0,0,0,.06),
+    inset 0 0 0 1px rgba(255,255,255,.5);
+  padding: 40px 44px 32px;
+  cursor: default;
+  position: relative;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  color: #18181b;
+  /* Strict A4 aspect ratio 210:297 ≈ 1:1.414 */
+  aspect-ratio: 210 / 297;
+  max-width: 600px;
+  width: 100%;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.diary-a4:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 10px 28px rgba(0,0,0,.12),
+    0 2px 4px rgba(0,0,0,.06);
+}
+
+/* Header — date on left, Note: on right */
+.diary-a4-header {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+}
+.diary-a4-date {
+  flex-shrink: 0;
+  border-right: 1px solid #18181b;
+  padding-right: 18px;
+  padding-top: 4px;
+}
+.diary-a4-day-month {
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: -.01em;
+  color: #18181b;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+.diary-a4-year {
+  font-size: 32px;
+  font-weight: 900;
+  letter-spacing: -.04em;
+  color: #000;
+  line-height: .9;
+}
+.diary-a4-note {
+  flex: 1;
+  padding-top: 6px;
+}
+.diary-a4-note-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #000;
+  margin-bottom: 4px;
+}
+.diary-a4-note-line {
+  border-bottom: 1px solid #18181b;
+  height: 14px;
+}
+.diary-a4-reminder {
+  font-size: 12px;
+  color: #18181b;
+  border-bottom: 1px solid #18181b;
+  padding-bottom: 4px;
+  margin-top: 4px;
+}
+
+/* Black divider between header and subject */
+.diary-a4-divider {
+  height: 2px;
+  background: #000;
+  margin: 14px 0 16px;
+}
+
+/* Subject row */
+.diary-a4-subject-row {
+  font-size: 13px;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-bottom: 2px;
+}
+.diary-a4-subject-label {
+  font-weight: 700;
+  color: #000;
+  flex-shrink: 0;
+}
+.diary-a4-subject-value {
+  flex: 1;
+  font-weight: 500;
+  color: #18181b;
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.diary-a4-subject {
+  font-size: 13px;
+  font-weight: 700;
+  color: #000;
+  margin-bottom: 2px;
+}
+.diary-a4-subject-line {
+  border-bottom: 1.5px solid #18181b;
+  margin-bottom: 14px;
+}
+
+/* Body — ruled lines */
+.diary-a4-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+.diary-a4-body-line {
+  border-bottom: 1px dashed #a1a1aa;
+  padding: 6px 0 2px;
+  min-height: 22px;
+  font-size: 13.5px;
+  line-height: 1.4;
+  color: #27272a;
+  font-family: 'Caveat', 'Bradley Hand', cursive;
+  font-size: 17px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.diary-a4-body-line.diary-a4-more {
+  font-family: inherit;
+  font-size: 11px;
+  font-style: italic;
+  color: #71717a;
+  text-align: center;
+  border-bottom: none;
+  padding-top: 8px;
+}
+.diary-a4-body-empty {
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+}
+.diary-a4-empty-text {
+  font-size: 14px;
+  color: #a1a1aa;
+  font-style: italic;
+  text-align: center;
+  padding: 40px 20px;
+}
+
+/* Bottom signature area */
+.diary-a4-bottom {
+  margin-top: auto;
+  padding-top: 18px;
+  border-top: 2px solid #000;
+  display: flex;
+  justify-content: flex-end;
+}
+.diary-a4-signature {
+  text-align: center;
+  min-width: 140px;
+}
+.diary-a4-sig-line {
+  border-bottom: 1px solid #18181b;
+  height: 14px;
+  margin-bottom: 4px;
+}
+.diary-a4-sig-label {
+  font-size: 11px;
+  color: #52525b;
+  letter-spacing: .02em;
+}
+
+/* Load handwriting font */
+@import url('https://fonts.googleapis.com/css2?family=Caveat:wght@400;500;700&display=swap');
+
+/* Dark mode — keep paper aesthetic but slightly muted */
+[data-theme="dark"] .diary-a4 {
+  background: #1c1917;
+  border-color: #3f3f46;
+  color: #fafaf9;
+  box-shadow:
+    0 4px 14px rgba(0,0,0,.4),
+    0 1px 3px rgba(0,0,0,.3);
+}
+[data-theme="dark"] .diary-a4-day-month,
+[data-theme="dark"] .diary-a4-subject-value,
+[data-theme="dark"] .diary-a4-reminder { color: #fafaf9; }
+[data-theme="dark"] .diary-a4-year,
+[data-theme="dark"] .diary-a4-note-label,
+[data-theme="dark"] .diary-a4-subject-label,
+[data-theme="dark"] .diary-a4-subject { color: #fff; }
+[data-theme="dark"] .diary-a4-divider,
+[data-theme="dark"] .diary-a4-bottom { border-color: #f5f5f4; background: transparent; }
+[data-theme="dark"] .diary-a4-divider { background: #f5f5f4; }
+[data-theme="dark"] .diary-a4-date,
+[data-theme="dark"] .diary-a4-note-line,
+[data-theme="dark"] .diary-a4-sig-line,
+[data-theme="dark"] .diary-a4-subject-line { border-color: #f5f5f4; }
+[data-theme="dark"] .diary-a4-body-line { border-bottom-color: #525252; color: #e5e5e5; }
+[data-theme="dark"] .diary-a4-sig-label { color: #a8a29e; }
+[data-theme="dark"] .diary-a4-empty-text { color: #71717a; }
+
+@media(max-width:600px){
+  .diary-a4 { padding: 24px 20px 20px; min-height: 480px; }
+  .diary-a4-year { font-size: 26px; }
+  .diary-a4-body-line { font-size: 15px; }
+}
+
+
+/* Inline-edit diary inputs */
+.diary-a4-editable {
+  cursor: default;
+}
+.diary-a4-date {
+  position: relative;
+}
+.diary-a4-date-input {
+  position: absolute; inset: 0;
+  opacity: 0; cursor: pointer;
+  width: 100%; height: 100%;
+  border: none; background: transparent;
+}
+.diary-a4-reminder-input {
+  width: 100%;
+  border: none;
+  background: transparent;
+  border-bottom: 1px solid #18181b;
+  padding: 2px 0;
+  font-family: inherit;
+  font-size: 12px;
+  outline: none;
+  color: #18181b;
+}
+.diary-a4-reminder-input:focus { border-bottom-color: #3b82f6; }
+.diary-a4-reminder-display {
+  font-size: 11px;
+  color: #18181b;
+  margin-top: 4px;
+  font-weight: 500;
+}
+.diary-a4-note-hint {
+  font-size: 10px;
+  color: #a1a1aa;
+  margin-top: 2px;
+  font-style: italic;
+}
+.diary-a4-subject-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  outline: none;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  color: #18181b;
+  padding: 2px 4px;
+  border-radius: 3px;
+  transition: background .15s;
+}
+.diary-a4-subject-input:focus { background: rgba(59,130,246,.06); }
+.diary-a4-body-editor {
+  width: 100%;
+  min-height: 280px;
+  border: none;
+  background:
+    repeating-linear-gradient(transparent, transparent 26px, #a1a1aa 26px, #a1a1aa 27px);
+  background-attachment: local;
+  background-position: 0 6px;
+  outline: none;
+  resize: none;
+  padding: 6px 0 0;
+  font-family: 'Caveat', 'Bradley Hand', cursive;
+  font-size: 19px;
+  line-height: 27px;
+  color: #18181b;
+  margin: 6px 0 0;
+  display: block;
+  flex: 1;
+}
+.diary-a4-body-editor::placeholder {
+  color: #a1a1aa;
+  font-style: italic;
+}
+.diary-a4-delete {
+  background: none;
+  border: 1px solid #fca5a5;
+  color: #dc2626;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 5px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: inherit;
+  margin-right: auto;
+}
+.diary-a4-delete:hover { background: #fef2f2; }
+.diary-a4-empty-state {
+  text-align: center;
+  cursor: pointer;
+  padding: 60px 20px;
+  min-height: auto;
+}
+.diary-a4-empty-state:hover { background: #fafaf9; }
+
+/* Dark mode for editable inputs */
+[data-theme="dark"] .diary-a4-reminder-input,
+[data-theme="dark"] .diary-a4-subject-input,
+[data-theme="dark"] .diary-a4-body-editor { color: #fafaf9; }
+[data-theme="dark"] .diary-a4-reminder-input { border-bottom-color: #f5f5f4; }
+[data-theme="dark"] .diary-a4-reminder-display { color: #fafaf9; }
+[data-theme="dark"] .diary-a4-body-editor {
+  background: repeating-linear-gradient(transparent, transparent 26px, #525252 26px, #525252 27px);
+  background-attachment: local;
+  background-position: 0 6px;
+}
+[data-theme="dark"] .diary-a4-delete { border-color: #7f1d1d; color: #fca5a5; }
+[data-theme="dark"] .diary-a4-delete:hover { background: rgba(220,38,38,.1); }
+
+
+/* ── Diary flipbook ── */
+.diary-flipbook {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 0 16px;
+}
+.diary-nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  gap: 12px;
+}
+.diary-nav-btn {
+  background: #fff;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #0f172a;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all .15s;
+}
+.diary-nav-btn:hover:not(:disabled) {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+.diary-nav-btn:disabled {
+  opacity: .4;
+  cursor: not-allowed;
+}
+.diary-nav-info {
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+  font-variant-numeric: tabular-nums;
+}
+[data-theme="dark"] .diary-nav-btn {
+  background: #1e293b;
+  border-color: #2d3f55;
+  color: #f1f5f9;
+}
+[data-theme="dark"] .diary-nav-btn:hover:not(:disabled) {
+  background: #253447;
+}
+[data-theme="dark"] .diary-nav-info { color: #94a3b8; }
+
+/* Page stack — 3D perspective for the flip effect */
+.diary-page-stack {
+  position: relative;
+  perspective: 2000px;
+  min-height: 700px;
+}
+.diary-page-slot {
+  position: absolute;
+  inset: 0;
+  transition: transform .5s cubic-bezier(.4,0,.2,1), opacity .3s;
+  transform-style: preserve-3d;
+  transform-origin: left center;
+  backface-visibility: hidden;
+}
+.diary-page-current {
+  z-index: 3;
+  transform: rotateY(0deg);
+  opacity: 1;
+}
+.diary-page-prev {
+  z-index: 1;
+  transform: rotateY(-160deg) translateX(-20px);
+  opacity: 0;
+  pointer-events: none;
+}
+.diary-page-next {
+  z-index: 2;
+  transform: rotateY(0deg) translateX(8px) translateY(8px);
+  opacity: .4;
+  pointer-events: none;
+  filter: blur(1px);
+}
+
+@media(max-width:600px){
+  .diary-page-stack { min-height: 560px; }
+  .diary-nav-btn { padding: 7px 12px; font-size: 12px; }
+}
+
+
+/* Attachment error chip */
+.att-error-chip {
+  background: #fef2f2 !important;
+  border: 1.5px solid #fca5a5 !important;
+  transition: opacity .3s;
+}
+.att-error-icon {
+  background: #fee2e2 !important;
+  color: #dc2626 !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.att-error-icon svg { width: 18px; height: 18px; }
+[data-theme="dark"] .att-error-chip {
+  background: #2d1517 !important;
+  border-color: #7f1d1d !important;
+}
+[data-theme="dark"] .att-error-icon {
+  background: #4a1818 !important;
+  color: #fca5a5 !important;
+}
+
 </style>
 </body>
 </html>
