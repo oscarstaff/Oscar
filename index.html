@@ -15867,10 +15867,12 @@ async function openQuizAdminPanel(quizId, quizTitleOverride){
       let statusBadge = '';
       let actionBtns = '';
       if(result){
+        // Score badge is CLICKABLE — opens detailed review showing per-question right/wrong
+        const reviewBtn = 'onclick="event.stopPropagation();viewQuizAttemptDetail(\''+n.replace(/\\/g,"\\\\").replace(/\'/g,"\\\'")+'\','+result.id+',\''+quizId+'\')" title="Click to see which questions they got right/wrong"';
         if(result.passed){
-          statusBadge = '<span style="font-size:10px;font-weight:700;color:#059669;background:#d1fae5;padding:2px 7px;border-radius:8px;">✓ '+result.score+'/'+result.total+'</span>';
+          statusBadge = '<button '+reviewBtn+' style="font-size:10px;font-weight:700;color:#059669;background:#d1fae5;padding:2px 7px;border-radius:8px;border:none;cursor:pointer;font-family:inherit;">✓ '+result.score+'/'+result.total+' (review)</button>';
         } else {
-          statusBadge = '<span style="font-size:10px;font-weight:700;color:#991b1b;background:#fee2e2;padding:2px 7px;border-radius:8px;">✕ '+result.score+'/'+result.total+'</span>';
+          statusBadge = '<button '+reviewBtn+' style="font-size:10px;font-weight:700;color:#991b1b;background:#fee2e2;padding:2px 7px;border-radius:8px;border:none;cursor:pointer;font-family:inherit;">✕ '+result.score+'/'+result.total+' (review)</button>';
           if(isStandard){
             actionBtns += '<button onclick="resetStaffQuiz(\''+n.replace(/\\/g,"\\\\").replace(/\'/g,"\\\'")+'\','+result.id+');setTimeout(function(){openQuizAdminPanel(\''+quizId+'\');},400);" style="background:#3b82f6;color:#fff;border:none;border-radius:6px;padding:3px 8px;font-size:10px;font-weight:600;cursor:pointer;font-family:inherit;">Retake</button>';
           } else {
@@ -16511,7 +16513,11 @@ async function loadStandardQuizOverride(){
 // ─────────────────────────────────────
 // UNI-STYLE: View each staff's wrong answers
 // ─────────────────────────────────────
-async function viewQuizAttemptDetail(staffName, resultId){
+async function viewQuizAttemptDetail(staffName, resultId, quizId){
+  // quizId optional — if missing, defaults to standard quiz
+  quizId = quizId || 'checklist_v1';
+  const isStandard = (quizId === 'checklist_v1');
+  
   let bd = document.getElementById('quizDetailBack');
   if(!bd){
     bd = document.createElement('div');
@@ -16520,31 +16526,46 @@ async function viewQuizAttemptDetail(staffName, resultId){
     bd.onclick = function(e){ if(e.target===bd) bd.remove(); };
     document.body.appendChild(bd);
   }
-  bd.innerHTML = '<div style="background:#fff;border-radius:16px;width:100%;max-width:680px;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 24px 60px rgba(15,23,42,.3);overflow:hidden;" onclick="event.stopPropagation()"><div style="padding:14px 18px;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center;"><div><div style="font-size:14px;font-weight:700;color:#0f172a;">Quiz Review — '+staffName+'</div><div style="font-size:11px;color:#64748b;margin-top:2px;">Loading...</div></div><button onclick="this.closest(\'#quizDetailBack\').remove()" style="background:none;border:none;font-size:22px;color:#94a3b8;cursor:pointer;line-height:1;padding:4px 10px;">×</button></div><div id="qdBody" style="padding:18px;overflow-y:auto;flex:1;">Loading...</div></div>';
+  bd.innerHTML = '<div style="background:#fff;border-radius:16px;width:100%;max-width:680px;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 24px 60px rgba(15,23,42,.3);overflow:hidden;" onclick="event.stopPropagation()"><div style="padding:14px 18px;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center;"><div><div style="font-size:14px;font-weight:700;color:#0f172a;">Quiz Review — '+staffName+'</div><div style="font-size:11px;color:#64748b;margin-top:2px;">Loading...</div></div><button onclick="document.getElementById(\'quizDetailBack\').remove()" style="background:none;border:none;font-size:22px;color:#94a3b8;cursor:pointer;line-height:1;padding:4px 10px;">×</button></div><div id="qdBody" style="padding:18px;overflow-y:auto;flex:1;">Loading...</div></div>';
   
   try{
-    const rows = await sbGet('training_quiz_results', '?id=eq.'+resultId);
-    if(!rows || !rows[0]){ document.getElementById('qdBody').innerHTML = '<div style="color:#dc2626;">Result not found</div>'; return; }
-    const r = rows[0];
+    let r, questions;
+    if(isStandard){
+      const rows = await sbGet('training_quiz_results', '?id=eq.'+resultId);
+      if(!rows || !rows[0]){ document.getElementById('qdBody').innerHTML = '<div style="color:#dc2626;">Result not found</div>'; return; }
+      r = rows[0];
+      questions = TRAINING_QUIZ.questions; // hardcoded + possibly overridden
+    } else {
+      // Custom quiz — fetch result + the quiz definition
+      const [rows, quizRows] = await Promise.all([
+        sbGet('custom_quiz_results', '?id=eq.'+resultId),
+        sbGet('custom_quizzes', '?id=eq.'+quizId)
+      ]);
+      if(!rows || !rows[0]){ document.getElementById('qdBody').innerHTML = '<div style="color:#dc2626;">Result not found</div>'; return; }
+      if(!quizRows || !quizRows[0]){ document.getElementById('qdBody').innerHTML = '<div style="color:#dc2626;">Quiz definition not found</div>'; return; }
+      r = rows[0];
+      questions = quizRows[0].questions || [];
+    }
+    
     const answers = r.answers || {};
-    // Use TRAINING_QUIZ.questions (latest version, possibly overridden)
+    
     let html = '<div style="margin-bottom:16px;padding:12px 14px;background:'+(r.passed?'#f0fdf4':'#fef2f2')+';border:1px solid '+(r.passed?'#bbf7d0':'#fecaca')+';border-radius:10px;display:flex;justify-content:space-between;align-items:center;">'+
       '<div><div style="font-size:13px;font-weight:700;color:'+(r.passed?'#065f46':'#991b1b')+';">'+(r.passed?'Passed ✓':'Failed ✕')+'</div>'+
       '<div style="font-size:11px;color:'+(r.passed?'#065f46':'#991b1b')+';">Submitted '+new Date(r.created_at).toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'})+'</div></div>'+
       '<div style="font-size:22px;font-weight:900;color:'+(r.passed?'#10b981':'#dc2626')+';">'+r.score+'/'+r.total+'</div></div>';
     
-    TRAINING_QUIZ.questions.forEach(function(q, i){
+    questions.forEach(function(q, i){
       const userAns = answers[String(i)] !== undefined ? answers[String(i)] : answers[i];
       const isCorrect = userAns === q.correct;
-      const userOpt = (userAns !== undefined && q.options[userAns]) ? q.options[userAns] : '(no answer)';
-      const correctOpt = q.options[q.correct];
+      const userOpt = (userAns !== undefined && q.options[userAns] !== undefined) ? q.options[userAns] : '(no answer)';
+      const correctOpt = q.options[q.correct] || '(unknown)';
       html += '<div style="margin-bottom:14px;padding:12px 14px;border:1.5px solid '+(isCorrect?'#bbf7d0':'#fecaca')+';background:'+(isCorrect?'#f0fdf4':'#fef2f2')+';border-radius:10px;">'+
         '<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;">'+
         '<div style="background:'+(isCorrect?'#10b981':'#dc2626')+';color:#fff;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;margin-top:1px;">'+(isCorrect?'✓':'✕')+'</div>'+
-        '<div style="font-size:13px;font-weight:600;color:#0f172a;line-height:1.45;">Q'+(i+1)+'. '+q.q.replace(/</g,'&lt;')+'</div>'+
+        '<div style="font-size:13px;font-weight:600;color:#0f172a;line-height:1.45;">Q'+(i+1)+'. '+String(q.q).replace(/</g,'&lt;')+'</div>'+
         '</div>'+
-        '<div style="font-size:12px;color:#475569;margin-bottom:4px;padding-left:30px;"><b>Their answer:</b> '+userOpt.replace(/</g,'&lt;')+'</div>'+
-        (!isCorrect ? '<div style="font-size:12px;color:#065f46;padding-left:30px;"><b>Correct answer:</b> '+correctOpt.replace(/</g,'&lt;')+'</div>' : '')+
+        '<div style="font-size:12px;color:#475569;margin-bottom:4px;padding-left:30px;"><b>Their answer:</b> '+String(userOpt).replace(/</g,'&lt;')+'</div>'+
+        (!isCorrect ? '<div style="font-size:12px;color:#065f46;padding-left:30px;"><b>Correct answer:</b> '+String(correctOpt).replace(/</g,'&lt;')+'</div>' : '')+
         '</div>';
     });
     document.getElementById('qdBody').innerHTML = html;
