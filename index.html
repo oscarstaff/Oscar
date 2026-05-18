@@ -11585,6 +11585,38 @@ async function applyGpsLock(){
   }
 }
 
+
+// Retry any clock sync that failed (network/Apps Script down)
+async function flushClockSyncQueue(){
+  try{
+    const queue = JSON.parse(localStorage.getItem('clock_sync_queue') || '[]');
+    if(!queue.length) return;
+    console.log('[clock] retrying '+queue.length+' queued sheet syncs');
+    const DEFAULT_SHEET_URL = 'https://script.google.com/macros/s/AKfycby0Bq97bCZAsmnruXFuJuCqXQE_kOxhYE2KFuJnVzLXtT5CV0Y12k5176dxZbdaYVGE/exec';
+    const sheetUrl = localStorage.getItem('oscars_sheet_url') || DEFAULT_SHEET_URL;
+    const remaining = [];
+    for(const item of queue){
+      // Skip if too old (>3 days)
+      if(Date.now() - item.queuedAt > 3*24*3600*1000) continue;
+      try{
+        const r = await fetch(sheetUrl, {
+          method:'POST',
+          headers:{'Content-Type':'text/plain;charset=utf-8'},
+          body: JSON.stringify(item.payload)
+        });
+        if(r.ok){
+          console.log('[clock] queued sync flushed OK');
+        } else {
+          remaining.push(item);
+        }
+      }catch(e){
+        remaining.push(item);
+      }
+    }
+    localStorage.setItem('clock_sync_queue', JSON.stringify(remaining));
+  }catch(e){ console.warn('flushClockSyncQueue:', e); }
+}
+
 async function loadClockState(){
   if(!me) return;
   applyGpsLock();
@@ -12493,15 +12525,42 @@ async function toggleClock(){
       };
       if(next === 'in') payload.timeIn = timeStr;
       else payload.timeOut = timeStr;
-      fetch(sheetUrl, {
-        method:'POST',
-        mode:'no-cors',
-        headers:{'Content-Type':'text/plain;charset=utf-8'},
-        body: JSON.stringify(payload)
-      }).catch(function(e){ console.warn('sheets sync failed:', e); });
+      // Try CORS first (will work since Apps Script returns CORS headers), then no-cors fallback
+      const syncToSheet = function(){
+        return fetch(sheetUrl, {
+          method:'POST',
+          headers:{'Content-Type':'text/plain;charset=utf-8'},
+          body: JSON.stringify(payload)
+        }).then(function(r){
+          if(!r.ok) throw new Error('HTTP '+r.status);
+          return r.text();
+        }).then(function(txt){
+          console.log('[clock] sheets sync OK:', txt.slice(0,120));
+        }).catch(function(e){
+          console.warn('[clock] sheets sync attempt 1 failed:', e.message);
+          // Retry once with no-cors mode (fire-and-forget)
+          return fetch(sheetUrl, {
+            method:'POST',
+            mode:'no-cors',
+            headers:{'Content-Type':'text/plain;charset=utf-8'},
+            body: JSON.stringify(payload)
+          }).then(function(){
+            console.log('[clock] sheets sync attempt 2 (no-cors) sent');
+          }).catch(function(e2){
+            console.error('[clock] both sheets sync attempts failed:', e2.message);
+            // Queue for later retry
+            try{
+              const queue = JSON.parse(localStorage.getItem('clock_sync_queue') || '[]');
+              queue.push({payload: payload, queuedAt: Date.now()});
+              localStorage.setItem('clock_sync_queue', JSON.stringify(queue.slice(-20)));
+            }catch(_){}
+          });
+        });
+      };
+      syncToSheet();
     }
     _clockState = next;
-    _clockSinceTs = new Date();
+    _clockSinceTs = flexedDate; // use the flexed/rounded time (matches what's in supabase)
     if(next === 'in') window._autoClockOutFired = false; // reset for new session
     // Cache for instant render on next page load
     try{
@@ -12510,7 +12569,13 @@ async function toggleClock(){
         ts: _clockSinceTs.toISOString()
       }));
     }catch(e){}
+    // Force immediate button text update before renderClockCard runs
+    btn.textContent = (next === 'in') ? 'Clock Out' : 'Clock In';
+    btn.style.background = (next === 'in') ? '#dc2626' : 'var(--accent)';
     renderClockCard();
+    // Second forced render after a tick to defeat any race with state restore
+    setTimeout(renderClockCard, 50);
+    setTimeout(renderClockCard, 300);
     showToast(next==='in' ? 'Clocked in' : 'Clocked out');
     loadAllClockLogs();
     applyGpsLock();
@@ -13388,7 +13453,25 @@ async function approveExtraBreak(id, staff, date, minutes){
     });
     // 2. Top up break_hrs in clock_overrides — verified write
     const existing = await sbGet('clock_overrides','?staff_name=eq.'+encodeURIComponent(staff)+'&date=eq.'+date);
-    const currentBreak = (existing && existing.length) ? (parseFloat(existing[0].break_hrs) || 0) : 0.5;
+    let currentBreak;
+    if(existing && existing.length){
+      currentBreak = parseFloat(existing[0].break_hrs) || 0;
+    } else {
+      // No override yet — compute the auto break from actual clock_log for this day
+      // Mirrors applyAutoRules: weekend = 0, weekday with >5.5h = 0.5, else 0
+      const dayStart = new Date(date + 'T00:00:00');
+      const dayEnd = new Date(date + 'T23:59:59');
+      const dayLogs = await sbGet('clock_log','?staff_name=eq.'+encodeURIComponent(staff)+'&ts=gte.'+dayStart.toISOString()+'&ts=lte.'+dayEnd.toISOString()+'&order=ts.asc');
+      let rawHours = 0;
+      const inTs = (dayLogs||[]).find(function(r){return r.action==='in';});
+      const outTs = (dayLogs||[]).reverse().find(function(r){return r.action==='out';});
+      if(inTs && outTs){
+        rawHours = (new Date(outTs.ts) - new Date(inTs.ts)) / 3600000;
+      }
+      const dow = dayStart.getDay(); // 0=Sun, 6=Sat
+      const isWeekend = (dow === 0 || dow === 6);
+      currentBreak = isWeekend ? 0 : (rawHours > 5.5 ? 0.5 : 0);
+    }
     const newBreak = currentBreak + (minutes / 60);
     console.log('[approveBreak] staff:', staff, 'date:', date, 'current:', currentBreak, 'add:', minutes/60, 'new:', newBreak);
     let writeRes;
@@ -18624,6 +18707,7 @@ async function initRealtime(){
 }
 
 if(typeof loadStandardQuizOverride === 'function') loadStandardQuizOverride();
+  if(typeof flushClockSyncQueue === 'function') setTimeout(flushClockSyncQueue, 2000);
 if(typeof refreshTrainingBadge === 'function') setTimeout(refreshTrainingBadge, 1500);
 function setupRealtimeChannels(){
   _realtimeChannels.forEach(function(ch){ try{ _realtimeClient.removeChannel(ch); }catch(e){} });
