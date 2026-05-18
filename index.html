@@ -16631,7 +16631,7 @@ async function openQuizAdminPanel(quizId, quizTitleOverride){
       isStandard 
         ? sbGet('training_quiz_results', '?quiz_id=eq.checklist_v1&order=created_at.desc')
         : sbGet('custom_quiz_results', '?quiz_id=eq.'+quizId+'&order=created_at.desc'),
-      sbGet('staff_settings', '?select=name&order=name.asc')
+      sbGet('staff_names', '?select=name&order=name.asc')
     ]);
     
     const accessSet = new Set((accessRows||[]).map(function(a){return a.staff_name;}));
@@ -16744,7 +16744,7 @@ async function bulkAccessForQuiz(quizId, grant){
   if(!confirm('Are you sure you want to '+verb+' for ALL staff on this quiz?')) return;
   try{
     if(grant){
-      const allStaff = await sbGet('staff_settings', '?select=name');
+      const allStaff = await sbGet('staff_names', '?select=name');
       const existing = await sbGet('quiz_access', '?quiz_id=eq.'+encodeURIComponent(quizId));
       const existingSet = new Set((existing||[]).map(function(a){return a.staff_name;}));
       const toAdd = (allStaff||[]).map(function(s){return s.name;}).filter(function(n){return n && !existingSet.has(n);});
