@@ -41,14 +41,29 @@
 *{box-sizing:border-box;margin:0;padding:0;}
 html,body{height:100%;overflow:hidden;}
 body{
-  background:#f1f5f9;color:#0f172a;
+  background:#f6f7fb;color:#0f172a;
   font-family:'Inter',system-ui,sans-serif;
   font-size:14px;display:flex;flex-direction:column;
   -webkit-text-size-adjust:100%;
 }
+/* Soft ambient mesh-gradient background — subtle, performance-friendly */
 body::before{
   content:"";position:fixed;inset:0;z-index:-1;
-  background:#f1f5f9;
+  background:
+    radial-gradient(at 12% 8%, rgba(16,185,129,.08) 0px, transparent 50%),
+    radial-gradient(at 88% 12%, rgba(139,92,246,.07) 0px, transparent 55%),
+    radial-gradient(at 50% 100%, rgba(59,130,246,.06) 0px, transparent 60%),
+    radial-gradient(at 5% 90%, rgba(244,114,182,.05) 0px, transparent 55%),
+    #f6f7fb;
+}
+[data-theme="dark"] body{ background:#0a0f1c; }
+[data-theme="dark"] body::before{
+  background:
+    radial-gradient(at 12% 8%, rgba(16,185,129,.10) 0px, transparent 50%),
+    radial-gradient(at 88% 12%, rgba(139,92,246,.10) 0px, transparent 55%),
+    radial-gradient(at 50% 100%, rgba(59,130,246,.08) 0px, transparent 60%),
+    radial-gradient(at 5% 90%, rgba(244,114,182,.06) 0px, transparent 55%),
+    #0a0f1c;
 }
 
 /* ── AUTH ── */
@@ -938,7 +953,7 @@ body.ready{visibility:visible;}
 .ann-card{background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:18px 20px;margin-bottom:12px;transition:transform .18s,box-shadow .18s;}
 .ann-card:hover{transform:translateY(-1px);box-shadow:0 4px 16px var(--accent-dim);}
 .ann-card.pinned{border-color:var(--accent-bd);background:#f0f7ff;}
-.ann-pin{font-size:10px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px;display:flex;align-items:center;gap:5px;}
+.ann-pin{font-size:10px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px;display:inline-flex;align-items:center;gap:5px;background:var(--accent-dim);padding:3px 9px;border-radius:14px;}
 .ann-title{font-size:15px;font-weight:700;color:#0f172a;margin-bottom:6px;}
 .ann-body{font-size:13px;color:#475569;line-height:1.6;}
 .ann-meta{font-size:11px;color:#94a3b8;margin-top:10px;display:flex;align-items:center;justify-content:space-between;}
@@ -4442,7 +4457,7 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
 
   <!-- MOBILE HEADER -->
   <div class="mobile-header">
-    <div class="mh-user" onclick="goTo('profile')" style="cursor:pointer;" title="Open profile">
+    <div class="mh-user" onclick="goTo('profile')" style="cursor:pointer;padding:4px 10px 4px 4px;border-radius:20px;background:#f1f5f9;transition:background .15s;display:flex;align-items:center;" title="Open profile">
       <div class="mh-ava" id="mhAva"></div>
       <div class="mh-name" id="mhNameInline" style="font-size:12px;font-weight:600;color:#1e293b;"></div>
     </div>
@@ -4529,7 +4544,7 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
           <svg class="nav-chevron" viewBox="0 0 20 20" fill="currentColor" style="width:16px;height:16px;margin-left:auto;flex-shrink:0;opacity:.7;transition:transform .25s ease;"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
         </div>
         <div class="nav-children">
-          <div class="nav-child" data-tab="training" onclick="goTo('training')">My Training</div>
+          <div class="nav-child" data-tab="training" onclick="goTo('training')">Learnings</div>
           <div class="nav-child" data-tab="documents" onclick="goTo('documents')">Documents</div>
         </div>
       </div>
@@ -4549,7 +4564,10 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
       <div id="clockCard" class="card" style="margin-bottom:12px;padding:18px;">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;">
           <div style="flex:1;min-width:180px;">
-            <div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">Time clock</div>
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+              <div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.06em;">Time clock</div>
+              <div id="nepaliDateBadge" style="font-size:10px;font-weight:700;color:#7c3aed;background:rgba(139,92,246,.1);padding:2px 7px;border-radius:6px;letter-spacing:.02em;"></div>
+            </div>
             <div id="clockStatus" style="font-size:18px;font-weight:700;color:#0f172a;letter-spacing:-.01em;">Loading...</div>
             <div id="clockSubStatus" style="font-size:12px;color:#64748b;margin-top:2px;"></div>
           </div>
@@ -4747,9 +4765,13 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
             <button class="cal-view-btn active" data-view="month" onclick="setCalView('month')">Month</button>
             <button class="cal-view-btn" data-view="year" onclick="setCalView('year')">Year</button>
           </div>
+          <div class="cal-views" style="margin-left:6px;">
+            <button class="cal-view-btn active" data-cal-system="ad" onclick="setCalSystem('ad')">AD</button>
+            <button class="cal-view-btn" data-cal-system="bs" onclick="setCalSystem('bs')">BS</button>
+          </div>
           <button id="calAddEventBtn" onclick="toggleCalEventForm()" style="display:none;font-size:12px;font-weight:600;color:var(--accent);background:none;border:none;cursor:pointer;font-family:inherit;padding:6px 10px;">+ Event</button>
           <button class="cal-nav-btn" onclick="calPrev()" style="cursor:pointer;">&#8249;</button>
-          <span id="bdayMonthLabel" style="font-size:13px;font-weight:700;color:#0f172a;min-width:120px;text-align:center;"></span>
+          <span style="display:inline-flex;flex-direction:column;align-items:center;min-width:140px;text-align:center;line-height:1.2;"><span id="bdayMonthLabel" style="font-size:13px;font-weight:700;color:#0f172a;"></span><span id="bdayNepaliLabel" style="font-size:10px;font-weight:600;color:#7c3aed;margin-top:1px;letter-spacing:.02em;"></span></span>
           <button class="cal-nav-btn" onclick="calNext()" style="cursor:pointer;">&#8250;</button>
           <button class="cal-today-btn" onclick="calToday()" style="cursor:pointer;font-family:inherit;">Today</button>
         </div>
@@ -4871,26 +4893,8 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
           <div class="page-title">Documents</div>
           <div class="page-sub" id="docsSub">Resources shared with your team</div>
         </div>
-        <button onclick="goTo('training')" class="lib-switch-btn" style="background:#f1f5f9;border:1px solid #e2e8f0;border-radius:8px;padding:7px 12px;font-size:12px;font-weight:600;color:#0f172a;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:5px;">🎓 Training →</button>
+        <button onclick="goTo('training')" class="lib-switch-btn" style="background:#f1f5f9;border:1px solid #e2e8f0;border-radius:8px;padding:7px 12px;font-size:12px;font-weight:600;color:#0f172a;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:5px;">Learnings →</button>
       </div>
-
-      <!-- TRAINING QUIZ STRIP -->
-      <div id="quizStrip" style="display:none;margin-bottom:14px;background:#fff;border:1.5px solid #e2e8f0;border-radius:12px;padding:14px 18px;align-items:center;gap:14px;cursor:pointer;transition:border-color .15s,background .15s;" onclick="openTrainingQuiz()" onmouseover="this.style.borderColor='#3b82f6';this.style.background='#f8faff'" onmouseout="this.style.borderColor='#e2e8f0';this.style.background='#fff'">
-        <div id="quizStripIcon" style="width:42px;height:42px;border-radius:10px;background:#eff6ff;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="15" x2="15" y2="15"/><line x1="9" y1="11" x2="15" y2="11"/></svg>
-        </div>
-        <div style="flex:1;min-width:0;">
-          <div id="quizStripTitle" style="font-size:14px;font-weight:700;color:#0f172a;margin-bottom:2px;">Standard Knowledge Quiz — Oscars</div>
-          <div id="quizStripSub" style="font-size:12px;color:#64748b;">Complete once to verify your understanding of the training material</div>
-        </div>
-        <div id="quizStripStatus" style="font-size:12px;font-weight:700;padding:5px 12px;border-radius:14px;background:#3b82f6;color:#fff;flex-shrink:0;">Start →</div>
-        <button id="quizManageBtn" onclick="event.stopPropagation();openQuizAdminPanel('checklist_v1')" style="display:none;background:#0f172a;color:#fff;border:none;border-radius:8px;padding:5px 10px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;flex-shrink:0;margin-left:6px;">Manage</button>
-        <button id="quizEditBtn" onclick="event.stopPropagation();openQuizEditor()" style="display:none;background:#475569;color:#fff;border:none;border-radius:8px;padding:5px 10px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;flex-shrink:0;margin-left:4px;">Edit</button>
-      </div>
-
-      <!-- ADMIN: Non-compliant staff alert -->
-      <div id="quizAdminPanel" style="display:none;margin-bottom:14px;"></div>
-
       <!-- Search -->
       <div style="position:relative;margin-bottom:14px;">
         <svg style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#94a3b8;" width="16" height="16" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd"/></svg>
@@ -5096,8 +5100,8 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
 <div class="page" id="page-training">
   <div class="page-hd">
     <div>
-      <div class="page-title">My Training</div>
-      <div class="page-sub">Compliance reading + quizzes assigned to you</div>
+      <div class="page-title">Learnings</div>
+      <div class="page-sub">Compliance quizzes &amp; learning materials</div>
     </div>
   </div>
   
@@ -5372,6 +5376,167 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
       <!-- FEEDBACK section (staff only - anonymous) -->
   </main>
 <style>
+/* ── Quiz admin panel — dynamic button styles ── */
+.qap-action-btn {
+  flex: 1;
+  min-width: 140px;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 11px 16px;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  letter-spacing: -.005em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  position: relative;
+  overflow: hidden;
+  transition: transform .15s cubic-bezier(.4,0,.2,1), box-shadow .15s, filter .15s;
+  box-shadow: 0 2px 4px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+}
+.qap-action-btn::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,.18) 0%, rgba(255,255,255,0) 60%);
+  pointer-events: none;
+}
+.qap-action-btn:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.08);
+  box-shadow: 0 8px 18px rgba(0,0,0,.15), 0 3px 6px rgba(0,0,0,.08);
+}
+.qap-action-btn:active {
+  transform: translateY(0);
+  filter: brightness(.95);
+  transition-duration: .05s;
+}
+.qap-btn-give    { background: linear-gradient(135deg, #10b981 0%, #059669 100%); box-shadow: 0 4px 12px rgba(16,185,129,.25); }
+.qap-btn-revoke  { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); box-shadow: 0 4px 12px rgba(220,38,38,.25); }
+.qap-btn-report  { background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); box-shadow: 0 4px 12px rgba(59,130,246,.25); }
+.qap-btn-publish { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); box-shadow: 0 4px 12px rgba(245,158,11,.25); }
+.qap-btn-edit    { background: linear-gradient(135deg, #64748b 0%, #475569 100%); box-shadow: 0 4px 12px rgba(71,85,105,.25); }
+.qap-btn-delete  { background: linear-gradient(135deg, #991b1b 0%, #7f1d1d 100%); box-shadow: 0 4px 12px rgba(127,29,29,.3); }
+
+/* Stat cards in quiz admin */
+.qap-stat-card {
+  flex: 1;
+  min-width: 90px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+  transition: transform .2s;
+}
+.qap-stat-card::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,.4) 0%, rgba(255,255,255,0) 70%);
+  pointer-events: none;
+}
+.qap-stat-card:hover { transform: translateY(-1px); }
+.qap-stat-num {
+  font-size: 24px;
+  font-weight: 900;
+  letter-spacing: -.02em;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+.qap-stat-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+
+/* Per-staff toggle buttons polished */
+.qap-give-btn, .qap-revoke-btn {
+  border: none;
+  border-radius: 7px;
+  padding: 5px 11px;
+  font-size: 10.5px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  min-width: 78px;
+  color: #fff;
+  transition: transform .12s, filter .12s, box-shadow .15s;
+}
+.qap-give-btn   { background: linear-gradient(135deg, #10b981, #059669); box-shadow: 0 2px 6px rgba(16,185,129,.3); }
+.qap-revoke-btn { background: linear-gradient(135deg, #ef4444, #dc2626); box-shadow: 0 2px 6px rgba(220,38,38,.3); }
+.qap-give-btn:hover, .qap-revoke-btn:hover { transform: translateY(-1px); filter: brightness(1.08); }
+.qap-give-btn:active, .qap-revoke-btn:active { transform: translateY(0); }
+
+/* Retake button */
+.qap-retake-btn {
+  background: linear-gradient(135deg, #6366f1, #4f46e5);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 4px 9px;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  box-shadow: 0 2px 5px rgba(79,70,229,.3);
+  transition: transform .12s, filter .12s;
+}
+.qap-retake-btn:hover { transform: translateY(-1px); filter: brightness(1.1); }
+
+/* Modal wrapper subtle entrance */
+#quizAdminBack > div {
+  animation: qapModalIn .25s cubic-bezier(.4,0,.2,1);
+}
+@keyframes qapModalIn {
+  from { opacity: 0; transform: translateY(8px) scale(.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* Staff row hover */
+.qap-row {
+  transition: background .15s;
+  border-radius: 8px;
+}
+.qap-row:hover { background: #f8fafc; }
+[data-theme="dark"] .qap-row:hover { background: rgba(255,255,255,.04); }
+
+/* Draft pill — animated */
+.qap-draft-pill {
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
+  color: #78350f;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 3px 10px;
+  border-radius: 10px;
+  margin-left: 10px;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  box-shadow: 0 1px 3px rgba(217,119,6,.2);
+  display: inline-block;
+  animation: qapDraftPulse 2.5s ease-in-out infinite;
+}
+@keyframes qapDraftPulse {
+  0%, 100% { box-shadow: 0 1px 3px rgba(217,119,6,.2); }
+  50% { box-shadow: 0 2px 12px rgba(217,119,6,.5); }
+}
+</style>
+
+<style>
+.mh-user:hover { background: #e2e8f0 !important; }
+.mh-user:active { transform: scale(0.96); }
+[data-theme="dark"] .mh-user { background: #1e293b !important; }
+[data-theme="dark"] .mh-user:hover { background: #253447 !important; }
+[data-theme="dark"] .mh-user .mh-name { color: #f1f5f9 !important; }
+.sb-user { transition: background .15s; }
+.sb-user:hover { background: rgba(0,0,0,.04); }
+[data-theme="dark"] .sb-user:hover { background: rgba(255,255,255,.06); }
+</style>
+
+<style>
 @keyframes libSheetUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 [data-theme="dark"] #libChooserSheet { background: #0f172a !important; border-top-color: #1e293b !important; }
 [data-theme="dark"] #libChooserSheet button { background: #1e293b !important; border-color: #2d3f55 !important; }
@@ -5609,7 +5774,7 @@ function renderDocs(docs){
     let quizBtn = '';
     if(quizzes.length){
       // Clickable indicator — routes to My Training
-      quizBtn = '<button onclick="event.preventDefault();event.stopPropagation();goTo(\'training\');setTimeout(function(){scrollToTrainingItem(\''+quizzes[0].id+'\');},300);" style="background:#eff6ff;color:#1e40af;border:1px solid #bfdbfe;border-radius:6px;padding:4px 10px;font-size:10.5px;font-weight:700;font-family:inherit;cursor:pointer;margin-right:6px;">📋 Has Quiz</button>';
+      quizBtn = '<button onclick="event.preventDefault();event.stopPropagation();goTo(\'training\');setTimeout(function(){scrollToTrainingItem(\''+quizzes[0].id+'\');},300);" style="background:#eff6ff;color:#1e40af;border:1px solid #bfdbfe;border-radius:6px;padding:4px 10px;font-size:10.5px;font-weight:700;font-family:inherit;cursor:pointer;margin-right:6px;">Has Quiz</button>';
     } else {
       quizBtn = '<span style="background:#f1f5f9;color:#94a3b8;font-size:10px;font-weight:600;padding:3px 8px;border-radius:6px;margin-right:6px;">No Quiz</span>';
     }
@@ -5869,12 +6034,12 @@ async function loadDiscussions(){
       // Pin + must-read badges
       let badges = '';
       if(r.pinned){
-        badges += '<span style="display:inline-flex;align-items:center;gap:3px;background:#fef3c7;color:#92400e;font-size:9px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;padding:2px 7px;border-radius:20px;margin-right:5px;">'+
-          '<svg width="10" height="10" viewBox="0 0 20 20" fill="currentColor"><path d="M5.5 3a.5.5 0 01.5-.5h8a.5.5 0 010 1V8l3 4v1H3v-1l3-4V3.5h-.5z"/></svg>Pinned</span>';
+        badges += '<span style="display:inline-flex;align-items:center;gap:5px;background:#fef3c7;color:#92400e;font-size:9.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;padding:3px 9px;border-radius:20px;margin-right:5px;line-height:1.3;">'+
+          '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:1px;"><line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24z"/></svg>Pinned</span>';
       }
       if(r.must_read){
-        badges += '<span style="display:inline-flex;align-items:center;gap:3px;background:#fee2e2;color:#991b1b;font-size:9px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;padding:2px 7px;border-radius:20px;margin-right:5px;">'+
-          '<svg width="10" height="10" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2h-1V9z" clip-rule="evenodd"/></svg>Must read</span>';
+        badges += '<span style="display:inline-flex;align-items:center;gap:5px;background:#fee2e2;color:#991b1b;font-size:9.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;padding:3px 9px;border-radius:20px;margin-right:5px;line-height:1.3;">'+
+          '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:1px;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>Must read</span>';
       }
       if(badges) html += '<div style="margin-bottom:3px;">'+badges+'</div>';
       html+='<div style="font-size:13px;font-weight:700;color:#0f172a;">'+r.title+'</div>';
@@ -6596,7 +6761,7 @@ function openLibrary(){
     defaultTab: 'training',
     options: [
       {
-        label: 'My Training',
+        label: 'Learnings',
         sub: 'Quizzes & compliance checks',
         bg: '#eff6ff',
         icon: '<svg width="18" height="18" viewBox="0 0 20 20" fill="#3b82f6"><path d="M10.394 2.08a1 1 0 00-.788 0l-7 3a1 1 0 000 1.84L5.25 8.051a.999.999 0 01.356-.257l4-1.714a1 1 0 11.788 1.838L7.667 9.088l1.94.831a1 1 0 00.787 0l7-3a1 1 0 000-1.838l-7-3zM3.31 9.397L5 10.12v4.102a8.969 8.969 0 00-1.05-.174 1 1 0 01-.89-.89 11.115 11.115 0 01.25-3.762zM9.3 16.573A9.026 9.026 0 007 14.935v-3.957l1.818.78a3 3 0 002.364 0l5.508-2.361a11.026 11.026 0 01.25 3.762 1 1 0 01-.89.89 8.968 8.968 0 00-5.35 2.524 1 1 0 01-1.4 0zM6 18a1 1 0 001-1v-2.065a8.935 8.935 0 00-2-.712V17a1 1 0 001 1z"/></svg>',
@@ -6788,7 +6953,7 @@ async function loadAdminAvailGrid(){
     html+='<div style="font-size:12.5px;font-weight:700;min-width:150px;padding-top:2px">'+name+'</div>';
     if(!row){html+='<div style="font-size:11px;color:#94a3b8;">Not set</div>';}
     else{
-      const period=row.is_ongoing?"Ongoing":(row.valid_from?"From "+row.valid_from+(row.valid_until?" – "+row.valid_until:""):"");
+      const period=row.is_ongoing?"Ongoing":(row.valid_from?"From "+row.valid_from+(row.valid_until?" - "+row.valid_until:""):"");
       if(period)html+='<div style="font-size:10px;color:#94a3b8;margin-right:6px;padding-top:3px;">'+period+'</div>';
       const av=row.availability||{};
       html+='<div style="display:flex;gap:3px;flex-wrap:wrap">';
@@ -6932,7 +7097,7 @@ function showAvailSuccess(row){
   let html='<div class="card"><div class="card-title" style="margin-bottom:14px">Your Availability</div>';
   days.forEach((day,i)=>{
     const a=avail[i]||avail[String(i)]||{type:"unset"};
-    const lbl=a.type==="custom"?(a.start+" – "+a.end):a.type==="all"?"All Day":a.type==="no"?"Unavailable":"Not Set";
+    const lbl=a.type==="custom"?(a.start+" - "+a.end):a.type==="all"?"All Day":a.type==="no"?"Unavailable":"Not Set";
     const col=a.type==="all"?"#16a34a":a.type==="no"?"#dc2626":a.type==="custom"?"#0284c7":"#94a3b8";
     html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid #f1f5f9;">';
     html+='<div style="font-size:13px;font-weight:600;color:#1e293b;">'+day+'</div>';
@@ -8174,6 +8339,7 @@ function setCalView(v){
 }
 
 function calPrev(){
+  if(_calSystem === 'bs' && calView === 'month'){ return bsCalPrev(); }
   if(calView==='day') bdayViewDate=new Date(bdayViewDate.getFullYear(),bdayViewDate.getMonth(),bdayViewDate.getDate()-1);
   else if(calView==='week') bdayViewDate=new Date(bdayViewDate.getFullYear(),bdayViewDate.getMonth(),bdayViewDate.getDate()-7);
   else if(calView==='year') bdayViewDate=new Date(bdayViewDate.getFullYear()-1,0,1);
@@ -8181,6 +8347,7 @@ function calPrev(){
   renderBdayCalendar();
 }
 function calNext(){
+  if(_calSystem === 'bs' && calView === 'month'){ return bsCalNext(); }
   if(calView==='day') bdayViewDate=new Date(bdayViewDate.getFullYear(),bdayViewDate.getMonth(),bdayViewDate.getDate()+1);
   else if(calView==='week') bdayViewDate=new Date(bdayViewDate.getFullYear(),bdayViewDate.getMonth(),bdayViewDate.getDate()+7);
   else if(calView==='year') bdayViewDate=new Date(bdayViewDate.getFullYear()+1,0,1);
@@ -8189,6 +8356,8 @@ function calNext(){
 }
 function calToday(){
   bdayViewDate=new Date();
+  if(_calSystem === 'bs'){ const tbs = adToBs(new Date()); if(tbs){ _bsViewYear = tbs.year; _bsViewMonth = tbs.month; } }
+  if(typeof updateCalendarNepaliLabel==='function') setTimeout(updateCalendarNepaliLabel,50);
   if(calView==='month') bdayViewDate.setDate(1);
   if(calView==='year') bdayViewDate=new Date(bdayViewDate.getFullYear(),0,1);
   renderBdayCalendar();
@@ -8308,6 +8477,7 @@ function renderCalPreview(){
 
 // ── DAY VIEW ──────────────────────────────────────
 function renderDayView(el, lbl){
+  if(typeof updateCalendarNepaliLabel==='function') setTimeout(updateCalendarNepaliLabel,0);
   const d = new Date(bdayViewDate);
   const today = new Date(); today.setHours(0,0,0,0);
   const isToday = today.getTime() === new Date(d.getFullYear(),d.getMonth(),d.getDate()).getTime();
@@ -8371,6 +8541,7 @@ function renderDayEvent(it){
 
 // ── WEEK VIEW ─────────────────────────────────────
 function renderWeekView(el, lbl){
+  if(typeof updateCalendarNepaliLabel==='function') setTimeout(updateCalendarNepaliLabel,0);
   const start = new Date(bdayViewDate);
   // Move to Monday
   const dow = start.getDay();
@@ -8384,7 +8555,7 @@ function renderWeekView(el, lbl){
     if(sameMonth){
       lbl.textContent = start.toLocaleDateString('en-AU',{day:'numeric'})+'–'+end.toLocaleDateString('en-AU',{day:'numeric',month:'long',year:'numeric'});
     } else {
-      lbl.textContent = start.toLocaleDateString('en-AU',{day:'numeric',month:'short'})+' – '+end.toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'});
+      lbl.textContent = start.toLocaleDateString('en-AU',{day:'numeric',month:'short'})+' - '+end.toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'});
     }
   }
 
@@ -8413,6 +8584,7 @@ function renderWeekView(el, lbl){
 
 // ── YEAR VIEW ─────────────────────────────────────
 function renderYearView(el, lbl){
+  if(typeof updateCalendarNepaliLabel==='function') setTimeout(updateCalendarNepaliLabel,0);
   const yr = bdayViewDate.getFullYear();
   if(lbl) lbl.textContent = String(yr);
   const today = new Date(); today.setHours(0,0,0,0);
@@ -8445,8 +8617,15 @@ function renderBdayCalendar(){
   const el=document.getElementById('birthdayList');
   const lbl=document.getElementById('bdayMonthLabel');
   if(!el)return;
+  // Update Nepali date label every render (only in AD mode — BS view sets its own label)
+  if(_calSystem !== 'bs' && typeof updateCalendarNepaliLabel==='function') setTimeout(updateCalendarNepaliLabel,0);
 
-  // Dispatch by view
+  // BS calendar takes over entirely if selected
+  if(_calSystem === 'bs' && calView === 'month'){
+    return renderBsMonthView(el, lbl);
+  }
+  
+  // Dispatch by view (AD)
   if(calView==='day'){ return renderDayView(el, lbl); }
   if(calView==='week'){ return renderWeekView(el, lbl); }
   if(calView==='year'){ return renderYearView(el, lbl); }
@@ -11446,7 +11625,375 @@ async function loadClockState(){
   }
 }
 
+
+// ─────────────────────────────────────
+// NEPALI DATE (Bikram Sambat) CONVERTER
+// Reference: 1 Baisakh 2070 BS = 14 April 2013 AD
+// Days-in-month data for 2070-2090 BS
+// ─────────────────────────────────────
+const NEPALI_BS_MONTHS = {
+  2070:[31,31,32,32,31,31,30,29,30,29,30,30],
+  2071:[31,31,32,31,31,31,30,29,30,29,30,30],
+  2072:[31,32,31,32,31,31,30,29,30,29,30,30],
+  2073:[31,31,32,32,31,30,30,30,29,29,30,31],
+  2074:[31,31,32,32,31,31,30,29,30,29,30,30],
+  2075:[31,32,31,32,31,31,30,29,30,29,30,30],
+  2076:[31,31,32,32,31,31,30,29,30,29,30,30],
+  2077:[31,31,32,31,31,31,30,29,30,29,30,30],
+  2078:[31,32,31,32,31,31,30,29,30,29,30,30],
+  2079:[31,31,32,32,31,30,30,30,29,29,30,31],
+  2080:[31,32,31,32,31,30,30,30,29,30,30,30],
+  2081:[31,31,32,32,31,31,30,29,30,29,30,30],
+  2082:[31,32,31,32,31,30,30,30,29,30,30,30],
+  2083:[31,31,32,31,31,30,30,30,29,30,30,30],
+  2084:[31,31,32,31,31,30,30,30,29,30,30,30],
+  2085:[31,32,31,32,31,31,30,30,29,30,30,30],
+  2086:[31,32,31,32,31,31,30,29,30,29,30,30],
+  2087:[31,31,32,31,31,31,30,29,30,29,30,30],
+  2088:[30,31,32,32,30,31,30,29,30,29,30,30],
+  2089:[30,31,32,32,31,30,30,30,29,30,30,30],
+  2090:[30,31,32,32,31,30,30,30,29,30,30,30]
+};
+const NEPALI_BS_MONTH_NAMES = ['Baisakh','Jestha','Ashadh','Shrawan','Bhadra','Ashwin','Kartik','Mangsir','Poush','Magh','Falgun','Chaitra'];
+const NEPALI_BS_MONTH_NEP = ['बैशाख','जेठ','असार','साउन','भदौ','असोज','कार्तिक','मंसिर','पुष','माघ','फागुन','चैत'];
+const NEPALI_DIGITS = ['०','१','२','३','४','५','६','७','८','९'];
+
+// AD reference: 14 April 2013 = 1 Baisakh 2070 BS
+function adToBs(adDate){
+  if(!(adDate instanceof Date) || isNaN(adDate.getTime())) return null;
+  // Strip time
+  const ad = new Date(adDate.getFullYear(), adDate.getMonth(), adDate.getDate());
+  const refAD = new Date(2013, 3, 14); // April 14, 2013
+  let diffDays = Math.round((ad - refAD) / (1000*60*60*24));
+  if(diffDays < 0) return null; // before our supported range
+  
+  let bsYear = 2070;
+  let bsMonth = 0; // 0-indexed (Baisakh)
+  let bsDay = 1;
+  
+  while(diffDays > 0){
+    const monthsInYear = NEPALI_BS_MONTHS[bsYear];
+    if(!monthsInYear) return null; // out of range
+    const daysInMonth = monthsInYear[bsMonth];
+    const daysLeftInMonth = daysInMonth - bsDay;
+    if(diffDays <= daysLeftInMonth){
+      bsDay += diffDays;
+      diffDays = 0;
+    } else {
+      diffDays -= (daysLeftInMonth + 1);
+      bsDay = 1;
+      bsMonth++;
+      if(bsMonth > 11){ bsMonth = 0; bsYear++; }
+    }
+  }
+  
+  return { year: bsYear, month: bsMonth, day: bsDay };
+}
+
+function formatNepaliDate(adDate, opts){
+  opts = opts || {};
+  const bs = adToBs(adDate || new Date());
+  if(!bs) return '';
+  const monthName = opts.nepali ? NEPALI_BS_MONTH_NEP[bs.month] : NEPALI_BS_MONTH_NAMES[bs.month];
+  let dayStr = String(bs.day);
+  let yearStr = String(bs.year);
+  if(opts.nepali){
+    dayStr = dayStr.split('').map(function(d){return NEPALI_DIGITS[parseInt(d,10)]||d;}).join('');
+    yearStr = yearStr.split('').map(function(d){return NEPALI_DIGITS[parseInt(d,10)]||d;}).join('');
+  }
+  if(opts.short){
+    return dayStr + ' ' + monthName.slice(0,3);
+  }
+  return dayStr + ' ' + monthName + ' ' + yearStr;
+}
+
+
+// Refresh Nepali date badge every minute
+setInterval(function(){ try{ const npd = document.getElementById('nepaliDateBadge'); if(npd) npd.textContent = formatNepaliDate(new Date()); }catch(e){} }, 60000);
+
+
+// Update Nepali calendar label — shows BS year/month range for currently viewed AD month
+
+// ─────────────────────────────────────
+// NEPALI CALENDAR — BS month grid
+// ─────────────────────────────────────
+let _calSystem = 'ad'; // 'ad' or 'bs'
+let _bsViewYear = null; // current BS year being viewed
+let _bsViewMonth = null; // current BS month (0-11)
+
+// BS → AD conversion (reverse lookup)
+function bsToAd(bsYear, bsMonth, bsDay){
+  // Start from anchor: 1 Baisakh 2070 BS = 14 April 2013 AD
+  const monthsData = NEPALI_BS_MONTHS;
+  let daysFromAnchor = 0;
+  // Sum all complete years before bsYear
+  for(let y = 2070; y < bsYear; y++){
+    if(!monthsData[y]) return null;
+    daysFromAnchor += monthsData[y].reduce(function(a,b){return a+b;}, 0);
+  }
+  // Sum complete months in current year
+  if(!monthsData[bsYear]) return null;
+  for(let m = 0; m < bsMonth; m++){
+    daysFromAnchor += monthsData[bsYear][m];
+  }
+  // Add day offset (bsDay is 1-indexed)
+  daysFromAnchor += (bsDay - 1);
+  const adRef = new Date(2013, 3, 14);
+  const ad = new Date(adRef.getTime() + daysFromAnchor * 86400000);
+  return ad;
+}
+
+function setCalSystem(sys){
+  _calSystem = sys;
+  document.querySelectorAll('[data-cal-system]').forEach(function(b){
+    b.classList.toggle('active', b.dataset.calSystem === sys);
+  });
+  if(sys === 'bs'){
+    // Initialize BS view from current AD view
+    const adFirst = new Date(bdayViewDate.getFullYear(), bdayViewDate.getMonth(), 1);
+    const bs = adToBs(adFirst);
+    if(bs){ _bsViewYear = bs.year; _bsViewMonth = bs.month; }
+    else { 
+      const today = adToBs(new Date());
+      if(today){ _bsViewYear = today.year; _bsViewMonth = today.month; }
+    }
+  }
+  renderBdayCalendar();
+}
+
+function bsCalPrev(){
+  if(!_bsViewYear) return;
+  _bsViewMonth--;
+  if(_bsViewMonth < 0){ _bsViewMonth = 11; _bsViewYear--; }
+  // Sync bdayViewDate so the AD machinery (events/birthdays) follow
+  syncAdFromBs();
+  renderBdayCalendar();
+}
+
+function bsCalNext(){
+  if(!_bsViewYear) return;
+  _bsViewMonth++;
+  if(_bsViewMonth > 11){ _bsViewMonth = 0; _bsViewYear++; }
+  syncAdFromBs();
+  renderBdayCalendar();
+}
+
+function syncAdFromBs(){
+  if(_bsViewYear == null) return;
+  const ad = bsToAd(_bsViewYear, _bsViewMonth, 1);
+  if(ad) bdayViewDate = ad;
+}
+
+// Render the Nepali BS month grid
+function renderBsMonthView(el, lbl){
+  if(!NEPALI_BS_MONTHS[_bsViewYear]){
+    el.innerHTML = '<div style="padding:40px 20px;text-align:center;color:#94a3b8;font-size:13px;">BS year '+_bsViewYear+' not in supported range (2070-2090)</div>';
+    return;
+  }
+  
+  const monthName = NEPALI_BS_MONTH_NAMES[_bsViewMonth];
+  const monthNep = NEPALI_BS_MONTH_NEP[_bsViewMonth];
+  const daysInMonth = NEPALI_BS_MONTHS[_bsViewYear][_bsViewMonth];
+  
+  if(lbl) lbl.textContent = monthName + ' ' + _bsViewYear;
+  // Also update the Nepali label below
+  const npLbl = document.getElementById('bdayNepaliLabel');
+  if(npLbl){
+    npLbl.textContent = monthNep + ' ' + _bsViewYear + ' BS';
+  }
+  
+  // Get AD date for day 1 of this BS month → determines weekday offset
+  const firstAd = bsToAd(_bsViewYear, _bsViewMonth, 1);
+  if(!firstAd){ el.innerHTML = '<div>Conversion failed</div>'; return; }
+  
+  const firstDow = firstAd.getDay(); // 0=Sun
+  const startOffset = (firstDow === 0) ? 6 : firstDow - 1; // Mon-first
+  
+  // Build event maps keyed by BS day-of-month
+  const today = new Date(); today.setHours(0,0,0,0);
+  const todayBs = adToBs(today);
+  
+  // Get all AD dates this BS month covers
+  const adDates = [];
+  for(let d = 1; d <= daysInMonth; d++){
+    const ad = bsToAd(_bsViewYear, _bsViewMonth, d);
+    adDates.push({bsDay: d, ad: ad});
+  }
+  
+  // Build event indices
+  const bdayMap = {};
+  bdayData.forEach(function(r){
+    if(!r.birthday) return;
+    const d = new Date(r.birthday + 'T00:00:00');
+    adDates.forEach(function(item){
+      if(item.ad.getMonth() === d.getMonth() && item.ad.getDate() === d.getDate()){
+        if(!bdayMap[item.bsDay]) bdayMap[item.bsDay] = [];
+        bdayMap[item.bsDay].push({name: r.staff_name});
+      }
+    });
+  });
+  
+  const holidayMap = {};
+  Object.entries(AU_HOLIDAYS).forEach(function(e){
+    const hd = new Date(e[0] + 'T00:00:00');
+    adDates.forEach(function(item){
+      if(item.ad.getTime() === hd.getTime()){ holidayMap[item.bsDay] = e[1]; }
+    });
+  });
+  
+  const eventMap = {};
+  calEvents.forEach(function(ev){
+    if(!ev.event_date) return;
+    const ed = new Date(ev.event_date + 'T00:00:00');
+    adDates.forEach(function(item){
+      if(item.ad.getTime() === ed.getTime()){
+        if(!eventMap[item.bsDay]) eventMap[item.bsDay] = [];
+        eventMap[item.bsDay].push(ev);
+      }
+    });
+  });
+  
+  const taskMap = {};
+  if(typeof _tasks !== 'undefined' && _tasks){
+    _tasks.forEach(function(t){
+      if(!t.dueDate) return;
+      const td = new Date(t.dueDate + 'T00:00:00');
+      adDates.forEach(function(item){
+        if(item.ad.getTime() === td.getTime()){
+          if(!taskMap[item.bsDay]) taskMap[item.bsDay] = [];
+          taskMap[item.bsDay].push(t);
+        }
+      });
+    });
+  }
+  
+  // Build grid
+  let html = '<div class="cal-week-header">';
+  ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].forEach(function(d){
+    html += '<div class="cal-weekday">'+d+'</div>';
+  });
+  html += '</div>';
+  html += '<div class="cal-grid">';
+  
+  // Leading empty cells
+  for(let i = 0; i < startOffset; i++){
+    html += '<div class="cal-day cal-day-prev"><div class="cal-date">·</div></div>';
+  }
+  
+  for(let d = 1; d <= daysInMonth; d++){
+    const ad = adDates[d-1].ad;
+    const adDate = ad.getDate();
+    const adMonthShort = ad.toLocaleDateString('en-AU', {month:'short'});
+    const isToday = todayBs && todayBs.year === _bsViewYear && todayBs.month === _bsViewMonth && todayBs.day === d;
+    const dow = ad.getDay();
+    const isWeekend = (dow === 0 || dow === 6);
+    
+    const classes = ['cal-day'];
+    if(isToday) classes.push('cal-day-today');
+    if(isWeekend) classes.push('cal-day-weekend');
+    
+    const adDateStr = ad.getFullYear()+'-'+String(ad.getMonth()+1).padStart(2,'0')+'-'+String(ad.getDate()).padStart(2,'0');
+    
+    html += '<div class="'+classes.join(' ')+'" onclick="openDayEventModal(\''+adDateStr+'\')" style="cursor:pointer;">';
+    // BS date big, AD date small below
+    html += '<div class="cal-date">';
+    if(isToday) html += '<span class="cal-date-today">'+d+'</span>';
+    else html += d;
+    html += '<span style="display:block;font-size:9px;font-weight:500;color:#94a3b8;margin-top:1px;">'+adDate+' '+adMonthShort+'</span>';
+    html += '</div>';
+    html += '<div class="cal-pills">';
+    
+    const holiday = holidayMap[d];
+    if(holiday){
+      html += '<div class="cal-pill cal-pill-holiday" title="'+holiday+'">'+holiday+'</div>';
+    }
+    const events = eventMap[d] || [];
+    events.forEach(function(ev){
+      const timeStr = ev.event_time ? ev.event_time.slice(0,5)+' ' : '';
+      const colorIdx = (String(ev.id||'').split('').reduce(function(a,c){return a+c.charCodeAt(0);},0) % 6) + 1;
+      const canDelete = myIsAdmin || (ev.created_by === me);
+      const deleteBtn = canDelete ? '<span class="cal-pill-x" data-id="'+ev.id+'" onclick="event.stopPropagation();deleteCalEvent(this.dataset.id)">×</span>' : '';
+      html += '<div class="cal-pill cal-pill-event-'+colorIdx+'" data-ev-id="'+ev.id+'" onclick="event.stopPropagation();viewEvent(this.dataset.evId,event)" style="cursor:pointer;" title="'+ev.title+'">'+timeStr+ev.title+deleteBtn+'</div>';
+    });
+    const bdays = bdayMap[d] || [];
+    bdays.forEach(function(b){
+      html += '<div class="cal-pill cal-pill-bday" title="'+b.name+' birthday">'+b.name.split(' ')[0]+'</div>';
+    });
+    const tasksToday = taskMap[d] || [];
+    tasksToday.forEach(function(t){
+      const doneCls = t.done ? ' done' : '';
+      html += '<div class="cal-pill cal-pill-task'+doneCls+'" title="Task: '+t.title.replace(/"/g,'&quot;')+'" onclick="event.stopPropagation();goTo(\'tasks\');">'+t.title.replace(/</g,'&lt;')+'</div>';
+    });
+    
+    html += '</div></div>';
+  }
+  
+  // Trailing empty cells
+  const totalCells = startOffset + daysInMonth;
+  const trailing = (7 - (totalCells % 7)) % 7;
+  for(let i = 0; i < trailing; i++){
+    html += '<div class="cal-day cal-day-next"><div class="cal-date">·</div></div>';
+  }
+  
+  html += '</div>';
+  el.innerHTML = html;
+}
+
+
+function updateCalendarNepaliLabel(){
+  try{
+    const npLbl = document.getElementById('bdayNepaliLabel');
+    if(!npLbl) return;
+    // Use the current calendar view date (window.bdayViewDate is the global)
+    let d = (typeof bdayViewDate !== 'undefined' && bdayViewDate) ? bdayViewDate : new Date();
+    // For day view, show single BS date. For others, show month range.
+    const view = (typeof calView !== 'undefined') ? calView : 'month';
+    if(view === 'day'){
+      const bs = adToBs(d);
+      if(!bs){ npLbl.textContent = ''; return; }
+      npLbl.textContent = bs.day + ' ' + NEPALI_BS_MONTH_NAMES[bs.month] + ' ' + bs.year;
+      return;
+    }
+    if(view === 'year'){
+      const firstDay = new Date(d.getFullYear(), 0, 1);
+      const lastDay = new Date(d.getFullYear(), 11, 31);
+      const bs1 = adToBs(firstDay);
+      const bs2 = adToBs(lastDay);
+      if(!bs1 || !bs2){ npLbl.textContent = ''; return; }
+      if(bs1.year === bs2.year){ npLbl.textContent = 'BS ' + bs1.year; }
+      else { npLbl.textContent = 'BS ' + bs1.year + '/' + bs2.year; }
+      return;
+    }
+    // Week or month — get BS for first and last day of view
+    let firstDay, lastDay;
+    if(view === 'week'){
+      const dow = d.getDay();
+      firstDay = new Date(d.getFullYear(), d.getMonth(), d.getDate() - dow);
+      lastDay = new Date(firstDay.getFullYear(), firstDay.getMonth(), firstDay.getDate() + 6);
+    } else {
+      firstDay = new Date(d.getFullYear(), d.getMonth(), 1);
+      lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+    }
+    const bs1 = adToBs(firstDay);
+    const bs2 = adToBs(lastDay);
+    if(!bs1 || !bs2){ npLbl.textContent = ''; return; }
+    if(bs1.month === bs2.month && bs1.year === bs2.year){
+      npLbl.textContent = NEPALI_BS_MONTH_NAMES[bs1.month] + ' ' + bs1.year;
+    } else {
+      const m1 = NEPALI_BS_MONTH_NAMES[bs1.month].slice(0,3);
+      const m2 = NEPALI_BS_MONTH_NAMES[bs2.month].slice(0,3);
+      npLbl.textContent = m1 + '/' + m2 + ' ' + bs2.year;
+    }
+  }catch(e){ console.warn('nepali label:', e); }
+}
+
+
 function renderClockCard(){
+  // Update Nepali date badge
+  try{
+    const npd = document.getElementById('nepaliDateBadge');
+    if(npd) npd.textContent = formatNepaliDate(new Date());
+  }catch(e){}
   const status = document.getElementById('clockStatus');
   const sub = document.getElementById('clockSubStatus');
   const btn = document.getElementById('clockBtn');
@@ -12899,7 +13446,7 @@ function renderDiary(){
   if(!allPages.length){
     el.innerHTML = '<div class="diary-flipbook">'+
       '<div class="diary-a4 diary-a4-empty-state" onclick="startNewDiaryPage()">'+
-        '<div class="diary-a4-empty-text">📔 Tap to start your first page</div>'+
+        '<div class="diary-a4-empty-text">Tap to start your first page</div>'+
       '</div>'+
     '</div>';
     return;
@@ -12959,7 +13506,7 @@ function renderDiaryPage(e, isNew){
       '<div class="diary-a4-note">'+
         '<div class="diary-a4-note-label">Note:</div>'+
         '<input type="datetime-local" class="diary-a4-reminder-input" placeholder="Set reminder…" value="'+reminderIso+'" onchange="updateDiaryField(this,\''+(e.id||'new')+'\',\'remind_at\')" title="Set reminder">'+
-        (reminderDisplay ? '<div class="diary-a4-reminder-display">⏰ '+reminderDisplay+'</div>' : '<div class="diary-a4-note-hint">Tap above to set a reminder</div>')+
+        (reminderDisplay ? '<div class="diary-a4-reminder-display">'+reminderDisplay+'</div>' : '<div class="diary-a4-note-hint">Tap above to set a reminder</div>')+
       '</div>'+
     '</div>'+
     '<div class="diary-a4-divider"></div>'+
@@ -13974,7 +14521,7 @@ function getPeriodRange(period){
     end = new Date(start.getTime() + MS_FORT);
     const startLbl = start.toLocaleDateString('en-AU',{day:'numeric',month:'short'});
     const endLbl = (new Date(end.getTime()-MS_DAY)).toLocaleDateString('en-AU',{day:'numeric',month:'short'});
-    label = 'Fortnight: '+startLbl+' – '+endLbl;
+    label = 'Fortnight: '+startLbl+' - '+endLbl;
   } else { // month
     start = new Date(now.getFullYear(), now.getMonth(), 1);
     end = new Date(now.getFullYear(), now.getMonth()+1, 1);
@@ -14726,7 +15273,7 @@ async function loadHomeData(){
       return;
     }
     const av=ar[0].availability;
-    const period=ar[0].is_ongoing?"Ongoing":(ar[0].valid_from?"From "+fmtF(ar[0].valid_from)+(ar[0].valid_until?" – "+fmtF(ar[0].valid_until):""):"");
+    const period=ar[0].is_ongoing?"Ongoing":(ar[0].valid_from?"From "+fmtF(ar[0].valid_from)+(ar[0].valid_until?" - "+fmtF(ar[0].valid_until):""):"");
     if(sumEl)sumEl.innerHTML='<div style="font-size:11px;color:#94a3b8;margin-bottom:10px;font-weight:500;">'+period+'</div>'+
     DAYS.map((day,i)=>{
       const a=av[i]||av[String(i)]||{type:"unset"};
@@ -14918,7 +15465,7 @@ async function loadNotifications(){
     // Render reaction notifications first
     let reactHtml='';
     newReactNotifs.forEach(function(r){
-      reactHtml+='<div style="background:#fdf4ff;border:1px solid #e9d5ff;border-radius:12px;padding:14px;margin-bottom:10px;">'+
+      reactHtml+='<div style="background:#fdf4ff;border:1px solid #e9d5ff;border-radius:12px;padding:14px;margin-bottom:10px;cursor:pointer;" data-rid="'+r.id+'" onclick="markReactSeen(this.dataset.rid);goTo(\'engagement\');setTimeout(function(){showEngagementTab(\'discussions\');},120);">'+
         '<div style="font-size:13px;font-weight:700;color:#7c3aed;margin-bottom:4px;">'+r.emoji+' Reaction on your post</div>'+
         '<div style="font-size:12.5px;color:#475569;">'+r.staff_name+' reacted to your '+(r.target_type==='disc'?'discussion':'announcement')+'</div>'+
         '<div style="font-size:11px;color:#94a3b8;margin-top:4px;">'+fmtF(r.created_at)+'</div>'+
@@ -15254,13 +15801,13 @@ async function checkNewNotifications(){
         if(typeof triggerBellPulse === 'function') triggerBellPulse();
         const approved=r.status==='approved';
         const title=approved ? 'Leave Approved' : 'Leave Declined';
-        showBanner(title, fmtF(r.from_date)+' – '+fmtF(r.to_date), approved ? 'success' : 'warning');
+        showBanner(title, fmtF(r.from_date)+' - '+fmtF(r.to_date), approved ? 'success' : 'warning');
         if(typeof NotifManager !== 'undefined' && NotifManager.push){
           NotifManager.push({
             id: 'leave-'+r.id,
             type: approved ? 'leave-approved' : 'leave-declined',
             title: title,
-            body: fmtF(r.from_date)+' – '+fmtF(r.to_date) + (r.decline_reason?' · '+r.decline_reason:''),
+            body: fmtF(r.from_date)+' - '+fmtF(r.to_date) + (r.decline_reason?' · '+r.decline_reason:''),
             ts: Date.now(),
             link: 'leave'
           });
@@ -15495,7 +16042,7 @@ async function renderQuizAdminPanel(){
     
     let html = '<div style="background:#fff;border:1.5px solid #e2e8f0;border-radius:12px;padding:14px 16px;">'+
       '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:'+(failed.length?'12':'0')+'px;flex-wrap:wrap;gap:10px;">'+
-        '<div style="font-size:13.5px;font-weight:700;color:#0f172a;">📋 Standard Knowledge Quiz — Oscars</div>'+
+        '<div style="font-size:13.5px;font-weight:700;color:#0f172a;">Standard Knowledge Quiz — Oscars</div>'+
         '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">'+
           '<div style="background:#d1fae5;color:#065f46;font-size:11px;font-weight:700;padding:3px 9px;border-radius:10px;">'+passed.length+' passed</div>'+
           '<div style="background:#fee2e2;color:#991b1b;font-size:11px;font-weight:700;padding:3px 9px;border-radius:10px;">'+failed.length+' need review</div>'+
@@ -15577,7 +16124,7 @@ function renderQuizModal(){
     bd.innerHTML = '<div style="background:#fff;border-radius:16px;width:100%;max-width:540px;padding:36px 28px;text-align:center;box-shadow:0 24px 60px rgba(15,23,42,.3);">'+
       (passed ?
         '<svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin:0 auto 12px;display:block;"><circle cx="12" cy="12" r="10"/><polyline points="9 12 12 15 17 10"/></svg>'+
-        '<div style="font-size:22px;font-weight:800;color:#10b981;margin-bottom:6px;">Passed! 🎉</div>'
+        '<div style="font-size:22px;font-weight:800;color:#10b981;margin-bottom:6px;">Passed! </div>'
         :
         '<svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin:0 auto 12px;display:block;"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>'+
         '<div style="font-size:22px;font-weight:800;color:#dc2626;margin-bottom:6px;">Needs review</div>'
@@ -15771,8 +16318,11 @@ async function renderMyTraining(){
       }catch(e){ customAccessSet = new Set(); }
     }
     (customQuizzes||[]).forEach(function(q){
-      // Staff only sees quizzes they have access to; admin sees all
-      if(!myIsAdmin && customAccessSet && !customAccessSet.has(q.id)) return;
+      // Staff only sees PUBLISHED quizzes they have access to; admin sees all
+      if(!myIsAdmin){
+        if(customAccessSet && !customAccessSet.has(q.id)) return;
+        if(q.status && q.status === 'draft') return; // hide drafts from staff
+      }
       const linkedDoc = docsById[q.document_id];
       const myResult = (customResults||[]).find(function(r){return r.quiz_id===q.id;});
       trainingItems.push({
@@ -15869,8 +16419,8 @@ async function renderMyTraining(){
         adminCard = '<div style="margin-top:12px;padding:10px 12px;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:9px;display:flex;flex-wrap:wrap;align-items:center;gap:6px;">'+
           '<span style="font-size:10.5px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.06em;flex:1;min-width:120px;">Admin</span>'+
           '<button onclick="openQuizAdminPanel(\''+t.id+'\')" style="background:#0f172a;color:#fff;border:none;border-radius:6px;padding:5px 11px;font-size:10.5px;font-weight:700;cursor:pointer;font-family:inherit;">Manage access</button>'+
-          '<button onclick="downloadQuizReport(\''+t.id+'\',\''+t.title.replace(/[\'\\\\]/g,"")+'\')" style="background:#3b82f6;color:#fff;border:none;border-radius:6px;padding:5px 11px;font-size:10.5px;font-weight:700;cursor:pointer;font-family:inherit;">⬇ Report</button>'+
-          (t.kind === 'custom' ? '<button onclick="deleteQuizFromAdmin(\''+t.id+'\');setTimeout(renderMyTraining,400);" style="background:#7f1d1d;color:#fff;border:none;border-radius:6px;padding:5px 11px;font-size:10.5px;font-weight:700;cursor:pointer;font-family:inherit;">🗑 Delete</button>' : '<button onclick="openQuizEditor()" style="background:#475569;color:#fff;border:none;border-radius:6px;padding:5px 11px;font-size:10.5px;font-weight:700;cursor:pointer;font-family:inherit;">✏ Edit</button>')+
+          '<button onclick="downloadQuizReport(\''+t.id+'\',\''+t.title.replace(/[\'\\\\]/g,"")+'\')" style="background:#3b82f6;color:#fff;border:none;border-radius:6px;padding:5px 11px;font-size:10.5px;font-weight:700;cursor:pointer;font-family:inherit;">Report</button>'+
+          (t.kind === 'custom' ? '<button onclick="deleteQuizFromAdmin(\''+t.id+'\');setTimeout(renderMyTraining,400);" style="background:#7f1d1d;color:#fff;border:none;border-radius:6px;padding:5px 11px;font-size:10.5px;font-weight:700;cursor:pointer;font-family:inherit;">Delete</button>' : '<button onclick="openQuizEditor()" style="background:#475569;color:#fff;border:none;border-radius:6px;padding:5px 11px;font-size:10.5px;font-weight:700;cursor:pointer;font-family:inherit;">Edit</button>')+
         '</div>';
       }
       html += '<div data-quiz-id="'+t.id+'" style="background:'+cardBg+';border:1.5px solid '+borderColor+';border-radius:14px;padding:16px 18px;margin-bottom:12px;transition:outline .2s;">'+
@@ -15963,7 +16513,7 @@ async function openQuizAdminPanel(quizId, quizTitleOverride){
     } else {
       const cq = await sbGet('custom_quizzes', '?id=eq.'+quizId);
       if(!cq || !cq[0]) throw new Error('Quiz not found');
-      quizMeta = { id: cq[0].id, title: cq[0].title, kind: 'custom', document_id: cq[0].document_id, questions: cq[0].questions };
+      quizMeta = { id: cq[0].id, title: cq[0].title, kind: 'custom', document_id: cq[0].document_id, questions: cq[0].questions, status: cq[0].status || 'published' };
     }
     
     // Fetch access list + results + all staff
@@ -15986,26 +16536,33 @@ async function openQuizAdminPanel(quizId, quizTitleOverride){
     // Header
     html += '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:16px;">';
     html += '<div style="flex:1;"><div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.1em;margin-bottom:3px;">Manage quiz</div>';
-    html += '<div style="font-size:17px;font-weight:800;color:#0f172a;letter-spacing:-.01em;line-height:1.3;">'+quizMeta.title.replace(/</g,"&lt;")+'</div></div>';
+    const draftPill = (quizMeta.status === 'draft') ? '<span class="qap-draft-pill">Draft</span>' : '';
+    html += '<div style="font-size:17px;font-weight:800;color:#0f172a;letter-spacing:-.01em;line-height:1.3;">'+quizMeta.title.replace(/</g,"&lt;")+draftPill+'</div></div>';
     html += '<button onclick="document.getElementById(\'quizAdminBack\').remove()" style="background:none;border:none;font-size:22px;color:#94a3b8;cursor:pointer;line-height:1;padding:0 4px;">×</button>';
     html += '</div>';
     
     // Stats row
-    html += '<div style="display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap;">';
-    html += '<div style="flex:1;min-width:90px;background:#dbeafe;color:#1e40af;padding:10px 14px;border-radius:10px;text-align:center;"><div style="font-size:20px;font-weight:900;">'+accessSet.size+'</div><div style="font-size:11px;font-weight:600;">Has access</div></div>';
-    html += '<div style="flex:1;min-width:90px;background:#d1fae5;color:#065f46;padding:10px 14px;border-radius:10px;text-align:center;"><div style="font-size:20px;font-weight:900;">'+passedCount+'</div><div style="font-size:11px;font-weight:600;">Passed</div></div>';
-    html += '<div style="flex:1;min-width:90px;background:#fee2e2;color:#991b1b;padding:10px 14px;border-radius:10px;text-align:center;"><div style="font-size:20px;font-weight:900;">'+failedCount+'</div><div style="font-size:11px;font-weight:600;">Failed</div></div>';
+    html += '<div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;">';
+    html += '<div class="qap-stat-card" style="background:linear-gradient(135deg,#dbeafe,#bfdbfe);color:#1e3a8a;"><div class="qap-stat-num">'+accessSet.size+'</div><div class="qap-stat-label">Has access</div></div>';
+    html += '<div class="qap-stat-card" style="background:linear-gradient(135deg,#d1fae5,#a7f3d0);color:#065f46;"><div class="qap-stat-num">'+passedCount+'</div><div class="qap-stat-label">Passed</div></div>';
+    html += '<div class="qap-stat-card" style="background:linear-gradient(135deg,#fee2e2,#fecaca);color:#991b1b;"><div class="qap-stat-num">'+failedCount+'</div><div class="qap-stat-label">Failed</div></div>';
     html += '</div>';
     
     // Action buttons
     html += '<div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">';
-    html += '<button onclick="bulkAccessForQuiz(\''+quizId+'\',true)" style="flex:1;min-width:140px;background:#10b981;color:#fff;border:none;border-radius:8px;padding:9px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;">+ Give access to all</button>';
-    html += '<button onclick="bulkAccessForQuiz(\''+quizId+'\',false)" style="flex:1;min-width:140px;background:#dc2626;color:#fff;border:none;border-radius:8px;padding:9px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;">– Revoke all access</button>';
-    html += '<button onclick="downloadQuizReport(\''+quizId+'\',\''+quizMeta.title.replace(/[\'\\\\]/g,"")+'\')" style="flex:1;min-width:140px;background:#3b82f6;color:#fff;border:none;border-radius:8px;padding:9px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;">⬇ Download report (CSV)</button>';
+    // Show publish button for draft custom quizzes
+    if(!isStandard && quizMeta.status === 'draft'){
+      html += '<button onclick="publishQuiz(\''+quizId+'\')" class="qap-action-btn qap-btn-publish">Publish quiz</button>';
+    }
+    html += '<button onclick="bulkAccessForQuiz(\''+quizId+'\',true)" class="qap-action-btn qap-btn-give">+ Give access to all</button>';
+    html += '<button onclick="bulkAccessForQuiz(\''+quizId+'\',false)" class="qap-action-btn qap-btn-revoke">- Revoke all access</button>';
+    html += '<button onclick="downloadQuizReport(\''+quizId+'\',\''+quizMeta.title.replace(/[\'\\\\]/g,"")+'\')" class="qap-action-btn qap-btn-report">Download report (CSV)</button>';
     if(isStandard){
-      html += '<button onclick="deleteStandardQuiz()" style="flex:1;min-width:140px;background:#7f1d1d;color:#fff;border:none;border-radius:8px;padding:9px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;">🗑 Delete quiz</button>';
+      html += '<button onclick="openQuizEditor()" class="qap-action-btn qap-btn-edit">Edit questions</button>';
+      html += '<button onclick="deleteStandardQuiz()" class="qap-action-btn qap-btn-delete">Delete quiz</button>';
     } else {
-      html += '<button onclick="deleteQuizFromAdmin(\''+quizId+'\')" style="flex:1;min-width:140px;background:#7f1d1d;color:#fff;border:none;border-radius:8px;padding:9px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;">🗑 Delete quiz</button>';
+      html += '<button onclick="openCustomQuizEditor(\''+quizId+'\')" class="qap-action-btn qap-btn-edit">Edit questions</button>';
+      html += '<button onclick="deleteQuizFromAdmin(\''+quizId+'\')" class="qap-action-btn qap-btn-delete">Delete quiz</button>';
     }
     html += '</div>';
     
@@ -16028,13 +16585,13 @@ async function openQuizAdminPanel(quizId, quizTitleOverride){
         } else {
           statusBadge = '<button '+reviewBtn+' style="font-size:10px;font-weight:700;color:#991b1b;background:#fee2e2;padding:2px 7px;border-radius:8px;border:none;cursor:pointer;font-family:inherit;">✕ '+result.score+'/'+result.total+' (review)</button>';
           if(isStandard){
-            actionBtns += '<button onclick="resetStaffQuiz(\''+n.replace(/\\/g,"\\\\").replace(/\'/g,"\\\'")+'\','+result.id+');setTimeout(function(){openQuizAdminPanel(\''+quizId+'\');},400);" style="background:#3b82f6;color:#fff;border:none;border-radius:6px;padding:3px 8px;font-size:10px;font-weight:600;cursor:pointer;font-family:inherit;">Retake</button>';
+            actionBtns += '<button onclick="resetStaffQuiz(\''+n.replace(/\\/g,"\\\\").replace(/\'/g,"\\\'")+'\','+result.id+');setTimeout(function(){openQuizAdminPanel(\''+quizId+'\');},400);" class="qap-retake-btn">Retake</button>';
           } else {
-            actionBtns += '<button onclick="resetCustomQuizAttempt('+result.id+',\''+quizId+'\',\''+quizMeta.title.replace(/[\'\\\\]/g,"")+'\');setTimeout(function(){openQuizAdminPanel(\''+quizId+'\');},400);" style="background:#3b82f6;color:#fff;border:none;border-radius:6px;padding:3px 8px;font-size:10px;font-weight:600;cursor:pointer;font-family:inherit;">Retake</button>';
+            actionBtns += '<button onclick="resetCustomQuizAttempt('+result.id+',\''+quizId+'\',\''+quizMeta.title.replace(/[\'\\\\]/g,"")+'\');setTimeout(function(){openQuizAdminPanel(\''+quizId+'\');},400);" class="qap-retake-btn">Retake</button>';
           }
         }
       }
-      const toggleBtn = '<button onclick="togglePerQuizAccess(\''+n.replace(/\\/g,"\\\\").replace(/\'/g,"\\\'")+'\',\''+quizId+'\','+(!hasAccess)+');setTimeout(function(){openQuizAdminPanel(\''+quizId+'\');},300);" style="background:'+(hasAccess?"#dc2626":"#10b981")+';color:#fff;border:none;border-radius:6px;padding:3px 9px;font-size:10px;font-weight:700;cursor:pointer;font-family:inherit;min-width:74px;">'+(hasAccess?'Revoke':'Give')+'</button>';
+      const toggleBtn = '<button onclick="togglePerQuizAccess(\''+n.replace(/\\/g,"\\\\").replace(/\'/g,"\\\'")+'\',\''+quizId+'\','+(!hasAccess)+');setTimeout(function(){openQuizAdminPanel(\''+quizId+'\');},300);" class="'+(hasAccess?"qap-revoke-btn":"qap-give-btn")+'">'+(hasAccess?'Revoke':'Give')+'</button>';
       
       html += '<div class="qap-row" data-name="'+n.toLowerCase().replace(/"/g,"&quot;")+'" style="display:flex;justify-content:space-between;align-items:center;padding:9px 6px;border-bottom:1px solid #f1f5f9;gap:6px;">'+
         '<div style="flex:1;min-width:0;"><div style="font-size:12.5px;font-weight:600;color:#0f172a;">'+n.replace(/</g,'&lt;')+'</div></div>'+
@@ -16143,6 +16700,65 @@ async function downloadQuizReport(quizId, quizTitle){
   }catch(e){ showToast('Download failed: '+e.message, 'error'); }
 }
 
+
+
+async function openCustomQuizEditor(quizId){
+  if(!myIsAdmin) return;
+  try{
+    const rows = await sbGet('custom_quizzes', '?id=eq.'+quizId);
+    if(!rows || !rows[0]){ showToast('Quiz not found', 'error'); return; }
+    const q = rows[0];
+    _quizBuilder = {
+      docId: q.document_id,
+      isStandardQuiz: false,
+      isEditing: true,
+      editingId: quizId,
+      title: q.title,
+      pass_pct: q.pass_pct || 80,
+      questions: q.questions || [],
+      status: q.status || 'published'
+    };
+    // Close admin panel
+    const bd = document.getElementById('quizAdminBack');
+    if(bd) bd.remove();
+    renderQuizBuilder();
+  }catch(e){ showToast('Failed: '+e.message, 'error'); }
+}
+
+
+async function publishQuiz(quizId){
+  if(!confirm('Publish this quiz?\n\nIt will become visible to staff with access and they will get a notification.')) return;
+  try{
+    // Flip status to published
+    await fetch(SB+'/rest/v1/custom_quizzes?id=eq.'+quizId, {
+      method:'PATCH',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body: JSON.stringify({ status: 'published' })
+    });
+    // Get quiz info + access list to send pushes
+    const [quizRows, accessRows] = await Promise.all([
+      sbGet('custom_quizzes', '?id=eq.'+quizId),
+      sbGet('quiz_access', '?quiz_id=eq.'+quizId)
+    ]);
+    const quiz = quizRows && quizRows[0];
+    const recipients = (accessRows||[]).map(function(a){return a.staff_name;});
+    
+    // Send web push to each recipient (respects 7pm / Sunday gates inside sendPushTo)
+    if(quiz && recipients.length && typeof sendPushTo === 'function'){
+      for(const name of recipients){
+        try{
+          sendPushTo(name, 'New quiz available', 'A new compliance quiz has been published: ' + quiz.title, {
+            url: './#training',
+            tag: 'quiz-published-'+quizId
+          });
+        }catch(e){}
+      }
+    }
+    showToast('Quiz published - ' + recipients.length + ' staff notified');
+    // Refresh panel
+    setTimeout(function(){ openQuizAdminPanel(quizId); }, 300);
+  }catch(e){ showToast('Publish failed: '+e.message, 'error'); }
+}
 
 async function deleteStandardQuiz(){
   if(!confirm('Delete the Standard Knowledge Quiz?\n\nThis will:\n• Remove all staff access\n• Delete all attempt records\n• Reset any custom edits\n\nThis cannot be undone.')) return;
@@ -16480,7 +17096,7 @@ function renderCustomQuizModal(){
     bd.innerHTML = '<div style="background:#fff;border-radius:16px;width:100%;max-width:540px;padding:36px 28px;text-align:center;box-shadow:0 24px 60px rgba(15,23,42,.3);">'+
       (passed ?
         '<svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin:0 auto 12px;display:block;"><circle cx="12" cy="12" r="10"/><polyline points="9 12 12 15 17 10"/></svg>'+
-        '<div style="font-size:22px;font-weight:800;color:#10b981;margin-bottom:6px;">Passed! 🎉</div>'
+        '<div style="font-size:22px;font-weight:800;color:#10b981;margin-bottom:6px;">Passed! </div>'
         :
         '<svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin:0 auto 12px;display:block;"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>'+
         '<div style="font-size:22px;font-weight:800;color:#dc2626;margin-bottom:6px;">Needs review</div>'
@@ -16655,15 +17271,32 @@ async function saveCustomQuiz(){
       showToast('Standard Knowledge Quiz updated');
     } else {
       // Custom quiz attached to document
-      await sbPost('custom_quizzes', {
-        document_id: qb.docId,
-        title: qb.title,
-        pass_pct: qb.pass_pct,
-        questions: qb.questions,
-        created_by: me
-      });
-      showToast('Quiz saved');
+      if(qb.isEditing && qb.editingId){
+        // PATCH existing
+        await fetch(SB+'/rest/v1/custom_quizzes?id=eq.'+qb.editingId, {
+          method:'PATCH',
+          headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+          body: JSON.stringify({
+            title: qb.title,
+            pass_pct: qb.pass_pct,
+            questions: qb.questions
+          })
+        });
+        showToast('Quiz updated');
+      } else {
+        // INSERT new — save as DRAFT first (status='draft')
+        await sbPost('custom_quizzes', {
+          document_id: qb.docId,
+          title: qb.title,
+          pass_pct: qb.pass_pct,
+          questions: qb.questions,
+          created_by: me,
+          status: 'draft'
+        });
+        showToast('Quiz saved as draft - publish it from My Training to notify staff');
+      }
       loadDocuments();
+      if(typeof renderMyTraining === 'function') renderMyTraining();
     }
     closeQuizBuilder();
   }catch(e){
@@ -17346,7 +17979,7 @@ async function loadNotifDrop(dropId){
       const label=approved?'✓ Leave Approved':'✕ Leave Declined';
       html+='<div class="notif-drop-item'+(isRead?'':' unread')+'" data-nid="'+r.id+'" onclick="closeAllNotifDrops();markNotifRead(this.dataset.nid);goTo(\'schedule\');setTimeout(function(){showSchedTab(\'leave\');},120);">'+
         '<div style="font-size:12px;font-weight:700;color:'+col+';margin-bottom:2px;">'+label+'</div>'+
-        '<div style="font-size:12px;color:#475569;">'+fmtF(r.from_date)+' – '+fmtF(r.to_date)+'</div>'+
+        '<div style="font-size:12px;color:#475569;">'+fmtF(r.from_date)+' - '+fmtF(r.to_date)+'</div>'+
         (r.reason?'<div style="font-size:11px;color:#94a3b8;margin-top:2px;">'+r.reason+'</div>':'')+
         (r.status==='declined'&&r.decline_reason?'<div style="font-size:11px;color:#dc2626;margin-top:2px;">'+r.decline_reason+'</div>':'')+
         '<div style="font-size:10px;color:#94a3b8;margin-top:3px;">Tap to view leave history</div>'+
@@ -17375,6 +18008,7 @@ function markTaskNotifSeen(id){
     window._taskNotifications = window._taskNotifications.filter(function(n){return n.id!==id;});
   }
 }
+
 
 async function markReplySeen(id){
   // Local cache for instant UI
