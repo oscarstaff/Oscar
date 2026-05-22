@@ -5003,24 +5003,6 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
 
     <!-- PROFILE -->
     <!-- DIARY PAGE — personal entries, NOT on shared calendar -->
-    <div class="page" id="page-diary" style="display:none !important;">
-      <div class="tab-bar" style="margin-bottom:14px;padding:0 4px;">
-        <button class="eng-tab" onclick="goTo('calendar')">Calendar</button>
-        <button class="eng-tab" onclick="goTo('tasks')">Tasks</button>
-        <button class="eng-tab active" onclick="goTo('diary')">Diary</button>
-      </div>
-      <div class="page-hd" style="display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:12px;">
-        <div>
-          <div class="page-title">Digital Diary</div>
-          <div class="page-sub">Private entries — only you can see these</div>
-        </div>
-        <button onclick="startNewDiaryPage()" class="btn btn-green" style="padding:9px 18px;font-size:13px;">+ New page</button>
-      </div>
-      <div id="diaryList" style="display:flex;flex-direction:column;gap:14px;">
-        <div style="text-align:center;padding:40px 16px;color:#94a3b8;font-size:13px;">Loading...</div>
-      </div>
-    </div>
-
     <!-- MY REPORTS PAGE — clock-in reports + admin timesheet manager -->
     <div class="page" id="page-notifs">
       <div class="page-hd">
@@ -5375,6 +5357,18 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
 <!-- DISCUSSIONS section -->
       <!-- FEEDBACK section (staff only - anonymous) -->
   </main>
+
+
+
+
+
+
+
+
+
+
+
+
 <style>
 /* ── Quiz admin panel — dynamic button styles ── */
 .qap-action-btn {
@@ -5615,6 +5609,7 @@ function switchProfileTab(t){
       <div class="bn-item" id="bn-library" data-tab="library" onclick="if(navigator.vibrate)navigator.vibrate(8);openLibrary()" aria-label="Library">
         <svg class="bn-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M10.394 2.08a1 1 0 00-.788 0l-7 3a1 1 0 000 1.84L5.25 8.051a.999.999 0 01.356-.257l4-1.714a1 1 0 11.788 1.838L7.667 9.088l1.94.831a1 1 0 00.787 0l7-3a1 1 0 000-1.838l-7-3zM3.31 9.397L5 10.12v4.102a8.969 8.969 0 00-1.05-.174 1 1 0 01-.89-.89 11.115 11.115 0 01.25-3.762zM9.3 16.573A9.026 9.026 0 007 14.935v-3.957l1.818.78a3 3 0 002.364 0l5.508-2.361a11.026 11.026 0 01.25 3.762 1 1 0 01-.89.89 8.968 8.968 0 00-5.35 2.524 1 1 0 01-1.4 0zM6 18a1 1 0 001-1v-2.065a8.935 8.935 0 00-2-.712V17a1 1 0 001 1z"/></svg>
         <div class="bn-badge" id="bnLibraryBadge"></div>
+      </div>
       </div>
       <!-- DISCUSSIONS — speech icon (matches sidebar) -->
       <div class="bn-item" id="bn-engagement" data-tab="engagement" onclick="if(navigator.vibrate)navigator.vibrate(8);goTo('engagement')" aria-label="Discussions">
@@ -6841,7 +6836,6 @@ function _setBottomNavActive(page){
     'engagement':'engagement',
     'announcements':'engagement', // legacy redirect
     'tasks':'calendar',
-    'diary':'calendar',
     'training':'library',
     'documents':'library'
   };
@@ -6901,6 +6895,7 @@ function goTo(p){
   if(p==="profile")loadProfilePage();
   if(p==="home"){loadHomeData();loadClockState();refreshHomeOnboardingCard();}
   if(p==="notifs"){renderNotifsPage();}
+  
   if(p==="training"){renderMyTraining();}
 
   if(p==="announcements"){loadAnnouncements();}
@@ -13612,202 +13607,35 @@ async function showDiscReaders(id){
 }
 
 // ── DIARY ──────────────────────────────
-let _diaryEntries = [];
+
 let _diaryEditId = null;
 
-async function loadDiary(){
-  if(!me) return;
-  try{
-    _diaryEntries = await sbGet('diary_entries','?staff_name=eq.'+encodeURIComponent(me)+'&order=entry_date.desc&limit=500');
-  }catch(e){ console.warn('loadDiary:',e); _diaryEntries = []; }
-  renderDiary();
-}
 
-function renderDiary(){
-  const el = document.getElementById('diaryList');
-  if(!el) return;
-  el.style.cssText = 'display:block;background:transparent;padding:24px 0;';
-  
-  // Build all pages in a flipbook
-  const allPages = [];
-  if(_diaryNewPageOpen){
-    allPages.push({id:'new', entry_date: new Date().toISOString().split('T')[0], title:'', body:'', remind_at:'', isNew:true});
-  }
-  _diaryEntries.forEach(function(e){ allPages.push(e); });
-  
-  if(!allPages.length){
-    el.innerHTML = '<div class="diary-flipbook">'+
-      '<div class="diary-a4 diary-a4-empty-state" onclick="startNewDiaryPage()">'+
-        '<div class="diary-a4-empty-text">Tap to start your first page</div>'+
-      '</div>'+
-    '</div>';
-    return;
-  }
-  
-  if(_diaryFlipIndex >= allPages.length) _diaryFlipIndex = 0;
-  if(_diaryFlipIndex < 0) _diaryFlipIndex = allPages.length - 1;
-  
-  let html = '<div class="diary-flipbook">';
-  // Page nav
-  html += '<div class="diary-nav">';
-  html += '<button class="diary-nav-btn" onclick="flipDiary(-1)" title="Previous page" '+(_diaryFlipIndex===0?'disabled':'')+'>‹ Prev</button>';
-  html += '<div class="diary-nav-info">Page '+(_diaryFlipIndex+1)+' of '+allPages.length+'</div>';
-  html += '<button class="diary-nav-btn" onclick="flipDiary(1)" title="Next page" '+(_diaryFlipIndex>=allPages.length-1?'disabled':'')+'>Next ›</button>';
-  html += '</div>';
-  // The flipping page stack
-  html += '<div class="diary-page-stack" id="diaryPageStack">';
-  allPages.forEach(function(p, idx){
-    const cls = idx === _diaryFlipIndex ? 'diary-page-current' : (idx < _diaryFlipIndex ? 'diary-page-prev' : 'diary-page-next');
-    html += '<div class="diary-page-slot '+cls+'" data-idx="'+idx+'">'+renderDiaryPage(p, p.isNew)+'</div>';
-  });
-  html += '</div>';
-  html += '</div>';
-  el.innerHTML = html;
-}
 
-function flipDiary(delta){
-  _diaryFlipIndex += delta;
-  renderDiary();
-}
+
+
+
 
 let _diaryFlipIndex = 0;
 
 
-function renderDiaryPage(e, isNew){
-  const d = new Date(e.entry_date+'T00:00:00');
-  const dayMonth = d.toLocaleDateString('en-AU',{day:'numeric',month:'long'});
-  const year = d.getFullYear();
-  const idAttr = e.id ? ('data-id="'+e.id+'"') : 'data-new="1"';
-  const dayName = d.toLocaleDateString('en-AU',{weekday:'long'});
-  const titleSafe = String(e.title||'').replace(/</g,'&lt;').replace(/"/g,'&quot;');
-  const bodySafe = String(e.body||'').replace(/</g,'&lt;');
-  const reminderDisplay = e.remind_at ? new Date(e.remind_at).toLocaleString('en-AU',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : '';
-  const reminderIso = e.remind_at ? (function(iso){
-    const d2 = new Date(iso);
-    const pad = function(n){return String(n).padStart(2,'0');};
-    return d2.getFullYear()+'-'+pad(d2.getMonth()+1)+'-'+pad(d2.getDate())+'T'+pad(d2.getHours())+':'+pad(d2.getMinutes());
-  })(e.remind_at) : '';
-  
-  return '<div class="diary-a4 diary-a4-editable" '+idAttr+'>'+
-    '<div class="diary-a4-header">'+
-      '<div class="diary-a4-date">'+
-        '<div class="diary-a4-day-month">'+dayMonth+'</div>'+
-        '<div class="diary-a4-year">'+year+'</div>'+
-        '<input type="date" class="diary-a4-date-input" value="'+e.entry_date+'" onchange="updateDiaryField(this,\''+(e.id||'new')+'\',\'entry_date\')" title="Change date">'+
-      '</div>'+
-      '<div class="diary-a4-note">'+
-        '<div class="diary-a4-note-label">Note:</div>'+
-        '<input type="datetime-local" class="diary-a4-reminder-input" placeholder="Set reminder…" value="'+reminderIso+'" onchange="updateDiaryField(this,\''+(e.id||'new')+'\',\'remind_at\')" title="Set reminder">'+
-        (reminderDisplay ? '<div class="diary-a4-reminder-display">'+reminderDisplay+'</div>' : '<div class="diary-a4-note-hint">Tap above to set a reminder</div>')+
-      '</div>'+
-    '</div>'+
-    '<div class="diary-a4-divider"></div>'+
-    '<div class="diary-a4-subject-row">'+
-      '<span class="diary-a4-subject-label">Subject:</span>'+
-      '<input type="text" class="diary-a4-subject-input" placeholder="What\'s this entry about?" value="'+titleSafe+'" oninput="updateDiaryField(this,\''+(e.id||'new')+'\',\'title\')">'+
-    '</div>'+
-    '<div class="diary-a4-subject-line"></div>'+
-    '<textarea class="diary-a4-body-editor" placeholder="Write your entry here…&#10;The paper will hold as many lines as you need." oninput="updateDiaryField(this,\''+(e.id||'new')+'\',\'body\');autoGrow(this)">'+bodySafe+'</textarea>'+
-    '<div class="diary-a4-bottom">'+
-      (e.id ? '<button class="diary-a4-delete" onclick="event.stopPropagation();deleteDiaryPageInline(\''+e.id+'\')">Delete this page</button>' : '')+
-      '<div class="diary-a4-signature">'+
-        '<div class="diary-a4-sig-line"></div>'+
-        '<div class="diary-a4-sig-label">— '+dayName+' —</div>'+
-      '</div>'+
-    '</div>'+
-  '</div>';
-}
+
 
 let _diaryNewPageOpen = false;
 let _diaryDraft = {}; // {id: {field: value}}
 let _diarySaveTimer = null;
 
-function startNewDiaryPage(){
-  _diaryNewPageOpen = true;
-  _diaryDraft.new = {entry_date: new Date().toISOString().split('T')[0], title: '', body: '', remind_at: ''};
-  renderDiary();
-  // Focus on the subject input of the new page
-  setTimeout(function(){
-    const inp = document.querySelector('.diary-a4[data-new="1"] .diary-a4-subject-input');
-    if(inp) inp.focus();
-  }, 100);
-}
 
-function updateDiaryField(input, id, field){
-  if(!_diaryDraft[id]) _diaryDraft[id] = {};
-  _diaryDraft[id][field] = input.value;
-  // Debounced save (1.5s after last input)
-  if(_diarySaveTimer) clearTimeout(_diarySaveTimer);
-  _diarySaveTimer = setTimeout(function(){ persistDiaryDraft(id); }, 1500);
-}
 
-async function persistDiaryDraft(id){
-  const draft = _diaryDraft[id];
-  if(!draft || !me) return;
-  // Convert remind_at to ISO if present
-  const payload = {
-    staff_name: me,
-    entry_date: draft.entry_date,
-    title: draft.title || '',
-    body: draft.body || ''
-  };
-  if(draft.remind_at){
-    try{ payload.remind_at = new Date(draft.remind_at).toISOString(); }catch(e){}
-  } else if(draft.hasOwnProperty('remind_at')){
-    payload.remind_at = null;
-  }
-  
-  try{
-    if(id === 'new'){
-      const created = await sbPost('diary_entries', payload, true);
-      if(created && created[0]){
-        // Replace 'new' with real ID in draft + DOM
-        _diaryDraft[created[0].id] = draft;
-        delete _diaryDraft.new;
-        _diaryNewPageOpen = false;
-        const newPage = document.querySelector('.diary-a4[data-new="1"]');
-        if(newPage){
-          newPage.setAttribute('data-id', created[0].id);
-          newPage.removeAttribute('data-new');
-          // Update inline onchange handlers to use real ID
-          newPage.querySelectorAll('[onchange*="\'new\'"], [oninput*="\'new\'"]').forEach(function(el){
-            ['onchange','oninput'].forEach(function(attr){
-              const v = el.getAttribute(attr);
-              if(v) el.setAttribute(attr, v.replace(/'new'/g, "'"+created[0].id+"'"));
-            });
-          });
-          // Add delete button
-          const bottom = newPage.querySelector('.diary-a4-bottom');
-          if(bottom && !bottom.querySelector('.diary-a4-delete')){
-            const delBtn = document.createElement('button');
-            delBtn.className = 'diary-a4-delete';
-            delBtn.textContent = 'Delete this page';
-            delBtn.onclick = function(ev){ ev.stopPropagation(); deleteDiaryPageInline(created[0].id); };
-            bottom.insertBefore(delBtn, bottom.firstChild);
-          }
-        }
-        // Reload entries in background
-        loadDiary();
-      }
-    } else {
-      await fetch(SB+'/rest/v1/diary_entries?id=eq.'+encodeURIComponent(id), {
-        method:'PATCH',
-        headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
-        body: JSON.stringify(payload)
-      });
-      // Update local cache so re-render preserves edits
-      const cached = _diaryEntries.find(function(x){return x.id===id;});
-      if(cached){ Object.assign(cached, payload); }
-    }
-    flashSavedIndicator();
-  }catch(e){ console.warn('diary save:', e); }
-}
+
+
+
 
 function flashSavedIndicator(){
-  let ind = document.getElementById('diarySavedInd');
+  let ind = document.getElementById('savedInd');
   if(!ind){
     ind = document.createElement('div');
-    ind.id = 'diarySavedInd';
+    ind.id = 'savedInd';
     ind.style.cssText = 'position:fixed;top:80px;right:20px;background:#10b981;color:#fff;padding:6px 14px;border-radius:20px;font-size:12px;font-weight:600;z-index:9999;box-shadow:0 4px 14px rgba(16,185,129,.3);opacity:0;transition:opacity .25s;font-family:inherit;';
     ind.textContent = '✓ Saved';
     document.body.appendChild(ind);
@@ -13817,19 +13645,7 @@ function flashSavedIndicator(){
   ind._timer = setTimeout(function(){ ind.style.opacity = '0'; }, 1800);
 }
 
-async function deleteDiaryPageInline(id){
-  if(!confirm('Delete this diary page? This cannot be undone.')) return;
-  try{
-    await fetch(SB+'/rest/v1/diary_entries?id=eq.'+encodeURIComponent(id), {
-      method:'DELETE',
-      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}
-    });
-    _diaryEntries = _diaryEntries.filter(function(x){return x.id !== id;});
-    delete _diaryDraft[id];
-    renderDiary();
-    showToast('Page deleted');
-  }catch(e){ showToast('Delete failed','error'); }
-}
+
 
 function autoGrow(textarea){
   textarea.style.height = 'auto';
@@ -13839,172 +13655,17 @@ function autoGrow(textarea){
 
 
 
-function openDiaryEntry(id){
-  _diaryEditId = id || null;
-  let bd = document.getElementById('diaryBack');
-  if(!bd){
-    bd = document.createElement('div');
-    bd.id = 'diaryBack';
-    bd.style.cssText = 'position:fixed;inset:0;z-index:9560;background:rgba(15,23,42,.55);backdrop-filter:blur(10px);display:flex;align-items:center;justify-content:center;padding:16px;';
-    document.body.appendChild(bd);
-    bd.addEventListener('click', function(e){ if(e.target===bd) closeDiaryEntry(); });
-  }
-  const today = new Date().toISOString().split('T')[0];
-  let entry = {entry_date: today, title: '', body: '', remind_at: ''};
-  let titleHd = 'New diary entry';
-  let saveLabel = 'Save';
-  let deleteBtn = '';
-  if(id){
-    const found = _diaryEntries.find(function(x){return x.id===id;});
-    if(found){
-      entry = {
-        entry_date: found.entry_date,
-        title: found.title || '',
-        body: found.body || '',
-        remind_at: found.remind_at ? (function(iso){
-          const d = new Date(iso);
-          // Convert to local datetime-local format (YYYY-MM-DDTHH:mm)
-          const pad = function(n){return String(n).padStart(2,'0');};
-          return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+'T'+pad(d.getHours())+':'+pad(d.getMinutes());
-        })(found.remind_at) : ''
-      };
-      titleHd = 'Edit entry';
-      saveLabel = 'Update';
-      deleteBtn = '<button onclick="deleteDiaryEntry()" style="background:none;border:none;color:#dc2626;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;padding:8px 14px;">Delete</button>';
-    }
-  }
-  bd.innerHTML = '<div style="background:#fff;border-radius:14px;width:100%;max-width:480px;max-height:90dvh;display:flex;flex-direction:column;box-shadow:0 24px 60px rgba(15,23,42,.3);overflow:hidden;" onclick="event.stopPropagation()">'+
-    '<div style="padding:14px 18px;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center;">'+
-      '<div style="font-size:15px;font-weight:700;color:#0f172a;">'+titleHd+'</div>'+
-      '<button onclick="closeDiaryEntry()" style="background:none;border:none;font-size:22px;color:#94a3b8;cursor:pointer;line-height:1;padding:4px 8px;">×</button>'+
-    '</div>'+
-    '<div style="padding:18px;overflow-y:auto;flex:1;">'+
-      '<div style="margin-bottom:14px;">'+
-        '<label style="font-size:11px;font-weight:600;color:#64748b;">Date</label>'+
-        '<input type="date" id="diDate" value="'+entry.entry_date+'" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:9px 12px;font-size:14px;font-family:inherit;outline:none;margin-top:3px;">'+
-      '</div>'+
-      '<div style="margin-bottom:14px;">'+
-        '<label style="font-size:11px;font-weight:600;color:#64748b;">Title</label>'+
-        '<input type="text" id="diTitle" value="'+String(entry.title).replace(/"/g,'&quot;')+'" placeholder="e.g. Coffee with Jess" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:9px 12px;font-size:14px;font-family:inherit;outline:none;margin-top:3px;">'+
-      '</div>'+
-      '<div style="margin-bottom:14px;">'+
-        '<label style="font-size:11px;font-weight:600;color:#64748b;">Notes</label>'+
-        '<textarea id="diBody" rows="6" placeholder="What\'s on your mind?" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:9px 12px;font-size:14px;font-family:inherit;outline:none;margin-top:3px;resize:vertical;min-height:120px;">'+String(entry.body).replace(/</g,'&lt;')+'</textarea>'+
-      '</div>'+
-      '<div style="margin-bottom:6px;">'+
-        '<label style="font-size:11px;font-weight:600;color:#64748b;display:flex;align-items:center;gap:6px;">'+
-          '<svg width="12" height="12" viewBox="0 0 20 20" fill="#94a3b8"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/></svg>'+
-          'Reminder (optional)'+
-        '</label>'+
-        '<input type="datetime-local" id="diRemind" value="'+entry.remind_at+'" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:9px 12px;font-size:14px;font-family:inherit;outline:none;margin-top:3px;">'+
-        '<div style="font-size:11px;color:#94a3b8;margin-top:4px;">Get a notification at this time. Leave blank for no reminder.</div>'+
-      '</div>'+
-    '</div>'+
-    '<div style="padding:12px 18px;border-top:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center;gap:8px;">'+
-      deleteBtn+
-      '<div style="display:flex;gap:8px;margin-left:auto;">'+
-        '<button onclick="closeDiaryEntry()" class="btn btn-outline" style="padding:8px 16px;font-size:13px;">Cancel</button>'+
-        '<button onclick="saveDiaryEntry()" class="btn btn-green" style="padding:8px 18px;font-size:13px;" id="diSaveBtn">'+saveLabel+'</button>'+
-      '</div>'+
-    '</div>'+
-  '</div>';
-  bd.style.display='flex';
-  setTimeout(function(){ const ti=document.getElementById('diTitle'); if(ti) ti.focus(); }, 50);
-}
 
-function closeDiaryEntry(){
-  const bd = document.getElementById('diaryBack');
-  if(bd) bd.style.display = 'none';
-  _diaryEditId = null;
-}
 
-async function saveDiaryEntry(){
-  const date = document.getElementById('diDate').value;
-  const title = document.getElementById('diTitle').value.trim();
-  const body = document.getElementById('diBody').value.trim();
-  const remind = document.getElementById('diRemind').value;
-  if(!date){ showToast('Pick a date'); return; }
-  if(!title && !body){ showToast('Add a title or notes'); return; }
 
-  const payload = {
-    staff_name: me,
-    entry_date: date,
-    title: title || null,
-    body: body || null,
-    remind_at: remind ? new Date(remind).toISOString() : null,
-    reminded: false,
-    updated_at: new Date().toISOString()
-  };
-  const btn = document.getElementById('diSaveBtn');
-  btn.disabled = true; btn.textContent = '...';
-  try{
-    if(_diaryEditId){
-      await fetch(SB+'/rest/v1/diary_entries?id=eq.'+encodeURIComponent(_diaryEditId), {
-        method:'PATCH',
-        headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
-        body: JSON.stringify(payload)
-      });
-    } else {
-      await sbPost('diary_entries', payload);
-    }
-    closeDiaryEntry();
-    showToast(_diaryEditId ? 'Entry updated' : 'Entry saved');
-    loadDiary();
-  }catch(e){
-    showToast('Save failed');
-    btn.disabled = false;
-    btn.textContent = _diaryEditId ? 'Update' : 'Save';
-  }
-}
 
-async function deleteDiaryEntry(){
-  if(!_diaryEditId) return;
-  if(!confirm('Delete this diary entry?')) return;
-  try{
-    await fetch(SB+'/rest/v1/diary_entries?id=eq.'+encodeURIComponent(_diaryEditId), {
-      method:'DELETE',
-      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Prefer':'return=minimal'}
-    });
-    closeDiaryEntry();
-    showToast('Entry deleted');
-    loadDiary();
-  }catch(e){ showToast('Delete failed'); }
-}
+
+
+
 
 // Reminder fire — check every 30s
-function checkDiaryReminders(){
-  if(!_diaryEntries || !_diaryEntries.length) return;
-  const now = new Date();
-  _diaryEntries.forEach(function(e){
-    if(!e.remind_at || e.reminded) return;
-    const remTime = new Date(e.remind_at);
-    if(remTime <= now){
-      // Fire notif via NotifManager
-      if(typeof NotifManager !== 'undefined'){
-        NotifManager.push({
-          id: 'diary-'+e.id,
-          type: 'diary',
-          title: e.title || 'Diary reminder',
-          body: e.body ? e.body.slice(0, 140) : 'Diary entry reminder',
-          ts: Date.now(),
-          link: 'diary'
-        });
-      }
-      // System notif
-      if(typeof showSystemNotification === 'function'){
-        showSystemNotification(e.title || 'Diary reminder', e.body ? e.body.slice(0, 140) : '', 'diary-'+e.id, 'tasks');
-      }
-      // Mark as reminded server-side
-      e.reminded = true;
-      fetch(SB+'/rest/v1/diary_entries?id=eq.'+encodeURIComponent(e.id), {
-        method:'PATCH',
-        headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
-        body: JSON.stringify({reminded: true})
-      }).catch(function(){});
-    }
-  });
-}
-setInterval(checkDiaryReminders, 30000);
+
+
 
 // ── MY REPORTS PAGE ──────────────────
 function showReportsTab(tab){
@@ -17766,6 +17427,9 @@ async function pushSubsUpsert(payload){
 // NotifManager — central local notification engine
 // Pure local state via localStorage; no external services.
 // ─────────────────────────────────────
+
+
+
 const NotifManager = (function(){
   const KEY_PREFIX = 'notif_local_';
   const MAX_STORED = 100;
@@ -19009,426 +18673,40 @@ window.addEventListener('resize', function(){
   50% { transform: scale(1.06); box-shadow: 0 0 0 14px rgba(16,185,129,0); }
 }
 
-  .diary-title { font-size: 15px; }
-  .diary-text { font-size: 13px; }
 }
 
 
 /* ── A4 Paper Diary look ── */
-.diary-a4 {
-  background: #fefefe;
-  border: 1px solid #d4d4d8;
-  border-radius: 2px;
-  box-shadow:
-    0 8px 24px rgba(0,0,0,.12),
-    0 2px 6px rgba(0,0,0,.06),
-    inset 0 0 0 1px rgba(255,255,255,.5);
-  padding: 40px 44px 32px;
-  cursor: default;
-  position: relative;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  color: #18181b;
-  /* Strict A4 aspect ratio 210:297 ≈ 1:1.414 */
-  aspect-ratio: 210 / 297;
-  max-width: 600px;
-  width: 100%;
-  margin: 0 auto;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-.diary-a4:hover {
-  transform: translateY(-2px);
-  box-shadow:
-    0 10px 28px rgba(0,0,0,.12),
-    0 2px 4px rgba(0,0,0,.06);
-}
 
 /* Header — date on left, Note: on right */
-.diary-a4-header {
-  display: flex;
-  gap: 24px;
-  align-items: flex-start;
-}
-.diary-a4-date {
-  flex-shrink: 0;
-  border-right: 1px solid #18181b;
-  padding-right: 18px;
-  padding-top: 4px;
-}
-.diary-a4-day-month {
-  font-size: 13px;
-  font-weight: 500;
-  letter-spacing: -.01em;
-  color: #18181b;
-  line-height: 1;
-  margin-bottom: 4px;
-}
-.diary-a4-year {
-  font-size: 32px;
-  font-weight: 900;
-  letter-spacing: -.04em;
-  color: #000;
-  line-height: .9;
-}
-.diary-a4-note {
-  flex: 1;
-  padding-top: 6px;
-}
-.diary-a4-note-label {
-  font-size: 12px;
-  font-weight: 700;
-  color: #000;
-  margin-bottom: 4px;
-}
-.diary-a4-note-line {
-  border-bottom: 1px solid #18181b;
-  height: 14px;
-}
-.diary-a4-reminder {
-  font-size: 12px;
-  color: #18181b;
-  border-bottom: 1px solid #18181b;
-  padding-bottom: 4px;
-  margin-top: 4px;
-}
 
 /* Black divider between header and subject */
-.diary-a4-divider {
-  height: 2px;
-  background: #000;
-  margin: 14px 0 16px;
-}
 
 /* Subject row */
-.diary-a4-subject-row {
-  font-size: 13px;
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-  margin-bottom: 2px;
-}
-.diary-a4-subject-label {
-  font-weight: 700;
-  color: #000;
-  flex-shrink: 0;
-}
-.diary-a4-subject-value {
-  flex: 1;
-  font-weight: 500;
-  color: #18181b;
-  font-size: 14px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.diary-a4-subject {
-  font-size: 13px;
-  font-weight: 700;
-  color: #000;
-  margin-bottom: 2px;
-}
-.diary-a4-subject-line {
-  border-bottom: 1.5px solid #18181b;
-  margin-bottom: 14px;
-}
 
 /* Body — ruled lines */
-.diary-a4-body {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-}
-.diary-a4-body-line {
-  border-bottom: 1px dashed #a1a1aa;
-  padding: 6px 0 2px;
-  min-height: 22px;
-  font-size: 13.5px;
-  line-height: 1.4;
-  color: #27272a;
-  font-family: 'Caveat', 'Bradley Hand', cursive;
-  font-size: 17px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.diary-a4-body-line.diary-a4-more {
-  font-family: inherit;
-  font-size: 11px;
-  font-style: italic;
-  color: #71717a;
-  text-align: center;
-  border-bottom: none;
-  padding-top: 8px;
-}
-.diary-a4-body-empty {
-  align-items: center;
-  justify-content: center;
-  min-height: 200px;
-}
-.diary-a4-empty-text {
-  font-size: 14px;
-  color: #a1a1aa;
-  font-style: italic;
-  text-align: center;
-  padding: 40px 20px;
-}
 
 /* Bottom signature area */
-.diary-a4-bottom {
-  margin-top: auto;
-  padding-top: 18px;
-  border-top: 2px solid #000;
-  display: flex;
-  justify-content: flex-end;
-}
-.diary-a4-signature {
-  text-align: center;
-  min-width: 140px;
-}
-.diary-a4-sig-line {
-  border-bottom: 1px solid #18181b;
-  height: 14px;
-  margin-bottom: 4px;
-}
-.diary-a4-sig-label {
-  font-size: 11px;
-  color: #52525b;
-  letter-spacing: .02em;
-}
 
 /* Load handwriting font */
 @import url('https://fonts.googleapis.com/css2?family=Caveat:wght@400;500;700&display=swap');
 
 /* Dark mode — keep paper aesthetic but slightly muted */
-[data-theme="dark"] .diary-a4 {
-  background: #1c1917;
-  border-color: #3f3f46;
-  color: #fafaf9;
-  box-shadow:
-    0 4px 14px rgba(0,0,0,.4),
-    0 1px 3px rgba(0,0,0,.3);
-}
-[data-theme="dark"] .diary-a4-day-month,
-[data-theme="dark"] .diary-a4-subject-value,
-[data-theme="dark"] .diary-a4-reminder { color: #fafaf9; }
-[data-theme="dark"] .diary-a4-year,
-[data-theme="dark"] .diary-a4-note-label,
-[data-theme="dark"] .diary-a4-subject-label,
-[data-theme="dark"] .diary-a4-subject { color: #fff; }
-[data-theme="dark"] .diary-a4-divider,
-[data-theme="dark"] .diary-a4-bottom { border-color: #f5f5f4; background: transparent; }
-[data-theme="dark"] .diary-a4-divider { background: #f5f5f4; }
-[data-theme="dark"] .diary-a4-date,
-[data-theme="dark"] .diary-a4-note-line,
-[data-theme="dark"] .diary-a4-sig-line,
-[data-theme="dark"] .diary-a4-subject-line { border-color: #f5f5f4; }
-[data-theme="dark"] .diary-a4-body-line { border-bottom-color: #525252; color: #e5e5e5; }
-[data-theme="dark"] .diary-a4-sig-label { color: #a8a29e; }
-[data-theme="dark"] .diary-a4-empty-text { color: #71717a; }
 
 @media(max-width:600px){
-  .diary-a4 { padding: 24px 20px 20px; min-height: 480px; }
-  .diary-a4-year { font-size: 26px; }
-  .diary-a4-body-line { font-size: 15px; }
 }
 
 
 /* Inline-edit diary inputs */
-.diary-a4-editable {
-  cursor: default;
-}
-.diary-a4-date {
-  position: relative;
-}
-.diary-a4-date-input {
-  position: absolute; inset: 0;
-  opacity: 0; cursor: pointer;
-  width: 100%; height: 100%;
-  border: none; background: transparent;
-}
-.diary-a4-reminder-input {
-  width: 100%;
-  border: none;
-  background: transparent;
-  border-bottom: 1px solid #18181b;
-  padding: 2px 0;
-  font-family: inherit;
-  font-size: 12px;
-  outline: none;
-  color: #18181b;
-}
-.diary-a4-reminder-input:focus { border-bottom-color: #3b82f6; }
-.diary-a4-reminder-display {
-  font-size: 11px;
-  color: #18181b;
-  margin-top: 4px;
-  font-weight: 500;
-}
-.diary-a4-note-hint {
-  font-size: 10px;
-  color: #a1a1aa;
-  margin-top: 2px;
-  font-style: italic;
-}
-.diary-a4-subject-input {
-  flex: 1;
-  border: none;
-  background: transparent;
-  outline: none;
-  font-family: inherit;
-  font-size: 14px;
-  font-weight: 500;
-  color: #18181b;
-  padding: 2px 4px;
-  border-radius: 3px;
-  transition: background .15s;
-}
-.diary-a4-subject-input:focus { background: rgba(59,130,246,.06); }
-.diary-a4-body-editor {
-  width: 100%;
-  min-height: 280px;
-  border: none;
-  background:
-    repeating-linear-gradient(transparent, transparent 26px, #a1a1aa 26px, #a1a1aa 27px);
-  background-attachment: local;
-  background-position: 0 6px;
-  outline: none;
-  resize: none;
-  padding: 6px 0 0;
-  font-family: 'Caveat', 'Bradley Hand', cursive;
-  font-size: 19px;
-  line-height: 27px;
-  color: #18181b;
-  margin: 6px 0 0;
-  display: block;
-  flex: 1;
-}
-.diary-a4-body-editor::placeholder {
-  color: #a1a1aa;
-  font-style: italic;
-}
-.diary-a4-delete {
-  background: none;
-  border: 1px solid #fca5a5;
-  color: #dc2626;
-  font-size: 11px;
-  font-weight: 600;
-  padding: 5px 10px;
-  border-radius: 4px;
-  cursor: pointer;
-  font-family: inherit;
-  margin-right: auto;
-}
-.diary-a4-delete:hover { background: #fef2f2; }
-.diary-a4-empty-state {
-  text-align: center;
-  cursor: pointer;
-  padding: 60px 20px;
-  min-height: auto;
-}
-.diary-a4-empty-state:hover { background: #fafaf9; }
 
 /* Dark mode for editable inputs */
-[data-theme="dark"] .diary-a4-reminder-input,
-[data-theme="dark"] .diary-a4-subject-input,
-[data-theme="dark"] .diary-a4-body-editor { color: #fafaf9; }
-[data-theme="dark"] .diary-a4-reminder-input { border-bottom-color: #f5f5f4; }
-[data-theme="dark"] .diary-a4-reminder-display { color: #fafaf9; }
-[data-theme="dark"] .diary-a4-body-editor {
-  background: repeating-linear-gradient(transparent, transparent 26px, #525252 26px, #525252 27px);
-  background-attachment: local;
-  background-position: 0 6px;
-}
-[data-theme="dark"] .diary-a4-delete { border-color: #7f1d1d; color: #fca5a5; }
-[data-theme="dark"] .diary-a4-delete:hover { background: rgba(220,38,38,.1); }
 
 
 /* ── Diary flipbook ── */
-.diary-flipbook {
-  max-width: 720px;
-  margin: 0 auto;
-  padding: 0 16px;
-}
-.diary-nav {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 16px;
-  gap: 12px;
-}
-.diary-nav-btn {
-  background: #fff;
-  border: 1.5px solid #e2e8f0;
-  border-radius: 8px;
-  padding: 8px 16px;
-  font-size: 13px;
-  font-weight: 600;
-  color: #0f172a;
-  cursor: pointer;
-  font-family: inherit;
-  transition: all .15s;
-}
-.diary-nav-btn:hover:not(:disabled) {
-  background: #f8fafc;
-  border-color: #cbd5e1;
-}
-.diary-nav-btn:disabled {
-  opacity: .4;
-  cursor: not-allowed;
-}
-.diary-nav-info {
-  font-size: 12px;
-  font-weight: 600;
-  color: #64748b;
-  font-variant-numeric: tabular-nums;
-}
-[data-theme="dark"] .diary-nav-btn {
-  background: #1e293b;
-  border-color: #2d3f55;
-  color: #f1f5f9;
-}
-[data-theme="dark"] .diary-nav-btn:hover:not(:disabled) {
-  background: #253447;
-}
-[data-theme="dark"] .diary-nav-info { color: #94a3b8; }
 
 /* Page stack — 3D perspective for the flip effect */
-.diary-page-stack {
-  position: relative;
-  perspective: 2000px;
-  min-height: 700px;
-}
-.diary-page-slot {
-  position: absolute;
-  inset: 0;
-  transition: transform .5s cubic-bezier(.4,0,.2,1), opacity .3s;
-  transform-style: preserve-3d;
-  transform-origin: left center;
-  backface-visibility: hidden;
-}
-.diary-page-current {
-  z-index: 3;
-  transform: rotateY(0deg);
-  opacity: 1;
-}
-.diary-page-prev {
-  z-index: 1;
-  transform: rotateY(-160deg) translateX(-20px);
-  opacity: 0;
-  pointer-events: none;
-}
-.diary-page-next {
-  z-index: 2;
-  transform: rotateY(0deg) translateX(8px) translateY(8px);
-  opacity: .4;
-  pointer-events: none;
-  filter: blur(1px);
-}
 
 @media(max-width:600px){
-  .diary-page-stack { min-height: 560px; }
-  .diary-nav-btn { padding: 7px 12px; font-size: 12px; }
 }
 
 
