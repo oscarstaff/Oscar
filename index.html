@@ -4765,10 +4765,7 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
             <button class="cal-view-btn active" data-view="month" onclick="setCalView('month')">Month</button>
             <button class="cal-view-btn" data-view="year" onclick="setCalView('year')">Year</button>
           </div>
-          <div class="cal-views" style="margin-left:6px;">
-            <button class="cal-view-btn active" data-cal-system="ad" onclick="setCalSystem('ad')">AD</button>
-            <button class="cal-view-btn" data-cal-system="bs" onclick="setCalSystem('bs')">BS</button>
-          </div>
+
           <button id="calAddEventBtn" onclick="toggleCalEventForm()" style="display:none;font-size:12px;font-weight:600;color:var(--accent);background:none;border:none;cursor:pointer;font-family:inherit;padding:6px 10px;">+ Event</button>
           <button class="cal-nav-btn" onclick="calPrev()" style="cursor:pointer;">&#8249;</button>
           <span style="display:inline-flex;flex-direction:column;align-items:center;min-width:140px;text-align:center;line-height:1.2;"><span id="bdayMonthLabel" style="font-size:13px;font-weight:700;color:#0f172a;"></span><span id="bdayNepaliLabel" style="font-size:10px;font-weight:600;color:#7c3aed;margin-top:1px;letter-spacing:.02em;"></span></span>
@@ -5357,6 +5354,44 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
 <!-- DISCUSSIONS section -->
       <!-- FEEDBACK section (staff only - anonymous) -->
   </main>
+<style>
+/* BS Devanagari day inside calendar cells */
+.cal-bs-day {
+  display: inline-block;
+  margin-left: 5px;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: #7c3aed;
+  background: rgba(139,92,246,.08);
+  padding: 0 4px;
+  border-radius: 3px;
+  vertical-align: top;
+  line-height: 14px;
+  font-family: 'Noto Sans Devanagari', 'Mangal', system-ui, sans-serif;
+}
+[data-theme="dark"] .cal-bs-day {
+  color: #c4b5fd;
+  background: rgba(196,181,253,.12);
+}
+.cal-day-today .cal-bs-day {
+  background: rgba(255,255,255,.18);
+  color: #fff;
+}
+.cal-day-weekend .cal-bs-day {
+  opacity: .75;
+}
+/* On small screens, position BS day below the AD date */
+@media (max-width: 700px) {
+  .cal-bs-day {
+    display: block;
+    margin-left: 0;
+    margin-top: 1px;
+    font-size: 9.5px;
+    padding: 0 3px;
+  }
+}
+</style>
+
 
 
 
@@ -8334,7 +8369,6 @@ function setCalView(v){
 }
 
 function calPrev(){
-  if(_calSystem === 'bs' && calView === 'month'){ return bsCalPrev(); }
   if(calView==='day') bdayViewDate=new Date(bdayViewDate.getFullYear(),bdayViewDate.getMonth(),bdayViewDate.getDate()-1);
   else if(calView==='week') bdayViewDate=new Date(bdayViewDate.getFullYear(),bdayViewDate.getMonth(),bdayViewDate.getDate()-7);
   else if(calView==='year') bdayViewDate=new Date(bdayViewDate.getFullYear()-1,0,1);
@@ -8342,7 +8376,6 @@ function calPrev(){
   renderBdayCalendar();
 }
 function calNext(){
-  if(_calSystem === 'bs' && calView === 'month'){ return bsCalNext(); }
   if(calView==='day') bdayViewDate=new Date(bdayViewDate.getFullYear(),bdayViewDate.getMonth(),bdayViewDate.getDate()+1);
   else if(calView==='week') bdayViewDate=new Date(bdayViewDate.getFullYear(),bdayViewDate.getMonth(),bdayViewDate.getDate()+7);
   else if(calView==='year') bdayViewDate=new Date(bdayViewDate.getFullYear()+1,0,1);
@@ -8351,7 +8384,6 @@ function calNext(){
 }
 function calToday(){
   bdayViewDate=new Date();
-  if(_calSystem === 'bs'){ const tbs = adToBs(new Date()); if(tbs){ _bsViewYear = tbs.year; _bsViewMonth = tbs.month; } }
   if(typeof updateCalendarNepaliLabel==='function') setTimeout(updateCalendarNepaliLabel,50);
   if(calView==='month') bdayViewDate.setDate(1);
   if(calView==='year') bdayViewDate=new Date(bdayViewDate.getFullYear(),0,1);
@@ -8615,11 +8647,6 @@ function renderBdayCalendar(){
   // Update Nepali date label every render (only in AD mode — BS view sets its own label)
   if(_calSystem !== 'bs' && typeof updateCalendarNepaliLabel==='function') setTimeout(updateCalendarNepaliLabel,0);
 
-  // BS calendar takes over entirely if selected
-  if(_calSystem === 'bs' && calView === 'month'){
-    return renderBsMonthView(el, lbl);
-  }
-  
   // Dispatch by view (AD)
   if(calView==='day'){ return renderDayView(el, lbl); }
   if(calView==='week'){ return renderWeekView(el, lbl); }
@@ -8628,6 +8655,8 @@ function renderBdayCalendar(){
   const today=new Date(); today.setHours(0,0,0,0);
   const yr=bdayViewDate.getFullYear(), mo=bdayViewDate.getMonth();
   if(lbl)lbl.textContent=new Date(yr,mo,1).toLocaleDateString('en-AU',{month:'long',year:'numeric'});
+  // Update BS sub-label to show BS month range in Devanagari + English
+  if(typeof updateCalendarNepaliLabel === 'function') setTimeout(updateCalendarNepaliLabel, 0);
 
   // Build event maps
   const bdayMap={};
@@ -8707,7 +8736,15 @@ function renderBdayCalendar(){
     const dateStr=yr+'-'+String(mo+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
     const clickHandler='onclick="openDayEventModal(\''+dateStr+'\')" style="cursor:pointer;"';
     html+='<div class="'+classes.join(' ')+'" '+clickHandler+'>';
-    html+='<div class="cal-date">'+(isToday?'<span class="cal-date-today">'+d+'</span>':d)+'</div>';
+    // Combined AD + BS date display
+    const _adDateObj_$ = new Date(yr, mo, d);
+    const _bsDate_$ = (typeof adToBs === 'function') ? adToBs(_adDateObj_$) : null;
+    const _bsDayNep_$ = (_bsDate_$ && typeof NEPALI_DIGITS !== 'undefined')
+      ? String(_bsDate_$.day).split('').map(function(c){return NEPALI_DIGITS[parseInt(c,10)]||c;}).join('')
+      : '';
+    html+='<div class="cal-date">'+(isToday?'<span class="cal-date-today">'+d+'</span>':d);
+    if(_bsDayNep_$) html += '<span class="cal-bs-day" title="'+(NEPALI_BS_MONTH_NAMES[_bsDate_$.month]+' '+_bsDate_$.day)+'">'+_bsDayNep_$+'</span>';
+    html += '</div>';
     html+='<div class="cal-pills">';
 
     // Holiday pill (red)
@@ -11812,12 +11849,14 @@ function adToBs(adDate){
 
 function formatNepaliDate(adDate, opts){
   opts = opts || {};
+  // Default: Devanagari numerals + Nepali month name
+  const useNep = opts.nepali !== false;
   const bs = adToBs(adDate || new Date());
   if(!bs) return '';
-  const monthName = opts.nepali ? NEPALI_BS_MONTH_NEP[bs.month] : NEPALI_BS_MONTH_NAMES[bs.month];
+  const monthName = useNep ? NEPALI_BS_MONTH_NEP[bs.month] : NEPALI_BS_MONTH_NAMES[bs.month];
   let dayStr = String(bs.day);
   let yearStr = String(bs.year);
-  if(opts.nepali){
+  if(useNep){
     dayStr = dayStr.split('').map(function(d){return NEPALI_DIGITS[parseInt(d,10)]||d;}).join('');
     yearStr = yearStr.split('').map(function(d){return NEPALI_DIGITS[parseInt(d,10)]||d;}).join('');
   }
@@ -11828,8 +11867,29 @@ function formatNepaliDate(adDate, opts){
 }
 
 
-// Refresh Nepali date badge every minute
-setInterval(function(){ try{ const npd = document.getElementById('nepaliDateBadge'); if(npd) npd.textContent = formatNepaliDate(new Date()); }catch(e){} }, 60000);
+// Refresh Nepali date badge — every minute + at midnight
+function _refreshNepaliBadge(){
+  try{
+    const npd = document.getElementById('nepaliDateBadge');
+    if(npd) npd.textContent = formatNepaliDate(new Date());
+  }catch(e){}
+}
+setInterval(_refreshNepaliBadge, 60000);
+// Also schedule one shot at next midnight to handle date rollover precisely
+function _scheduleNepaliMidnight(){
+  const now = new Date();
+  const mid = new Date(now);
+  mid.setHours(24, 0, 5, 0); // 00:00:05 tomorrow (5s past midnight for safety)
+  setTimeout(function(){
+    _refreshNepaliBadge();
+    _scheduleNepaliMidnight(); // schedule next
+  }, mid.getTime() - now.getTime());
+}
+_scheduleNepaliMidnight();
+// Refresh whenever page becomes visible (handles tab/app re-focus across midnight)
+document.addEventListener('visibilitychange', function(){
+  if(!document.hidden) _refreshNepaliBadge();
+});
 
 
 // Update Nepali calendar label — shows BS year/month range for currently viewed AD month
@@ -11879,215 +11939,35 @@ function bsToAd(bsYear, bsMonth, bsDay){
   return new Date(_BS_ANCHOR_AD.getTime() + daysDiff * 86400000);
 }
 
-function setCalSystem(sys){
-  _calSystem = sys;
-  document.querySelectorAll('[data-cal-system]').forEach(function(b){
-    b.classList.toggle('active', b.dataset.calSystem === sys);
-  });
-  if(sys === 'bs'){
-    // Initialize BS view from current AD view
-    const adFirst = new Date(bdayViewDate.getFullYear(), bdayViewDate.getMonth(), 1);
-    const bs = adToBs(adFirst);
-    if(bs){ _bsViewYear = bs.year; _bsViewMonth = bs.month; }
-    else { 
-      const today = adToBs(new Date());
-      if(today){ _bsViewYear = today.year; _bsViewMonth = today.month; }
-    }
-  }
-  renderBdayCalendar();
-}
 
-function bsCalPrev(){
-  if(!_bsViewYear) return;
-  _bsViewMonth--;
-  if(_bsViewMonth < 0){ _bsViewMonth = 11; _bsViewYear--; }
-  // Sync bdayViewDate so the AD machinery (events/birthdays) follow
-  syncAdFromBs();
-  renderBdayCalendar();
-}
 
-function bsCalNext(){
-  if(!_bsViewYear) return;
-  _bsViewMonth++;
-  if(_bsViewMonth > 11){ _bsViewMonth = 0; _bsViewYear++; }
-  syncAdFromBs();
-  renderBdayCalendar();
-}
 
-function syncAdFromBs(){
-  if(_bsViewYear == null) return;
-  const ad = bsToAd(_bsViewYear, _bsViewMonth, 1);
-  if(ad) bdayViewDate = ad;
-}
+
+
+
+
 
 // Render the Nepali BS month grid
-function renderBsMonthView(el, lbl){
-  if(!NEPALI_BS_MONTHS[_bsViewYear]){
-    el.innerHTML = '<div style="padding:40px 20px;text-align:center;color:#94a3b8;font-size:13px;">BS year '+_bsViewYear+' not in supported range (2070-2090)</div>';
-    return;
-  }
-  
-  const monthName = NEPALI_BS_MONTH_NAMES[_bsViewMonth];
-  const monthNep = NEPALI_BS_MONTH_NEP[_bsViewMonth];
-  const daysInMonth = NEPALI_BS_MONTHS[_bsViewYear][_bsViewMonth];
-  
-  if(lbl) lbl.textContent = monthName + ' ' + _bsViewYear;
-  // Also update the Nepali label below
-  const npLbl = document.getElementById('bdayNepaliLabel');
-  if(npLbl){
-    npLbl.textContent = monthNep + ' ' + _bsViewYear + ' BS';
-  }
-  
-  // Get AD date for day 1 of this BS month → determines weekday offset
-  const firstAd = bsToAd(_bsViewYear, _bsViewMonth, 1);
-  if(!firstAd){ el.innerHTML = '<div>Conversion failed</div>'; return; }
-  
-  const firstDow = firstAd.getDay(); // 0=Sun
-  const startOffset = (firstDow === 0) ? 6 : firstDow - 1; // Mon-first
-  
-  // Build event maps keyed by BS day-of-month
-  const today = new Date(); today.setHours(0,0,0,0);
-  const todayBs = adToBs(today);
-  
-  // Get all AD dates this BS month covers
-  const adDates = [];
-  for(let d = 1; d <= daysInMonth; d++){
-    const ad = bsToAd(_bsViewYear, _bsViewMonth, d);
-    adDates.push({bsDay: d, ad: ad});
-  }
-  
-  // Build event indices
-  const bdayMap = {};
-  bdayData.forEach(function(r){
-    if(!r.birthday) return;
-    const d = new Date(r.birthday + 'T00:00:00');
-    adDates.forEach(function(item){
-      if(item.ad.getMonth() === d.getMonth() && item.ad.getDate() === d.getDate()){
-        if(!bdayMap[item.bsDay]) bdayMap[item.bsDay] = [];
-        bdayMap[item.bsDay].push({name: r.staff_name});
-      }
-    });
-  });
-  
-  const holidayMap = {};
-  Object.entries(AU_HOLIDAYS).forEach(function(e){
-    const hd = new Date(e[0] + 'T00:00:00');
-    adDates.forEach(function(item){
-      if(item.ad.getTime() === hd.getTime()){ holidayMap[item.bsDay] = e[1]; }
-    });
-  });
-  
-  const eventMap = {};
-  calEvents.forEach(function(ev){
-    if(!ev.event_date) return;
-    const ed = new Date(ev.event_date + 'T00:00:00');
-    adDates.forEach(function(item){
-      if(item.ad.getTime() === ed.getTime()){
-        if(!eventMap[item.bsDay]) eventMap[item.bsDay] = [];
-        eventMap[item.bsDay].push(ev);
-      }
-    });
-  });
-  
-  const taskMap = {};
-  if(typeof _tasks !== 'undefined' && _tasks){
-    _tasks.forEach(function(t){
-      if(!t.dueDate) return;
-      const td = new Date(t.dueDate + 'T00:00:00');
-      adDates.forEach(function(item){
-        if(item.ad.getTime() === td.getTime()){
-          if(!taskMap[item.bsDay]) taskMap[item.bsDay] = [];
-          taskMap[item.bsDay].push(t);
-        }
-      });
-    });
-  }
-  
-  // Build grid
-  let html = '<div class="cal-week-header">';
-  ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].forEach(function(d){
-    html += '<div class="cal-weekday">'+d+'</div>';
-  });
-  html += '</div>';
-  html += '<div class="cal-grid">';
-  
-  // Leading empty cells
-  for(let i = 0; i < startOffset; i++){
-    html += '<div class="cal-day cal-day-prev"><div class="cal-date">·</div></div>';
-  }
-  
-  for(let d = 1; d <= daysInMonth; d++){
-    const ad = adDates[d-1].ad;
-    const adDate = ad.getDate();
-    const adMonthShort = ad.toLocaleDateString('en-AU', {month:'short'});
-    const isToday = todayBs && todayBs.year === _bsViewYear && todayBs.month === _bsViewMonth && todayBs.day === d;
-    const dow = ad.getDay();
-    const isWeekend = (dow === 0 || dow === 6);
-    
-    const classes = ['cal-day'];
-    if(isToday) classes.push('cal-day-today');
-    if(isWeekend) classes.push('cal-day-weekend');
-    
-    const adDateStr = ad.getFullYear()+'-'+String(ad.getMonth()+1).padStart(2,'0')+'-'+String(ad.getDate()).padStart(2,'0');
-    
-    html += '<div class="'+classes.join(' ')+'" onclick="openDayEventModal(\''+adDateStr+'\')" style="cursor:pointer;">';
-    // BS date big, AD date small below
-    html += '<div class="cal-date">';
-    if(isToday) html += '<span class="cal-date-today">'+d+'</span>';
-    else html += d;
-    html += '<span style="display:block;font-size:9px;font-weight:500;color:#94a3b8;margin-top:1px;">'+adDate+' '+adMonthShort+'</span>';
-    html += '</div>';
-    html += '<div class="cal-pills">';
-    
-    const holiday = holidayMap[d];
-    if(holiday){
-      html += '<div class="cal-pill cal-pill-holiday" title="'+holiday+'">'+holiday+'</div>';
-    }
-    const events = eventMap[d] || [];
-    events.forEach(function(ev){
-      const timeStr = ev.event_time ? ev.event_time.slice(0,5)+' ' : '';
-      const colorIdx = (String(ev.id||'').split('').reduce(function(a,c){return a+c.charCodeAt(0);},0) % 6) + 1;
-      const canDelete = myIsAdmin || (ev.created_by === me);
-      const deleteBtn = canDelete ? '<span class="cal-pill-x" data-id="'+ev.id+'" onclick="event.stopPropagation();deleteCalEvent(this.dataset.id)">×</span>' : '';
-      html += '<div class="cal-pill cal-pill-event-'+colorIdx+'" data-ev-id="'+ev.id+'" onclick="event.stopPropagation();viewEvent(this.dataset.evId,event)" style="cursor:pointer;" title="'+ev.title+'">'+timeStr+ev.title+deleteBtn+'</div>';
-    });
-    const bdays = bdayMap[d] || [];
-    bdays.forEach(function(b){
-      html += '<div class="cal-pill cal-pill-bday" title="'+b.name+' birthday">'+b.name.split(' ')[0]+'</div>';
-    });
-    const tasksToday = taskMap[d] || [];
-    tasksToday.forEach(function(t){
-      const doneCls = t.done ? ' done' : '';
-      html += '<div class="cal-pill cal-pill-task'+doneCls+'" title="Task: '+t.title.replace(/"/g,'&quot;')+'" onclick="event.stopPropagation();goTo(\'tasks\');">'+t.title.replace(/</g,'&lt;')+'</div>';
-    });
-    
-    html += '</div></div>';
-  }
-  
-  // Trailing empty cells
-  const totalCells = startOffset + daysInMonth;
-  const trailing = (7 - (totalCells % 7)) % 7;
-  for(let i = 0; i < trailing; i++){
-    html += '<div class="cal-day cal-day-next"><div class="cal-date">·</div></div>';
-  }
-  
-  html += '</div>';
-  el.innerHTML = html;
-}
+
 
 
 function updateCalendarNepaliLabel(){
   try{
     const npLbl = document.getElementById('bdayNepaliLabel');
     if(!npLbl) return;
-    // Use the current calendar view date (window.bdayViewDate is the global)
     let d = (typeof bdayViewDate !== 'undefined' && bdayViewDate) ? bdayViewDate : new Date();
-    // For day view, show single BS date. For others, show month range.
     const view = (typeof calView !== 'undefined') ? calView : 'month';
+    
+    function toDev(n){
+      if(typeof NEPALI_DIGITS === 'undefined') return String(n);
+      return String(n).split('').map(function(c){return NEPALI_DIGITS[parseInt(c,10)]||c;}).join('');
+    }
+    
     if(view === 'day'){
       const bs = adToBs(d);
       if(!bs){ npLbl.textContent = ''; return; }
-      npLbl.textContent = bs.day + ' ' + NEPALI_BS_MONTH_NAMES[bs.month] + ' ' + bs.year;
+      const nepMonth = (typeof NEPALI_BS_MONTH_NEP !== 'undefined') ? NEPALI_BS_MONTH_NEP[bs.month] : NEPALI_BS_MONTH_NAMES[bs.month];
+      npLbl.textContent = toDev(bs.day) + ' ' + nepMonth + ' ' + toDev(bs.year);
       return;
     }
     if(view === 'year'){
@@ -12096,11 +11976,10 @@ function updateCalendarNepaliLabel(){
       const bs1 = adToBs(firstDay);
       const bs2 = adToBs(lastDay);
       if(!bs1 || !bs2){ npLbl.textContent = ''; return; }
-      if(bs1.year === bs2.year){ npLbl.textContent = 'BS ' + bs1.year; }
-      else { npLbl.textContent = 'BS ' + bs1.year + '/' + bs2.year; }
+      if(bs1.year === bs2.year){ npLbl.textContent = toDev(bs1.year); }
+      else { npLbl.textContent = toDev(bs1.year) + '/' + toDev(bs2.year); }
       return;
     }
-    // Week or month — get BS for first and last day of view
     let firstDay, lastDay;
     if(view === 'week'){
       const dow = d.getDay();
@@ -12113,12 +11992,12 @@ function updateCalendarNepaliLabel(){
     const bs1 = adToBs(firstDay);
     const bs2 = adToBs(lastDay);
     if(!bs1 || !bs2){ npLbl.textContent = ''; return; }
+    const nepM1 = (typeof NEPALI_BS_MONTH_NEP !== 'undefined') ? NEPALI_BS_MONTH_NEP[bs1.month] : NEPALI_BS_MONTH_NAMES[bs1.month];
+    const nepM2 = (typeof NEPALI_BS_MONTH_NEP !== 'undefined') ? NEPALI_BS_MONTH_NEP[bs2.month] : NEPALI_BS_MONTH_NAMES[bs2.month];
     if(bs1.month === bs2.month && bs1.year === bs2.year){
-      npLbl.textContent = NEPALI_BS_MONTH_NAMES[bs1.month] + ' ' + bs1.year;
+      npLbl.textContent = nepM1 + ' ' + toDev(bs1.year);
     } else {
-      const m1 = NEPALI_BS_MONTH_NAMES[bs1.month].slice(0,3);
-      const m2 = NEPALI_BS_MONTH_NAMES[bs2.month].slice(0,3);
-      npLbl.textContent = m1 + '/' + m2 + ' ' + bs2.year;
+      npLbl.textContent = nepM1 + '/' + nepM2 + ' ' + toDev(bs2.year);
     }
   }catch(e){ console.warn('nepali label:', e); }
 }
