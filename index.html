@@ -6758,6 +6758,7 @@ async function enterHub(){
   // Sync window.me for any code that uses window.me
   try{ window.me = me; }catch(e){}
   if(typeof startNotifSyncWhenReady === 'function') setTimeout(startNotifSyncWhenReady, 1000);
+  if(typeof captureMyPushEndpoint === 'function') setTimeout(captureMyPushEndpoint, 1500);
   // Register service worker for push notifications
   if(typeof registerServiceWorker === 'function') registerServiceWorker();
   await loadStaffList();
@@ -17535,6 +17536,23 @@ async function markNotifReadEverywhere(notifKey){
 }
 
 // Bootstrap when both me and supabase lib are ready
+
+// Passively capture our own push endpoint on every page load
+// (used by markNotifReadEverywhere as exclude_endpoint)
+async function captureMyPushEndpoint(){
+  try{
+    if(!('serviceWorker' in navigator)) return;
+    const reg = await navigator.serviceWorker.getRegistration();
+    if(!reg) return;
+    const sub = await reg.pushManager.getSubscription();
+    if(sub && sub.endpoint){
+      window._myEndpoint = sub.endpoint;
+      console.log('[notif-sync] endpoint captured');
+    }
+  }catch(e){ console.warn('[notif-sync] endpoint capture failed:', e); }
+}
+
+
 function startNotifSyncWhenReady(){
   if(window.supabase && me){
     initNotifSync();
