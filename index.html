@@ -6124,7 +6124,7 @@ async function loadDiscussions(){
       const isOpen=!isScheduled&&!isClosed;
       // Skip scheduled discussions (not open yet) for non-admins
       if(isScheduled&&!myIsAdmin)return '';
-      let html='<div class="ann-card" style="margin-bottom:12px;opacity:'+(isClosed?.6:1)+'">'+
+      let html='<div class="ann-card" id="disc-card-'+r.id+'" style="margin-bottom:12px;opacity:'+(isClosed?.6:1)+';transition:box-shadow .3s, transform .3s;">'+
         (isScheduled?'<div style="display:inline-block;background:#f0f9ff;border:1px solid #bae6fd;color:#0284c7;font-size:9px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;padding:2px 8px;border-radius:20px;margin-bottom:6px;">Opens '+new Date(r.open_at).toLocaleDateString('en-AU',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})+'</div>':'')+
         (isClosed?'<div style="display:inline-block;background:#f8fafc;border:1px solid #e2e8f0;color:#94a3b8;font-size:9px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;padding:2px 8px;border-radius:20px;margin-bottom:6px;">Closed</div>':'');
       html+='<div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:8px;">';
@@ -6757,6 +6757,7 @@ async function enterHub(){
   }catch(e){}
   // Sync window.me for any code that uses window.me
   try{ window.me = me; }catch(e){}
+  if(typeof startNotifSyncWhenReady === 'function') setTimeout(startNotifSyncWhenReady, 1000);
   // Register service worker for push notifications
   if(typeof registerServiceWorker === 'function') registerServiceWorker();
   await loadStaffList();
@@ -6994,7 +6995,12 @@ function goTo(p){
   // Use data-tab for cleaner state management
   document.querySelectorAll(".page").forEach(pg=>pg.classList.toggle("active",pg.id==="page-"+p));
   document.querySelectorAll("[data-tab]").forEach(item=>item.classList.toggle("active",item.getAttribute("data-tab")===p));
-  if(p==="leave"||p==="availability"){document.querySelectorAll(".page").forEach(pg=>pg.classList.toggle("active",pg.id==="page-schedule"));document.querySelectorAll("[data-tab]").forEach(item=>item.classList.toggle("active",item.getAttribute("data-tab")==="schedule"));}
+  if(p==="leave"||p==="availability"){
+    document.querySelectorAll(".page").forEach(pg=>pg.classList.toggle("active",pg.id==="page-schedule"));
+    document.querySelectorAll("[data-tab]").forEach(item=>item.classList.toggle("active",item.getAttribute("data-tab")==="schedule"));
+    // Activate the right sub-tab
+    setTimeout(function(){ if(typeof showSchedTab === 'function') showSchedTab(p); }, 80);
+  }
   if(p==="schedule"){showSchedTab("leave");}
   if(p==="profile")loadProfilePage();
   if(p==="home"){loadHomeData();loadClockState();refreshHomeOnboardingCard();}
@@ -11487,8 +11493,9 @@ async function pollForNewActivity(){
       }catch(e){ console.warn('[poll] reactions fetch failed:', e); }
       for(let i=0; i<newReacts.length; i++){
         const r = newReacts[i];
-        if(r.staff_name === me) continue; // skip my own reactions
+        // Always advance the seen timestamp so we don't re-check forever
         if(r.created_at) _lastReactSeen = Math.max(_lastReactSeen, new Date(r.created_at).getTime());
+        if(r.staff_name === me) continue; // skip my own reactions
         // Determine if I authored the target — schema uses 'disc' / 'reply' / 'ann'
         let isMyContent = false;
         let targetLabel = 'content';
@@ -12852,7 +12859,7 @@ async function renderNotifsPage(){
 function handleNotifClick(id, link){
   if(typeof NotifManager !== 'undefined' && NotifManager.markRead) NotifManager.markRead(id);
   // Sanitize link — must be a known page name
-  const validPages = ['home','schedule','engagement','documents','training','tasks','calendar','myreports','notifs','profile'];
+  const validPages = ['home','schedule','leave','availability','engagement','documents','training','tasks','calendar','myreports','notifs','profile'];
   if(link && validPages.indexOf(link) >= 0){
     goTo(link);
   } else if(link){
@@ -15252,7 +15259,7 @@ async function loadNotifications(){
       const subText = isMention
         ? r.replier + ' mentioned you'
         : r.replier + ' replied to your discussion';
-      replyHtml+='<div style="background:var(--accent-dim);border:1px solid var(--accent-bd);border-radius:12px;padding:14px;margin-bottom:10px;cursor:pointer;" data-rid="'+r.id+'" onclick="markReplySeen(this.dataset.rid);goTo(\'engagement\');setTimeout(function(){showEngagementTab(\'discussions\');},120);">'+
+      replyHtml+='<div style="background:var(--accent-dim);border:1px solid var(--accent-bd);border-radius:12px;padding:14px;margin-bottom:10px;cursor:pointer;" data-rid="'+r.id+'" data-disc="'+(r.discussion_id||'')+'" onclick="markReplySeen(this.dataset.rid);goTo(\'engagement\');setTimeout(function(){showEngagementTab(\'discussions\');if(this.dataset.disc&&typeof openDiscussion===\'function\')openDiscussion(this.dataset.disc);}.bind(this),200);">'+
         '<div style="font-size:13px;font-weight:700;color:var(--accent-text);margin-bottom:4px;">'+heading+'</div>'+
         '<div style="font-size:12.5px;color:#475569;">'+subText+'</div>'+
         '<div style="font-size:11px;color:#94a3b8;margin-top:4px;font-style:italic;">'+bodyText+(bodyText.length>=80?'...':'')+'</div>'+
@@ -15266,16 +15273,19 @@ async function loadNotifications(){
     // Render reaction notifications first
     let reactHtml='';
     newReactNotifs.forEach(function(r){
-      reactHtml+='<div style="background:#fdf4ff;border:1px solid #e9d5ff;border-radius:12px;padding:14px;margin-bottom:10px;cursor:pointer;" data-rid="'+r.id+'" onclick="markReactSeen(this.dataset.rid);goTo(\'engagement\');setTimeout(function(){showEngagementTab(\'discussions\');},120);">'+
+      reactHtml+='<div style="background:#fdf4ff;border:1px solid #e9d5ff;border-radius:12px;padding:14px;margin-bottom:10px;cursor:pointer;" data-rid="'+r.id+'" data-target-id="'+(r.target_id||'')+'" data-target-type="'+(r.target_type||'')+'" onclick="markReactSeen(this.dataset.rid);goTo(\'engagement\');setTimeout(function(){showEngagementTab(\'discussions\');if(this.dataset.targetType===\'disc\'&&this.dataset.targetId&&typeof openDiscussion===\'function\')openDiscussion(this.dataset.targetId);}.bind(this),200);">'+
         '<div style="font-size:13px;font-weight:700;color:#7c3aed;margin-bottom:4px;">'+r.emoji+' Reaction on your post</div>'+
         '<div style="font-size:12.5px;color:#475569;">'+r.staff_name+' reacted to your '+(r.target_type==='disc'?'discussion':'announcement')+'</div>'+
         '<div style="font-size:11px;color:#94a3b8;margin-top:4px;">'+fmtF(r.created_at)+'</div>'+
         '</div>';
     });
-    // Mark react notifs as seen
+    // Mark react notifs as seen — local + cross-device
     if(newReactNotifs.length){
       const allReactIds=(reactNotifs||[]).map(function(r){return r.id;});
       localStorage.setItem('seen_reacts_'+me,JSON.stringify(allReactIds));
+      newReactNotifs.forEach(function(r){
+        if(typeof markNotifReadEverywhere === 'function') markNotifReadEverywhere('react_'+r.id);
+      });
     }
     // Only show UNREAD leave notifications — viewed = gone
     const unreadLeave = rows.filter(r => !read.includes(r.id));
@@ -15289,7 +15299,7 @@ async function loadNotifications(){
       const border=isApproved?"var(--accent-bd)":"#fecaca";
       const titleColor=isApproved?"var(--accent-text)":"#dc2626";
       const title=isApproved?"Leave Approved":"Leave Declined";
-      return '<div class="notif-item" style="background:'+bg+';border:1px solid '+border+';border-radius:12px;padding:14px;margin-bottom:10px;">'+
+      return '<div class="notif-item" style="background:'+bg+';border:1px solid '+border+';border-radius:12px;padding:14px;margin-bottom:10px;cursor:pointer;" onclick="goTo(\'schedule\');setTimeout(function(){showSchedTab(\'leave\');},120);">'+
         '<div style="width:7px;height:7px;border-radius:50%;background:'+(isApproved?"var(--accent)":"#dc2626")+';margin-bottom:8px;"></div>'+
         '<div style="font-size:13px;font-weight:700;color:'+titleColor+';margin-bottom:4px;">'+title+'</div>'+
         '<div style="font-size:12.5px;color:#475569;">'+fmtF(r.from_date)+' \u2013 '+fmtF(r.to_date)+(r.reason?' \u00b7 '+r.reason:'')+'</div>'+
@@ -15298,14 +15308,22 @@ async function loadNotifications(){
         '</div>';
     }).join("");
 
-    // Auto-mark everything as seen the moment the dropdown is rendered
+    // Auto-mark everything as seen the moment the dropdown/page is rendered
+    // Uses markNotifReadEverywhere() which: (a) upserts is_read=true → fires Realtime
+    // to other open tabs, (b) sends silent push → dismisses tray notifs on phones
     if(unreadLeave.length){
       const allLeaveIds = rows.map(r=>r.id);
       localStorage.setItem('oR_'+me, JSON.stringify(allLeaveIds));
+      unreadLeave.forEach(function(r){
+        if(typeof markNotifReadEverywhere === 'function') markNotifReadEverywhere('leave_'+r.id);
+      });
     }
     if(newRepliesList.length){
       const allReplyIds = replyNotifsList.map(r=>r.id);
       localStorage.setItem('seen_replies_'+me, JSON.stringify(allReplyIds));
+      newRepliesList.forEach(function(r){
+        if(typeof markNotifReadEverywhere === 'function') markNotifReadEverywhere('reply_'+r.id);
+      });
     }
     if(newReactNotifs.length){
       const allReactIds = (reactNotifs||[]).map(r=>r.id);
@@ -17284,6 +17302,8 @@ async function subscribeToPush(){
     }
     // Store subscription in supabase
     const subJson = sub.toJSON();
+    // Track our own endpoint so cross-device sync can exclude this device
+    try{ window._myEndpoint = sub.endpoint; }catch(e){}
     await sbPost('push_subscriptions', {
       staff_name: me,
       endpoint: sub.endpoint,
@@ -17376,6 +17396,168 @@ async function pushSubsUpsert(payload){
 // Pure local state via localStorage; no external services.
 // ─────────────────────────────────────
 
+
+
+
+// Deep-link to a specific discussion: scroll to it + flash highlight
+function openDiscussion(discId){
+  if(!discId) return;
+  const tryScroll = function(attempt){
+    const el = document.getElementById('disc-card-'+discId);
+    if(el){
+      el.scrollIntoView({behavior:'smooth', block:'start'});
+      // Flash highlight
+      el.style.boxShadow = '0 0 0 3px var(--accent), 0 4px 14px rgba(0,0,0,.08)';
+      el.style.transform = 'scale(1.005)';
+      setTimeout(function(){
+        el.style.boxShadow = '';
+        el.style.transform = '';
+      }, 1800);
+    } else if(attempt < 8){
+      // Discussions may still be loading after tab switch
+      setTimeout(function(){ tryScroll(attempt+1); }, 200);
+    }
+  };
+  tryScroll(0);
+}
+
+
+
+// ═══════════════════════════════════════════════════════════════
+// CROSS-DEVICE NOTIFICATION SYNC (Realtime + Silent Push)
+// ═══════════════════════════════════════════════════════════════
+let _sbClient = null;
+let _notifSyncChannel = null;
+
+function initNotifSync(){
+  if(_sbClient || !window.supabase || !me) return;
+  try{
+    _sbClient = window.supabase.createClient(SB, KEY, {
+      realtime: { params: { eventsPerSecond: 5 } }
+    });
+    _notifSyncChannel = _sbClient
+      .channel('notif-sync-' + me)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'notification_seen',
+        filter: 'staff_name=eq.' + me
+      }, function(payload){
+        const row = payload.new;
+        if(!row || !row.is_read) return;
+        handleRemoteDismiss(row.notif_key);
+      })
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'notification_seen',
+        filter: 'staff_name=eq.' + me
+      }, function(payload){
+        const row = payload.new;
+        if(row && row.is_read) handleRemoteDismiss(row.notif_key);
+      })
+      .subscribe();
+    console.log('[notif-sync] listening for', me);
+  }catch(e){ console.warn('[notif-sync] init failed:', e); }
+}
+
+function handleRemoteDismiss(notifKey){
+  if(!notifKey) return;
+  // notif_key formats: 'leave_<id>', 'reply_<id>', 'react_<id>', 'task_<id>'
+  // NotifManager stores ids with dash: 'leave-<id>'
+  try{
+    if(typeof NotifManager !== 'undefined' && NotifManager.markRead){
+      const localId = notifKey.replace('_', '-');
+      NotifManager.markRead(localId);
+    }
+    // Also update the localStorage seen lists
+    const parts = notifKey.split('_');
+    if(parts.length >= 2){
+      const kind = parts[0], rid = parts.slice(1).join('_');
+      let key = null;
+      if(kind === 'leave') key = 'oR_'+me;
+      else if(kind === 'reply') key = 'seen_replies_'+me;
+      else if(kind === 'react') key = 'seen_reacts_'+me;
+      else if(kind === 'task') key = 'seen_task_notifs_'+me;
+      if(key){
+        const arr = JSON.parse(localStorage.getItem(key) || '[]');
+        if(!arr.includes(rid) && !arr.includes(parseInt(rid,10))){
+          arr.push(rid);
+          localStorage.setItem(key, JSON.stringify(arr.slice(-500)));
+        }
+      }
+    }
+  }catch(e){ console.warn('[notif-sync] dismiss handler:', e); }
+  // Refresh UI
+  try{
+    if(typeof loadNotifications === 'function') loadNotifications();
+    if(typeof refreshAnnBadge === 'function') refreshAnnBadge();
+  }catch(e){}
+}
+
+// Upsert read state + fire silent push to other devices
+async function markNotifReadEverywhere(notifKey){
+  if(!me || !notifKey) return;
+  try{
+    // 1. Upsert read state (triggers Realtime on OPEN tabs)
+    await fetch(SB + '/rest/v1/notification_seen', {
+      method: 'POST',
+      headers: {
+        'apikey': KEY,
+        'Authorization': 'Bearer ' + KEY,
+        'Content-Type': 'application/json',
+        'Prefer': 'resolution=merge-duplicates,return=minimal'
+      },
+      body: JSON.stringify({
+        staff_name: me,
+        notif_key: notifKey,
+        is_read: true
+      })
+    });
+    // 2. Silent push to CLOSED devices (dismiss tray notifications)
+    if(typeof SEND_PUSH_URL !== 'undefined'){
+      fetch(SEND_PUSH_URL, {
+        method: 'POST',
+        headers: {
+          'apikey': KEY,
+          'Authorization': 'Bearer ' + KEY,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          staff_name: me,
+          action: 'dismiss',
+          notif_key: notifKey,
+          exclude_endpoint: window._myEndpoint || null
+        })
+      }).catch(function(){});
+    }
+  }catch(e){ console.warn('[notif-sync] mark failed:', e); }
+}
+
+// Bootstrap when both me and supabase lib are ready
+function startNotifSyncWhenReady(){
+  if(window.supabase && me){
+    initNotifSync();
+  } else {
+    setTimeout(startNotifSyncWhenReady, 500);
+  }
+}
+
+// Refresh on tab visibility return
+document.addEventListener('visibilitychange', function(){
+  if(!document.hidden && _sbClient){
+    if(typeof loadNotifications === 'function') loadNotifications();
+  }
+});
+
+// Listen for messages from SW (e.g. notification tap)
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.addEventListener('message', function(event){
+    if(event.data && event.data.type === 'notif-click' && event.data.notif_key){
+      markNotifReadEverywhere(event.data.notif_key);
+    }
+  });
+}
 
 
 const NotifManager = (function(){
