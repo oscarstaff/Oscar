@@ -13685,13 +13685,21 @@ async function runManagerReport(){
   await renderHoursTable(staff, startStr, endStr, el, true);
 }
 
-function calcDayExtras(rawHours, customBreak, customCoffee){
+function calcDayExtras(rawHours, customBreak, customCoffee, dateObj){
   // Returns {hours, breakHrs, coffeeAllowance}
   // Auto-rules (override if customBreak/customCoffee given):
-  // - if rawHours > 5.5 → 0.5h break (once)
-  // - if rawHours >= 4 → $5 coffee (once)
-  // - if rawHours < 4 → no break, no coffee
-  let breakHrs = (customBreak !== undefined && customBreak !== null && customBreak !== '') ? parseFloat(customBreak) : (rawHours > 5.5 ? 0.5 : 0);
+  // - WEEKENDS (Sat/Sun) → paid break, NO auto-deduct
+  // - Weekdays: rawHours > 5.5 → 0.5h break
+  // - rawHours >= 4 → $5 coffee (any day)
+  // - rawHours < 4 → no coffee
+  let isWeekend = false;
+  if(dateObj){
+    const d = (dateObj instanceof Date) ? dateObj : new Date(dateObj);
+    const dow = d.getDay();
+    isWeekend = (dow === 0 || dow === 6); // Sun=0, Sat=6
+  }
+  const autoBreak = isWeekend ? 0 : (rawHours > 5.5 ? 0.5 : 0);
+  let breakHrs = (customBreak !== undefined && customBreak !== null && customBreak !== '') ? parseFloat(customBreak) : autoBreak;
   let coffee = (customCoffee !== undefined && customCoffee !== null && customCoffee !== '') ? parseFloat(customCoffee) : (rawHours >= 4 ? 5 : 0);
   if(isNaN(breakHrs)) breakHrs = 0;
   if(isNaN(coffee)) coffee = 0;
@@ -13754,7 +13762,7 @@ async function renderHoursTable(targetStaff, startStr, endStr, el, allowEdit){
     const outS = d.out ? d.out.toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit',hour12:false}) : '—';
     const isoDate = (function(dt){ return dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0'); })(d.date);
     const ov = overrides[isoDate] || {};
-    const extras = calcDayExtras(d.hours, ov.break_hrs, ov.coffee);
+    const extras = calcDayExtras(d.hours, ov.break_hrs, ov.coffee, d.date);
     totalNet += extras.netHours;
     totalCoffee += extras.coffee;
     const inHHMM = d.in ? (String(d.in.getHours()).padStart(2,'0')+':'+String(d.in.getMinutes()).padStart(2,'0')) : '';
