@@ -4258,6 +4258,10 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
 [data-theme="dark"] .slack-date-label{background:#222529;color:#d1d2d3;border-color:#444;}
 
 </style>
+
+<!-- Supabase JS client (for realtime notification sync) -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+
 </head>
 <body>
 <!-- ── AUTH ── -->
@@ -4477,6 +4481,7 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
         <div class="nav-children">
           <div class="nav-child" data-tab="training" onclick="goTo('training')">Learnings</div>
           <div class="nav-child" data-tab="documents" onclick="goTo('documents')">Documents</div>
+          <div class="nav-child" data-tab="formcraft" id="nav-formcraft" onclick="goTo('formcraft')" style="display:none;">FormCraft</div>
         </div>
       </div>
     </nav>
@@ -5037,7 +5042,18 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
   </div>
 </div>
 
-<div class="page" id="page-profile">
+
+    <!-- FORMCRAFT — gated PDF form filler (Processing team + admins) -->
+    <div class="page" id="page-formcraft" style="max-width:none;width:100%;padding:0;">
+      <div id="formcraftGate" style="display:none;padding:60px 24px;text-align:center;color:#64748b;">
+        <div style="font-size:48px;margin-bottom:14px;">🔒</div>
+        <div style="font-size:18px;font-weight:700;color:#0f172a;margin-bottom:8px;">FormCraft is restricted</div>
+        <div style="font-size:14px;">This feature is currently available to selected teams only.<br>Contact an admin if you need access.</div>
+      </div>
+      <div id="formcraftFrame" style="display:none;height:calc(100vh - 60px);width:100%;">
+        <iframe src="./formcraft.html" style="width:100%;height:100%;border:0;display:block;" title="FormCraft" allow="clipboard-write"></iframe>
+      </div>
+    </div>    <div class="page" id="page-profile">
   <!-- Quick link to My Reports -->
   <div style="display:flex;justify-content:flex-end;margin-bottom:8px;">
     <button onclick="goTo('myreports')" style="background:#0f172a;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:6px;">
@@ -5280,7 +5296,14 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
         </div>
         <button class="btn btn-outline btn-block" onclick="doLogout()" style="color:#dc2626;border-color:#fca5a5;">Sign Out</button>
         </div><!-- /profileInfoSlot -->
-  </div>
+  
+      <!-- ADMIN: FormCraft access (only visible to admins) -->
+      <div id="formcraftAdminCard" style="display:none;background:#fff;border:1px solid var(--accent-bd);border-radius:14px;padding:18px;margin-top:14px;">
+        <div style="font-size:14px;font-weight:700;color:#0f172a;margin-bottom:4px;">FormCraft access (admin only)</div>
+        <div style="font-size:12.5px;color:#64748b;margin-bottom:12px;">Control which teams can use the PDF form filler.</div>
+        <button onclick="openFormcraftAccessPanel()" style="background:var(--accent);color:#fff;border:none;padding:8px 16px;border-radius:8px;font-weight:600;cursor:pointer;font-size:13px;font-family:inherit;">Manage access</button>
+      </div>
+</div>
 
 <!-- DISCUSSIONS section -->
       <!-- FEEDBACK section (staff only - anonymous) -->
@@ -6757,6 +6780,7 @@ async function enterHub(){
   }catch(e){}
   // Sync window.me for any code that uses window.me
   try{ window.me = me; }catch(e){}
+  if(typeof loadFormcraftAccess === 'function') setTimeout(loadFormcraftAccess, 1200);
   if(typeof startNotifSyncWhenReady === 'function') setTimeout(startNotifSyncWhenReady, 1000);
   if(typeof captureMyPushEndpoint === 'function') setTimeout(captureMyPushEndpoint, 1500);
   // Register service worker for push notifications
@@ -6801,7 +6825,7 @@ async function enterHub(){
   loadBirthdays();
   // Restore from URL hash if present
   const hash=window.location.hash.replace('#','');
-  const validPages=['home','schedule','profile','announcements','engagement'];
+  const validPages=['home','schedule','profile','announcements','engagement','formcraft','tasks','calendar','training','documents','myreports','notifs','leave','availability'];
   const hashMap={leave:'schedule',availability:'schedule',documents:'profile'};
   goTo(validPages.includes(hash)?hash:(hashMap[hash]||'home'));
   showProfileSection("account");
@@ -17586,6 +17610,116 @@ if('serviceWorker' in navigator){
 }
 
 
+
+// ═══════════════════════════════════════════════════════════════
+// FORMCRAFT GATING — Processing team default, admin-extendable
+// ═══════════════════════════════════════════════════════════════
+let _formcraftAllowedTeams = ['Processing']; // default
+const FORMCRAFT_SETTING_KEY = 'formcraft_allowed_teams';
+
+async function loadFormcraftAccess(){
+  try {
+    const rows = await sbGet('app_settings', '?key=eq.' + FORMCRAFT_SETTING_KEY);
+    if(rows && rows.length && rows[0].value){
+      const parsed = (typeof rows[0].value === 'string') ? JSON.parse(rows[0].value) : rows[0].value;
+      if(Array.isArray(parsed) && parsed.length){
+        _formcraftAllowedTeams = parsed;
+      }
+    }
+  } catch(e){ console.warn('[formcraft] access load failed:', e); }
+  applyFormcraftVisibility();
+}
+
+function userCanUseFormcraft(){
+  if(myIsAdmin) return true;
+  if(!myTeam) return false;
+  return _formcraftAllowedTeams.some(function(t){
+    return t.toLowerCase() === String(myTeam).toLowerCase();
+  });
+}
+
+function applyFormcraftVisibility(){
+  const navItem = document.getElementById('nav-formcraft');
+  if(navItem) navItem.style.display = userCanUseFormcraft() ? 'block' : 'none';
+  const adminCard = document.getElementById('formcraftAdminCard');
+  if(adminCard) adminCard.style.display = myIsAdmin ? 'block' : 'none';
+  // Also gate the page itself in case someone hits #formcraft directly
+  const gate = document.getElementById('formcraftGate');
+  const frame = document.getElementById('formcraftFrame');
+  if(gate && frame){
+    if(userCanUseFormcraft()){
+      gate.style.display = 'none';
+      frame.style.display = 'block';
+    } else {
+      gate.style.display = 'block';
+      frame.style.display = 'none';
+    }
+  }
+}
+
+// Admin: save the access list
+async function saveFormcraftAccess(teamsArr){
+  if(!myIsAdmin){ showToast('Admin only', 'warning'); return; }
+  try {
+    const existing = await sbGet('app_settings', '?key=eq.' + FORMCRAFT_SETTING_KEY);
+    const body = JSON.stringify({ key: FORMCRAFT_SETTING_KEY, value: JSON.stringify(teamsArr) });
+    if(existing && existing.length){
+      await fetch(SB + '/rest/v1/app_settings?key=eq.' + FORMCRAFT_SETTING_KEY, {
+        method: 'PATCH',
+        headers: { 'apikey': KEY, 'Authorization': 'Bearer ' + KEY, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+        body: body
+      });
+    } else {
+      await fetch(SB + '/rest/v1/app_settings', {
+        method: 'POST',
+        headers: { 'apikey': KEY, 'Authorization': 'Bearer ' + KEY, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+        body: body
+      });
+    }
+    _formcraftAllowedTeams = teamsArr;
+    applyFormcraftVisibility();
+    showToast('FormCraft access updated', 'success');
+  } catch(e){
+    showToast('Save failed: ' + e.message, 'error');
+  }
+}
+
+// Admin UI helper: prompt for new team list
+async function openFormcraftAccessPanel(){
+  if(!myIsAdmin) return;
+  // Get all known teams
+  let allTeams = [];
+  try {
+    const teamRows = await sbGet('staff_credentials', '?select=team');
+    const seen = {};
+    (teamRows||[]).forEach(function(r){ if(r.team && !seen[r.team]){ seen[r.team] = true; allTeams.push(r.team); } });
+  } catch(e){}
+  if(!allTeams.length) allTeams = ['Processing','Checklist Team','Admin'];
+  
+  // Build a simple modal
+  let html = '<div style="position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;" onclick="if(event.target===this)this.remove()">';
+  html += '<div style="background:#fff;border-radius:12px;max-width:420px;width:100%;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,.3);">';
+  html += '<div style="font-size:17px;font-weight:700;margin-bottom:6px;">FormCraft access</div>';
+  html += '<div style="font-size:13px;color:#64748b;margin-bottom:16px;">Tick which teams can use FormCraft. Admins always have access.</div>';
+  html += '<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:18px;">';
+  allTeams.forEach(function(t){
+    const checked = _formcraftAllowedTeams.some(function(x){ return x.toLowerCase() === t.toLowerCase(); }) ? 'checked' : '';
+    html += '<label style="display:flex;align-items:center;gap:10px;padding:10px;border:1px solid #e2e8f0;border-radius:8px;cursor:pointer;">';
+    html += '<input type="checkbox" value="'+t.replace(/"/g,'&quot;')+'" '+checked+' class="formcraft-team-check" style="width:16px;height:16px;">';
+    html += '<span style="font-size:14px;">'+t+'</span>';
+    html += '</label>';
+  });
+  html += '</div>';
+  html += '<div style="display:flex;gap:8px;justify-content:flex-end;">';
+  html += '<button onclick="this.closest(\'div[style*=fixed]\').remove()" style="background:#f1f5f9;border:none;padding:9px 16px;border-radius:8px;font-weight:600;cursor:pointer;font-family:inherit;color:#0f172a;">Cancel</button>';
+  html += '<button onclick="(function(btn){var checks=btn.closest(\'div[style*=fixed]\').querySelectorAll(\'.formcraft-team-check:checked\');var teams=Array.from(checks).map(function(c){return c.value;});saveFormcraftAccess(teams);btn.closest(\'div[style*=fixed]\').remove();})(this)" style="background:var(--accent);color:#fff;border:none;padding:9px 16px;border-radius:8px;font-weight:600;cursor:pointer;font-family:inherit;">Save</button>';
+  html += '</div></div></div>';
+  const wrap = document.createElement('div');
+  wrap.innerHTML = html;
+  document.body.appendChild(wrap.firstChild);
+}
+
+
 const NotifManager = (function(){
   const KEY_PREFIX = 'notif_local_';
   const MAX_STORED = 100;
@@ -18889,5 +19023,9 @@ window.addEventListener('resize', function(){
 }
 
 </style>
+
+
+
+
 </body>
 </html>
