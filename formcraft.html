@@ -188,106 +188,261 @@
     ::-webkit-scrollbar-thumb:hover { background: var(--text-3); }
   
     
-    /* HIDE PREVIEW IN FILL MODE — staff focus on form fields only */
-    body.fc-mode-fill .preview-pane,
-    body.fc-mode-fill .pdf-preview,
-    body.fc-mode-fill .preview-col,
+    /* HIDE PDF PREVIEW IN FILL MODE — staff focus on form fields */
     body.fc-mode-fill .pdf-pane,
-    body.fc-mode-fill .form-resizer { display: none !important; }
-    body.fc-mode-fill .form-pane,
-    body.fc-mode-fill .form-col { 
-      width: 100% !important; max-width: 900px !important; 
+    body.fc-mode-fill .form-resizer,
+    body.fc-mode-fill .resizer { display: none !important; }
+    body.fc-mode-fill .form-pane {
+      width: 100% !important;
+      max-width: 720px !important;
       margin: 0 auto !important;
+      padding: 24px !important;
     }
-    /* Restore preview in edit/admin mode (so admins can still draw fields) */
-    body.fc-mode-edit .preview-pane,
-    body.fc-mode-edit .pdf-preview { display: flex !important; }
 
     
     
-    /* ── NEXUS-style polish ── */
-    .btn-primary { 
-      background: var(--accent) !important; 
-      color: #fff !important; 
-      font-weight: 600 !important;
-      box-shadow: 0 1px 2px rgba(5,150,105,.2) !important;
-      border-radius: 8px !important;
+/* ── NEXUS-style polish (targets ACTUAL FormCraft classes) ── */
+    
+    /* Base app container */
+    .app {
+      background: var(--bg) !important;
+      color: var(--text) !important;
+      font-family: var(--font) !important;
     }
-    .btn-primary:hover:not(:disabled) { 
-      background: var(--accent-hi) !important; 
-      transform: translateY(-1px);
+    
+    /* Header */
+    .header {
+      background: var(--bg-card) !important;
+      border-bottom: 1px solid var(--border) !important;
+      padding: 0 20px !important;
+    }
+    .logo { 
+      color: var(--text) !important; 
+      font-weight: 700 !important; 
+      font-family: var(--font) !important;
+    }
+    .logo em { color: var(--accent) !important; font-weight: 600 !important; font-style: normal !important; }
+    
+    /* Buttons */
+    .btn {
+      font-family: var(--font) !important;
+      font-size: 13px !important;
+      border-radius: 8px !important;
+      transition: all .15s !important;
+    }
+    .btn-primary {
+      background: var(--accent) !important;
+      color: #fff !important;
+      font-weight: 600 !important;
+      border: none !important;
+      box-shadow: 0 1px 2px rgba(5,150,105,.2) !important;
+    }
+    .btn-primary:hover:not(:disabled) {
+      background: var(--accent-hi) !important;
       box-shadow: 0 2px 6px rgba(5,150,105,.28) !important;
     }
-    .btn-ghost { 
+    .btn-ghost {
+      background: transparent !important;
       color: var(--text-2) !important;
-      border-radius: 8px !important;
+      border: 1px solid transparent !important;
     }
-    .btn-ghost:hover:not(:disabled) { 
-      background: var(--bg-soft) !important; 
-      color: var(--text) !important; 
+    .btn-ghost:hover:not(:disabled) {
+      background: var(--bg-soft) !important;
+      color: var(--text) !important;
     }
     
-    /* Cards */
-    .field-card, .form-card, .group-card {
-      background: var(--bg-card) !important;
+    /* Mode switch pills */
+    .mode-switch {
+      background: var(--bg-soft) !important;
       border: 1px solid var(--border) !important;
-      border-radius: var(--radius) !important;
-      box-shadow: var(--shadow-sm) !important;
+      border-radius: 999px !important;
+    }
+    .mode-switch button {
+      font-family: var(--font) !important;
+      border-radius: 999px !important;
+      transition: all .15s !important;
+    }
+    .mode-switch button.active {
+      background: var(--accent) !important;
+      color: #fff !important;
+      font-weight: 600 !important;
+      box-shadow: 0 1px 3px rgba(5,150,105,.25) !important;
     }
     
-    /* Inputs */
-    .input, input[type="text"]:not([class]), input[type="email"]:not([class]),
-    input[type="date"]:not([class]), input[type="tel"]:not([class]),
-    textarea:not([class]), select:not([class]) {
+    /* Form pane (the field list) */
+    .form-pane {
+      background: var(--bg) !important;
+      padding: 24px !important;
+    }
+    .form-pane-header {
+      background: var(--bg-card) !important;
+      border-bottom: 1px solid var(--border) !important;
+      padding: 18px 24px !important;
+      margin: -24px -24px 18px !important;
+    }
+    .form-pane-title {
+      font-size: 18px !important;
+      font-weight: 700 !important;
+      color: var(--text) !important;
+      letter-spacing: -.01em !important;
+    }
+    .form-pane-sub {
+      font-size: 13px !important;
+      color: var(--text-2) !important;
+      margin-top: 4px !important;
+    }
+    
+    /* Field rows */
+    .form-list {
+      display: flex !important;
+      flex-direction: column !important;
+      gap: 14px !important;
+    }
+    .form-label, .form-label-page {
+      font-size: 13px !important;
+      font-weight: 600 !important;
+      color: var(--text) !important;
+      margin-bottom: 6px !important;
+      display: block !important;
+    }
+    .form-label-page {
+      color: var(--text-3) !important;
+      font-weight: 500 !important;
+      font-size: 11px !important;
+      text-transform: uppercase !important;
+      letter-spacing: .04em !important;
+      margin-top: 18px !important;
+    }
+    
+    /* All form inputs in field list */
+    .form-input, .form-pane input[type="text"], .form-pane input[type="email"],
+    .form-pane input[type="date"], .form-pane input[type="tel"], .form-pane input[type="number"],
+    .form-pane textarea, .form-pane select {
       background: var(--bg-card) !important;
       border: 1px solid var(--border-strong) !important;
       border-radius: 8px !important;
-      padding: 8px 12px !important;
+      padding: 10px 13px !important;
       font-family: var(--font) !important;
-      font-size: 13.5px !important;
-      transition: border-color .12s, box-shadow .12s;
+      font-size: 14px !important;
+      color: var(--text) !important;
+      width: 100% !important;
+      box-sizing: border-box !important;
+      transition: border-color .12s, box-shadow .12s !important;
     }
-    .input:focus, input:focus:not([class]), textarea:focus:not([class]) {
+    .form-input:focus, .form-pane input:focus, .form-pane textarea:focus, .form-pane select:focus {
       outline: none !important;
       border-color: var(--accent) !important;
       box-shadow: 0 0 0 3px rgba(5,150,105,.1) !important;
     }
+    .form-pane textarea { min-height: 80px; resize: vertical; }
     
-    /* Landing card matches Nexus card style */
+    /* Checkboxes and radio groups */
+    .form-check, .check-inline {
+      display: flex !important;
+      align-items: center !important;
+      gap: 8px !important;
+      padding: 8px 12px !important;
+      background: var(--bg-card) !important;
+      border: 1px solid var(--border) !important;
+      border-radius: 8px !important;
+      cursor: pointer !important;
+      transition: border-color .12s, background .12s !important;
+      font-size: 13.5px !important;
+    }
+    .form-check:hover, .check-inline:hover {
+      border-color: var(--accent) !important;
+      background: var(--accent-soft) !important;
+    }
+    .form-check input, .check-inline input {
+      accent-color: var(--accent) !important;
+    }
+    .form-radio-group {
+      display: flex !important;
+      flex-direction: column !important;
+      gap: 6px !important;
+    }
+    
+    /* Form footer */
+    .form-footer {
+      background: var(--bg-card) !important;
+      border-top: 1px solid var(--border) !important;
+      padding: 14px 24px !important;
+      margin: 24px -24px -24px !important;
+      display: flex !important;
+      gap: 10px !important;
+      align-items: center !important;
+    }
+    .form-footer-info {
+      flex: 1 !important;
+      font-size: 12.5px !important;
+      color: var(--text-2) !important;
+    }
+    
+    /* PDF pane (edit mode only — hidden in fill mode by other CSS) */
+    .pdf-pane {
+      background: var(--bg-sunk) !important;
+      border-left: 1px solid var(--border) !important;
+    }
+    .pdf-toolbar {
+      background: var(--bg-card) !important;
+      border-bottom: 1px solid var(--border) !important;
+      padding: 10px 14px !important;
+    }
+    
+    /* Landing card (TemplatePicker) */
+    .landing {
+      background: var(--bg) !important;
+      padding: 40px 20px !important;
+      min-height: 100% !important;
+    }
     .landing-card {
       background: var(--bg-card) !important;
       border: 1px solid var(--border) !important;
       border-radius: 14px !important;
+      padding: 36px !important;
       box-shadow: var(--shadow-md) !important;
+      max-width: 720px !important;
+      margin: 0 auto !important;
     }
-    
-    /* Mode switch — match Nexus pill style */
-    .mode-switch {
-      background: var(--bg-soft) !important;
-      border: 1px solid var(--border) !important;
-    }
-    .mode-switch button.active {
-      background: var(--bg-card) !important;
+    .landing-card .eyebrow {
       color: var(--accent) !important;
-      font-weight: 600 !important;
+      font-size: 11px !important;
+      font-weight: 700 !important;
+      text-transform: uppercase !important;
+      letter-spacing: .08em !important;
+      margin-bottom: 8px !important;
+    }
+    .landing-card h1 {
+      font-family: var(--font) !important;
+      font-size: 28px !important;
+      font-weight: 700 !important;
+      color: var(--text) !important;
+      letter-spacing: -.02em !important;
+      margin: 0 0 12px !important;
+    }
+    .landing-card h1 em {
+      font-style: normal !important;
+      color: var(--accent) !important;
+      font-weight: 700 !important;
+    }
+    .landing-card .lead {
+      color: var(--text-2) !important;
+      font-size: 14px !important;
+      line-height: 1.55 !important;
+      margin: 0 0 24px !important;
     }
     
-    /* Header polish */
-    .header {
-      background: var(--bg-card) !important;
-      border-bottom: 1px solid var(--border) !important;
-    }
-    .logo { color: var(--text) !important; font-weight: 700 !important; }
-    .logo em { color: var(--accent) !important; font-weight: 600 !important; font-style: normal !important; }
-    
-    /* Toast */
+    /* Toast notifications */
     .toast {
       border-radius: 10px !important;
       box-shadow: var(--shadow-lg) !important;
       font-family: var(--font) !important;
+      font-size: 13px !important;
+      padding: 12px 16px !important;
     }
     .toast.ok { background: var(--accent) !important; color: #fff !important; }
     .toast.err { background: var(--warn) !important; color: #fff !important; }
+    .toast.info { background: var(--text) !important; color: #fff !important; }
 
     </style>
 </head>
