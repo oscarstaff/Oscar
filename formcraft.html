@@ -664,44 +664,225 @@
       );
     }
 
-    function Landing({ onFile, onTemplateFile }) {
-      const [drag, setDrag] = useState(false);
-      const pdfRef = useRef(null);
-      const tplRef = useRef(null);
-      const pick = (f) => { if (f && f.type === 'application/pdf') onFile(f); };
+    // ═══════════════════════════════════════════════════════════════
+    // APPS SCRIPT BRIDGE — fetches/manages templates via parent Nexus
+    // ═══════════════════════════════════════════════════════════════
+    const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby0Bq97bCZAsmnruXFuJuCqXQE_kOxhYE2KFuJnVzLXtT5CV0Y12k5176dxZbdaYVGE/exec';
+    
+    async function apiCall(action, data) {
+      const body = Object.assign({ action }, data || {});
+      const res = await fetch(APPS_SCRIPT_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(body)
+      });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      return await res.json();
+    }
+
+    function TemplatePicker({ onFile, canManage }) {
+      const [templates, setTemplates] = useState(null);
+      const [error, setError] = useState(null);
+      const [loadingId, setLoadingId] = useState(null);
+      const [showManage, setShowManage] = useState(false);
+      const uploadRef = useRef(null);
+      const [uploading, setUploading] = useState(false);
+
+      const refresh = useCallback(async () => {
+        setError(null);
+        try {
+          const res = await apiCall('listTemplates');
+          if (res.ok) {
+            setTemplates(res.templates);
+          } else {
+            setError(res.error || 'Failed to load templates');
+          }
+        } catch (e) {
+          setError(e.message);
+        }
+      }, []);
+
+      useEffect(() => { refresh(); }, [refresh]);
+
+      const useTemplate = async (tpl) => {
+        setLoadingId(tpl.id);
+        try {
+          const res = await apiCall('fetchTemplate', { id: tpl.id });
+          if (!res.ok) throw new Error(res.error);
+          // Decode base64 to bytes → blob → File for onFile
+          const binary = atob(res.pdfBase64);
+          const bytes = new Uint8Array(binary.length);
+          for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+          const file = new File([bytes], res.name, { type: 'application/pdf' });
+          onFile(file);
+        } catch (e) {
+          setError('Could not load: ' + e.message);
+          setLoadingId(null);
+        }
+      };
+
+      const handleUpload = async (file) => {
+        if (!file || file.type !== 'application/pdf') return;
+        setUploading(true);
+        try {
+          const name = prompt('Name this template:', file.name.replace(/\.pdf$/i, ''));
+          if (!name) { setUploading(false); return; }
+          // Read as base64
+          const b64 = await new Promise((resolve, reject) => {
+            const r = new FileReader();
+            r.onload = () => resolve(String(r.result).split(',')[1]);
+            r.onerror = () => reject(new Error('read failed'));
+            r.readAsDataURL(file);
+          });
+          const res = await apiCall('uploadTemplate', { name, pdfBase64: b64 });
+          if (!res.ok) throw new Error(res.error);
+          await refresh();
+        } catch (e) {
+          alert('Upload failed: ' + e.message);
+        }
+        setUploading(false);
+      };
+
+      const renameTemplate = async (tpl) => {
+        const newName = prompt('Rename template:', tpl.name);
+        if (!newName || newName === tpl.name) return;
+        try {
+          const res = await apiCall('renameTemplate', { id: tpl.id, newName });
+          if (!res.ok) throw new Error(res.error);
+          await refresh();
+        } catch (e) {
+          alert('Rename failed: ' + e.message);
+        }
+      };
+
+      const deleteTemplate = async (tpl) => {
+        if (!confirm('Delete "' + tpl.name + '"?\n\nThis cannot be undone.')) return;
+        try {
+          const res = await apiCall('deleteTemplate', { id: tpl.id });
+          if (!res.ok) throw new Error(res.error);
+          await refresh();
+        } catch (e) {
+          alert('Delete failed: ' + e.message);
+        }
+      };
+
       return (
         <div className="landing">
-          <div className="landing-card">
-            <div className="eyebrow">PDF Form Filler · with templates</div>
-            <h1>Fill your forms<br /><em>without the PDF.</em></h1>
-            <p className="lead">Drop in a fillable PDF. We extract the fields, group related checkboxes, and give you a clean form to type in — with a live preview alongside.</p>
-            <div
-              className={'upload-zone' + (drag ? ' drag' : '')}
-              onClick={() => pdfRef.current && pdfRef.current.click()}
-              onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
-              onDragLeave={() => setDrag(false)}
-              onDrop={(e) => { e.preventDefault(); setDrag(false); pick(e.dataTransfer.files[0]); }}
-            >
-              <i className="fa-solid fa-file-pdf" />
-              <span>Select your template PDF</span>
-              <small>or drop it here</small>
-              <input ref={pdfRef} type="file" accept=".pdf,application/pdf" onChange={(e) => pick(e.target.files[0])} />
-            </div>
-            <div className="template-pill" onClick={() => tplRef.current && tplRef.current.click()}>
-              <i className="fa-solid fa-folder-open" />
-              Already have a saved template? <strong style={{marginLeft:4}}>Load it</strong>
-              <input ref={tplRef} type="file" accept=".json,application/json" style={{ display: 'none' }} onChange={(e) => e.target.files[0] && onTemplateFile(e.target.files[0])} />
-            </div>
-            <div className="features">
-              <div className="feat"><i className="fa-solid fa-wand-magic-sparkles" /> Auto-detects fields</div>
-              <div className="feat"><i className="fa-solid fa-object-group" /> Smart grouping</div>
-              <div className="feat"><i className="fa-solid fa-bookmark" /> Reusable templates</div>
-              <div className="feat"><i className="fa-solid fa-lock" /> 100% in your browser</div>
-            </div>
+          <div className="landing-card" style={{maxWidth:720}}>
+            <div className="eyebrow">FormCraft · Templates</div>
+            <h1>Pick a form<br /><em>and fill it in.</em></h1>
+            <p className="lead">Choose from the shared templates below. Fields auto-populate where possible.</p>
+
+            {error && (
+              <div style={{background:'#fee2e2',color:'#991b1b',padding:12,borderRadius:8,marginBottom:14,fontSize:13}}>
+                ⚠️ {error}
+                <button onClick={refresh} style={{marginLeft:8,background:'#fff',border:'1px solid #fca5a5',padding:'3px 10px',borderRadius:6,cursor:'pointer',fontSize:12}}>Retry</button>
+              </div>
+            )}
+
+            {templates === null && !error && (
+              <div style={{textAlign:'center',padding:30,color:'#a59c8c'}}>
+                <i className="fa-solid fa-spinner fa-spin" style={{fontSize:24}} />
+                <div style={{marginTop:10,fontSize:13}}>Loading templates...</div>
+              </div>
+            )}
+
+            {templates && templates.length === 0 && (
+              <div style={{textAlign:'center',padding:40,color:'#6b6356'}}>
+                <i className="fa-solid fa-folder-open" style={{fontSize:36,color:'#cfc6b5'}} />
+                <div style={{marginTop:14,fontSize:14}}>No templates yet.</div>
+                {canManage && (
+                  <div style={{marginTop:8,fontSize:12,color:'#a59c8c'}}>Click "Manage" below to upload your first template.</div>
+                )}
+              </div>
+            )}
+
+            {templates && templates.length > 0 && (
+              <div style={{display:'flex',flexDirection:'column',gap:8,marginTop:18}}>
+                {templates.map(tpl => (
+                  <div key={tpl.id} style={{
+                    display:'flex',alignItems:'center',gap:12,
+                    padding:'14px 16px',
+                    background:'#fff',
+                    border:'1px solid var(--border)',
+                    borderRadius:10,
+                    transition:'all .15s',
+                    cursor: loadingId === tpl.id ? 'wait' : 'pointer'
+                  }}
+                    onMouseEnter={(e) => e.currentTarget.style.borderColor = 'var(--accent)'}
+                    onMouseLeave={(e) => e.currentTarget.style.borderColor = 'var(--border)'}
+                    onClick={() => loadingId !== tpl.id && useTemplate(tpl)}
+                  >
+                    <i className="fa-solid fa-file-pdf" style={{fontSize:24,color:'var(--accent)'}} />
+                    <div style={{flex:1,textAlign:'left'}}>
+                      <div style={{fontWeight:600,fontSize:14,color:'var(--text)'}}>{tpl.name}</div>
+                      <div style={{fontSize:11,color:'var(--text-2)',marginTop:2}}>
+                        {(tpl.size/1024).toFixed(1)} KB · Updated {new Date(tpl.updated).toLocaleDateString()}
+                      </div>
+                    </div>
+                    {loadingId === tpl.id ? (
+                      <i className="fa-solid fa-spinner fa-spin" style={{color:'var(--accent)'}} />
+                    ) : (
+                      <button style={{
+                        background:'var(--accent)',color:'#fff',border:'none',
+                        padding:'7px 14px',borderRadius:6,fontWeight:600,fontSize:13,
+                        cursor:'pointer',fontFamily:'inherit'
+                      }} onClick={(e) => { e.stopPropagation(); useTemplate(tpl); }}>Use</button>
+                    )}
+                    {canManage && showManage && (
+                      <div style={{display:'flex',gap:4}}>
+                        <button onClick={(e) => { e.stopPropagation(); renameTemplate(tpl); }} style={{
+                          background:'#f3eee5',border:'1px solid var(--border)',padding:'6px 10px',
+                          borderRadius:5,fontSize:11,cursor:'pointer',fontFamily:'inherit'
+                        }}>Rename</button>
+                        <button onClick={(e) => { e.stopPropagation(); deleteTemplate(tpl); }} style={{
+                          background:'#fee2e2',color:'#991b1b',border:'1px solid #fca5a5',padding:'6px 10px',
+                          borderRadius:5,fontSize:11,cursor:'pointer',fontFamily:'inherit'
+                        }}>Delete</button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {canManage && (
+              <div style={{marginTop:24,padding:'16px 0 0',borderTop:'1px dashed var(--border)'}}>
+                <div style={{display:'flex',gap:8,justifyContent:'space-between',alignItems:'center'}}>
+                  <button onClick={() => setShowManage(s => !s)} style={{
+                    background:'transparent',border:'1px solid var(--border)',padding:'8px 14px',
+                    borderRadius:6,fontSize:13,cursor:'pointer',fontFamily:'inherit',color:'var(--text-2)'
+                  }}>
+                    <i className={'fa-solid fa-' + (showManage ? 'eye-slash' : 'gear')} style={{marginRight:6}} />
+                    {showManage ? 'Hide manage' : 'Manage'}
+                  </button>
+                  {showManage && (
+                    <button onClick={() => uploadRef.current && uploadRef.current.click()} disabled={uploading} style={{
+                      background:'var(--accent)',color:'#fff',border:'none',padding:'8px 16px',
+                      borderRadius:6,fontWeight:600,fontSize:13,cursor:uploading ? 'wait' : 'pointer',
+                      fontFamily:'inherit',opacity:uploading ? 0.6 : 1
+                    }}>
+                      {uploading ? <><i className="fa-solid fa-spinner fa-spin" style={{marginRight:6}}/>Uploading...</> :
+                                  <><i className="fa-solid fa-upload" style={{marginRight:6}}/>Upload new template</>}
+                    </button>
+                  )}
+                  <input ref={uploadRef} type="file" accept=".pdf,application/pdf" style={{display:'none'}}
+                         onChange={(e) => e.target.files[0] && handleUpload(e.target.files[0])} />
+                </div>
+                {showManage && (
+                  <div style={{fontSize:11,color:'var(--text-3)',marginTop:10,textAlign:'left'}}>
+                    💡 Tip: Upload a fillable PDF (with form fields). Staff will see it instantly in the picker above.
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       );
     }
+    
+    // Original Landing kept as fallback (unused but preserved)
+    function Landing(props) { return <TemplatePicker {...props} canManage={true} />; }
 
     function App() {
       const [pdfBytes, setPdfBytes] = useState(null);
@@ -979,7 +1160,12 @@
           <input ref={templateInputRef} type="file" accept=".json,application/json" style={{ display: 'none' }} onChange={(e) => e.target.files[0] && onTemplateFile(e.target.files[0])} />
 
           {!pdfBytes ? (
-            <Landing onFile={onPdfFile} onTemplateFile={onTemplateFile} />
+            <TemplatePicker onFile={onPdfFile} canManage={(() => {
+              try {
+                const params = new URLSearchParams(window.location.search);
+                return params.get('manage') === '1';
+              } catch (e) { return false; }
+            })()} />
           ) : fields.length === 0 ? (
             <div className="landing">
               <div className="landing-card">
