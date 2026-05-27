@@ -7020,6 +7020,8 @@ function goTo(p){
   if(p === 'diary'){ p = 'tasks'; } // diary removed → redirect to tasks
   // Announcements deprecated — redirect to discussions
   if(p === 'announcements') p = 'engagement';
+  // Notifications are mobile-only — redirect to home on desktop
+  if(p === 'notifs' && window.innerWidth > 900) p = 'home';
   // When user opens Discussions page, mark all as seen
   if((p === 'engagement' || p === 'discussions') && typeof markAllDiscussionsSeen === 'function'){
     setTimeout(markAllDiscussionsSeen, 600);
@@ -11742,6 +11744,26 @@ async function applyGpsLock(){
 
 // Retry any clock sync that failed (network/Apps Script down)
 async function flushClockSyncQueue(){
+  // ── Flush queued SUPABASE writes first ──
+  try{
+    const sbQ = JSON.parse(localStorage.getItem('clock_supabase_queue') || '[]');
+    if(sbQ.length){
+      console.log('[clock] retrying '+sbQ.length+' queued supabase writes');
+      const remSb = [];
+      for(const item of sbQ){
+        if(Date.now() - item.queuedAt > 3*24*3600*1000) continue;
+        try{
+          await sbPost('clock_log', item.payload);
+          console.log('[clock] queued supabase write flushed OK');
+        }catch(e){
+          remSb.push(item);
+        }
+      }
+      localStorage.setItem('clock_supabase_queue', JSON.stringify(remSb));
+    }
+  }catch(e){ console.warn('flush supabase queue:', e); }
+  
+  // ── Flush queued SHEETS syncs ──
   try{
     const queue = JSON.parse(localStorage.getItem('clock_sync_queue') || '[]');
     if(!queue.length) return;
@@ -11750,7 +11772,6 @@ async function flushClockSyncQueue(){
     const sheetUrl = localStorage.getItem('oscars_sheet_url') || DEFAULT_SHEET_URL;
     const remaining = [];
     for(const item of queue){
-      // Skip if too old (>3 days)
       if(Date.now() - item.queuedAt > 3*24*3600*1000) continue;
       try{
         const r = await fetch(sheetUrl, {
@@ -12500,11 +12521,49 @@ async function toggleClock(){
   try{
     const flexedDate = flexClockTime(new Date());
     const flexedTs = flexedDate.toISOString();
-    await sbPost('clock_log', {staff_name: me, action: next, ts: flexedTs});
+    
+    // ── OPTIMISTIC UI: update state + show toast IMMEDIATELY ──
+    // Network writes happen in the background — staff doesn't wait
+    _clockState = next;
+    _clockSinceTs = flexedDate;
+    if(next === 'in') window._autoClockOutFired = false;
+    
+    // Cache state for instant render on next page load
+    try{
+      localStorage.setItem('clock_state_'+me, JSON.stringify({
+        state: next,
+        ts: _clockSinceTs.toISOString()
+      }));
+    }catch(e){}
+    
+    // Update button + card NOW (no network wait)
+    btn.textContent = (next === 'in') ? 'Clock Out' : 'Clock In';
+    btn.style.background = (next === 'in') ? '#dc2626' : 'var(--accent)';
+    btn.disabled = false;
+    renderClockCard();
+    showToast(next==='in' ? 'Clocked in' : 'Clocked out');
+    applyGpsLock();
+    
+    // ── BACKGROUND: fire Supabase write (no await) ──
+    sbPost('clock_log', {staff_name: me, action: next, ts: flexedTs})
+      .then(function(){
+        // Refresh logs cache in background — non-blocking
+        if(typeof loadAllClockLogs === 'function') loadAllClockLogs();
+      })
+      .catch(function(err){
+        console.warn('[clock] supabase write failed, queuing:', err.message);
+        // Queue for retry
+        try{
+          const q = JSON.parse(localStorage.getItem('clock_supabase_queue') || '[]');
+          q.push({payload: {staff_name: me, action: next, ts: flexedTs}, queuedAt: Date.now()});
+          localStorage.setItem('clock_supabase_queue', JSON.stringify(q.slice(-20)));
+        }catch(_){}
+      });
+    
+    // ── BACKGROUND: fire Apps Script sheet sync (no await) ──
     const DEFAULT_SHEET_URL = 'https://script.google.com/macros/s/AKfycby0Bq97bCZAsmnruXFuJuCqXQE_kOxhYE2KFuJnVzLXtT5CV0Y12k5176dxZbdaYVGE/exec';
     const sheetUrl = localStorage.getItem('oscars_sheet_url') || DEFAULT_SHEET_URL;
     if(sheetUrl){
-      // Format date as DD/MM/YYYY and time as HH:MM (local Sydney time)
       const dd = String(flexedDate.getDate()).padStart(2,'0');
       const mm = String(flexedDate.getMonth()+1).padStart(2,'0');
       const yyyy = flexedDate.getFullYear();
@@ -12512,7 +12571,6 @@ async function toggleClock(){
       const hh = String(flexedDate.getHours()).padStart(2,'0');
       const mn = String(flexedDate.getMinutes()).padStart(2,'0');
       const timeStr = hh+':'+mn;
-      // Send as updatePunch (proven format) — only set timeIn OR timeOut depending on action
       const payload = {
         action: 'updatePunch',
         staff: me,
@@ -12521,64 +12579,41 @@ async function toggleClock(){
       };
       if(next === 'in') payload.timeIn = timeStr;
       else payload.timeOut = timeStr;
-      // Try CORS first (will work since Apps Script returns CORS headers), then no-cors fallback
-      const syncToSheet = function(){
+      
+      // Fire and forget — never blocks UI
+      fetch(sheetUrl, {
+        method:'POST',
+        headers:{'Content-Type':'text/plain;charset=utf-8'},
+        body: JSON.stringify(payload)
+      }).then(function(r){
+        if(!r.ok) throw new Error('HTTP '+r.status);
+        return r.text();
+      }).then(function(txt){
+        console.log('[clock] sheets sync OK:', txt.slice(0,120));
+      }).catch(function(e){
+        console.warn('[clock] sheets sync attempt 1 failed:', e.message);
+        // Retry with no-cors mode
         return fetch(sheetUrl, {
           method:'POST',
+          mode:'no-cors',
           headers:{'Content-Type':'text/plain;charset=utf-8'},
           body: JSON.stringify(payload)
-        }).then(function(r){
-          if(!r.ok) throw new Error('HTTP '+r.status);
-          return r.text();
-        }).then(function(txt){
-          console.log('[clock] sheets sync OK:', txt.slice(0,120));
-        }).catch(function(e){
-          console.warn('[clock] sheets sync attempt 1 failed:', e.message);
-          // Retry once with no-cors mode (fire-and-forget)
-          return fetch(sheetUrl, {
-            method:'POST',
-            mode:'no-cors',
-            headers:{'Content-Type':'text/plain;charset=utf-8'},
-            body: JSON.stringify(payload)
-          }).then(function(){
-            console.log('[clock] sheets sync attempt 2 (no-cors) sent');
-          }).catch(function(e2){
-            console.error('[clock] both sheets sync attempts failed:', e2.message);
-            // Queue for later retry
-            try{
-              const queue = JSON.parse(localStorage.getItem('clock_sync_queue') || '[]');
-              queue.push({payload: payload, queuedAt: Date.now()});
-              localStorage.setItem('clock_sync_queue', JSON.stringify(queue.slice(-20)));
-            }catch(_){}
-          });
+        }).then(function(){
+          console.log('[clock] sheets sync attempt 2 (no-cors) sent');
+        }).catch(function(e2){
+          console.error('[clock] both sheets sync attempts failed:', e2.message);
+          try{
+            const queue = JSON.parse(localStorage.getItem('clock_sync_queue') || '[]');
+            queue.push({payload: payload, queuedAt: Date.now()});
+            localStorage.setItem('clock_sync_queue', JSON.stringify(queue.slice(-20)));
+          }catch(_){}
         });
-      };
-      syncToSheet();
+      });
     }
-    _clockState = next;
-    _clockSinceTs = flexedDate; // use the flexed/rounded time (matches what's in supabase)
-    if(next === 'in') window._autoClockOutFired = false; // reset for new session
-    // Cache for instant render on next page load
-    try{
-      localStorage.setItem('clock_state_'+me, JSON.stringify({
-        state: next,
-        ts: _clockSinceTs.toISOString()
-      }));
-    }catch(e){}
-    // Force immediate button text update before renderClockCard runs
-    btn.textContent = (next === 'in') ? 'Clock Out' : 'Clock In';
-    btn.style.background = (next === 'in') ? '#dc2626' : 'var(--accent)';
-    renderClockCard();
-    // Second forced render after a tick to defeat any race with state restore
-    setTimeout(renderClockCard, 50);
-    setTimeout(renderClockCard, 300);
-    showToast(next==='in' ? 'Clocked in' : 'Clocked out');
-    loadAllClockLogs();
-    applyGpsLock();
+    
   }catch(e){
     showToast('Failed to record');
     btn.textContent = prevText;
-  }finally{
     btn.disabled = false;
   }
 }
@@ -17331,6 +17366,11 @@ async function isPushSubscribed(){
 }
 
 async function subscribeToPush(){
+  // Skip on desktop — notifications are mobile-only
+  if(window.innerWidth > 900){
+    console.log('[notif] subscribeToPush skipped — desktop mode');
+    return false;
+  }
   if(!('serviceWorker' in navigator) || !('PushManager' in window)){
     showToast('Push notifications not supported on this browser', 'warning');
     return false;
@@ -18793,6 +18833,18 @@ window.addEventListener('resize', function(){
     [data-theme="dark"] #qpNotes{color:#cbd5e1;}
     [data-theme="dark"] #qpEditBtn{background:var(--accent-dim);}
     [data-theme="dark"] #qpDeleteBtn{background:rgba(220,38,38,.15);}
+    
+    /* ═══════════════════════════════════════════════════════════ */
+    /* HIDE ALL NOTIFICATIONS UI ON DESKTOP — mobile only feature  */
+    /* ═══════════════════════════════════════════════════════════ */
+    @media (min-width: 901px) {
+      /* Hide notif page */
+      #page-notifs { display: none !important; }
+      /* Hide any notif bell/badge/dropdown if it exists in sidebar/header */
+      #notifBadge, .notif-bell, .bell-btn, #notifDropdown, #notifPanel,
+      [data-tab="notifs"]:not(.bn-item),
+      .nav-item[data-tab="notifs"] { display: none !important; }
+    }
     
     /* ═══════════════════════════════════════════════════════════ */
     /* HUB — external apps launcher (Mcd Connect style)            */
