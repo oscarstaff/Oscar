@@ -5054,11 +5054,11 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
       <div class="hub-wrap">
         <div class="hub-hdr">
           <h2>Nexits</h2>
-          <p>Productivity tools and external apps for your team. Each opens in a new tab.</p>
+          <p>Productivity tools and apps for your team. Each opens in a new tab.</p>
         </div>
         <div class="hub-grid">
-          <!-- FormCraft app -->
-          <a class="hub-card" href="https://oscarstaff.github.io/Oscar/formcraft.html" target="_blank" rel="noopener noreferrer">
+          <!-- FormCraft app (access-gated) -->
+          <a class="hub-card" id="hubcard-formcraft" style="display:none;" href="https://oscarstaff.github.io/Oscar/formcraft.html" target="_blank" rel="noopener noreferrer">
             <div class="hub-card-icon hub-icon-formcraft">
               <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/></svg>
             </div>
@@ -5068,7 +5068,18 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
             </div>
             <svg class="hub-card-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7"/><polyline points="7 7 17 7 17 17"/></svg>
           </a>
-          <!-- Arcade — minigames to decompress -->
+          <!-- Slip — receipt generator (access-gated) -->
+          <a class="hub-card" id="hubcard-slip" style="display:none;" href="https://oscarstaff.github.io/Oscar/slip.html" target="_blank" rel="noopener noreferrer">
+            <div class="hub-card-icon hub-icon-slip">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1z"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="8" y1="16" x2="13" y2="16"/></svg>
+            </div>
+            <div class="hub-card-body">
+              <div class="hub-card-title">Slip</div>
+              <div class="hub-card-desc">Generate fee receipts — clean, numbered, printable</div>
+            </div>
+            <svg class="hub-card-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7"/><polyline points="7 7 17 7 17 17"/></svg>
+          </a>
+          <!-- Bore-KADE — everyone has access -->
           <a class="hub-card" href="https://oscarstaff.github.io/Oscar/arcade.html" target="_blank" rel="noopener noreferrer">
             <div class="hub-card-icon hub-icon-arcade">
               <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="11" x2="10" y2="11"/><line x1="8" y1="9" x2="8" y2="13"/><line x1="15" y1="12" x2="15.01" y2="12"/><line x1="18" y1="10" x2="18.01" y2="10"/><rect x="2" y="6" width="20" height="12" rx="2"/></svg>
@@ -5079,7 +5090,34 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
             </div>
             <svg class="hub-card-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7"/><polyline points="7 7 17 7 17 17"/></svg>
           </a>
-          <!-- (Future apps go here as more <a class="hub-card"> elements) -->
+        </div>
+        <!-- Admin: manage who can access each app -->
+        <div id="hubAdminArea" style="display:none;margin-top:26px;">
+          <button class="btn-secondary" onclick="openAccessManager()" style="background:var(--accent);color:#fff;border:none;font-weight:600;font-size:14px;padding:11px 20px;border-radius:10px;cursor:pointer;">⚙️ Manage app access</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Access Manager Modal -->
+    <div id="accessModal" style="display:none;position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.5);align-items:center;justify-content:center;padding:20px;">
+      <div style="background:var(--card-bg,#fff);border-radius:18px;max-width:520px;width:100%;max-height:85vh;overflow-y:auto;padding:26px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+          <h2 style="font-size:20px;font-weight:700;margin:0;">Manage app access</h2>
+          <button onclick="closeAccessManager()" style="background:none;border:none;font-size:24px;cursor:pointer;color:var(--text-dim,#888);">×</button>
+        </div>
+        <p style="color:var(--text-dim,#888);font-size:13px;margin-bottom:18px;">Choose who can see each app in Nexits. Bore-KADE is available to everyone.</p>
+        <div style="display:flex;gap:8px;margin-bottom:18px;">
+          <button class="acc-app-tab acc-tab-active" id="acctab-formcraft" onclick="switchAccessApp('formcraft')" style="flex:1;padding:10px;border-radius:10px;border:1.5px solid var(--accent);background:var(--accent);color:#fff;font-weight:600;cursor:pointer;">FormCraft</button>
+          <button class="acc-app-tab" id="acctab-slip" onclick="switchAccessApp('slip')" style="flex:1;padding:10px;border-radius:10px;border:1.5px solid var(--border-color,#ddd);background:transparent;color:var(--text,#333);font-weight:600;cursor:pointer;">Slip</button>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;" id="accTeamButtons"></div>
+        <div style="display:flex;gap:8px;margin-bottom:14px;">
+          <input id="accSearch" placeholder="Search staff…" oninput="filterAccessList(this.value)" style="flex:1;padding:9px 12px;border:1.5px solid var(--border-color,#ddd);border-radius:9px;font-size:14px;">
+        </div>
+        <div id="accStaffList" style="max-height:340px;overflow-y:auto;"></div>
+        <div style="display:flex;gap:10px;margin-top:18px;">
+          <button onclick="saveAccessChanges()" style="flex:1;background:var(--accent);color:#fff;border:none;font-weight:600;font-size:14px;padding:12px;border-radius:10px;cursor:pointer;">Save changes</button>
+          <button onclick="closeAccessManager()" style="background:transparent;border:1.5px solid var(--border-color,#ddd);color:var(--text,#333);font-weight:600;font-size:14px;padding:12px 20px;border-radius:10px;cursor:pointer;">Cancel</button>
         </div>
       </div>
     </div>
@@ -6680,6 +6718,124 @@ async function sbGet(t,f){
   return r.json();
 }
 async function sbPost(t,b){return fetch(SB+"/rest/v1/"+t,{method:"POST",headers:{"apikey":KEY,"Authorization":"Bearer "+KEY,"Content-Type":"application/json","Prefer":"return=minimal"},body:JSON.stringify(b)});}
+
+// ═══════════════ NEXITS APP ACCESS CONTROL ═══════════════
+let _accessCache={formcraft:[],slip:[]};
+let _accessCurrentApp='formcraft';
+let _accessWorking={formcraft:new Set(),slip:new Set()};
+let _accessAllStaff=[];
+
+async function loadHubAccess(){
+  // Load access lists from Supabase
+  try{
+    const rows=await sbGet('app_access','?select=app,staff_name');
+    _accessCache={formcraft:[],slip:[]};
+    (rows||[]).forEach(r=>{ if(_accessCache[r.app]) _accessCache[r.app].push(r.staff_name); });
+  }catch(e){ console.warn('loadHubAccess',e); }
+  // Show/hide cards for current user
+  const fc=document.getElementById('hubcard-formcraft');
+  const sl=document.getElementById('hubcard-slip');
+  if(fc) fc.style.display=_accessCache.formcraft.includes(me)?'':'none';
+  if(sl) sl.style.display=_accessCache.slip.includes(me)?'':'none';
+  // Show admin button
+  const adminArea=document.getElementById('hubAdminArea');
+  if(adminArea) adminArea.style.display=(typeof myIsAdmin!=='undefined'&&myIsAdmin)?'block':'none';
+}
+
+async function openAccessManager(){
+  document.getElementById('accessModal').style.display='flex';
+  // load staff list
+  try{
+    const rows=await sbGet('staff_names','?order=name.asc');
+    _accessAllStaff=(rows||[]).map(r=>r.name).filter(Boolean);
+  }catch(e){ _accessAllStaff=[]; }
+  // refresh access from server
+  try{
+    const rows=await sbGet('app_access','?select=app,staff_name');
+    _accessCache={formcraft:[],slip:[]};
+    (rows||[]).forEach(r=>{ if(_accessCache[r.app]) _accessCache[r.app].push(r.staff_name); });
+  }catch(e){}
+  _accessWorking={formcraft:new Set(_accessCache.formcraft),slip:new Set(_accessCache.slip)};
+  // load team buttons
+  await buildTeamButtons();
+  switchAccessApp('formcraft');
+}
+function closeAccessManager(){ document.getElementById('accessModal').style.display='none'; }
+
+async function buildTeamButtons(){
+  const wrap=document.getElementById('accTeamButtons');
+  let teams=[];
+  try{
+    const rows=await sbGet('staff_credentials','?select=team&team=not.is.null');
+    teams=[...new Set((rows||[]).map(r=>r.team).filter(Boolean))];
+  }catch(e){}
+  wrap.innerHTML='<span style="font-size:12px;color:var(--text-dim,#888);align-self:center;margin-right:4px;">Quick add:</span>';
+  wrap.innerHTML+='<button onclick="accSelectAll()" style="padding:6px 12px;border-radius:8px;border:1.5px solid var(--accent);background:transparent;color:var(--accent);font-size:12px;font-weight:600;cursor:pointer;">Everyone</button>';
+  teams.forEach(t=>{
+    wrap.innerHTML+='<button onclick="accSelectTeam(\''+t.replace(/'/g,"\\'")+'\')" style="padding:6px 12px;border-radius:8px;border:1.5px solid var(--border-color,#ddd);background:transparent;color:var(--text,#333);font-size:12px;font-weight:600;cursor:pointer;">'+t+'</button>';
+  });
+  wrap.innerHTML+='<button onclick="accClearAll()" style="padding:6px 12px;border-radius:8px;border:1.5px solid #f5c2c2;background:transparent;color:#c0392b;font-size:12px;font-weight:600;cursor:pointer;">Clear all</button>';
+}
+async function accSelectTeam(team){
+  try{
+    const rows=await sbGet('staff_credentials','?select=staff_name&team=eq.'+encodeURIComponent(team));
+    (rows||[]).forEach(r=>{ if(r.staff_name) _accessWorking[_accessCurrentApp].add(r.staff_name); });
+  }catch(e){}
+  renderAccessList(document.getElementById('accSearch').value);
+}
+function accSelectAll(){ _accessAllStaff.forEach(n=>_accessWorking[_accessCurrentApp].add(n)); renderAccessList(document.getElementById('accSearch').value); }
+function accClearAll(){ _accessWorking[_accessCurrentApp].clear(); renderAccessList(document.getElementById('accSearch').value); }
+
+function switchAccessApp(app){
+  _accessCurrentApp=app;
+  document.getElementById('acctab-formcraft').className='acc-app-tab'+(app==='formcraft'?' acc-tab-active':'');
+  document.getElementById('acctab-slip').className='acc-app-tab'+(app==='slip'?' acc-tab-active':'');
+  // restyle tabs
+  ['formcraft','slip'].forEach(a=>{
+    const el=document.getElementById('acctab-'+a);
+    if(a===app){el.style.background='var(--accent)';el.style.color='#fff';el.style.borderColor='var(--accent)';}
+    else{el.style.background='transparent';el.style.color='var(--text,#333)';el.style.borderColor='var(--border-color,#ddd)';}
+  });
+  document.getElementById('accSearch').value='';
+  renderAccessList('');
+}
+function renderAccessList(filter){
+  const c=document.getElementById('accStaffList');
+  const f=(filter||'').toLowerCase();
+  const sel=_accessWorking[_accessCurrentApp];
+  const list=_accessAllStaff.filter(n=>n.toLowerCase().includes(f));
+  if(!list.length){ c.innerHTML='<div style="text-align:center;color:var(--text-dim,#888);padding:30px;">No staff found</div>'; return; }
+  c.innerHTML='';
+  list.forEach(n=>{
+    const on=sel.has(n);
+    const row=document.createElement('div');
+    row.style.cssText='display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:9px;cursor:pointer;border:1px solid '+(on?'var(--accent)':'var(--border-color,#eee)')+';margin-bottom:6px;background:'+(on?'rgba(45,157,148,.08)':'transparent')+';';
+    row.innerHTML='<span style="font-size:14px;font-weight:'+(on?'600':'400')+';">'+n+'</span><span style="font-size:18px;">'+(on?'✅':'⬜')+'</span>';
+    row.onclick=()=>{ if(sel.has(n))sel.delete(n); else sel.add(n); renderAccessList(filter); };
+    c.appendChild(row);
+  });
+}
+function filterAccessList(v){ renderAccessList(v); }
+
+async function saveAccessChanges(){
+  // Diff working set vs cache, apply inserts + deletes
+  for(const app of ['formcraft','slip']){
+    const before=new Set(_accessCache[app]);
+    const after=_accessWorking[app];
+    // inserts
+    const toAdd=[...after].filter(n=>!before.has(n));
+    const toDel=[...before].filter(n=>!after.has(n));
+    for(const n of toAdd){
+      await sbPost('app_access',{app:app,staff_name:n});
+    }
+    for(const n of toDel){
+      await fetch(SB+'/rest/v1/app_access?app=eq.'+encodeURIComponent(app)+'&staff_name=eq.'+encodeURIComponent(n),{method:'DELETE',headers:{"apikey":KEY,"Authorization":"Bearer "+KEY}});
+    }
+  }
+  showToast('Access updated');
+  closeAccessManager();
+  loadHubAccess();
+}
 async function hash(p){const e=new TextEncoder().encode(p+"oscar_roster_salt_2024"),b=await crypto.subtle.digest("SHA-256",e);return Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,"0")).join("");}
 
 function showAuth(s){
@@ -7037,6 +7193,8 @@ function goTo(p){
   if((p === 'engagement' || p === 'discussions') && typeof markAllDiscussionsSeen === 'function'){
     setTimeout(markAllDiscussionsSeen, 600);
   }
+  // Nexits — load app access gating
+  if(p === 'hub'){ setTimeout(loadHubAccess, 50); }
   // Track onboarding visits
   const myName = window.me || (typeof me !== 'undefined' && me) || null;
   if(myName){
@@ -18936,6 +19094,9 @@ window.addEventListener('resize', function(){
     }
     .hub-icon-arcade {
       background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%);
+    }
+    .hub-icon-slip {
+      background: linear-gradient(135deg, #1b9aaa 0%, #0f4c5c 100%);
     }
     /* Add more icon classes as needed:
        .hub-icon-myapp { background: linear-gradient(135deg, #3b82f6, #1d4ed8); }
