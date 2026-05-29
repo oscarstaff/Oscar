@@ -3997,45 +3997,66 @@ function aaRender(filter){
   });
 }
 async function aaSave(){
-  showToast('⏳ Saving access…');
-  // app_access apps
+  showToast('⏳ Saving…');
+  const H={apikey:AA_KEY,Authorization:'Bearer '+AA_KEY};
+  const HJ={...H,'Content-Type':'application/json'};
+  const jobs=[];
+
+  // ── app_access: formcraft, slip, shiftops ──
   for(const app of ['formcraft','slip','shiftops']){
     const add=[...aaWork[app]].filter(n=>!aaOrig[app].has(n));
     const del=[...aaOrig[app]].filter(n=>!aaWork[app].has(n));
-    for(const n of add){
-      await fetch(AA_SB+'/rest/v1/app_access',{method:'POST',headers:{apikey:AA_KEY,Authorization:'Bearer '+AA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({app:app,staff_name:n})});
-    }
-    for(const n of del){
-      await fetch(AA_SB+'/rest/v1/app_access?app=eq.'+encodeURIComponent(app)+'&staff_name=eq.'+encodeURIComponent(n),{method:'DELETE',headers:{apikey:AA_KEY,Authorization:'Bearer '+AA_KEY}});
-    }
+    add.forEach(n=>jobs.push(
+      fetch(AA_SB+'/rest/v1/app_access',{method:'POST',headers:{...HJ,'Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({app:app,staff_name:n})})
+    ));
+    del.forEach(n=>jobs.push(
+      fetch(AA_SB+'/rest/v1/app_access?app=eq.'+encodeURIComponent(app)+'&staff_name=eq.'+encodeURIComponent(n),{method:'DELETE',headers:H})
+    ));
   }
-  // Nexus admin → staff_settings.is_hub_admin
-  const adminAdd=[...aaWork.admin].filter(n=>!aaOrig.admin.has(n));
-  const adminDel=[...aaOrig.admin].filter(n=>!aaWork.admin.has(n));
-  for(const n of adminAdd){
-    await fetch(AA_SB+'/rest/v1/staff_settings',{method:'POST',headers:{apikey:AA_KEY,Authorization:'Bearer '+AA_KEY,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({name:n,is_hub_admin:true})});
-  }
-  for(const n of adminDel){
-    await fetch(AA_SB+'/rest/v1/staff_settings?name=eq.'+encodeURIComponent(n),{method:'PATCH',headers:{apikey:AA_KEY,Authorization:'Bearer '+AA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({is_hub_admin:false})});
-  }
-  // Shift admin → staff_settings.is_shift_admin
-  // INHERITANCE: a Shift Admin is ALSO a Nexus admin AND gets ShiftOps access automatically
+
+  // ── collect staff_settings changes per person, then ONE upsert each ──
+  // (avoids racing two PATCH/POSTs on the same row for shift+hub)
+  const settingsChanges={}; // name -> {is_hub_admin?, is_shift_admin?}
+  const setFlag=(n,k,v)=>{ if(!settingsChanges[n])settingsChanges[n]={name:n}; settingsChanges[n][k]=v; };
+
+  // Nexus admin
+  [...aaWork.admin].filter(n=>!aaOrig.admin.has(n)).forEach(n=>setFlag(n,'is_hub_admin',true));
+  [...aaOrig.admin].filter(n=>!aaWork.admin.has(n)).forEach(n=>setFlag(n,'is_hub_admin',false));
+
+  // Shift admin (inherits hub admin + shiftops access)
   const shiftAdd=[...aaWork.shiftadmin].filter(n=>!aaOrig.shiftadmin.has(n));
   const shiftDel=[...aaOrig.shiftadmin].filter(n=>!aaWork.shiftadmin.has(n));
-  for(const n of shiftAdd){
-    // set both shift + hub admin
-    await fetch(AA_SB+'/rest/v1/staff_settings',{method:'POST',headers:{apikey:AA_KEY,Authorization:'Bearer '+AA_KEY,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({name:n,is_shift_admin:true,is_hub_admin:true})});
-    // grant ShiftOps app access
-    await fetch(AA_SB+'/rest/v1/app_access',{method:'POST',headers:{apikey:AA_KEY,Authorization:'Bearer '+AA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({app:'shiftops',staff_name:n})}).catch(()=>{});
+  shiftAdd.forEach(n=>{ setFlag(n,'is_shift_admin',true); setFlag(n,'is_hub_admin',true);
+    jobs.push(fetch(AA_SB+'/rest/v1/app_access',{method:'POST',headers:{...HJ,'Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({app:'shiftops',staff_name:n})}));
+    aaWork.shiftops.add(n); aaWork.admin.add(n);
+  });
+  shiftDel.forEach(n=>{ setFlag(n,'is_shift_admin',false);
+    jobs.push(fetch(AA_SB+'/rest/v1/app_access?app=eq.shiftops&staff_name=eq.'+encodeURIComponent(n),{method:'DELETE',headers:H}));
+    aaWork.shiftops.delete(n);
+  });
+
+  // one upsert per changed person (merge-duplicates needs unique(name))
+  Object.values(settingsChanges).forEach(rec=>{
+    jobs.push(fetch(AA_SB+'/rest/v1/staff_settings',{method:'POST',headers:{...HJ,'Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify(rec)}));
+  });
+
+  // ── fire all in parallel, wait for completion ──
+  let failed=0;
+  try{
+    const results=await Promise.all(jobs.map(p=>p.then(r=>r.ok?true:r.text().then(t=>{console.warn('save fail',r.status,t);return false;})).catch(e=>{console.warn('save err',e);return false;})));
+    failed=results.filter(x=>x===false).length;
+  }catch(e){ failed=-1; }
+
+  if(failed>0){
+    showToast('⚠ Saved with '+failed+' error(s) — check staff_settings has a unique(name) constraint');
+  }else{
+    showToast('✅ Access & admin updated');
   }
-  for(const n of shiftDel){
-    // remove shift admin flag (leave hub_admin as-is unless also unticked in admin tab)
-    await fetch(AA_SB+'/rest/v1/staff_settings?name=eq.'+encodeURIComponent(n),{method:'PATCH',headers:{apikey:AA_KEY,Authorization:'Bearer '+AA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({is_shift_admin:false})});
-    // revoke ShiftOps access (only shift admins should have it)
-    await fetch(AA_SB+'/rest/v1/app_access?app=eq.shiftops&staff_name=eq.'+encodeURIComponent(n),{method:'DELETE',headers:{apikey:AA_KEY,Authorization:'Bearer '+AA_KEY}}).catch(()=>{});
-  }
-  showToast('✅ Access & admin updated');
-  closeModal('accessAdminModal');
+
+  // update originals to current so reopening reflects saved state (no false reverts)
+  aaOrig={formcraft:new Set(aaWork.formcraft),slip:new Set(aaWork.slip),shiftops:new Set(aaWork.shiftops),shiftadmin:new Set(aaWork.shiftadmin),admin:new Set(aaWork.admin)};
+  // re-render current tab so ticks reflect the (possibly cascaded) state
+  aaRender(document.getElementById('aaSearch').value);
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────
