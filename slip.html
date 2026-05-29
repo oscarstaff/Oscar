@@ -54,24 +54,25 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent);}
 
 /* ── Receipt preview (the printable doc) ── */
 .receipt{background:#fff;border:1px solid var(--line);border-radius:14px;padding:0;overflow:hidden;box-shadow:var(--shadow);}
-.r-head{background:var(--brand);color:#fff;padding:24px 28px;}
-.r-head .co{font-family:'Fraunces',serif;font-size:22px;font-weight:600;letter-spacing:.3px;}
+.r-head{background:var(--brand);color:#fff;padding:34px 40px;}
+.r-head .co{font-family:'Fraunces',serif;font-size:28px;font-weight:600;letter-spacing:.3px;}
 .r-head .addr{font-size:12px;opacity:.85;margin-top:4px;line-height:1.5;}
-.r-title{text-align:center;font-family:'Fraunces',serif;font-size:18px;font-weight:600;color:var(--brand);padding:16px;border-bottom:2px solid var(--line);letter-spacing:.5px;}
-.r-body{padding:22px 28px;}
-.r-meta{display:flex;justify-content:space-between;font-size:13px;margin-bottom:18px;gap:16px;flex-wrap:wrap;}
-.r-meta .mi span{display:block;color:var(--ink-dim);font-size:11px;text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px;}
-.r-meta .mi b{font-size:14px;font-weight:600;}
-.r-section-label{font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.6px;margin:16px 0 8px;}
+.r-title{text-align:center;font-family:'Fraunces',serif;font-size:24px;font-weight:600;color:var(--brand);padding:22px;border-bottom:2px solid var(--line);letter-spacing:1px;}
+.r-body{padding:34px 40px;min-height:340px;}
+.r-meta{display:flex;justify-content:space-between;font-size:14px;margin-bottom:26px;gap:16px;flex-wrap:wrap;}
+.r-meta .mi span{display:block;color:var(--ink-dim);font-size:12px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px;}
+.r-meta .mi b{font-size:16px;font-weight:600;}
+
+.r-section-label{font-size:12.5px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.6px;margin:16px 0 8px;}
 .r-table{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px;}
-.r-table th{background:#f4f7f9;text-align:left;padding:9px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--ink-dim);border-bottom:2px solid var(--line);}
+.r-table th{background:#f4f7f9;text-align:left;padding:13px 12px;font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--ink-dim);border-bottom:2px solid var(--line);}
 .r-table th.num,.r-table td.num{text-align:right;}
-.r-table td{padding:10px;border-bottom:1px solid var(--line);vertical-align:top;}
-.r-total{display:flex;justify-content:flex-end;margin-top:14px;}
+.r-table td{padding:15px 12px;border-bottom:1px solid var(--line);vertical-align:top;font-size:14px;}
+.r-total{display:flex;justify-content:flex-end;margin-top:26px;}
 .r-total .box{background:var(--brand);color:#fff;border-radius:10px;padding:12px 22px;text-align:right;}
 .r-total .box span{display:block;font-size:11px;opacity:.85;text-transform:uppercase;letter-spacing:.5px;}
-.r-total .box b{font-family:'Fraunces',serif;font-size:24px;}
-.r-foot{text-align:center;font-size:11px;color:var(--ink-dim);padding:16px 28px 24px;border-top:1px solid var(--line);line-height:1.6;}
+.r-total .box b{font-family:'Fraunces',serif;font-size:30px;}
+.r-foot{text-align:center;font-size:12px;color:var(--ink-dim);padding:24px 40px 34px;border-top:1px solid var(--line);line-height:1.7;margin-top:20px;}
 .r-foot .ref{color:var(--brand2);font-weight:600;margin-bottom:6px;}
 
 .empty{text-align:center;color:var(--ink-dim);padding:50px 20px;}
@@ -83,6 +84,7 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent);}
 .hist-item .hi-amt{font-family:'Fraunces',serif;font-size:18px;color:var(--brand);font-weight:600;}
 .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--ink);color:#fff;padding:13px 22px;border-radius:11px;font-size:14px;font-weight:500;box-shadow:0 8px 28px rgba(0,0,0,.25);opacity:0;transition:all .3s;z-index:100;}
 .toast.show{transform:translateX(-50%) translateY(0);opacity:1;}
+@page{ margin:14mm; }
 @media print{
   body *{visibility:hidden;}
   #receiptPrint,#receiptPrint *{visibility:visible;}
@@ -92,6 +94,38 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent);}
 </style>
 </head>
 <body>
+<!-- APP PASSWORD GATE -->
+<div id="__gate" style="position:fixed;inset:0;z-index:99999;background:linear-gradient(135deg,#0f1117,#1a1d27);display:flex;align-items:center;justify-content:center;font-family:system-ui,sans-serif;">
+  <div style="background:#1e2230;border:1px solid #2e3344;border-radius:18px;padding:40px 36px;width:min(360px,90vw);text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.5);">
+    <div style="font-size:42px;margin-bottom:14px;">🔒</div>
+    <div style="font-size:20px;font-weight:700;color:#fff;margin-bottom:6px;">Slip</div>
+    <div style="font-size:13px;color:#8b94a8;margin-bottom:24px;">Enter the access password to continue</div>
+    <input id="__gatePw" type="password" placeholder="Password" autocomplete="off"
+      style="width:100%;padding:13px 15px;border-radius:11px;border:1.5px solid #2e3344;background:#141824;color:#fff;font-size:15px;margin-bottom:12px;outline:none;"
+      onkeydown="if(event.key==='Enter')__gateCheck();">
+    <div id="__gateErr" style="color:#ff6b6b;font-size:12.5px;height:16px;margin-bottom:10px;"></div>
+    <button onclick="__gateCheck()" style="width:100%;padding:13px;border:none;border-radius:11px;background:linear-gradient(135deg,#3b82f6,#2563eb);color:#fff;font-size:15px;font-weight:700;cursor:pointer;">Unlock</button>
+  </div>
+</div>
+<script>
+(function(){
+  var APP='slip';
+  var HASH='ff42a71b63ecdb2d99001d8be0877a464c7ebe2828814674e48b53bdbd24535b'; // sha256(password + "_oscars_app_gate")
+  async function sha(s){var b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s));return Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,'0')).join('');}
+  // already unlocked this session?
+  if(sessionStorage.getItem('gate_'+APP)==='1'){var g=document.getElementById('__gate');if(g)g.remove();return;}
+  window.__gateCheck=async function(){
+    var pw=document.getElementById('__gatePw').value;
+    var h=await sha(pw+'_oscars_app_gate');
+    if(h===HASH){sessionStorage.setItem('gate_'+APP,'1');document.getElementById('__gate').remove();}
+    else{document.getElementById('__gateErr').textContent='Incorrect password';document.getElementById('__gatePw').value='';}
+  };
+  setTimeout(function(){var el=document.getElementById('__gatePw');if(el)el.focus();},100);
+})();
+</script>
+<!-- END GATE -->
+
+
 <div class="topnav">
   <div class="brand"><span class="logo">🧾</span> Slip</div>
   <div class="nav-tabs">
@@ -113,10 +147,7 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent);}
           <div class="field"><label>Receipt Number</label><input id="f-num" readonly></div>
           <div class="field"><label>Receipt Date</label><input id="f-date" readonly></div>
         </div>
-        <div class="row">
-          <div class="field"><label>Student Name</label><input id="f-name" placeholder="HARISH SINGH" oninput="renderReceipt()"></div>
-          <div class="field"><label>Student ID</label><input id="f-id" placeholder="2194" oninput="renderReceipt()"></div>
-        </div>
+        <div class="field"><label>Student Name</label><input id="f-name" placeholder="ABC Singh" oninput="renderReceipt()"></div>
         <label>Payment items</label>
         <div id="lineItems"></div>
         <button class="btn btn-add" onclick="addLine()">+ Add item</button>
@@ -143,7 +174,6 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent);}
             <div class="r-section-label">Student Information</div>
             <div class="r-meta">
               <div class="mi"><span>Name</span><b id="r-name">—</b></div>
-              <div class="mi"><span>Student ID</span><b id="r-id">—</b></div>
             </div>
             <div class="r-section-label">Payment Details</div>
             <table class="r-table">
@@ -239,7 +269,6 @@ function renderReceipt(){
   const today=fmtDate(new Date());
   document.getElementById('r-date').textContent=today;document.getElementById('f-date').value=today;
   document.getElementById('r-name').textContent=document.getElementById('f-name').value||'—';
-  document.getElementById('r-id').textContent=document.getElementById('f-id').value||'—';
   const rows=document.getElementById('r-rows');rows.innerHTML='';
   let total=0,n=0;
   lineData.forEach(li=>{
@@ -263,7 +292,7 @@ function saveReceipt(){
   if(!items.length){toast('Add at least one item');return;}
   let total=0;items.forEach(li=>{total+=(parseFloat(li.price)||0)-(parseFloat(li.disc)||0);});
   const num=getNextNum();
-  const rec={num:num,date:fmtDate(new Date()),name:name,id:document.getElementById('f-id').value.trim(),items:items,total:total,savedAt:Date.now()};
+  const rec={num:num,date:fmtDate(new Date()),name:name,id:'',items:items,total:total,savedAt:Date.now()};
   let all=[];try{all=JSON.parse(localStorage.getItem(LS.receipts))||[];}catch(e){}
   all.unshift(rec);localStorage.setItem(LS.receipts,JSON.stringify(all.slice(0,500)));
   // increment number
@@ -275,7 +304,7 @@ function saveReceipt(){
 }
 function resetForm(){
   lineData=[{desc:'',price:'',disc:''}];
-  document.getElementById('f-name').value='';document.getElementById('f-id').value='';
+  document.getElementById('f-name').value='';
   renderLines();renderReceipt();
 }
 function renderHistory(){
@@ -285,7 +314,7 @@ function renderHistory(){
   c.innerHTML='';
   all.forEach(r=>{
     const d=document.createElement('div');d.className='hist-item';
-    d.innerHTML=`<div class="hi-main"><b>#${r.num} · ${r.name}</b><span>${r.date} · ID ${r.id||'—'}</span></div><div class="hi-amt">${money(r.total)}</div>`;
+    d.innerHTML=`<div class="hi-main"><b>#${r.num} · ${r.name}</b><span>${r.date}</span></div><div class="hi-amt">${money(r.total)}</div>`;
     d.onclick=()=>loadReceipt(r);
     c.appendChild(d);
   });
@@ -293,13 +322,13 @@ function renderHistory(){
 function loadReceipt(r){
   // load into form as a view (doesn't change next number)
   showPage('new');
-  document.getElementById('f-name').value=r.name;document.getElementById('f-id').value=r.id||'';
+  document.getElementById('f-name').value=r.name;
   lineData=r.items.map(li=>({desc:li.desc,price:li.price,disc:li.disc}));
   renderLines();
   // show its original number/date
   document.getElementById('r-num').textContent=r.num;document.getElementById('f-num').value=r.num;
   document.getElementById('r-date').textContent=r.date;document.getElementById('f-date').value=r.date;
-  document.getElementById('r-name').textContent=r.name;document.getElementById('r-id').textContent=r.id||'—';
+  document.getElementById('r-name').textContent=r.name;
   const rows=document.getElementById('r-rows');rows.innerHTML='';let n=0;
   r.items.forEach(li=>{n++;const price=parseFloat(li.price)||0,disc=parseFloat(li.disc)||0;rows.innerHTML+=`<tr><td>${n}) ${(li.desc||'').toUpperCase()}</td><td class="num">${money(price)}</td><td class="num">${money(disc)}</td><td class="num">${money(price-disc)}</td></tr>`;});
   document.getElementById('r-total').textContent=money(r.total);document.getElementById('f-total').textContent=money(r.total);

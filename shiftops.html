@@ -915,6 +915,38 @@ select.form-input { cursor: pointer; }
 </style>
 </head>
 <body>
+<!-- APP PASSWORD GATE -->
+<div id="__gate" style="position:fixed;inset:0;z-index:99999;background:linear-gradient(135deg,#0f1117,#1a1d27);display:flex;align-items:center;justify-content:center;font-family:system-ui,sans-serif;">
+  <div style="background:#1e2230;border:1px solid #2e3344;border-radius:18px;padding:40px 36px;width:min(360px,90vw);text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.5);">
+    <div style="font-size:42px;margin-bottom:14px;">🔒</div>
+    <div style="font-size:20px;font-weight:700;color:#fff;margin-bottom:6px;">ShiftOps</div>
+    <div style="font-size:13px;color:#8b94a8;margin-bottom:24px;">Enter the access password to continue</div>
+    <input id="__gatePw" type="password" placeholder="Password" autocomplete="off"
+      style="width:100%;padding:13px 15px;border-radius:11px;border:1.5px solid #2e3344;background:#141824;color:#fff;font-size:15px;margin-bottom:12px;outline:none;"
+      onkeydown="if(event.key==='Enter')__gateCheck();">
+    <div id="__gateErr" style="color:#ff6b6b;font-size:12.5px;height:16px;margin-bottom:10px;"></div>
+    <button onclick="__gateCheck()" style="width:100%;padding:13px;border:none;border-radius:11px;background:linear-gradient(135deg,#3b82f6,#2563eb);color:#fff;font-size:15px;font-weight:700;cursor:pointer;">Unlock</button>
+  </div>
+</div>
+<script>
+(function(){
+  var APP='shiftops';
+  var HASH='0ce3760f2678c3243d0b1a19868734b6e0768250c1ad453345c81ab42ca77b55'; // sha256(password + "_oscars_app_gate")
+  async function sha(s){var b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s));return Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,'0')).join('');}
+  // already unlocked this session?
+  if(sessionStorage.getItem('gate_'+APP)==='1'){var g=document.getElementById('__gate');if(g)g.remove();return;}
+  window.__gateCheck=async function(){
+    var pw=document.getElementById('__gatePw').value;
+    var h=await sha(pw+'_oscars_app_gate');
+    if(h===HASH){sessionStorage.setItem('gate_'+APP,'1');document.getElementById('__gate').remove();}
+    else{document.getElementById('__gateErr').textContent='Incorrect password';document.getElementById('__gatePw').value='';}
+  };
+  setTimeout(function(){var el=document.getElementById('__gatePw');if(el)el.focus();},100);
+})();
+</script>
+<!-- END GATE -->
+
+
 <div class="shell">
   <aside class="sidebar">
     <div class="logo">

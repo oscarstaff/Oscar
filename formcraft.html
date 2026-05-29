@@ -14,20 +14,18 @@
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
-      --bg: #faf7f2; --bg-card: #ffffff; --bg-soft: #f3eee5; --bg-sunk: #ece6d9;
-      --border: rgba(60,50,35,0.10); --border-strong: rgba(60,50,35,0.20);
-      --text: #1f1a14; --text-2: #6b6356; --text-3: #a59c8c; --text-4: #cfc6b5;
-      --accent: #c8741a; --accent-hi: #e08930; --accent-soft: #fdf0e0; --accent-border: #f0c895;
-      --blue: #2864a8; --blue-soft: #e3eef9; --blue-border: #b6cfeb;
-      --ok: #2f8a5c; --ok-soft: #e4f3eb;
-      --err: #c0392b; --err-soft: #f8e4e0;
-      --radius: 10px; --radius-lg: 16px; --header-h: 56px;
-      --font: 'Instrument Sans', system-ui, sans-serif;
-      --font-display: 'Fraunces', Georgia, serif;
-      --font-mono: 'JetBrains Mono', monospace;
-      --shadow-sm: 0 1px 2px rgba(60,50,35,0.04), 0 0 0 1px var(--border);
-      --shadow-md: 0 4px 12px rgba(60,50,35,0.06), 0 0 0 1px var(--border);
-      --shadow-lg: 0 12px 40px rgba(60,50,35,0.10), 0 0 0 1px var(--border);
+      --bg: #f8fafc; --bg-card: #ffffff; --bg-soft: #f1f5f9; --bg-sunk: #e2e8f0;
+      --text: #0f172a; --text-2: #475569; --text-3: #94a3b8;
+      --accent: #059669; --accent-hi: #047857; --accent-soft: #ecfdf5; --accent-border: #a7f3d0;
+      --border: #e2e8f0; --border-strong: #cbd5e1;
+      --warn: #f05c4e; --warn-soft: #fef2f2; --warn-border: #fecaca;
+      --shadow-sm: 0 1px 2px rgba(15,23,42,.04);
+      --shadow-md: 0 4px 12px rgba(15,23,42,.06);
+      --shadow-lg: 0 12px 32px rgba(15,23,42,.08);
+      --radius: 10px; --radius-sm: 6px; --radius-lg: 14px;
+      --font: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-display: 'Inter', sans-serif;
+      --header-h: 56px;
     }
     html, body, #root { height: 100%; }
     body { font-family: var(--font); background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.55; overflow: hidden; -webkit-font-smoothing: antialiased; }
@@ -63,7 +61,7 @@
     .landing-card { width: 600px; max-width: 100%; text-align: center; }
     .eyebrow { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--accent); margin-bottom: 20px; }
     .landing-card h1 { font-family: var(--font-display); font-size: 48px; font-weight: 400; letter-spacing: -0.03em; line-height: 1.05; margin-bottom: 16px; }
-    .landing-card h1 em { font-style: italic; color: var(--accent); }
+    .landing-card h1 em { font-style: normal; color: var(--accent); font-weight: 600; }
     .landing-card .lead { font-size: 16px; color: var(--text-2); line-height: 1.6; margin-bottom: 32px; max-width: 460px; margin-left: auto; margin-right: auto; }
 
     .upload-zone { background: var(--bg-card); border: 1.5px dashed var(--border-strong); border-radius: var(--radius-lg); padding: 48px 32px; cursor: pointer; transition: all 0.2s; display: flex; flex-direction: column; align-items: center; gap: 10px; margin-bottom: 16px; }
@@ -188,9 +186,101 @@
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { background: var(--text-4); border-radius: 4px; }
     ::-webkit-scrollbar-thumb:hover { background: var(--text-3); }
-  </style>
+  
+    
+    /* HIDE PDF PREVIEW IN FILL MODE — staff focus on form fields */
+    /* Target the PdfPreview component and the resizer divider */
+    body.fc-mode-fill .workspace > :first-child,  /* PdfPreview is first child */
+    body.fc-mode-fill .divider,
+    body.fc-mode-fill .pdf-pane,
+    body.fc-mode-fill .form-resizer,
+    body.fc-mode-fill .resizer { display: none !important; }
+    
+    /* Collapse workspace grid to single column when preview hidden */
+    body.fc-mode-fill .workspace {
+      grid-template-columns: 1fr !important;
+      max-width: 760px !important;
+      margin: 0 auto !important;
+      background: var(--bg) !important;
+    }
+    body.fc-mode-fill .form-pane {
+      width: 100% !important;
+      max-width: 100% !important;
+      border-left: none !important;
+    }
+
+    
+    
+/* ── NEXUS minimal palette + accent override (no layout changes) ── */
+    
+    /* Header brand */
+    .logo em { color: var(--accent) !important; font-style: normal !important; font-weight: 600 !important; }
+    
+    /* Primary buttons */
+    .btn-primary {
+      background: var(--accent) !important;
+      box-shadow: 0 1px 2px rgba(5,150,105,.2) !important;
+    }
+    .btn-primary:hover:not(:disabled) {
+      background: var(--accent-hi) !important;
+    }
+    
+    /* Active mode pill */
+    .mode-switch button.active {
+      color: var(--accent) !important;
+    }
+    
+    /* Focus rings — green accent */
+    .form-input:focus, .form-pane input:focus, .form-pane textarea:focus, .form-pane select:focus {
+      border-color: var(--accent) !important;
+      box-shadow: 0 0 0 3px rgba(5,150,105,.1) !important;
+    }
+    
+    /* Landing accent text */
+    .landing-card .eyebrow { color: var(--accent) !important; }
+    .landing-card h1 em { color: var(--accent) !important; font-style: normal !important; }
+    
+    /* Toast success */
+    .toast.ok { background: var(--accent) !important; }
+    
+    /* Highlighted row */
+    .form-row.highlight { box-shadow: inset 3px 0 0 var(--accent) !important; background: var(--accent-soft) !important; }
+
+    </style>
 </head>
 <body>
+<!-- APP PASSWORD GATE -->
+<div id="__gate" style="position:fixed;inset:0;z-index:99999;background:linear-gradient(135deg,#0f1117,#1a1d27);display:flex;align-items:center;justify-content:center;font-family:system-ui,sans-serif;">
+  <div style="background:#1e2230;border:1px solid #2e3344;border-radius:18px;padding:40px 36px;width:min(360px,90vw);text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.5);">
+    <div style="font-size:42px;margin-bottom:14px;">🔒</div>
+    <div style="font-size:20px;font-weight:700;color:#fff;margin-bottom:6px;">FormCraft</div>
+    <div style="font-size:13px;color:#8b94a8;margin-bottom:24px;">Enter the access password to continue</div>
+    <input id="__gatePw" type="password" placeholder="Password" autocomplete="off"
+      style="width:100%;padding:13px 15px;border-radius:11px;border:1.5px solid #2e3344;background:#141824;color:#fff;font-size:15px;margin-bottom:12px;outline:none;"
+      onkeydown="if(event.key==='Enter')__gateCheck();">
+    <div id="__gateErr" style="color:#ff6b6b;font-size:12.5px;height:16px;margin-bottom:10px;"></div>
+    <button onclick="__gateCheck()" style="width:100%;padding:13px;border:none;border-radius:11px;background:linear-gradient(135deg,#3b82f6,#2563eb);color:#fff;font-size:15px;font-weight:700;cursor:pointer;">Unlock</button>
+  </div>
+</div>
+<script>
+(function(){
+  var APP='formcraft';
+  var HASH='8402c90ddf4f70ab18dd329d1aa5bc2961dff19a995eff840c9dce9ec11667c7'; // sha256(password + "_oscars_app_gate")
+  async function sha(s){var b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s));return Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,'0')).join('');}
+  // already unlocked this session?
+  if(sessionStorage.getItem('gate_'+APP)==='1'){var g=document.getElementById('__gate');if(g)g.remove();return;}
+  window.__gateCheck=async function(){
+    var pw=document.getElementById('__gatePw').value;
+    var h=await sha(pw+'_oscars_app_gate');
+    if(h===HASH){sessionStorage.setItem('gate_'+APP,'1');document.getElementById('__gate').remove();}
+    else{document.getElementById('__gateErr').textContent='Incorrect password';document.getElementById('__gatePw').value='';}
+  };
+  setTimeout(function(){var el=document.getElementById('__gatePw');if(el)el.focus();},100);
+})();
+</script>
+<!-- END GATE -->
+
+
   <div id="root"></div>
 
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -664,44 +754,225 @@
       );
     }
 
-    function Landing({ onFile, onTemplateFile }) {
-      const [drag, setDrag] = useState(false);
-      const pdfRef = useRef(null);
-      const tplRef = useRef(null);
-      const pick = (f) => { if (f && f.type === 'application/pdf') onFile(f); };
+    // ═══════════════════════════════════════════════════════════════
+    // APPS SCRIPT BRIDGE — fetches/manages templates via parent Nexus
+    // ═══════════════════════════════════════════════════════════════
+    const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby0Bq97bCZAsmnruXFuJuCqXQE_kOxhYE2KFuJnVzLXtT5CV0Y12k5176dxZbdaYVGE/exec';
+    
+    async function apiCall(action, data) {
+      const body = Object.assign({ action }, data || {});
+      const res = await fetch(APPS_SCRIPT_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(body)
+      });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      return await res.json();
+    }
+
+    function TemplatePicker({ onFile, canManage }) {
+      const [templates, setTemplates] = useState(null);
+      const [error, setError] = useState(null);
+      const [loadingId, setLoadingId] = useState(null);
+      const [showManage, setShowManage] = useState(false);
+      const uploadRef = useRef(null);
+      const [uploading, setUploading] = useState(false);
+
+      const refresh = useCallback(async () => {
+        setError(null);
+        try {
+          const res = await apiCall('listTemplates');
+          if (res.ok) {
+            setTemplates(res.templates);
+          } else {
+            setError(res.error || 'Failed to load templates');
+          }
+        } catch (e) {
+          setError(e.message);
+        }
+      }, []);
+
+      useEffect(() => { refresh(); }, [refresh]);
+
+      const useTemplate = async (tpl) => {
+        setLoadingId(tpl.id);
+        try {
+          const res = await apiCall('fetchTemplate', { id: tpl.id });
+          if (!res.ok) throw new Error(res.error);
+          // Decode base64 to bytes → blob → File for onFile
+          const binary = atob(res.pdfBase64);
+          const bytes = new Uint8Array(binary.length);
+          for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+          const file = new File([bytes], res.name, { type: 'application/pdf' });
+          onFile(file);
+        } catch (e) {
+          setError('Could not load: ' + e.message);
+          setLoadingId(null);
+        }
+      };
+
+      const handleUpload = async (file) => {
+        if (!file || file.type !== 'application/pdf') return;
+        setUploading(true);
+        try {
+          const name = prompt('Name this template:', file.name.replace(/\.pdf$/i, ''));
+          if (!name) { setUploading(false); return; }
+          // Read as base64
+          const b64 = await new Promise((resolve, reject) => {
+            const r = new FileReader();
+            r.onload = () => resolve(String(r.result).split(',')[1]);
+            r.onerror = () => reject(new Error('read failed'));
+            r.readAsDataURL(file);
+          });
+          const res = await apiCall('uploadTemplate', { name, pdfBase64: b64 });
+          if (!res.ok) throw new Error(res.error);
+          await refresh();
+        } catch (e) {
+          alert('Upload failed: ' + e.message);
+        }
+        setUploading(false);
+      };
+
+      const renameTemplate = async (tpl) => {
+        const newName = prompt('Rename template:', tpl.name);
+        if (!newName || newName === tpl.name) return;
+        try {
+          const res = await apiCall('renameTemplate', { id: tpl.id, newName });
+          if (!res.ok) throw new Error(res.error);
+          await refresh();
+        } catch (e) {
+          alert('Rename failed: ' + e.message);
+        }
+      };
+
+      const deleteTemplate = async (tpl) => {
+        if (!confirm('Delete "' + tpl.name + '"?\n\nThis cannot be undone.')) return;
+        try {
+          const res = await apiCall('deleteTemplate', { id: tpl.id });
+          if (!res.ok) throw new Error(res.error);
+          await refresh();
+        } catch (e) {
+          alert('Delete failed: ' + e.message);
+        }
+      };
+
       return (
         <div className="landing">
-          <div className="landing-card">
-            <div className="eyebrow">PDF Form Filler · with templates</div>
-            <h1>Fill your forms<br /><em>without the PDF.</em></h1>
-            <p className="lead">Drop in a fillable PDF. We extract the fields, group related checkboxes, and give you a clean form to type in — with a live preview alongside.</p>
-            <div
-              className={'upload-zone' + (drag ? ' drag' : '')}
-              onClick={() => pdfRef.current && pdfRef.current.click()}
-              onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
-              onDragLeave={() => setDrag(false)}
-              onDrop={(e) => { e.preventDefault(); setDrag(false); pick(e.dataTransfer.files[0]); }}
-            >
-              <i className="fa-solid fa-file-pdf" />
-              <span>Select your template PDF</span>
-              <small>or drop it here</small>
-              <input ref={pdfRef} type="file" accept=".pdf,application/pdf" onChange={(e) => pick(e.target.files[0])} />
-            </div>
-            <div className="template-pill" onClick={() => tplRef.current && tplRef.current.click()}>
-              <i className="fa-solid fa-folder-open" />
-              Already have a saved template? <strong style={{marginLeft:4}}>Load it</strong>
-              <input ref={tplRef} type="file" accept=".json,application/json" style={{ display: 'none' }} onChange={(e) => e.target.files[0] && onTemplateFile(e.target.files[0])} />
-            </div>
-            <div className="features">
-              <div className="feat"><i className="fa-solid fa-wand-magic-sparkles" /> Auto-detects fields</div>
-              <div className="feat"><i className="fa-solid fa-object-group" /> Smart grouping</div>
-              <div className="feat"><i className="fa-solid fa-bookmark" /> Reusable templates</div>
-              <div className="feat"><i className="fa-solid fa-lock" /> 100% in your browser</div>
-            </div>
+          <div className="landing-card" style={{maxWidth:720}}>
+            <div className="eyebrow">FormCraft · Templates</div>
+            <h1>Pick a form<br /><em>and fill it in.</em></h1>
+            <p className="lead">Choose from the shared templates below. Fields auto-populate where possible.</p>
+
+            {error && (
+              <div style={{background:'#fee2e2',color:'#991b1b',padding:12,borderRadius:8,marginBottom:14,fontSize:13}}>
+                ⚠️ {error}
+                <button onClick={refresh} style={{marginLeft:8,background:'#fff',border:'1px solid #fca5a5',padding:'3px 10px',borderRadius:6,cursor:'pointer',fontSize:12}}>Retry</button>
+              </div>
+            )}
+
+            {templates === null && !error && (
+              <div style={{textAlign:'center',padding:30,color:'#a59c8c'}}>
+                <i className="fa-solid fa-spinner fa-spin" style={{fontSize:24}} />
+                <div style={{marginTop:10,fontSize:13}}>Loading templates...</div>
+              </div>
+            )}
+
+            {templates && templates.length === 0 && (
+              <div style={{textAlign:'center',padding:40,color:'#6b6356'}}>
+                <i className="fa-solid fa-folder-open" style={{fontSize:36,color:'#cfc6b5'}} />
+                <div style={{marginTop:14,fontSize:14}}>No templates yet.</div>
+                {canManage && (
+                  <div style={{marginTop:8,fontSize:12,color:'#a59c8c'}}>Click "Manage" below to upload your first template.</div>
+                )}
+              </div>
+            )}
+
+            {templates && templates.length > 0 && (
+              <div style={{display:'flex',flexDirection:'column',gap:8,marginTop:18}}>
+                {templates.map(tpl => (
+                  <div key={tpl.id} style={{
+                    display:'flex',alignItems:'center',gap:12,
+                    padding:'14px 16px',
+                    background:'#fff',
+                    border:'1px solid var(--border)',
+                    borderRadius:10,
+                    transition:'all .15s',
+                    cursor: loadingId === tpl.id ? 'wait' : 'pointer'
+                  }}
+                    onMouseEnter={(e) => e.currentTarget.style.borderColor = 'var(--accent)'}
+                    onMouseLeave={(e) => e.currentTarget.style.borderColor = 'var(--border)'}
+                    onClick={() => loadingId !== tpl.id && useTemplate(tpl)}
+                  >
+                    <i className="fa-solid fa-file-pdf" style={{fontSize:24,color:'var(--accent)'}} />
+                    <div style={{flex:1,textAlign:'left'}}>
+                      <div style={{fontWeight:600,fontSize:14,color:'var(--text)'}}>{tpl.name}</div>
+                      <div style={{fontSize:11,color:'var(--text-2)',marginTop:2}}>
+                        {(tpl.size/1024).toFixed(1)} KB · Updated {new Date(tpl.updated).toLocaleDateString()}
+                      </div>
+                    </div>
+                    {loadingId === tpl.id ? (
+                      <i className="fa-solid fa-spinner fa-spin" style={{color:'var(--accent)'}} />
+                    ) : (
+                      <button style={{
+                        background:'var(--accent)',color:'#fff',border:'none',
+                        padding:'7px 14px',borderRadius:6,fontWeight:600,fontSize:13,
+                        cursor:'pointer',fontFamily:'inherit'
+                      }} onClick={(e) => { e.stopPropagation(); useTemplate(tpl); }}>Use</button>
+                    )}
+                    {canManage && showManage && (
+                      <div style={{display:'flex',gap:4}}>
+                        <button onClick={(e) => { e.stopPropagation(); renameTemplate(tpl); }} style={{
+                          background:'#f3eee5',border:'1px solid var(--border)',padding:'6px 10px',
+                          borderRadius:5,fontSize:11,cursor:'pointer',fontFamily:'inherit'
+                        }}>Rename</button>
+                        <button onClick={(e) => { e.stopPropagation(); deleteTemplate(tpl); }} style={{
+                          background:'#fee2e2',color:'#991b1b',border:'1px solid #fca5a5',padding:'6px 10px',
+                          borderRadius:5,fontSize:11,cursor:'pointer',fontFamily:'inherit'
+                        }}>Delete</button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {canManage && (
+              <div style={{marginTop:24,padding:'16px 0 0',borderTop:'1px dashed var(--border)'}}>
+                <div style={{display:'flex',gap:8,justifyContent:'space-between',alignItems:'center'}}>
+                  <button onClick={() => setShowManage(s => !s)} style={{
+                    background:'transparent',border:'1px solid var(--border)',padding:'8px 14px',
+                    borderRadius:6,fontSize:13,cursor:'pointer',fontFamily:'inherit',color:'var(--text-2)'
+                  }}>
+                    <i className={'fa-solid fa-' + (showManage ? 'eye-slash' : 'gear')} style={{marginRight:6}} />
+                    {showManage ? 'Hide manage' : 'Manage'}
+                  </button>
+                  {showManage && (
+                    <button onClick={() => uploadRef.current && uploadRef.current.click()} disabled={uploading} style={{
+                      background:'var(--accent)',color:'#fff',border:'none',padding:'8px 16px',
+                      borderRadius:6,fontWeight:600,fontSize:13,cursor:uploading ? 'wait' : 'pointer',
+                      fontFamily:'inherit',opacity:uploading ? 0.6 : 1
+                    }}>
+                      {uploading ? <><i className="fa-solid fa-spinner fa-spin" style={{marginRight:6}}/>Uploading...</> :
+                                  <><i className="fa-solid fa-upload" style={{marginRight:6}}/>Upload new template</>}
+                    </button>
+                  )}
+                  <input ref={uploadRef} type="file" accept=".pdf,application/pdf" style={{display:'none'}}
+                         onChange={(e) => e.target.files[0] && handleUpload(e.target.files[0])} />
+                </div>
+                {showManage && (
+                  <div style={{fontSize:11,color:'var(--text-3)',marginTop:10,textAlign:'left'}}>
+                    💡 Tip: Upload a fillable PDF (with form fields). Staff will see it instantly in the picker above.
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       );
     }
+    
+    // Original Landing kept as fallback (unused but preserved)
+    function Landing(props) { return <TemplatePicker {...props} canManage={true} />; }
 
     function App() {
       const [pdfBytes, setPdfBytes] = useState(null);
@@ -716,6 +987,11 @@
       const [scale] = useState(1.2);
       const [values, setValues] = useState({});
       const [mode, setMode] = useState('fill');
+      useEffect(() => {
+        // Sync body class for CSS-based preview hiding
+        document.body.classList.remove('fc-mode-fill', 'fc-mode-edit');
+        document.body.classList.add('fc-mode-' + mode);
+      }, [mode]);
       const [busy, setBusy] = useState(false);
       const [toast, setToast] = useState(null);
       const [highlight, setHighlight] = useState(null);
@@ -979,7 +1255,12 @@
           <input ref={templateInputRef} type="file" accept=".json,application/json" style={{ display: 'none' }} onChange={(e) => e.target.files[0] && onTemplateFile(e.target.files[0])} />
 
           {!pdfBytes ? (
-            <Landing onFile={onPdfFile} onTemplateFile={onTemplateFile} />
+            <TemplatePicker onFile={onPdfFile} canManage={(() => {
+              try {
+                const params = new URLSearchParams(window.location.search);
+                return params.get('manage') === '1';
+              } catch (e) { return false; }
+            })()} />
           ) : fields.length === 0 ? (
             <div className="landing">
               <div className="landing-card">
