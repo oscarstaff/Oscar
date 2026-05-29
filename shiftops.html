@@ -907,6 +907,11 @@ select.form-input { cursor: pointer; }
 #availNavBadge { animation: pulse 2s ease-in-out infinite; }
 @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:.5;} }
 
+.aa-tab{background:transparent;border:1.5px solid var(--border);color:var(--text-dim);font-family:inherit;font-weight:600;font-size:12px;padding:8px 14px;border-radius:9px;cursor:pointer;transition:all .15s;}
+.aa-tab:hover{color:var(--text);}
+.aa-tab.aa-active{background:var(--accent);border-color:var(--accent);color:#fff;}
+#aaSearch{background:var(--bg);border:1.5px solid var(--border);color:var(--text);border-radius:9px;padding:9px 12px;font-size:13px;font-family:inherit;}
+#aaSearch:focus{outline:none;border-color:var(--accent);}
 </style>
 </head>
 <body>
@@ -983,6 +988,10 @@ select.form-input { cursor: pointer; }
             <div class="tools-menu-item" onclick="closeToolsMenu();openSharedFolderSettings()">
               <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z"/><path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z"/></svg>
               Shared Folder
+            </div>
+            <div class="tools-menu-item" onclick="closeToolsMenu();openAccessAdmin()">
+              <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 1a4.5 4.5 0 00-4.5 4.5V9H5a2 2 0 00-2 2v6a2 2 0 002 2h10a2 2 0 002-2v-6a2 2 0 00-2-2h-.5V5.5A4.5 4.5 0 0010 1zm3 8V5.5a3 3 0 10-6 0V9h6z" clip-rule="evenodd"/></svg>
+              Access &amp; Admin
             </div>
           </div>
         </div>
@@ -1103,6 +1112,30 @@ select.form-input { cursor: pointer; }
     <div style="border-top:1px solid var(--border);padding-top:16px;display:flex;justify-content:flex-end;gap:10px;">
       <button class="btn btn-ghost" style="padding:9px 20px;font-size:13px" onclick="closeModal('deviceAllocModal')">Cancel</button>
       <button class="btn btn-primary" style="padding:9px 24px;font-size:13px;font-weight:700" onclick="applyDeviceAllocation()">💻 Apply Devices</button>
+    </div>
+  </div>
+</div>
+
+<!-- ACCESS & ADMIN — master control for all Nexus apps + admin rights -->
+<div class="modal-overlay" id="accessAdminModal">
+  <div class="modal" style="width:min(560px,94vw);max-height:88vh;overflow-y:auto;padding:28px 32px;">
+    <div class="modal-title" style="font-size:18px;margin-bottom:6px;">
+      <span>🔐 Access &amp; Admin</span>
+      <button class="modal-close" onclick="closeModal('accessAdminModal')">×</button>
+    </div>
+    <div style="font-family:var(--mono);font-size:9px;color:var(--text-dim);margin-bottom:18px;letter-spacing:.5px">Control who can open each Nexus app, and who has Nexus admin rights. Bore-KADE is available to everyone.</div>
+    <div style="display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap;">
+      <button class="aa-tab" id="aatab-formcraft" onclick="aaSwitch('formcraft')">FormCraft</button>
+      <button class="aa-tab" id="aatab-slip" onclick="aaSwitch('slip')">Slip</button>
+      <button class="aa-tab" id="aatab-shiftops" onclick="aaSwitch('shiftops')">ShiftOps</button>
+      <button class="aa-tab" id="aatab-admin" onclick="aaSwitch('admin')">Nexus Admin</button>
+    </div>
+    <div id="aaQuick" style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;"></div>
+    <input id="aaSearch" placeholder="Search staff…" oninput="aaRender(this.value)" style="width:100%;margin-bottom:12px;">
+    <div id="aaList" style="max-height:320px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;"></div>
+    <div style="border-top:1px solid var(--border);padding-top:16px;margin-top:16px;display:flex;justify-content:flex-end;gap:10px;">
+      <button class="btn btn-ghost" style="padding:9px 20px;font-size:13px" onclick="closeModal('accessAdminModal')">Close</button>
+      <button class="btn btn-primary" style="padding:9px 24px;font-size:13px;font-weight:700" onclick="aaSave()">Save changes</button>
     </div>
   </div>
 </div>
@@ -3880,6 +3913,110 @@ async function syncAvailability(){
 
 // ── PUBLISH ROSTER ────────────────────────────────────────────────────────
 
+
+// ═══════════════════════════════════════════════════════════════
+// ACCESS & ADMIN — master control (writes app_access + staff_settings)
+// ═══════════════════════════════════════════════════════════════
+const AA_SB='https://jcfgldqrdbfkgbixszds.supabase.co';
+const AA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpjZmdsZHFyZGJma2diaXhzemRzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1Nzc3NzEsImV4cCI6MjA5MDE1Mzc3MX0.Wj8cCpnlsoZOPj5sKWeEdfvgjG4Nc-UuTTYgbcrPfeI';
+async function aaGet(path){const r=await fetch(AA_SB+'/rest/v1/'+path,{headers:{apikey:AA_KEY,Authorization:'Bearer '+AA_KEY}});if(!r.ok)return[];return r.json();}
+let aaCurrent='formcraft';
+let aaAllStaff=[];
+let aaWork={formcraft:new Set(),slip:new Set(),shiftops:new Set(),admin:new Set()};
+let aaOrig={formcraft:new Set(),slip:new Set(),shiftops:new Set(),admin:new Set()};
+
+async function openAccessAdmin(){
+  openModal('accessAdminModal');
+  // staff list from staff_names (same as Nexus)
+  try{
+    const rows=await aaGet('staff_names?order=name.asc&select=name');
+    aaAllStaff=(rows||[]).map(r=>r.name).filter(Boolean);
+  }catch(e){ aaAllStaff=[]; }
+  // current app_access
+  aaWork={formcraft:new Set(),slip:new Set(),shiftops:new Set(),admin:new Set()};
+  try{
+    const rows=await aaGet('app_access?select=app,staff_name');
+    (rows||[]).forEach(r=>{ if(aaWork[r.app]) aaWork[r.app].add(r.staff_name); });
+  }catch(e){}
+  // current admins from staff_settings
+  try{
+    const rows=await aaGet('staff_settings?select=name,is_hub_admin&is_hub_admin=eq.true');
+    (rows||[]).forEach(r=>{ if(r.name) aaWork.admin.add(r.name); });
+  }catch(e){}
+  // snapshot originals for diffing
+  aaOrig={formcraft:new Set(aaWork.formcraft),slip:new Set(aaWork.slip),shiftops:new Set(aaWork.shiftops),admin:new Set(aaWork.admin)};
+  aaSwitch('formcraft');
+}
+function aaSwitch(app){
+  aaCurrent=app;
+  ['formcraft','slip','shiftops','admin'].forEach(a=>{
+    const t=document.getElementById('aatab-'+a);
+    if(t)t.className='aa-tab'+(a===app?' aa-active':'');
+  });
+  // quick buttons
+  const q=document.getElementById('aaQuick');
+  q.innerHTML='<span style="font-size:11px;color:var(--text-dim);align-self:center;margin-right:4px;">Quick:</span>';
+  const everyone=document.createElement('button');everyone.className='btn btn-ghost';everyone.style.cssText='padding:5px 11px;font-size:11px';everyone.textContent='Everyone';everyone.onclick=()=>{aaAllStaff.forEach(n=>aaWork[aaCurrent].add(n));aaRender(document.getElementById('aaSearch').value);};q.appendChild(everyone);
+  // teams as quick-adds (from ShiftOps teams)
+  try{(teams||[]).forEach(t=>{const b=document.createElement('button');b.className='btn btn-ghost';b.style.cssText='padding:5px 11px;font-size:11px';b.textContent=t;b.onclick=()=>{aaAddTeam(t);};q.appendChild(b);});}catch(e){}
+  const clr=document.createElement('button');clr.className='btn btn-ghost';clr.style.cssText='padding:5px 11px;font-size:11px;color:#ff6b6b';clr.textContent='Clear';clr.onclick=()=>{aaWork[aaCurrent].clear();aaRender(document.getElementById('aaSearch').value);};q.appendChild(clr);
+  document.getElementById('aaSearch').value='';
+  aaRender('');
+}
+function aaAddTeam(team){
+  // add all staff in this ShiftOps team (match by their full name)
+  try{
+    staff.filter(s=>s.team===team).forEach(s=>{
+      const full=(s.first+' '+s.last).trim();
+      // match against staff_names list if present, else add raw
+      const match=aaAllStaff.find(n=>n.toLowerCase()===full.toLowerCase())||full;
+      aaWork[aaCurrent].add(match);
+    });
+  }catch(e){}
+  aaRender(document.getElementById('aaSearch').value);
+}
+function aaRender(filter){
+  const c=document.getElementById('aaList');
+  const f=(filter||'').toLowerCase();
+  const sel=aaWork[aaCurrent];
+  const list=aaAllStaff.filter(n=>n.toLowerCase().includes(f));
+  const label=aaCurrent==='admin'?'Nexus admin':aaCurrent;
+  if(!list.length){c.innerHTML='<div style="text-align:center;color:var(--text-dim);padding:24px;font-size:13px;">No staff found in staff_names</div>';return;}
+  c.innerHTML='';
+  list.forEach(n=>{
+    const on=sel.has(n);
+    const row=document.createElement('div');
+    row.style.cssText='display:flex;align-items:center;justify-content:space-between;padding:9px 12px;border-radius:9px;cursor:pointer;border:1px solid '+(on?'var(--accent)':'var(--border)')+';background:'+(on?'var(--accent-dim)':'transparent')+';';
+    row.innerHTML='<span style="font-size:13px;font-weight:'+(on?'600':'400')+';">'+n+'</span><span style="font-size:16px;">'+(on?'✅':'⬜')+'</span>';
+    row.onclick=()=>{ if(sel.has(n))sel.delete(n); else sel.add(n); aaRender(filter); };
+    c.appendChild(row);
+  });
+}
+async function aaSave(){
+  showToast('⏳ Saving access…');
+  // app_access apps
+  for(const app of ['formcraft','slip','shiftops']){
+    const add=[...aaWork[app]].filter(n=>!aaOrig[app].has(n));
+    const del=[...aaOrig[app]].filter(n=>!aaWork[app].has(n));
+    for(const n of add){
+      await fetch(AA_SB+'/rest/v1/app_access',{method:'POST',headers:{apikey:AA_KEY,Authorization:'Bearer '+AA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({app:app,staff_name:n})});
+    }
+    for(const n of del){
+      await fetch(AA_SB+'/rest/v1/app_access?app=eq.'+encodeURIComponent(app)+'&staff_name=eq.'+encodeURIComponent(n),{method:'DELETE',headers:{apikey:AA_KEY,Authorization:'Bearer '+AA_KEY}});
+    }
+  }
+  // admin → staff_settings.is_hub_admin (upsert per person)
+  const adminAdd=[...aaWork.admin].filter(n=>!aaOrig.admin.has(n));
+  const adminDel=[...aaOrig.admin].filter(n=>!aaWork.admin.has(n));
+  for(const n of adminAdd){
+    await fetch(AA_SB+'/rest/v1/staff_settings',{method:'POST',headers:{apikey:AA_KEY,Authorization:'Bearer '+AA_KEY,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({name:n,is_hub_admin:true})});
+  }
+  for(const n of adminDel){
+    await fetch(AA_SB+'/rest/v1/staff_settings?name=eq.'+encodeURIComponent(n),{method:'PATCH',headers:{apikey:AA_KEY,Authorization:'Bearer '+AA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({is_hub_admin:false})});
+  }
+  showToast('✅ Access & admin updated');
+  closeModal('accessAdminModal');
+}
 
 // ── INIT ──────────────────────────────────────────────────────────────────
 (async()=>{
