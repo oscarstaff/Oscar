@@ -1123,11 +1123,12 @@ select.form-input { cursor: pointer; }
       <span>🔐 Access &amp; Admin</span>
       <button class="modal-close" onclick="closeModal('accessAdminModal')">×</button>
     </div>
-    <div style="font-family:var(--mono);font-size:9px;color:var(--text-dim);margin-bottom:18px;letter-spacing:.5px">Control who can open each Nexus app, and who has Nexus admin rights. Bore-KADE is available to everyone.</div>
+    <div style="font-family:var(--mono);font-size:9px;color:var(--text-dim);margin-bottom:18px;letter-spacing:.5px">Control who can open each Nexus app and who holds admin roles. SHIFT ADMIN = overall manager (auto-gets Nexus admin + ShiftOps access). NEXUS ADMIN = timesheet manager only. Bore-KADE is open to everyone.</div>
     <div style="display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap;">
       <button class="aa-tab" id="aatab-formcraft" onclick="aaSwitch('formcraft')">FormCraft</button>
       <button class="aa-tab" id="aatab-slip" onclick="aaSwitch('slip')">Slip</button>
       <button class="aa-tab" id="aatab-shiftops" onclick="aaSwitch('shiftops')">ShiftOps</button>
+      <button class="aa-tab" id="aatab-shiftadmin" onclick="aaSwitch('shiftadmin')">Shift Admin</button>
       <button class="aa-tab" id="aatab-admin" onclick="aaSwitch('admin')">Nexus Admin</button>
     </div>
     <div id="aaQuick" style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;"></div>
@@ -3922,8 +3923,8 @@ const AA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZ
 async function aaGet(path){const r=await fetch(AA_SB+'/rest/v1/'+path,{headers:{apikey:AA_KEY,Authorization:'Bearer '+AA_KEY}});if(!r.ok)return[];return r.json();}
 let aaCurrent='formcraft';
 let aaAllStaff=[];
-let aaWork={formcraft:new Set(),slip:new Set(),shiftops:new Set(),admin:new Set()};
-let aaOrig={formcraft:new Set(),slip:new Set(),shiftops:new Set(),admin:new Set()};
+let aaWork={formcraft:new Set(),slip:new Set(),shiftops:new Set(),shiftadmin:new Set(),admin:new Set()};
+let aaOrig={formcraft:new Set(),slip:new Set(),shiftops:new Set(),shiftadmin:new Set(),admin:new Set()};
 
 async function openAccessAdmin(){
   openModal('accessAdminModal');
@@ -3933,23 +3934,26 @@ async function openAccessAdmin(){
     aaAllStaff=(rows||[]).map(r=>r.name).filter(Boolean);
   }catch(e){ aaAllStaff=[]; }
   // current app_access
-  aaWork={formcraft:new Set(),slip:new Set(),shiftops:new Set(),admin:new Set()};
+  aaWork={formcraft:new Set(),slip:new Set(),shiftops:new Set(),shiftadmin:new Set(),admin:new Set()};
   try{
     const rows=await aaGet('app_access?select=app,staff_name');
     (rows||[]).forEach(r=>{ if(aaWork[r.app]) aaWork[r.app].add(r.staff_name); });
   }catch(e){}
-  // current admins from staff_settings
+  // current admins from staff_settings (both classes)
   try{
-    const rows=await aaGet('staff_settings?select=name,is_hub_admin&is_hub_admin=eq.true');
-    (rows||[]).forEach(r=>{ if(r.name) aaWork.admin.add(r.name); });
+    const rows=await aaGet('staff_settings?select=name,is_hub_admin,is_shift_admin');
+    (rows||[]).forEach(r=>{
+      if(r.is_hub_admin===true && r.name) aaWork.admin.add(r.name);
+      if(r.is_shift_admin===true && r.name) aaWork.shiftadmin.add(r.name);
+    });
   }catch(e){}
   // snapshot originals for diffing
-  aaOrig={formcraft:new Set(aaWork.formcraft),slip:new Set(aaWork.slip),shiftops:new Set(aaWork.shiftops),admin:new Set(aaWork.admin)};
+  aaOrig={formcraft:new Set(aaWork.formcraft),slip:new Set(aaWork.slip),shiftops:new Set(aaWork.shiftops),shiftadmin:new Set(aaWork.shiftadmin),admin:new Set(aaWork.admin)};
   aaSwitch('formcraft');
 }
 function aaSwitch(app){
   aaCurrent=app;
-  ['formcraft','slip','shiftops','admin'].forEach(a=>{
+  ['formcraft','slip','shiftops','shiftadmin','admin'].forEach(a=>{
     const t=document.getElementById('aatab-'+a);
     if(t)t.className='aa-tab'+(a===app?' aa-active':'');
   });
@@ -3980,7 +3984,7 @@ function aaRender(filter){
   const f=(filter||'').toLowerCase();
   const sel=aaWork[aaCurrent];
   const list=aaAllStaff.filter(n=>n.toLowerCase().includes(f));
-  const label=aaCurrent==='admin'?'Nexus admin':aaCurrent;
+  const label=aaCurrent==='admin'?'Nexus admin':aaCurrent==='shiftadmin'?'Shift admin':aaCurrent;
   if(!list.length){c.innerHTML='<div style="text-align:center;color:var(--text-dim);padding:24px;font-size:13px;">No staff found in staff_names</div>';return;}
   c.innerHTML='';
   list.forEach(n=>{
@@ -4005,7 +4009,7 @@ async function aaSave(){
       await fetch(AA_SB+'/rest/v1/app_access?app=eq.'+encodeURIComponent(app)+'&staff_name=eq.'+encodeURIComponent(n),{method:'DELETE',headers:{apikey:AA_KEY,Authorization:'Bearer '+AA_KEY}});
     }
   }
-  // admin → staff_settings.is_hub_admin (upsert per person)
+  // Nexus admin → staff_settings.is_hub_admin
   const adminAdd=[...aaWork.admin].filter(n=>!aaOrig.admin.has(n));
   const adminDel=[...aaOrig.admin].filter(n=>!aaWork.admin.has(n));
   for(const n of adminAdd){
@@ -4013,6 +4017,22 @@ async function aaSave(){
   }
   for(const n of adminDel){
     await fetch(AA_SB+'/rest/v1/staff_settings?name=eq.'+encodeURIComponent(n),{method:'PATCH',headers:{apikey:AA_KEY,Authorization:'Bearer '+AA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({is_hub_admin:false})});
+  }
+  // Shift admin → staff_settings.is_shift_admin
+  // INHERITANCE: a Shift Admin is ALSO a Nexus admin AND gets ShiftOps access automatically
+  const shiftAdd=[...aaWork.shiftadmin].filter(n=>!aaOrig.shiftadmin.has(n));
+  const shiftDel=[...aaOrig.shiftadmin].filter(n=>!aaWork.shiftadmin.has(n));
+  for(const n of shiftAdd){
+    // set both shift + hub admin
+    await fetch(AA_SB+'/rest/v1/staff_settings',{method:'POST',headers:{apikey:AA_KEY,Authorization:'Bearer '+AA_KEY,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({name:n,is_shift_admin:true,is_hub_admin:true})});
+    // grant ShiftOps app access
+    await fetch(AA_SB+'/rest/v1/app_access',{method:'POST',headers:{apikey:AA_KEY,Authorization:'Bearer '+AA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({app:'shiftops',staff_name:n})}).catch(()=>{});
+  }
+  for(const n of shiftDel){
+    // remove shift admin flag (leave hub_admin as-is unless also unticked in admin tab)
+    await fetch(AA_SB+'/rest/v1/staff_settings?name=eq.'+encodeURIComponent(n),{method:'PATCH',headers:{apikey:AA_KEY,Authorization:'Bearer '+AA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({is_shift_admin:false})});
+    // revoke ShiftOps access (only shift admins should have it)
+    await fetch(AA_SB+'/rest/v1/app_access?app=eq.shiftops&staff_name=eq.'+encodeURIComponent(n),{method:'DELETE',headers:{apikey:AA_KEY,Authorization:'Bearer '+AA_KEY}}).catch(()=>{});
   }
   showToast('✅ Access & admin updated');
   closeModal('accessAdminModal');
