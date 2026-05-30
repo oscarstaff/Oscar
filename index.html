@@ -5058,7 +5058,7 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
         </div>
         <div class="hub-grid">
           <!-- FormCraft app (access-gated) -->
-          <a class="hub-card" id="hubcard-formcraft" style="display:none;" href="https://oscarstaff.github.io/Oscar/formcraft.html" target="_blank" rel="noopener noreferrer">
+          <a class="hub-card" id="hubcard-formcraft" style="display:none;cursor:pointer;" onclick="openGatedApp(event,'formcraft','https://oscarstaff.github.io/Oscar/formcraft.html')">
             <div class="hub-card-icon hub-icon-formcraft">
               <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/></svg>
             </div>
@@ -5068,7 +5068,7 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
             <svg class="hub-card-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7"/><polyline points="7 7 17 7 17 17"/></svg>
           </a>
           <!-- Slip — receipt generator (access-gated) -->
-          <a class="hub-card" id="hubcard-slip" style="display:none;" href="https://oscarstaff.github.io/Oscar/slip.html" target="_blank" rel="noopener noreferrer">
+          <a class="hub-card" id="hubcard-slip" style="display:none;cursor:pointer;" onclick="openGatedApp(event,'slip','https://oscarstaff.github.io/Oscar/slip.html')">
             <div class="hub-card-icon hub-icon-slip">
               <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1z"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="8" y1="16" x2="13" y2="16"/></svg>
             </div>
@@ -5078,7 +5078,7 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
             <svg class="hub-card-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7"/><polyline points="7 7 17 7 17 17"/></svg>
           </a>
           <!-- ShiftOps — roster manager (access-gated) -->
-          <a class="hub-card" id="hubcard-shiftops" style="display:none;" href="https://oscarstaff.github.io/Oscar/shiftops.html" target="_blank" rel="noopener noreferrer">
+          <a class="hub-card" id="hubcard-shiftops" style="display:none;cursor:pointer;" onclick="openGatedApp(event,'shiftops','https://oscarstaff.github.io/Oscar/shiftops.html')">
             <div class="hub-card-icon hub-icon-shiftops">
               <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="14" x2="10" y2="14"/><line x1="14" y1="14" x2="16" y2="14"/><line x1="8" y1="18" x2="10" y2="18"/></svg>
             </div>
@@ -6703,6 +6703,32 @@ let _accessCache={formcraft:[],slip:[],shiftops:[]};
 let _accessCurrentApp='formcraft';
 let _accessWorking={formcraft:new Set(),slip:new Set(),shiftops:new Set()};
 let _accessAllStaff=[];
+
+async function openGatedApp(ev,app,url){
+  if(ev)ev.preventDefault();
+  try{
+    const token=await makeAppToken(app, me);
+    window.open(url+'#t='+encodeURIComponent(token),'_blank','noopener,noreferrer');
+  }catch(e){
+    showToast('Could not open app');
+    console.warn('openGatedApp',e);
+  }
+}
+// HMAC-signed token: base64(payload).hexsig  — payload={app,name,exp}
+const APP_GATE_SECRET='oscars_nexus_gate_v1_8f3a2c91'; // shared with each app
+async function makeAppToken(app,name){
+  const payload={app:app,name:name||'',exp:Date.now()+1000*60*5}; // valid 5 min to launch
+  const json=JSON.stringify(payload);
+  const b64=btoa(unescape(encodeURIComponent(json)));
+  const sig=await hmacHex(APP_GATE_SECRET, b64);
+  return b64+'.'+sig;
+}
+async function hmacHex(secret,msg){
+  const enc=new TextEncoder();
+  const key=await crypto.subtle.importKey('raw',enc.encode(secret),{name:'HMAC',hash:'SHA-256'},false,['sign']);
+  const sig=await crypto.subtle.sign('HMAC',key,enc.encode(msg));
+  return Array.from(new Uint8Array(sig)).map(x=>x.toString(16).padStart(2,'0')).join('');
+}
 
 async function loadHubAccess(){
   // Load access lists from Supabase

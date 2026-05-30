@@ -915,33 +915,50 @@ select.form-input { cursor: pointer; }
 </style>
 </head>
 <body>
-<!-- APP PASSWORD GATE -->
+<!-- NEXUS TOKEN GATE — app only opens when launched from Nexus -->
 <div id="__gate" style="position:fixed;inset:0;z-index:99999;background:linear-gradient(135deg,#0f1117,#1a1d27);display:flex;align-items:center;justify-content:center;font-family:system-ui,sans-serif;">
-  <div style="background:#1e2230;border:1px solid #2e3344;border-radius:18px;padding:40px 36px;width:min(360px,90vw);text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.5);">
+  <div style="background:#1e2230;border:1px solid #2e3344;border-radius:18px;padding:40px 36px;width:min(380px,90vw);text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.5);">
     <div style="font-size:42px;margin-bottom:14px;">🔒</div>
-    <div style="font-size:20px;font-weight:700;color:#fff;margin-bottom:6px;">ShiftOps</div>
-    <div style="font-size:13px;color:#8b94a8;margin-bottom:24px;">Enter the access password to continue</div>
-    <input id="__gatePw" type="password" placeholder="Password" autocomplete="off"
-      style="width:100%;padding:13px 15px;border-radius:11px;border:1.5px solid #2e3344;background:#141824;color:#fff;font-size:15px;margin-bottom:12px;outline:none;"
-      onkeydown="if(event.key==='Enter')__gateCheck();">
-    <div id="__gateErr" style="color:#ff6b6b;font-size:12.5px;height:16px;margin-bottom:10px;"></div>
-    <button onclick="__gateCheck()" style="width:100%;padding:13px;border:none;border-radius:11px;background:linear-gradient(135deg,#3b82f6,#2563eb);color:#fff;font-size:15px;font-weight:700;cursor:pointer;">Unlock</button>
+    <div style="font-size:20px;font-weight:700;color:#fff;margin-bottom:8px;">ShiftOps</div>
+    <div id="__gateMsg" style="font-size:13.5px;color:#8b94a8;line-height:1.5;">Checking access…</div>
   </div>
 </div>
 <script>
 (function(){
   var APP='shiftops';
-  var HASH='7c186b1a82763dee2fd670d93c024967d9878ae17ad509c64ed87fa2e3a81a2c'; // sha256(password + "_oscars_app_gate")
-  async function sha(s){var b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s));return Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,'0')).join('');}
-  // already unlocked this session?
-  if(sessionStorage.getItem('gate_'+APP)==='1'){var g=document.getElementById('__gate');if(g)g.remove();return;}
-  window.__gateCheck=async function(){
-    var pw=document.getElementById('__gatePw').value;
-    var h=await sha(pw+'_oscars_app_gate');
-    if(h===HASH){sessionStorage.setItem('gate_'+APP,'1');document.getElementById('__gate').remove();}
-    else{document.getElementById('__gateErr').textContent='Incorrect password';document.getElementById('__gatePw').value='';}
-  };
-  setTimeout(function(){var el=document.getElementById('__gatePw');if(el)el.focus();},100);
+  var SECRET='oscars_nexus_gate_v1_8f3a2c91';
+  var SB='https://jcfgldqrdbfkgbixszds.supabase.co';
+  var KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpjZmdsZHFyZGJma2diaXhzemRzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1Nzc3NzEsImV4cCI6MjA5MDE1Mzc3MX0.Wj8cCpnlsoZOPj5sKWeEdfvgjG4Nc-UuTTYgbcrPfeI';
+  function fail(m){var el=document.getElementById('__gateMsg');if(el){el.innerHTML=m+'<br><br><span style=\"color:#6b7585;font-size:12px;\">Open this app from the Nexits page in Nexus.</span>';}}
+  function pass(){var g=document.getElementById('__gate');if(g)g.remove();}
+  async function hmacHex(secret,msg){var enc=new TextEncoder();var k=await crypto.subtle.importKey('raw',enc.encode(secret),{name:'HMAC',hash:'SHA-256'},false,['verify','sign']);var s=await crypto.subtle.sign('HMAC',k,enc.encode(msg));return Array.from(new Uint8Array(s)).map(x=>x.toString(16).padStart(2,'0')).join('');}
+  // session unlock — once verified, stay in for this tab session
+  if(sessionStorage.getItem('ngate_'+APP)==='1'){pass();return;}
+  (async function(){
+    try{
+      var hash=location.hash||'';
+      var m=hash.match(/t=([^&]+)/);
+      if(!m){fail('No access token.');return;}
+      var token=decodeURIComponent(m[1]);
+      var parts=token.split('.');
+      if(parts.length!==2){fail('Invalid token.');return;}
+      var b64=parts[0], sig=parts[1];
+      var want=await hmacHex(SECRET,b64);
+      if(want!==sig){fail('Token signature invalid.');return;}
+      var payload=JSON.parse(decodeURIComponent(escape(atob(b64))));
+      if(payload.app!==APP){fail('Token is for a different app.');return;}
+      if(Date.now()>payload.exp){fail('Token expired — relaunch from Nexus.');return;}
+      // verify the person is still on the access list (server-side truth)
+      var name=payload.name||'';
+      var r=await fetch(SB+'/rest/v1/app_access?app=eq.'+APP+'&staff_name=eq.'+encodeURIComponent(name)+'&select=staff_name',{headers:{apikey:KEY,Authorization:'Bearer '+KEY}});
+      var rows=r.ok?await r.json():[];
+      if(!rows.length){fail('You no longer have access to this app.');return;}
+      // success — strip token from URL + unlock for session
+      sessionStorage.setItem('ngate_'+APP,'1');
+      try{history.replaceState(null,'',location.pathname+location.search);}catch(e){}
+      pass();
+    }catch(e){ fail('Access check failed.'); console.warn('gate',e); }
+  })();
 })();
 </script>
 <!-- END GATE -->
