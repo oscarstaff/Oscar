@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Office Showdown · Nexits</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0e1320;--panel:#161d2e;--panel2:#1e2740;--border:#2a3550;
+  --text:#eaf0fa;--dim:#8a96b0;
+  --caffeine:#c97b3f;--paper:#e8d9a0;--tech:#4aa3e0;--chaos:#b14dff;--admin:#3fc98f;
+  --hp-good:#3fc98f;--hp-mid:#ffce4a;--hp-low:#ff5a5a;
+  --accent:#ffce4a;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden;
+  background-image:radial-gradient(circle at 50% -10%,rgba(255,206,74,.06),transparent 50%);}
+.wrap{max-width:780px;margin:0 auto;padding:20px 16px 60px;}
+.hero{text-align:center;padding:18px 0 22px;}
+.hero h1{font-family:'Bebas Neue';font-size:clamp(34px,7vw,56px);letter-spacing:2px;line-height:1;
+  background:linear-gradient(180deg,#ffce4a,#e0922a);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;}
+.hero p{color:var(--dim);font-size:14px;margin-top:6px;}
+
+.screen{display:none;}.screen.active{display:block;animation:fade .3s;}
+@keyframes fade{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:none;}}
+
+/* TEAM PREVIEW */
+.section-label{font-family:'Bebas Neue';font-size:20px;letter-spacing:1px;color:var(--accent);margin:18px 0 10px;}
+.mon-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;}
+.mon-card{background:var(--panel);border:2px solid var(--border);border-radius:14px;padding:14px;cursor:pointer;transition:all .15s;position:relative;}
+.mon-card:hover{border-color:var(--accent);transform:translateY(-2px);}
+.mon-card.picked{border-color:var(--accent);background:var(--panel2);}
+.mon-card .pick-num{position:absolute;top:8px;right:8px;width:22px;height:22px;border-radius:50%;background:var(--accent);color:#1a1a1a;font-weight:800;font-size:12px;display:flex;align-items:center;justify-content:center;}
+.mon-emoji{font-size:34px;text-align:center;margin-bottom:6px;}
+.mon-name{font-weight:700;font-size:15px;text-align:center;}
+.mon-types{display:flex;gap:4px;justify-content:center;margin-top:6px;flex-wrap:wrap;}
+.type-badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;text-transform:uppercase;letter-spacing:.5px;color:#0e1320;}
+.t-caffeine{background:var(--caffeine);}.t-paper{background:var(--paper);}.t-tech{background:var(--tech);}.t-chaos{background:var(--chaos);color:#fff;}.t-admin{background:var(--admin);}
+.mon-stats{margin-top:8px;font-size:10px;color:var(--dim);display:grid;grid-template-columns:1fr 1fr;gap:1px 8px;}
+
+.btn{font-family:'Outfit';font-weight:700;font-size:15px;border:none;border-radius:12px;padding:13px 26px;cursor:pointer;transition:transform .12s,box-shadow .12s;}
+.btn-primary{background:linear-gradient(135deg,#ffce4a,#e0922a);color:#1a1a1a;box-shadow:0 4px 14px rgba(255,206,74,.3);}
+.btn-primary:hover{transform:translateY(-2px);}
+.btn-primary:disabled{opacity:.4;cursor:not-allowed;transform:none;}
+.btn-ghost{background:var(--panel2);border:1.5px solid var(--border);color:var(--text);}
+
+/* BATTLE */
+.battlefield{background:linear-gradient(170deg,#1a2438,#10friberg 0,#131a2a);border:1px solid var(--border);border-radius:18px;padding:18px;margin-bottom:14px;position:relative;overflow:hidden;}
+.field-side{margin-bottom:14px;}
+.field-side.enemy{}
+.side-label{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--dim);margin-bottom:8px;font-weight:700;}
+.active-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.battle-mon{background:var(--panel);border:2px solid var(--border);border-radius:14px;padding:12px;transition:all .2s;position:relative;}
+.battle-mon.targetable{cursor:pointer;border-color:var(--accent);box-shadow:0 0 14px rgba(255,206,74,.3);}
+.battle-mon.fainted{opacity:.35;filter:grayscale(1);}
+.battle-mon.acting{border-color:#fff;box-shadow:0 0 18px rgba(255,255,255,.4);}
+.bm-top{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
+.bm-emoji{font-size:26px;}
+.bm-name{font-weight:700;font-size:14px;flex:1;}
+.bm-lvl{font-size:10px;color:var(--dim);}
+.hp-bar{height:9px;background:#0a0e18;border-radius:6px;overflow:hidden;margin-top:4px;}
+.hp-fill{height:100%;border-radius:6px;transition:width .5s,background .3s;}
+.hp-text{font-size:10px;color:var(--dim);margin-top:3px;font-variant-numeric:tabular-nums;}
+.status-chip{font-size:9px;font-weight:700;padding:1px 6px;border-radius:8px;text-transform:uppercase;}
+.st-brn{background:#ff5a3f;color:#fff;}.st-par{background:#ffce4a;color:#1a1a1a;}.st-slp{background:#9c7bff;color:#fff;}
+.protect-ring{position:absolute;inset:-2px;border:2px solid var(--tech);border-radius:14px;opacity:.6;animation:pulse 1s infinite;}
+@keyframes pulse{50%{opacity:.2;}}
+
+.log{background:#0a0e18;border:1px solid var(--border);border-radius:12px;padding:14px 16px;height:90px;overflow-y:auto;font-size:13px;line-height:1.6;margin-bottom:14px;}
+.log .turn-sep{color:var(--accent);font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:1px;margin-top:6px;}
+.log .eff{color:var(--hp-good);}.log .noteff{color:var(--dim);}.log .crit{color:var(--hp-low);font-weight:700;}
+
+.controls{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:14px;}
+.ctrl-prompt{font-size:13px;color:var(--dim);margin-bottom:10px;}
+.ctrl-prompt b{color:var(--text);}
+.move-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.move-btn{background:var(--panel2);border:2px solid var(--border);border-radius:11px;padding:11px 12px;cursor:pointer;text-align:left;transition:all .12s;}
+.move-btn:hover{border-color:var(--accent);}
+.move-btn:disabled{opacity:.4;cursor:not-allowed;}
+.move-name{font-weight:700;font-size:13px;display:flex;justify-content:space-between;align-items:center;}
+.move-meta{font-size:10px;color:var(--dim);margin-top:3px;display:flex;gap:8px;}
+.move-cat{font-size:9px;padding:1px 6px;border-radius:7px;font-weight:700;text-transform:uppercase;}
+.cat-phys{background:#e0762a;color:#fff;}.cat-spec{background:#4a8fe0;color:#fff;}.cat-status{background:#8a96b0;color:#fff;}
+.switch-row{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;}
+.switch-btn{background:var(--panel2);border:1.5px solid var(--border);border-radius:10px;padding:8px 12px;cursor:pointer;font-size:12px;font-weight:600;display:flex;align-items:center;gap:6px;transition:all .12s;}
+.switch-btn:hover:not(:disabled){border-color:var(--admin);}
+.switch-btn:disabled{opacity:.35;cursor:not-allowed;}
+.back-link{background:none;border:none;color:var(--dim);font-family:'Outfit';font-weight:600;font-size:14px;cursor:pointer;padding:6px 0;}
+.back-link:hover{color:var(--accent);}
+
+.result-overlay{position:fixed;inset:0;background:rgba(8,12,20,.9);display:none;align-items:center;justify-content:center;z-index:100;}
+.result-overlay.show{display:flex;}
+.result-box{text-align:center;}
+.result-box h2{font-family:'Bebas Neue';font-size:64px;letter-spacing:2px;}
+.result-box.win h2{color:var(--accent);}.result-box.lose h2{color:var(--hp-low);}
+
+.teampick-bar{display:flex;gap:8px;align-items:center;margin-top:14px;flex-wrap:wrap;}
+.footer-note{text-align:center;color:var(--dim);font-size:12px;margin-top:28px;line-height:1.6;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- MENU / TEAM PREVIEW -->
+  <div class="screen active" id="screen-menu">
+    <div class="hero"><h1>OFFICE SHOWDOWN</h1><p>VGC-style doubles battles. Pick 4, bring 2 out at a time.</p></div>
+    <div class="section-label">Choose your team — tap 4 creatures</div>
+    <div class="mon-grid" id="rosterGrid"></div>
+    <div class="teampick-bar">
+      <button class="btn btn-primary" id="startBtn" disabled onclick="startBattle()">Start battle</button>
+      <span id="pickStatus" style="color:var(--dim);font-size:13px;"></span>
+    </div>
+    <div class="footer-note">Type chart: ☕ Caffeine › 📝 Paper › 🖥️ Tech › ☕ Caffeine · 📅 Chaos ⇄ 📎 Admin<br>Part of Nexits · take a real break too 🌿</div>
+  </div>
+
+  <!-- BATTLE -->
+  <div class="screen" id="screen-battle">
+    <button class="back-link" onclick="quitBattle()">← Forfeit</button>
+    <div class="battlefield">
+      <div class="field-side enemy">
+        <div class="side-label">Opponent</div>
+        <div class="active-row" id="enemyActive"></div>
+      </div>
+      <div class="field-side">
+        <div class="side-label">Your team</div>
+        <div class="active-row" id="playerActive"></div>
+      </div>
+    </div>
+    <div class="log" id="battleLog"></div>
+    <div class="controls" id="battleControls"></div>
+  </div>
+
+  <div class="result-overlay" id="resultOverlay">
+    <div class="result-box" id="resultBox">
+      <h2 id="resultText">—</h2>
+      <button class="btn btn-primary" style="margin-top:20px;" onclick="backToMenu()">Play again</button>
+    </div>
+  </div>
+
+</div>
+<script>
+// ═══════════════ TYPE CHART ═══════════════
+// Caffeine > Paper > Tech > Caffeine ; Chaos <-> Admin counter each other
+const TYPES=['caffeine','paper','tech','chaos','admin'];
+const CHART={
+  caffeine:{paper:2,   tech:0.5, caffeine:1, chaos:1,   admin:1},
+  paper:   {tech:2,    caffeine:0.5,paper:1, chaos:1,   admin:0.5},
+  tech:    {caffeine:2,paper:0.5, tech:1,   chaos:1,   admin:1},
+  chaos:   {admin:2,   chaos:0.5, caffeine:1,paper:1,  tech:1},
+  admin:   {chaos:2,   admin:0.5, caffeine:1,paper:1,  tech:1},
+};
+function typeMult(atk,defTypes){let m=1;defTypes.forEach(t=>{m*=(CHART[atk]&&CHART[atk][t]!=null)?CHART[atk][t]:1;});return m;}
+
+// ═══════════════ MOVES ═══════════════
+// cat: phys|spec|status ; target: enemy|all-enemies|self|ally
+const MOVES={
+  // damaging
+  espresso_shot:{name:'Espresso Shot',type:'caffeine',cat:'spec',power:80,acc:100,target:'enemy',desc:'Reliable jolt.'},
+  double_shot:{name:'Double Shot',type:'caffeine',cat:'spec',power:55,acc:100,target:'all-enemies',desc:'Hits both foes.'},
+  paper_cut:{name:'Paper Cut',type:'paper',cat:'phys',power:75,acc:100,target:'enemy',desc:'Sharp edge.'},
+  ream_slam:{name:'Ream Slam',type:'paper',cat:'phys',power:95,acc:90,target:'enemy',desc:'Heavy stack.'},
+  data_breach:{name:'Data Breach',type:'tech',cat:'spec',power:85,acc:100,target:'enemy',desc:'Leaks damage.'},
+  ctrl_alt_del:{name:'Ctrl-Alt-Del',type:'tech',cat:'spec',power:60,acc:100,target:'all-enemies',desc:'Force-quits both.'},
+  scope_creep:{name:'Scope Creep',type:'chaos',cat:'phys',power:80,acc:95,target:'enemy',desc:'Never-ending.'},
+  meltdown:{name:'Meltdown',type:'chaos',cat:'spec',power:110,acc:85,target:'enemy',desc:'High risk hit.'},
+  policy_slap:{name:'Policy Slap',type:'admin',cat:'phys',power:75,acc:100,target:'enemy',desc:'By the book.'},
+  audit:{name:'Audit',type:'admin',cat:'spec',power:70,acc:100,target:'enemy',desc:'Thorough.'},
+  // status
+  caffeine_crash:{name:'Caffeine Crash',type:'caffeine',cat:'status',acc:100,target:'enemy',status:'par',desc:'Paralyzes foe.'},
+  red_tape:{name:'Red Tape',type:'admin',cat:'status',acc:100,target:'enemy',status:'par',desc:'Tangles foe (paralyze).'},
+  burnout:{name:'Burnout',type:'chaos',cat:'status',acc:90,target:'enemy',status:'brn',desc:'Burns foe.'},
+  coffee_break:{name:'Coffee Break',type:'caffeine',cat:'status',target:'self',heal:0.5,desc:'Heal 50% HP.'},
+  protect:{name:'Protect',type:'admin',cat:'status',target:'self',protect:true,desc:'Blocks attacks this turn.'},
+  overtime:{name:'Overtime',type:'admin',cat:'status',target:'self',boost:{atk:1,spa:1},desc:'+Atk +SpA.'},
+};
+
+// ═══════════════ CREATURES ═══════════════
+const DEX={
+  caffeed:{name:'Caffeed',emoji:'☕',types:['caffeine'],
+    stats:{hp:120,atk:70,def:65,spa:115,spd:60,spe:120},
+    moves:['espresso_shot','double_shot','caffeine_crash','coffee_break']},
+  spreadsheex:{name:'Spreadsheex',emoji:'📊',types:['tech'],
+    stats:{hp:155,atk:60,def:110,spa:95,spd:115,spe:55},
+    moves:['data_breach','ctrl_alt_del','audit','protect']},
+  deadliplor:{name:'Deadliplor',emoji:'📅',types:['chaos'],
+    stats:{hp:125,atk:120,def:70,spa:90,spd:70,spe:100},
+    moves:['scope_creep','meltdown','burnout','overtime']},
+  printerror:{name:'Printerror',emoji:'🖨️',types:['tech'],
+    stats:{hp:170,atk:95,def:120,spa:70,spd:95,spe:45},
+    moves:['data_breach','policy_slap','protect','ctrl_alt_del']},
+  memoth:{name:'Memoth',emoji:'📝',types:['paper'],
+    stats:{hp:140,atk:75,def:90,spa:100,spd:100,spe:80},
+    moves:['paper_cut','audit','red_tape','coffee_break']},
+  staplor:{name:'Staplor',emoji:'📎',types:['paper','admin'],
+    stats:{hp:135,atk:125,def:95,spa:55,spd:80,spe:90},
+    moves:['ream_slam','policy_slap','paper_cut','overtime']},
+};
+
+// ═══════════════ TEAM SELECTION ═══════════════
+let picked=[];
+function renderRoster(){
+  const g=document.getElementById('rosterGrid');g.innerHTML='';
+  Object.entries(DEX).forEach(([id,m])=>{
+    const idx=picked.indexOf(id);
+    const card=document.createElement('div');
+    card.className='mon-card'+(idx>=0?' picked':'');
+    card.onclick=()=>togglePick(id);
+    card.innerHTML=(idx>=0?'<div class="pick-num">'+(idx+1)+'</div>':'')+
+      '<div class="mon-emoji">'+m.emoji+'</div>'+
+      '<div class="mon-name">'+m.name+'</div>'+
+      '<div class="mon-types">'+m.types.map(t=>'<span class="type-badge t-'+t+'">'+t+'</span>').join('')+'</div>'+
+      '<div class="mon-stats"><span>HP '+m.stats.hp+'</span><span>SPE '+m.stats.spe+'</span><span>ATK '+m.stats.atk+'</span><span>DEF '+m.stats.def+'</span><span>SPA '+m.stats.spa+'</span><span>SPD '+m.stats.spd+'</span></div>';
+    g.appendChild(card);
+  });
+  document.getElementById('startBtn').disabled=picked.length!==4;
+  document.getElementById('pickStatus').textContent=picked.length+'/4 selected';
+}
+function togglePick(id){
+  const i=picked.indexOf(id);
+  if(i>=0)picked.splice(i,1);
+  else if(picked.length<4)picked.push(id);
+  renderRoster();
+}
+
+// ═══════════════ BATTLE STATE ═══════════════
+let battle=null;
+function makeMon(id){
+  const d=DEX[id];
+  return {id:id,name:d.name,emoji:d.emoji,types:d.types,stats:{...d.stats},
+    maxhp:d.stats.hp,hp:d.stats.hp,moves:d.moves.slice(),
+    status:null,boosts:{atk:0,spa:0,def:0,spd:0},protect:false,fainted:false};
+}
+function startBattle(){
+  // player team = picked; enemy team = random 4
+  const allIds=Object.keys(DEX);
+  const enemyIds=allIds.slice().sort(()=>Math.random()-.5).slice(0,4);
+  battle={
+    player:{team:picked.map(makeMon),active:[0,1]},
+    enemy:{team:enemyIds.map(makeMon),active:[0,1]},
+    turn:0,phase:'select',pending:[],log:[]
+  };
+  document.getElementById('screen-menu').classList.remove('active');
+  document.getElementById('screen-battle').classList.add('active');
+  logLine('<span class="turn-sep">Battle start!</span>');
+  renderBattle();
+  promptPlayerAction();
+}
+function quitBattle(){ if(confirm('Forfeit this battle?')) backToMenu(); }
+function backToMenu(){
+  document.getElementById('resultOverlay').classList.remove('show');
+  document.getElementById('screen-battle').classList.remove('active');
+  document.getElementById('screen-menu').classList.add('active');
+  battle=null;
+}
+
+// ── helpers ──
+function side(s){return battle[s];}
+function activeMons(s){return battle[s].active.map(i=>battle[s].team[i]).filter(m=>m&&!m.fainted);}
+function allActive(s){return battle[s].active.map(i=>battle[s].team[i]);}
+function logLine(html){battle.log.push(html);const el=document.getElementById('battleLog');el.innerHTML=battle.log.slice(-30).join('<br>');el.scrollTop=el.scrollHeight;}
+function hpColor(frac){return frac>0.5?'var(--hp-good)':frac>0.22?'var(--hp-mid)':'var(--hp-low)';}
+
+// ═══════════════ RENDER ═══════════════
+function renderBattle(){
+  renderSide('enemy','enemyActive');
+  renderSide('player','playerActive');
+}
+function renderSide(s,elId){
+  const el=document.getElementById(elId);el.innerHTML='';
+  battle[s].active.forEach((teamIdx,slot)=>{
+    const m=battle[s].team[teamIdx];
+    const div=document.createElement('div');
+    div.className='battle-mon'+(m&&m.fainted?' fainted':'');
+    div.dataset.side=s;div.dataset.slot=slot;
+    if(!m){div.style.visibility='hidden';el.appendChild(div);return;}
+    const frac=m.hp/m.maxhp;
+    div.innerHTML=
+      (m.protect?'<div class="protect-ring"></div>':'')+
+      '<div class="bm-top"><span class="bm-emoji">'+m.emoji+'</span><span class="bm-name">'+m.name+'</span>'+
+      (m.status?'<span class="status-chip st-'+m.status+'">'+m.status+'</span>':'')+'</div>'+
+      '<div class="hp-bar"><div class="hp-fill" style="width:'+(frac*100)+'%;background:'+hpColor(frac)+';"></div></div>'+
+      '<div class="hp-text">'+Math.max(0,Math.ceil(m.hp))+' / '+m.maxhp+'</div>';
+    el.appendChild(div);
+  });
+}
+
+// ═══════════════ PLAYER ACTION SELECTION ═══════════════
+let selecting={slot:0,actions:[]};
+function promptPlayerAction(){
+  selecting={slot:0,actions:[]};
+  askMoveForSlot(0);
+}
+function askMoveForSlot(slot){
+  const teamIdx=battle.player.active[slot];
+  const m=battle.player.team[teamIdx];
+  // skip fainted/empty active slots
+  if(!m||m.fainted){
+    if(slot===0){selecting.actions[0]=null;askMoveForSlot(1);return;}
+    else{selecting.actions[1]=null;submitPlayerActions();return;}
+  }
+  const c=document.getElementById('battleControls');
+  let html='<div class="ctrl-prompt">Choose a move for <b>'+m.emoji+' '+m.name+'</b> ('+(slot+1)+' of 2)</div>';
+  html+='<div class="move-grid">';
+  m.moves.forEach(mvId=>{
+    const mv=MOVES[mvId];
+    const cat=mv.cat==='phys'?'cat-phys':mv.cat==='spec'?'cat-spec':'cat-status';
+    html+='<button class="move-btn" onclick="chooseMove('+slot+',\''+mvId+'\')">'+
+      '<div class="move-name">'+mv.name+' <span class="move-cat '+cat+'">'+mv.cat+'</span></div>'+
+      '<div class="move-meta"><span class="type-badge t-'+mv.type+'">'+mv.type+'</span>'+(mv.power?'<span>PWR '+mv.power+'</span>':'')+(mv.acc?'<span>'+mv.acc+'%</span>':'')+'</div>'+
+      '</button>';
+  });
+  html+='</div>';
+  // switch options
+  const bench=battle.player.team.map((mm,i)=>({mm,i})).filter(x=>!x.mm.fainted&&!battle.player.active.includes(x.i));
+  if(bench.length){
+    html+='<div class="switch-row">';
+    bench.forEach(x=>{html+='<button class="switch-btn" onclick="chooseSwitch('+slot+','+x.i+')">↻ '+x.mm.emoji+' '+x.mm.name+'</button>';});
+    html+='</div>';
+  }
+  c.innerHTML=html;
+}
+let pendingMove=null;
+function chooseMove(slot,mvId){
+  const mv=MOVES[mvId];
+  // need a target?
+  if(mv.target==='enemy'){
+    pendingMove={slot,mvId};
+    promptTarget(slot,mvId);
+  }else{
+    selecting.actions[slot]={type:'move',mvId,target:null};
+    nextSlotOrSubmit(slot);
+  }
+}
+function promptTarget(slot,mvId){
+  const enemies=allActive('enemy').map((m,i)=>({m,i})).filter(x=>x.m&&!x.m.fainted);
+  if(enemies.length<=1){
+    selecting.actions[slot]={type:'move',mvId,target:enemies.length?enemies[0].i:0};
+    nextSlotOrSubmit(slot);return;
+  }
+  const c=document.getElementById('battleControls');
+  c.innerHTML='<div class="ctrl-prompt">Choose a target for <b>'+MOVES[mvId].name+'</b></div>';
+  // highlight enemy mons as targetable
+  document.querySelectorAll('#enemyActive .battle-mon').forEach(el=>{
+    const sl=parseInt(el.dataset.slot);const tIdx=battle.enemy.active[sl];const tm=battle.enemy.team[tIdx];
+    if(tm&&!tm.fainted){el.classList.add('targetable');el.onclick=()=>{selecting.actions[slot]={type:'move',mvId,target:sl};clearTargetable();nextSlotOrSubmit(slot);};}
+  });
+}
+function clearTargetable(){document.querySelectorAll('.battle-mon.targetable').forEach(el=>{el.classList.remove('targetable');el.onclick=null;});}
+function chooseSwitch(slot,benchIdx){selecting.actions[slot]={type:'switch',benchIdx};nextSlotOrSubmit(slot);}
+function nextSlotOrSubmit(slot){
+  if(slot===0&&activeMons('player').length>1){askMoveForSlot(1);}
+  else if(slot===0){selecting.actions[1]=null;submitPlayerActions();}
+  else submitPlayerActions();
+}
+function submitPlayerActions(){
+  document.getElementById('battleControls').innerHTML='<div class="ctrl-prompt">Resolving turn…</div>';
+  const enemyActions=chooseEnemyActions();
+  resolveTurn(selecting.actions,enemyActions);
+}
+
+// ═══════════════ ENEMY AI ═══════════════
+function chooseEnemyActions(){
+  const actions=[null,null];
+  battle.enemy.active.forEach((teamIdx,slot)=>{
+    const m=battle.enemy.team[teamIdx];
+    if(!m||m.fainted)return;
+    const foes=allActive('player').map((mm,i)=>({mm,i})).filter(x=>x.mm&&!x.mm.fainted);
+    if(!foes.length)return;
+    // score each damaging move vs each foe, pick best; sometimes status
+    let best={score:-1};
+    m.moves.forEach(mvId=>{
+      const mv=MOVES[mvId];
+      if(mv.cat==='status'){
+        // small chance to use status/heal if useful
+        let s=0;
+        if(mv.heal&&m.hp/m.maxhp<0.5)s=60;
+        else if(mv.protect)s=15+Math.random()*15;
+        else if(mv.status)s=30+Math.random()*20;
+        else if(mv.boost)s=25;
+        if(s>best.score)best={score:s,mvId,target:foes[0].i};
+      }else{
+        foes.forEach(f=>{
+          const eff=typeMult(mv.type,f.mm.types);
+          const s=(mv.power||0)*eff*(0.85+Math.random()*0.3);
+          if(s>best.score)best={score:s,mvId,target:f.i};
+        });
+      }
+    });
+    actions[slot]={type:'move',mvId:best.mvId,target:best.target};
+  });
+  return actions;
+}
+
+// ═══════════════ TURN RESOLUTION ═══════════════
+function statOf(m,key){
+  let v=m.stats[key];
+  const b=m.boosts[key]||0;
+  v=Math.floor(v*(b>=0?(2+b)/2:2/(2-b)));
+  if(key==='spe'&&m.status==='par')v=Math.floor(v*0.5);
+  return v;
+}
+function resolveTurn(pActions,eActions){
+  battle.turn++;
+  logLine('<span class="turn-sep">Turn '+battle.turn+'</span>');
+  // clear protect
+  [...battle.player.team,...battle.enemy.team].forEach(m=>m.protect=false);
+  // build action list with side+slot
+  let queue=[];
+  pActions.forEach((a,slot)=>{if(a)queue.push({side:'player',slot,...a});});
+  eActions.forEach((a,slot)=>{if(a)queue.push({side:'enemy',slot,...a});});
+  // switches first
+  queue.filter(a=>a.type==='switch').forEach(doSwitch);
+  // then moves, ordered by speed (protect resolves on the acting mon at execution)
+  let moves=queue.filter(a=>a.type==='move');
+  moves.forEach(a=>{const m=battle[a.side].team[battle[a.side].active[a.slot]];a._spe=m?statOf(m,'spe'):0;});
+  moves.sort((x,y)=>y._spe-x._spe||Math.random()-0.5);
+  // execute
+  for(const a of moves){ executeMove(a); if(checkEnd())return; }
+  renderBattle();
+  // faint replacement + next turn
+  if(checkEnd())return;
+  handleFaintsThenContinue();
+}
+function doSwitch(a){
+  const s=battle[a.side];
+  const old=s.team[s.active[a.slot]];
+  s.active[a.slot]=a.benchIdx;
+  const nu=s.team[a.benchIdx];
+  logLine((a.side==='player'?'You':'Opponent')+' sent out '+nu.emoji+' '+nu.name+'.');
+}
+function executeMove(a){
+  const s=battle[a.side];
+  const m=s.team[s.active[a.slot]];
+  if(!m||m.fainted)return;
+  const mv=MOVES[a.mvId];
+  // paralysis full-skip chance
+  if(m.status==='par'&&Math.random()<0.25){logLine(m.emoji+' '+m.name+' is paralyzed and can\'t move!');return;}
+  logLine('<b>'+m.emoji+' '+m.name+'</b> used <b>'+mv.name+'</b>!');
+  // status / self moves
+  if(mv.cat==='status'){
+    if(mv.protect){m.protect=true;logLine(m.name+' braces — Protect!');return;}
+    if(mv.heal){const h=Math.floor(m.maxhp*mv.heal);m.hp=Math.min(m.maxhp,m.hp+h);logLine(m.name+' recovered HP.');renderBattle();return;}
+    if(mv.boost){Object.entries(mv.boost).forEach(([k,v])=>{m.boosts[k]=Math.min(6,(m.boosts[k]||0)+v);});logLine(m.name+'\'s stats rose!');return;}
+    if(mv.status){
+      const foeSide=a.side==='player'?'enemy':'player';
+      const tIdx=battle[foeSide].active[a.target!=null?a.target:0];
+      const t=battle[foeSide].team[tIdx];
+      if(!t||t.fainted){logLine('But there was no target.');return;}
+      if(t.protect){logLine(t.name+' protected itself!');return;}
+      if(Math.random()*100>(mv.acc||100)){logLine('It missed!');return;}
+      if(t.status){logLine(t.name+' already has a status.');return;}
+      t.status=mv.status;logLine(t.name+' was '+(mv.status==='brn'?'burned':mv.status==='par'?'paralyzed':'afflicted')+'!');renderBattle();return;
+    }
+    return;
+  }
+  // damaging — gather targets
+  const foeSide=a.side==='player'?'enemy':'player';
+  let targets=[];
+  if(mv.target==='all-enemies'){targets=allActive(foeSide).map((mm,i)=>i).filter(i=>{const t=battle[foeSide].team[battle[foeSide].active[i]];return t&&!t.fainted;});}
+  else{targets=[a.target!=null?a.target:0];}
+  targets.forEach(slot=>{
+    const tIdx=battle[foeSide].active[slot];const t=battle[foeSide].team[tIdx];
+    if(!t||t.fainted)return;
+    if(Math.random()*100>(mv.acc||100)){logLine('It missed '+t.name+'!');return;}
+    if(t.protect){logLine(t.name+' protected itself!');return;}
+    const dmg=calcDamage(m,t,mv,targets.length>1);
+    t.hp-=dmg.amount;
+    let msg='';
+    if(dmg.eff>1)msg=' <span class="eff">Super effective!</span>';
+    else if(dmg.eff<1&&dmg.eff>0)msg=' <span class="noteff">Not very effective…</span>';
+    else if(dmg.eff===0)msg=' <span class="noteff">No effect.</span>';
+    if(dmg.crit)msg=' <span class="crit">Critical hit!</span>'+msg;
+    logLine('→ '+t.name+' took '+dmg.amount+' damage.'+msg);
+    if(t.hp<=0){t.hp=0;t.fainted=true;logLine('<b>'+t.name+' fainted!</b>');}
+  });
+  // burn chip on attacker
+  renderBattle();
+}
+function calcDamage(atk,def,mv,spread){
+  const eff=typeMult(mv.type,def.types);
+  if(eff===0)return{amount:0,eff:0,crit:false};
+  const isPhys=mv.cat==='phys';
+  const A=statOf(atk,isPhys?'atk':'spa');
+  const D=statOf(def,isPhys?'def':'spd');
+  const stab=atk.types.includes(mv.type)?1.5:1;
+  const crit=Math.random()<0.0625;
+  const critMult=crit?1.5:1;
+  const rand=0.85+Math.random()*0.15;
+  const spreadMult=spread?0.75:1;
+  let burnMult=(isPhys&&atk.status==='brn')?0.5:1;
+  const base=(((2*50/5+2)*mv.power*A/D)/50)+2;
+  const amount=Math.max(1,Math.floor(base*stab*eff*critMult*rand*spreadMult*burnMult));
+  return{amount,eff,crit};
+}
+
+// ═══════════════ FAINTS / END ═══════════════
+function handleFaintsThenContinue(){
+  // end-of-turn burn damage
+  ['player','enemy'].forEach(s=>{
+    allActive(s).forEach(m=>{
+      if(m&&!m.fainted&&m.status==='brn'){const d=Math.floor(m.maxhp/16);m.hp-=d;logLine(m.emoji+' '+m.name+' is hurt by its burn ('+d+').');if(m.hp<=0){m.hp=0;m.fainted=true;logLine('<b>'+m.name+' fainted!</b>');}}
+    });
+  });
+  renderBattle();
+  if(checkEnd())return;
+  // auto-send replacements for fainted active slots
+  ['player','enemy'].forEach(s=>{
+    battle[s].active.forEach((teamIdx,slot)=>{
+      const m=battle[s].team[teamIdx];
+      if(m&&m.fainted){
+        const bench=battle[s].team.map((mm,i)=>({mm,i})).filter(x=>!x.mm.fainted&&!battle[s].active.includes(x.i));
+        if(bench.length){battle[s].active[slot]=bench[0].i;logLine((s==='player'?'You':'Opponent')+' sent out '+bench[0].mm.emoji+' '+bench[0].mm.name+'!');}
+      }
+    });
+  });
+  renderBattle();
+  if(checkEnd())return;
+  promptPlayerAction();
+}
+function teamAlive(s){return battle[s].team.some(m=>!m.fainted);}
+function checkEnd(){
+  if(!battle)return true;
+  if(!teamAlive('enemy')){endBattle(true);return true;}
+  if(!teamAlive('player')){endBattle(false);return true;}
+  return false;
+}
+function endBattle(win){
+  const ov=document.getElementById('resultOverlay');
+  const box=document.getElementById('resultBox');
+  box.className='result-box '+(win?'win':'lose');
+  document.getElementById('resultText').textContent=win?'YOU WIN! 🎉':'DEFEATED';
+  if(win){try{let w=parseInt(localStorage.getItem('showdown_wins'))||0;localStorage.setItem('showdown_wins',w+1);}catch(e){}}
+  ov.classList.add('show');
+}
+
+renderRoster();
+</script>
+</body>
+</html>
