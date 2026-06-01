@@ -106,6 +106,8 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent);}
   .topnav,.no-print{display:none!important;}
 }
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body>
 <!-- NEXUS TOKEN GATE — app only opens when launched from Nexus -->
@@ -185,7 +187,7 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent);}
         <div class="total-box"><span class="lbl">Total Paid</span><span class="amt" id="f-total">$0</span></div>
         <div class="actions">
           <button class="btn btn-primary" onclick="saveReceipt()">Save &amp; Finish</button>
-          <button class="btn btn-ghost" onclick="window.print()">Print / PDF</button>
+          <button class="btn btn-ghost" onclick="downloadPDF()">⬇ Save as PDF</button>
           <button class="btn btn-ghost" onclick="resetForm()">Clear</button>
         </div>
       </div>
@@ -312,6 +314,38 @@ function renderReceipt(){
   if(n===0)rows.innerHTML='<tr><td colspan="4" style="text-align:center;color:#9aa6b3;padding:20px;">No items yet</td></tr>';
   document.getElementById('r-total').textContent=money(total);
   document.getElementById('f-total').textContent=money(total);
+}
+
+async function downloadPDF(){
+  const name=document.getElementById('f-name').value.trim();
+  if(!name){toast('Enter a student name first');return;}
+  const receipt=document.getElementById('receiptPrint');
+  if(!window.html2canvas||!window.jspdf){toast('PDF tools still loading — try again');return;}
+  toast('Generating PDF…');
+  // temporarily flatten the receipt for a clean capture
+  const prev={br:receipt.style.borderRadius,bs:receipt.style.boxShadow,bd:receipt.style.border};
+  receipt.style.borderRadius='0';receipt.style.boxShadow='none';receipt.style.border='none';
+  try{
+    const canvas=await html2canvas(receipt,{scale:3,backgroundColor:'#ffffff',useCORS:true,logging:false});
+    receipt.style.borderRadius=prev.br;receipt.style.boxShadow=prev.bs;receipt.style.border=prev.bd;
+    const img=canvas.toDataURL('image/png');
+    const {jsPDF}=window.jspdf;
+    const pdf=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+    const pageW=210, pageH=297, margin=12;
+    const usableW=pageW-margin*2;
+    // scale image to fit width, keep aspect
+    const imgH=canvas.height*usableW/canvas.width;
+    const y=margin;
+    pdf.addImage(img,'PNG',margin,y,usableW,imgH,undefined,'FAST');
+    const num=document.getElementById('r-num').textContent.replace(/[^0-9]/g,'')||'receipt';
+    const safeName=name.replace(/[^a-z0-9]+/gi,'_').replace(/^_+|_+$/g,'');
+    pdf.save('Receipt_'+num+'_'+safeName+'.pdf');
+    toast('PDF saved');
+  }catch(e){
+    receipt.style.borderRadius=prev.br;receipt.style.boxShadow=prev.bs;receipt.style.border=prev.bd;
+    console.warn('PDF error',e);
+    toast('Could not generate PDF');
+  }
 }
 
 function saveReceipt(){
