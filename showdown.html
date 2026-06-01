@@ -194,6 +194,7 @@ body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);min-
 .fx-admin .stamp{position:absolute;top:30%;left:30%;width:46px;height:46px;border:5px solid #3fc98f;border-radius:8px;color:#3fc98f;font-weight:800;font-size:11px;display:flex;align-items:center;justify-content:center;animation:stampHit .5s cubic-bezier(.2,2,.4,1) forwards;}
 @keyframes stampHit{from{transform:scale(2.5);opacity:0;}50%{transform:scale(1);opacity:1;}100%{transform:scale(1);opacity:0;}}
 </style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 </head>
 <body>
 <div class="wrap">
@@ -204,10 +205,28 @@ body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);min-
     <div class="section-label">Choose your team — tap 4 creatures</div>
     <div class="mon-grid" id="rosterGrid"></div>
     <div class="teampick-bar">
-      <button class="btn btn-primary" id="startBtn" disabled onclick="startBattle()">Start battle</button>
+      <button class="btn btn-primary" id="startBtn" disabled onclick="startBattle()">⚔ Solo vs CPU</button>
+      <button class="btn btn-ghost" id="pvpBtn" disabled onclick="openLobby()">👥 Battle a coworker</button>
       <span id="pickStatus" style="color:var(--dim);font-size:13px;"></span>
     </div>
     <div class="footer-note">Type chart: ☕ Caffeine › 📝 Paper › 🖥️ Tech › ☕ Caffeine · 📅 Chaos ⇄ 📎 Admin<br>Part of Nexits · take a real break too 🌿</div>
+  </div>
+
+  <!-- LOBBY (PvP) -->
+  <div class="screen" id="screen-lobby">
+    <div class="hero" style="padding-bottom:10px;"><h1 style="font-size:clamp(28px,6vw,44px);">PvP LOBBY</h1></div>
+    <div style="text-align:center;margin-bottom:14px;">
+      <label style="font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px;">Your name</label><br>
+      <input id="pvpName" placeholder="First name" style="margin-top:6px;background:var(--panel);border:1.5px solid var(--border);color:var(--text);border-radius:10px;padding:10px 14px;font-size:15px;text-align:center;width:200px;">
+    </div>
+    <div style="display:flex;gap:10px;justify-content:center;margin-bottom:20px;flex-wrap:wrap;">
+      <button class="btn btn-primary" onclick="createBattle()">+ Create challenge</button>
+      <button class="btn btn-ghost" onclick="refreshLobby()">↻ Refresh</button>
+      <button class="btn btn-ghost" onclick="leaveLobby()">← Back</button>
+    </div>
+    <div class="section-label" style="text-align:center;">Open challenges</div>
+    <div id="lobbyList" style="max-width:480px;margin:0 auto;"></div>
+    <div id="lobbyStatus" style="text-align:center;color:var(--dim);font-size:13px;margin-top:14px;"></div>
   </div>
 
   <!-- BATTLE -->
@@ -300,7 +319,188 @@ const DEX={
 
 // ═══════════════ TEAM SELECTION ═══════════════
 let picked=[];
-function renderRoster(){
+// ═══════════════════════════════════════════════════════════
+// PvP — real-time battles over Supabase Realtime (host = referee)
+// ═══════════════════════════════════════════════════════════
+const PVP_SB_URL='https://jcfgldqrdbfkgbixszds.supabase.co';
+const PVP_SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpjZmdsZHFyZGJma2diaXhzemRzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1Nzc3NzEsImV4cCI6MjA5MDE1Mzc3MX0.Wj8cCpnlsoZOPj5sKWeEdfvgjG4Nc-UuTTYgbcrPfeI';
+let sb=null;
+function sbClient(){ if(!sb&&window.supabase){sb=window.supabase.createClient(PVP_SB_URL,PVP_SB_KEY);} return sb; }
+let pvp=null; // {id, role:'host'|'guest', name, channel}
+
+function openLobby(){
+  if(picked.length!==4){toast('Pick 4 first');return;}
+  if(!sbClient()){alert('Could not connect to the battle server. Check your connection.');return;}
+  document.getElementById('screen-menu').classList.remove('active');
+  document.getElementById('screen-lobby').classList.add('active');
+  // prefill name from token if available
+  try{const t=new URLSearchParams(location.hash.replace('#','')).get('t');}catch(e){}
+  refreshLobby();
+}
+function leaveLobby(){
+  cleanupPvp();
+  document.getElementById('screen-lobby').classList.remove('active');
+  document.getElementById('screen-menu').classList.add('active');
+}
+function firstName(){
+  let n=(document.getElementById('pvpName').value||'').trim();
+  if(!n){n='Player'+Math.floor(Math.random()*900+100);}
+  return n.split(/\s+/)[0]; // first name only
+}
+async function refreshLobby(){
+  const c=sbClient();if(!c)return;
+  const list=document.getElementById('lobbyList');
+  list.innerHTML='<div style="text-align:center;color:var(--dim);padding:20px;">Loading…</div>';
+  const {data,error}=await c.from('showdown_battles').select('id,host_name,created_at').eq('status','open').order('created_at',{ascending:false}).limit(20);
+  if(error){list.innerHTML='<div style="text-align:center;color:var(--hp-low);padding:20px;">Could not load lobby</div>';return;}
+  if(!data||!data.length){list.innerHTML='<div style="text-align:center;color:var(--dim);padding:20px;">No open challenges. Create one!</div>';return;}
+  list.innerHTML='';
+  data.forEach(b=>{
+    const row=document.createElement('div');
+    row.style.cssText='display:flex;justify-content:space-between;align-items:center;background:var(--panel);border:1.5px solid var(--border);border-radius:11px;padding:12px 16px;margin-bottom:9px;';
+    row.innerHTML='<span style="font-weight:700;">⚔ '+b.host_name+'\'s challenge</span>';
+    const btn=document.createElement('button');btn.className='btn btn-primary';btn.style.cssText='padding:8px 18px;font-size:13px;';btn.textContent='Join';
+    btn.onclick=()=>joinBattle(b.id);
+    row.appendChild(btn);
+    list.appendChild(row);
+  });
+}
+async function createBattle(){
+  const c=sbClient();if(!c)return;
+  const name=firstName();
+  const seed=Math.floor(Math.random()*1e9);
+  const {data,error}=await c.from('showdown_battles').insert({host_name:name,host_team:picked,seed:seed,status:'open',turn:0}).select().single();
+  if(error){toast('Could not create challenge');console.warn(error);return;}
+  pvp={id:data.id,role:'host',name:name,seed:seed};
+  document.getElementById('lobbyStatus').textContent='Waiting for an opponent to join…';
+  subscribeBattle(data.id);
+}
+async function joinBattle(id){
+  const c=sbClient();if(!c)return;
+  const name=firstName();
+  // fetch the battle
+  const {data:b}=await c.from('showdown_battles').select('*').eq('id',id).single();
+  if(!b||b.status!=='open'){toast('That challenge is no longer open');refreshLobby();return;}
+  pvp={id:id,role:'guest',name:name,seed:b.seed};
+  await c.from('showdown_battles').update({guest_name:name,guest_team:picked,status:'active'}).eq('id',id);
+  document.getElementById('lobbyStatus').textContent='Joining…';
+  subscribeBattle(id);
+}
+function subscribeBattle(id){
+  const c=sbClient();
+  pvp.channel=c.channel('battle-'+id)
+    .on('postgres_changes',{event:'UPDATE',schema:'public',table:'showdown_battles',filter:'id=eq.'+id},payload=>{
+      onBattleUpdate(payload.new);
+    })
+    .subscribe();
+}
+async function onBattleUpdate(b){
+  if(!pvp)return;
+  // both joined → start
+  if(b.status==='active' && !pvp.started){
+    pvp.started=true;
+    startPvpBattle(b);
+    return;
+  }
+  // a turn's actions changed → host checks if both in
+  if(pvp.role==='host' && b.status==='active' && pvp.started){
+    if(b.host_action && b.guest_action && !pvp.resolvingTurn){
+      pvp.resolvingTurn=true;
+      await hostResolveTurn(b.host_action,b.guest_action);
+      pvp.resolvingTurn=false;
+    }
+  }
+  // guest receives resolved state
+  if(pvp.role==='guest' && b.state && b.turn!==pvp.lastSeenTurn){
+    pvp.lastSeenTurn=b.turn;
+    guestApplyState(b);
+  }
+  // finished
+  if(b.status==='finished' && !pvp.ended){
+    pvp.ended=true;
+    const iWon=(b.winner===pvp.name);
+    endBattle(iWon);
+  }
+}
+function cleanupPvp(){
+  if(pvp&&pvp.channel){try{sbClient().removeChannel(pvp.channel);}catch(e){}}
+  pvp=null;
+}
+
+// seeded RNG so host resolution is reproducible/fair
+function makeRNG(seed){let s=seed>>>0;return function(){s=(s*1664525+1013904223)>>>0;return s/4294967296;};}
+
+function startPvpBattle(b){
+  // host's team is "player" for host; for guest, swap perspective
+  const mine = pvp.role==='host' ? b.host_team : b.guest_team;
+  const theirs = pvp.role==='host' ? b.guest_team : b.host_team;
+  const myName = pvp.name;
+  const theirName = pvp.role==='host' ? b.guest_name : b.host_name;
+  battle={
+    player:{team:mine.map(makeMon),active:0,name:myName},
+    enemy:{team:theirs.map(makeMon),active:0,name:theirName},
+    turn:0,log:[],pvp:true
+  };
+  pvp.rng=makeRNG(b.seed);
+  document.getElementById('screen-lobby').classList.remove('active');
+  document.getElementById('screen-menu').classList.remove('active');
+  document.getElementById('screen-battle').classList.add('active');
+  logLine('<span class="turn-sep">Battle start!</span>');
+  logLine('<b>'+theirName+'</b> wants to battle!');
+  renderBattle();
+  const em=document.getElementById('enemyMon'),pm=document.getElementById('playerMon');
+  if(em){em.classList.add('intro-enemy');setTimeout(()=>em.classList.remove('intro-enemy'),600);}
+  if(pm){pm.classList.add('intro-player');setTimeout(()=>pm.classList.remove('intro-player'),600);}
+  setTimeout(promptPlayerAction,700);
+}
+
+// in PvP, submitting writes the action to the server instead of resolving locally
+async function pvpSubmit(action){
+  const c=sbClient();if(!c||!pvp)return;
+  document.getElementById('battleControls').innerHTML='<div class="ctrl-prompt">Waiting for '+(battle.enemy.name||'opponent')+'…</div>';
+  const field=pvp.role==='host'?'host_action':'guest_action';
+  await c.from('showdown_battles').update({[field]:action}).eq('id',pvp.id);
+}
+
+// HOST: both actions present → resolve authoritatively, write state, clear actions
+async function hostResolveTurn(hostAction,guestAction){
+  // host perspective: player=host, enemy=guest
+  const pAction = hostAction;
+  const eAction = guestAction;
+  await resolveTurn(pAction,eAction); // uses existing engine + animations on host screen
+  // serialize state for the guest
+  const c=sbClient();
+  const snap=serializeBattle();
+  let winner=null,status='active';
+  if(!battle.player.team.some(m=>!m.fainted)){winner=battle.enemy.name;status='finished';}
+  else if(!battle.enemy.team.some(m=>!m.fainted)){winner=battle.player.name;status='finished';}
+  await c.from('showdown_battles').update({state:snap,turn:battle.turn,host_action:null,guest_action:null,status:status,winner:winner}).eq('id',pvp.id);
+}
+function serializeBattle(){
+  const ser=s=>({active:battle[s].active,name:battle[s].name,team:battle[s].team.map(m=>({id:m.id,hp:m.hp,status:m.status,boosts:m.boosts,fainted:m.fainted}))});
+  return {player:ser('player'),enemy:ser('enemy'),turn:battle.turn,log:battle.log.slice(-30)};
+}
+// GUEST: apply the host-computed state (host's player = guest's enemy, swap)
+function guestApplyState(b){
+  const st=b.state;if(!st)return;
+  // host's "player" is the host; from guest's view that's the enemy
+  const applySide=(fromObj,toSide)=>{
+    battle[toSide].active=fromObj.active;
+    fromObj.team.forEach((sm,i)=>{const m=battle[toSide].team[i];if(m){m.hp=sm.hp;m.status=sm.status;m.boosts=sm.boosts;m.fainted=sm.fainted;}});
+  };
+  applySide(st.player,'enemy'); // host player -> guest enemy
+  applySide(st.enemy,'player'); // host enemy -> guest player
+  battle.turn=st.turn;
+  battle.log=st.log||battle.log;
+  document.getElementById('battleLog').innerHTML=battle.log.slice(-30).join('<br>');
+  renderBattle();
+  // continue if not finished (host already auto-replaced fainted mons in the state)
+  if(b.status!=='finished'){ promptPlayerAction(); }
+}
+
+function renderRoster(){renderRosterImpl();}
+// ── original solo roster render kept below ──
+function renderRosterImpl(){
   const g=document.getElementById('rosterGrid');g.innerHTML='';
   Object.entries(DEX).forEach(([id,m])=>{
     const idx=picked.indexOf(id);
@@ -315,6 +515,7 @@ function renderRoster(){
     g.appendChild(card);
   });
   document.getElementById('startBtn').disabled=picked.length!==4;
+  const pb=document.getElementById('pvpBtn');if(pb)pb.disabled=picked.length!==4;
   document.getElementById('pickStatus').textContent=picked.length+'/4 selected';
 }
 function togglePick(id){
@@ -356,8 +557,10 @@ function quitBattle(){ if(confirm('Forfeit this battle?')) backToMenu(); }
 function backToMenu(){
   document.getElementById('resultOverlay').classList.remove('show');
   document.getElementById('screen-battle').classList.remove('active');
+  document.getElementById('screen-lobby').classList.remove('active');
   document.getElementById('screen-menu').classList.add('active');
   battle=null;
+  cleanupPvp();
 }
 
 // ── helpers ──
@@ -489,6 +692,7 @@ function chooseMove(mvId){ playerAction={type:'move',mvId}; submitPlayerAction()
 function chooseSwitch(benchIdx){ playerAction={type:'switch',benchIdx}; submitPlayerAction(); }
 function submitPlayerAction(){
   if(resolving)return;
+  if(battle&&battle.pvp){ pvpSubmit(playerAction); return; }
   document.getElementById('battleControls').innerHTML='<div class="ctrl-prompt">…</div>';
   const enemyAction=chooseEnemyAction();
   resolveTurn(playerAction,enemyAction);
@@ -639,10 +843,21 @@ async function handleFaintsThenContinue(){
     if(bench.length){battle.enemy.active=bench[0].i;logLine('Opponent sent out '+bench[0].mm.name+'!');renderMon('enemy');renderHP('enemy');const el=monElS('enemy');if(el){el.classList.add('intro-enemy');setTimeout(()=>el.classList.remove('intro-enemy'),500);}await sleep(500);}
   }
   if(checkEnd())return;
-  // player chooses replacement if fainted
+  // player replacement
   if(activeMon('player').fainted){
-    promptReplacement();
-    return; // wait for player pick
+    if(battle.pvp){
+      // auto-replace in PvP to keep both clients in sync (no interactive pick)
+      const bench=battle.player.team.map((mm,i)=>({mm,i})).filter(x=>!x.mm.fainted);
+      if(bench.length){battle.player.active=bench[0].i;logLine('You sent out '+activeMon('player').name+'!');renderMon('player');renderHP('player');const el=monElS('player');if(el){el.classList.add('intro-player');setTimeout(()=>el.classList.remove('intro-player'),500);}await sleep(500);}
+    }else{
+      promptReplacement();
+      return; // wait for player pick
+    }
+  }
+  if(battle.pvp){
+    // only the host drives the next prompt cycle; guest waits for state echo then prompts
+    if(pvp&&pvp.role==='host') promptPlayerAction();
+    return;
   }
   promptPlayerAction();
 }
@@ -655,6 +870,7 @@ function promptReplacement(){
   c.innerHTML=html;
 }
 function doReplacement(idx){
+  if(battle&&battle.pvp){ playerAction={type:'switch',benchIdx:idx}; pvpSubmit(playerAction); return; }
   battle.player.active=idx;
   const nu=activeMon('player');
   logLine('You sent out '+nu.name+'!');
@@ -676,6 +892,7 @@ function endBattle(win){
   document.getElementById('resultText').textContent=win?'YOU WIN! 🎉':'DEFEATED';
   if(win){try{let w=parseInt(localStorage.getItem('showdown_wins'))||0;localStorage.setItem('showdown_wins',w+1);}catch(e){}}
   ov.classList.add('show');
+  if(pvp){cleanupPvp();}
 }
 
 renderRoster();
