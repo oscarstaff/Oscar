@@ -448,16 +448,28 @@
           const fld = form.getField(f.name);
           const ctor = fld.constructor.name;
           if (ctor === 'PDFCheckBox') {
-            if (v) {
-              try { fld.check(); } catch (e) { console.warn('checkbox', f.name, e.message); }
-            } else { try { fld.uncheck(); } catch {} }
+            if (v) { try { fld.check(); } catch (e) { console.warn('checkbox', f.name, e.message); } }
+            else { try { fld.uncheck(); } catch {} }
           }
-          else if (ctor === 'PDFDropdown' || ctor === 'PDFOptionList') fld.select(String(v));
+          else if (ctor === 'PDFDropdown' || ctor === 'PDFOptionList') { try { fld.select(String(v)); } catch { try { fld.setText && fld.setText(String(v)); } catch {} } }
           else if (ctor === 'PDFRadioGroup') fld.select(String(v));
-          else fld.setText(String(v));
+          else {
+            // text: shrink font to fit so long values stay inside the box
+            try { fld.setFontSize(0); } catch {}   // 0 = auto-size to fit the field
+            fld.setText(String(v));
+          }
         } catch (e) { console.warn('fill', f.name, e.message); }
       }
-      try { form.flatten(); } catch (e) { console.warn('flatten', e); }
+      // generate appearance streams BEFORE flattening — without this, iLovePDF
+      // forms often fail to flatten (boxes stay visible, checks don't render)
+      try { form.updateFieldAppearances(); } catch (e) { console.warn('appearances', e); }
+      try {
+        form.flatten();
+      } catch (e) {
+        console.warn('flatten failed', e.message);
+        // last resort: mark NeedAppearances + readonly so viewers render values
+        try { form.getFields().forEach(f => { try { f.enableReadOnly(); } catch {} }); } catch {}
+      }
       return pdfDoc.save();
     }
 
@@ -491,9 +503,31 @@
     }
     const hasValue = (f, v) => f.type === 'checkbox' ? !!v : (v != null && v !== '');
 
-    function PdfPreview({ pdfJsDoc, fields, values, currentPage, onPageChange, pageCount, scale, highlightedFieldName, onFieldClick }) {
+    function PdfPreview({ pdfJsDoc, fields, values, currentPage, onPageChange, pageCount, scale: _ignoredScale, highlightedFieldName, onFieldClick }) {
       const canvasRef = useRef(null);
+      const paneRef = useRef(null);
       const [renderedSize, setRenderedSize] = useState({ width: 0, height: 0 });
+      const [scale, setScale] = useState(1.2);
+
+      // fit the page to the available pane width (so the whole page is visible)
+      useEffect(() => {
+        if (!pdfJsDoc) return;
+        let cancelled = false;
+        const fit = async () => {
+          try {
+            const page = await pdfJsDoc.getPage(currentPage);
+            const natural = page.getViewport({ scale: 1 });
+            const pane = paneRef.current;
+            const avail = (pane ? pane.clientWidth : 700) - 48; // minus padding
+            let s = avail / natural.width;
+            s = Math.max(0.4, Math.min(2.2, s)); // clamp
+            if (!cancelled) setScale(s);
+          } catch (e) { /* ignore */ }
+        };
+        fit();
+        window.addEventListener('resize', fit);
+        return () => { cancelled = true; window.removeEventListener('resize', fit); };
+      }, [pdfJsDoc, currentPage]);
 
       useEffect(() => {
         if (!pdfJsDoc || !canvasRef.current) return;
@@ -553,7 +587,7 @@
       }, [fields, currentPage, scale]);
 
       return (
-        <div className="pdf-pane">
+        <div className="pdf-pane" ref={paneRef}>
           <div className="pdf-toolbar">
             <div className="page-nav">
               <button onClick={() => onPageChange(currentPage - 1)} disabled={currentPage <= 1}>
@@ -1073,9 +1107,26 @@
         setBusy(true);
         try {
           const out = await fillPdf(pdfBytes, fields, values);
-          const base = fileName.replace(/\.pdf$/i, '') || 'form';
-          const stamp = new Date().toISOString().slice(0, 10);
-          downloadBytes(out, base + '_filled_' + stamp + '.pdf');
+          // build "First_Last Application Form.pdf" from name-like fields
+          const findVal = (res) => {
+            for (const f of fields) {
+              const lab = (f.label || '').toLowerCase();
+              if (res.test(lab) && values[f.name]) return String(values[f.name]).trim();
+            }
+            return '';
+          };
+          const first = findVal(/given|first/);
+          const last  = findVal(/surname|last|family/);
+          const formTitle = (fileName.replace(/\.pdf$/i, '') || 'Form');
+          let outName;
+          if (first || last) {
+            const who = [first, last].filter(Boolean).join('_').replace(/[^\w\-]+/g, '');
+            outName = who + ' ' + formTitle + '.pdf';
+          } else {
+            const stamp = new Date().toISOString().slice(0, 10);
+            outName = formTitle + '_filled_' + stamp + '.pdf';
+          }
+          downloadBytes(out, outName);
           showToast('Filled PDF downloaded', 'ok');
         } catch (e) {
           console.error(e);
