@@ -205,6 +205,8 @@
   var SECRET='oscars_nexus_gate_v1_8f3a2c91';
   var SB='https://jcfgldqrdbfkgbixszds.supabase.co';
   var KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpjZmdsZHFyZGJma2diaXhzemRzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1Nzc3NzEsImV4cCI6MjA5MDE1Mzc3MX0.Wj8cCpnlsoZOPj5sKWeEdfvgjG4Nc-UuTTYgbcrPfeI';
+  // expose for the app (shared template library)
+  window.NEXUS_SB=SB; window.NEXUS_KEY=KEY;
   function fail(m){var el=document.getElementById('__gateMsg');if(el){el.innerHTML=m+'<br><br><span style=\"color:#6b7585;font-size:12px;\">Open this app from the Nexits page in Nexus.</span>';}}
   function pass(){var g=document.getElementById('__gate');if(g)g.remove();}
   async function hmacHex(secret,msg){var enc=new TextEncoder();var k=await crypto.subtle.importKey('raw',enc.encode(secret),{name:'HMAC',hash:'SHA-256'},false,['verify','sign']);var s=await crypto.subtle.sign('HMAC',k,enc.encode(msg));return Array.from(new Uint8Array(s)).map(x=>x.toString(16).padStart(2,'0')).join('');}
@@ -226,6 +228,7 @@
       if(Date.now()>payload.exp){fail('Token expired — relaunch from Nexus.');return;}
       // verify the person is still on the access list (server-side truth)
       var name=payload.name||'';
+      window.NEXUS_USER=name;
       var r=await fetch(SB+'/rest/v1/app_access?app=eq.'+APP+'&staff_name=eq.'+encodeURIComponent(name)+'&select=staff_name',{headers:{apikey:KEY,Authorization:'Bearer '+KEY}});
       var rows=r.ok?await r.json():[];
       if(!rows.length){fail('You no longer have access to this app.');return;}
@@ -328,15 +331,22 @@
 
     function suggestGroups(fields) {
       const checkboxes = fields.filter(f => f.type === 'checkbox' && f.widgets.length);
+      // iLovePDF (and similar) export loose, generically-named checkboxes like
+      // "CheckBoxFormField 1". These are independent on/off boxes, NOT a radio set —
+      // grouping them produces options that never map to a real /Yes toggle, so the
+      // box visually never ticks. Only auto-group when names look intentional.
+      const genericRe = /^(checkbox|check box|checkboxformfield|chk|cb)[\s_]*\d*$/i;
       const used = new Set();
       const suggestions = [];
       for (let i = 0; i < checkboxes.length; i++) {
         if (used.has(checkboxes[i].name)) continue;
         const a = checkboxes[i];
+        if (genericRe.test(a.name)) continue; // leave generic boxes as plain tickboxes
         const aw = a.widgets[0];
         for (let j = i + 1; j < checkboxes.length; j++) {
           if (used.has(checkboxes[j].name)) continue;
           const b = checkboxes[j];
+          if (genericRe.test(b.name)) continue;
           const bw = b.widgets[0];
           if (aw.page !== bw.page) continue;
           const ay = aw.y + aw.h / 2;
@@ -437,7 +447,11 @@
         try {
           const fld = form.getField(f.name);
           const ctor = fld.constructor.name;
-          if (ctor === 'PDFCheckBox') v ? fld.check() : fld.uncheck();
+          if (ctor === 'PDFCheckBox') {
+            if (v) {
+              try { fld.check(); } catch (e) { console.warn('checkbox', f.name, e.message); }
+            } else { try { fld.uncheck(); } catch {} }
+          }
           else if (ctor === 'PDFDropdown' || ctor === 'PDFOptionList') fld.select(String(v));
           else if (ctor === 'PDFRadioGroup') fld.select(String(v));
           else fld.setText(String(v));
@@ -752,6 +766,38 @@
       );
     }
 
+    // ── Shared template library (Supabase) ──
+    const SB_URL = window.NEXUS_SB || '';
+    const SB_KEY = window.NEXUS_KEY || '';
+    const SB_USER = window.NEXUS_USER || '';
+    const sbHeaders = { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY, 'Content-Type': 'application/json' };
+    async function fetchTemplates(fingerprint) {
+      try {
+        let url = SB_URL + '/rest/v1/formcraft_templates?select=*&order=created_at.desc';
+        const r = await fetch(url, { headers: sbHeaders });
+        if (!r.ok) return [];
+        const rows = await r.json();
+        // show templates for this PDF first, then the rest
+        return rows.sort((a, b) => {
+          const am = a.pdf_fingerprint === fingerprint ? 0 : 1;
+          const bm = b.pdf_fingerprint === fingerprint ? 0 : 1;
+          return am - bm;
+        });
+      } catch (e) { console.warn('fetchTemplates', e); return []; }
+    }
+    async function saveTemplateToCloud(name, fingerprint, data) {
+      const r = await fetch(SB_URL + '/rest/v1/formcraft_templates', {
+        method: 'POST', headers: { ...sbHeaders, Prefer: 'return=representation' },
+        body: JSON.stringify({ name, pdf_fingerprint: fingerprint, data, created_by: SB_USER }),
+      });
+      if (!r.ok) throw new Error('save failed (' + r.status + ')');
+      return (await r.json())[0];
+    }
+    async function deleteTemplateFromCloud(id) {
+      const r = await fetch(SB_URL + '/rest/v1/formcraft_templates?id=eq.' + id, { method: 'DELETE', headers: sbHeaders });
+      if (!r.ok) throw new Error('delete failed');
+    }
+
     function App() {
       const [pdfBytes, setPdfBytes] = useState(null);
       const [pdfJsDoc, setPdfJsDoc] = useState(null);
@@ -768,6 +814,8 @@
       const [busy, setBusy] = useState(false);
       const [toast, setToast] = useState(null);
       const [highlight, setHighlight] = useState(null);
+      const [library, setLibrary] = useState([]);
+      const [showLibrary, setShowLibrary] = useState(false);
       const [formWidth, setFormWidth] = useState(() => {
         const stored = parseInt(localStorage.getItem('fc_formWidth') || '', 10);
         return Number.isFinite(stored) && stored > 320 && stored < 1600 ? stored : 500;
@@ -821,6 +869,7 @@
           setValues({});
 
           const fp = pdfFingerprint(bytes);
+          loadLibrary(fp);
           let stored = null;
           try { const raw = localStorage.getItem(fp); if (raw) stored = JSON.parse(raw); } catch {}
 
@@ -938,14 +987,52 @@
         );
       }, [groups, originalFields]);
 
-      const saveTemplate = useCallback(() => {
+      const saveTemplate = useCallback(async () => {
         const tpl = buildTemplate(fields, originalFields, groups);
-        const json = JSON.stringify(tpl, null, 2);
-        if (pdfBytes) localStorage.setItem(pdfFingerprint(pdfBytes), json);
-        const base = fileName.replace(/\.pdf$/i, '') || 'form';
-        downloadBytes(new TextEncoder().encode(json), base + '.template.json', 'application/json');
-        showToast('Template saved (browser + download)', 'ok');
+        const fp = pdfBytes ? pdfFingerprint(pdfBytes) : null;
+        const defName = (fileName.replace(/\.pdf$/i, '') || 'Form') + ' template';
+        const name = prompt('Name this template (visible to all staff):', defName);
+        if (!name) return;
+        // keep a local copy too (fast reload on same device)
+        if (fp) { try { localStorage.setItem(fp, JSON.stringify(tpl)); } catch {} }
+        try {
+          await saveTemplateToCloud(name.trim(), fp, tpl);
+          showToast('Template saved to team library', 'ok');
+          loadLibrary(fp);
+        } catch (e) {
+          console.error(e);
+          showToast('Cloud save failed — saved on this device only', 'err');
+        }
       }, [fields, originalFields, groups, fileName, pdfBytes]);
+
+      const loadLibrary = useCallback(async (fp) => {
+        const rows = await fetchTemplates(fp);
+        setLibrary(rows);
+      }, []);
+
+      const applyCloudTemplate = useCallback((tplRow) => {
+        if (!pdfBytes) { showToast('Upload a PDF first, then apply a template', 'info'); return; }
+        try {
+          const { fields: applied, groups } = applyTemplate(originalFields, tplRow.data);
+          setFields(applied);
+          setGroups(groups);
+          setPendingSuggestions([]);
+          try { localStorage.setItem(pdfFingerprint(pdfBytes), JSON.stringify(tplRow.data)); } catch {}
+          setShowLibrary(false);
+          showToast('Applied "' + tplRow.name + '"', 'ok');
+        } catch (e) {
+          showToast('Could not apply template: ' + e.message, 'err');
+        }
+      }, [pdfBytes, originalFields]);
+
+      const removeTemplate = useCallback(async (tplRow) => {
+        if (!confirm('Delete "' + tplRow.name + '" from the team library? This affects all staff.')) return;
+        try {
+          await deleteTemplateFromCloud(tplRow.id);
+          setLibrary(lib => lib.filter(t => t.id !== tplRow.id));
+          showToast('Template deleted', 'ok');
+        } catch (e) { showToast('Delete failed', 'err'); }
+      }, []);
 
       const onExport = useCallback(async () => {
         if (errors.length) {
@@ -1012,7 +1099,7 @@
             <div className="header-right">
               {pdfBytes && (
                 <React.Fragment>
-                  <button className="btn btn-ghost" onClick={() => templateInputRef.current && templateInputRef.current.click()}><i className="fa-solid fa-folder-open" /> Load template</button>
+                  <button className="btn btn-ghost" onClick={() => setShowLibrary(s => !s)}><i className="fa-solid fa-folder-open" /> Team templates{library.length ? ' (' + library.length + ')' : ''}</button>
                   <button className="btn btn-ghost" onClick={saveTemplate}><i className="fa-solid fa-save" /> Save template</button>
                   <button className="btn btn-ghost" onClick={onReset}><i className="fa-solid fa-file-arrow-up" /> New PDF</button>
                   <button className="btn btn-primary" onClick={onExport} disabled={busy || fields.length === 0}>
@@ -1026,6 +1113,30 @@
           </header>
 
           <input ref={templateInputRef} type="file" accept=".json,application/json" style={{ display: 'none' }} onChange={(e) => e.target.files[0] && onTemplateFile(e.target.files[0])} />
+
+          {showLibrary && pdfBytes && (
+            <div style={{ position: 'absolute', top: 64, right: 16, zIndex: 50, width: 340, maxHeight: '70vh', overflow: 'auto', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 14, boxShadow: '0 12px 40px rgba(0,0,0,.3)', padding: 14 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                <strong style={{ fontSize: 14 }}><i className="fa-solid fa-folder-open" style={{ color: 'var(--accent)', marginRight: 6 }} />Team templates</strong>
+                <button className="btn btn-ghost" style={{ padding: '4px 8px' }} onClick={() => setShowLibrary(false)}><i className="fa-solid fa-xmark" /></button>
+              </div>
+              {library.length === 0
+                ? <div style={{ fontSize: 13, color: 'var(--text-3)', padding: '12px 4px' }}>No saved templates yet. Set up this form's fields, then “Save template” to share it with all staff.</div>
+                : library.map(t => {
+                    const mine = t.pdf_fingerprint === pdfFingerprint(pdfBytes);
+                    return (
+                      <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 10px', border: '1px solid var(--border)', borderRadius: 9, marginBottom: 7, background: mine ? 'var(--accent-soft)' : 'transparent' }}>
+                        <div style={{ flex: 1, minWidth: 0, cursor: 'pointer' }} onClick={() => applyCloudTemplate(t)}>
+                          <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.name}{mine ? '' : ''}</div>
+                          <div style={{ fontSize: 11, color: 'var(--text-3)' }}>{mine ? 'matches this PDF · ' : ''}{t.created_by || 'staff'}</div>
+                        </div>
+                        <button className="btn btn-ghost" style={{ padding: '4px 7px', fontSize: 12 }} onClick={() => applyCloudTemplate(t)}>Use</button>
+                        <button className="btn btn-ghost" style={{ padding: '4px 7px', fontSize: 12, color: 'var(--danger, #c0392b)' }} onClick={() => removeTemplate(t)}><i className="fa-solid fa-trash" /></button>
+                      </div>
+                    );
+                  })}
+            </div>
+          )}
 
           {!pdfBytes ? (
             <Landing onFile={onPdfFile} onTemplateFile={onTemplateFile} />
