@@ -426,7 +426,7 @@
     }
 
     async function fillPdf(bytes, fields, values) {
-      const pdfDoc = await PDFDocument.load(bytes, { ignoreEncryption: true });
+      const pdfDoc = await PDFDocument.load(bytes.slice(), { ignoreEncryption: true });
       const form = pdfDoc.getForm();
       for (const f of fields) {
         const v = values[f.name];
@@ -727,17 +727,16 @@
       );
     }
 
-    function Landing({ onFile, onTemplateFile }) {
+    function Landing({ onFile, onOpenLibrary }) {
       const [drag, setDrag] = useState(false);
       const pdfRef = useRef(null);
-      const tplRef = useRef(null);
       const pick = (f) => { if (f && f.type === 'application/pdf') onFile(f); };
       return (
         <div className="landing">
           <div className="landing-card">
             <div className="eyebrow">PDF Form Filler · with templates</div>
-            <h1>Fill your forms<br /><em>without the PDF.</em></h1>
-            <p className="lead">Drop in a fillable PDF. We extract the fields, group related checkboxes, and give you a clean form to type in — with a live preview alongside.</p>
+            <h1>Fill your forms<br /><em>without the hassle.</em></h1>
+            <p className="lead">Drop in a fillable PDF, or load a saved team template to start filling instantly.</p>
             <div
               className={'upload-zone' + (drag ? ' drag' : '')}
               onClick={() => pdfRef.current && pdfRef.current.click()}
@@ -746,14 +745,13 @@
               onDrop={(e) => { e.preventDefault(); setDrag(false); pick(e.dataTransfer.files[0]); }}
             >
               <i className="fa-solid fa-file-pdf" />
-              <span>Select your template PDF</span>
+              <span>Select your PDF form</span>
               <small>or drop it here</small>
               <input ref={pdfRef} type="file" accept=".pdf,application/pdf" onChange={(e) => pick(e.target.files[0])} />
             </div>
-            <div className="template-pill" onClick={() => tplRef.current && tplRef.current.click()}>
+            <div className="template-pill" onClick={onOpenLibrary}>
               <i className="fa-solid fa-folder-open" />
-              Already have a saved template? <strong style={{marginLeft:4}}>Load it</strong>
-              <input ref={tplRef} type="file" accept=".json,application/json" style={{ display: 'none' }} onChange={(e) => e.target.files[0] && onTemplateFile(e.target.files[0])} />
+              <strong style={{marginLeft:4}}>Load a team template</strong>
             </div>
             <div className="features">
               <div className="feat"><i className="fa-solid fa-wand-magic-sparkles" /> Auto-detects fields</div>
@@ -990,10 +988,17 @@
       const saveTemplate = useCallback(async () => {
         const tpl = buildTemplate(fields, originalFields, groups);
         const fp = pdfBytes ? pdfFingerprint(pdfBytes) : null;
+        // embed the PDF itself (base64) so the template can be opened ready-to-fill
+        if (pdfBytes) {
+          let bin = '';
+          const arr = new Uint8Array(pdfBytes);
+          for (let i = 0; i < arr.length; i++) bin += String.fromCharCode(arr[i]);
+          tpl.pdfBase64 = btoa(bin);
+          tpl.pdfName = fileName || 'form.pdf';
+        }
         const defName = (fileName.replace(/\.pdf$/i, '') || 'Form') + ' template';
         const name = prompt('Name this template (visible to all staff):', defName);
         if (!name) return;
-        // keep a local copy too (fast reload on same device)
         if (fp) { try { localStorage.setItem(fp, JSON.stringify(tpl)); } catch {} }
         try {
           await saveTemplateToCloud(name.trim(), fp, tpl);
@@ -1001,7 +1006,7 @@
           loadLibrary(fp);
         } catch (e) {
           console.error(e);
-          showToast('Cloud save failed — saved on this device only', 'err');
+          showToast('Cloud save failed: ' + e.message, 'err');
         }
       }, [fields, originalFields, groups, fileName, pdfBytes]);
 
@@ -1010,8 +1015,29 @@
         setLibrary(rows);
       }, []);
 
+      const openTemplatePdf = useCallback(async (tplRow) => {
+        // open a template that carries its own PDF, ready to fill
+        const b64 = tplRow.data && tplRow.data.pdfBase64;
+        if (!b64) { showToast('This template has no embedded PDF — upload the PDF first, then apply it.', 'info'); return; }
+        setBusy(true);
+        try {
+          const bin = atob(b64);
+          const bytes = new Uint8Array(bin.length);
+          for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+          const file = new File([bytes], tplRow.data.pdfName || 'form.pdf', { type: 'application/pdf' });
+          // stash the template so onPdfFile applies it after the PDF parses
+          sessionStorage.setItem('pendingTemplate', JSON.stringify(tplRow.data));
+          setShowLibrary(false);
+          await onPdfFile(file);
+          showToast('Loaded "' + tplRow.name + '"', 'ok');
+        } catch (e) {
+          showToast('Could not open template: ' + e.message, 'err');
+        }
+        setBusy(false);
+      }, [onPdfFile]);
+
       const applyCloudTemplate = useCallback((tplRow) => {
-        if (!pdfBytes) { showToast('Upload a PDF first, then apply a template', 'info'); return; }
+        if (!pdfBytes) { return openTemplatePdf(tplRow); }
         try {
           const { fields: applied, groups } = applyTemplate(originalFields, tplRow.data);
           setFields(applied);
@@ -1023,7 +1049,12 @@
         } catch (e) {
           showToast('Could not apply template: ' + e.message, 'err');
         }
-      }, [pdfBytes, originalFields]);
+      }, [pdfBytes, originalFields, openTemplatePdf]);
+
+      const openLibrary = useCallback(async () => {
+        await loadLibrary(null);
+        setShowLibrary(true);
+      }, [loadLibrary]);
 
       const removeTemplate = useCallback(async (tplRow) => {
         if (!confirm('Delete "' + tplRow.name + '" from the team library? This affects all staff.')) return;
@@ -1114,7 +1145,7 @@
 
           <input ref={templateInputRef} type="file" accept=".json,application/json" style={{ display: 'none' }} onChange={(e) => e.target.files[0] && onTemplateFile(e.target.files[0])} />
 
-          {showLibrary && pdfBytes && (
+          {showLibrary && (
             <div style={{ position: 'absolute', top: 64, right: 16, zIndex: 50, width: 340, maxHeight: '70vh', overflow: 'auto', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 14, boxShadow: '0 12px 40px rgba(0,0,0,.3)', padding: 14 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
                 <strong style={{ fontSize: 14 }}><i className="fa-solid fa-folder-open" style={{ color: 'var(--accent)', marginRight: 6 }} />Team templates</strong>
@@ -1123,7 +1154,7 @@
               {library.length === 0
                 ? <div style={{ fontSize: 13, color: 'var(--text-3)', padding: '12px 4px' }}>No saved templates yet. Set up this form's fields, then “Save template” to share it with all staff.</div>
                 : library.map(t => {
-                    const mine = t.pdf_fingerprint === pdfFingerprint(pdfBytes);
+                    const mine = pdfBytes && t.pdf_fingerprint === pdfFingerprint(pdfBytes);
                     return (
                       <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 10px', border: '1px solid var(--border)', borderRadius: 9, marginBottom: 7, background: mine ? 'var(--accent-soft)' : 'transparent' }}>
                         <div style={{ flex: 1, minWidth: 0, cursor: 'pointer' }} onClick={() => applyCloudTemplate(t)}>
@@ -1139,7 +1170,7 @@
           )}
 
           {!pdfBytes ? (
-            <Landing onFile={onPdfFile} onTemplateFile={onTemplateFile} />
+            <Landing onFile={onPdfFile} onOpenLibrary={openLibrary} />
           ) : fields.length === 0 ? (
             <div className="landing">
               <div className="landing-card">
