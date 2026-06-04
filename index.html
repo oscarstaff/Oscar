@@ -12010,12 +12010,81 @@ async function loadClockState(){
       }));
     }catch(e){}
     renderClockCard();
+    // Forgot to clock out? Force clock-out at 8:00pm of the clock-in date.
+    maybeAutoClockOut8pm();
   }catch(e){
     console.warn('loadClock:',e);
     // Only fall to 'out' if NO cached state was used
     if(_clockState === null){ _clockState='out'; renderClockCard(); }
   }
 }
+
+// ── 8PM FORGOT-CLOCKOUT AUTO-OUT ──────────
+// If staff are still 'in' and 8:00pm has passed for their clock-in date,
+// auto clock-out at exactly 20:00, flip the button back to Clock In,
+// and push the corrected out-time to the Google Sheet.
+let _auto8Fired = false;
+function eightPmOf(d){
+  const e = new Date(d);
+  e.setHours(20,0,0,0);
+  return e;
+}
+function maybeAutoClockOut8pm(){
+  if(_auto8Fired) return;
+  if(_clockState !== 'in' || !_clockSinceTs) return;
+  const inDate = new Date(_clockSinceTs);
+  // clock-in must be before 8pm; if someone clocked in after 8pm leave them alone
+  const eight = eightPmOf(inDate);
+  if(inDate >= eight) return;
+  // only fire once 8pm has actually passed
+  if(Date.now() < eight.getTime()) return;
+  _auto8Fired = true;
+  doAutoClockOut8pm(eight);
+}
+
+async function doAutoClockOut8pm(outDate){
+  try{
+    const ts = outDate.toISOString();
+    _clockState = 'out';
+    _clockSinceTs = outDate;
+    try{ localStorage.setItem('clock_state_'+me, JSON.stringify({state:'out', ts:ts})); }catch(e){}
+    renderClockCard();
+    const btn = document.getElementById('clockBtn');
+    if(btn){ btn.textContent='Clock In'; btn.style.background='var(--accent)'; btn.disabled=false; }
+    if(typeof showToast === 'function') showToast('Auto clocked-out at 8:00pm (missed clock-out)', 'info');
+    // Supabase row
+    sbPost('clock_log', {staff_name: me, action: 'out', ts: ts, notes: 'auto: 8pm missed clock-out'})
+      .then(function(){ if(typeof loadAllClockLogs==='function') loadAllClockLogs(); })
+      .catch(function(){
+        try{ const q=JSON.parse(localStorage.getItem('clock_supabase_queue')||'[]');
+          q.push({payload:{staff_name:me,action:'out',ts:ts,notes:'auto: 8pm missed clock-out'},queuedAt:Date.now()});
+          localStorage.setItem('clock_supabase_queue',JSON.stringify(q.slice(-20))); }catch(_){}
+      });
+    // Google Sheet — timeOut = 20:00 on the clock-in date
+    const DEFAULT_SHEET_URL='https://script.google.com/macros/s/AKfycby0Bq97bCZAsmnruXFuJuCqXQE_kOxhYE2KFuJnVzLXtT5CV0Y12k5176dxZbdaYVGE/exec';
+    const sheetUrl=window.APPS_SCRIPT_URL || localStorage.getItem('oscars_sheet_url') || DEFAULT_SHEET_URL;
+    if(sheetUrl){
+      const dd=String(outDate.getDate()).padStart(2,'0'), mm=String(outDate.getMonth()+1).padStart(2,'0'), yyyy=outDate.getFullYear();
+      const payload={action:'updatePunch',staff:me,date:dd+'/'+mm+'/'+yyyy,timeOut:'20:00',editor:'auto-8pm'};
+      fetch(sheetUrl,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload)})
+        .catch(function(){ try{ const q=JSON.parse(localStorage.getItem('clock_sync_queue')||'[]');
+          q.push({payload:payload,queuedAt:Date.now()}); localStorage.setItem('clock_sync_queue',JSON.stringify(q.slice(-20))); }catch(_){}
+        });
+    }
+    // Web push
+    if('Notification' in window && Notification.permission === 'granted'){
+      navigator.serviceWorker.getRegistration().then(function(reg){
+        if(reg) reg.showNotification('Clocked out at 8:00pm', {
+          body:'You forgot to clock out — recorded as 8:00pm. Tap to review.',
+          icon:'./icon-192.png', badge:'./icon-192.png', tag:'auto-8pm', data:{url:'./#home'}
+        });
+      }).catch(function(){});
+    }
+  }catch(e){ console.warn('8pm auto-out failed:',e); _auto8Fired=false; }
+}
+
+// If app stays open across 8pm, fire on a timer too (not just next load)
+setInterval(function(){ try{ maybeAutoClockOut8pm(); }catch(e){} }, 60000);
 
 
 // ─────────────────────────────────────
@@ -12711,7 +12780,7 @@ async function toggleClock(){
     // Network writes happen in the background — staff doesn't wait
     _clockState = next;
     _clockSinceTs = flexedDate;
-    if(next === 'in') window._autoClockOutFired = false;
+    if(next === 'in'){ window._autoClockOutFired = false; _auto8Fired = false; }
     
     // Cache state for instant render on next page load
     try{
@@ -12978,16 +13047,30 @@ async function runReport(){
   if(!logs.length){ el.innerHTML = '<div style="color:#94a3b8;text-align:center;padding:30px;">No clock-ins in this range.</div>'; return; }
   // Pair in/out per day
   logs.sort(function(a,b){return new Date(a.ts) - new Date(b.ts);});
+  // DEDUPE: collapse duplicate rows that share the same action + same minute
+  // (historical double-taps / bugged saves piled up many rows per day)
+  (function(){
+    const seen = {};
+    logs = logs.filter(function(r){
+      const t = new Date(r.ts);
+      const k = r.action+'|'+t.getFullYear()+'-'+(t.getMonth()+1)+'-'+t.getDate()+'|'+t.getHours()+':'+t.getMinutes();
+      if(seen[k]) return false; seen[k]=1; return true;
+    });
+  })();
   const byDay = {};
   let openIn = null, openInId = null;
   logs.forEach(function(r){
     const t = new Date(r.ts);
     const dayKey = t.toLocaleDateString('en-AU',{day:'2-digit',month:'2-digit',year:'numeric'});
     if(!byDay[dayKey]) byDay[dayKey] = {date:t, in:null, out:null, hours:0, in_id:'', out_id:''};
-    if(r.action === 'in'){ openIn = t; openInId = r.id; byDay[dayKey].in = t; byDay[dayKey].in_id = r.id; }
+    if(r.action === 'in'){
+      // earliest IN of the day wins (shift start)
+      if(!byDay[dayKey].in || t < byDay[dayKey].in){ byDay[dayKey].in = t; byDay[dayKey].in_id = r.id; }
+      if(!openIn){ openIn = t; openInId = r.id; }
+    }
     else if(r.action === 'out'){
-      byDay[dayKey].out = t;
-      byDay[dayKey].out_id = r.id;
+      // latest OUT of the day wins (shift end)
+      if(!byDay[dayKey].out || t > byDay[dayKey].out){ byDay[dayKey].out = t; byDay[dayKey].out_id = r.id; }
       if(openIn){
         const span = t - openIn;
         if(span > 0 && span < 24*60*60*1000){
@@ -13982,15 +14065,27 @@ async function renderHoursTable(targetStaff, startStr, endStr, el, allowEdit){
   logs = (logs||[]).filter(function(r){ const t = new Date(r.ts); return t >= start && t <= end; });
   if(!logs.length){ el.innerHTML = '<div style="color:#94a3b8;text-align:center;padding:30px;">No clock-ins in this range.</div>'; return; }
   logs.sort(function(a,b){return new Date(a.ts) - new Date(b.ts);});
+  // DEDUPE duplicate rows (same action + same minute) from historical pileup
+  (function(){
+    const seen = {};
+    logs = logs.filter(function(r){
+      const t = new Date(r.ts);
+      const k = r.action+'|'+t.getFullYear()+'-'+(t.getMonth()+1)+'-'+t.getDate()+'|'+t.getHours()+':'+t.getMinutes();
+      if(seen[k]) return false; seen[k]=1; return true;
+    });
+  })();
   const byDay = {};
   let openIn = null;
   logs.forEach(function(r){
     const t = new Date(r.ts);
     const dayKey = t.toLocaleDateString('en-AU',{day:'2-digit',month:'2-digit',year:'numeric'});
     if(!byDay[dayKey]) byDay[dayKey] = {date:t, in:null, out:null, hours:0, in_id:'', out_id:''};
-    if(r.action === 'in'){ openIn = t; byDay[dayKey].in = t; byDay[dayKey].in_id = r.id; }
+    if(r.action === 'in'){
+      if(!byDay[dayKey].in || t < byDay[dayKey].in){ byDay[dayKey].in = t; byDay[dayKey].in_id = r.id; }
+      if(!openIn) openIn = t;
+    }
     else if(r.action === 'out'){
-      byDay[dayKey].out = t; byDay[dayKey].out_id = r.id;
+      if(!byDay[dayKey].out || t > byDay[dayKey].out){ byDay[dayKey].out = t; byDay[dayKey].out_id = r.id; }
       if(openIn){
         const span = t - openIn;
         if(span > 0 && span < 24*60*60*1000){ byDay[dayKey].hours += span/3600000; }
@@ -14535,12 +14630,14 @@ async function savePunchEdit(){
     document.getElementById('punchEditBack').style.display='none';
     // Refresh Who's Working immediately so the just-clocked-in staff appears
     if(typeof loadWhosWorking === 'function') setTimeout(loadWhosWorking, 300);
-    // Refresh ALL relevant views — always, in case they're rendered offscreen
+    // Refresh ALL relevant views — always, in case they're rendered offscreen.
+    // Delay must exceed the in-function 300ms delete+insert consistency wait so
+    // the re-render reads the freshly-written single in/out pair, not stale rows.
     setTimeout(function(){
       if(typeof runReport === 'function' && document.getElementById('reportsBack') && document.getElementById('reportsBack').style.display !== 'none') runReport();
       if(typeof runHoursReport === 'function' && document.getElementById('rsec-hours')) runHoursReport();
       if(typeof runManagerReport === 'function' && document.getElementById('rsec-manager') && document.getElementById('mgrStaffSel') && document.getElementById('mgrStaffSel').value) runManagerReport();
-    }, 200);
+    }, 800);
     // Refresh own clock state if editing own
     if(staff === me){
       await loadAllClockLogs();
