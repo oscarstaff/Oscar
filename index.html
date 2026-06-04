@@ -16823,12 +16823,29 @@ async function openCustomQuizEditor(quizId){
 async function publishQuiz(quizId){
   if(!confirm('Publish this quiz?\n\nIt will become visible to staff with access and they will get a notification.')) return;
   try{
-    // Flip status to published
-    await fetch(SB+'/rest/v1/custom_quizzes?id=eq.'+quizId, {
+    // Flip status to published — and CHECK it worked
+    const pr = await fetch(SB+'/rest/v1/custom_quizzes?id=eq.'+quizId, {
       method:'PATCH',
-      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=representation'},
       body: JSON.stringify({ status: 'published' })
     });
+    if(!pr.ok){
+      const msg = await pr.text();
+      showToast('Publish failed ('+pr.status+'): '+msg.slice(0,140), 'error');
+      return;
+    }
+    // confirm the row really is published now (catches RLS row-filtered no-op updates)
+    let updated = [];
+    try{ updated = await pr.json(); }catch(e){}
+    if(!updated.length){
+      // representation returned nothing -> update matched no row (RLS or bad id)
+      showToast('Publish did not apply — check quiz update permissions (RLS).', 'error');
+      return;
+    }
+    if(updated[0].status !== 'published'){
+      showToast('Status did not change — still "'+updated[0].status+'".', 'error');
+      return;
+    }
     // Get quiz info + access list to send pushes
     const [quizRows, accessRows] = await Promise.all([
       sbGet('custom_quizzes', '?id=eq.'+quizId),

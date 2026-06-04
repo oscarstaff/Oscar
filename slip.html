@@ -36,7 +36,7 @@ input,textarea{width:100%;font-family:'Inter';font-size:14px;color:var(--ink);ba
 input:focus,textarea:focus{outline:none;border-color:var(--accent);}
 .field{margin-bottom:15px;}
 .row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
-.line-item{display:grid;grid-template-columns:1fr 90px 90px 40px;gap:8px;align-items:center;margin-bottom:9px;}
+.line-item{display:grid;grid-template-columns:1fr 64px 80px 80px 36px;gap:7px;align-items:center;margin-bottom:9px;}
 .line-item input{padding:9px 10px;font-size:13px;}
 .li-del{background:#fdecec;border:1px solid #f5c2c2;color:#c0392b;border-radius:8px;height:38px;cursor:pointer;font-size:16px;line-height:1;transition:all .15s;}
 .li-del:hover{background:#c0392b;color:#fff;}
@@ -51,6 +51,19 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent);}
 .total-box{background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff;border-radius:12px;padding:16px 20px;display:flex;justify-content:space-between;align-items:center;margin-top:14px;}
 .total-box .lbl{font-size:13px;opacity:.85;text-transform:uppercase;letter-spacing:.5px;}
 .total-box .amt{font-family:'Fraunces',serif;font-size:26px;font-weight:600;}
+
+/* ── Invoice layout (printable) ── */
+.inv-head{display:flex;justify-content:space-between;align-items:flex-start;padding:34px 40px 8px;}
+.inv-title{font-family:'Fraunces',serif;font-size:46px;font-weight:600;color:var(--ink);line-height:1;}
+.inv-co{text-align:right;font-size:13px;line-height:1.6;color:var(--ink);}
+.inv-co b{font-weight:700;}
+.inv-meta{display:flex;gap:34px;padding:6px 40px 14px;font-size:13.5px;flex-wrap:wrap;}
+.inv-meta .mi span{color:var(--ink-dim);font-weight:600;}
+.inv-meta .mi b{font-weight:700;border-bottom:1px solid var(--ink);padding:0 28px 1px 6px;}
+.inv-sect{font-size:12px;font-weight:700;letter-spacing:1.2px;color:var(--ink);padding:6px 40px;text-transform:uppercase;}
+.inv-bill{padding:2px 40px 14px;font-size:13.5px;line-height:2;}
+.inv-bill .k{display:inline-block;min-width:64px;color:var(--ink-dim);font-weight:600;}
+.inv-bill .v{font-weight:600;border-bottom:1px dotted #9aa6b3;padding:0 6px 1px;}
 
 /* ── Receipt preview (the printable doc) ── */
 .receipt{background:#fff;border:1px solid var(--line);border-radius:14px;padding:0;overflow:hidden;box-shadow:var(--shadow);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;}
@@ -84,6 +97,18 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent);}
 .r-total .box b{font-family:'Inter',sans-serif;font-size:28px;font-weight:800;letter-spacing:.5px;}
 .r-foot{text-align:center;font-size:11.5px;color:var(--ink-dim);padding:20px 40px 30px;border-top:1px solid var(--line);line-height:1.7;margin-top:24px;}
 .r-foot .ref{color:var(--brand2);font-weight:700;margin-bottom:6px;font-size:12px;}
+
+/* invoice bottom: notes + totals */
+.inv-bottom{display:flex;gap:18px;padding:14px 40px 4px;align-items:flex-start;}
+.inv-notes{flex:1;border:1px dashed var(--ink-dim);border-radius:6px;padding:12px 14px;min-height:150px;font-size:13px;}
+.inv-notes .nt-lbl{font-weight:700;margin-bottom:6px;}
+.inv-notes .nt-body{white-space:pre-wrap;line-height:1.6;color:var(--ink);}
+.inv-tot{width:270px;}
+.inv-tot .tr{display:flex;align-items:stretch;border:1px solid var(--ink);border-bottom:none;}
+.inv-tot .tr:last-child{border-bottom:1px solid var(--ink);}
+.inv-tot .tl{flex:1;padding:9px 12px;text-align:right;font-weight:700;letter-spacing:.8px;font-size:12px;text-transform:uppercase;}
+.inv-tot .tv{width:110px;border-left:1px solid var(--ink);padding:9px 12px;text-align:right;font-weight:700;font-size:13.5px;}
+.inv-tot .grand .tl,.inv-tot .grand .tv{background:var(--brand);color:#fff;}
 
 .empty{text-align:center;color:var(--ink-dim);padding:50px 20px;}
 .empty .ic{font-size:40px;margin-bottom:12px;}
@@ -180,10 +205,21 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent);}
           <div class="field"><label>Receipt Number</label><input id="f-num" readonly></div>
           <div class="field"><label>Receipt Date</label><input id="f-date" readonly></div>
         </div>
-        <div class="field"><label>Student Name</label><input id="f-name" placeholder="ABC Singh" oninput="renderReceipt()"></div>
-        <label>Payment items</label>
+        <div class="field"><label>Student / Client Name</label><input id="f-name" placeholder="ABC Singh" oninput="renderReceipt()"></div>
+        <div class="row">
+          <div class="field"><label>Phone</label><input id="f-phone" placeholder="123-445-7890" oninput="renderReceipt()"></div>
+          <div class="field"><label>Email</label><input id="f-email" placeholder="name@mail.com" oninput="renderReceipt()"></div>
+        </div>
+        <div class="field"><label>Address</label><input id="f-addr" placeholder="Street, City, State" oninput="renderReceipt()"></div>
+        <label>Items</label>
+        <div class="line-head" style="display:grid;grid-template-columns:1fr 64px 80px 80px 36px;gap:7px;font-size:10.5px;font-weight:700;color:var(--ink-dim);text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px;padding:0 2px;"><span>Description</span><span>Qty</span><span>Cost</span><span>Disc</span><span></span></div>
         <div id="lineItems"></div>
         <button class="btn btn-add" onclick="addLine()">+ Add item</button>
+        <div class="row" style="margin-top:12px;">
+          <div class="field"><label>Tax</label><input id="f-tax" inputmode="decimal" placeholder="0" oninput="renderReceipt()"></div>
+          <div class="field"><label>Shipping</label><input id="f-ship" inputmode="decimal" placeholder="0" oninput="renderReceipt()"></div>
+        </div>
+        <div class="field"><label>Notes</label><textarea id="f-notes" rows="3" placeholder="Notes…" oninput="renderReceipt()" style="resize:vertical;"></textarea></div>
         <div class="total-box"><span class="lbl">Total Paid</span><span class="amt" id="f-total">$0</span></div>
         <div class="actions">
           <button class="btn btn-primary" onclick="saveReceipt()">Save &amp; Finish</button>
@@ -194,27 +230,38 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent);}
       <!-- preview -->
       <div>
         <div class="receipt" id="receiptPrint">
-          <div class="r-head">
-            <div class="co" id="r-co">Oscars Training Center</div>
-            <div class="addr" id="r-addr">6/5 King St, Rockdale NSW 2216, Australia<br>Phone: +61 451 995 201</div>
+          <div class="inv-head">
+            <div class="inv-title">Invoice</div>
+            <div class="inv-co" id="r-co-block"><b id="r-co">Oscars Training Center</b><br><span id="r-addr">6/5 King St, Rockdale NSW 2216, Australia</span></div>
           </div>
-          <div class="r-title">FEE RECEIPT SLIP</div>
-          <div class="r-body">
-            <div class="r-meta">
-              <div class="mi"><span>Receipt No.</span><b id="r-num">—</b></div>
-              <div class="mi right"><span>Date</span><b id="r-date">—</b></div>
-            </div>
-            <div class="r-section-label">Student Information</div>
-            <div class="r-info-row"><span class="k">Name</span><span class="v" id="r-name">—</span></div>
-            <div class="r-section-label">Payment Details</div>
+          <div class="inv-meta">
+            <div class="mi"><span>Invoice No:</span> <b id="r-num">—</b></div>
+            <div class="mi"><span>Date:</span> <b id="r-date">—</b></div>
+          </div>
+          <div class="inv-sect">Billing Information</div>
+          <div class="inv-bill">
+            <div><span class="k">Name:</span> <span class="v" id="r-name">—</span></div>
+            <div><span class="k">Address:</span> <span class="v" id="r-baddr">—</span></div>
+            <div><span class="k">Phone:</span> <span class="v" id="r-bphone">—</span> &nbsp; <span class="k">Email:</span> <span class="v" id="r-bemail">—</span></div>
+          </div>
+          <div style="padding:6px 40px 0;">
             <table class="r-table">
-              <thead><tr><th>Description</th><th class="num">Price</th><th class="num">Discount</th><th class="num">Amount AUD</th></tr></thead>
+              <thead><tr><th>Description</th><th class="num">Quantity</th><th class="num">Cost</th><th class="num">Amount</th></tr></thead>
               <tbody id="r-rows"></tbody>
             </table>
-            <div class="r-total"><div class="box"><span>Total Amount Paid</span><b id="r-total">$0</b></div></div>
+          </div>
+          <div class="inv-bottom">
+            <div class="inv-notes"><div class="nt-lbl">Notes:</div><div class="nt-body" id="r-notes"></div></div>
+            <div class="inv-tot">
+              <div class="tr"><div class="tl">Sub Total</div><div class="tv" id="r-sub">$0</div></div>
+              <div class="tr"><div class="tl">Discount</div><div class="tv" id="r-disc">$0</div></div>
+              <div class="tr"><div class="tl">Tax</div><div class="tv" id="r-taxv">$0</div></div>
+              <div class="tr"><div class="tl">Shipping</div><div class="tv" id="r-shipv">$0</div></div>
+              <div class="tr grand"><div class="tl">Total</div><div class="tv" id="r-total">$0</div></div>
+            </div>
           </div>
           <div class="r-foot">
-            <div class="ref">Please use this receipt number as payment reference.</div>
+            <div class="ref">Please use the invoice number as payment reference.</div>
             <div id="r-foot-co">Oscars Training Center · 6/5 King St, Rockdale NSW 2216, Australia · +61 451 995 201</div>
           </div>
         </div>
@@ -249,7 +296,7 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent);}
 
 <script>
 const LS={settings:'slip_settings',receipts:'slip_receipts',nextNum:'slip_nextnum'};
-let lineData=[{desc:'',price:'',disc:''}];
+let lineData=[{desc:'',qty:'',price:'',disc:''}];
 
 function loadSettings(){
   let s={};try{s=JSON.parse(localStorage.getItem(LS.settings))||{};}catch(e){}
@@ -271,7 +318,7 @@ function saveSettings(){
 function applySettingsToReceipt(){
   const co=document.getElementById('s-co').value,addr=document.getElementById('s-addr').value,ph=document.getElementById('s-phone').value;
   document.getElementById('r-co').textContent=co;
-  document.getElementById('r-addr').innerHTML=addr+'<br>Phone: '+ph;
+  document.getElementById('r-addr').innerHTML=addr;
   document.getElementById('r-foot-co').textContent=co+' · '+addr+' · '+ph;
 }
 function getNextNum(){let nn=parseInt(localStorage.getItem(LS.nextNum));if(!nn||isNaN(nn))nn=2650;return nn;}
@@ -284,14 +331,15 @@ function renderLines(){
   lineData.forEach((li,i)=>{
     const div=document.createElement('div');div.className='line-item';
     div.innerHTML=`<input placeholder="Description" value="${li.desc.replace(/"/g,'&quot;')}" oninput="updLine(${i},'desc',this.value)">
-      <input placeholder="Price" inputmode="decimal" value="${li.price}" oninput="updLine(${i},'price',this.value)">
+      <input placeholder="Qty" inputmode="decimal" value="${li.qty}" oninput="updLine(${i},'qty',this.value)">
+      <input placeholder="Cost" inputmode="decimal" value="${li.price}" oninput="updLine(${i},'price',this.value)">
       <input placeholder="Disc" inputmode="decimal" value="${li.disc}" oninput="updLine(${i},'disc',this.value)">
       <button class="li-del" onclick="delLine(${i})">×</button>`;
     c.appendChild(div);
   });
 }
-function addLine(){lineData.push({desc:'',price:'',disc:''});renderLines();renderReceipt();}
-function delLine(i){if(lineData.length===1){lineData=[{desc:'',price:'',disc:''}];}else lineData.splice(i,1);renderLines();renderReceipt();}
+function addLine(){lineData.push({desc:'',qty:'',price:'',disc:''});renderLines();renderReceipt();}
+function delLine(i){if(lineData.length===1){lineData=[{desc:'',qty:'',price:'',disc:''}];}else lineData.splice(i,1);renderLines();renderReceipt();}
 function updLine(i,k,v){lineData[i][k]=v;renderReceipt();}
 
 function renderReceipt(){
@@ -300,18 +348,30 @@ function renderReceipt(){
   const today=fmtDate(new Date());
   document.getElementById('r-date').textContent=today;document.getElementById('f-date').value=today;
   document.getElementById('r-name').textContent=document.getElementById('f-name').value||'—';
+  document.getElementById('r-baddr').textContent=document.getElementById('f-addr').value||'—';
+  document.getElementById('r-bphone').textContent=document.getElementById('f-phone').value||'—';
+  document.getElementById('r-bemail').textContent=document.getElementById('f-email').value||'—';
+  document.getElementById('r-notes').textContent=document.getElementById('f-notes').value||'';
   const rows=document.getElementById('r-rows');rows.innerHTML='';
-  let total=0,n=0;
+  let sub=0,discTot=0,n=0;
   lineData.forEach(li=>{
-    if(!li.desc&&!li.price)return;
+    if(!li.desc&&!li.price&&!li.qty)return;
     n++;
-    const price=parseFloat(li.price)||0,disc=parseFloat(li.disc)||0,amt=price-disc;
-    total+=amt;
+    const qty=parseFloat(li.qty)||1,price=parseFloat(li.price)||0,disc=parseFloat(li.disc)||0;
+    const amt=qty*price-disc;
+    sub+=qty*price;discTot+=disc;
     const tr=document.createElement('tr');
-    tr.innerHTML=`<td>${n}) ${(li.desc||'').toUpperCase()}</td><td class="num">${money(price)}</td><td class="num">${money(disc)}</td><td class="num">${money(amt)}</td>`;
+    tr.innerHTML=`<td>${(li.desc||'').toUpperCase()}</td><td class="num">${qty}</td><td class="num">${money(price)}</td><td class="num">${money(amt)}</td>`;
     rows.appendChild(tr);
   });
   if(n===0)rows.innerHTML='<tr><td colspan="4" style="text-align:center;color:#9aa6b3;padding:20px;">No items yet</td></tr>';
+  const tax=parseFloat(document.getElementById('f-tax').value)||0;
+  const ship=parseFloat(document.getElementById('f-ship').value)||0;
+  const total=sub-discTot+tax+ship;
+  document.getElementById('r-sub').textContent=money(sub);
+  document.getElementById('r-disc').textContent=money(discTot);
+  document.getElementById('r-taxv').textContent=money(tax);
+  document.getElementById('r-shipv').textContent=money(ship);
   document.getElementById('r-total').textContent=money(total);
   document.getElementById('f-total').textContent=money(total);
 }
@@ -350,24 +410,29 @@ async function downloadPDF(){
 
 function saveReceipt(){
   const name=document.getElementById('f-name').value.trim();
-  if(!name){toast('Enter a student name first');return;}
-  const items=lineData.filter(li=>li.desc||li.price);
+  if(!name){toast('Enter a name first');return;}
+  const items=lineData.filter(li=>li.desc||li.price||li.qty);
   if(!items.length){toast('Add at least one item');return;}
-  let total=0;items.forEach(li=>{total+=(parseFloat(li.price)||0)-(parseFloat(li.disc)||0);});
+  let sub=0,discTot=0;items.forEach(li=>{const q=parseFloat(li.qty)||1,p=parseFloat(li.price)||0,d=parseFloat(li.disc)||0;sub+=q*p;discTot+=d;});
+  const tax=parseFloat(document.getElementById('f-tax').value)||0;
+  const ship=parseFloat(document.getElementById('f-ship').value)||0;
+  const total=sub-discTot+tax+ship;
   const num=getNextNum();
-  const rec={num:num,date:fmtDate(new Date()),name:name,id:'',items:items,total:total,savedAt:Date.now()};
+  const rec={num:num,date:fmtDate(new Date()),name:name,
+    addr:document.getElementById('f-addr').value,phone:document.getElementById('f-phone').value,
+    email:document.getElementById('f-email').value,notes:document.getElementById('f-notes').value,
+    tax:tax,ship:ship,id:'',items:items,total:total,savedAt:Date.now()};
   let all=[];try{all=JSON.parse(localStorage.getItem(LS.receipts))||[];}catch(e){}
   all.unshift(rec);localStorage.setItem(LS.receipts,JSON.stringify(all.slice(0,500)));
-  // increment number
   localStorage.setItem(LS.nextNum,num+1);
   document.getElementById('s-nextnum').value=num+1;
-  toast('Receipt #'+num+' saved');
+  toast('Invoice #'+num+' saved');
   resetForm();
   renderHistory();
 }
 function resetForm(){
-  lineData=[{desc:'',price:'',disc:''}];
-  document.getElementById('f-name').value='';
+  lineData=[{desc:'',qty:'',price:'',disc:''}];
+  ['f-name','f-addr','f-phone','f-email','f-notes','f-tax','f-ship'].forEach(id=>document.getElementById(id).value='');
   renderLines();renderReceipt();
 }
 function renderHistory(){
@@ -383,19 +448,21 @@ function renderHistory(){
   });
 }
 function loadReceipt(r){
-  // load into form as a view (doesn't change next number)
   showPage('new');
-  document.getElementById('f-name').value=r.name;
-  lineData=r.items.map(li=>({desc:li.desc,price:li.price,disc:li.disc}));
+  document.getElementById('f-name').value=r.name||'';
+  document.getElementById('f-addr').value=r.addr||'';
+  document.getElementById('f-phone').value=r.phone||'';
+  document.getElementById('f-email').value=r.email||'';
+  document.getElementById('f-notes').value=r.notes||'';
+  document.getElementById('f-tax').value=r.tax||'';
+  document.getElementById('f-ship').value=r.ship||'';
+  lineData=r.items.map(li=>({desc:li.desc||'',qty:li.qty||'',price:li.price||'',disc:li.disc||''}));
   renderLines();
-  // show its original number/date
+  renderReceipt();
+  // override with original number/date (renderReceipt uses next num)
   document.getElementById('r-num').textContent=r.num;document.getElementById('f-num').value=r.num;
   document.getElementById('r-date').textContent=r.date;document.getElementById('f-date').value=r.date;
-  document.getElementById('r-name').textContent=r.name;
-  const rows=document.getElementById('r-rows');rows.innerHTML='';let n=0;
-  r.items.forEach(li=>{n++;const price=parseFloat(li.price)||0,disc=parseFloat(li.disc)||0;rows.innerHTML+=`<tr><td>${n}) ${(li.desc||'').toUpperCase()}</td><td class="num">${money(price)}</td><td class="num">${money(disc)}</td><td class="num">${money(price-disc)}</td></tr>`;});
-  document.getElementById('r-total').textContent=money(r.total);document.getElementById('f-total').textContent=money(r.total);
-  toast('Loaded #'+r.num+' (read-only view)');
+  toast('Loaded #'+r.num+' (view)');
 }
 
 function showPage(p){
