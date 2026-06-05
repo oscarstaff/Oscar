@@ -503,31 +503,9 @@
     }
     const hasValue = (f, v) => f.type === 'checkbox' ? !!v : (v != null && v !== '');
 
-    function PdfPreview({ pdfJsDoc, fields, values, currentPage, onPageChange, pageCount, scale: _ignoredScale, highlightedFieldName, onFieldClick }) {
+    function PdfPreview({ pdfJsDoc, fields, values, currentPage, onPageChange, pageCount, scale, onZoom, highlightedFieldName, onFieldClick }) {
       const canvasRef = useRef(null);
-      const paneRef = useRef(null);
       const [renderedSize, setRenderedSize] = useState({ width: 0, height: 0 });
-      const [scale, setScale] = useState(1.2);
-
-      // fit the page to the available pane width (so the whole page is visible)
-      useEffect(() => {
-        if (!pdfJsDoc) return;
-        let cancelled = false;
-        const fit = async () => {
-          try {
-            const page = await pdfJsDoc.getPage(currentPage);
-            const natural = page.getViewport({ scale: 1 });
-            const pane = paneRef.current;
-            const avail = (pane ? pane.clientWidth : 700) - 48; // minus padding
-            let s = avail / natural.width;
-            s = Math.max(0.4, Math.min(2.2, s)); // clamp
-            if (!cancelled) setScale(s);
-          } catch (e) { /* ignore */ }
-        };
-        fit();
-        window.addEventListener('resize', fit);
-        return () => { cancelled = true; window.removeEventListener('resize', fit); };
-      }, [pdfJsDoc, currentPage]);
 
       useEffect(() => {
         if (!pdfJsDoc || !canvasRef.current) return;
@@ -587,7 +565,7 @@
       }, [fields, currentPage, scale]);
 
       return (
-        <div className="pdf-pane" ref={paneRef}>
+        <div className="pdf-pane">
           <div className="pdf-toolbar">
             <div className="page-nav">
               <button onClick={() => onPageChange(currentPage - 1)} disabled={currentPage <= 1}>
@@ -597,6 +575,11 @@
               <button onClick={() => onPageChange(currentPage + 1)} disabled={currentPage >= pageCount}>
                 <i className="fa-solid fa-chevron-right" />
               </button>
+            </div>
+            <div className="page-nav" style={{ marginLeft: 8 }}>
+              <button onClick={() => onZoom && onZoom(-0.15)} disabled={scale <= 0.5} title="Zoom out"><i className="fa-solid fa-minus" /></button>
+              <span>{Math.round(scale * 100)}%</span>
+              <button onClick={() => onZoom && onZoom(0.15)} disabled={scale >= 2.5} title="Zoom in"><i className="fa-solid fa-plus" /></button>
             </div>
           </div>
           <div className="pdf-page-wrap" style={{ width: renderedSize.width || undefined, height: renderedSize.height || undefined }}>
@@ -840,7 +823,7 @@
       const [fileName, setFileName] = useState('');
       const [pageCount, setPageCount] = useState(1);
       const [currentPage, setCurrentPage] = useState(1);
-      const [scale] = useState(1.2);
+      const [scale, setScale] = useState(1.2);
       const [values, setValues] = useState({});
       const [mode, setMode] = useState('fill');
       const [busy, setBusy] = useState(false);
@@ -1241,6 +1224,7 @@
                 onPageChange={setCurrentPage}
                 pageCount={pageCount}
                 scale={scale}
+                onZoom={(d) => setScale(s => Math.max(0.5, Math.min(2.5, +(s + d).toFixed(2))))}
                 highlightedFieldName={highlight}
                 onFieldClick={handleFieldClick}
               />
