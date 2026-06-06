@@ -211,18 +211,9 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent);}
         <div class="line-head" style="display:grid;grid-template-columns:1fr 64px 80px 80px 36px;gap:7px;font-size:10.5px;font-weight:700;color:var(--ink-dim);text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px;padding:0 2px;"><span>Description</span><span>Qty</span><span>Unit $</span><span>Disc</span><span></span></div>
         <div id="lineItems"></div>
         <button class="btn btn-add" onclick="addLine()">+ Add item</button>
-        <div class="row" style="margin-top:12px;">
-          <div class="field"><label>GST</label>
-            <select id="f-gstmode" oninput="renderReceipt()" style="width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:9px;font-size:14px;font-family:inherit;">
-              <option value="excl">GST exclusive (add 10%)</option>
-              <option value="incl">GST inclusive (in price)</option>
-              <option value="none">No GST</option>
-            </select>
-          </div>
-          <div class="field"><label>Shipping</label><input id="f-ship" inputmode="decimal" placeholder="0" oninput="renderReceipt()"></div>
-        </div>
+        <div class="field" style="margin-top:12px;"><label>Shipping</label><input id="f-ship" inputmode="decimal" placeholder="0" oninput="renderReceipt()"></div>
         <div class="field"><label>Notes</label><textarea id="f-notes" rows="3" placeholder="Notes…" oninput="renderReceipt()" style="resize:vertical;"></textarea></div>
-        <div class="total-box"><span class="lbl">Total Paid</span><span class="amt" id="f-total">$0</span></div>
+        <div class="total-box"><span class="lbl">Total Amount</span><span class="amt" id="f-total">$0</span></div>
         <div class="actions">
           <button class="btn btn-primary" onclick="saveReceipt()">Save &amp; Finish</button>
           <button class="btn btn-ghost" onclick="downloadPDF()">⬇ Save as PDF</button>
@@ -267,7 +258,6 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent);}
                 <th>Description</th>
                 <th class="num">Quantity</th>
                 <th class="num">Unit Price</th>
-                <th class="num">GST</th>
                 <th class="num">Amount AUD</th>
               </tr></thead>
               <tbody id="r-rows"></tbody>
@@ -277,10 +267,8 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent);}
               <div class="inv-tot">
                 <div class="tr"><span class="tl">Subtotal</span><span class="tv" id="r-sub">$0.00</span></div>
                 <div class="tr" id="r-disc-row"><span class="tl">Discount</span><span class="tv" id="r-disc">$0.00</span></div>
-                <div class="tr"><span class="tl">TOTAL GST 10%</span><span class="tv" id="r-gst">$0.00</span></div>
                 <div class="tr" id="r-ship-row"><span class="tl">Shipping</span><span class="tv" id="r-shipv">$0.00</span></div>
-                <div class="tr total"><span class="tl">TOTAL AUD</span><span class="tv" id="r-total">$0.00</span></div>
-                <div class="tr due"><span class="tl">Amount Due</span><span class="tv" id="r-due-amt">$0.00</span></div>
+                <div class="tr due"><span class="tl">Total Amount</span><span class="tv" id="r-total">$0.00</span></div>
               </div>
             </div>
 
@@ -412,40 +400,31 @@ function renderReceipt(){
   document.getElementById('r-notes').textContent=notesV;
   document.getElementById('r-notes-wrap').style.display=notesV?'':'none';
 
-  const gstMode=document.getElementById('f-gstmode').value; // excl|incl|none
   const rows=document.getElementById('r-rows');rows.innerHTML='';
-  let sub=0,discTot=0,gstTot=0,n=0;
+  let sub=0,discTot=0,n=0;
   lineData.forEach(li=>{
     if(!li.desc&&!li.price&&!li.qty)return;
     n++;
     const qty=parseFloat(li.qty)||1,price=parseFloat(li.price)||0,disc=parseFloat(li.disc)||0;
-    let lineNet=qty*price-disc;          // amount shown in row (ex-GST for excl, inc for incl)
-    let lineGst=0, lineEx=lineNet;
-    if(gstMode==='excl'){lineGst=lineNet*0.10;}
-    else if(gstMode==='incl'){lineEx=lineNet/1.10;lineGst=lineNet-lineEx;}
-    sub+=lineEx; discTot+=disc; gstTot+=lineGst;
-    const amtCol=(gstMode==='excl')?lineNet:lineNet; // Amount AUD = the net entered
+    const amt=qty*price-disc;
+    sub+=qty*price; discTot+=disc;
     const tr=document.createElement('tr');
     tr.innerHTML=`<td class="desc">${(li.desc||'').toUpperCase()}</td>`+
       `<td class="num">${qty}</td>`+
       `<td class="num">${money(price)}</td>`+
-      `<td class="num">${gstMode==='none'?'—':money(lineGst)}</td>`+
-      `<td class="num">${money(amtCol)}</td>`;
+      `<td class="num">${money(amt)}</td>`;
     rows.appendChild(tr);
   });
-  if(n===0)rows.innerHTML='<tr><td colspan="5" style="text-align:center;color:#9aa6b3;padding:22px;">No items yet</td></tr>';
+  if(n===0)rows.innerHTML='<tr><td colspan="4" style="text-align:center;color:#9aa6b3;padding:22px;">No items yet</td></tr>';
   const ship=parseFloat(document.getElementById('f-ship').value)||0;
-  // subtotal = ex-GST goods + shipping (treat shipping ex-GST simple)
-  const subTotal=sub+ship;
-  const total=subTotal+gstTot;
+  const subTotal=sub;
+  const total=subTotal-discTot+ship;
   document.getElementById('r-sub').textContent=money(subTotal);
   document.getElementById('r-disc').textContent=money(discTot);
   document.getElementById('r-disc-row').style.display=discTot>0?'':'none';
-  document.getElementById('r-gst').textContent=money(gstTot);
   document.getElementById('r-shipv').textContent=money(ship);
   document.getElementById('r-ship-row').style.display=ship>0?'':'none';
   document.getElementById('r-total').textContent=money(total);
-  document.getElementById('r-due-amt').textContent=money(total);
   document.getElementById('f-total').textContent=money(total);
 }
 
@@ -486,18 +465,14 @@ function saveReceipt(){
   if(!name){toast('Enter a name first');return;}
   const items=lineData.filter(li=>li.desc||li.price||li.qty);
   if(!items.length){toast('Add at least one item');return;}
-  const gstMode=document.getElementById('f-gstmode').value;
-  let sub=0,discTot=0,gstTot=0;
-  items.forEach(li=>{const q=parseFloat(li.qty)||1,p=parseFloat(li.price)||0,d=parseFloat(li.disc)||0;
-    let net=q*p-d,ex=net,g=0;
-    if(gstMode==='excl')g=net*0.10;else if(gstMode==='incl'){ex=net/1.10;g=net-ex;}
-    sub+=ex;discTot+=d;gstTot+=g;});
+  let sub=0,discTot=0;
+  items.forEach(li=>{const q=parseFloat(li.qty)||1,p=parseFloat(li.price)||0,d=parseFloat(li.disc)||0;sub+=q*p;discTot+=d;});
   const ship=parseFloat(document.getElementById('f-ship').value)||0;
-  const total=sub+ship+gstTot;
+  const total=sub-discTot+ship;
   const num=getNextNum();
   const rec={num:num,date:fmtDate(new Date()),
     due:document.getElementById('f-due').value,ref:document.getElementById('f-ref').value,
-    gstMode:gstMode,name:name,
+    name:name,
     addr:document.getElementById('f-addr').value,phone:document.getElementById('f-phone').value,
     email:document.getElementById('f-email').value,notes:document.getElementById('f-notes').value,
     ship:ship,items:items,total:total,savedAt:Date.now()};
@@ -512,7 +487,6 @@ function saveReceipt(){
 function resetForm(){
   lineData=[{desc:'',qty:'',price:'',disc:''}];
   ['f-name','f-addr','f-phone','f-email','f-notes','f-ship','f-due','f-ref'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
-  document.getElementById('f-gstmode').value='excl';
   renderLines();renderReceipt();
 }
 function renderHistory(){
@@ -537,7 +511,6 @@ function loadReceipt(r){
   document.getElementById('f-ship').value=r.ship||'';
   document.getElementById('f-due').value=r.due||'';
   document.getElementById('f-ref').value=r.ref||'';
-  document.getElementById('f-gstmode').value=r.gstMode||'excl';
   lineData=r.items.map(li=>({desc:li.desc||'',qty:li.qty||'',price:li.price||'',disc:li.disc||''}));
   renderLines();
   renderReceipt();
