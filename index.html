@@ -10464,6 +10464,10 @@ function toggleTaskDone(id){
   t.doneAt = t.done ? new Date().toISOString() : null;
   saveTasks();
   if(typeof pushTaskToSupabase === 'function') pushTaskToSupabase(t);
+  // Shared task: notify the original creator when recipient completes it (ANY-completes model)
+  if(t.sharedFrom && !wasDone && t.done && typeof notifyTaskCompleted==='function'){
+    notifyTaskCompleted(t);
+  }
   // Animate the row before re-rendering moves it
   const row = document.querySelector('.task-item[data-id="'+id+'"]');
   const finishToggle = function(){
@@ -14843,25 +14847,86 @@ async function openShareTask(taskId){
     bd.addEventListener('click', function(e){ if(e.target===bd) closeShareTask(); });
   }
   const all = (typeof STAFF !== 'undefined') ? STAFF.filter(function(n){return n && n!==me;}) : [];
+
+  // Fetch team membership for everyone so we can offer team quick-picks
+  let teamOf = {};
+  try{
+    const rows = await sbGet('staff_credentials','?select=staff_name,team&team=not.is.null');
+    (rows||[]).forEach(function(r){ if(r.team) teamOf[r.staff_name] = r.team; });
+  }catch(e){ teamOf = {}; }
+
+  // Group staff by team ('No team' bucket last)
+  const groups = {};
+  all.forEach(function(name){
+    const tm = teamOf[name] || 'No team';
+    (groups[tm] = groups[tm] || []).push(name);
+  });
+  const teamNames = Object.keys(groups).filter(function(x){return x!=='No team';}).sort();
+  if(groups['No team']) teamNames.push('No team');
+
+  function avaRow(name){
+    const init = name.split(' ').map(function(w){return w[0];}).join('').slice(0,2);
+    const color = (typeof rtAvaColor==='function') ? rtAvaColor(name) : '#64748b';
+    const tm = teamOf[name] || 'No team';
+    return '<div class="share-staff-row" data-name="'+name.replace(/"/g,'&quot;')+'" data-team="'+tm.replace(/"/g,'&quot;')+'" onclick="this.classList.toggle(\'selected\');shareUpdateCount();">'+
+      '<div class="share-staff-ava" style="background:'+color+';">'+init.toUpperCase()+'</div>'+
+      '<div class="share-staff-name">'+name+'</div>'+
+      '<div class="share-check"></div>'+
+    '</div>';
+  }
+
+  // Quick-pick chips: Everyone, My team (if set), then each other team
+  let chips = '<div class="share-chip" data-pick="all" onclick="sharePick(\'all\')">Everyone</div>';
+  if(myTeam && teamNames.indexOf(myTeam)>=0){
+    chips += '<div class="share-chip share-chip-mine" data-pick="team:'+myTeam.replace(/"/g,'&quot;')+'" onclick="sharePick(\'team:'+myTeam.replace(/'/g,"\\'")+'\')">My team · '+myTeam+'</div>';
+  }
+  teamNames.forEach(function(tm){
+    if(tm===myTeam) return; // already shown as "My team"
+    chips += '<div class="share-chip" data-pick="team:'+tm.replace(/"/g,'&quot;')+'" onclick="sharePick(\'team:'+tm.replace(/'/g,"\\'")+'\')">'+tm+'</div>';
+  });
+  chips += '<div class="share-chip share-chip-clear" onclick="sharePick(\'none\')">Clear</div>';
+
+  // Staff list grouped by team with section labels
+  let listHtml = '';
+  teamNames.forEach(function(tm){
+    listHtml += '<div class="share-team-label">'+tm+'</div>'+groups[tm].map(avaRow).join('');
+  });
+
   bd.innerHTML = '<div class="share-modal" onclick="event.stopPropagation()">'+
-    '<div class="share-hd"><h3>Share task with team</h3><button onclick="closeShareTask()" style="background:none;border:none;font-size:22px;color:#94a3b8;cursor:pointer;">×</button></div>'+
-    '<div class="share-staff-list" id="shareStaffList">'+
-      all.map(function(name){
-        const init = name.split(' ').map(function(w){return w[0];}).join('').slice(0,2);
-        const color = (typeof rtAvaColor==='function') ? rtAvaColor(name) : '#64748b';
-        return '<div class="share-staff-row" data-name="'+name.replace(/"/g,'&quot;')+'" onclick="this.classList.toggle(\'selected\')">'+
-          '<div class="share-staff-ava" style="background:'+color+';">'+init.toUpperCase()+'</div>'+
-          '<div class="share-staff-name">'+name+'</div>'+
-          '<div class="share-check"></div>'+
-        '</div>';
-      }).join('')+
-    '</div>'+
+    '<div class="share-hd"><h3>Share task</h3><button onclick="closeShareTask()" style="background:none;border:none;font-size:22px;color:#94a3b8;cursor:pointer;">×</button></div>'+
+    '<div class="share-chips">'+chips+'</div>'+
+    '<div class="share-staff-list" id="shareStaffList">'+listHtml+'</div>'+
     '<div class="share-actions">'+
+      '<span id="shareCount" style="font-size:12px;color:#94a3b8;margin-right:auto;align-self:center;"></span>'+
       '<button onclick="closeShareTask()" class="btn btn-outline" style="padding:8px 14px;font-size:12px;">Cancel</button>'+
       '<button onclick="confirmShareTask()" class="btn btn-green" style="padding:8px 18px;font-size:12px;">Share</button>'+
     '</div>'+
   '</div>';
   bd.style.display='flex';
+  shareUpdateCount();
+}
+
+// Quick-pick: select all / a team / clear. Toggles .selected on rows.
+function sharePick(pick){
+  const rows = document.querySelectorAll('#shareStaffList .share-staff-row');
+  if(pick==='all'){
+    rows.forEach(function(r){ r.classList.add('selected'); });
+  } else if(pick==='none'){
+    rows.forEach(function(r){ r.classList.remove('selected'); });
+  } else if(pick.indexOf('team:')===0){
+    const tm = pick.slice(5);
+    // If every member of this team is already selected, toggle them off; else select them
+    const members = Array.prototype.filter.call(rows, function(r){ return r.dataset.team===tm; });
+    const allSel = members.length && members.every(function(r){ return r.classList.contains('selected'); });
+    members.forEach(function(r){ r.classList.toggle('selected', !allSel); });
+  }
+  shareUpdateCount();
+}
+
+function shareUpdateCount(){
+  const n = document.querySelectorAll('#shareStaffList .share-staff-row.selected').length;
+  const el = document.getElementById('shareCount');
+  if(el) el.textContent = n ? (n+' selected') : '';
 }
 
 function closeShareTask(){
@@ -14963,6 +15028,34 @@ async function loadSharedTasksFromOthers(){
       if(typeof showToast==='function') showToast(added+' shared task'+(added===1?'':'s')+' added');
     }
   }catch(e){console.warn('loadSharedTasks:',e);}
+}
+
+// ── SHARED TASK COMPLETION → notify creator (ANY-completes) ──
+// Recipient's imported task has id 'shared_<sourceRowId>' and sharedFrom=<creator>.
+// On completion: mark the shared_tasks row done, then drop a bell notification
+// into reply_notifications addressed to the creator. Reuses existing notif channel.
+async function notifyTaskCompleted(t){
+  try{
+    const rowId = String(t.id||'').indexOf('shared_')===0 ? t.id.slice(7) : null;
+    if(!rowId) return;
+    const title = t.title || 'a task';
+    // 1. Mark shared_tasks row complete (best-effort; column may not exist on old schema)
+    try{
+      await fetch(SB+'/rest/v1/shared_tasks?id=eq.'+encodeURIComponent(rowId),{
+        method:'PATCH',
+        headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+        body: JSON.stringify({status:'done', completed_by: me, completed_at: new Date().toISOString()})
+      });
+    }catch(e){ /* schema without status cols — notif still fires */ }
+    // 2. Bell notification to the original creator via reply_notifications
+    await sbPost('reply_notifications',{
+      recipient: t.sharedFrom,
+      reply_id: 'taskdone_'+rowId,
+      reply_body: 'task completed: '+title.slice(0,60),
+      annoucement_title: title.slice(0,80),
+      replied_by: me
+    });
+  }catch(e){ console.warn('notifyTaskCompleted:',e); }
 }
 
 // ── ATTACHMENTS (Phase 4) ──────────────────
@@ -15625,9 +15718,22 @@ async function loadNotifications(){
     });
     if(sysSeenChanged) localStorage.setItem(sysSeenKey, JSON.stringify(sysSeen.slice(-100)));
     newRepliesList.forEach(function(r){
+      const body = (r.body || r.reply_body || '');
       const isMention = (r.body && r.body.indexOf('mentioned you')>=0) || (r.reply_body && r.reply_body.indexOf('mention')===0);
+      const isTaskDone = body.indexOf('task completed:')===0 || (r.reply_id && String(r.reply_id).indexOf('taskdone_')===0);
+      if(isTaskDone){
+        const who = r.replier || r.replied_by || 'Someone';
+        const taskTitle = body.replace(/^task completed: ?/i,'') || (r.annoucement_title||'a task');
+        replyHtml+='<div style="background:var(--accent-dim);border:1px solid var(--accent-bd);border-radius:12px;padding:14px;margin-bottom:10px;cursor:pointer;" data-rid="'+r.id+'" onclick="markReplySeen(this.dataset.rid);goTo(\'tasks\');">'+
+          '<div style="width:7px;height:7px;border-radius:50%;background:var(--accent);margin-bottom:8px;"></div>'+
+          '<div style="font-size:13px;font-weight:700;color:var(--accent-text);margin-bottom:4px;">\u2713 Task completed</div>'+
+          '<div style="font-size:12.5px;color:#475569;">'+who+' completed a task you shared</div>'+
+          '<div style="font-size:11px;color:#94a3b8;margin-top:4px;font-style:italic;">'+taskTitle.slice(0,80)+(taskTitle.length>=80?'...':'')+'</div>'+
+          '</div>';
+        return;
+      }
       const heading = isMention ? 'Mentioned you' : 'New reply';
-      const bodyText = (r.body || r.reply_body || '').replace(/^mentioned you: ?/i,'').replace(/^mention in (announcement|discussion): ?/i,'');
+      const bodyText = body.replace(/^mentioned you: ?/i,'').replace(/^mention in (announcement|discussion): ?/i,'');
       const subText = isMention
         ? r.replier + ' mentioned you'
         : r.replier + ' replied to your discussion';
@@ -19686,6 +19792,45 @@ input:focus{
 
 /* ── 15. btn-green contrast guard (light) ────────────────────── */
 .btn-green{ color:#fff !important; }
+
+/* ── 16. Share modal: team quick-pick chips + grouped list ───── */
+.share-chips{
+  display:flex;flex-wrap:wrap;gap:7px;
+  padding:4px 0 12px;margin-bottom:4px;
+  border-bottom:1px solid var(--m-border);
+}
+.share-chip{
+  font-size:12px;font-weight:650;
+  padding:6px 13px;border-radius:var(--m-r-pill);
+  border:1.5px solid var(--m-border-hi);
+  color:var(--m-ink-2);background:var(--m-card);
+  cursor:pointer;user-select:none;
+  transition:background .14s,border-color .14s,color .14s,transform .08s;
+}
+.share-chip:hover{ border-color:var(--accent-bd);color:var(--m-ink);background:var(--m-card-2); }
+.share-chip:active{ transform:scale(.96); }
+.share-chip-mine{
+  border-color:var(--accent-bd);
+  color:var(--accent-text);
+  background:var(--accent-dim);
+}
+.share-chip-clear{ margin-left:auto;color:var(--m-ink-3); }
+.share-team-label{
+  font-size:10.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--m-ink-3);
+  padding:12px 4px 5px;
+}
+.share-team-label:first-child{ padding-top:4px; }
+[data-theme="dark"] .share-chip{ background:var(--m-card-2);border-color:var(--m-border-hi);color:var(--m-ink-2); }
+[data-theme="dark"] .share-chip-mine{ background:var(--accent-dim);color:var(--accent-text);border-color:var(--accent-bd); }
+
+/* Share modal surface — warm in both themes */
+.share-modal{ background:var(--m-card) !important; border-radius:var(--m-r) !important; box-shadow:var(--m-sh-3) !important; }
+.share-hd{ border-bottom:1px solid var(--m-border) !important; }
+.share-hd h3{ color:var(--m-ink) !important; font-family:'Fraunces','Inter',Georgia,serif !important; }
+.share-staff-row:hover{ background:var(--m-card-2) !important; }
+.share-staff-row.selected{ background:var(--accent-dim) !important; }
+.share-staff-name{ color:var(--m-ink) !important; }
 </style>
 
 </body>
