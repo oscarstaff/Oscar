@@ -66,6 +66,7 @@ body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);min-
 .mode-btn.sel{border-color:var(--gold);color:var(--gold);background:rgba(232,184,74,.08);}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 </head>
 <body>
 <div class="wrap">
@@ -79,7 +80,7 @@ body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);min-
       </div>
       <div class="game-card" style="--accent:#e05a3f;" onclick="openGame('kart')">
         <span class="ico">🏎️</span><h3>GRAND KART</h3>
-        <p>Top-down racing against three CPU karts. Steer, drift the corners, three laps — first across the line wins.</p>
+        <p>One long lap against three CPU karts — big straights, sweeping turns. First across the line wins.</p>
         <div class="best" id="best-kart" style="color:#e05a3f;">WINS: 0</div>
       </div>
     </div>
@@ -100,6 +101,24 @@ body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);min-
       <div class="mode-select" style="width:100%;max-width:560px;" id="modeSelect">
         <button class="mode-btn sel" id="mode-ai" onclick="poolSetMode('ai')">vs CPU</button>
         <button class="mode-btn" id="mode-solo" onclick="poolSetMode('solo')">Solo practice</button>
+        <button class="mode-btn" id="mode-online" onclick="poolSetMode('online')">Online 2P</button>
+      </div>
+      <div id="onlinePanel" style="display:none;width:100%;max-width:560px;background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:6px;">
+        <div id="onlineSetup">
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+            <button class="btn-primary" id="btnCreateRoom" onclick="poolCreateRoom()">Create room</button>
+            <span style="color:var(--text-dim);font-size:13px;">or</span>
+            <input id="joinCodeInput" maxlength="5" placeholder="CODE" style="text-transform:uppercase;width:90px;padding:10px;border:1px solid var(--border);border-radius:10px;font-family:'Outfit';font-weight:700;font-size:15px;letter-spacing:2px;text-align:center;">
+            <button class="mode-btn" style="flex:0 0 auto;" id="btnJoinRoom" onclick="poolJoinRoom()">Join</button>
+          </div>
+          <div id="onlineErr" style="color:#d33;font-size:12px;margin-top:8px;display:none;"></div>
+        </div>
+        <div id="onlineStatus" style="display:none;align-items:center;gap:10px;flex-wrap:wrap;">
+          <span style="font-size:13px;color:var(--text-dim);">Room</span>
+          <span id="roomCode" style="font-family:'Outfit';font-weight:800;font-size:20px;letter-spacing:3px;color:var(--gold);"></span>
+          <span id="roomState" style="font-size:13px;color:var(--text-dim);"></span>
+          <button class="mode-btn" style="flex:0 0 auto;margin-left:auto;" onclick="poolLeaveRoom()">Leave</button>
+        </div>
       </div>
       <div id="poolWrap">
         <canvas id="poolCanvas" width="560" height="304"></canvas>
@@ -120,6 +139,7 @@ body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);min-
     <div class="topbar">
       <button class="back-btn" onclick="closeGame()">← Back</button>
       <span class="game-title">GRAND KART</span>
+      <button class="back-btn" id="kartSfxBtn" onclick="toggleKartSfx()" title="Sound on/off" style="margin-left:auto;">🔊</button>
       <span class="status-pill" id="kartStatus">Get ready…</span>
     </div>
     <div class="pool-stage">
@@ -140,9 +160,9 @@ body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);min-
         </div>
       </div>
       <div class="pool-hud">
-        <button class="btn-primary" onclick="showTrackPicker()">Change track</button>
+        <button class="btn-primary" onclick="kartNewRace()">Restart race</button>
       </div>
-      <div class="hint">Desktop: <b>↑/W</b> gas, <b>↓/S</b> brake/reverse, <b>←→/AD</b> steer. Mobile: use the on-screen buttons. Three laps, four karts — get to the front and hold the line.</div>
+      <div class="hint">Desktop: <b>↑/W</b> gas, <b>↓/S</b> brake/reverse, <b>←→/AD</b> steer. Mobile: use the on-screen buttons. One long lap, four karts — get to the front and hold the line.</div>
     </div>
   </div>
 </div>
@@ -165,73 +185,56 @@ body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);min-
 // ════════════════════ GRAND KART ════════════════════
 let kartRAF=null,kartWins=0,kctx=null,kcv=null;
 let karts=[],kartKeys={},kartState='ready',kartCountdown=0,kartLastT=0;
-const KK={W:560,H:360,LAPS:2,WORLD:2.6};
-// World is KK.W*WORLD by KK.H*WORLD; we render scaled-down so the track sprawls
+const KK={W:560,H:360,LAPS:1,WORLD:2.6, WORLD_W:11000, WORLD_H:5200};
+// World is WORLD_W x WORLD_H; render canvas stays 560x360 (camera follows the kart).
 // across a much larger area (zoomed-out camera). Physics run in WORLD coords.
-function worldW(){return KK.W*KK.WORLD;}
-function worldH(){return KK.H*KK.WORLD;}
+function worldW(){return KK.WORLD_W;}
+function worldH(){return KK.WORLD_H;}
 
-// ── TRACK LIBRARY: 6 themed circuits, each its own waypoint shape + colours ──
-// wp = clockwise centerline; roadw = half road width; theme = palette/flavour.
+// ── TRACK: one long, mostly-straight circuit (~1 min/lap) ──
+// Big stadium: two long straights + two gentle end sweeps + a soft kink. Authored
+// in a large space; scaled into the world by WORLD. roadw = half road width.
 const KTRACKS={
-  shanghai:{
-    name:'Shanghai', flag:'🇨🇳', desc:'Long neon river circuit', scenery:'shanghai',
-    roadw:26,
-    grass:'#2a4a6a', road:'#3a4150', edge:'#4a5260', line:'rgba(120,200,255,.4)',
-    wp:[{x:120,y:80},{x:230,y:58},{x:340,y:70},{x:430,y:60},{x:500,y:120},{x:470,y:185},{x:500,y:250},{x:430,y:310},{x:330,y:285},{x:280,y:330},{x:200,y:310},{x:150,y:250},{x:210,y:195},{x:120,y:150}]
-  },
-  kathmandu:{
-    name:'Kathmandu', flag:'🇳🇵', desc:'Long mountain switchbacks', scenery:'kathmandu',
-    roadw:32,
-    grass:'#3a5a3a', road:'#5a4a3a', edge:'#6a5a44', line:'rgba(255,235,180,.35)',
-    wp:[{x:90,y:75},{x:200,y:60},{x:300,y:110},{x:210,y:155},{x:300,y:195},{x:400,y:150},{x:480,y:90},{x:500,y:200},{x:430,y:250},{x:480,y:310},{x:340,y:320},{x:280,y:270},{x:190,y:300},{x:110,y:255},{x:150,y:170}]
-  },
-  hongkong:{
-    name:'Hong Kong', flag:'🇭🇰', desc:'Long harbour street circuit', scenery:'hongkong',
-    roadw:24,
-    grass:'#1f3a4a', road:'#444b54', edge:'#565d68', line:'rgba(255,210,120,.4)',
-    wp:[{x:100,y:75},{x:230,y:65},{x:360,y:75},{x:470,y:85},{x:490,y:150},{x:400,y:160},{x:340,y:130},{x:300,y:185},{x:380,y:215},{x:480,y:215},{x:470,y:300},{x:350,y:320},{x:300,y:275},{x:200,y:300},{x:130,y:280},{x:90,y:185}]
-  },
-  lima:{
-    name:'Lima', flag:'🇵🇪', desc:'Long coastal sweep', scenery:'lima',
-    roadw:28,
-    grass:'#b89a6a', road:'#4a4f57', edge:'#5a5f67', line:'rgba(255,255,255,.4)',
-    wp:[{x:110,y:100},{x:230,y:70},{x:350,y:85},{x:450,y:70},{x:500,y:140},{x:450,y:200},{x:500,y:270},{x:410,y:300},{x:320,y:260},{x:260,y:300},{x:180,y:280},{x:140,y:320},{x:80,y:240},{x:130,y:170}]
-  },
-  ulaanbaatar:{
-    name:'Ulaanbaatar', flag:'🇲🇳', desc:'Long open steppe', scenery:'ulaanbaatar',
+  grandmile:{
+    name:'Grand Mile', flag:'🏁', desc:'Long circuit — two big straights, sweeping ends', scenery:'shanghai',
     roadw:30,
-    grass:'#6a8a4a', road:'#7a6a4a', edge:'#8a7a54', line:'rgba(255,250,220,.35)',
-    wp:[{x:120,y:90},{x:260,y:65},{x:400,y:80},{x:490,y:140},{x:450,y:200},{x:500,y:270},{x:400,y:315},{x:280,y:290},{x:220,y:325},{x:140,y:290},{x:90,y:210},{x:150,y:150}]
-  },
-  almaty:{
-    name:'Almaty', flag:'🇰🇿', desc:'Long alpine hairpins', scenery:'almaty',
-    roadw:34,
-    grass:'#cdd6dd', road:'#48505a', edge:'#5a626c', line:'rgba(200,225,255,.45)',
-    wp:[{x:95,y:85},{x:220,y:65},{x:330,y:105},{x:240,y:150},{x:340,y:185},{x:450,y:140},{x:500,y:210},{x:430,y:255},{x:490,y:310},{x:360,y:320},{x:300,y:270},{x:200,y:305},{x:120,y:265},{x:140,y:170}]
+    grass:'#2a4a6a', road:'#3a4150', edge:'#4a5260', line:'rgba(120,200,255,.4)',
+    wp:[
+      // bottom straight, left -> right (long)
+      {x:375,y:1500},{x:875,y:1520},{x:1438,y:1495},{x:2063,y:1520},{x:2688,y:1500},{x:3250,y:1515},
+      // right end sweep, up (gentle)
+      {x:3625,y:1440},{x:3850,y:1280},{x:3900,y:1060},{x:3850,y:840},{x:3650,y:680},
+      // top straight, right -> left (long) with one soft kink
+      {x:3250,y:600},{x:2688,y:580},{x:2125,y:620},{x:1563,y:585},{x:975,y:610},{x:538,y:640},
+      // left end sweep, down (gentle)
+      {x:288,y:780},{x:213,y:1000},{x:231,y:1240},{x:300,y:1400}
+    ]
   }
 };
-let kartTrackId='shanghai';
+let kartTrackId='grandmile';
 let KTRACK=null;
 
 function setKartTrack(id){
   kartTrackId=id;
   const src=KTRACKS[id];
   const S=KK.WORLD;
-  // scale the authored (small-space) waypoints + road into the larger world
+  // centre of the authored bbox, scaled — used for distant-mountain ring etc.
+  const xs=src.wp.map(p=>p.x),ys=src.wp.map(p=>p.y);
+  const cx=((Math.min(...xs)+Math.max(...xs))/2)*S, cy=((Math.min(...ys)+Math.max(...ys))/2)*S;
   KTRACK=Object.assign({},src,{
     roadw:src.roadw*S,
     wp:src.wp.map(p=>({x:p.x*S,y:p.y*S})),
-    cx:280*S, cy:180*S
+    cx, cy
   });
 }
-setKartTrack('shanghai');
+setKartTrack('grandmile');
 
 function kartInit(){
   kcv=document.getElementById('kartCanvas');
   if(!window.THREE){alert('3D engine still loading — try again in a moment.');return;}
   kart3DSetup();
-  showTrackPicker();
+  setKartTrack('grandmile');
+  kartNewRace();
 }
 function showTrackPicker(){
   if(kartRAF)cancelAnimationFrame(kartRAF);
@@ -275,6 +278,7 @@ function kartNewRace(){
     });
   }
   kartState='ready';kartCountdown=3.2;
+  T3._cx=undefined;T3._cz=undefined;
   // dispose old scene + build fresh 3D scene for this track
   T3.ready=false;
   buildScene3D();
@@ -350,6 +354,7 @@ function kartPhysics(k,dt){
     k.wpIdx=(k.wpIdx+1)%KTRACK.wp.length;
     if(k.wpIdx===1){ // just crossed wp0 = start/finish line, completed a circuit
       k.lap++;
+      if(k.isPlayer&&k.lap<KK.LAPS)KS.lap();
       if(k.lap>=KK.LAPS){k.finished=true;k.finishT=performance.now();onKartFinish(k);}
     }
   }
@@ -357,10 +362,11 @@ function kartPhysics(k,dt){
 }
 
 function kartCollisions(){
-  const HIT=18*KK.WORLD;
+  const HIT=22;  // kart meshes ~18 wide (wheels at ±9); collide only when bodies actually touch
   for(let i=0;i<karts.length;i++)for(let j=i+1;j<karts.length;j++){
     const a=karts[i],b=karts[j];const dx=b.x-a.x,dy=b.y-a.y,d=Math.hypot(dx,dy);
-    if(d<HIT&&d>0){const o=(HIT-d)/2,nx=dx/d,ny=dy/d;a.x-=nx*o;a.y-=ny*o;b.x+=nx*o;b.y+=ny*o;a.v*=0.85;b.v*=0.85;}
+    if(d<HIT&&d>0){const o=(HIT-d)/2,nx=dx/d,ny=dy/d;a.x-=nx*o;a.y-=ny*o;b.x+=nx*o;b.y+=ny*o;a.v*=0.85;b.v*=0.85;
+      const nowt=performance.now();if(nowt-(kartCollisions._lastBump||0)>140){kartCollisions._lastBump=nowt;KS.bump();}}
   }
 }
 
@@ -390,6 +396,7 @@ function updateKartHud(){
 
 function endKartRace(){
   kartState='done';
+  ksfxStopEngine();
   const order=rankKarts();
   const you=karts[0];
   const pos=order.indexOf(you)+1;
@@ -397,8 +404,8 @@ function endKartRace(){
   const msg=document.getElementById('kartMsg');
   const t=document.getElementById('kartMsgText');
   const place=['🥇 1st','🥈 2nd','🥉 3rd','4th'][pos-1];
-  if(won){t.textContent='🏆 YOU WON!';msg.className='msg-overlay win show';kartWins++;try{localStorage.setItem('arcade_best_kart',kartWins);}catch(e){}}
-  else{t.textContent='Finished '+place;msg.className='msg-overlay lose show';}
+  if(won){t.textContent='🏆 YOU WON!';msg.className='msg-overlay win show';kartWins++;try{localStorage.setItem('arcade_best_kart',kartWins);}catch(e){}KS.win();}
+  else{t.textContent='Finished '+place;msg.className='msg-overlay lose show';KS.lose();}
   document.getElementById('kartStatus').textContent='Race over — '+place;
 }
 
@@ -493,6 +500,68 @@ function drawScenery(g,id){
 
 // ════════════ REAL 3D (Three.js) — COCKPIT VIEW ════════════
 // Physics/AI run in 2D world (x,y,a). 3D maps: world x -> X, world y -> Z, height -> Y.
+// ════════════════════ KART SFX (WebAudio) ════════════════════
+const KSFX={ctx:null,on:true,engine:null,engGain:null,engOsc2:null,offNoise:null,offGain:null,started:false};
+function ksfxCtx(){
+  if(!KSFX.ctx){try{KSFX.ctx=new (window.AudioContext||window.webkitAudioContext)();}catch(e){KSFX.on=false;}}
+  if(KSFX.ctx&&KSFX.ctx.state==='suspended')KSFX.ctx.resume();
+  return KSFX.ctx;
+}
+function ktone(freq,dur,type,vol,slideTo){
+  if(!KSFX.on)return;const c=ksfxCtx();if(!c)return;
+  const o=c.createOscillator(),g=c.createGain();
+  o.type=type||'square';o.frequency.setValueAtTime(freq,c.currentTime);
+  if(slideTo)o.frequency.exponentialRampToValueAtTime(slideTo,c.currentTime+dur);
+  g.gain.setValueAtTime(0.0001,c.currentTime);
+  g.gain.exponentialRampToValueAtTime(vol||0.18,c.currentTime+0.012);
+  g.gain.exponentialRampToValueAtTime(0.0001,c.currentTime+dur);
+  o.connect(g).connect(c.destination);o.start();o.stop(c.currentTime+dur+0.02);
+}
+function ksfxStartEngine(){
+  const c=ksfxCtx();if(!c||!KSFX.on||KSFX.started)return;
+  // two detuned saws through a lowpass = engine drone
+  const o1=c.createOscillator(),o2=c.createOscillator(),g=c.createGain(),lp=c.createBiquadFilter();
+  o1.type='sawtooth';o2.type='sawtooth';o2.detune.value=18;
+  lp.type='lowpass';lp.frequency.value=900;
+  g.gain.value=0.0; o1.frequency.value=55;o2.frequency.value=55;
+  o1.connect(lp);o2.connect(lp);lp.connect(g).connect(c.destination);
+  o1.start();o2.start();
+  // off-road tyre rumble (filtered noise), gated by gain
+  const buf=c.createBuffer(1,c.sampleRate*1,c.sampleRate);const d=buf.getChannelData(0);
+  for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;
+  const noise=c.createBufferSource();noise.buffer=buf;noise.loop=true;
+  const ng=c.createGain();ng.gain.value=0;const nf=c.createBiquadFilter();nf.type='bandpass';nf.frequency.value=420;
+  noise.connect(nf).connect(ng).connect(c.destination);noise.start();
+  KSFX.engine=o1;KSFX.engOsc2=o2;KSFX.engGain=g;KSFX.offNoise=noise;KSFX.offGain=ng;KSFX.started=true;
+}
+function ksfxStopEngine(){
+  if(!KSFX.started)return;
+  try{KSFX.engine.stop();KSFX.engOsc2.stop();KSFX.offNoise.stop();}catch(e){}
+  KSFX.started=false;KSFX.engine=KSFX.engOsc2=KSFX.engGain=KSFX.offNoise=KSFX.offGain=null;
+}
+// called each frame with player's speed fraction (0..1) + offroad flag
+function ksfxEngineUpdate(spdFrac,offroad){
+  if(!KSFX.started||!KSFX.on)return;const c=KSFX.ctx;
+  const f=55+spdFrac*220;                 // idle 55Hz → ~275Hz flat out
+  KSFX.engine.frequency.setTargetAtTime(f,c.currentTime,0.06);
+  KSFX.engOsc2.frequency.setTargetAtTime(f,c.currentTime,0.06);
+  KSFX.engGain.gain.setTargetAtTime(0.04+spdFrac*0.10,c.currentTime,0.1);
+  KSFX.offGain.gain.setTargetAtTime(offroad?Math.min(0.12,0.03+spdFrac*0.14):0,c.currentTime,0.05);
+}
+const KS={
+  beep:()=>ktone(520,0.18,'square',0.2),
+  go:()=>{ktone(880,0.35,'square',0.26);setTimeout(()=>ktone(1180,0.3,'square',0.22),60);},
+  bump:()=>{ktone(150,0.16,'square',0.22,70);},
+  lap:()=>{ktone(700,0.1,'triangle',0.2);setTimeout(()=>ktone(1050,0.16,'triangle',0.2),90);},
+  win:()=>{[660,880,1100,1320].forEach((f,i)=>setTimeout(()=>ktone(f,0.22,'square',0.22),i*120));},
+  lose:()=>{[440,330,247].forEach((f,i)=>setTimeout(()=>ktone(f,0.26,'sawtooth',0.18),i*150));}
+};
+function toggleKartSfx(){
+  KSFX.on=!KSFX.on;
+  const b=document.getElementById('kartSfxBtn');if(b)b.textContent=KSFX.on?'🔊':'🔇';
+  if(!KSFX.on)ksfxStopEngine();
+}
+
 let T3={scene:null,cam:null,renderer:null,trackGroup:null,kartMeshes:[],ready:false};
 
 function kart3DSetup(){
@@ -500,7 +569,7 @@ function kart3DSetup(){
   const renderer=new THREE.WebGLRenderer({canvas:kcv,antialias:true});
   renderer.setSize(KK.W,KK.H,false);
   renderer.setPixelRatio(Math.min(2,window.devicePixelRatio||1));
-  const cam=new THREE.PerspectiveCamera(72,KK.W/KK.H,1,6000);
+  const cam=new THREE.PerspectiveCamera(72,KK.W/KK.H,1,12000);
   T3.renderer=renderer;T3.cam=cam;
 }
 
@@ -513,14 +582,14 @@ function buildScene3D(){
   const scene=new THREE.Scene();
   const sk=skyColors(KTRACK.scenery);
   scene.background=new THREE.Color(sk[0]);
-  scene.fog=new THREE.Fog(new THREE.Color(sk[1]).getHex(),300,2200);
+  scene.fog=new THREE.Fog(new THREE.Color(sk[1]).getHex(),900,6500);
   // lights
   scene.add(new THREE.AmbientLight(0xffffff,0.75));
   const sun=new THREE.DirectionalLight(0xffffff,0.7);sun.position.set(300,600,200);scene.add(sun);
   // ground
   const groundCol=new THREE.Color(KTRACK.grass||'#3a7d3a').getHex();
-  const ground=new THREE.Mesh(new THREE.PlaneGeometry(6000,6000),new THREE.MeshLambertMaterial({color:groundCol}));
-  ground.rotation.x=-Math.PI/2;ground.position.y=-0.2;scene.add(ground);
+  const ground=new THREE.Mesh(new THREE.PlaneGeometry(20000,20000),new THREE.MeshLambertMaterial({color:groundCol}));
+  ground.rotation.x=-Math.PI/2;ground.position.set(KTRACK.cx,-0.2,KTRACK.cy);scene.add(ground);
   // track mesh: build a flat ribbon from waypoint samples
   if(!KTRACK._samples)buildSamples(KTRACK);
   const sm=KTRACK._samples,half=KTRACK.roadw;
@@ -585,7 +654,7 @@ function build3DScenery(scene){
     const dx=b.x-a.x,dy=b.y-a.y,dl=Math.hypot(dx,dy)||1;const nx=-dy/dl,ny=dx/dl;
     [1,-1].forEach(side=>{
       if(rnd()>0.55)return;
-      const off=(KTRACK.roadw+40+rnd()*120)*side;
+      const off=(KTRACK.roadw*1.9+70+rnd()*180)*side;
       const px=a.x+nx*off, pz=a.y+ny*off;
       let mesh;
       if(kind==='shanghai'||kind==='hongkong'){
@@ -626,16 +695,18 @@ function kart3DRender(){
     const k=karts[i],m=T3.kartMeshes[i];if(!m)continue;
     m.position.set(k.x,0,k.y);
     m.rotation.y=-k.a+Math.PI/2;
-    m.visible=(i!==0)&&!k.finished?true:(i!==0);
+    m.visible=true;
   }
-  // cockpit camera: at the player's position, eye height, looking along heading
+  // 3rd-person chase camera: sit behind + above the kart, look ahead over it
   const p=karts[0];
-  const eyeH=14;
   const cosA=Math.cos(p.a),sinA=Math.sin(p.a);
-  // sit the eye a touch back from kart center
-  const ex=p.x-cosA*4, ez=p.y-sinA*4;
-  T3.cam.position.set(ex,eyeH,ez);
-  T3.cam.lookAt(p.x+cosA*60, eyeH-4, p.y+sinA*60);
+  const camBack=95, camHeight=58, lookAhead=70, lookH=10;
+  // smooth follow position
+  const tx=p.x-cosA*camBack, tz=p.y-sinA*camBack;
+  if(T3._cx===undefined){T3._cx=tx;T3._cz=tz;}
+  T3._cx=lerp(T3._cx,tx,0.18); T3._cz=lerp(T3._cz,tz,0.18);
+  T3.cam.position.set(T3._cx,camHeight,T3._cz);
+  T3.cam.lookAt(p.x+cosA*lookAhead, lookH, p.y+sinA*lookAhead);
   T3.renderer.render(T3.scene,T3.cam);
   // HUD overlays drawn via DOM (status pill / lap) already exist; countdown via overlay
   drawKartOverlay();
@@ -656,12 +727,20 @@ function kartLoop(){
   const now=performance.now();let dt=(now-kartLastT)/1000;kartLastT=now;
   if(dt>0.05)dt=0.05;
   if(kartState==='ready'){
+    const prev=kartCountdown;
     kartCountdown-=dt;
-    if(kartCountdown<=0){kartState='race';document.getElementById('kartStatus').textContent='Race!';}
+    // beep on each whole-second tick, GO when it hits zero
+    const pn=Math.ceil(prev-0.2),nn=Math.ceil(kartCountdown-0.2);
+    if(nn!==pn&&nn>0)KS.beep();
+    if(kartCountdown<=0){kartState='race';document.getElementById('kartStatus').textContent='Race!';ksfxStartEngine();KS.go();}
   }else if(kartState==='race'){
     karts.forEach(k=>kartPhysics(k,dt));
     kartCollisions();
     updateKartHud();
+    // engine pitch from player speed + off-road rumble
+    const p=karts[0];const spdFrac=Math.min(1,Math.abs(p.v)/(2.5*KK.WORLD));
+    const off=nearestSeg(p.x,p.y).dist>KTRACK.roadw;
+    ksfxEngineUpdate(spdFrac,off);
   }
   kart3DRender();
   if(kartState!=='done')kartRAF=requestAnimationFrame(kartLoop);
@@ -705,7 +784,7 @@ function buildProps(T){
     const nx=-diry/dl,ny=dirx/dl;
     [1,-1].forEach(side=>{
       if(rnd()>0.62)return;
-      const off=(T.roadw+30+rnd()*90)*side;
+      const off=(T.roadw*1.9+70+rnd()*150)*side;
       props.push({x:a.x+nx*off, y:a.y+ny*off, kind:kind, h:50+rnd()*150, w:24+rnd()*30, lit:rnd()>0.4, seed:rnd()});
     });
   }
@@ -728,22 +807,28 @@ function poolInit(){
   pcv=document.getElementById('poolCanvas');pctx=pcv.getContext('2d');
   poolNewGame();
 }
-function poolSetMode(m){poolMode=m;document.getElementById('mode-ai').classList.toggle('sel',m==='ai');document.getElementById('mode-solo').classList.toggle('sel',m==='solo');poolNewGame();}
-function poolNewGame(){
-  balls=[];pocketed=[];gameOver=false;turn='you';assigned={you:null,ai:null};ballInHand=false;
+function poolSetMode(m){
+  poolMode=m;
+  document.getElementById('mode-ai').classList.toggle('sel',m==='ai');
+  document.getElementById('mode-solo').classList.toggle('sel',m==='solo');
+  document.getElementById('mode-online').classList.toggle('sel',m==='online');
+  document.getElementById('onlinePanel').style.display=(m==='online')?'block':'none';
+  document.getElementById('modeSelect').style.display='flex';
+  if(m==='online'){
+    // don't auto-rack; wait for room create/join. show empty-ish table.
+    poolNewGameCore(); turn='host'; assigned={host:null,guest:null};
+    document.getElementById('poolStatus').textContent='Create or join a room';
+    poolDraw();
+  } else {
+    poolNewGame();
+  }
+}
+// rack + reset, no HUD text assumptions (shared by all modes)
+function poolNewGameCore(){
+  balls=[];pocketed=[];gameOver=false;ballInHand=false;
   document.getElementById('poolMsg').classList.remove('show','win','lose');
-  // cue ball
   balls.push({n:0,x:140,y:152,vx:0,vy:0,in:false,spin:0});
-  // rack 8 balls in triangle at right
-  // Standard rack: 8-ball in center, corners mixed, apex on the foot spot
-  // Rows (apex first): row0=apex, ... 8-ball is row2 middle
-  const rackRows=[
-    [1],            // apex
-    [9,2],          // row 2
-    [10,8,3],       // row 3 (8 in center)
-    [11,4,12,5],    // row 4
-    [6,13,7,14,15]  // back row (corners 6 & 15 = solid/stripe)
-  ];
+  const rackRows=[[1],[9,2],[10,8,3],[11,4,12,5],[6,13,7,14,15]];
   const startX=370,startY=152,gap=C.R*2+1.5;let placed=[];
   for(let col=0;col<rackRows.length;col++){
     const rowBalls=rackRows[col];
@@ -754,6 +839,15 @@ function poolNewGame(){
     }
   }
   placed.forEach(b=>balls.push(b));
+}
+function poolNewGame(){
+  if(poolMode==='online'){
+    // host re-racks and broadcasts; guest can't re-rack
+    if(netRole==='host'){ netSeq++; poolNewGameCore(); turn='host'; assigned={host:null,guest:null}; updateOnlineHud(); poolDraw(); dbWriteState({pendingShot:null}); }
+    return;
+  }
+  poolNewGameCore();
+  turn='you';assigned={you:null,ai:null};
   updatePoolHud();
   document.getElementById('poolStatus').textContent= poolMode==='solo'?'Solo practice':'Your break';
   poolDraw();
@@ -876,9 +970,172 @@ function poolEnd(youWin){
   updatePoolHud();
 }
 
+// ═══════════════ ONLINE 2P (Supabase realtime, host-authority) ═══════════════
+const PSB="https://jcfgldqrdbfkgbixszds.supabase.co";
+const PKEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpjZmdsZHFyZGJma2diaXhzemRzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1Nzc3NzEsImV4cCI6MjA5MDE1Mzc3MX0.Wj8cCpnlsoZOPj5sKWeEdfvgjG4Nc-UuTTYgbcrPfeI";
+let _psb=null, netRole=null, roomCode=null, netChan=null, netSeq=0, netReady=false;
+function psbClient(){
+  if(!_psb){ if(!window.supabase){return null;} _psb=window.supabase.createClient(PSB,PKEY); }
+  return _psb;
+}
+function onlineErr(msg){const e=document.getElementById('onlineErr');if(e){e.textContent=msg;e.style.display=msg?'block':'none';}}
+function genCode(){const c='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';let s='';for(let i=0;i<5;i++)s+=c[Math.floor(Math.random()*c.length)];return s;}
+function iAmOnTurn(){ if(poolMode!=='online')return turn==='you'; return turn===netRole; }
+
+function buildRackState(){ poolNewGameCore(); return serializeState('break'); }
+function serializeState(status){
+  return {
+    balls: balls.map(b=>({n:b.n,x:+b.x.toFixed(2),y:+b.y.toFixed(2),in:!!b.in})),
+    turn, assigned, ballInHand, status: status||(gameOver?'over':'play'), seq: netSeq
+  };
+}
+function applyState(st){
+  if(!st)return;
+  balls = st.balls.map(b=>({n:b.n,x:b.x,y:b.y,vx:0,vy:0,in:b.in,spin:Math.random()*7}));
+  turn = st.turn; assigned = st.assigned||{host:null,guest:null}; ballInHand = !!st.ballInHand;
+  gameOver = st.status==='over'; netSeq = st.seq||netSeq;
+  updateOnlineHud(); poolDraw();
+  if(gameOver){
+    const m=document.getElementById('poolMsg'),t=document.getElementById('poolMsgText');
+    const youWon = st.winner===netRole; m.classList.add('show',youWon?'win':'lose');
+    t.textContent = youWon?'YOU WIN! 🎉':'YOU LOSE';
+  }
+}
+function updateOnlineHud(){
+  const yl=document.getElementById('you-label'),al=document.getElementById('ai-label');
+  const grpName=g=>g==='solid'?'Solids':g==='stripe'?'Stripes':'—';
+  const opp = netRole==='host'?'guest':'host';
+  yl.textContent='You · '+grpName(assigned[netRole]);
+  al.textContent='Opponent · '+grpName(assigned[opp]);
+  document.getElementById('tag-you').classList.toggle('active',turn===netRole);
+  document.getElementById('tag-ai').classList.toggle('active',turn!==netRole);
+  const rs=document.getElementById('roomState');
+  if(rs)rs.textContent = !netReady?'waiting for opponent…':(turn===netRole?'Your shot':"Opponent's shot");
+  document.getElementById('poolStatus').textContent = !netReady?'Waiting for opponent…':(turn===netRole?(ballInHand?'Ball in hand':'Your shot'):"Opponent's turn");
+}
+async function dbWriteState(extra){
+  const c=psbClient();if(!c)return;
+  const st=serializeState(); if(extra)Object.assign(st,extra);
+  await c.from('pool_rooms').update({state:st, updated_at:new Date().toISOString()}).eq('code',roomCode);
+}
+function subscribeRoom(){
+  const c=psbClient();if(!c)return;
+  if(netChan)c.removeChannel(netChan);
+  netChan=c.channel('room-'+roomCode)
+    .on('postgres_changes',{event:'*',schema:'public',table:'pool_rooms',filter:'code=eq.'+roomCode},payload=>{
+      const row=payload.new; if(!row)return;
+      if(row.guest_joined && !netReady){ netReady=true; updateOnlineHud(); }
+      const st=row.state; if(!st)return;
+      if(netRole==='host' && st.pendingShot && st.pendingShot.seq>netSeq){
+        const ps=st.pendingShot; netSeq=ps.seq;
+        const cue=balls.find(b=>b.n===0);
+        if(ps.cueX!=null){cue.x=ps.cueX;cue.y=ps.cueY;ballInHand=false;}
+        simulateAndBroadcast(ps.angle,ps.power); return;
+      }
+      if(st.seq>=netSeq){ netSeq=st.seq; if(netRole==='guest') applyState(st); }
+    })
+    .subscribe();
+}
+async function poolCreateRoom(){
+  onlineErr('');
+  const c=psbClient(); if(!c){onlineErr('Network not ready — refresh and retry.');return;}
+  netRole='host'; roomCode=genCode(); netSeq=0; netReady=false;
+  const st=buildRackState();
+  const {error}=await c.from('pool_rooms').insert({code:roomCode, state:st, host_joined:true, guest_joined:false, updated_at:new Date().toISOString()});
+  if(error){onlineErr('Could not create room: '+error.message);return;}
+  showRoomActive(); subscribeRoom(); applyState(st);
+  document.getElementById('poolStatus').textContent='Share code '+roomCode+' — waiting…';
+}
+async function poolJoinRoom(){
+  onlineErr('');
+  const code=(document.getElementById('joinCodeInput').value||'').toUpperCase().trim();
+  if(code.length<4){onlineErr('Enter the 5-letter room code.');return;}
+  const c=psbClient(); if(!c){onlineErr('Network not ready — refresh and retry.');return;}
+  const {data,error}=await c.from('pool_rooms').select('*').eq('code',code).maybeSingle();
+  if(error||!data){onlineErr('Room not found.');return;}
+  netRole='guest'; roomCode=code; netReady=true; netSeq=(data.state&&data.state.seq)||0;
+  await c.from('pool_rooms').update({guest_joined:true, updated_at:new Date().toISOString()}).eq('code',code);
+  showRoomActive(); subscribeRoom(); applyState(data.state);
+}
+function showRoomActive(){
+  document.getElementById('onlineSetup').style.display='none';
+  document.getElementById('onlineStatus').style.display='flex';
+  document.getElementById('roomCode').textContent=roomCode; updateOnlineHud();
+}
+async function poolLeaveRoom(){
+  const c=psbClient();
+  if(c&&netChan)c.removeChannel(netChan);
+  if(c&&roomCode&&netRole==='host'){ try{await c.from('pool_rooms').delete().eq('code',roomCode);}catch(e){} }
+  netChan=null;roomCode=null;netRole=null;netReady=false;
+  document.getElementById('onlineSetup').style.display='block';
+  document.getElementById('onlineStatus').style.display='none';
+  document.getElementById('joinCodeInput').value='';
+}
+function simulateAndBroadcast(angle,power){
+  const cue=balls.find(b=>b.n===0);
+  cue.vx=Math.cos(angle)*power;cue.vy=Math.sin(angle)*power;
+  shooting=true;firstContact=null;pocketedThisShot=[];
+  poolRAF=requestAnimationFrame(poolLoopOnlineHost);
+}
+function poolLoopOnlineHost(){
+  const moving=poolStep(); poolDraw();
+  if(moving){poolRAF=requestAnimationFrame(poolLoopOnlineHost);}
+  else{ shooting=false; resolveShotOnline(); }
+}
+async function sendShotIntent(angle,power){
+  const cue=balls.find(b=>b.n===0);
+  netSeq++;
+  const ps={seq:netSeq,angle,power,cueX:ballInHand?cue.x:null,cueY:ballInHand?cue.y:null};
+  ballInHand=false;
+  document.getElementById('poolStatus').textContent='Shot sent…';
+  await dbWriteState({pendingShot:ps});
+}
+function resolveShotOnline(){
+  const cue=balls.find(b=>b.n===0);
+  let scratch=false;
+  if(cue.in){scratch=true;cue.in=false;cue.x=150;cue.y=152;cue.vx=0;cue.vy=0;ballInHand=true;}
+  const potted=pocketedThisShot.filter(n=>n!==0);
+  let winner=null, over=false;
+  if(pocketedThisShot.includes(8)){
+    const myGroup=assigned[turn];
+    const myRemaining=balls.filter(b=>!b.in&&inGroup(b.n,myGroup)).length;
+    if(myGroup&&myRemaining===0&&!scratch){winner=turn;} else {winner=(turn==='host'?'guest':'host');}
+    over=true;
+  }
+  if(!over && !assigned.host && potted.length){
+    const firstSolid=potted.some(n=>n>=1&&n<=7), firstStripe=potted.some(n=>n>=9&&n<=15);
+    const other=turn==='host'?'guest':'host';
+    if(firstSolid&&!firstStripe){assigned[turn]='solid';assigned[other]='stripe';}
+    else if(firstStripe&&!firstSolid){assigned[turn]='stripe';assigned[other]='solid';}
+  }
+  let continueTurn=false;
+  if(!over && !scratch && potted.length){
+    const g=assigned[turn];
+    if(!g)continueTurn=true; else if(potted.some(n=>inGroup(n,g)))continueTurn=true;
+  }
+  pocketedThisShot=[];firstContact=null;
+  if(over){ gameOver=true; } else if(!continueTurn){ turn=(turn==='host')?'guest':'host'; }
+  netSeq++;
+  updateOnlineHud(); poolDraw();
+  const st=serializeState(over?'over':'play'); st.pendingShot=null; if(over)st.winner=winner;
+  dbWriteState(st);
+  if(over){
+    const m=document.getElementById('poolMsg'),t=document.getElementById('poolMsgText');
+    const youWon=winner===netRole; m.classList.add('show',youWon?'win':'lose');
+    t.textContent=youWon?'YOU WIN! 🎉':'YOU LOSE';
+  }
+}
+
 // ---- shooting ----
 function poolShoot(angle,power){
   if(shooting||gameOver)return;
+  if(poolMode==='online'){
+    if(!netReady||turn!==netRole)return;          // not your turn
+    if(netRole==='guest'){ sendShotIntent(angle,power); return; }
+    // host: simulate locally + broadcast
+    document.getElementById('powerFill').style.width='0%';
+    simulateAndBroadcast(angle,power); return;
+  }
   const cue=balls.find(b=>b.n===0);
   cue.vx=Math.cos(angle)*power;cue.vy=Math.sin(angle)*power;
   shooting=true;firstContact=null;pocketedThisShot=[];
@@ -949,7 +1206,7 @@ function poolDraw(){
     pctx.strokeStyle='rgba(0,0,0,.5)';pctx.lineWidth=2;pctx.beginPath();pctx.arc(p[0],p[1],C.POCKET-1,0,7);pctx.stroke();
   });
   // aim line + trajectory prediction
-  if(aiming&&aimStart&&aimCur&&!shooting&&!gameOver&&turn==='you'){
+  if(aiming&&aimStart&&aimCur&&!shooting&&!gameOver&&iAmOnTurn()){
     const cue=balls.find(b=>b.n===0);
     const ang=Math.atan2(cue.y-aimCur.y,cue.x-aimCur.x);
     // raycast to find first ball the cue would hit
@@ -1033,6 +1290,7 @@ function roundRect(x,y,w,h,r){pctx.beginPath();pctx.moveTo(x+r,y);pctx.arcTo(x+w
 function poolXY(e){const r=pcv.getBoundingClientRect();const t=(e.touches&&e.touches[0])||(e.changedTouches&&e.changedTouches[0]);const clientX=t?t.clientX:e.clientX;const clientY=t?t.clientY:e.clientY;const cx=clientX-r.left,cy=clientY-r.top;return{x:cx*(C.W/r.width),y:cy*(C.H/r.height)};}
 function poolDown(e){
   if(shooting||gameOver||(poolMode==='ai'&&turn!=='you'))return;
+  if(poolMode==='online'&&(!netReady||turn!==netRole))return;
   const p=poolXY(e);
   const cue=balls.find(b=>b.n===0);
   if(ballInHand){
@@ -1053,7 +1311,7 @@ function poolUp(e){
 }
 
 function openGame(g){document.getElementById('menuScreen').classList.remove('show');document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById('screen-'+g).classList.add('active');if(g==='pool'){poolInit();}if(g==='kart'){kartInit();}}
-function closeGame(){if(poolRAF)cancelAnimationFrame(poolRAF);if(kartRAF)cancelAnimationFrame(kartRAF);document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById('menuScreen').classList.add('show');refreshBests();}
+function closeGame(){if(poolRAF)cancelAnimationFrame(poolRAF);if(kartRAF)cancelAnimationFrame(kartRAF);ksfxStopEngine();if(poolMode==='online'&&roomCode){poolLeaveRoom();}document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById('menuScreen').classList.add('show');refreshBests();}
 function refreshBests(){
   try{poolWins=parseInt(localStorage.getItem('arcade_best_pool'))||0;}catch(e){poolWins=0;}
   document.getElementById('best-pool').textContent='WINS: '+poolWins;
