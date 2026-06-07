@@ -19521,6 +19521,43 @@ window.addEventListener('resize', function(){
 
 
 
+<script id="nexus-pwtoggle-v1">
+/* Universal show/hide-password toggle.
+   Wraps every type=password input with an eye button. Idempotent.
+   Revert: delete this <script id="nexus-pwtoggle-v1"> block + its CSS in the modernize block. */
+(function(){
+  var EYE = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M1.5 10S4.5 4 10 4s8.5 6 8.5 6-3 6-8.5 6-8.5-6-8.5-6z"/><circle cx="10" cy="10" r="2.4"/></svg>';
+  var EYE_OFF = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M1.5 10S4.5 4 10 4s8.5 6 8.5 6-3 6-8.5 6-8.5-6-8.5-6z"/><circle cx="10" cy="10" r="2.4"/><line x1="3" y1="3" x2="17" y2="17"/></svg>';
+  function addToggle(inp){
+    if(!inp || inp.dataset.pwToggled) return;
+    if(inp.type !== 'password') return;
+    inp.dataset.pwToggled = '1';
+    var wrap = document.createElement('div');
+    wrap.className = 'pw-wrap';
+    inp.parentNode.insertBefore(wrap, inp);
+    wrap.appendChild(inp);
+    inp.classList.add('pw-has-toggle');
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'pw-eye';
+    btn.setAttribute('aria-label','Show password');
+    btn.tabIndex = -1;
+    btn.innerHTML = EYE;
+    btn.addEventListener('click', function(e){
+      e.preventDefault(); e.stopPropagation();
+      if(inp.type === 'password'){ inp.type = 'text'; btn.innerHTML = EYE_OFF; btn.setAttribute('aria-label','Hide password'); }
+      else { inp.type = 'password'; btn.innerHTML = EYE; btn.setAttribute('aria-label','Show password'); }
+    });
+    wrap.appendChild(btn);
+  }
+  function scan(){ document.querySelectorAll('input[type="password"]').forEach(addToggle); }
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', scan);
+  else scan();
+  document.addEventListener('click', function(){ setTimeout(scan, 60); }, true);
+})();
+</script>
+
+
 <style id="nexus-modernize-v1">
 /* ════════════════════════════════════════════════════════════════
    NEXUS · SOFT-WARM MODERNIZATION  (cascade-last override layer)
@@ -19831,6 +19868,45 @@ input:focus{
 .share-staff-row:hover{ background:var(--m-card-2) !important; }
 .share-staff-row.selected{ background:var(--accent-dim) !important; }
 .share-staff-name{ color:var(--m-ink) !important; }
+
+/* ── 17. Task SHARE button — make it visible & labeled ───────── */
+.task-share{
+  width:auto !important; height:auto !important;
+  border-radius:var(--m-r-pill) !important;
+  padding:6px 13px 6px 11px !important;
+  background:var(--accent-dim) !important;
+  border:1.5px solid var(--accent-bd) !important;
+  color:var(--accent-text) !important;
+  gap:6px !important;
+  font-size:12px !important; font-weight:700 !important;
+  box-shadow:var(--m-sh-1);
+}
+.task-share svg{ width:14px !important; height:14px !important; }
+.task-share::after{ content:"Share"; }
+.task-share:hover{
+  background:var(--accent) !important; color:#fff !important;
+  border-color:var(--accent) !important;
+  transform:translateY(-1px);
+  box-shadow:var(--m-sh-accent);
+}
+[data-theme="dark"] .task-share{ background:var(--accent-dim) !important; color:var(--accent-text) !important; border-color:var(--accent-bd) !important; }
+[data-theme="dark"] .task-share:hover{ background:var(--accent) !important; color:#06140f !important; }
+
+/* ── 18. Show/hide password eye toggle ───────────────────────── */
+.pw-wrap{ position:relative; display:block; }
+.pw-wrap input.pw-has-toggle{ padding-right:42px !important; width:100%; }
+.pw-eye{
+  position:absolute; top:50%; right:8px; transform:translateY(-50%);
+  width:30px; height:30px; padding:0;
+  display:flex; align-items:center; justify-content:center;
+  background:transparent; border:none; cursor:pointer;
+  color:var(--m-ink-3); border-radius:8px;
+  transition:color .14s, background .14s;
+}
+.pw-eye svg{ width:18px; height:18px; }
+.pw-eye:hover{ color:var(--accent-text); background:var(--accent-dim); }
+[data-theme="dark"] .pw-eye{ color:var(--m-ink-3); }
+[data-theme="dark"] .pw-eye:hover{ color:var(--accent-text); background:var(--accent-dim); }
 </style>
 
 </body>
