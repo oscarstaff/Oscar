@@ -4489,7 +4489,7 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
       <!-- HUB — external apps launcher (Mcd Connect style) -->
       <div class="nav-item" id="nav-hub" data-tab="hub" onclick="goTo('hub')">
         <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M3 4a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H5a2 2 0 01-2-2V4zm0 8a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H5a2 2 0 01-2-2v-2zm8-8a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V4zm0 8a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
-        Nexits
+        Nodes
       </div>
     </nav>
   </aside>
@@ -5054,7 +5054,7 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
     <div class="page" id="page-hub">
       <div class="hub-wrap">
         <div class="hub-hdr">
-          <h2>Nexits</h2>
+          <h2>Nodes</h2>
           <p>Productivity tools and apps for your team. Each opens in a new tab.</p>
         </div>
         <div class="hub-grid">
@@ -6709,7 +6709,7 @@ async function sbGet(t,f){
 }
 async function sbPost(t,b){return fetch(SB+"/rest/v1/"+t,{method:"POST",headers:{"apikey":KEY,"Authorization":"Bearer "+KEY,"Content-Type":"application/json","Prefer":"return=minimal"},body:JSON.stringify(b)});}
 
-// ═══════════════ NEXITS APP ACCESS CONTROL ═══════════════
+// ═══════════════ NODES APP ACCESS CONTROL ═══════════════
 let _accessCache={formcraft:[],slip:[],shiftops:[]};
 let _accessCurrentApp='formcraft';
 let _accessWorking={formcraft:new Set(),slip:new Set(),shiftops:new Set()};
@@ -7023,7 +7023,8 @@ async function enterHub(){
   loadGlobalGeofence(); // pull global geofence value at startup
   setTimeout(rtUpgradeAll, 200);
   setTimeout(startActivityPolling, 4000);
-  // setInterval(loadSharedTasksFromOthers, 60000); // disabled — feature not in use
+  setInterval(loadSharedTasksFromOthers, 45000); // poll for tasks shared to me
+  loadSharedTasksFromOthers();
   await loadTasks();updateTaskBadge();scheduleTaskReminders();
   startAutoRefresh();
   initRealtime();
@@ -7210,7 +7211,7 @@ function goTo(p){
   if((p === 'engagement' || p === 'discussions') && typeof markAllDiscussionsSeen === 'function'){
     setTimeout(markAllDiscussionsSeen, 600);
   }
-  // Nexits — load app access gating
+  // Nodes — load app access gating
   if(p === 'hub'){ setTimeout(loadHubAccess, 50); }
   // Track onboarding visits
   const myName = window.me || (typeof me !== 'undefined' && me) || null;
@@ -7245,7 +7246,7 @@ function goTo(p){
   if(p==="announcements"){loadAnnouncements();}
   if(p==="engagement"){showEngagementTab('discussions');}
   if(p==="documents"){loadDocuments();refreshQuizStrip();}
-  if(p==="tasks"){ loadTasks().then(function(){ renderTasks(); updateTaskBadge(); maybeShowNotifyBanner(); }); }
+  if(p==="tasks"){ loadSharedTasksFromOthers(); loadTasks().then(function(){ renderTasks(); updateTaskBadge(); maybeShowNotifyBanner(); }); }
   if(p==="announcements" || p==="engagement"){ setTimeout(rtUpgradeAll, 50); }
   if(p==="myreports"){ initReportsPage(); setTimeout(initReportsPage, 600); /* re-run after myIsAdmin settles */ }
   
@@ -10612,10 +10613,14 @@ function renderTasks(){
 
     const overdueCls = (!t.done && due && (due - now) < 0) ? ' overdue' : '';
     const prioCls = ' priority-' + (t.priority||'med');
-    const hasMeta = !!(dueChip || remChip || (t.priority==='high'||t.priority==='low'));
+    const SHARE_SVG = '<svg width="11" height="11" viewBox="0 0 20 20" fill="currentColor"><path d="M15 8a3 3 0 10-2.977-2.63l-4.94 2.47a3 3 0 100 4.319l4.94 2.47a3 3 0 10.895-1.789l-4.94-2.47a3.027 3.027 0 000-.74l4.94-2.47A3 3 0 0015 8z"/></svg>';
+    const shareChip = t.sharedFrom
+      ? '<span class="task-chip share-tag" title="Shared by '+(t.sharedFrom).replace(/"/g,'&quot;')+'">'+SHARE_SVG+' From '+(t.sharedFrom)+'</span>'
+      : (t.sharedTo
+        ? '<span class="task-chip share-tag out" title="Shared with '+(t.sharedTo||[]).join(', ').replace(/"/g,'&quot;')+'">'+SHARE_SVG+' Shared</span>'
+        : '<button class="task-chip share-btn" onclick="event.stopPropagation();openShareTask(\''+t.id+'\')" title="Share with team">'+SHARE_SVG+' Share</button>');
     return '<div class="task-item'+(t.done?' done':'')+overdueCls+prioCls+'" data-id="'+t.id+'" onclick="openTaskForm(\''+t.id+'\')">'+
       '<button class="task-del" onclick="event.stopPropagation();deleteTask(\''+t.id+'\')" title="Delete">×</button>'+
-      (t.sharedFrom ? '<div class="task-shared-tag" title="Shared by '+(t.sharedFrom).replace(/"/g,'&quot;')+'"><svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor"><path d="M15 8a3 3 0 10-2.977-2.63l-4.94 2.47a3 3 0 100 4.319l4.94 2.47a3 3 0 10.895-1.789l-4.94-2.47a3.027 3.027 0 000-.74l4.94-2.47A3 3 0 0015 8z"/></svg> '+(t.sharedFrom)+'</div>' : (t.sharedTo ? '<div class="task-shared-tag shared-out" title="Shared with '+(t.sharedTo||[]).join(', ')+'"><svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor"><path d="M15 8a3 3 0 10-2.977-2.63l-4.94 2.47a3 3 0 100 4.319l4.94 2.47a3 3 0 10.895-1.789l-4.94-2.47a3.027 3.027 0 000-.74l4.94-2.47A3 3 0 0015 8z"/></svg> Shared</div>' : '<button class="task-share" onclick="event.stopPropagation();openShareTask(\''+t.id+'\')" title="Share with team"><svg width="13" height="13" viewBox="0 0 20 20" fill="currentColor"><path d="M15 8a3 3 0 10-2.977-2.63l-4.94 2.47a3 3 0 100 4.319l4.94 2.47a3 3 0 10.895-1.789l-4.94-2.47a3.027 3.027 0 000-.74l4.94-2.47A3 3 0 0015 8z"/></svg></button>'))+
       '<div class="task-card-hd">'+
         '<div class="task-check" onclick="event.stopPropagation();toggleTaskDone(\''+t.id+'\')">'+checkIcon+'</div>'+
         '<div class="task-body">'+
@@ -10623,7 +10628,7 @@ function renderTasks(){
           (t.notes ? '<div class="task-notes">'+t.notes.replace(/</g,'&lt;')+'</div>' : '')+
         '</div>'+
       '</div>'+
-      (hasMeta ? '<div class="task-meta">'+dueChip+remChip+(t.priority==='high'||t.priority==='low'?prioChip:'')+'</div>' : '')+
+      '<div class="task-meta">'+dueChip+remChip+(t.priority==='high'||t.priority==='low'?prioChip:'')+shareChip+'</div>'+
     '</div>';
   }).join('');
   allHtml += '</div>'; // close task-grid
@@ -14948,18 +14953,28 @@ async function confirmShareTask(){
     originalNote: t.notes || ''
   };
 
-  let okCount = 0, dupCount = 0, failCount = 0;
+  let okCount = 0, dupCount = 0, failCount = 0, lastErr = '';
   for(const name of selected){
     try{
       const res = await fetch(SB+'/rest/v1/shared_tasks', {
         method:'POST',
         headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
-        body: JSON.stringify({source_id: t.id, from_user: me, to_user: name, task_data: taskCopy})
+        body: JSON.stringify({
+          sender: me,
+          recipient: name,
+          title: t.title || 'Untitled task',
+          notes: t.notes || '',
+          due_date: t.dueDate || null,
+          due_time: t.dueTime || null,
+          priority: t.priority || 'med',
+          done: false,
+          status: 'pending'
+        })
       });
       if(res.ok) okCount++;
       else if(res.status === 409) dupCount++;
-      else failCount++;
-    }catch(e){failCount++;}
+      else { failCount++; try{ lastErr = (await res.text()).slice(0,140); }catch(e){} console.warn('share POST', res.status, lastErr); }
+    }catch(e){ failCount++; lastErr = String(e).slice(0,140); console.warn('share err', e); }
   }
 
   // Mark original as shared so it can't be re-shared
@@ -14971,53 +14986,41 @@ async function confirmShareTask(){
   let msg = '';
   if(okCount) msg += 'Shared with '+okCount+' '+(okCount===1?'person':'people');
   if(dupCount) msg += (msg?', ':'') + dupCount+' already had it';
-  if(failCount) msg += (msg?', ':'') + failCount+' failed';
-  showToast(msg || 'Shared');
+  if(failCount) msg += (msg?', ':'') + failCount+' failed'+(lastErr?' ('+lastErr+')':'');
+  showToast(msg || 'Shared', failCount&&!okCount ? 'error' : undefined);
 }
 
 async function loadSharedTasksFromOthers(){
   if(!me) return;
-  if(window._sharedTasksDisabled) return; // permanently disabled if schema mismatch
   try{
-    let rows = null;
-    // Try multiple column names to find what schema has
-    const colNames = ['to_user','recipient','to_staff','assigned_to','target_user'];
-    let foundCol = null;
-    for(const col of colNames){
-      try{
-        const resp = await fetch(SB+'/rest/v1/shared_tasks?'+col+'=eq.'+encodeURIComponent(me)+'&order=shared_at.desc&limit=200',{
-          headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}
-        });
-        if(resp.ok){
-          rows = await resp.json();
-          foundCol = col;
-          break;
-        }
-      }catch(e){}
-    }
-    if(!foundCol){
-      // No matching column found — disable feature permanently this session
-      window._sharedTasksDisabled = true;
-      return;
-    }
+    const resp = await fetch(SB+'/rest/v1/shared_tasks?recipient=eq.'+encodeURIComponent(me)+'&order=created_at.desc&limit=200',{
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}
+    });
+    if(!resp.ok){ console.warn('loadShared read', resp.status); return; }
+    const rows = await resp.json();
     if(!rows || !rows.length) return;
     let added = 0;
     rows.forEach(function(r){
-      const data = r.task_data || {};
       const localId = 'shared_'+r.id;
-      if(_tasks.find(function(x){return x.id===localId;})) return; // already imported
+      const existing = _tasks.find(function(x){return x.id===localId;});
+      if(existing){
+        // keep recipient's completion in sync with remote
+        if(r.done && !existing.done){ existing.done = true; existing.doneAt = r.completed_at || new Date().toISOString(); }
+        return;
+      }
       _tasks.push({
         id: localId,
-        title: data.title || 'Shared task',
-        dueDate: data.dueDate || null,
-        dueTime: data.dueTime || null,
-        priority: data.priority || 'med',
-        remindBefore: data.remindBefore == null ? null : data.remindBefore,
-        notes: data.notes || '',
-        originalNote: data.originalNote || data.notes || '',
-        sharedFrom: r.from_user,
-        done: false,
-        createdAt: r.shared_at
+        title: r.title || 'Shared task',
+        dueDate: r.due_date || null,
+        dueTime: r.due_time || null,
+        priority: r.priority || 'med',
+        remindBefore: null,
+        notes: r.notes || '',
+        originalNote: r.notes || '',
+        sharedFrom: r.sender,
+        sharedRowId: r.id,
+        done: !!r.done,
+        createdAt: r.created_at
       });
       added++;
     });
@@ -15044,7 +15047,7 @@ async function notifyTaskCompleted(t){
       await fetch(SB+'/rest/v1/shared_tasks?id=eq.'+encodeURIComponent(rowId),{
         method:'PATCH',
         headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
-        body: JSON.stringify({status:'done', completed_by: me, completed_at: new Date().toISOString()})
+        body: JSON.stringify({done:true, status:'done', completed_by: me, completed_at: new Date().toISOString()})
       });
     }catch(e){ /* schema without status cols — notif still fires */ }
     // 2. Bell notification to the original creator via reply_notifications
@@ -19869,26 +19872,54 @@ input:focus{
 .share-staff-row.selected{ background:var(--accent-dim) !important; }
 .share-staff-name{ color:var(--m-ink) !important; }
 
-/* ── 17. Task SHARE button — make it visible & labeled ───────── */
-.task-share{
-  width:auto !important; height:auto !important;
-  border-radius:var(--m-r-pill) !important;
-  padding:6px 13px 6px 11px !important;
+/* ── 19. Share modal — full warm polish, consistent with Nexus ── */
+.share-back{ background:rgba(43,36,28,.5) !important; backdrop-filter:blur(10px) !important; }
+.share-modal{
+  background:var(--m-card) !important;
+  border:1px solid var(--m-border) !important;
+  border-radius:var(--m-r-lg) !important;
+  max-width:420px !important;
+  box-shadow:var(--m-sh-3) !important;
+  overflow:hidden;
+}
+.share-hd{ padding:18px 20px 14px !important; border-bottom:1px solid var(--m-border) !important; }
+.share-hd h3{ font-family:'Fraunces','Inter',Georgia,serif !important; font-size:18px !important; color:var(--m-ink) !important; }
+.share-hd button{ color:var(--m-ink-3) !important; transition:color .14s; }
+.share-hd button:hover{ color:var(--m-ink) !important; }
+.share-chips{ padding:12px 20px 14px !important; margin:0 !important; }
+.share-staff-list{ padding:6px 12px 8px !important; }
+.share-staff-row{ padding:9px 12px !important; border-radius:12px !important; }
+.share-staff-row:hover{ background:var(--m-card-2) !important; }
+.share-staff-row.selected{ background:var(--accent-dim) !important; }
+.share-staff-name{ font-size:13.5px !important; }
+.share-check{ border-color:var(--m-border-hi) !important; }
+.share-actions{ padding:14px 20px !important; border-top:1px solid var(--m-border) !important; gap:10px !important; }
+[data-theme="dark"] .share-staff-list::-webkit-scrollbar{ width:8px; }
+[data-theme="dark"] .share-staff-list::-webkit-scrollbar-thumb{ background:var(--m-border-hi); border-radius:4px; }
+.share-team-label{ padding:13px 8px 6px !important; }
+
+/* ── 17. Task SHARE — now a meta-row chip (not a corner pill) ── */
+.task-chip.share-btn{
+  cursor:pointer;
   background:var(--accent-dim) !important;
-  border:1.5px solid var(--accent-bd) !important;
+  border:1px solid var(--accent-bd) !important;
   color:var(--accent-text) !important;
-  gap:6px !important;
-  font-size:12px !important; font-weight:700 !important;
-  box-shadow:var(--m-sh-1);
+  margin-left:auto;            /* push to right end of meta row */
+  transition:background .14s, color .14s, transform .08s;
 }
-.task-share svg{ width:14px !important; height:14px !important; }
-.task-share::after{ content:"Share"; }
-.task-share:hover{
-  background:var(--accent) !important; color:#fff !important;
-  border-color:var(--accent) !important;
-  transform:translateY(-1px);
-  box-shadow:var(--m-sh-accent);
+.task-chip.share-btn:hover{ background:var(--accent) !important; color:#fff !important; border-color:var(--accent) !important; }
+.task-chip.share-btn:active{ transform:scale(.95); }
+.task-chip.share-tag{
+  background:var(--accent-dim) !important; color:var(--accent-text) !important;
+  border:1px solid var(--accent-bd) !important; margin-left:auto;
 }
+.task-chip.share-tag.out{ background:#fef3c7 !important; color:#92400e !important; border-color:#fcd9a0 !important; }
+[data-theme="dark"] .task-chip.share-btn{ background:var(--accent-dim) !important; color:var(--accent-text) !important; border-color:var(--accent-bd) !important; }
+[data-theme="dark"] .task-chip.share-btn:hover{ background:var(--accent) !important; color:#06140f !important; }
+[data-theme="dark"] .task-chip.share-tag{ background:var(--accent-dim) !important; color:var(--accent-text) !important; border-color:var(--accent-bd) !important; }
+[data-theme="dark"] .task-chip.share-tag.out{ background:rgba(146,64,14,.22) !important; color:#fbbf6b !important; border-color:rgba(146,64,14,.4) !important; }
+/* neutralize the old absolute corner styles in case any cached markup uses them */
+.task-share, .task-shared-tag{ position:static !important; }
 [data-theme="dark"] .task-share{ background:var(--accent-dim) !important; color:var(--accent-text) !important; border-color:var(--accent-bd) !important; }
 [data-theme="dark"] .task-share:hover{ background:var(--accent) !important; color:#06140f !important; }
 
