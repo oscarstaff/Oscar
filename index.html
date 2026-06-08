@@ -6929,12 +6929,17 @@ async function doLogin(){
     // ── Phase 1B: try REAL Supabase Auth first ──
     const auth = getAuthClient();
     let authedViaSupabase = false;
+    if(!auth){ console.warn('[auth] getAuthClient() returned null — supabase-js not loaded; using legacy login'); }
     if(auth){
+      const synthEmail = synthEmailFromName(m);
+      console.log('[auth] attempting Supabase sign-in as', synthEmail);
       try{
         const { data, error } = await auth.signInWithPassword({
-          email: synthEmailFromName(m), password: pass
+          email: synthEmail, password: pass
         });
+        if(error){ console.warn('[auth] sign-in failed:', error.message, '→ falling back to legacy'); }
         if(!error && data && data.session){
+          console.log('[auth] Supabase sign-in OK for', synthEmail);
           authedViaSupabase = true;
           // Check the must_reset flag — HARD force a password change if set.
           let mustReset = false;
@@ -6955,9 +6960,21 @@ async function doLogin(){
       }catch(e){ /* fall through to legacy */ }
     }
 
-    // ── Legacy fallback: old client-side hash login (for not-yet-migrated staff) ──
+    // ── Legacy fallback: ONLY for staff not yet migrated to Supabase Auth. ──
+    // If the staff has an auth_uid, they MUST use the new auth login — the old
+    // password is disabled for them (this is what actually improves security).
+    const credRows = await sbGet("staff_credentials","?staff_name=eq."+encodeURIComponent(m)+"&select=password_hash,auth_uid");
+    const isMigrated = credRows.length && credRows[0].auth_uid;
+    if(isMigrated){
+      // migrated — auth already tried + failed above; do NOT accept the old hash.
+      err.textContent="Please use your temporary password (or the new one you set). Old passwords no longer work.";
+      err.classList.add("show");
+      btn.disabled=false;btn.textContent="Sign In";
+      return;
+    }
+    // Not migrated yet → allow the old client-side hash login.
     const h=await hash(pass);
-    const rows=await sbGet("staff_credentials","?staff_name=eq."+encodeURIComponent(m));
+    const rows=credRows;
     if(!rows.length){err.textContent="No password set yet. Use 'Set your password' below.";err.classList.add("show");}
     else if(rows[0].password_hash!==h){err.textContent="Incorrect password. Please try again.";err.classList.add("show");}
     else{saveMe(m);enterHub();}
