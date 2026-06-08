@@ -7193,13 +7193,25 @@ async function doResetKey(){
   finally{btn.disabled=false;btn.textContent="Reset Password";}
 }
 
-function doLogout(){
+async function doLogout(){
   try{ teardownRealtime(); }catch(e){}
   // Stop any running timers
   if(typeof _clockTickTimer !== 'undefined' && _clockTickTimer){ clearInterval(_clockTickTimer); _clockTickTimer=null; }
   // Clear session
   sessionStorage.removeItem("ou");
-  try{ const a=getAuthClient(); if(a && a.signOut) a.signOut(); }catch(e){}
+  // Sign out of Supabase Auth and WAIT for it — otherwise the reload races the
+  // signOut and the session survives, logging the user straight back in.
+  try{
+    const a=getAuthClient();
+    if(a && a.signOut){ await a.signOut(); }
+  }catch(e){}
+  // Belt + suspenders: nuke the persisted auth token so restore can't find it.
+  try{
+    for(let i=localStorage.length-1;i>=0;i--){
+      const k=localStorage.key(i);
+      if(k && (k==='oscars_auth' || k.startsWith('sb-') || k.indexOf('supabase.auth')!==-1)) localStorage.removeItem(k);
+    }
+  }catch(e){}
   me=null;
   // Hard reload to ensure all state cleared cleanly
   window.location.reload();
