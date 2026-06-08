@@ -5826,9 +5826,11 @@ let _authClient = null;
 function getAuthClient(){
   if(_authClient) return _authClient;
   if(window.supabase && window.supabase.createClient){
-    _authClient = window.supabase.createClient(SB, KEY, {
+    const client = window.supabase.createClient(SB, KEY, {
       auth: { persistSession: true, autoRefreshToken: true, storageKey: 'oscars_auth' }
     });
+    // supabase-js v2: auth methods live under client.auth — expose that directly
+    _authClient = client.auth ? client.auth : client;
   }
   return _authClient;
 }
