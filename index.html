@@ -7025,8 +7025,8 @@ async function enterHub(){
   setTimeout(startActivityPolling, 4000);
   setInterval(loadSharedTasksFromOthers, 45000); // poll for tasks shared to me
   setInterval(loadMySharedOutStatus, 45000); // poll completion of tasks I shared out
-  loadSharedTasksFromOthers(); loadMySharedOutStatus();
   await loadTasks();updateTaskBadge();scheduleTaskReminders();
+  loadSharedTasksFromOthers(true); loadMySharedOutStatus();
   startAutoRefresh();
   initRealtime();
   loadBirthdays();
@@ -7273,8 +7273,8 @@ function showProfileSection(sec){
     if(tab)tab.classList.toggle("active",s===sec);
   });
 
-  // Mark notifications read when profile is opened
-  markAllNotificationsRead();
+  // Mark notifications read when profile is opened (silent — no toast)
+  markAllNotificationsRead(true);
   const main=document.querySelector(".main");
   if(main)main.scrollTop=0;
 }
@@ -11815,35 +11815,6 @@ function startActivityPolling(){
   _activityPollTimer = setInterval(pollForNewActivity, 60000);
 }
 
-// Mark all notifications as read
-async function markAllNotificationsRead(){
-  try{
-    // Mark all reply_notifications as seen for current user
-    await fetch(SB+'/rest/v1/reply_notifications?recipient=eq.'+encodeURIComponent(me)+'&seen=eq.false',{
-      method:'PATCH',
-      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
-      body:JSON.stringify({seen:true})
-    });
-    // Clear in-memory task notifs
-    if(window._taskNotifications){
-      const seen = JSON.parse(localStorage.getItem('seen_task_notifs_'+me)||'[]');
-      window._taskNotifications.forEach(function(n){ if(!seen.includes(n.id)) seen.push(n.id); });
-      localStorage.setItem('seen_task_notifs_'+me, JSON.stringify(seen));
-      window._taskNotifications = [];
-    }
-    // Clear seen reactions
-    const reactNotifs = JSON.parse(localStorage.getItem('lastSeenReactionTime_'+me)||'null');
-    localStorage.setItem('lastSeenReactionTime_'+me, new Date().toISOString());
-    // Reload bell
-    if(typeof loadNotifDrop==='function'){
-      loadNotifDrop('mhNotifDrop'); loadNotifDrop('notifDropList');
-    }
-    if(typeof showToast==='function') showToast('All marked as read');
-    // Hide bell badge
-    const badges = document.querySelectorAll('#mhBellBadge,#sbBellBadge');
-    badges.forEach(function(b){ if(b) b.style.display='none'; });
-  }catch(e){console.warn(e);}
-}
 
 // ── PWA INSTALL PROMPT ──────────
 let _deferredPwaPrompt = null;
@@ -15026,7 +14997,7 @@ async function loadMySharedOutStatus(){
   }catch(e){ console.warn('loadMySharedOutStatus:',e); }
 }
 
-async function loadSharedTasksFromOthers(){
+async function loadSharedTasksFromOthers(silent){
   if(!me) return;
   try{
     const resp = await fetch(SB+'/rest/v1/shared_tasks?recipient=eq.'+encodeURIComponent(me)+'&order=created_at.desc&limit=200',{
@@ -15064,7 +15035,7 @@ async function loadSharedTasksFromOthers(){
       saveTasks();
       if(typeof renderTasks==='function') renderTasks();
       if(typeof updateTaskBadge==='function') updateTaskBadge();
-      if(typeof showToast==='function') showToast(added+' shared task'+(added===1?'':'s')+' added');
+      if(!silent && typeof showToast==='function') showToast(added+' shared task'+(added===1?'':'s')+' added');
     }
   }catch(e){console.warn('loadSharedTasks:',e);}
 }
@@ -15860,7 +15831,7 @@ async function loadNotifications(){
   }catch(e){console.warn(e);if(el)el.innerHTML='<div style="color:#dc2626;text-align:center;padding:16px;font-size:13px;">Could not load alerts.</div>';}
 }
 
-async function markAllNotificationsRead(){
+async function markAllNotificationsRead(silent){
   try{
     const postSeen = async (key)=>{
       try{ await fetch(SB+'/rest/v1/notification_seen',{
@@ -15908,7 +15879,7 @@ async function markAllNotificationsRead(){
     if(typeof loadNotifications === 'function') loadNotifications();
     if(typeof loadNotifDrop === 'function'){ loadNotifDrop('notifDropList'); loadNotifDrop('mhNotifDrop'); }
     closeAllNotifDrops();
-    showToast('All notifications marked as read');
+    if(!silent) showToast('All notifications marked as read');
   }catch(e){console.warn('markAllNotificationsRead',e);}
 }
 
