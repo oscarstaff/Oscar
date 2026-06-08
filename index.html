@@ -5820,6 +5820,24 @@ function switchProfileTab(t){
 <script>
 /* v1778631856 */
 const SB="https://jcfgldqrdbfkgbixszds.supabase.co";
+// ── Phase 1B: Supabase Auth (real login). Synthetic email derived from name. ──
+const AUTH_EMAIL_DOMAIN = 'oscars.local';
+let _authClient = null;
+function getAuthClient(){
+  if(_authClient) return _authClient;
+  if(window.supabase && window.supabase.createClient){
+    _authClient = window.supabase.createClient(SB, KEY, {
+      auth: { persistSession: true, autoRefreshToken: true, storageKey: 'oscars_auth' }
+    });
+  }
+  return _authClient;
+}
+function synthEmailFromName(name){
+  const local = String(name).trim().toLowerCase()
+    .replace(/[^a-z0-9\s]/g,'').replace(/\s+/g,'.').replace(/\.+/g,'.').replace(/^\.|\.$/g,'');
+  return local + '@' + AUTH_EMAIL_DOMAIN;
+}
+let _mustResetPending = false; // set true when a logged-in user still has the temp password
 // ── Apps Script (Google Sheet sync) shared token. MUST match API_SECRET in the script. ──
 const GAS_TOKEN = "oscars_gas_83235a5f0c1f6ba32b18235e2b2d544ac137167d";
 // Auto-inject the token into every POST to the Apps Script /exec endpoint.
@@ -6904,9 +6922,40 @@ async function doLogin(){
   if(!pass){err.textContent="Please enter your password.";err.classList.add("show");return;}
   const btn=document.getElementById("loginBtn");btn.disabled=true;btn.innerHTML='<span class="sp"></span> Signing in...';
   try{
-    // Always validate against Supabase so removed staff can't log in
+    // Always validate the name against the live staff list (removed staff can't log in)
     const m=await validateStaffName(name);
     if(!m){err.textContent="Name not found. You may have been removed from the system.";err.classList.add("show");btn.disabled=false;btn.textContent="Sign In";return;}
+
+    // ── Phase 1B: try REAL Supabase Auth first ──
+    const auth = getAuthClient();
+    let authedViaSupabase = false;
+    if(auth){
+      try{
+        const { data, error } = await auth.signInWithPassword({
+          email: synthEmailFromName(m), password: pass
+        });
+        if(!error && data && data.session){
+          authedViaSupabase = true;
+          // Check the must_reset flag — HARD force a password change if set.
+          let mustReset = false;
+          try{
+            const cr = await sbGet("staff_credentials","?staff_name=eq."+encodeURIComponent(m)+"&select=must_reset");
+            mustReset = cr.length && cr[0].must_reset === true;
+          }catch(e){}
+          if(mustReset){
+            _mustResetPending = true;
+            saveMe(m);
+            btn.disabled=false;btn.textContent="Sign In";
+            showForcedReset(m);   // blocks all app access until new password set
+            return;
+          }
+          saveMe(m); enterHub(); return;
+        }
+        // auth error → fall through to legacy login below
+      }catch(e){ /* fall through to legacy */ }
+    }
+
+    // ── Legacy fallback: old client-side hash login (for not-yet-migrated staff) ──
     const h=await hash(pass);
     const rows=await sbGet("staff_credentials","?staff_name=eq."+encodeURIComponent(m));
     if(!rows.length){err.textContent="No password set yet. Use 'Set your password' below.";err.classList.add("show");}
@@ -6914,6 +6963,55 @@ async function doLogin(){
     else{saveMe(m);enterHub();}
   }catch(e){err.textContent="Connection error. Please try again.";err.classList.add("show");}
   finally{btn.disabled=false;btn.textContent="Sign In";}
+}
+
+// ── HARD forced password reset: full-screen block, no app access until done ──
+function showForcedReset(name){
+  let ov = document.getElementById('forcedResetOverlay');
+  if(!ov){
+    ov = document.createElement('div');
+    ov.id='forcedResetOverlay';
+    ov.style.cssText='position:fixed;inset:0;z-index:99999;background:var(--m-bg,#fdf8f2);display:flex;align-items:center;justify-content:center;padding:20px;';
+    ov.innerHTML =
+      '<div style="max-width:380px;width:100%;background:var(--m-card,#fff);border:1px solid var(--m-border,#e7ddd0);border-radius:18px;padding:28px;box-shadow:0 12px 40px rgba(60,40,20,.18);">'+
+      '<div style="font-family:Fraunces,Georgia,serif;font-size:20px;font-weight:800;margin-bottom:6px;color:var(--m-ink,#2b241c);">Set a new password</div>'+
+      '<div style="font-size:13.5px;color:var(--m-ink-2,#6b5d4d);margin-bottom:18px;line-height:1.5;">For security, you must choose your own password before continuing.</div>'+
+      '<input id="frNew" type="password" placeholder="New password (min 6 chars)" style="width:100%;margin-bottom:10px;padding:12px 14px;border:1px solid var(--m-border,#e7ddd0);border-radius:11px;font-size:14px;">'+
+      '<input id="frConfirm" type="password" placeholder="Confirm new password" style="width:100%;margin-bottom:14px;padding:12px 14px;border:1px solid var(--m-border,#e7ddd0);border-radius:11px;font-size:14px;">'+
+      '<div id="frErr" style="color:#c0392b;font-size:12.5px;margin-bottom:10px;display:none;"></div>'+
+      '<button id="frBtn" style="width:100%;padding:13px;border:none;border-radius:11px;background:linear-gradient(100deg,#ffd23d,#ff6b3d);color:#1a1205;font-weight:800;font-size:15px;cursor:pointer;">Save & Continue</button>'+
+      '</div>';
+    document.body.appendChild(ov);
+    document.getElementById('frBtn').onclick = ()=>submitForcedReset(name);
+  }
+  ov.style.display='flex';
+}
+async function submitForcedReset(name){
+  const np=document.getElementById('frNew').value;
+  const cp=document.getElementById('frConfirm').value;
+  const fe=document.getElementById('frErr');
+  const show=(m)=>{fe.textContent=m;fe.style.display='block';};
+  if(!np || np.length<6) return show('Password must be at least 6 characters.');
+  if(np!==cp) return show('Passwords do not match.');
+  const btn=document.getElementById('frBtn'); btn.disabled=true; btn.textContent='Saving...';
+  try{
+    const auth=getAuthClient();
+    // update the real Supabase Auth password
+    const { error } = await auth.updateUser({ password: np });
+    if(error){ btn.disabled=false; btn.textContent='Save & Continue'; return show(error.message||'Could not update password.'); }
+    // clear the must_reset flag + keep legacy hash in sync (so fallback still matches)
+    try{
+      const h=await hash(np);
+      await fetch(SB+'/rest/v1/staff_credentials?staff_name=eq.'+encodeURIComponent(name),{
+        method:'PATCH',
+        headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+        body: JSON.stringify({ must_reset:false, password_hash:h })
+      });
+    }catch(e){}
+    _mustResetPending=false;
+    const ov=document.getElementById('forcedResetOverlay'); if(ov) ov.style.display='none';
+    enterHub();
+  }catch(e){ btn.disabled=false; btn.textContent='Save & Continue'; show('Something went wrong. Try again.'); }
 }
 
 async function doSetPass(){
