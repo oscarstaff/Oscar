@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://jcfgldqrdbfkgbixszds.supabase.co wss://jcfgldqrdbfkgbixszds.supabase.co https://api.klipy.co https://script.google.com https://*.googleapis.com; frame-src 'self'; object-src 'none'; base-uri 'self';">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -5819,6 +5820,39 @@ function switchProfileTab(t){
 <script>
 /* v1778631856 */
 const SB="https://jcfgldqrdbfkgbixszds.supabase.co";
+// ── Apps Script (Google Sheet sync) shared token. MUST match API_SECRET in the script. ──
+const GAS_TOKEN = "oscars_gas_83235a5f0c1f6ba32b18235e2b2d544ac137167d";
+// Auto-inject the token into every POST to the Apps Script /exec endpoint.
+// This covers all clock/punch/updatePunch/uploadDoc/template calls + queue replays
+// in one place, so no call can forget the token.
+(function(){
+  const _origFetch = window.fetch.bind(window);
+  window.fetch = function(url, opts){
+    try{
+      const u = (typeof url === 'string') ? url : (url && url.url) || '';
+      if(u.indexOf('script.google.com/macros') !== -1 && opts && opts.body && typeof opts.body === 'string'){
+        const b = JSON.parse(opts.body);
+        if(b && typeof b === 'object' && b.token === undefined){
+          b.token = GAS_TOKEN;
+          opts = Object.assign({}, opts, { body: JSON.stringify(b) });
+        }
+      }
+    }catch(e){ /* leave body untouched on any parse issue */ }
+    return _origFetch(url, opts);
+  };
+})();
+// ── XSS escape helpers — use for ANY user-supplied value placed into innerHTML ──
+function esc(s){
+  if(s==null) return '';
+  return String(s)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&#39;');
+}
+// alias for attribute context (same rules cover it)
+const escAttr = esc;
 const KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpjZmdsZHFyZGJma2diaXhzemRzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1Nzc3NzEsImV4cCI6MjA5MDE1Mzc3MX0.Wj8cCpnlsoZOPj5sKWeEdfvgjG4Nc-UuTTYgbcrPfeI";
 let STAFF=["Abhishek Karki","Anish Dhodari","Anurag Dahal","Asha Aryal","Bikash Dahal","Kushal Piya","Monika Kawadi","Musica Karki","Nabina Uchchai Thakuri","Nidhi Subedi","Nippu Pokhrel","Pavneet Kaur","Presna Aryal","Prashna Sapkota","Roshana Puri","Sachin Sanwa Limbu","Sagun Panta","Saksham Shrestha","Sami Basnet","Sameekshya Regmi","Sanju Gharti Magar","Sandhya Sangroula","Sanskar Pokharel","Santosh Singh Basnet","Siddhartha Gautam","Supriya Thapa","Tejaswee Bhetwal","Umisha Ghimire","Usam Adhikari"]; // fallback, gets replaced by Supabase
 
@@ -5966,7 +6000,7 @@ function renderDocs(docs){
       '<div class="doc-icon '+iconClass+'">'+iconSvg+'</div>'+
       '<div style="flex:1;min-width:0;">'+
         '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">'+
-          '<span class="doc-title">'+d.title+'</span>'+
+          '<span class="doc-title">'+esc(d.title)+'</span>'+
           (isNew?'<span class="doc-badge-new">New</span>':'')+
         '</div>'+
         (teamTags?'<div style="margin-top:4px;display:flex;flex-wrap:wrap;gap:3px;max-height:24px;overflow:hidden;">'+teamTags+'</div>':'')+
@@ -6041,7 +6075,7 @@ async function uploadDocument(){
   if(progress)progress.style.display='block';
   try{
     // Upload to Google Drive via Apps Script
-    if(progressLabel)progressLabel.textContent='Uploading '+docSelectedFile.name+' to Drive...';
+    if(progressLabel)progressLabel.textContent='Uploading '+esc(docSelectedFile.name)+' to Drive...';
     if(progressBar)progressBar.style.width='15%';
     // Read file as base64
     const fileData = await new Promise(function(resolve, reject){
@@ -6156,7 +6190,7 @@ async function loadHomeDiscPreview(){
       return'<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #f1f5f9;">'+
         '<div style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,var(--accent),#7c3aed);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;color:#fff;flex-shrink:0;">'+ava+'</div>'+
         '<div style="flex:1;min-width:0;">'+
-          '<div style="font-size:13px;font-weight:600;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+r.title+'</div>'+
+          '<div style="font-size:13px;font-weight:600;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+esc(r.title)+'</div>'+
           '<div style="font-size:11px;color:#94a3b8;">'+r.created_by+' · '+d+'</div>'+
         '</div></div>';
     }).join('');
@@ -6224,7 +6258,7 @@ async function loadDiscussions(){
           '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:1px;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>Must read</span>';
       }
       if(badges) html += '<div style="margin-bottom:3px;">'+badges+'</div>';
-      html+='<div style="font-size:13px;font-weight:700;color:#0f172a;">'+r.title+'</div>';
+      html+='<div style="font-size:13px;font-weight:700;color:#0f172a;">'+esc(r.title)+'</div>';
       html+='<div style="font-size:11px;color:#94a3b8;margin-top:1px;">'+r.created_by+' · '+d+'</div>';
       html+='</div>';
       html+='<div style="display:flex;gap:4px;align-items:center;flex-shrink:0;">';
@@ -6325,7 +6359,7 @@ function renderReplyItem(rep, allReplies, depth, discId){
   html += '<div style="width:30px;height:30px;border-radius:50%;background:'+color+';display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;flex-shrink:0;">'+ra+'</div>';
   html += '<div style="flex:1;min-width:0;">';
   html += '<div style="background:#f1f5f9;border-radius:14px;padding:8px 12px;display:inline-block;max-width:100%;">';
-  html += '<div style="font-size:12px;font-weight:700;color:#0f172a;margin-bottom:1px;">'+rep.staff_name+'</div>';
+  html += '<div style="font-size:12px;font-weight:700;color:#0f172a;margin-bottom:1px;">'+esc(rep.staff_name)+'</div>';
   html += '<div class="rt-content" style="font-size:13px;color:#0f172a;line-height:1.45;">'+mdToHtml(rep.body)+'</div>';
   if(rep.attachments && rep.attachments.length){
     html += attRenderGrid(rep.attachments);
@@ -7061,7 +7095,7 @@ function openSubtabChooser(config){
   sheet.dataset.title = config.title;
   sheet.style.cssText = 'position:fixed;left:0;right:0;bottom:calc(56px + env(safe-area-inset-bottom,0px));z-index:9100;background:#fff;border-top:1px solid #e2e8f0;border-radius:14px 14px 0 0;box-shadow:0 -8px 30px rgba(15,23,42,.18);padding:12px;display:flex;flex-direction:column;gap:8px;animation:libSheetUp .2s ease;';
   let html = '<div style="display:flex;justify-content:space-between;align-items:center;padding:0 6px 6px;">'+
-    '<div style="font-size:13px;font-weight:700;color:#0f172a;">'+config.title+'</div>'+
+    '<div style="font-size:13px;font-weight:700;color:#0f172a;">'+esc(config.title)+'</div>'+
     '<button onclick="document.getElementById(\'subtabChooserSheet\').remove();" style="background:none;border:none;font-size:20px;color:#94a3b8;cursor:pointer;line-height:1;padding:2px 8px;">×</button>'+
   '</div>';
   config.options.forEach(function(o){
@@ -7960,7 +7994,7 @@ async function loadAnnouncements(){
         (isUrgent?'<div style="display:inline-block;background:#dc2626;color:#fff;font-size:9px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;padding:2px 8px;border-radius:20px;margin-bottom:6px;">Urgent</div>':'')+
         (r.pinned?'<div class="ann-pin">📌 Pinned'+(myIsAdmin?'<button data-id="'+r.id+'" onclick="togglePin(this.dataset.id,true)" style="margin-left:8px;background:none;border:none;color:#94a3b8;font-size:10px;font-weight:600;cursor:pointer;font-family:inherit;">Unpin</button>':'')+'</div>':'')+
         (!isRead?'<span class="ann-unread-dot"></span>':'')+
-        '<div class="ann-title">'+r.title+'</div>'+
+        '<div class="ann-title">'+esc(r.title)+'</div>'+
         '<div class="ann-body rt-content">'+mdToHtml(r.body)+'</div>'+attRenderGrid(r.attachments||[])+
         '<div class="ann-meta"><span>Posted by '+r.created_by+' · '+d+'</span>'+
         '<div style="display:flex;gap:6px;align-items:center;margin-left:auto;flex-wrap:wrap;">'+
@@ -8180,7 +8214,7 @@ function openDayEventModal(dateStr){
     const labels = {event:'Event', bday:'Birthday', holiday:'Public holiday', task:'Task'};
     const c = colors[it.type] || '#64748b';
     const tStr = it.time ? String(it.time).slice(0,5) : (it.type==='holiday' ? 'Holiday' : 'All day');
-    const titleEsc = String(it.title||'').replace(/</g,'&lt;');
+    const titleEsc = esc(it.title||'');
     const evId = (it.type==='event' && it.ev) ? it.ev.id : null;
     const click = evId ? 'onclick="document.getElementById(\'dayEventBackdrop\').style.display=\'none\';viewEvent(\''+evId+'\',event)" style="cursor:pointer;"' : 'style="cursor:default;"';
     const doneStyle = it.done ? ';opacity:.5;text-decoration:line-through;' : '';
@@ -8450,8 +8484,8 @@ function viewEvent(evId, clickEvt){
   const timeStr = ev.event_time ? ev.event_time.slice(0,5) : 'All day';
   const canEdit = myIsAdmin || (ev.created_by === me);
   const titleSafe = String(ev.title||'(No title)').replace(/</g,'&lt;');
-  const descSafe = String(ev.description||'').replace(/</g,'&lt;');
-  const whoLine = ev.created_by ? ('<div style="font-size:11.5px;color:#94a3b8;margin-top:8px;">Added by '+String(ev.created_by).replace(/</g,'&lt;')+'</div>') : '';
+  const descSafe = esc(ev.description||'');
+  const whoLine = ev.created_by ? ('<div style="font-size:11.5px;color:#94a3b8;margin-top:8px;">Added by '+esc(ev.created_by)+'</div>') : '';
 
   bd.innerHTML = '<div style="background:#fff;border-radius:14px;width:100%;max-width:380px;padding:20px 22px;box-shadow:0 24px 60px rgba(15,23,42,.3);position:relative;" onclick="event.stopPropagation()">'+
     '<button onclick="closeEventQuickPop()" style="position:absolute;top:10px;right:12px;background:none;border:none;font-size:22px;line-height:1;color:#94a3b8;cursor:pointer;padding:4px 8px;border-radius:6px;" aria-label="Close">×</button>'+
@@ -8870,7 +8904,7 @@ function renderDayView(el, lbl){
 function renderDayEvent(it){
   const cls = 'cal-day-event' + (it.type==='bday' ? ' bday' : '') + (it.type==='holiday' ? ' holiday' : '') + (it.type==='task' ? ' task' : '') + (it.done ? ' done' : '');
   const tStr = it.time ? '<div class="cal-day-event-time">'+String(it.time).slice(0,5)+'</div>' : '';
-  const titleEsc = String(it.title||'').replace(/</g,'&lt;');
+  const titleEsc = esc(it.title||'');
   // Click = open quick popover for editable events
   const evId = (it.type==='event' && it.ev) ? it.ev.id : null;
   const click = evId ? ' data-ev-id="'+evId+'" onclick="viewEvent(this.dataset.evId,event)"' : '';
@@ -8909,7 +8943,7 @@ function renderWeekView(el, lbl){
     items.forEach(function(it){
       const cls = 'cal-week-event' + (it.type==='bday' ? ' bday' : '') + (it.type==='holiday' ? ' holiday' : '') + (it.type==='task' ? ' task' : '');
       const tStr = it.time ? String(it.time).slice(0,5)+' ' : '';
-      const titleEsc = String(it.title||'').replace(/</g,'&lt;');
+      const titleEsc = esc(it.title||'');
       const evId = (it.type==='event' && it.ev) ? it.ev.id : null;
       const click = evId ? ' data-ev-id="'+evId+'" onclick="viewEvent(this.dataset.evId,event)"' : '';
       html += '<div class="'+cls+'"'+click+' title="'+titleEsc+'">'+tStr+titleEsc+'</div>';
@@ -9069,22 +9103,22 @@ function renderBdayCalendar(){
       const colorIdx=(String(ev.id||'').split('').reduce(function(a,c){return a+c.charCodeAt(0);},0)%6)+1;
       const canDelete=myIsAdmin||(ev.created_by===me);
       const deleteBtn=canDelete?'<span class="cal-pill-x" data-id="'+ev.id+'" onclick="event.stopPropagation();deleteCalEvent(this.dataset.id)">×</span>':'';
-      html+='<div class="cal-pill cal-pill-event-'+colorIdx+'" data-ev-id="'+ev.id+'" onclick="event.stopPropagation();viewEvent(this.dataset.evId,event)" style="cursor:pointer;" title="'+ev.title+(ev.description?' — '+ev.description:'')+'">'+timeStr+ev.title+deleteBtn+'</div>';
+      html+='<div class="cal-pill cal-pill-event-'+colorIdx+'" data-ev-id="'+ev.id+'" onclick="event.stopPropagation();viewEvent(this.dataset.evId,event)" style="cursor:pointer;" title="'+esc(ev.title)+(ev.description?' — '+ev.description:'')+'">'+timeStr+esc(ev.title)+deleteBtn+'</div>';
     });
     // Birthday pills (blue with first name)
     bdays.forEach(function(b){
-      html+='<div class="cal-pill cal-pill-bday" title="'+b.name+'\'s birthday">🎂 '+b.name.split(' ')[0]+'</div>';
+      html+='<div class="cal-pill cal-pill-bday" title="'+esc(b.name)+'\'s birthday">🎂 '+b.name.split(' ')[0]+'</div>';
     });
     // Task pills (blue, with check or open state)
     const tasksToday = taskMap[d] || [];
     tasksToday.forEach(function(t){
       const doneCls = t.done ? ' done' : '';
       const timePart = t.dueTime ? t.dueTime.slice(0,5)+' ' : '';
-      const tip = (t.done?'Done — ':'')+'Task: '+t.title.replace(/"/g,'&quot;');
+      const tip = (t.done?'Done — ':'')+'Task: '+esc(t.title);
       const taskIcon = t.done
         ? '<svg width="9" height="9" viewBox="0 0 20 20" fill="currentColor" style="display:inline-block;vertical-align:-1px;margin-right:3px;"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>'
         : '<svg width="9" height="9" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" style="display:inline-block;vertical-align:-1px;margin-right:3px;"><rect x="3" y="3" width="14" height="14" rx="2"/></svg>';
-      html+='<div class="cal-pill cal-pill-task'+doneCls+'" title="'+tip+'" onclick="event.stopPropagation();goTo(\'tasks\');">'+taskIcon+timePart+t.title.replace(/</g,'&lt;')+'</div>';
+      html+='<div class="cal-pill cal-pill-task'+doneCls+'" title="'+tip+'" onclick="event.stopPropagation();goTo(\'tasks\');">'+taskIcon+timePart+esc(t.title)+'</div>';
     });
 
     html+='</div></div>';
@@ -9831,7 +9865,7 @@ function renderStaffDirectory(list){
     return '<div style="padding:8px 4px 4px;font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.8px;">'+team+'</div>'+
       members.map(function(p){
         const ava=p.staff_name.split(' ').map(function(w){return w[0];}).join('').slice(0,2).toUpperCase();
-        const pron=p.pronouns?' <span style="font-size:10px;color:#94a3b8;font-weight:400;">('+p.pronouns+')</span>':'';
+        const pron=p.pronouns?' <span style="font-size:10px;color:#94a3b8;font-weight:400;">('+esc(p.pronouns)+')</span>':'';
         const badge=p.is_admin?' <span style="font-size:9px;background:#fef3c7;color:#92400e;padding:1px 6px;border-radius:10px;font-weight:700;">ADMIN</span>':'';
         // Quiz access UI moved to per-quiz admin pages
         let quizBlock = '';
@@ -9850,7 +9884,7 @@ function renderStaffDirectory(list){
         }
         return '<div onclick="viewStaffProfile(\''+p.staff_name.replace(/'/g,"&#39;")+'\')" style="display:flex;align-items:center;gap:10px;padding:8px 8px;border-radius:8px;cursor:pointer;transition:background .1s;" onmouseover="this.style.background=\'#f8fafc\'" onmouseout="this.style.background=\'\'" >'+
           '<div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--accent),#7c3aed);display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700;flex-shrink:0;">'+ava+'</div>'+
-          '<div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:600;color:#0f172a;">'+p.staff_name+pron+badge+'</div></div>'+
+          '<div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:600;color:#0f172a;">'+esc(p.staff_name)+pron+badge+'</div></div>'+
           quizBlock+
           (myIsAdmin?'':'<svg width="14" height="14" viewBox="0 0 20 20" fill="#cbd5e1"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>')+
           '</div>';
@@ -10103,7 +10137,7 @@ async function loadHomeNotifPreview(){
       const lbl=ok?"Approved":"Declined";
       return'<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #f1f5f9;">'+
         (!isRead?'<div style="width:7px;height:7px;border-radius:50%;background:'+col+';flex-shrink:0;"></div>':'<div style="width:7px;height:7px;flex-shrink:0;"></div>')+
-        '<div style="flex:1;font-size:12.5px;color:#1e293b;">'+r.staff_name+' — '+fmtF(r.from_date)+'</div>'+
+        '<div style="flex:1;font-size:12.5px;color:#1e293b;">'+esc(r.staff_name)+' — '+fmtF(r.from_date)+'</div>'+
         '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:'+bg+';color:'+col+'">'+lbl+'</span>'+
         '</div>';
     }).join("");
@@ -10119,7 +10153,7 @@ async function loadHomeAnnPreview(){
     const r=rows[0];
     // Strip HTML tags for the preview snippet
     const _bodyText = (typeof searchText === 'function') ? searchText(r.body) : String(r.body||'').replace(/<[^>]*>/g,' ').replace(/\s+/g,' ').trim();
-    el.innerHTML='<div style="font-size:14px;font-weight:700;color:#0f172a;margin-bottom:4px;">'+r.title+'</div><div style="font-size:13px;color:#475569;line-height:1.5;">'+_bodyText.slice(0,100)+(_bodyText.length>100?'...':'')+'</div>';
+    el.innerHTML='<div style="font-size:14px;font-weight:700;color:#0f172a;margin-bottom:4px;">'+esc(r.title)+'</div><div style="font-size:13px;color:#475569;line-height:1.5;">'+_bodyText.slice(0,100)+(_bodyText.length>100?'...':'')+'</div>';
   }catch(e){console.warn(e);el.innerHTML='<div style="color:#94a3b8;font-size:13px;">No announcements yet.</div>';}
 }
 
@@ -10313,7 +10347,7 @@ function openTaskForm(editId){
         if(body) body.insertBefore(banner, body.firstChild);
       }
       banner.innerHTML = '<div style="display:flex;align-items:center;gap:8px;"><svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor"><path d="M15 8a3 3 0 10-2.977-2.63l-4.94 2.47a3 3 0 100 4.319l4.94 2.47a3 3 0 10.895-1.789l-4.94-2.47a3.027 3.027 0 000-.74l4.94-2.47A3 3 0 0015 8z"/></svg>Shared by '+(t.sharedFrom||'someone')+'</div>'+
-        (t.originalNote ? '<div style="margin-top:6px;font-weight:400;color:#475569;font-style:italic;">"'+String(t.originalNote).replace(/</g,'&lt;')+'"</div>' : '');
+        (t.originalNote ? '<div style="margin-top:6px;font-weight:400;color:#475569;font-style:italic;">"'+esc(t.originalNote)+'"</div>' : '');
       banner.style.display = '';
       // Hide save button for shared
       document.getElementById('taskFormSaveBtn').style.display = 'none';
@@ -10609,7 +10643,7 @@ function renderTasks(){
     }
     const prioLbl = {high:'High', med:'Medium', low:'Low'}[t.priority]||'Medium';
     const prioChip = '<span class="task-chip priority-'+(t.priority||'med')+'">'+prioLbl+'</span>';
-    const notesHtml = t.notes ? '<div style="font-size:12.5px;color:#64748b;margin-top:4px;white-space:pre-wrap;">'+t.notes.replace(/</g,'&lt;')+'</div>' : '';
+    const notesHtml = t.notes ? '<div style="font-size:12.5px;color:#64748b;margin-top:4px;white-space:pre-wrap;">'+esc(t.notes)+'</div>' : '';
     const checkIcon = t.done ? '<svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>' : '';
 
     const overdueCls = (!t.done && due && (due - now) < 0) ? ' overdue' : '';
@@ -10625,8 +10659,8 @@ function renderTasks(){
       '<div class="task-card-hd">'+
         '<div class="task-check" onclick="event.stopPropagation();toggleTaskDone(\''+t.id+'\')">'+checkIcon+'</div>'+
         '<div class="task-body">'+
-          '<div class="task-title">'+t.title.replace(/</g,'&lt;')+'</div>'+
-          (t.notes ? '<div class="task-notes">'+t.notes.replace(/</g,'&lt;')+'</div>' : '')+
+          '<div class="task-title">'+esc(t.title)+'</div>'+
+          (t.notes ? '<div class="task-notes">'+esc(t.notes)+'</div>' : '')+
         '</div>'+
       '</div>'+
       '<div class="task-meta">'+dueChip+remChip+(t.priority==='high'||t.priority==='low'?prioChip:'')+shareChip+'</div>'+
@@ -13385,8 +13419,8 @@ async function renderOnboardingChecklist(){
         (isDone ? '<svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M2 6.5L4.5 9L10 3" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>' : '')+
       '</div>'+
       '<div style="flex:1;min-width:0;">'+
-        '<div style="font-size:13px;font-weight:'+(isDone?'600':'700')+';color:'+(isDone?'#64748b':'#0f172a')+';margin-bottom:2px;'+(isDone?'text-decoration:line-through;':'')+'">'+task.title+'</div>'+
-        '<div style="font-size:11.5px;color:#94a3b8;line-height:1.4;margin-bottom:'+(isDone?'0':'8px')+';">'+task.body+'</div>'+
+        '<div style="font-size:13px;font-weight:'+(isDone?'600':'700')+';color:'+(isDone?'#64748b':'#0f172a')+';margin-bottom:2px;'+(isDone?'text-decoration:line-through;':'')+'">'+esc(task.title)+'</div>'+
+        '<div style="font-size:11.5px;color:#94a3b8;line-height:1.4;margin-bottom:'+(isDone?'0':'8px')+';">'+esc(task.body)+'</div>'+
         (isDone ? '' : '<button onclick="handleOnboardingAction(\''+task.id+'\')" style="background:#0f172a;color:#fff;border:none;border-radius:7px;padding:7px 14px;font-size:11.5px;font-weight:700;cursor:pointer;font-family:inherit;transition:background .15s;" onmouseover="this.style.background=\'#1e293b\'" onmouseout="this.style.background=\'#0f172a\'">'+task.cta+' →</button>')+
       '</div>'+
     '</div>';
@@ -13703,7 +13737,7 @@ async function loadExtraBreakRequests(){
       html += '<div style="padding:12px 14px;border-bottom:1px solid #f1f5f9;display:flex;flex-wrap:wrap;gap:10px;align-items:flex-start;">'+
         '<div style="flex:1;min-width:160px;">'+
           '<div style="font-size:13px;font-weight:700;color:#0f172a;">'+safeStaff+' · +'+dur+'</div>'+
-          '<div style="font-size:11.5px;color:#64748b;margin-top:2px;">'+d+(r.reason?' · '+r.reason:'')+'</div>'+
+          '<div style="font-size:11.5px;color:#64748b;margin-top:2px;">'+d+(r.reason?' · '+esc(r.reason):'')+'</div>'+
         '</div>'+
         '<div style="display:flex;gap:6px;">'+
           '<button data-id="'+r.id+'" data-staff="'+safeStaff+'" data-date="'+r.request_date+'" data-min="'+r.minutes+'" onclick="handleApproveBreak(this)" style="padding:6px 12px;background:#10b981;color:#fff;border:none;border-radius:7px;font-size:11.5px;font-weight:700;cursor:pointer;font-family:inherit;">Approve</button>'+
@@ -13861,7 +13895,7 @@ async function showDiscReaders(id){
     document.body.appendChild(bd);
     bd.addEventListener('click', function(e){ if(e.target===bd) bd.style.display='none'; });
   }
-  bd.innerHTML = '<div style="background:#fff;border-radius:14px;width:100%;max-width:420px;max-height:70dvh;display:flex;flex-direction:column;overflow:hidden;" onclick="event.stopPropagation()"><div style="padding:14px 18px;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center;"><div><div style="font-size:13px;font-weight:700;color:#0f172a;">Read by</div><div style="font-size:11.5px;color:#64748b;margin-top:2px;">'+disc.title+'</div></div><button onclick="document.getElementById(\'discReadersBack\').style.display=\'none\'" style="background:none;border:none;font-size:22px;color:#94a3b8;cursor:pointer;">×</button></div><div id="discReadersList" style="padding:12px 18px;overflow-y:auto;">Loading...</div></div>';
+  bd.innerHTML = '<div style="background:#fff;border-radius:14px;width:100%;max-width:420px;max-height:70dvh;display:flex;flex-direction:column;overflow:hidden;" onclick="event.stopPropagation()"><div style="padding:14px 18px;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center;"><div><div style="font-size:13px;font-weight:700;color:#0f172a;">Read by</div><div style="font-size:11.5px;color:#64748b;margin-top:2px;">'+esc(disc.title)+'</div></div><button onclick="document.getElementById(\'discReadersBack\').style.display=\'none\'" style="background:none;border:none;font-size:22px;color:#94a3b8;cursor:pointer;">×</button></div><div id="discReadersList" style="padding:12px 18px;overflow-y:auto;">Loading...</div></div>';
   bd.style.display = 'flex';
   try{
     const reads = await sbGet('discussion_reads','?discussion_id=eq.'+encodeURIComponent(id)+'&order=read_at.asc');
@@ -14224,7 +14258,7 @@ async function debugClockLog(){
     html += '</div>';
     out.innerHTML = html;
   }catch(e){
-    out.innerHTML = '<div style="color:#dc2626;">Error: '+e.message+'</div>';
+    out.innerHTML = '<div style="color:#dc2626;">Error: '+esc(e.message)+'</div>';
   }
 }
 
@@ -14262,7 +14296,7 @@ async function wipeAndResyncFromSheet(){
     showToast('Wiped '+rows.length+' rows');
     if(typeof runManagerReport === 'function') runManagerReport();
   }catch(e){
-    out.innerHTML = '<div style="color:#dc2626;">Error: '+e.message+'</div>';
+    out.innerHTML = '<div style="color:#dc2626;">Error: '+esc(e.message)+'</div>';
   }
 }
 
@@ -15610,8 +15644,8 @@ async function loadLeaveHistory(){
           '<div class="leave-duration">'+days+' day'+(days!==1?'s':'')+'</div></div>'+
           '<div class="status-tag '+sc+'">'+sl+'</div>'+
         '</div>'+
-        (r.reason?'<div class="leave-reason-txt">'+r.reason+'</div>':'')+
-        (r.status==="declined"&&r.decline_reason?'<div class="manager-note"><strong>Manager note:</strong> '+r.decline_reason+'</div>':'')+
+        (r.reason?'<div class="leave-reason-txt">'+esc(r.reason)+'</div>':'')+
+        (r.status==="declined"&&r.decline_reason?'<div class="manager-note"><strong>Manager note:</strong> '+esc(r.decline_reason)+'</div>':'')+
         '</div>';
     }).join("");
   }catch(e){el.innerHTML='<div class="empty" style="padding:12px 0"><div class="empty-sub">Could not load history.</div></div>';}
@@ -15766,7 +15800,7 @@ async function loadNotifications(){
     newReactNotifs.forEach(function(r){
       reactHtml+='<div style="background:#fdf4ff;border:1px solid #e9d5ff;border-radius:12px;padding:14px;margin-bottom:10px;cursor:pointer;" data-rid="'+r.id+'" data-target-id="'+(r.target_id||'')+'" data-target-type="'+(r.target_type||'')+'" onclick="markReactSeen(this.dataset.rid);goTo(\'engagement\');setTimeout(function(){showEngagementTab(\'discussions\');if(this.dataset.targetType===\'disc\'&&this.dataset.targetId&&typeof openDiscussion===\'function\')openDiscussion(this.dataset.targetId);}.bind(this),200);">'+
         '<div style="font-size:13px;font-weight:700;color:#7c3aed;margin-bottom:4px;">'+r.emoji+' Reaction on your post</div>'+
-        '<div style="font-size:12.5px;color:#475569;">'+r.staff_name+' reacted to your '+(r.target_type==='disc'?'discussion':'announcement')+'</div>'+
+        '<div style="font-size:12.5px;color:#475569;">'+esc(r.staff_name)+' reacted to your '+(r.target_type==='disc'?'discussion':'announcement')+'</div>'+
         '<div style="font-size:11px;color:#94a3b8;margin-top:4px;">'+fmtF(r.created_at)+'</div>'+
         '</div>';
     });
@@ -15794,7 +15828,7 @@ async function loadNotifications(){
         '<div style="width:7px;height:7px;border-radius:50%;background:'+(isApproved?"var(--accent)":"#dc2626")+';margin-bottom:8px;"></div>'+
         '<div style="font-size:13px;font-weight:700;color:'+titleColor+';margin-bottom:4px;">'+title+'</div>'+
         '<div style="font-size:12.5px;color:#475569;">'+fmtF(r.from_date)+' \u2013 '+fmtF(r.to_date)+(r.reason?' \u00b7 '+r.reason:'')+'</div>'+
-        (r.status==="declined"&&r.decline_reason?'<div style="font-size:12px;color:#dc2626;margin-top:6px;"><strong>Reason:</strong> '+r.decline_reason+'</div>':'')+
+        (r.status==="declined"&&r.decline_reason?'<div style="font-size:12px;color:#dc2626;margin-top:6px;"><strong>Reason:</strong> '+esc(r.decline_reason)+'</div>':'')+
         '<div style="font-size:11px;color:#94a3b8;margin-top:6px;">'+fmtF(r.submitted_at)+'</div>'+
         '</div>';
     }).join("");
@@ -16402,7 +16436,7 @@ async function renderQuizAdminPanel(){
       failed.forEach(function(r){
         const dt = new Date(r.created_at).toLocaleDateString('en-AU',{day:'numeric',month:'short'});
         html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid #f1f5f9;">'+
-          '<div><div style="font-size:12.5px;font-weight:600;color:#0f172a;">'+r.staff_name+'</div>'+
+          '<div><div style="font-size:12.5px;font-weight:600;color:#0f172a;">'+esc(r.staff_name)+'</div>'+
           '<div style="font-size:10.5px;color:#64748b;">Score '+r.score+'/'+r.total+' · '+dt+'</div></div>'+
           '<div style="display:flex;gap:5px;">'+
             '<button onclick="viewQuizAttemptDetail(\''+r.staff_name.replace(/'/g,"\\'")+'\','+r.id+')" style="background:#0f172a;color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:10px;font-weight:600;cursor:pointer;font-family:inherit;">Review</button>'+
@@ -16414,7 +16448,7 @@ async function renderQuizAdminPanel(){
     }
     html += '</div>';
     panel.innerHTML = html;
-  }catch(e){ console.warn('quiz admin:', e); panel.innerHTML = '<div style="padding:14px;background:#fee2e2;border-radius:10px;color:#991b1b;font-size:12px;">Failed to load: '+e.message+'</div>'; }
+  }catch(e){ console.warn('quiz admin:', e); panel.innerHTML = '<div style="padding:14px;background:#fee2e2;border-radius:10px;color:#991b1b;font-size:12px;">Failed to load: '+esc(e.message)+'</div>'; }
 }
 
 function filterQuizAdminList(q){ /* admin search moved to Staff Directory */ }
@@ -16500,7 +16534,7 @@ function renderQuizModal(){
   // Header
   html += '<div style="padding:18px 22px;border-bottom:1px solid #f1f5f9;">';
   html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">';
-  html += '<div style="font-size:15px;font-weight:700;color:#0f172a;">'+TRAINING_QUIZ.title+'</div>';
+  html += '<div style="font-size:15px;font-weight:700;color:#0f172a;">'+esc(TRAINING_QUIZ.title)+'</div>';
   html += '<div style="font-size:12px;color:#64748b;font-weight:600;">Question '+(i+1)+' of '+total+'</div>';
   html += '</div>';
   html += '<div style="background:#f1f5f9;height:5px;border-radius:3px;overflow:hidden;"><div style="background:#3b82f6;height:100%;width:'+pct+'%;transition:width .3s;"></div></div>';
@@ -16508,7 +16542,7 @@ function renderQuizModal(){
   
   // Question
   html += '<div style="padding:24px 22px;overflow-y:auto;flex:1;">';
-  html += '<div style="font-size:15px;font-weight:600;color:#0f172a;line-height:1.5;margin-bottom:18px;">'+q.q.replace(/</g,'&lt;')+'</div>';
+  html += '<div style="font-size:15px;font-weight:600;color:#0f172a;line-height:1.5;margin-bottom:18px;">'+esc(q.q)+'</div>';
   
   q.options.forEach(function(opt, idx){
     const isSelected = selected === idx;
@@ -16744,7 +16778,7 @@ async function renderMyTraining(){
       if(t.documentUrl){
         docBlock = '<a href="'+t.documentUrl+'" target="_blank" rel="noopener" style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:9px;margin-top:12px;text-decoration:none;color:#0f172a;transition:background .15s;" onmouseover="this.style.background=\'#f1f5f9\'" onmouseout="this.style.background=\'#f8fafc\'">'+
           '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>'+
-          '<div style="flex:1;min-width:0;"><div style="font-size:12.5px;font-weight:600;color:#0f172a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+t.documentTitle.replace(/</g,'&lt;')+'</div>'+
+          '<div style="flex:1;min-width:0;"><div style="font-size:12.5px;font-weight:600;color:#0f172a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+esc(t.documentTitle)+'</div>'+
           '<div style="font-size:10.5px;color:#64748b;margin-top:1px;">Tap to read</div></div>'+
           '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><polyline points="9 18 15 12 9 6"/></svg>'+
         '</a>';
@@ -16774,7 +16808,7 @@ async function renderMyTraining(){
       html += '<div data-quiz-id="'+t.id+'" style="background:'+cardBg+';border:1.5px solid '+borderColor+';border-radius:14px;padding:16px 18px;margin-bottom:12px;transition:outline .2s;">'+
         '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:8px;">'+
           '<div style="flex:1;min-width:0;">'+
-            '<div style="font-size:14.5px;font-weight:700;color:#0f172a;letter-spacing:-.005em;margin-bottom:3px;">'+t.title.replace(/</g,'&lt;')+'</div>'+
+            '<div style="font-size:14.5px;font-weight:700;color:#0f172a;letter-spacing:-.005em;margin-bottom:3px;">'+esc(t.title)+'</div>'+
             '<div style="font-size:12px;color:#64748b;line-height:1.4;">'+t.subtitle+'</div>'+
           '</div>'+
           statusBadge+
@@ -16799,7 +16833,7 @@ async function renderMyTraining(){
       }
     }
   }catch(e){
-    el.innerHTML = '<div style="padding:30px 16px;text-align:center;color:#dc2626;font-size:13px;">Failed to load training: '+e.message+'</div>';
+    el.innerHTML = '<div style="padding:30px 16px;text-align:center;color:#dc2626;font-size:13px;">Failed to load training: '+esc(e.message)+'</div>';
   }
 }
 
@@ -16885,7 +16919,7 @@ async function openQuizAdminPanel(quizId, quizTitleOverride){
     html += '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:16px;">';
     html += '<div style="flex:1;"><div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.1em;margin-bottom:3px;">Manage quiz</div>';
     const draftPill = (quizMeta.status === 'draft') ? '<span class="qap-draft-pill">Draft</span>' : '';
-    html += '<div style="font-size:17px;font-weight:800;color:#0f172a;letter-spacing:-.01em;line-height:1.3;">'+quizMeta.title.replace(/</g,"&lt;")+draftPill+'</div></div>';
+    html += '<div style="font-size:17px;font-weight:800;color:#0f172a;letter-spacing:-.01em;line-height:1.3;">'+esc(quizMeta.title)+draftPill+'</div></div>';
     html += '<button onclick="document.getElementById(\'quizAdminBack\').remove()" style="background:none;border:none;font-size:22px;color:#94a3b8;cursor:pointer;line-height:1;padding:0 4px;">×</button>';
     html += '</div>';
     
@@ -16951,7 +16985,7 @@ async function openQuizAdminPanel(quizId, quizTitleOverride){
     
     document.getElementById('qapBody').innerHTML = html;
   }catch(e){
-    document.getElementById('qapBody').innerHTML = '<div style="color:#dc2626;font-size:13px;padding:20px;">Failed: '+e.message+'</div>';
+    document.getElementById('qapBody').innerHTML = '<div style="color:#dc2626;font-size:13px;padding:20px;">Failed: '+esc(e.message)+'</div>';
   }
 }
 
@@ -17317,7 +17351,7 @@ function renderQuizBuilder(){
   html += '<div style="margin-bottom:18px;background:#f8fafc;border:1px solid #f1f5f9;border-radius:10px;padding:14px;">';
   html += '<div style="display:grid;grid-template-columns:1fr 110px;gap:10px;align-items:end;">';
   html += '<div><label style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.06em;">Quiz title</label>';
-  html += '<input type="text" value="'+qb.title.replace(/"/g,'&quot;')+'" oninput="_quizBuilder.title=this.value" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:8px 12px;font-size:13px;font-family:inherit;outline:none;margin-top:4px;"></div>';
+  html += '<input type="text" value="'+esc(qb.title)+'" oninput="_quizBuilder.title=this.value" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:8px 12px;font-size:13px;font-family:inherit;outline:none;margin-top:4px;"></div>';
   html += '<div><label style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.06em;">Pass %</label>';
   html += '<input type="number" min="50" max="100" value="'+qb.pass_pct+'" oninput="_quizBuilder.pass_pct=parseInt(this.value||80,10)" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:8px 12px;font-size:13px;font-family:inherit;outline:none;margin-top:4px;"></div>';
   html += '</div></div>';
@@ -17331,7 +17365,7 @@ function renderQuizBuilder(){
       html += '<button onclick="removeQuizBuilderQ('+qi+')" style="background:none;border:none;color:#dc2626;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;">Remove</button>';
     }
     html += '</div>';
-    html += '<textarea oninput="updateQuizBuilderQ('+qi+',\'q\',this.value)" placeholder="Enter the question..." rows="2" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:9px 12px;font-size:13.5px;font-family:inherit;outline:none;resize:vertical;margin-bottom:10px;">'+q.q.replace(/</g,'&lt;')+'</textarea>';
+    html += '<textarea oninput="updateQuizBuilderQ('+qi+',\'q\',this.value)" placeholder="Enter the question..." rows="2" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:9px 12px;font-size:13.5px;font-family:inherit;outline:none;resize:vertical;margin-bottom:10px;">'+esc(q.q)+'</textarea>';
     
     q.options.forEach(function(opt, oi){
       const isCorrect = q.correct === oi;
@@ -17482,13 +17516,13 @@ function renderCustomQuizModal(){
   let html = '<div style="background:#fff;border-radius:16px;width:100%;max-width:600px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 24px 60px rgba(15,23,42,.3);overflow:hidden;">';
   html += '<div style="padding:18px 22px;border-bottom:1px solid #f1f5f9;">';
   html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">';
-  html += '<div style="font-size:15px;font-weight:700;color:#0f172a;">'+cq.title.replace(/</g,'&lt;')+'</div>';
+  html += '<div style="font-size:15px;font-weight:700;color:#0f172a;">'+esc(cq.title)+'</div>';
   html += '<div style="font-size:12px;color:#64748b;font-weight:600;">'+(i+1)+'/'+total+'</div>';
   html += '</div>';
   html += '<div style="background:#f1f5f9;height:5px;border-radius:3px;overflow:hidden;"><div style="background:#3b82f6;height:100%;width:'+pct+'%;transition:width .3s;"></div></div>';
   html += '</div>';
   html += '<div style="padding:24px 22px;overflow-y:auto;flex:1;">';
-  html += '<div style="font-size:15px;font-weight:600;color:#0f172a;line-height:1.5;margin-bottom:18px;">'+q.q.replace(/</g,'&lt;')+'</div>';
+  html += '<div style="font-size:15px;font-weight:600;color:#0f172a;line-height:1.5;margin-bottom:18px;">'+esc(q.q)+'</div>';
   q.options.forEach(function(opt, idx){
     const isSel = selected === idx;
     html += '<div onclick="selectCustomQuizAnswer('+idx+')" style="border:1.5px solid '+(isSel?'#3b82f6':'#e2e8f0')+';background:'+(isSel?'#eff6ff':'#fff')+';border-radius:10px;padding:13px 16px;margin-bottom:8px;cursor:pointer;display:flex;align-items:flex-start;gap:11px;">';
@@ -17554,7 +17588,7 @@ async function viewCustomQuizResults(quizId, quizTitle){
       results.forEach(function(r){
         const dt = new Date(r.created_at).toLocaleDateString('en-AU',{day:'numeric',month:'short'});
         html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #f1f5f9;">'+
-          '<div><div style="font-size:13px;font-weight:600;color:#0f172a;">'+r.staff_name+'</div><div style="font-size:11px;color:#64748b;">'+dt+'</div></div>'+
+          '<div><div style="font-size:13px;font-weight:600;color:#0f172a;">'+esc(r.staff_name)+'</div><div style="font-size:11px;color:#64748b;">'+dt+'</div></div>'+
           '<div style="display:flex;align-items:center;gap:8px;">'+
             (r.passed
               ? '<span style="font-size:11px;font-weight:700;color:#065f46;background:#d1fae5;padding:4px 10px;border-radius:8px;">'+r.score+'/'+r.total+' ✓</span>'
@@ -17564,7 +17598,7 @@ async function viewCustomQuizResults(quizId, quizTitle){
       });
     }
     document.getElementById('qrBody').innerHTML = html;
-  }catch(e){ document.getElementById('qrBody').innerHTML = '<div style="color:#dc2626;">Failed: '+e.message+'</div>'; }
+  }catch(e){ document.getElementById('qrBody').innerHTML = '<div style="color:#dc2626;">Failed: '+esc(e.message)+'</div>'; }
 }
 
 async function resetCustomQuizAttempt(resultId, quizId, quizTitle){
@@ -17733,14 +17767,14 @@ async function viewQuizAttemptDetail(staffName, resultId, quizId){
       html += '<div style="margin-bottom:14px;padding:12px 14px;border:1.5px solid '+(isCorrect?'#bbf7d0':'#fecaca')+';background:'+(isCorrect?'#f0fdf4':'#fef2f2')+';border-radius:10px;">'+
         '<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;">'+
         '<div style="background:'+(isCorrect?'#10b981':'#dc2626')+';color:#fff;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;margin-top:1px;">'+(isCorrect?'✓':'✕')+'</div>'+
-        '<div style="font-size:13px;font-weight:600;color:#0f172a;line-height:1.45;">Q'+(i+1)+'. '+String(q.q).replace(/</g,'&lt;')+'</div>'+
+        '<div style="font-size:13px;font-weight:600;color:#0f172a;line-height:1.45;">Q'+(i+1)+'. '+esc(q.q)+'</div>'+
         '</div>'+
-        '<div style="font-size:12px;color:#475569;margin-bottom:4px;padding-left:30px;"><b>Their answer:</b> '+String(userOpt).replace(/</g,'&lt;')+'</div>'+
-        (!isCorrect ? '<div style="font-size:12px;color:#065f46;padding-left:30px;"><b>Correct answer:</b> '+String(correctOpt).replace(/</g,'&lt;')+'</div>' : '')+
+        '<div style="font-size:12px;color:#475569;margin-bottom:4px;padding-left:30px;"><b>Their answer:</b> '+esc(userOpt)+'</div>'+
+        (!isCorrect ? '<div style="font-size:12px;color:#065f46;padding-left:30px;"><b>Correct answer:</b> '+esc(correctOpt)+'</div>' : '')+
         '</div>';
     });
     document.getElementById('qdBody').innerHTML = html;
-  }catch(e){ document.getElementById('qdBody').innerHTML = '<div style="color:#dc2626;">Failed: '+e.message+'</div>'; }
+  }catch(e){ document.getElementById('qdBody').innerHTML = '<div style="color:#dc2626;">Failed: '+esc(e.message)+'</div>'; }
 }
 
 
@@ -18266,8 +18300,8 @@ const NotifManager = (function(){
       '<div class="notif-drop-list" style="max-height:50dvh;overflow-y:auto;padding:6px 8px;">'+
         list.map(function(n){
           const ago = timeAgo(n.ts);
-          const safeTitle = String(n.title||'').replace(/</g,'&lt;');
-          const safeBody = String(n.body||'').replace(/</g,'&lt;');
+          const safeTitle = esc(n.title||'');
+          const safeBody = esc(n.body||'');
           return '<div class="notif-item'+(n.read?' read':'')+'" data-id="'+n.id+'" onclick="NotifManager._handleClick(\''+n.id+'\')" style="position:relative;padding:11px 32px 11px 14px;cursor:pointer;border-radius:10px;'+(n.read?'background:transparent;opacity:.65;':'background:var(--accent-dim);')+'">'+
             '<button onclick="event.stopPropagation();NotifManager.clearOne(\''+n.id+'\')" title="Dismiss" style="position:absolute;top:8px;right:8px;background:none;border:none;color:#94a3b8;font-size:16px;line-height:1;cursor:pointer;width:20px;height:20px;border-radius:50%;">×</button>'+
             '<div style="font-size:13px;font-weight:700;color:#0f172a;margin-bottom:2px;line-height:1.3;">'+safeTitle+'</div>'+
@@ -18502,8 +18536,8 @@ async function loadNotifDrop(dropId){
     // Task reminders
     newTaskNotifs.forEach(function(n){
       html+='<div class="notif-drop-item unread" data-nid="'+n.id+'" data-tid="'+(n.taskId||'')+'" onclick="closeAllNotifDrops();markTaskNotifSeen(this.dataset.nid);goTo(\'tasks\');">'+
-        '<div style="font-size:12px;font-weight:700;color:#059669;margin-bottom:2px;">'+n.title+'</div>'+
-        '<div style="font-size:12px;color:#475569;">'+n.body+'</div>'+
+        '<div style="font-size:12px;font-weight:700;color:#059669;margin-bottom:2px;">'+esc(n.title)+'</div>'+
+        '<div style="font-size:12px;color:#475569;">'+esc(n.body)+'</div>'+
         '<div style="font-size:10px;color:#94a3b8;margin-top:3px;">Tap to view task</div>'+
         '</div>';
     });
@@ -18512,8 +18546,8 @@ async function loadNotifDrop(dropId){
     newReplies.forEach(function(r){
       html+='<div class="notif-drop-item unread" onclick="closeAllNotifDrops();markReplySeen(\''+r.id+'\');goTo(\'engagement\');setTimeout(function(){showEngagementTab(\'discussions\');},120);">'+
         '<div style="font-size:12px;font-weight:700;color:var(--accent);margin-bottom:2px;"> New Reply</div>'+
-        '<div style="font-size:12px;color:#475569;">'+r.replier+' replied to your discussion</div>'+
-        '<div style="font-size:11px;color:#94a3b8;margin-top:2px;">'+r.body+'</div>'+
+        '<div style="font-size:12px;color:#475569;">'+esc(r.replier)+' replied to your discussion</div>'+
+        '<div style="font-size:11px;color:#94a3b8;margin-top:2px;">'+esc(r.body)+'</div>'+
         '</div>';
     });
 
@@ -18521,7 +18555,7 @@ async function loadNotifDrop(dropId){
     newReactsDrop.forEach(function(r){
       html+='<div class="notif-drop-item unread" data-rid="'+r.id+'" onclick="markReactSeen(this.dataset.rid);closeAllNotifDrops();">'+
         '<div style="font-size:12px;font-weight:700;color:#7c3aed;margin-bottom:2px;">'+r.emoji+' Reaction on your post</div>'+
-        '<div style="font-size:12px;color:#475569;">'+r.staff_name+' reacted to your '+(r.target_type==='disc'?'discussion':'announcement')+'</div>'+
+        '<div style="font-size:12px;color:#475569;">'+esc(r.staff_name)+' reacted to your '+(r.target_type==='disc'?'discussion':'announcement')+'</div>'+
         '</div>';
     });
 
@@ -18536,8 +18570,8 @@ async function loadNotifDrop(dropId){
       html+='<div class="notif-drop-item'+(isRead?'':' unread')+'" data-nid="'+r.id+'" onclick="closeAllNotifDrops();markNotifRead(this.dataset.nid);goTo(\'schedule\');setTimeout(function(){showSchedTab(\'leave\');},120);">'+
         '<div style="font-size:12px;font-weight:700;color:'+col+';margin-bottom:2px;">'+label+'</div>'+
         '<div style="font-size:12px;color:#475569;">'+fmtF(r.from_date)+' - '+fmtF(r.to_date)+'</div>'+
-        (r.reason?'<div style="font-size:11px;color:#94a3b8;margin-top:2px;">'+r.reason+'</div>':'')+
-        (r.status==='declined'&&r.decline_reason?'<div style="font-size:11px;color:#dc2626;margin-top:2px;">'+r.decline_reason+'</div>':'')+
+        (r.reason?'<div style="font-size:11px;color:#94a3b8;margin-top:2px;">'+esc(r.reason)+'</div>':'')+
+        (r.status==='declined'&&r.decline_reason?'<div style="font-size:11px;color:#dc2626;margin-top:2px;">'+esc(r.decline_reason)+'</div>':'')+
         '<div style="font-size:10px;color:#94a3b8;margin-top:3px;">Tap to view leave history</div>'+
         '</div>';
     });
