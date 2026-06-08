@@ -13227,6 +13227,7 @@ function handleNotifClick(id, link){
 }
 
 function markAllNotifsRead(){
+  if(typeof markAllNotificationsRead === 'function'){ markAllNotificationsRead(); return; }
   if(typeof NotifManager !== 'undefined' && NotifManager.markAllRead){
     NotifManager.markAllRead();
     setTimeout(renderNotifsPage, 100);
@@ -15664,6 +15665,9 @@ async function loadNotifications(){
     const allRead = read.concat(serverSeen.filter(function(id){ return !read.includes(id); }));
     if(allRead.length !== read.length) localStorage.setItem('oR_'+me, JSON.stringify(allRead));
     const unread=rows.filter(r=>!allRead.includes(r.id));
+    // Age cap: ignore anything older than 14 days so the bell self-clears stale items
+    const NOTIF_MAX_AGE = 14*24*3600*1000;
+    const freshEnough = (ts)=>{ if(!ts) return true; const t=new Date(ts).getTime(); return isNaN(t) ? true : (Date.now()-t) < NOTIF_MAX_AGE; };
     // Compute total unread across all notif types
     let replyNotifsList=[];
     try{ replyNotifsList=await sbGet('reply_notifications','?recipient=eq.'+encodeURIComponent(me)+'&order=created_at.desc&limit=20'); }catch(e){}
@@ -15675,7 +15679,7 @@ async function loadNotifications(){
     const seenRepliesList=JSON.parse(localStorage.getItem('seen_replies_'+me)||'[]');
     const allSeenReplies = seenRepliesList.concat(serverReplies.filter(function(id){ return !seenRepliesList.includes(id); }));
     if(allSeenReplies.length !== seenRepliesList.length) localStorage.setItem('seen_replies_'+me, JSON.stringify(allSeenReplies));
-    const newRepliesList=replyNotifsList.filter(r=>!allSeenReplies.includes(r.id));
+    const newRepliesList=replyNotifsList.filter(r=>!allSeenReplies.includes(r.id) && freshEnough(r.created_at));
     let serverReacts = [];
     try{
       const r3 = await sbGet('notification_seen','?staff_name=eq.'+encodeURIComponent(me)+'&notif_key=like.react_*&limit=200');
@@ -15684,7 +15688,7 @@ async function loadNotifications(){
     const seenReacts=JSON.parse(localStorage.getItem('seen_reacts_'+me)||'[]');
     const allSeenReacts = seenReacts.concat(serverReacts.filter(function(id){ return !seenReacts.includes(id); }));
     if(allSeenReacts.length !== seenReacts.length) localStorage.setItem('seen_reacts_'+me, JSON.stringify(allSeenReacts));
-    const newReactNotifs=(reactNotifs||[]).filter(function(r){return !allSeenReacts.includes(r.id);});
+    const newReactNotifs=(reactNotifs||[]).filter(function(r){return !allSeenReacts.includes(r.id) && freshEnough(r.created_at||r.reacted_at);});
     let serverTasks = [];
     try{
       const r4 = await sbGet('notification_seen','?staff_name=eq.'+encodeURIComponent(me)+'&notif_key=like.task_*&limit=200');
@@ -15694,7 +15698,7 @@ async function loadNotifications(){
     const allSeenTasks = seenTaskNotifs.concat(serverTasks.filter(function(id){ return !seenTaskNotifs.includes(id); }));
     if(allSeenTasks.length !== seenTaskNotifs.length) localStorage.setItem('seen_task_notifs_'+me, JSON.stringify(allSeenTasks));
     const newTaskNotifs=(window._taskNotifications||[]).filter(function(n){return !allSeenTasks.includes(n.id);});
-    const totalUnread = unread.length + newRepliesList.length + newReactNotifs.length + newTaskNotifs.length;
+    const totalUnread = unread.filter(r=>freshEnough(r.submitted_at)).length + newRepliesList.length + newReactNotifs.length + newTaskNotifs.length;
     if(badge){badge.style.display="none";}
     if(bnBadge){bnBadge.style.display="none";}
     updateBellBadge(totalUnread);
@@ -15821,20 +15825,56 @@ async function loadNotifications(){
   }catch(e){console.warn(e);if(el)el.innerHTML='<div style="color:#dc2626;text-align:center;padding:16px;font-size:13px;">Could not load alerts.</div>';}
 }
 
-function markAllNotificationsRead(){
+async function markAllNotificationsRead(){
   try{
-    // Get all current notification IDs and mark them all read
-    sbGet("leave_submissions","?staff_name=eq."+encodeURIComponent(me)+"&status=in.(approved,declined)").then(rows=>{
-      if(!rows.length)return;
-      const allIds=rows.map(r=>r.id);
-      localStorage.setItem("oR_"+me,JSON.stringify(allIds));
-      // Clear badge immediately
-
-
-      // Re-render without dots
-      loadNotifications();
-    });
-  }catch(e){console.warn(e);}
+    const postSeen = async (key)=>{
+      try{ await fetch(SB+'/rest/v1/notification_seen',{
+        method:'POST',
+        headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates'},
+        body:JSON.stringify({staff_name:me, notif_key:key})
+      }); }catch(e){}
+    };
+    // Leave
+    try{
+      const rows = await sbGet("leave_submissions","?staff_name=eq."+encodeURIComponent(me)+"&status=in.(approved,declined)&limit=200");
+      const ids = (rows||[]).map(r=>r.id);
+      const cur = JSON.parse(localStorage.getItem("oR_"+me)||"[]");
+      for(const id of ids){ if(!cur.includes(id)) cur.push(id); await postSeen('leave_'+id); }
+      localStorage.setItem("oR_"+me, JSON.stringify(cur));
+    }catch(e){}
+    // Replies
+    try{
+      const rows = await sbGet('reply_notifications','?recipient=eq.'+encodeURIComponent(me)+'&limit=200');
+      const ids = (rows||[]).map(r=>r.id);
+      const cur = JSON.parse(localStorage.getItem('seen_replies_'+me)||'[]');
+      for(const id of ids){ if(!cur.includes(id)) cur.push(id); await postSeen('reply_'+id); }
+      localStorage.setItem('seen_replies_'+me, JSON.stringify(cur));
+    }catch(e){}
+    // Reactions
+    try{
+      const reacts = (typeof loadReactNotifs==='function') ? await loadReactNotifs() : [];
+      const ids = (reacts||[]).map(r=>r.id);
+      const cur = JSON.parse(localStorage.getItem('seen_reacts_'+me)||'[]');
+      for(const id of ids){ if(!cur.includes(id)) cur.push(id); await postSeen('react_'+id); }
+      localStorage.setItem('seen_reacts_'+me, JSON.stringify(cur));
+    }catch(e){}
+    // Tasks
+    try{
+      const ids = (window._taskNotifications||[]).map(n=>n.id);
+      const cur = JSON.parse(localStorage.getItem('seen_task_notifs_'+me)||'[]');
+      for(const id of ids){ if(!cur.includes(id)) cur.push(id); await postSeen('task_'+id); }
+      localStorage.setItem('seen_task_notifs_'+me, JSON.stringify(cur));
+      if(window._taskNotifications) window._taskNotifications = [];
+    }catch(e){}
+    // clear react cache so dropdown rebuilds fresh
+    if(typeof _reactNotifsCache !== 'undefined'){ try{ _reactNotifsCache=null; }catch(e){} }
+    updateBellBadge(0);
+    if(typeof NotifManager!=='undefined' && NotifManager.markAllRead) NotifManager.markAllRead();
+    if(typeof loadNotifications === 'function') loadNotifications();
+    if(typeof loadNotifDrop === 'function'){ loadNotifDrop('notifDropList'); loadNotifDrop('mhNotifDrop'); }
+    closeAllNotifDrops();
+    showToast('All notifications marked as read');
+  }catch(e){console.warn('markAllNotificationsRead',e);}
 }
 
 
@@ -16092,6 +16132,8 @@ async function checkNewNotifications(){
   try{
     const rows=await sbGet('leave_submissions','?staff_name=eq.'+encodeURIComponent(me)+'&status=in.(approved,declined)&order=submitted_at.desc&limit=5');
     const read=JSON.parse(localStorage.getItem('oR_'+me)||'[]');
+    const _MAXAGE=14*24*3600*1000;
+    const _fresh=(ts)=>{ if(!ts) return true; const t=new Date(ts).getTime(); return isNaN(t)?true:(Date.now()-t)<_MAXAGE; };
     const unread=rows.filter(r=>!read.includes(r.id));
     if(unread.length){
       const r=unread[0];
@@ -18436,10 +18478,10 @@ async function loadNotifDrop(dropId){
         .filter(function(r){ return r.recipient === _currentMe; });
     }catch(e){}
     const seenReplies=JSON.parse(localStorage.getItem('seen_replies_'+me)||'[]');
-    const newReplies=replyNotifsRaw.filter(r=>!seenReplies.includes(r.id));
+    const newReplies=replyNotifsRaw.filter(r=>!seenReplies.includes(r.id)&&_fresh(r.created_at));
     const reactNotifsDrop=await loadReactNotifs();
     const seenReactsDrop=JSON.parse(localStorage.getItem('seen_reacts_'+me)||'[]');
-    const newReactsDrop=(reactNotifsDrop||[]).filter(function(r){return !seenReactsDrop.includes(r.id);});
+    const newReactsDrop=(reactNotifsDrop||[]).filter(function(r){return !seenReactsDrop.includes(r.id)&&_fresh(r.created_at||r.reacted_at);});
     // Task reminders (from in-memory list)
     const taskNotifsSeen = JSON.parse(localStorage.getItem('seen_task_notifs_'+me)||'[]');
     const newTaskNotifs = (window._taskNotifications||[]).filter(function(n){return !taskNotifsSeen.includes(n.id);});
@@ -18471,7 +18513,7 @@ async function loadNotifDrop(dropId){
 
     // Reaction notifications
     newReactsDrop.forEach(function(r){
-      html+='<div class="notif-drop-item unread" onclick="closeAllNotifDrops();">'+
+      html+='<div class="notif-drop-item unread" data-rid="'+r.id+'" onclick="markReactSeen(this.dataset.rid);closeAllNotifDrops();">'+
         '<div style="font-size:12px;font-weight:700;color:#7c3aed;margin-bottom:2px;">'+r.emoji+' Reaction on your post</div>'+
         '<div style="font-size:12px;color:#475569;">'+r.staff_name+' reacted to your '+(r.target_type==='disc'?'discussion':'announcement')+'</div>'+
         '</div>';
@@ -18480,7 +18522,7 @@ async function loadNotifDrop(dropId){
 
 
     // Leave notifications
-    rows.forEach(function(r){
+    rows.filter(function(r){ return _fresh(r.submitted_at); }).forEach(function(r){
       const isRead=read.includes(r.id);
       const approved=r.status==='approved';
       const col=approved?'#16a34a':'#dc2626';
@@ -18558,6 +18600,7 @@ async function markReactSeen(id){
     });
   }catch(e){}
   if(typeof loadNotifications === 'function') loadNotifications();
+  if(typeof loadNotifDrop === 'function'){ loadNotifDrop('notifDropList'); loadNotifDrop('mhNotifDrop'); }
 }
 
 async function markTaskNotifSeen(id){
