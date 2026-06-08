@@ -5145,6 +5145,20 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
             </div>
           </div>
         </div>
+        <div class="card" data-admin-only style="margin-bottom:12px;cursor:pointer;display:none;" onclick="showAuthMigrationStatus()">
+          <div style="display:flex;align-items:center;justify-content:space-between;">
+            <div style="display:flex;align-items:center;gap:12px;">
+              <div style="width:36px;height:36px;border-radius:50%;background:var(--accent-dim);display:flex;align-items:center;justify-content:center;">
+                <svg width="18" height="18" viewBox="0 0 20 20" fill="#2563eb"><path d="M10 2a4 4 0 00-4 4v2H5a2 2 0 00-2 2v6a2 2 0 002 2h10a2 2 0 002-2v-6a2 2 0 00-2-2h-1V6a4 4 0 00-4-4zm2 6V6a2 2 0 10-4 0v2h4z"/></svg>
+              </div>
+              <div>
+                <div style="font-size:13px;font-weight:600;color:#0f172a;">Auth migration status</div>
+                <div style="font-size:11px;color:#94a3b8;margin-top:2px;">See who's ready for the new login</div>
+              </div>
+            </div>
+            <svg width="16" height="16" viewBox="0 0 20 20" fill="#94a3b8"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
+          </div>
+        </div>
         <div class="card" style="margin-bottom:12px;cursor:pointer;" onclick="openStaffDirectory()">
           <div style="display:flex;align-items:center;justify-content:space-between;">
             <div style="display:flex;align-items:center;gap:12px;">
@@ -6915,6 +6929,33 @@ function showAuth(s){
 }
 function saveMe(n){me=n;sessionStorage.setItem("ou",n);}
 function loadMe(){const n=sessionStorage.getItem("ou");if(n){me=n;return true;}return false;}
+// ── 1C-1: prefer the verified auth session for identity, fall back to name string ──
+// Returns the staff_name tied to the current Supabase Auth session, or null.
+async function getAuthIdentity(){
+  try{
+    const auth = getAuthClient();
+    if(!auth || !auth.getSession) return null;
+    const { data } = await auth.getSession();
+    const session = data && data.session;
+    if(!session) return null;
+    // staff_name was stored in user_metadata at migration; fall back to email-derived
+    const u = session.user || {};
+    const nameFromMeta = u.user_metadata && u.user_metadata.staff_name;
+    if(nameFromMeta) return nameFromMeta;
+    // fallback: look up by auth_uid
+    try{
+      const rows = await sbGet('staff_credentials','?auth_uid=eq.'+encodeURIComponent(u.id)+'&select=staff_name');
+      if(rows.length) return rows[0].staff_name;
+    }catch(e){}
+    return null;
+  }catch(e){ return null; }
+}
+// On boot: if a verified auth session exists, adopt that identity (authoritative).
+async function restoreAuthSession(){
+  const name = await getAuthIdentity();
+  if(name){ saveMe(name); return true; }
+  return false;
+}
 
 async function doLogin(){
   const name=document.getElementById("loginName").value.trim();
@@ -7040,7 +7081,7 @@ async function doSetPass(){
   const err=document.getElementById("spErr"),ok=document.getElementById("spOk");
   err.classList.remove("show");ok.classList.remove("show");
   if(!name){err.textContent="Please enter your full name.";err.classList.add("show");return;}
-  if(!pass||pass.length<4){err.textContent="Password must be at least 4 characters.";err.classList.add("show");return;}
+  if(!pass||pass.length<6){err.textContent="Password must be at least 6 characters.";err.classList.add("show");return;}
   if(pass!==conf){err.textContent="Passwords do not match.";err.classList.add("show");return;}
   const btn=document.getElementById("spBtn");btn.disabled=true;btn.innerHTML='<span class="sp"></span>';
   try{
@@ -7087,13 +7128,54 @@ async function doResetKey(){
   const err=document.getElementById("rkErr"),ok=document.getElementById("rkOk");
   err.classList.remove("show");ok.classList.remove("show");
   if(!a1||!a2){err.textContent="Please answer both security questions.";err.classList.add("show");return;}
-  if(!pass||pass.length<4){err.textContent="Password must be at least 4 characters.";err.classList.add("show");return;}
+  if(!pass||pass.length<6){err.textContent="Password must be at least 6 characters.";err.classList.add("show");return;}
   if(pass!==conf){err.textContent="Passwords do not match.";err.classList.add("show");return;}
   const btn=document.getElementById("rkBtn");btn.disabled=true;btn.innerHTML='<span class="sp"></span>';
   try{
     const m=await validateStaffName(name);
     if(!m){err.textContent="Name not found.";err.classList.add("show");btn.disabled=false;btn.textContent="Reset Password";return;}
     const [h1,h2]=await Promise.all([hash(a1),hash(a2)]);
+
+    // 1C-2: reset the REAL Supabase Auth password via the secure server endpoint.
+    // The server re-verifies the SQ answers (client can't be trusted) + sets the
+    // auth password using the service key (never exposed to the browser).
+    const execUrl = localStorage.getItem('oscars_sheet_url') || 'https://script.google.com/macros/s/AKfycby0Bq97bCZAsmnruXFuJuCqXQE_kOxhYE2KFuJnVzLXtT5CV0Y12k5176dxZbdaYVGE/exec';
+    let serverOk = false, serverErr = '';
+    try{
+      const resp = await fetch(execUrl, {
+        method:'POST', headers:{'Content-Type':'text/plain'},
+        body: JSON.stringify({ action:'resetPwViaSQ', staff:m, a1hash:h1, a2hash:h2, newPassword:pass })
+      });
+      const j = await resp.json().catch(()=>({}));
+      serverOk = j && j.ok === true;
+      serverErr = (j && j.error) || '';
+    }catch(e){ serverErr = 'network'; }
+
+    if(serverOk){
+      // keep legacy hash in sync so any not-yet-migrated path still matches
+      try{
+        const nh=await hash(pass);
+        await fetch(SB+"/rest/v1/staff_credentials?staff_name=eq."+encodeURIComponent(m),{
+          method:"PATCH",
+          headers:{"apikey":KEY,"Authorization":"Bearer "+KEY,"Content-Type":"application/json","Prefer":"return=minimal"},
+          body:JSON.stringify({password_hash:nh})
+        });
+      }catch(e){}
+      ok.textContent="Password reset! Signing you in...";ok.classList.add("show");
+      // sign in via auth with the new password so they get a real session
+      try{
+        const auth=getAuthClient();
+        if(auth){ await auth.signInWithPassword({ email:synthEmailFromName(m), password:pass }); }
+      }catch(e){}
+      saveMe(m);setTimeout(enterHub,1500);
+      return;
+    }
+
+    // If the server path isn't available yet (endpoint not deployed) OR the staff
+    // isn't migrated, fall back to the legacy hash reset so nobody is stuck.
+    if(serverErr === 'incorrect answers'){
+      err.textContent="Incorrect answers. Please try again.";err.classList.add("show");btn.disabled=false;btn.textContent="Reset Password";return;
+    }
     const rows=await sbGet("staff_credentials","?staff_name=eq."+encodeURIComponent(m));
     if(!rows.length){err.textContent="Account not found.";err.classList.add("show");btn.disabled=false;btn.textContent="Reset Password";return;}
     const r=rows[0];
@@ -7117,6 +7199,7 @@ function doLogout(){
   if(typeof _clockTickTimer !== 'undefined' && _clockTickTimer){ clearInterval(_clockTickTimer); _clockTickTimer=null; }
   // Clear session
   sessionStorage.removeItem("ou");
+  try{ const a=getAuthClient(); if(a && a.signOut) a.signOut(); }catch(e){}
   me=null;
   // Hard reload to ensure all state cleared cleanly
   window.location.reload();
@@ -10184,7 +10267,7 @@ async function changePassword(){
   const err=document.getElementById("profPassErr"),ok=document.getElementById("profPassOk");
   err.classList.remove("show");ok.classList.remove("show");
   if(!curr){err.textContent="Please enter your current password.";err.classList.add("show");return;}
-  if(!newp||newp.length<4){err.textContent="New password must be at least 4 characters.";err.classList.add("show");return;}
+  if(!newp||newp.length<6){err.textContent="New password must be at least 6 characters.";err.classList.add("show");return;}
   if(newp!==conf){err.textContent="Passwords do not match.";err.classList.add("show");return;}
   const btn=document.getElementById("profPassBtn");btn.disabled=true;btn.innerHTML='<span class="sp"></span> Saving...';
   try{
@@ -16180,17 +16263,20 @@ document.fonts.ready.then(function(){
   var splash = document.getElementById('splash');
   if(splash){
     splash.classList.add('fade');
-    setTimeout(function(){
+    setTimeout(async function(){
       splash.style.display='none';
-      // Only show content after splash gone
-      if(loadMe()){
+      // 1C-1: verified auth session wins; else legacy name-string session.
+      if(await restoreAuthSession() || loadMe()){
         enterHub();
       }else{
         document.getElementById('authLayer').style.display='flex';
       }
     }, 280);
   } else {
-    if(loadMe()){enterHub();}else{document.getElementById('authLayer').style.display='flex';}
+    (async function(){
+      if(await restoreAuthSession() || loadMe()){enterHub();}
+      else{document.getElementById('authLayer').style.display='flex';}
+    })();
   }
 });
 
@@ -16550,6 +16636,51 @@ async function refreshQuizStrip(){
       }
     }
   }catch(e){ console.warn('quiz strip:', e); }
+}
+
+// ── 1C-3: Admin view of auth-migration status (who can use the new login) ──
+// status per staff:
+//   • "Ready"   = migrated (auth_uid) AND set own password (must_reset=false)
+//   • "Temp pw" = migrated but still on the temp password (must_reset=true) — needs first login
+//   • "Not migrated" = no auth_uid — would be LOCKED OUT if we go auth-only
+async function showAuthMigrationStatus(){
+  let ov = document.getElementById('authMigOverlay');
+  if(!ov){
+    ov = document.createElement('div');
+    ov.id='authMigOverlay';
+    ov.style.cssText='position:fixed;inset:0;z-index:99998;background:rgba(43,36,28,.5);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;padding:20px;';
+    ov.onclick=(e)=>{ if(e.target===ov) ov.style.display='none'; };
+    document.body.appendChild(ov);
+  }
+  ov.style.display='flex';
+  ov.innerHTML='<div style="max-width:520px;width:100%;max-height:82vh;overflow:auto;background:var(--m-card,#fff);border:1px solid var(--m-border,#e7ddd0);border-radius:18px;padding:24px;box-shadow:0 16px 50px rgba(60,40,20,.2);"><div style="font-family:Fraunces,Georgia,serif;font-size:20px;font-weight:800;color:var(--m-ink,#2b241c);margin-bottom:4px;">Auth migration status</div><div style="font-size:13px;color:var(--m-ink-2,#6b5d4d);margin-bottom:16px;">Loading…</div></div>';
+  try{
+    const rows = await sbGet('staff_credentials','?select=staff_name,auth_uid,must_reset&order=staff_name.asc&limit=1000');
+    let ready=0, temp=0, notmig=0;
+    const items = rows.map(function(r){
+      let label, color;
+      if(!r.auth_uid){ notmig++; label='Not migrated'; color='#c0392b'; }
+      else if(r.must_reset===true){ temp++; label='Temp pw — needs first login'; color='#c98a14'; }
+      else { ready++; label='Ready'; color='#1f9d6b'; }
+      return '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 12px;border:1px solid var(--m-border,#eee);border-radius:10px;margin-bottom:6px;">'+
+        '<span style="font-weight:600;font-size:13.5px;color:var(--m-ink,#2b241c);">'+esc(r.staff_name)+'</span>'+
+        '<span style="font-size:11.5px;font-weight:700;color:'+color+';">'+label+'</span></div>';
+    }).join('');
+    const summary='<div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">'+
+      '<span style="font-size:12px;font-weight:700;background:#e7f7f0;color:#1f9d6b;padding:5px 10px;border-radius:8px;">Ready: '+ready+'</span>'+
+      '<span style="font-size:12px;font-weight:700;background:#fdf3e0;color:#c98a14;padding:5px 10px;border-radius:8px;">Temp pw: '+temp+'</span>'+
+      '<span style="font-size:12px;font-weight:700;background:#fdecec;color:#c0392b;padding:5px 10px;border-radius:8px;">Not migrated: '+notmig+'</span></div>';
+    const note = notmig>0
+      ? '<div style="font-size:12px;color:#c0392b;margin-top:10px;line-height:1.5;">⚠ '+notmig+' staff are NOT migrated — they would be locked out if you switch to auth-only. Migrate them first.</div>'
+      : (temp>0 ? '<div style="font-size:12px;color:#c98a14;margin-top:10px;line-height:1.5;">'+temp+' staff still on the temp password — chase them to log in + set their own before locking down.</div>'
+                : '<div style="font-size:12px;color:#1f9d6b;margin-top:10px;line-height:1.5;">✓ Everyone is ready. Safe to proceed to auth-only.</div>');
+    ov.querySelector('div').innerHTML =
+      '<div style="font-family:Fraunces,Georgia,serif;font-size:20px;font-weight:800;color:var(--m-ink,#2b241c);margin-bottom:12px;">Auth migration status</div>'+
+      summary + items + note +
+      '<button onclick="document.getElementById(\'authMigOverlay\').style.display=\'none\'" style="margin-top:14px;width:100%;padding:11px;border:none;border-radius:10px;background:var(--m-card-2,#f2ece2);color:var(--m-ink,#2b241c);font-weight:700;cursor:pointer;">Close</button>';
+  }catch(e){
+    ov.querySelector('div').innerHTML = '<div style="color:#c0392b;">Could not load status: '+esc(e.message||'error')+'</div>';
+  }
 }
 
 async function renderQuizAdminPanel(){
