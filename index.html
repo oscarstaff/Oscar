@@ -14418,6 +14418,24 @@ async function deletePunch(){
         });
       });
       await Promise.all(dels);
+      // VERIFY the clock_log delete actually persisted (catches RLS blocking DELETE,
+      // which is the #1 cause of "deleted punch reappears" — the reconcile cron
+      // re-reads the surviving Supabase row and re-fills the sheet).
+      try{
+        const stillCl = await sbGet('clock_log','?staff_name=eq.'+encodeURIComponent(staff)+'&ts=gte.'+wideStart+'&ts=lte.'+wideEnd);
+        const survivors = (stillCl||[]).filter(function(r){
+          const t = new Date(r.ts);
+          const localStr = t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0');
+          return localStr === isoDate;
+        });
+        if(survivors.length){
+          console.error('[deletePunch] CRITICAL: clock_log rows survived delete — RLS likely blocking DELETE:', survivors);
+          showToast('⚠ Delete blocked by database — punch will reappear. Run the clock_log delete policy (see console).');
+          console.error('FIX: run this SQL in Supabase →\n  create policy clocklog_delete on public.clock_log for delete to anon using (true);');
+          if(btn){ btn.disabled=false; btn.textContent='Delete punch'; }
+          return; // stop — don't pretend it worked
+        }
+      }catch(e){ console.warn('[deletePunch] clock_log verify failed:', e); }
     }
     // 2. Delete clock_overrides for that day (break + coffee data)
     try{
