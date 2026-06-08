@@ -12742,6 +12742,15 @@ function flexClockTime(date){
 async function toggleClock(){
   const btn = document.getElementById('clockBtn');
   if(!btn) return;
+  // DEBOUNCE: ignore rapid re-fires (double-tap / re-trigger) within 4s.
+  // Without this, a fast double-press fires 'in' then 'out' at the same second,
+  // creating a phantom clock_log row (the same-time in+out flicker bug).
+  const _now = Date.now();
+  if(window._lastClockToggle && (_now - window._lastClockToggle) < 4000){
+    console.warn('[clock] ignored rapid re-fire (', _now - window._lastClockToggle, 'ms)');
+    return;
+  }
+  window._lastClockToggle = _now;
   const next = (_clockState === 'in') ? 'out' : 'in';
   btn.disabled = true;
   const prevText = btn.textContent;
