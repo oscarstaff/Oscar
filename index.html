@@ -7024,7 +7024,8 @@ async function enterHub(){
   setTimeout(rtUpgradeAll, 200);
   setTimeout(startActivityPolling, 4000);
   setInterval(loadSharedTasksFromOthers, 45000); // poll for tasks shared to me
-  loadSharedTasksFromOthers();
+  setInterval(loadMySharedOutStatus, 45000); // poll completion of tasks I shared out
+  loadSharedTasksFromOthers(); loadMySharedOutStatus();
   await loadTasks();updateTaskBadge();scheduleTaskReminders();
   startAutoRefresh();
   initRealtime();
@@ -7246,7 +7247,7 @@ function goTo(p){
   if(p==="announcements"){loadAnnouncements();}
   if(p==="engagement"){showEngagementTab('discussions');}
   if(p==="documents"){loadDocuments();refreshQuizStrip();}
-  if(p==="tasks"){ loadSharedTasksFromOthers(); loadTasks().then(function(){ renderTasks(); updateTaskBadge(); maybeShowNotifyBanner(); }); }
+  if(p==="tasks"){ loadSharedTasksFromOthers(); loadMySharedOutStatus(); loadTasks().then(function(){ renderTasks(); updateTaskBadge(); maybeShowNotifyBanner(); }); }
   if(p==="announcements" || p==="engagement"){ setTimeout(rtUpgradeAll, 50); }
   if(p==="myreports"){ initReportsPage(); setTimeout(initReportsPage, 600); /* re-run after myIsAdmin settles */ }
   
@@ -10617,7 +10618,7 @@ function renderTasks(){
     const shareChip = t.sharedFrom
       ? '<span class="task-chip share-tag" title="Shared by '+(t.sharedFrom).replace(/"/g,'&quot;')+'">'+SHARE_SVG+' From '+(t.sharedFrom)+'</span>'
       : (t.sharedTo
-        ? '<span class="task-chip share-tag out" title="Shared with '+(t.sharedTo||[]).join(', ').replace(/"/g,'&quot;')+'">'+SHARE_SVG+' Shared</span>'
+        ? '<span class="task-chip share-tag out" title="Shared with '+(t.sharedTo||[]).join(', ').replace(/"/g,'&quot;')+'">'+SHARE_SVG+(t.completedByOther?' Done by '+t.completedByOther:' Shared')+'</span>'
         : '<button class="task-chip share-btn" onclick="event.stopPropagation();openShareTask(\''+t.id+'\')" title="Share with team">'+SHARE_SVG+' Share</button>');
     return '<div class="task-item'+(t.done?' done':'')+overdueCls+prioCls+'" data-id="'+t.id+'" onclick="openTaskForm(\''+t.id+'\')">'+
       '<button class="task-del" onclick="event.stopPropagation();deleteTask(\''+t.id+'\')" title="Delete">×</button>'+
@@ -14989,6 +14990,40 @@ async function confirmShareTask(){
   if(dupCount) msg += (msg?', ':'') + dupCount+' already had it';
   if(failCount) msg += (msg?', ':'') + failCount+' failed'+(lastErr?' ('+lastErr+')':'');
   showToast(msg || 'Shared', failCount&&!okCount ? 'error' : undefined);
+}
+
+// Sharer side: poll tasks I shared OUT; if a recipient completed it, mark my original done.
+async function loadMySharedOutStatus(){
+  if(!me) return;
+  try{
+    const resp = await fetch(SB+'/rest/v1/shared_tasks?sender=eq.'+encodeURIComponent(me)+'&order=created_at.desc&limit=200',{
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}
+    });
+    if(!resp.ok) return;
+    const rows = await resp.json();
+    if(!rows || !rows.length) return;
+    // collect titles that ANY recipient has completed
+    const doneTitles = {};
+    rows.forEach(function(r){ if(r.done || r.status==='done'){ doneTitles[(r.title||'').trim()] = r.completed_by || 'someone'; } });
+    let changed = false;
+    _tasks.forEach(function(t){
+      if(t.sharedFrom) return;            // skip tasks shared TO me
+      if(!t.sharedTo || !t.sharedTo.length) return;  // only my shared-out ones
+      if(t.done) return;
+      const who = doneTitles[(t.title||'').trim()];
+      if(who){
+        t.done = true;
+        t.doneAt = new Date().toISOString();
+        t.completedByOther = who;
+        changed = true;
+      }
+    });
+    if(changed){
+      saveTasks();
+      if(typeof renderTasks==='function') renderTasks();
+      if(typeof updateTaskBadge==='function') updateTaskBadge();
+    }
+  }catch(e){ console.warn('loadMySharedOutStatus:',e); }
 }
 
 async function loadSharedTasksFromOthers(){
