@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Slip · Receipt Generator · Nexits</title>
+<title>Slip · Receipt Generator · Nodes</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -110,7 +110,9 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent);}
 .hist-item:hover{border-color:var(--accent);}
 .hist-item .hi-main b{font-size:14px;}
 .hist-item .hi-main span{display:block;color:var(--ink-dim);font-size:12px;margin-top:2px;}
-.hist-item .hi-amt{font-family:'Inter',sans-serif;font-size:18px;color:var(--brand);font-weight:800;}
+.hist-item .hi-amt{font-family:'Inter',sans-serif;font-size:18px;color:var(--brand);font-weight:800;cursor:pointer;margin-left:auto;}
+.hist-item .hi-del{margin-left:14px;background:transparent;border:1px solid var(--line);color:var(--ink-dim);width:30px;height:30px;border-radius:8px;cursor:pointer;font-size:13px;line-height:1;flex-shrink:0;transition:all .14s;}
+.hist-item .hi-del:hover{background:#fdecec;border-color:#e0a99a;color:#c0392b;}
 .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--ink);color:#fff;padding:13px 22px;border-radius:11px;font-size:14px;font-weight:500;box-shadow:0 8px 28px rgba(0,0,0,.25);opacity:0;transition:all .3s;z-index:100;}
 .toast.show{transform:translateX(-50%) translateY(0);opacity:1;}
 @page{ size:A4; margin:0; }
@@ -141,7 +143,7 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent);}
   var SECRET='oscars_nexus_gate_v1_8f3a2c91';
   var SB='https://jcfgldqrdbfkgbixszds.supabase.co';
   var KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpjZmdsZHFyZGJma2diaXhzemRzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1Nzc3NzEsImV4cCI6MjA5MDE1Mzc3MX0.Wj8cCpnlsoZOPj5sKWeEdfvgjG4Nc-UuTTYgbcrPfeI';
-  function fail(m){var el=document.getElementById('__gateMsg');if(el){el.innerHTML=m+'<br><br><span style=\"color:#6b7585;font-size:12px;\">Open this app from the Nexits page in Nexus.</span>';}}
+  function fail(m){var el=document.getElementById('__gateMsg');if(el){el.innerHTML=m+'<br><br><span style=\"color:#6b7585;font-size:12px;\">Open this app from the Nodes page in Nexus.</span>';}}
   function pass(){var g=document.getElementById('__gate');if(g)g.remove();}
   async function hmacHex(secret,msg){var enc=new TextEncoder();var k=await crypto.subtle.importKey('raw',enc.encode(secret),{name:'HMAC',hash:'SHA-256'},false,['verify','sign']);var s=await crypto.subtle.sign('HMAC',k,enc.encode(msg));return Array.from(new Uint8Array(s)).map(x=>x.toString(16).padStart(2,'0')).join('');}
   // session unlock — once verified, stay in for this tab session
@@ -280,7 +282,6 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent);}
             <div class="inv-pay">
               <div class="pt">Payment Advice</div>
               <div id="r-pay">Please pay by the due date. Use the invoice number as your payment reference.</div>
-              <div id="r-bank" style="margin-top:8px;"></div>
               <div class="inv-thanks">Thank you for choosing Oscars Training Centre</div>
             </div>
           </div>
@@ -307,7 +308,6 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent);}
       <div class="field"><label>Address</label><input id="s-addr" value="6/5 King St, Rockdale NSW 2216, Australia" oninput="saveSettings()"></div>
       <div class="field"><label>Phone</label><input id="s-phone" value="+61 451 995 201" oninput="saveSettings()"></div>
       <div class="field"><label>ABN</label><input id="s-abn" value="ABN 00 000 000 000" oninput="saveSettings()"></div>
-      <div class="field"><label>Bank / Payment Details (shown on invoice)</label><textarea id="s-bank" rows="2" oninput="saveSettings()" style="resize:vertical;">Bank: Westpac · BSB 032-000 · Acc 000000 · Name: Oscars Training Centre</textarea></div>
       <div class="field"><label>Default Payment Terms (days)</label><input id="s-terms" type="number" value="7" oninput="saveSettings()"></div>
       <div class="field"><label>Next Invoice Number</label><input id="s-nextnum" type="number" oninput="saveSettings()"></div>
       <div class="actions"><button class="btn btn-primary" onclick="saveSettings();toast('Settings saved')">Save settings</button></div>
@@ -328,7 +328,7 @@ function loadSettings(){
   if(s.addr)document.getElementById('s-addr').value=s.addr;
   if(s.phone)document.getElementById('s-phone').value=s.phone;
   if(s.abn)document.getElementById('s-abn').value=s.abn;
-  if(s.bank)document.getElementById('s-bank').value=s.bank;
+
   if(s.terms)document.getElementById('s-terms').value=s.terms;
   let nn=parseInt(localStorage.getItem(LS.nextNum));
   if(!nn||isNaN(nn))nn=2650; // start at 2650
@@ -341,7 +341,7 @@ function loadSettings(){
 function saveSettings(){
   const s={co:document.getElementById('s-co').value,addr:document.getElementById('s-addr').value,
     phone:document.getElementById('s-phone').value,abn:document.getElementById('s-abn').value,
-    bank:document.getElementById('s-bank').value,terms:document.getElementById('s-terms').value};
+    terms:document.getElementById('s-terms').value};
   localStorage.setItem(LS.settings,JSON.stringify(s));
   let nn=parseInt(document.getElementById('s-nextnum').value)||2650;
   localStorage.setItem(LS.nextNum,nn);
@@ -349,13 +349,11 @@ function saveSettings(){
 }
 function applySettingsToReceipt(){
   const co=document.getElementById('s-co').value,addr=document.getElementById('s-addr').value,
-    ph=document.getElementById('s-phone').value,abn=document.getElementById('s-abn').value,
-    bank=document.getElementById('s-bank').value;
+    ph=document.getElementById('s-phone').value,abn=document.getElementById('s-abn').value;
   document.getElementById('r-co').textContent=co;
   document.getElementById('r-addr').textContent=addr;
   document.getElementById('r-cophone').textContent=ph;
   document.getElementById('r-abn').textContent=abn;
-  document.getElementById('r-bank').innerHTML=bank?('<b>'+co+'</b><br>'+bank.replace(/\n/g,'<br>')):'';
 }
 function getNextNum(){let nn=parseInt(localStorage.getItem(LS.nextNum));if(!nn||isNaN(nn))nn=2650;return nn;}
 
@@ -496,10 +494,20 @@ function renderHistory(){
   c.innerHTML='';
   all.forEach(r=>{
     const d=document.createElement('div');d.className='hist-item';
-    d.innerHTML=`<div class="hi-main"><b>#${r.num} · ${r.name}</b><span>${r.date}</span></div><div class="hi-amt">${money(r.total)}</div>`;
-    d.onclick=()=>loadReceipt(r);
+    d.innerHTML=`<div class="hi-main"><b>#${r.num} · ${r.name}</b><span>${r.date}</span></div><div class="hi-amt">${money(r.total)}</div><button class="hi-del" title="Delete">✕</button>`;
+    d.querySelector('.hi-main').onclick=()=>loadReceipt(r);
+    d.querySelector('.hi-amt').onclick=()=>loadReceipt(r);
+    d.querySelector('.hi-del').onclick=(e)=>{e.stopPropagation();deleteReceipt(r.num);};
     c.appendChild(d);
   });
+}
+function deleteReceipt(num){
+  if(!confirm('Delete invoice #'+num+'? This cannot be undone.'))return;
+  let all=[];try{all=JSON.parse(localStorage.getItem(LS.receipts))||[];}catch(e){}
+  all=all.filter(r=>r.num!==num);
+  localStorage.setItem(LS.receipts,JSON.stringify(all));
+  renderHistory();
+  toast('Invoice #'+num+' deleted');
 }
 function loadReceipt(r){
   showPage('new');
