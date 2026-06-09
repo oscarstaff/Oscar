@@ -2298,6 +2298,7 @@ function openAddStaff(){
 function editStaff(id){
   const s=staff.find(x=>x.id===id);if(!s)return;
   editingStaffId=id;
+  window._editingOldName = (s.first+' '+s.last).trim();  // remember name BEFORE edit, to detect renames
   document.getElementById('staffModalTitle').textContent='Edit Staff Member';
   document.getElementById('staffFirstName').value=s.first;
   document.getElementById('staffLastName').value=s.last;
@@ -2347,7 +2348,7 @@ function populateTeamSelect(selectedTeam){
   const sel=document.getElementById('staffTeam');
   sel.innerHTML=[...teams].sort().map(t=>`<option value="${t}"${t===selectedTeam?' selected':''}>${t}</option>`).join('');
 }
-function saveStaff(){
+async function saveStaff(){
   const first=document.getElementById('staffFirstName').value.trim();
   const last=document.getElementById('staffLastName').value.trim();
   const team=document.getElementById('staffTeam').value;
@@ -2360,7 +2361,15 @@ function saveStaff(){
   // Multiple office managers allowed
   if(editingStaffId){
     const s=staff.find(x=>x.id===editingStaffId);
+    const oldName = (window._editingOldName||'').trim();
+    const newName = (first+' '+last).trim();
     if(s){s.first=first;s.last=last;s.team=team;s.isManager=isOfficeManager?'office':isManager;s.isOfficeManager=isOfficeManager;s.type=type;s.maxHours=maxHours;}
+    // If the NAME changed, RENAME the existing rows instead of letting the sync
+    // create a duplicate (the old Monika/Monica, Muhammad/Muahmmad bug).
+    if(oldName && newName && oldName.toLowerCase() !== newName.toLowerCase()){
+      await renameStaffEverywhere(oldName, newName);
+    }
+    window._editingOldName = null;
     closeModal('staffModal');forceSave();renderAll();showToast('✓ Staff updated');pushStaffNames();
   }else{
     const s={id:nextStaffId++,first,last,team,isManager:isOfficeManager?'office':isManager,isOfficeManager,type,maxHours,color:COLORS[(nextStaffId-2)%COLORS.length]};
@@ -3868,6 +3877,29 @@ async function doResetPassword(){
 const SUPABASE_URL='https://jcfgldqrdbfkgbixszds.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpjZmdsZHFyZGJma2diaXhzemRzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1Nzc3NzEsImV4cCI6MjA5MDE1Mzc3MX0.Wj8cCpnlsoZOPj5sKWeEdfvgjG4Nc-UuTTYgbcrPfeI';
 
+// Rename a staff member IN PLACE across the DB so renaming doesn't create a
+// duplicate credential row. PATCHes staff_credentials + staff_names by old name.
+async function renameStaffEverywhere(oldName, newName){
+  const H={'apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY,'Content-Type':'application/json','Prefer':'return=minimal'};
+  try{
+    // Guard: if a row with the NEW name already exists in credentials, don't clobber it.
+    const clash=await fetch(SUPABASE_URL+'/rest/v1/staff_credentials?staff_name=eq.'+encodeURIComponent(newName)+'&select=staff_name',{headers:H});
+    const clashRows=clash.ok?await clash.json():[];
+    if(clashRows.length){
+      showToast('⚠ "'+newName+'" already exists — not renaming to avoid a clash');
+      return;
+    }
+    // 1. staff_credentials: rename the row (keeps password, auth_uid, SQ, team, admin)
+    await fetch(SUPABASE_URL+'/rest/v1/staff_credentials?staff_name=eq.'+encodeURIComponent(oldName),{
+      method:'PATCH', headers:H, body:JSON.stringify({staff_name:newName})
+    });
+    // 2. staff_names: rename (so pushStaffNames doesn't see it as delete-old + add-new)
+    await fetch(SUPABASE_URL+'/rest/v1/staff_names?name=eq.'+encodeURIComponent(oldName),{
+      method:'PATCH', headers:H, body:JSON.stringify({name:newName})
+    });
+  }catch(e){ console.warn('renameStaffEverywhere failed',e); }
+}
+
 async function pushStaffNames(){
   try{
     const currentNames=staff.map(s=>`${s.first} ${s.last}`);
@@ -3898,30 +3930,15 @@ async function pushStaffNames(){
       });
     }
 
-    // 4. Sync each staff member's team to staff_credentials (UPSERT)
-    // PATCH only updates existing rows. Staff who never set a Nexus password
-    // have no credentials row, so PATCH was a silent no-op → team never landed.
-    // Now: PATCH, and if 0 rows matched, POST a new row.
-    await Promise.all(staff.map(async s=>{
+    // 4. Sync each staff member's team to staff_credentials
+    await Promise.all(staff.map(s=>{
       const fullName=s.first+' '+s.last;
       const team=s.team||'';
-      try{
-        const patch=await fetch(SUPABASE_URL+'/rest/v1/staff_credentials?staff_name=eq.'+encodeURIComponent(fullName),{
-          method:'PATCH',
-          headers:{'apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY,'Content-Type':'application/json','Prefer':'return=representation'},
-          body:JSON.stringify({team:team})
-        });
-        let patched=[];
-        try{ patched=await patch.json(); }catch(e){}
-        // No existing row → insert one (team only; password stays null until they set it)
-        if(!Array.isArray(patched)||patched.length===0){
-          await fetch(SUPABASE_URL+'/rest/v1/staff_credentials',{
-            method:'POST',
-            headers:{'apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
-            body:JSON.stringify({staff_name:fullName,team:team,password_hash:''})
-          });
-        }
-      }catch(e){console.warn('team sync failed for',fullName,e);}
+      return fetch(SUPABASE_URL+'/rest/v1/staff_credentials?staff_name=eq.'+encodeURIComponent(fullName),{
+        method:'PATCH',
+        headers:{'apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+        body:JSON.stringify({team:team})
+      });
     }));
 
   }catch(e){console.warn('Could not sync staff names',e);}
