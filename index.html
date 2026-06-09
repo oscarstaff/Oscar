@@ -6056,6 +6056,44 @@ const GAS_TOKEN = "oscars_gas_83235a5f0c1f6ba32b18235e2b2d544ac137167d";
 // Auto-inject the token into every POST to the Apps Script /exec endpoint.
 // This covers all clock/punch/updatePunch/uploadDoc/template calls + queue replays
 // in one place, so no call can forget the token.
+// ═══════ AUTO-UPDATE — detect new deploys + force one clean reload ═══════
+// Stale cached app versions caused real clock bugs (old logic punching wrong
+// times). This fingerprints the DEPLOYED index.html (no-store fetch), compares
+// against the signature seen last time, and on any change clears CacheStorage
+// and reloads ONCE. Fully automatic — no version constant to bump.
+(function(){
+  if(location.protocol === 'file:') return; // skip local testing
+  function sig(s){ let h=5381; for(let i=0;i<s.length;i+=7){ h=((h<<5)+h+s.charCodeAt(i))>>>0; } return h.toString(36)+'-'+s.length; }
+  let _lastFgCheck = 0;
+  async function checkAppVersion(){
+    try{
+      const url = location.href.split('#')[0].split('?')[0] + '?_vchk=' + Date.now();
+      const r = await fetch(url, {cache:'no-store'});
+      if(!r.ok) return;
+      const remote = sig(await r.text());
+      const stored = localStorage.getItem('app_deploy_sig');
+      if(!stored){ localStorage.setItem('app_deploy_sig', remote); return; }
+      if(stored === remote) return;
+      // New deploy detected
+      localStorage.setItem('app_deploy_sig', remote);
+      if(localStorage.getItem('app_reloaded_sig') === remote) return; // already reloaded for this one
+      localStorage.setItem('app_reloaded_sig', remote);
+      if(typeof showToast === 'function') showToast('Updating portal to the latest version…','info');
+      try{ if(window.caches && caches.keys){ const ks = await caches.keys(); await Promise.all(ks.map(function(k){ return caches.delete(k); })); } }catch(e){}
+      setTimeout(function(){ location.reload(); }, 900);
+    }catch(e){ /* offline etc — try again next cycle */ }
+  }
+  setTimeout(checkAppVersion, 8000);                 // shortly after open
+  setInterval(checkAppVersion, 15*60*1000);          // every 15 min
+  document.addEventListener('visibilitychange', function(){
+    if(document.visibilityState !== 'visible') return;
+    const now = Date.now();
+    if(now - _lastFgCheck < 5*60*1000) return;       // throttle foreground checks
+    _lastFgCheck = now;
+    checkAppVersion();                                // app brought back to front
+  });
+})();
+
 (function(){
   const _origFetch = window.fetch.bind(window);
   window.fetch = function(url, opts){
