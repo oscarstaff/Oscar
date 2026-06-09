@@ -3922,6 +3922,21 @@ async function renameStaffEverywhere(oldName, newName){
     await fetch(SUPABASE_URL+'/rest/v1/staff_names?name=eq.'+encodeURIComponent(oldName),{
       method:'PATCH', headers:H, body:JSON.stringify({name:newName})
     });
+    // 3. Update the auth account's email (firstname.lastname@oscars.local) + metadata
+    //    to match the new name — otherwise login (which builds the email from the
+    //    name) would break after a rename.
+    try{
+      const resp=await fetch(GAS_EXEC_URL,{
+        method:'POST',headers:{'Content-Type':'text/plain'},
+        body:JSON.stringify({action:'adminRenameAuth',oldName:oldName,newName:newName,token:GAS_TOKEN})
+      });
+      const j=await resp.json().catch(()=>({}));
+      if(!(j&&j.ok)){
+        showToast('⚠ Renamed, but auth email update failed: '+((j&&j.error)||'error')+'. Staff may need a password reset to log in.');
+      }
+    }catch(e){
+      showToast('⚠ Renamed, but auth email update failed (network). Staff may need a password reset.');
+    }
   }catch(e){ console.warn('renameStaffEverywhere failed',e); }
 }
 
