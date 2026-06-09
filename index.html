@@ -16790,16 +16790,19 @@ document.fonts.ready.then(function(){
     setTimeout(async function(){
       splash.style.display='none';
       // 1C-1: verified auth session wins; else legacy name-string session.
-      if(await restoreAuthSession() || loadMe()){
+      // AUTH_ONLY: a cached name with NO live auth session is a dead half-state
+      // (locked tables would all read empty). Require the real session.
+      if(await restoreAuthSession() || (!AUTH_ONLY_MODE && loadMe())){
         enterHub();
       }else{
+        try{ sessionStorage.removeItem('ou'); }catch(e){}
         document.getElementById('authLayer').style.display='flex';
       }
     }, 280);
   } else {
     (async function(){
-      if(await restoreAuthSession() || loadMe()){enterHub();}
-      else{document.getElementById('authLayer').style.display='flex';}
+      if(await restoreAuthSession() || (!AUTH_ONLY_MODE && loadMe())){enterHub();}
+      else{try{ sessionStorage.removeItem('ou'); }catch(e){} document.getElementById('authLayer').style.display='flex';}
     })();
   }
 });
