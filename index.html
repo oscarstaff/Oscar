@@ -5867,6 +5867,7 @@ const GAS_TOKEN = "oscars_gas_83235a5f0c1f6ba32b18235e2b2d544ac137167d";
   window.fetch = function(url, opts){
     try{
       const u = (typeof url === 'string') ? url : (url && url.url) || '';
+      // GAS token injection (unchanged)
       if(u.indexOf('script.google.com/macros') !== -1 && opts && opts.body && typeof opts.body === 'string'){
         const b = JSON.parse(opts.body);
         if(b && typeof b === 'object' && b.token === undefined){
@@ -5874,7 +5875,23 @@ const GAS_TOKEN = "oscars_gas_83235a5f0c1f6ba32b18235e2b2d544ac137167d";
           opts = Object.assign({}, opts, { body: JSON.stringify(b) });
         }
       }
-    }catch(e){ /* leave body untouched on any parse issue */ }
+      // Supabase REST: if we have a logged-in user session token, send THAT as the
+      // bearer (so DB calls run as `authenticated`, enabling auth.uid()/RLS). The
+      // anon KEY stays in the apikey header. This covers EVERY supabase call in one
+      // place, so individual call sites don't each need updating.
+      if(window._sbAuthToken &&
+         u.indexOf('/rest/v1/') !== -1 && u.indexOf(SB) !== -1){
+        const h = Object.assign({}, (opts && opts.headers) || {});
+        // only override if the current Authorization is the anon KEY (don't clobber
+        // a deliberately different header)
+        const cur = h['Authorization'] || h['authorization'] || '';
+        if(cur === 'Bearer '+KEY || cur === ''){
+          h['Authorization'] = 'Bearer ' + window._sbAuthToken;
+          h['apikey'] = KEY;
+          opts = Object.assign({}, opts, { headers: h });
+        }
+      }
+    }catch(e){ /* leave request untouched on any issue */ }
     return _origFetch(url, opts);
   };
 })();
@@ -6772,13 +6789,29 @@ async function deleteDiscussion(id){
   }catch(e){console.warn(e);}
 }
 
+// Holds the current Supabase Auth access token (user session). When set, DB
+// calls go out as the AUTHENTICATED user (so auth.uid()/`to authenticated` RLS
+// works). Falls back to the anon KEY before login / if no session.
+window._sbAuthToken = null;
+async function refreshSbAuthToken(){
+  try{
+    const auth = getAuthClient();
+    if(auth && auth.getSession){
+      const { data } = await auth.getSession();
+      window._sbAuthToken = (data && data.session && data.session.access_token) ? data.session.access_token : null;
+    }
+  }catch(e){ window._sbAuthToken = null; }
+  return window._sbAuthToken;
+}
+function _sbBearer(){ return window._sbAuthToken || KEY; }
+
 async function sbGet(t,f){
   const url=SB+"/rest/v1/"+t+(f||"");
-  const r=await fetch(url,{headers:{"apikey":KEY,"Authorization":"Bearer "+KEY}});
+  const r=await fetch(url,{headers:{"apikey":KEY,"Authorization":"Bearer "+_sbBearer()}});
   if(!r.ok){console.warn("sbGet failed:",t,r.status,await r.text().catch(()=>''));return[];}
   return r.json();
 }
-async function sbPost(t,b){return fetch(SB+"/rest/v1/"+t,{method:"POST",headers:{"apikey":KEY,"Authorization":"Bearer "+KEY,"Content-Type":"application/json","Prefer":"return=minimal"},body:JSON.stringify(b)});}
+async function sbPost(t,b){return fetch(SB+"/rest/v1/"+t,{method:"POST",headers:{"apikey":KEY,"Authorization":"Bearer "+_sbBearer(),"Content-Type":"application/json","Prefer":"return=minimal"},body:JSON.stringify(b)});}
 
 // ═══════════════ NODES APP ACCESS CONTROL ═══════════════
 let _accessCache={formcraft:[],slip:[],shiftops:[]};
@@ -6956,7 +6989,7 @@ async function getAuthIdentity(){
 // On boot: if a verified auth session exists, adopt that identity (authoritative).
 async function restoreAuthSession(){
   const name = await getAuthIdentity();
-  if(name){ saveMe(name); return true; }
+  if(name){ await refreshSbAuthToken(); saveMe(name); return true; }
   return false;
 }
 
@@ -6987,6 +7020,8 @@ async function doLogin(){
         if(!error && data && data.session){
           console.log('[auth] Supabase sign-in OK for', synthEmail);
           authedViaSupabase = true;
+          // capture the session token so subsequent DB calls run authenticated
+          window._sbAuthToken = data.session.access_token || null;
           // Check the must_reset flag — HARD force a password change if set.
           let mustReset = false;
           try{
@@ -7069,6 +7104,7 @@ async function submitForcedReset(name){
     // update the real Supabase Auth password
     const { error } = await auth.updateUser({ password: np });
     if(error){ btn.disabled=false; btn.textContent='Save & Continue'; return show(error.message||'Could not update password.'); }
+    await refreshSbAuthToken();
     // clear the must_reset flag + keep legacy hash in sync (so fallback still matches)
     try{
       const h=await hash(np);
@@ -7179,7 +7215,7 @@ async function doResetKey(){
       // sign in via auth with the new password so they get a real session
       try{
         const auth=getAuthClient();
-        if(auth){ await auth.signInWithPassword({ email:synthEmailFromName(m), password:pass }); }
+        if(auth){ await auth.signInWithPassword({ email:synthEmailFromName(m), password:pass }); await refreshSbAuthToken(); }
       }catch(e){}
       saveMe(m);setTimeout(enterHub,1500);
       return;
@@ -7213,6 +7249,7 @@ async function doLogout(){
   if(typeof _clockTickTimer !== 'undefined' && _clockTickTimer){ clearInterval(_clockTickTimer); _clockTickTimer=null; }
   // Clear session
   sessionStorage.removeItem("ou");
+  window._sbAuthToken = null;
   // Sign out of Supabase Auth and WAIT for it — otherwise the reload races the
   // signOut and the session survives, logging the user straight back in.
   try{
