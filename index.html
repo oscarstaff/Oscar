@@ -7145,6 +7145,24 @@ async function refreshSbAuthToken(){
   }catch(e){ window._sbAuthToken = null; }
   return window._sbAuthToken;
 }
+// Tokens expire (~1h). The supabase client auto-refreshes its session in the
+// background — keep our cached copy in sync so locked-table requests never go
+// out with a stale token (symptom: data silently "disappears" after an hour).
+setInterval(function(){ if(window._sbAuthToken) refreshSbAuthToken(); }, 5*60*1000);
+document.addEventListener('visibilitychange', function(){
+  if(document.visibilityState === 'visible' && window._sbAuthToken) refreshSbAuthToken();
+});
+try{
+  const _ac = getAuthClient();
+  if(_ac && _ac.onAuthStateChange){
+    _ac.onAuthStateChange(function(event, session){
+      if(event === 'TOKEN_REFRESHED' || event === 'SIGNED_IN'){
+        window._sbAuthToken = (session && session.access_token) || window._sbAuthToken;
+      }
+      if(event === 'SIGNED_OUT') window._sbAuthToken = null;
+    });
+  }
+}catch(e){}
 function _sbBearer(){ return window._sbAuthToken || KEY; }
 
 async function sbGet(t,f){
