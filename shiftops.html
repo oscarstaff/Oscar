@@ -3922,6 +3922,15 @@ async function renameStaffEverywhere(oldName, newName){
     await fetch(SUPABASE_URL+'/rest/v1/staff_names?name=eq.'+encodeURIComponent(oldName),{
       method:'PATCH', headers:H, body:JSON.stringify({name:newName})
     });
+    // 2b. clock_log + clock_overrides: rename the staff_name on all punch rows.
+    //     CRITICAL — without this, old-name rows remain and the reconcile cron
+    //     recreates a sheet tab under the OLD name (renamed staff "comes back").
+    await fetch(SUPABASE_URL+'/rest/v1/clock_log?staff_name=eq.'+encodeURIComponent(oldName),{
+      method:'PATCH', headers:H, body:JSON.stringify({staff_name:newName})
+    });
+    await fetch(SUPABASE_URL+'/rest/v1/clock_overrides?staff_name=eq.'+encodeURIComponent(oldName),{
+      method:'PATCH', headers:H, body:JSON.stringify({staff_name:newName})
+    }).catch(function(){});
     // 3. Update the auth account's email (firstname.lastname@oscars.local) + metadata
     //    to match the new name — otherwise login (which builds the email from the
     //    name) would break after a rename.
