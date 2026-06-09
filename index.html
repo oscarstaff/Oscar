@@ -4404,6 +4404,35 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
 [data-theme="dark"] .lrn-chip{background:#16222f;border-color:#2a3c50;color:#a8bccf;}
 [data-theme="dark"] .lrn-chip.on{background:#dde8f5;border-color:#dde8f5;color:#0f1923;}
 [data-theme="dark"] .lrn-doc,[data-theme="dark"] .lrn-admin{background:#0f1923;border-color:#243446;}
+/* ═══════ QUIZ ADMIN PANEL 2.0 ═══════ */
+.qap2-hero{background:linear-gradient(132deg,#0f172a,#1e3a8a 60%,#3b82f6);color:#fff;border-radius:16px;padding:16px 18px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:flex-start;gap:12px;position:relative;overflow:hidden;}
+.qap2-hero::after{content:'';position:absolute;right:-30px;top:-50px;width:160px;height:160px;border-radius:50%;background:rgba(255,255,255,.07);}
+.qap2-kicker{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.12em;opacity:.75;margin-bottom:3px;}
+.qap2-title{font-size:16.5px;font-weight:800;letter-spacing:-.01em;line-height:1.3;}
+.qap2-x{background:rgba(255,255,255,.14);border:none;border-radius:9px;width:30px;height:30px;font-size:17px;color:#fff;cursor:pointer;line-height:1;flex-shrink:0;transition:background .15s;position:relative;z-index:1;}
+.qap2-x:hover{background:rgba(255,255,255,.26);}
+.qap2-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-bottom:16px;}
+.qap2-stat{border-radius:14px;padding:13px 14px;position:relative;overflow:hidden;transition:transform .15s;}
+.qap2-stat:hover{transform:translateY(-1px);}
+.qap2-stat-num{font-size:23px;font-weight:850;line-height:1;letter-spacing:-.02em;}
+.qap2-stat-lbl{font-size:10px;font-weight:750;text-transform:uppercase;letter-spacing:.07em;margin-top:4px;opacity:.8;}
+.qap2-chips{display:flex;gap:6px;margin-bottom:11px;flex-wrap:wrap;}
+.qap2-chip{background:#fff;border:1px solid #e3e9f1;border-radius:18px;padding:5.5px 12px;font-size:11px;font-weight:700;color:#5b7089;cursor:pointer;font-family:inherit;transition:all .15s;display:inline-flex;align-items:center;gap:5px;}
+.qap2-chip:hover{border-color:#c3cfdd;color:#33455c;}
+.qap2-chip.on{background:#0f172a;border-color:#0f172a;color:#fff;}
+.qap2-chip .ct{background:rgba(100,116,139,.14);border-radius:10px;padding:1px 6px;font-size:9.5px;font-weight:800;}
+.qap2-chip.on .ct{background:rgba(255,255,255,.22);}
+.qap2-search{width:100%;border:1px solid #e3e9f1;border-radius:12px;padding:10px 14px;font-size:13px;font-family:inherit;outline:none;background:#f8fafc;margin-bottom:10px;transition:all .2s;}
+.qap2-search:focus{border-color:var(--accent);background:#fff;box-shadow:0 0 0 3px rgba(5,150,105,.08);}
+.qap2-row{display:flex;justify-content:space-between;align-items:center;padding:8px 9px;border-radius:11px;gap:8px;transition:background .12s;}
+.qap2-row:hover{background:#f5f8fb;}
+.qap2-rava{width:30px;height:30px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#fff;flex-shrink:0;}
+.qap2-rname{font-size:12.5px;font-weight:650;color:#0f172a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.qap2-rsub{font-size:10px;color:#94a3b8;margin-top:1px;}
+[data-theme="dark"] .qap2-chip,[data-theme="dark"] .qap2-search{background:#16222f;border-color:#2a3c50;color:#a8bccf;}
+[data-theme="dark"] .qap2-chip.on{background:#dde8f5;color:#0f1923;border-color:#dde8f5;}
+[data-theme="dark"] .qap2-rname{color:#dde8f5;}
+[data-theme="dark"] .qap2-row:hover{background:#1d2c3c;}
 
 </style>
 
@@ -17659,19 +17688,19 @@ async function openQuizAdminPanel(quizId, quizTitleOverride){
     const failedCount = Object.values(latestByStaff).filter(function(r){return !r.passed;}).length;
     
     let html = '';
-    // Header
-    html += '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:16px;">';
-    html += '<div style="flex:1;"><div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.1em;margin-bottom:3px;">Manage quiz</div>';
+    // Hero header
     const draftPill = (quizMeta.status === 'draft') ? '<span class="qap-draft-pill">Draft</span>' : '';
-    html += '<div style="font-size:17px;font-weight:800;color:#0f172a;letter-spacing:-.01em;line-height:1.3;">'+esc(quizMeta.title)+draftPill+'</div></div>';
-    html += '<button onclick="document.getElementById(\'quizAdminBack\').remove()" style="background:none;border:none;font-size:22px;color:#94a3b8;cursor:pointer;line-height:1;padding:0 4px;">×</button>';
+    html += '<div class="qap2-hero">';
+    html += '<div style="flex:1;min-width:0;position:relative;z-index:1;"><div class="qap2-kicker">Manage quiz</div>';
+    html += '<div class="qap2-title">'+esc(quizMeta.title)+draftPill+'</div></div>';
+    html += '<button onclick="document.getElementById(\'quizAdminBack\').remove()" class="qap2-x">×</button>';
     html += '</div>';
-    
-    // Stats row
-    html += '<div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;">';
-    html += '<div class="qap-stat-card" style="background:linear-gradient(135deg,#dbeafe,#bfdbfe);color:#1e3a8a;"><div class="qap-stat-num">'+accessSet.size+'</div><div class="qap-stat-label">Has access</div></div>';
-    html += '<div class="qap-stat-card" style="background:linear-gradient(135deg,#d1fae5,#a7f3d0);color:#065f46;"><div class="qap-stat-num">'+passedCount+'</div><div class="qap-stat-label">Passed</div></div>';
-    html += '<div class="qap-stat-card" style="background:linear-gradient(135deg,#fee2e2,#fecaca);color:#991b1b;"><div class="qap-stat-num">'+failedCount+'</div><div class="qap-stat-label">Failed</div></div>';
+
+    // Stats
+    html += '<div class="qap2-stats">';
+    html += '<div class="qap2-stat" style="background:linear-gradient(135deg,#dbeafe,#bfdbfe);color:#1e3a8a;"><div class="qap2-stat-num">'+accessSet.size+'</div><div class="qap2-stat-lbl">Has access</div></div>';
+    html += '<div class="qap2-stat" style="background:linear-gradient(135deg,#d1fae5,#a7f3d0);color:#065f46;"><div class="qap2-stat-num">'+passedCount+'</div><div class="qap2-stat-lbl">Passed</div></div>';
+    html += '<div class="qap2-stat" style="background:linear-gradient(135deg,#fee2e2,#fecaca);color:#991b1b;"><div class="qap2-stat-num">'+failedCount+'</div><div class="qap2-stat-lbl">Failed</div></div>';
     html += '</div>';
     
     // Action buttons
@@ -17692,24 +17721,35 @@ async function openQuizAdminPanel(quizId, quizTitleOverride){
     }
     html += '</div>';
     
+    // Status filter chips
+    const noAccessCount = (allStaff||[]).filter(function(s){return s.name && !accessSet.has(s.name);}).length;
+    html += '<div class="qap2-chips">';
+    html += '<button class="qap2-chip on" data-f="all" onclick="qapSetFilter(\'all\',this)">All <span class="ct">'+(allStaff||[]).length+'</span></button>';
+    html += '<button class="qap2-chip" data-f="access" onclick="qapSetFilter(\'access\',this)">Has access <span class="ct">'+accessSet.size+'</span></button>';
+    html += '<button class="qap2-chip" data-f="noaccess" onclick="qapSetFilter(\'noaccess\',this)">No access <span class="ct">'+noAccessCount+'</span></button>';
+    html += '<button class="qap2-chip" data-f="passed" onclick="qapSetFilter(\'passed\',this)">Passed <span class="ct">'+passedCount+'</span></button>';
+    html += '<button class="qap2-chip" data-f="failed" onclick="qapSetFilter(\'failed\',this)">Failed <span class="ct">'+failedCount+'</span></button>';
+    html += '</div>';
+
     // Search input
-    html += '<input type="search" id="qapSearch" placeholder="Search staff..." oninput="filterQuizAdminPanel(this.value)" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;outline:none;background:#f8fafc;margin-bottom:10px;">';
-    
+    html += '<input type="search" id="qapSearch" placeholder="Search staff…" oninput="filterQuizAdminPanel(this.value)" class="qap2-search">';
+
     // Staff list
     html += '<div id="qapStaffList" style="max-height:360px;overflow-y:auto;">';
     const names = (allStaff||[]).map(function(s){return s.name;}).filter(Boolean).sort();
     names.forEach(function(n){
       const hasAccess = accessSet.has(n);
       const result = latestByStaff[n];
+      const rState = result ? (result.passed?'passed':'failed') : 'none';
       let statusBadge = '';
       let actionBtns = '';
       if(result){
         // Score badge is CLICKABLE — opens detailed review showing per-question right/wrong
         const reviewBtn = 'onclick="event.stopPropagation();viewQuizAttemptDetail(\''+n.replace(/\\/g,"\\\\").replace(/\'/g,"\\\'")+'\','+result.id+',\''+quizId+'\')" title="Click to see which questions they got right/wrong"';
         if(result.passed){
-          statusBadge = '<button '+reviewBtn+' style="font-size:10px;font-weight:700;color:#059669;background:#d1fae5;padding:2px 7px;border-radius:8px;border:none;cursor:pointer;font-family:inherit;">✓ '+result.score+'/'+result.total+' (review)</button>';
+          statusBadge = '<button '+reviewBtn+' style="font-size:10px;font-weight:700;color:#059669;background:#d1fae5;padding:3px 8px;border-radius:9px;border:none;cursor:pointer;font-family:inherit;">✓ '+result.score+'/'+result.total+'</button>';
         } else {
-          statusBadge = '<button '+reviewBtn+' style="font-size:10px;font-weight:700;color:#991b1b;background:#fee2e2;padding:2px 7px;border-radius:8px;border:none;cursor:pointer;font-family:inherit;">✕ '+result.score+'/'+result.total+' (review)</button>';
+          statusBadge = '<button '+reviewBtn+' style="font-size:10px;font-weight:700;color:#991b1b;background:#fee2e2;padding:3px 8px;border-radius:9px;border:none;cursor:pointer;font-family:inherit;">✕ '+result.score+'/'+result.total+'</button>';
         }
         // Allow retake button — admin only, shows for BOTH passed and failed
         if(isStandard){
@@ -17719,9 +17759,16 @@ async function openQuizAdminPanel(quizId, quizTitleOverride){
         }
       }
       const toggleBtn = '<button onclick="togglePerQuizAccess(\''+n.replace(/\\/g,"\\\\").replace(/\'/g,"\\\'")+'\',\''+quizId+'\','+(!hasAccess)+');setTimeout(function(){openQuizAdminPanel(\''+quizId+'\');},300);" class="'+(hasAccess?"qap-revoke-btn":"qap-give-btn")+'">'+(hasAccess?'Revoke':'Give')+'</button>';
-      
-      html += '<div class="qap-row" data-name="'+n.toLowerCase().replace(/"/g,"&quot;")+'" style="display:flex;justify-content:space-between;align-items:center;padding:9px 6px;border-bottom:1px solid #f1f5f9;gap:6px;">'+
-        '<div style="flex:1;min-width:0;"><div style="font-size:12.5px;font-weight:600;color:#0f172a;">'+n.replace(/</g,'&lt;')+'</div></div>'+
+
+      const initials = n.split(' ').map(function(w){return w[0];}).join('').slice(0,2).toUpperCase();
+      const avaColor = (typeof rtAvaColor==='function') ? rtAvaColor(n) : '#64748b';
+      const subTxt = hasAccess ? (result ? (result.passed?'Access · passed':'Access · failed') : 'Access · not taken') : 'No access';
+
+      html += '<div class="qap2-row qap-row" data-name="'+n.toLowerCase().replace(/"/g,"&quot;")+'" data-access="'+(hasAccess?1:0)+'" data-state="'+rState+'">'+
+        '<div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0;">'+
+          '<div class="qap2-rava" style="background:'+avaColor+';">'+initials+'</div>'+
+          '<div style="min-width:0;"><div class="qap2-rname">'+n.replace(/</g,'&lt;')+'</div><div class="qap2-rsub">'+subTxt+'</div></div>'+
+        '</div>'+
         '<div style="display:flex;align-items:center;gap:5px;flex-shrink:0;">'+statusBadge+actionBtns+toggleBtn+'</div>'+
       '</div>';
     });
@@ -17733,11 +17780,25 @@ async function openQuizAdminPanel(quizId, quizTitleOverride){
   }
 }
 
+let _qapFilter='all';
+function qapSetFilter(f,btn){
+  _qapFilter=f;
+  document.querySelectorAll('.qap2-chip').forEach(function(c){c.classList.remove('on');});
+  if(btn) btn.classList.add('on');
+  filterQuizAdminPanel((document.getElementById('qapSearch')||{}).value||'');
+}
 function filterQuizAdminPanel(q){
   q = (q||'').toLowerCase().trim();
   document.querySelectorAll('.qap-row').forEach(function(row){
     const name = row.dataset.name || '';
-    row.style.display = (!q || name.indexOf(q) >= 0) ? 'flex' : 'none';
+    const access = row.dataset.access === '1';
+    const state = row.dataset.state || 'none';
+    let ok = (!q || name.indexOf(q) >= 0);
+    if(ok && _qapFilter==='access')   ok = access;
+    if(ok && _qapFilter==='noaccess') ok = !access;
+    if(ok && _qapFilter==='passed')   ok = state==='passed';
+    if(ok && _qapFilter==='failed')   ok = state==='failed';
+    row.style.display = ok ? 'flex' : 'none';
   });
 }
 
