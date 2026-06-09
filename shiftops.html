@@ -2374,7 +2374,19 @@ async function saveStaff(){
   }else{
     const s={id:nextStaffId++,first,last,team,isManager:isOfficeManager?'office':isManager,isOfficeManager,type,maxHours,color:COLORS[(nextStaffId-2)%COLORS.length]};
     staff.push(s);shifts[s.id]={};availability[s.id]={};
-    closeModal('staffModal');forceSave();renderAll();showToast(`✓ ${first} ${last} added`);pushStaffNames();
+    const fullName=(first+' '+last).trim();
+    closeModal('staffModal');forceSave();renderAll();pushStaffNames();
+    // Create the staff's real auth account (temp password, forced reset on first login)
+    // so they can actually log in under auth-only mode.
+    try{
+      const resp=await fetch(GAS_EXEC_URL,{
+        method:'POST',headers:{'Content-Type':'text/plain'},
+        body:JSON.stringify({action:'adminSetPw',staff:fullName,newPassword:'Oscars2026!',token:GAS_TOKEN})
+      });
+      const j=await resp.json().catch(()=>({}));
+      if(j&&j.ok){ showToast(`✓ ${fullName} added — temp password: Oscars2026!`); }
+      else { showToast(`✓ ${fullName} added, but auth setup failed: ${(j&&j.error)||'error'}. Use Set Password.`); }
+    }catch(e){ showToast(`✓ ${fullName} added, but auth setup failed. Use Set Password to fix.`); }
   }
 }
 function removeStaff(id){
@@ -3825,8 +3837,8 @@ async function doResetPassword(){
   const msg=document.getElementById('resetPassMsg');
   msg.style.display='none';
 
-  if(!pass||pass.length<4){
-    msg.textContent='Password must be at least 4 characters.';
+  if(!pass||pass.length<6){
+    msg.textContent='Password must be at least 6 characters.';
     msg.style.cssText='display:block;background:rgba(255,92,53,.1);border:1px solid rgba(255,92,53,.2);color:var(--warn);font-size:12px;padding:8px 12px;border-radius:8px;margin-bottom:8px';
     return;
   }
@@ -3840,33 +3852,22 @@ async function doResetPassword(){
   btn.disabled=true;btn.textContent='Saving…';
 
   try{
-    const hash=await hashPassword(pass);
     const name=resetPassTarget.name;
-    const checkRes=await fetch(
-      `${SUPABASE_URL}/rest/v1/staff_credentials?staff_name=eq.${encodeURIComponent(name)}`,
-      {headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`}}
-    );
-    const existing=await checkRes.json();
-    let res;
-    if(existing.length){
-      res=await fetch(
-        `${SUPABASE_URL}/rest/v1/staff_credentials?staff_name=eq.${encodeURIComponent(name)}`,
-        {method:'PATCH',headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`,'Content-Type':'application/json','Prefer':'return=minimal'},
-         body:JSON.stringify({password_hash:hash,reset_key_hash:null})}
-      );
-    } else {
-      res=await fetch(
-        `${SUPABASE_URL}/rest/v1/staff_credentials`,
-        {method:'POST',headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`,'Content-Type':'application/json','Prefer':'return=minimal'},
-         body:JSON.stringify({staff_name:name,password_hash:hash})}
-      );
-    }
-    if(res.ok||res.status===201||res.status===204){
+    // 1C-4b: set the REAL Supabase Auth password via the secure server endpoint.
+    // (The legacy password_hash is no longer used for login under auth-only mode.)
+    const resp=await fetch(GAS_EXEC_URL,{
+      method:'POST',headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({action:'adminSetPw',staff:name,newPassword:pass,token:GAS_TOKEN})
+    });
+    const j=await resp.json().catch(()=>({}));
+    if(j&&j.ok){
       closeModal('resetPassModal');
-      showToast(`✅ Password set for ${name}`);
-    } else throw new Error('Failed');
+      showToast(`✅ Password set for ${name} — they'll set their own on first login`);
+    } else {
+      throw new Error((j&&j.error)||'Failed');
+    }
   }catch(e){
-    msg.textContent='Failed to set password. Check your internet connection.';
+    msg.textContent='Failed to set password: '+(e.message||'connection error')+'.';
     msg.style.cssText='display:block;background:rgba(255,92,53,.1);border:1px solid rgba(255,92,53,.2);color:var(--warn);font-size:12px;padding:8px 12px;border-radius:8px;margin-bottom:8px';
   }finally{
     btn.disabled=false;btn.textContent='Set Password';
@@ -3875,6 +3876,9 @@ async function doResetPassword(){
 
 // ── SUPABASE SYNC ─────────────────────────────────────────────────────────
 const SUPABASE_URL='https://jcfgldqrdbfkgbixszds.supabase.co';
+// Apps Script endpoint + token for admin auth-password operations (set password)
+const GAS_EXEC_URL='https://script.google.com/macros/s/AKfycby0Bq97bCZAsmnruXFuJuCqXQE_kOxhYE2KFuJnVzLXtT5CV0Y12k5176dxZbdaYVGE/exec';
+const GAS_TOKEN='oscars_gas_83235a5f0c1f6ba32b18235e2b2d544ac137167d';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpjZmdsZHFyZGJma2diaXhzemRzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1Nzc3NzEsImV4cCI6MjA5MDE1Mzc3MX0.Wj8cCpnlsoZOPj5sKWeEdfvgjG4Nc-UuTTYgbcrPfeI';
 
 // Rename a staff member IN PLACE across the DB so renaming doesn't create a
