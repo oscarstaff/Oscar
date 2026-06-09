@@ -101,7 +101,8 @@ body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);min-
       <div class="mode-select" style="width:100%;max-width:560px;" id="modeSelect">
         <button class="mode-btn sel" id="mode-ai" onclick="poolSetMode('ai')">vs CPU</button>
         <button class="mode-btn" id="mode-solo" onclick="poolSetMode('solo')">Solo practice</button>
-        <button class="mode-btn" id="mode-online" onclick="poolSetMode('online')">Online 2P</button>
+        <!-- Online 2P removed — synced every shot via the DB which overloaded the
+             nano database. Local play (vs CPU / solo / pass-and-play) is unaffected. -->
       </div>
       <div id="onlinePanel" style="display:none;width:100%;max-width:560px;background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:6px;">
         <div id="onlineSetup">
@@ -808,11 +809,12 @@ function poolInit(){
   poolNewGame();
 }
 function poolSetMode(m){
+  if(m==='online') m='ai'; // online removed — fall back to vs CPU
   poolMode=m;
   document.getElementById('mode-ai').classList.toggle('sel',m==='ai');
   document.getElementById('mode-solo').classList.toggle('sel',m==='solo');
-  document.getElementById('mode-online').classList.toggle('sel',m==='online');
-  document.getElementById('onlinePanel').style.display=(m==='online')?'block':'none';
+  var _mo=document.getElementById('mode-online'); if(_mo) _mo.classList.toggle('sel',m==='online');
+  var _op=document.getElementById('onlinePanel'); if(_op) _op.style.display=(m==='online')?'block':'none';
   document.getElementById('modeSelect').style.display='flex';
   if(m==='online'){
     // don't auto-rack; wait for room create/join. show empty-ish table.

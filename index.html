@@ -19552,7 +19552,6 @@ function setupRealtimeChannels(){
   // Discussions — polls + new post notifications
   const discCh = _realtimeClient.channel('discussions-live')
     .on('postgres_changes', {event:'*', schema:'public', table:'discussions'}, function(payload){
-      // Fire notif for INSERT events (new post by someone else)
       if(payload.eventType==='INSERT' && payload.new && payload.new.created_by !== me){
         const d = payload.new;
         const fireKey = 'rt_disc_'+d.id;
@@ -19631,13 +19630,10 @@ function setupRealtimeChannels(){
       const id = (payload.new && payload.new.target_id) || (payload.old && payload.old.target_id);
       const type = (payload.new && payload.new.target_type) || (payload.old && payload.old.target_type);
       if(id && type) loadReactCounts(id, type);
-      
-      // Fire notif on INSERT if reaction is on my content
       if(payload.eventType === 'INSERT' && payload.new && payload.new.staff_name !== me){
         const r = payload.new;
         const fireKey = 'rt_react_'+r.id;
         if(sessionStorage.getItem(fireKey)) return;
-        // Check if I authored the target
         try{
           let isMine = false;
           let label = 'content';
