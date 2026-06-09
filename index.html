@@ -12221,6 +12221,7 @@ async function flushClockSyncQueue(){
 
 async function loadClockState(){
   if(!me) return;
+  window._clockSyncing = true;   // block clock taps until state is confirmed fresh
   applyGpsLock();
   // INSTANT render from cached state — avoids "disappears" flash on refresh
   try{
@@ -12253,11 +12254,13 @@ async function loadClockState(){
     }catch(e){}
     renderClockCard();
     // Forgot to clock out? Force clock-out at 8:00pm of the clock-in date.
-    maybeAutoClockOut8pm();
+    await maybeAutoClockOut8pm();
+    window._clockSyncing = false;   // state confirmed — taps allowed now
   }catch(e){
     console.warn('loadClock:',e);
     // Only fall to 'out' if NO cached state was used
     if(_clockState === null){ _clockState='out'; renderClockCard(); }
+    window._clockSyncing = false;   // don't lock the button on a fetch error
   }
 }
 
@@ -12281,7 +12284,7 @@ function maybeAutoClockOut8pm(){
   // only fire once 8pm has actually passed
   if(Date.now() < eight.getTime()) return;
   _auto8Fired = true;
-  doAutoClockOut8pm(eight);
+  return doAutoClockOut8pm(eight);
 }
 
 async function doAutoClockOut8pm(outDate){
@@ -12944,15 +12947,14 @@ function getCurrentPosition(){
 }
 
 function flexClockTime(date){
-  // 7-minute flexibility:
-  //   :00-:07 → :00 (round down)
+  // 7-minute flexibility (round to nearest 15 with a 7-min boundary):
+  //   :00-:07 → :00
   //   :08-:22 → :15
   //   :23-:37 → :30
   //   :38-:52 → :45
   //   :53-:59 → next hour :00
   const d = new Date(date);
   const min = d.getMinutes();
-  const sec = d.getSeconds();
   let newMin;
   if(min <= 7) newMin = 0;
   else if(min <= 22) newMin = 15;
@@ -12972,18 +12974,18 @@ function clockOutConfirm(){
     if(!ov){
       ov = document.createElement('div');
       ov.id = 'clockOutConfirmOverlay';
-      ov.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(20,16,12,.5);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;padding:24px;';
+      ov.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(8,16,26,.72);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;padding:24px;animation:coFade .15s ease;';
       document.body.appendChild(ov);
     }
     ov.style.display = 'flex';
     ov.innerHTML =
-      '<div style="max-width:340px;width:100%;background:var(--card,#fff);border-radius:18px;padding:24px;box-shadow:0 16px 50px rgba(0,0,0,.25);text-align:center;">'+
-        '<div style="font-size:34px;margin-bottom:8px;">🕒</div>'+
-        '<div style="font-family:Fraunces,Georgia,serif;font-size:19px;font-weight:800;color:var(--ink,#2b241c);margin-bottom:6px;">Clock out now?</div>'+
-        '<div style="font-size:13.5px;color:var(--ink-2,#6b5d4d);margin-bottom:20px;line-height:1.5;">This will record your finish time for today.</div>'+
+      '<div style="max-width:330px;width:100%;background:var(--card);border:1px solid var(--border-hi);border-radius:18px;padding:26px 24px;box-shadow:0 20px 60px rgba(0,0,0,.5);text-align:center;">'+
+        '<div style="width:54px;height:54px;margin:0 auto 14px;border-radius:50%;background:var(--warn-dim);display:flex;align-items:center;justify-content:center;font-size:26px;">🕒</div>'+
+        '<div style="font-size:18px;font-weight:700;color:var(--text);margin-bottom:7px;letter-spacing:-0.2px;">Clock out now?</div>'+
+        '<div style="font-size:13px;color:var(--text2);margin-bottom:22px;line-height:1.5;">This records your finish time for today.</div>'+
         '<div style="display:flex;gap:10px;">'+
-          '<button id="coCancel" style="flex:1;padding:12px;border:1px solid var(--border,#e7ddd0);border-radius:11px;background:var(--card-2,#f2ece2);color:var(--ink,#2b241c);font-weight:700;font-size:14px;cursor:pointer;">Cancel</button>'+
-          '<button id="coYes" style="flex:1;padding:12px;border:none;border-radius:11px;background:#dc2626;color:#fff;font-weight:700;font-size:14px;cursor:pointer;">Clock Out</button>'+
+          '<button id="coCancel" style="flex:1;padding:12px;border:1px solid var(--border-hi);border-radius:11px;background:transparent;color:var(--text2);font-weight:600;font-size:14px;cursor:pointer;font-family:inherit;">Cancel</button>'+
+          '<button id="coYes" style="flex:1;padding:12px;border:none;border-radius:11px;background:var(--warn);color:#fff;font-weight:700;font-size:14px;cursor:pointer;font-family:inherit;">Clock Out</button>'+
         '</div>'+
       '</div>';
     const close = function(val){ ov.style.display='none'; resolve(val); };
@@ -12993,9 +12995,46 @@ function clockOutConfirm(){
   });
 }
 
+// Shown when a staff tries to clock IN but a previous shift was never closed.
+function openShiftBlockedDialog(sinceTs){
+  return new Promise(function(resolve){
+    let since = '';
+    try{
+      const d = new Date(sinceTs);
+      since = d.toLocaleDateString([], {weekday:'short', day:'numeric', month:'short'}) +
+              ' at ' + d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+    }catch(e){}
+    let ov = document.getElementById('openShiftOverlay');
+    if(!ov){
+      ov = document.createElement('div');
+      ov.id = 'openShiftOverlay';
+      ov.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(8,16,26,.72);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;padding:24px;';
+      document.body.appendChild(ov);
+    }
+    ov.style.display = 'flex';
+    ov.innerHTML =
+      '<div style="max-width:340px;width:100%;background:var(--card);border:1px solid var(--border-hi);border-radius:18px;padding:26px 24px;box-shadow:0 20px 60px rgba(0,0,0,.5);text-align:center;">'+
+        '<div style="width:54px;height:54px;margin:0 auto 14px;border-radius:50%;background:var(--gold-dim);display:flex;align-items:center;justify-content:center;font-size:26px;">⚠️</div>'+
+        '<div style="font-size:18px;font-weight:700;color:var(--text);margin-bottom:7px;letter-spacing:-0.2px;">You\'re still clocked in</div>'+
+        '<div style="font-size:13px;color:var(--text2);margin-bottom:22px;line-height:1.55;">You have an open shift'+(since?(' from <b style="color:var(--text)">'+since+'</b>'):'')+' that was never clocked out. Please clock OUT first to close it before starting a new shift.</div>'+
+        '<button id="osOk" style="width:100%;padding:12px;border:none;border-radius:11px;background:var(--accent);color:#fff;font-weight:700;font-size:14px;cursor:pointer;font-family:inherit;">Got it</button>'+
+      '</div>';
+    const close = function(){ ov.style.display='none'; resolve(); };
+    document.getElementById('osOk').onclick = close;
+    ov.onclick = function(e){ if(e.target===ov) close(); };
+  });
+}
+
 async function toggleClock(){
   const btn = document.getElementById('clockBtn');
   if(!btn) return;
+  // Don't allow a tap until the opening state-sync (incl. the 8pm auto-clockout
+  // check) has settled — otherwise a tap in that ~5s window races the auto-out
+  // and creates a confusing in/out tangle.
+  if(window._clockSyncing){
+    showToast('One sec — checking your clock status…');
+    return;
+  }
   // DEBOUNCE: ignore rapid re-fires of the SAME action (double-tap) within 4s.
   // We key on the action so a genuine in→out a few seconds apart still works;
   // only an accidental in→in or out→out double-fire is blocked.
@@ -13009,6 +13048,20 @@ async function toggleClock(){
   window._lastClockToggle = _now;
   window._lastClockAction = _nextAction;
   const next = (_clockState === 'in') ? 'out' : 'in';
+  // GUARD: never allow a clock-IN while a previous shift is still open (no
+  // clock-out recorded). Verify against the source of truth, not just local
+  // state, in case state desynced or a prior day was never closed.
+  if(next === 'in'){
+    try{
+      const last = await sbGet('clock_log','?staff_name=eq.'+encodeURIComponent(me)+'&order=ts.desc&limit=1');
+      if(last && last.length && last[0].action === 'in'){
+        _clockState = 'in';
+        renderClockCard();
+        await openShiftBlockedDialog(last[0].ts);
+        return;
+      }
+    }catch(e){ /* if the check fails, fall through (don't hard-block on a network blip) */ }
+  }
   // Ask for confirmation before clocking OUT — prevents accidental taps.
   if(next === 'out'){
     const ok = await clockOutConfirm();
