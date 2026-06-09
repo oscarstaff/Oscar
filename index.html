@@ -5836,6 +5836,9 @@ function switchProfileTab(t){
 const SB="https://jcfgldqrdbfkgbixszds.supabase.co";
 // ── Phase 1B: Supabase Auth (real login). Synthetic email derived from name. ──
 const AUTH_EMAIL_DOMAIN = 'oscars.local';
+// ── 1C-4: master switch. true = auth-only (legacy login disabled). Flip to
+// false to instantly revert to allowing legacy hash login (safe rollback). ──
+const AUTH_ONLY_MODE = true;
 let _authClient = null;
 function getAuthClient(){
   if(_authClient) return _authClient;
@@ -7003,9 +7006,9 @@ async function doLogin(){
       }catch(e){ console.error('[auth] signInWithPassword THREW:', e && (e.message||e), e); }
     }
 
-    // ── Legacy fallback: ONLY for staff not yet migrated to Supabase Auth. ──
-    // If the staff has an auth_uid, they MUST use the new auth login — the old
-    // password is disabled for them (this is what actually improves security).
+    // ── 1C-4: auth-only mode. When AUTH_ONLY_MODE is true, the legacy hash login
+    // is disabled — everyone must use real Supabase Auth. Flip the flag to false
+    // (top of script) to instantly revert to allowing legacy login as a fallback.
     const credRows = await sbGet("staff_credentials","?staff_name=eq."+encodeURIComponent(m)+"&select=password_hash,auth_uid");
     const isMigrated = credRows.length && credRows[0].auth_uid;
     if(isMigrated){
@@ -7015,7 +7018,14 @@ async function doLogin(){
       btn.disabled=false;btn.textContent="Sign In";
       return;
     }
-    // Not migrated yet → allow the old client-side hash login.
+    if(AUTH_ONLY_MODE){
+      // Not migrated + auth-only → cannot log in with the old system. Tell them clearly.
+      err.textContent="Your account isn't set up for the new login yet. Please ask an admin to migrate your account.";
+      err.classList.add("show");
+      btn.disabled=false;btn.textContent="Sign In";
+      return;
+    }
+    // (Legacy mode only — AUTH_ONLY_MODE=false) old client-side hash login.
     const h=await hash(pass);
     const rows=credRows;
     if(!rows.length){err.textContent="No password set yet. Use 'Set your password' below.";err.classList.add("show");}
@@ -7085,6 +7095,10 @@ async function doSetPass(){
   if(pass!==conf){err.textContent="Passwords do not match.";err.classList.add("show");return;}
   const btn=document.getElementById("spBtn");btn.disabled=true;btn.innerHTML='<span class="sp"></span>';
   try{
+    if(AUTH_ONLY_MODE){
+      err.textContent="New accounts are set up by an admin now. Please ask your manager to create your login.";
+      err.classList.add("show");btn.disabled=false;btn.textContent="Set Password";return;
+    }
     // Validate against Supabase — only current staff can register
     const m=await validateStaffName(name);
     if(!m){err.textContent="Name not found. Check your spelling or contact your manager.";err.classList.add("show");btn.disabled=false;btn.textContent="Set Password";return;}
@@ -12954,15 +12968,18 @@ function flexClockTime(date){
 async function toggleClock(){
   const btn = document.getElementById('clockBtn');
   if(!btn) return;
-  // DEBOUNCE: ignore rapid re-fires (double-tap / re-trigger) within 4s.
-  // Without this, a fast double-press fires 'in' then 'out' at the same second,
-  // creating a phantom clock_log row (the same-time in+out flicker bug).
+  // DEBOUNCE: ignore rapid re-fires of the SAME action (double-tap) within 4s.
+  // We key on the action so a genuine in→out a few seconds apart still works;
+  // only an accidental in→in or out→out double-fire is blocked.
   const _now = Date.now();
-  if(window._lastClockToggle && (_now - window._lastClockToggle) < 4000){
-    console.warn('[clock] ignored rapid re-fire (', _now - window._lastClockToggle, 'ms)');
+  const _nextAction = (_clockState === 'in') ? 'out' : 'in';
+  if(window._lastClockToggle && window._lastClockAction === _nextAction
+     && (_now - window._lastClockToggle) < 4000){
+    console.warn('[clock] ignored rapid duplicate', _nextAction, '(', _now - window._lastClockToggle, 'ms)');
     return;
   }
   window._lastClockToggle = _now;
+  window._lastClockAction = _nextAction;
   const next = (_clockState === 'in') ? 'out' : 'in';
   btn.disabled = true;
   const prevText = btn.textContent;
@@ -13010,8 +13027,13 @@ async function toggleClock(){
 
   btn.textContent = '...';
   try{
-    const flexedDate = flexClockTime(new Date());
-    const flexedTs = flexedDate.toISOString();
+    // Store the REAL timestamp in Supabase (distinct per punch) so the state
+    // logic (order=ts.desc limit 1) and clock-out always work. The Google Sheet
+    // rounds to 15-min buckets server-side (flexTimeStr in Apps Script) for
+    // payroll — rounding still happens, just not on the stored timestamp.
+    const realDate = new Date();
+    const realTs = realDate.toISOString();
+    const flexedDate = flexClockTime(realDate); // for the optimistic card display only
     
     // ── OPTIMISTIC UI: update state + show toast IMMEDIATELY ──
     // Network writes happen in the background — staff doesn't wait
@@ -13036,7 +13058,7 @@ async function toggleClock(){
     applyGpsLock();
     
     // ── BACKGROUND: fire Supabase write (no await) ──
-    sbPost('clock_log', {staff_name: me, action: next, ts: flexedTs})
+    sbPost('clock_log', {staff_name: me, action: next, ts: realTs})
       .then(function(){
         // Refresh logs cache in background — non-blocking
         if(typeof loadAllClockLogs === 'function') loadAllClockLogs();
@@ -13046,7 +13068,7 @@ async function toggleClock(){
         // Queue for retry
         try{
           const q = JSON.parse(localStorage.getItem('clock_supabase_queue') || '[]');
-          q.push({payload: {staff_name: me, action: next, ts: flexedTs}, queuedAt: Date.now()});
+          q.push({payload: {staff_name: me, action: next, ts: realTs}, queuedAt: Date.now()});
           localStorage.setItem('clock_supabase_queue', JSON.stringify(q.slice(-20)));
         }catch(_){}
       });
