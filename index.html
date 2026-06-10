@@ -10837,6 +10837,7 @@ async function loadTasks(){
     const rows = await sbGet('staff_tasks', '?staff_name=eq.'+encodeURIComponent(me)+'&order=created_at.asc');
     if(rows){
       _tasks = rows.map(function(r){
+        const sm = r.share_meta || null;
         return {
           id: r.id,
           title: r.title,
@@ -10846,7 +10847,13 @@ async function loadTasks(){
           remindBefore: r.remind_before,
           notes: r.notes,
           done: r.done,
-          createdAt: r.created_at
+          createdAt: r.created_at,
+          // share metadata persisted server-side (so chips + completion sync
+          // survive reloads on any device)
+          sharedTo: (sm && sm.to) || undefined,
+          sharedRowIds: (sm && sm.rowIds) || undefined,
+          completedByOther: (sm && sm.doneBy) || undefined,
+          doneAt: (sm && sm.doneAt) || undefined
         };
       });
       // Cache to localStorage for offline + instant render
@@ -10881,7 +10888,11 @@ async function pushTaskToSupabase(t){
     remind_before: (t.remindBefore == null ? null : t.remindBefore),
     notes: t.notes || '',
     done: !!t.done,
-    created_at: t.createdAt || new Date().toISOString()
+    created_at: t.createdAt || new Date().toISOString(),
+    share_meta: (t.sharedTo && t.sharedTo.length) ? {
+      to: t.sharedTo, rowIds: t.sharedRowIds || [],
+      doneBy: t.completedByOther || null, doneAt: t.doneAt || null
+    } : null
   };
   try{
     await fetch(SB+'/rest/v1/staff_tasks',{
@@ -15744,6 +15755,7 @@ async function confirmShareTask(){
   t.sharedTo = selected;
   if(rowIds.length) t.sharedRowIds = (t.sharedRowIds||[]).concat(rowIds);
   saveTasks();
+  pushTaskToSupabase(t);   // persist share metadata server-side
   renderTasks();
 
   closeShareTask();
@@ -15789,6 +15801,7 @@ async function loadMySharedOutStatus(){
         t.doneAt = new Date().toISOString();
         t.completedByOther = who;
         changed = true;
+        pushTaskToSupabase(t);   // persist done + doneBy server-side
       }
     });
     if(changed){
