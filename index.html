@@ -15712,11 +15712,12 @@ async function confirmShareTask(){
   };
 
   let okCount = 0, dupCount = 0, failCount = 0, lastErr = '';
+  const rowIds = [];
   for(const name of selected){
     try{
       const res = await fetch(SB+'/rest/v1/shared_tasks', {
         method:'POST',
-        headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+        headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=representation'},
         body: JSON.stringify({
           sender: me,
           recipient: name,
@@ -15729,14 +15730,19 @@ async function confirmShareTask(){
           status: 'pending'
         })
       });
-      if(res.ok) okCount++;
+      if(res.ok){
+        okCount++;
+        try{ const made = await res.json(); if(made && made[0] && made[0].id != null) rowIds.push(made[0].id); }catch(e){}
+      }
       else if(res.status === 409) dupCount++;
       else { failCount++; try{ lastErr = (await res.text()).slice(0,140); }catch(e){} console.warn('share POST', res.status, lastErr); }
     }catch(e){ failCount++; lastErr = String(e).slice(0,140); console.warn('share err', e); }
   }
 
-  // Mark original as shared so it can't be re-shared
+  // Mark original as shared so it can't be re-shared; keep the created row ids
+  // so completion can be matched precisely (not by fragile title compare).
   t.sharedTo = selected;
+  if(rowIds.length) t.sharedRowIds = (t.sharedRowIds||[]).concat(rowIds);
   saveTasks();
   renderTasks();
 
@@ -15758,15 +15764,26 @@ async function loadMySharedOutStatus(){
     if(!resp.ok) return;
     const rows = await resp.json();
     if(!rows || !rows.length) return;
-    // collect titles that ANY recipient has completed
+    // collect completions: by row id (precise) + by title (legacy fallback)
+    const doneById = {};
     const doneTitles = {};
-    rows.forEach(function(r){ if(r.done || r.status==='done'){ doneTitles[(r.title||'').trim()] = r.completed_by || 'someone'; } });
+    rows.forEach(function(r){
+      if(r.done || r.status==='done'){
+        doneById[String(r.id)] = r.completed_by || 'someone';
+        doneTitles[(r.title||'').trim()] = r.completed_by || 'someone';
+      }
+    });
     let changed = false;
     _tasks.forEach(function(t){
       if(t.sharedFrom) return;            // skip tasks shared TO me
       if(!t.sharedTo || !t.sharedTo.length) return;  // only my shared-out ones
       if(t.done) return;
-      const who = doneTitles[(t.title||'').trim()];
+      let who = null;
+      if(t.sharedRowIds && t.sharedRowIds.length){
+        for(const rid of t.sharedRowIds){ if(doneById[String(rid)]){ who = doneById[String(rid)]; break; } }
+      } else {
+        who = doneTitles[(t.title||'').trim()];      // legacy tasks shared before ids were stored
+      }
       if(who){
         t.done = true;
         t.doneAt = new Date().toISOString();
