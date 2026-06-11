@@ -934,6 +934,7 @@ select.form-input { cursor: pointer; }
 #aaSearch{background:var(--bg);border:1.5px solid var(--border);color:var(--text);border-radius:9px;padding:9px 12px;font-size:13px;font-family:inherit;}
 #aaSearch:focus{outline:none;border-color:var(--accent);}
 </style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 <!-- NEXUS TOKEN GATE — app only opens when launched from Nexus -->
@@ -974,6 +975,14 @@ select.form-input { cursor: pointer; }
       var r=await fetch(SB+'/rest/v1/app_access?app=eq.'+APP+'&staff_name=eq.'+encodeURIComponent(name)+'&select=staff_name',{headers:{apikey:KEY,Authorization:'Bearer '+KEY}});
       var rows=r.ok?await r.json():[];
       if(!rows.length){fail('You no longer have access to this app.');return;}
+      // Capture Nexus' Supabase session so ShiftOps writes as an authenticated
+      // user (RLS-locked tables reject the anon key). Stash for the tab session.
+      try{
+        if(payload.sb_at){
+          sessionStorage.setItem('so_sb_at', payload.sb_at);
+          if(payload.sb_rt) sessionStorage.setItem('so_sb_rt', payload.sb_rt);
+        }
+      }catch(e){}
       // success — strip token from URL + unlock for session
       sessionStorage.setItem('ngate_'+APP,'1');
       try{history.replaceState(null,'',location.pathname+location.search);}catch(e){}
@@ -3901,6 +3910,56 @@ const SUPABASE_URL='https://jcfgldqrdbfkgbixszds.supabase.co';
 const GAS_EXEC_URL='https://script.google.com/macros/s/AKfycby0Bq97bCZAsmnruXFuJuCqXQE_kOxhYE2KFuJnVzLXtT5CV0Y12k5176dxZbdaYVGE/exec';
 const GAS_TOKEN='oscars_gas_83235a5f0c1f6ba32b18235e2b2d544ac137167d';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpjZmdsZHFyZGJma2diaXhzemRzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1Nzc3NzEsImV4cCI6MjA5MDE1Mzc3MX0.Wj8cCpnlsoZOPj5sKWeEdfvgjG4Nc-UuTTYgbcrPfeI';
+
+// ── AUTH TOKEN SWAP ──────────────────────────────────────────────────────
+// ShiftOps inherits Nexus' Supabase session (passed in the launch token) so
+// its writes run as an authenticated user. RLS-locked tables (staff_names,
+// etc.) reject the anon key; this wrapper swaps in the session JWT on every
+// Supabase REST call, keeping the anon key only as a fallback.
+let _soAuthToken = null;
+try{ _soAuthToken = sessionStorage.getItem('so_sb_at') || null; }catch(e){}
+function _soTok(){
+  if(_soAuthToken) return _soAuthToken;
+  try{ _soAuthToken = sessionStorage.getItem('so_sb_at') || null; }catch(e){}
+  return _soAuthToken;
+}
+(function(){
+  const _origFetch = window.fetch.bind(window);
+  window.fetch = function(input, init){
+    try{
+      const url = (typeof input === 'string') ? input : (input && input.url) || '';
+      const tok = _soTok();
+      if(tok && url.indexOf('/rest/v1/') >= 0 && url.indexOf(SUPABASE_URL) >= 0){
+        init = init || {};
+        const h = new Headers((init && init.headers) || (typeof input!=='string' && input.headers) || {});
+        h.set('Authorization', 'Bearer ' + tok);
+        if(!h.has('apikey')) h.set('apikey', SUPABASE_KEY);
+        init.headers = h;
+      }
+    }catch(e){}
+    return _origFetch(input, init);
+  };
+})();
+// Keep the inherited session alive (tokens expire ~1h). Use supabase-js to
+// refresh from the refresh token and update the cached access token.
+(async function(){
+  try{
+    const rt = sessionStorage.getItem('so_sb_rt');
+    if(window.supabase && _soAuthToken && rt){
+      const _c = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+      await _c.auth.setSession({ access_token: _soAuthToken, refresh_token: rt });
+      _c.auth.onAuthStateChange(function(evt, sess){
+        if(sess && sess.access_token){
+          _soAuthToken = sess.access_token;
+          try{ sessionStorage.setItem('so_sb_at', sess.access_token); if(sess.refresh_token) sessionStorage.setItem('so_sb_rt', sess.refresh_token); }catch(e){}
+        }
+      });
+      setInterval(async function(){
+        try{ const { data } = await _c.auth.getSession(); if(data && data.session && data.session.access_token){ _soAuthToken = data.session.access_token; sessionStorage.setItem('so_sb_at', _soAuthToken); } }catch(e){}
+      }, 5*60*1000);
+    }
+  }catch(e){ console.warn('so session init', e); }
+})();
 
 // Rename a staff member IN PLACE across the DB so renaming doesn't create a
 // duplicate credential row. PATCHes staff_credentials + staff_names by old name.

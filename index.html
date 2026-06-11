@@ -7260,6 +7260,18 @@ async function openGatedApp(ev,app,url){
 const APP_GATE_SECRET='oscars_nexus_gate_v1_8f3a2c91'; // shared with each app
 async function makeAppToken(app,name){
   const payload={app:app,name:name||'',exp:Date.now()+1000*60*5}; // valid 5 min to launch
+  // Hand the launched app our live Supabase session so it can write to
+  // RLS-locked tables as an authenticated user (no anon-key writes).
+  try{
+    const ac = getAuthClient();
+    if(ac && ac.getSession){
+      const { data } = await ac.getSession();
+      if(data && data.session){
+        payload.sb_at = data.session.access_token || null;
+        payload.sb_rt = data.session.refresh_token || null;
+      }
+    }
+  }catch(e){}
   const json=JSON.stringify(payload);
   const b64=btoa(unescape(encodeURIComponent(json)));
   const sig=await hmacHex(APP_GATE_SECRET, b64);
