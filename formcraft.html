@@ -974,6 +974,14 @@
       if (!r.ok) throw new Error('save failed (' + r.status + ')');
       return (await r.json())[0];
     }
+    async function updateTemplateInCloud(id, name, fingerprint, data) {
+      const r = await fetch(SB_URL + '/rest/v1/formcraft_templates?id=eq.' + id, {
+        method: 'PATCH', headers: { ...sbHeaders, Prefer: 'return=representation' },
+        body: JSON.stringify({ name, pdf_fingerprint: fingerprint, data }),
+      });
+      if (!r.ok) throw new Error('update failed (' + r.status + ')');
+      return (await r.json())[0];
+    }
     async function deleteTemplateFromCloud(id) {
       const r = await fetch(SB_URL + '/rest/v1/formcraft_templates?id=eq.' + id, { method: 'DELETE', headers: sbHeaders });
       if (!r.ok) throw new Error('delete failed');
@@ -1007,6 +1015,8 @@
       }, [highlight]);
       const [library, setLibrary] = useState([]);
       const [showLibrary, setShowLibrary] = useState(false);
+      const [loadedTplId, setLoadedTplId] = useState(null);
+      const [loadedTplName, setLoadedTplName] = useState(null);
       const [formWidth, setFormWidth] = useState(() => {
         const stored = parseInt(localStorage.getItem('fc_formWidth') || '', 10);
         return Number.isFinite(stored) && stored > 320 && stored < 1600 ? stored : 500;
@@ -1189,19 +1199,36 @@
           tpl.pdfBase64 = btoa(bin);
           tpl.pdfName = fileName || 'form.pdf';
         }
-        const defName = (fileName.replace(/\.pdf$/i, '') || 'Form') + ' template';
+        // If this came from an existing saved template, offer to overwrite it.
+        if (loadedTplId) {
+          const upd = confirm('Update the existing template "' + (loadedTplName || 'template') + '"?\n\nOK = overwrite it.\nCancel = save as a NEW template.');
+          if (upd) {
+            if (fp) { try { localStorage.setItem(fp, JSON.stringify(tpl)); } catch {} }
+            try {
+              await updateTemplateInCloud(loadedTplId, loadedTplName, fp, tpl);
+              showToast('Template "' + loadedTplName + '" updated', 'ok');
+              loadLibrary(fp);
+            } catch (e) {
+              console.error(e);
+              showToast('Update failed: ' + e.message, 'err');
+            }
+            return;
+          }
+        }
+        const defName = (loadedTplName || (fileName.replace(/\.pdf$/i, '') || 'Form') + ' template');
         const name = prompt('Name this template (visible to all staff):', defName);
         if (!name) return;
         if (fp) { try { localStorage.setItem(fp, JSON.stringify(tpl)); } catch {} }
         try {
-          await saveTemplateToCloud(name.trim(), fp, tpl);
+          const made = await saveTemplateToCloud(name.trim(), fp, tpl);
+          if (made && made.id) { setLoadedTplId(made.id); setLoadedTplName(made.name); }
           showToast('Template saved to team library', 'ok');
           loadLibrary(fp);
         } catch (e) {
           console.error(e);
           showToast('Cloud save failed: ' + e.message, 'err');
         }
-      }, [fields, originalFields, groups, fileName, pdfBytes]);
+      }, [fields, originalFields, groups, fileName, pdfBytes, loadedTplId, loadedTplName]);
 
       const loadLibrary = useCallback(async (fp) => {
         const rows = await fetchTemplates(fp);
@@ -1237,6 +1264,8 @@
           setGroups(groups);
           setPendingSuggestions([]);
           try { localStorage.setItem(pdfFingerprint(pdfBytes), JSON.stringify(tplRow.data)); } catch {}
+          setLoadedTplId(tplRow.id);
+          setLoadedTplName(tplRow.name);
           setShowLibrary(false);
           showToast('Applied "' + tplRow.name + '"', 'ok');
         } catch (e) {
@@ -1299,6 +1328,7 @@
         setPdfBytes(null); setPdfJsDoc(null);
         setOriginalFields([]); setFields([]); setGroups([]);
         setFileName(''); setValues({}); setPendingSuggestions([]);
+        setLoadedTplId(null); setLoadedTplName(null);
       }, []);
 
       const handleFieldClick = useCallback((fieldName) => {
