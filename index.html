@@ -7971,7 +7971,7 @@ function goTo(p){
   if(p==="announcements"){loadAnnouncements();}
   if(p==="engagement"){showEngagementTab('discussions');}
   if(p==="documents"){loadDocuments();refreshQuizStrip();}
-  if(p==="tasks"){ loadSharedTasksFromOthers(); loadMySharedOutStatus(); loadTasks().then(function(){ renderTasks(); updateTaskBadge(); maybeShowNotifyBanner(); }); }
+  if(p==="tasks"){ loadTasks().then(function(){ renderTasks(); updateTaskBadge(); maybeShowNotifyBanner(); loadSharedTasksFromOthers(); loadMySharedOutStatus(); }); }
   if(p==="announcements" || p==="engagement"){ setTimeout(rtUpgradeAll, 50); }
   if(p==="myreports"){ initReportsPage(); setTimeout(initReportsPage, 600); /* re-run after myIsAdmin settles */ }
   
@@ -15988,6 +15988,9 @@ async function loadSharedTasksFromOthers(silent){
         createdAt: r.created_at
       });
       added++;
+      // persist to staff_tasks immediately so a parallel/next loadTasks()
+      // can never wipe the just-arrived shared task (the "refresh 4 times" race)
+      try{ pushTaskToSupabase(_tasks[_tasks.length-1]); }catch(e){}
     });
     if(added){
       saveTasks();
