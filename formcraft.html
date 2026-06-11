@@ -255,6 +255,16 @@
 
     .form-footer{ background:rgba(255,255,255,.92); backdrop-filter:saturate(1.1); }
     .toast{ border-radius:12px; box-shadow:var(--shadow-lg); }
+
+    /* fix: form pane was clipping (couldn't see/scroll lower fields in edit mode).
+       Make the pane a flex column that fills its grid track; the list scrolls,
+       header + footer stay pinned. */
+    .workspace{ min-height:0; height:100%; }
+    .pdf-pane{ min-height:0; }
+    .form-pane{ min-height:0; height:100%; overflow:hidden; }
+    .form-pane-header{ flex-shrink:0; }
+    .form-list{ flex:1 1 auto; min-height:0; overflow-y:auto; }
+    .form-footer{ flex-shrink:0; position:relative; bottom:auto; }
   </style>
 </head>
 <body>
@@ -896,6 +906,16 @@
       const [busy, setBusy] = useState(false);
       const [toast, setToast] = useState(null);
       const [highlight, setHighlight] = useState(null);
+      // When a field is selected, scroll its row into view in the form list so
+      // the field being edited is always visible (mirrors the PDF auto-scroll).
+      useEffect(() => {
+        if (!highlight) return;
+        const t = setTimeout(() => {
+          const row = document.querySelector('[data-row="' + (window.CSS && CSS.escape ? CSS.escape(highlight) : highlight) + '"]');
+          if (row && row.scrollIntoView) row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 60);
+        return () => clearTimeout(t);
+      }, [highlight]);
       const [library, setLibrary] = useState([]);
       const [showLibrary, setShowLibrary] = useState(false);
       const [formWidth, setFormWidth] = useState(() => {
