@@ -256,6 +256,15 @@
     .form-footer{ background:rgba(255,255,255,.92); backdrop-filter:saturate(1.1); }
     .toast{ border-radius:12px; box-shadow:var(--shadow-lg); }
 
+    /* address autocomplete */
+    .addr-wrap{ position:relative; }
+    .addr-sugs{ position:absolute; top:calc(100% + 4px); left:0; right:0; z-index:60; background:var(--bg-card); border:1px solid var(--border-strong); border-radius:11px; box-shadow:var(--shadow-lg); overflow:hidden; max-height:240px; overflow-y:auto; }
+    .addr-sug{ display:flex; align-items:center; gap:9px; padding:10px 13px; font-size:13px; color:var(--text); cursor:pointer; border-bottom:1px solid var(--border); transition:background .1s; }
+    .addr-sug:last-child{ border-bottom:none; }
+    .addr-sug:hover,.addr-sug.active{ background:var(--accent-soft); }
+    .addr-sug i{ font-size:11px; color:var(--accent); flex-shrink:0; }
+    .addr-sug span{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
     /* fix: form pane was clipping (couldn't see/scroll lower fields in edit mode).
        Make the pane a flex column that fills its grid track; the list scrolls,
        header + footer stay pinned. */
@@ -690,6 +699,80 @@
       );
     }
 
+    function AddressInput({ cls, value, onChange }) {
+      const [sugs, setSugs] = React.useState([]);
+      const [open, setOpen] = React.useState(false);
+      const [active, setActive] = React.useState(-1);
+      const boxRef = React.useRef(null);
+      const tmrRef = React.useRef(null);
+
+      const fetchSugs = (q) => {
+        if (!q || q.trim().length < 3) { setSugs([]); setOpen(false); return; }
+        // Photon (Komoot) — free, no API key. Biased to Australia.
+        const url = 'https://photon.komoot.io/api/?q=' + encodeURIComponent(q) +
+                    '&limit=5&lang=en&lat=-33.87&lon=151.21';
+        fetch(url).then(r => r.json()).then(data => {
+          const list = (data && data.features ? data.features : []).map(f => {
+            const p = f.properties || {};
+            const parts = [
+              [p.housenumber, p.street].filter(Boolean).join(' '),
+              p.suburb || p.city || p.district || p.town || p.village,
+              p.state, p.postcode, p.country
+            ].filter(Boolean);
+            return parts.join(', ');
+          }).filter((v, i, a) => v && a.indexOf(v) === i);
+          setSugs(list); setOpen(list.length > 0); setActive(-1);
+        }).catch(() => { setSugs([]); setOpen(false); });
+      };
+
+      const onType = (e) => {
+        const v = e.target.value;
+        onChange(v);
+        clearTimeout(tmrRef.current);
+        tmrRef.current = setTimeout(() => fetchSugs(v), 280); // debounce
+      };
+      const pick = (s) => { onChange(s); setSugs([]); setOpen(false); setActive(-1); };
+      const onKey = (e) => {
+        if (!open || !sugs.length) return;
+        if (e.key === 'ArrowDown') { e.preventDefault(); setActive(a => Math.min(a + 1, sugs.length - 1)); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); setActive(a => Math.max(a - 1, 0)); }
+        else if (e.key === 'Enter' && active >= 0) { e.preventDefault(); pick(sugs[active]); }
+        else if (e.key === 'Escape') { setOpen(false); }
+      };
+
+      React.useEffect(() => {
+        const close = (e) => { if (boxRef.current && !boxRef.current.contains(e.target)) setOpen(false); };
+        document.addEventListener('mousedown', close);
+        return () => document.removeEventListener('mousedown', close);
+      }, []);
+
+      return (
+        <div className="addr-wrap" ref={boxRef}>
+          <input type="text" className={cls} value={value || ''} onChange={onType}
+            onKeyDown={onKey} onFocus={() => sugs.length && setOpen(true)}
+            placeholder="Start typing an address…" autoComplete="off" />
+          {open && (
+            <div className="addr-sugs">
+              {sugs.map((s, i) => (
+                <div key={i} className={'addr-sug' + (i === active ? ' active' : '')}
+                  onMouseDown={(e) => { e.preventDefault(); pick(s); }}
+                  onMouseEnter={() => setActive(i)}>
+                  <i className="fa-solid fa-location-dot" /> <span>{s}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    function isAddressField(field) {
+      const s = ((field.label || '') + ' ' + (field.name || '')).toLowerCase();
+      // single-line address fields only (skip suburb/state/postcode-only boxes)
+      if (/\b(suburb|state|postcode|post code|city|country)\b/.test(s)) return false;
+      return /\b(address|street address|residential address|home address|addr)\b/.test(s);
+    }
+
     function FieldInput({ field, value, onChange, err }) {
       const cls = 'form-input' + (hasValue(field, value) ? ' has-value' : '') + (err ? ' invalid' : '');
       if (field.type === 'checkbox') return (
@@ -717,6 +800,10 @@
       if (field.type === 'multiline') return (
         <textarea className={cls} rows={3} value={value || ''} onChange={(e) => onChange(e.target.value)} placeholder="Type your answer…" />
       );
+      // address fields get live autocomplete
+      if ((field.type === 'text' || !field.type) && isAddressField(field)) {
+        return <AddressInput cls={cls} value={value} onChange={onChange} />;
+      }
       return (
         <input type={htmlInputType(field.type)} className={cls} value={value || ''} onChange={(e) => onChange(e.target.value)} placeholder="Type your answer…" />
       );
