@@ -2114,7 +2114,6 @@ function renderStaffList(){
         <button onclick="setStaffSort('asc')" style="padding:5px 12px;font-size:11px;font-family:var(--mono);font-weight:600;cursor:pointer;border:none;transition:all .15s;background:${staffSortOrder==='asc'?'rgba(0,229,160,.15)':'transparent'};color:${staffSortOrder==='asc'?'var(--accent)':'var(--text-dim)'}">A → Z</button>
         <button onclick="setStaffSort('desc')" style="padding:5px 12px;font-size:11px;font-family:var(--mono);font-weight:600;cursor:pointer;border:none;border-left:1px solid var(--border);transition:all .15s;background:${staffSortOrder==='desc'?'rgba(0,229,160,.15)':'transparent'};color:${staffSortOrder==='desc'?'var(--accent)':'var(--text-dim)'}">Z → A</button>
       </div>
-      <button class="btn btn-ghost" onclick="openAccessAdmin()" title="Manage app access and admin rights">🔐 Access &amp; Admin</button>
       <button class="btn btn-primary" onclick="openAddStaff()">+ Add Staff</button>
     </div>
   </div>
@@ -2431,13 +2430,17 @@ async function loadStaffAccess(s){
     const rows = await aaGet('app_access?select=app&staff_name=eq.'+encodeURIComponent(full));
     (rows||[]).forEach(r=>{ const b=document.getElementById('saAccess_'+r.app); if(b) b.checked=true; });
   }catch(e){ console.warn('loadStaffAccess', e); }
-  // if admin, shiftops is implied
-  if(adminBox && adminBox.checked){ const so=document.getElementById('saAccess_shiftops'); if(so) so.checked=true; }
+  // if admin, shiftops is implied + locked on
+  if(adminBox && adminBox.checked){ onStaffAdminToggle(adminBox); }
+  else{ const so=document.getElementById('saAccess_shiftops'); if(so){ so.disabled=false; so.parentElement.style.opacity='1'; } }
 }
 
-// Admin checkbox auto-implies ShiftOps access
+// Admin checkbox forces ShiftOps access on (and locks the box while Admin)
 function onStaffAdminToggle(box){
-  if(box.checked){ const so=document.getElementById('saAccess_shiftops'); if(so) so.checked=true; }
+  const so=document.getElementById('saAccess_shiftops');
+  if(!so) return;
+  if(box.checked){ so.checked=true; so.disabled=true; so.parentElement.style.opacity='.7'; }
+  else{ so.disabled=false; so.parentElement.style.opacity='1'; }
 }
 
 // Persist the edit panel's access choices for one staff member
@@ -2446,9 +2449,12 @@ async function saveStaffAccess(fullName){
   const H={apikey:AA_KEY,Authorization:'Bearer '+AA_KEY};
   const HJ={...H,'Content-Type':'application/json'};
   const jobs=[];
-  // app_access for the 3 apps
+  const isAdmin = !!(document.getElementById('saAccess_admin')||{}).checked;
+  // app_access for the 3 apps. Admin ALWAYS gets ShiftOps access, even if the
+  // ShiftOps box is unticked — admin rights require it.
   for(const app of ['formcraft','slip','shiftops']){
-    const want = (document.getElementById('saAccess_'+app)||{}).checked;
+    let want = (document.getElementById('saAccess_'+app)||{}).checked;
+    if(app==='shiftops' && isAdmin) want = true;
     if(want){
       jobs.push(fetch(AA_SB+'/rest/v1/app_access',{method:'POST',headers:{...HJ,'Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({app:app,staff_name:fullName})}));
     }else{
@@ -2456,7 +2462,6 @@ async function saveStaffAccess(fullName){
     }
   }
   // admin flag → both is_hub_admin + is_shift_admin
-  const isAdmin = !!(document.getElementById('saAccess_admin')||{}).checked;
   jobs.push(fetch(AA_SB+'/rest/v1/staff_settings',{method:'POST',headers:{...HJ,'Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({name:fullName,is_hub_admin:isAdmin,is_shift_admin:isAdmin})}));
   try{ await Promise.all(jobs.map(p=>p.catch(e=>{console.warn('saveStaffAccess job',e);}))); }catch(e){ console.warn('saveStaffAccess',e); }
 }
