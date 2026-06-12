@@ -1011,6 +1011,18 @@ body{ background:
 .tools-menu-item{ border-radius:9px!important; transition:background .12s!important; }
 .tools-menu-item:hover{ background:var(--accent-dim)!important; }
 .sub-tab.active,.type-toggle.on{ box-shadow:0 2px 8px -2px rgba(79,70,229,.4); }
+/* per-staff access rows in Edit modal */
+.sa-acc-row{display:flex;align-items:center;gap:11px;padding:11px 13px;border:1px solid var(--border);border-radius:11px;cursor:pointer;transition:all .14s;background:#fff;}
+.sa-acc-row:hover{border-color:var(--accent-border);background:var(--accent-dim);}
+.sa-acc-row input[type=checkbox]{width:17px;height:17px;accent-color:var(--accent);cursor:pointer;flex-shrink:0;}
+.sa-acc-label{font-size:13px;font-weight:700;color:var(--text);}
+.sa-acc-desc{font-size:11px;color:var(--text-dim);margin-left:auto;}
+.sa-acc-admin{background:linear-gradient(135deg,rgba(245,158,11,.06),rgba(217,119,6,.04));border-color:rgba(245,158,11,.3);}
+.sa-acc-admin:hover{border-color:rgba(245,158,11,.5);background:linear-gradient(135deg,rgba(245,158,11,.1),rgba(217,119,6,.06));}
+.sa-acc-admin input[type=checkbox]{accent-color:#d97706;}
+.sa-acc-admin .sa-acc-label{color:#b45309;}
+[data-theme="dark"] .sa-acc-row{background:#16222f;border-color:#243446;}
+[data-theme="dark"] .sa-acc-label{color:#dde8f5;}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -1307,11 +1319,15 @@ body{ background:
       <div class="form-group"><label class="form-label">Max Hours / Week</label><input type="number" class="form-input" id="staffMaxHours" value="38" min="1" max="80"></div>
     </div>
     <div id="staffAdminSection" style="display:none;margin-top:18px;padding-top:18px;border-top:1px solid var(--border);">
-      <div style="font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;">Account &amp; Permissions</div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;">
-        <button type="button" id="modalSetPasswordBtn" onclick="modalSetPassword()" class="btn btn-ghost" style="padding:8px 14px;font-size:12.5px;font-weight:600;background:rgba(61,158,255,.12);color:#3d9eff;border:1px solid rgba(61,158,255,.35);">🔑 Set Password</button>
-        <button type="button" id="modalToggleAdminBtn" onclick="modalToggleAdmin()" class="btn btn-ghost" style="padding:8px 14px;font-size:12.5px;font-weight:600;"></button>
+      <div style="font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:12px;">🔐 Access &amp; Admin</div>
+      <div style="font-size:11px;color:var(--text-dim);margin-bottom:12px;line-height:1.5;">Choose which Nexus apps this person can open. <b>Admin</b> grants full manager rights (roster + timesheet + auto ShiftOps access).</div>
+      <div id="staffAccessChecks" style="display:flex;flex-direction:column;gap:9px;margin-bottom:14px;">
+        <label class="sa-acc-row"><input type="checkbox" id="saAccess_formcraft"><span class="sa-acc-label">FormCraft</span><span class="sa-acc-desc">PDF form filler</span></label>
+        <label class="sa-acc-row"><input type="checkbox" id="saAccess_slip"><span class="sa-acc-label">Slip</span><span class="sa-acc-desc">Tax invoices</span></label>
+        <label class="sa-acc-row"><input type="checkbox" id="saAccess_shiftops"><span class="sa-acc-label">ShiftOps</span><span class="sa-acc-desc">Staff management</span></label>
+        <label class="sa-acc-row sa-acc-admin"><input type="checkbox" id="saAccess_admin" onchange="onStaffAdminToggle(this)"><span class="sa-acc-label">⭐ Admin</span><span class="sa-acc-desc">Full manager rights</span></label>
       </div>
+      <button type="button" id="modalSetPasswordBtn" onclick="modalSetPassword()" class="btn btn-ghost" style="padding:8px 14px;font-size:12.5px;font-weight:600;background:rgba(61,158,255,.12);color:#3d9eff;border:1px solid rgba(61,158,255,.35);">🔑 Set Password</button>
     </div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeModal('staffModal')">Cancel</button>
@@ -2396,40 +2412,58 @@ function editStaff(id){
   document.getElementById('staffType').value=s.type;
   document.getElementById('staffMaxHours').value=s.maxHours;
   onRoleChange(document.getElementById('staffIsManager'));
-  // Show admin section + update toggle label
+  // Show access & admin section + load THIS person's access
   const adminSec = document.getElementById('staffAdminSection');
   if(adminSec) adminSec.style.display = '';
-  const adminBtn = document.getElementById('modalToggleAdminBtn');
-  if(adminBtn){
-    const isAdmin = !!s.isHubAdmin;
-    adminBtn.textContent = isAdmin ? '✕ Remove Hub Admin' : '★ Make Hub Admin';
-    adminBtn.style.background = isAdmin ? 'rgba(244,67,54,.12)' : 'rgba(255,193,7,.12)';
-    adminBtn.style.color = isAdmin ? '#f44336' : '#ffc107';
-    adminBtn.style.borderColor = isAdmin ? 'rgba(244,67,54,.35)' : 'rgba(255,193,7,.35)';
-  }
+  loadStaffAccess(s);
   openModal('staffModal');
+}
+
+// Load one staff member's app access + admin flag into the edit panel
+async function loadStaffAccess(s){
+  const full = (s.first + ' ' + s.last).trim();
+  // admin flag from what we already know
+  const adminBox = document.getElementById('saAccess_admin');
+  if(adminBox) adminBox.checked = !!s.isHubAdmin || !!s.isShiftAdmin;
+  // app access — read this person's rows from app_access
+  ['formcraft','slip','shiftops'].forEach(a=>{ const b=document.getElementById('saAccess_'+a); if(b) b.checked=false; });
+  try{
+    const rows = await aaGet('app_access?select=app&staff_name=eq.'+encodeURIComponent(full));
+    (rows||[]).forEach(r=>{ const b=document.getElementById('saAccess_'+r.app); if(b) b.checked=true; });
+  }catch(e){ console.warn('loadStaffAccess', e); }
+  // if admin, shiftops is implied
+  if(adminBox && adminBox.checked){ const so=document.getElementById('saAccess_shiftops'); if(so) so.checked=true; }
+}
+
+// Admin checkbox auto-implies ShiftOps access
+function onStaffAdminToggle(box){
+  if(box.checked){ const so=document.getElementById('saAccess_shiftops'); if(so) so.checked=true; }
+}
+
+// Persist the edit panel's access choices for one staff member
+async function saveStaffAccess(fullName){
+  if(!fullName) return;
+  const H={apikey:AA_KEY,Authorization:'Bearer '+AA_KEY};
+  const HJ={...H,'Content-Type':'application/json'};
+  const jobs=[];
+  // app_access for the 3 apps
+  for(const app of ['formcraft','slip','shiftops']){
+    const want = (document.getElementById('saAccess_'+app)||{}).checked;
+    if(want){
+      jobs.push(fetch(AA_SB+'/rest/v1/app_access',{method:'POST',headers:{...HJ,'Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({app:app,staff_name:fullName})}));
+    }else{
+      jobs.push(fetch(AA_SB+'/rest/v1/app_access?app=eq.'+encodeURIComponent(app)+'&staff_name=eq.'+encodeURIComponent(fullName),{method:'DELETE',headers:H}));
+    }
+  }
+  // admin flag → both is_hub_admin + is_shift_admin
+  const isAdmin = !!(document.getElementById('saAccess_admin')||{}).checked;
+  jobs.push(fetch(AA_SB+'/rest/v1/staff_settings',{method:'POST',headers:{...HJ,'Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({name:fullName,is_hub_admin:isAdmin,is_shift_admin:isAdmin})}));
+  try{ await Promise.all(jobs.map(p=>p.catch(e=>{console.warn('saveStaffAccess job',e);}))); }catch(e){ console.warn('saveStaffAccess',e); }
 }
 
 function modalSetPassword(){
   if(!editingStaffId) return;
   resetStaffPasswordById(editingStaffId);
-}
-
-function modalToggleAdmin(){
-  if(!editingStaffId) return;
-  toggleHubAdmin(editingStaffId);
-  // Refresh button state inline
-  const s = staff.find(x => x.id === editingStaffId);
-  if(s){
-    const adminBtn = document.getElementById('modalToggleAdminBtn');
-    if(adminBtn){
-      const isAdmin = !!s.isHubAdmin;
-      adminBtn.textContent = isAdmin ? '✕ Remove Hub Admin' : '★ Make Hub Admin';
-      adminBtn.style.background = isAdmin ? 'rgba(244,67,54,.12)' : 'rgba(255,193,7,.12)';
-      adminBtn.style.color = isAdmin ? '#f44336' : '#ffc107';
-      adminBtn.style.borderColor = isAdmin ? 'rgba(244,67,54,.35)' : 'rgba(255,193,7,.35)';
-    }
-  }
 }
 
 function populateTeamSelect(selectedTeam){
@@ -2458,6 +2492,9 @@ async function saveStaff(){
       await renameStaffEverywhere(oldName, newName);
     }
     window._editingOldName = null;
+    await saveStaffAccess(newName);   // persist app access + admin flag for this person
+    // keep local admin flag in sync so the row badge updates without a reload
+    if(s){ const isAdmin=!!(document.getElementById('saAccess_admin')||{}).checked; s.isHubAdmin=isAdmin; s.isShiftAdmin=isAdmin; }
     closeModal('staffModal');forceSave();renderAll();showToast('✓ Staff updated');pushStaffNames();
   }else{
     const s={id:nextStaffId++,first,last,team,isManager:isOfficeManager?'office':isManager,isOfficeManager,type,maxHours,color:COLORS[(nextStaffId-2)%COLORS.length]};
