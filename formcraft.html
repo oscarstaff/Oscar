@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>FormCraft — PDF form filler with templates</title>
+  <title>Fill Tool — PDF form filler</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%23c8741a'/><text x='16' y='22' font-family='Georgia,serif' font-size='18' font-style='italic' text-anchor='middle' fill='%23fff'>F</text></svg>" />
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -133,6 +133,8 @@
     .pdf-value-overlay { position: absolute; pointer-events: all; cursor: text; display: flex; align-items: center; padding: 0 4px; font-size: 11px; color: var(--text); overflow: hidden; white-space: nowrap; }
     .pdf-inline-input { position: absolute; z-index: 20; border: 2px solid var(--accent); border-radius: 3px; background: #fff; font-family: var(--font); font-size: 12px; color: var(--text); padding: 0 4px; outline: none; box-shadow: 0 4px 14px -4px rgba(37,99,235,.45); resize: none; line-height: 1.2; }
     .pdf-inline-input:focus { box-shadow: 0 0 0 3px rgba(37,99,235,.16), 0 4px 14px -4px rgba(37,99,235,.45); }
+    .pdf-sig-mark { position: absolute; pointer-events: all; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px; font-size: 11px; font-weight: 600; color: var(--ok); background: var(--ok-soft); border: 1px solid var(--ok); border-radius: 3px; overflow: hidden; }
+    .pdf-sig-mark i { font-size: 11px; }
 
     /* ── Form pane ── */
     .form-pane { width: 420px; flex-shrink: 0; display: flex; flex-direction: column; background: var(--surface); border-left: 1px solid var(--border); height: 100%; overflow: hidden; }
@@ -224,7 +226,7 @@
 <div id="__gate" style="position:fixed;inset:0;z-index:99999;background:linear-gradient(135deg,#0f1117,#1a1d27);display:flex;align-items:center;justify-content:center;font-family:system-ui,sans-serif;">
   <div style="background:#1e2230;border:1px solid #2e3344;border-radius:18px;padding:40px 36px;width:min(380px,90vw);text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.5);">
     <div style="font-size:42px;margin-bottom:14px;">🔒</div>
-    <div style="font-size:20px;font-weight:700;color:#fff;margin-bottom:8px;">FormCraft</div>
+    <div style="font-size:20px;font-weight:700;color:#fff;margin-bottom:8px;">Fill Tool</div>
     <div id="__gateMsg" style="font-size:13.5px;color:#8b94a8;line-height:1.5;">Checking access…</div>
   </div>
 </div>
@@ -342,7 +344,9 @@
             for (let i = 0; i < pages.length; i++) {
               if (pages[i].ref === ref) { pageIndex = i; break; }
             }
-            if (pageIndex === -1) continue;
+            // Some PDFs (esp. signature widgets) have a broken/missing page ref.
+            // Fall back to page 1 so the field still has a position to fill/draw.
+            if (pageIndex === -1) pageIndex = 0;
             const rect = w.getRectangle();
             const ps = pageSizes[pageIndex];
             widgets.push({
@@ -740,13 +744,20 @@
                       className={'pdf-field-box' + (filled ? ' has-value' : '') + (highlight ? ' highlight' : '') + (o.field.isGroup ? ' group' : '') + (canInline ? ' editable' : '')}
                       style={{ left: o.x, top: o.y, width: o.w, height: o.h }}
                       onClick={onBoxClick}
-                      title={canInline ? 'Click to type' : o.field.label}
+                      title={canInline ? 'Click to type' : (t === 'checkbox' ? 'Click to tick' : o.field.label)}
                     >
-                      {!filled && (t === 'checkbox' ? '' : (o.field.label || '').slice(0, 20))}
+                      {t === 'checkbox'
+                        ? (filled ? <i className="fa-solid fa-check" style={{ fontSize: Math.min(o.h * 0.8, 12), color: 'var(--ok)' }} /> : '')
+                        : (!filled && (o.field.label || '').slice(0, 20))}
                     </div>
-                    {filled && t !== 'checkbox' && (
+                    {filled && t !== 'checkbox' && t !== 'signature' && (
                       <div className="pdf-value-overlay" style={{ left: o.x, top: o.y, width: o.w, height: o.h }} onClick={(e) => { e.stopPropagation(); onFieldClick(o.fieldName); if (canInline) setEditing(o.fieldName); }}>
                         {String(v).slice(0, 60)}
+                      </div>
+                    )}
+                    {filled && t === 'signature' && (
+                      <div className="pdf-sig-mark" style={{ left: o.x, top: o.y, width: o.w, height: o.h }} onClick={(e) => { e.stopPropagation(); onFieldClick(o.fieldName); }}>
+                        <i className="fa-solid fa-signature" /> Signed
                       </div>
                     )}
                   </React.Fragment>
@@ -1432,7 +1443,7 @@
         <div className="app">
           <header className="header">
             <div className="header-left">
-              <span className="logo" onClick={() => pdfBytes && onReset()}>form<em>Craft</em></span>
+              <span className="logo" onClick={() => pdfBytes && onReset()}>Fill<em> Tool</em></span>
               {fileName && (
                 <React.Fragment>
                   <div className="header-divider" />
