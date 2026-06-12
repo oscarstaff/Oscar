@@ -263,6 +263,16 @@
     .builtin-card span{ flex:1; font-size:13px; font-weight:650; color:var(--text); line-height:1.35; }
     .builtin-go{ color:var(--text-3); font-size:12px; flex-shrink:0; transition:transform .16s; }
     .builtin-card:hover .builtin-go{ color:var(--accent); transform:translateX(3px); }
+    /* signature pad */
+    .sig-pad-wrap{ border:1.5px solid var(--border); border-radius:12px; overflow:hidden; background:#fff; box-shadow:var(--shadow-sm); }
+    .sig-pad{ display:block; width:100%; height:150px; background:
+      linear-gradient(#fff,#fff) padding-box,
+      repeating-linear-gradient(0deg,transparent,transparent 28px,#f0ece3 28px,#f0ece3 29px);
+      cursor:crosshair; touch-action:none; }
+    .sig-pad-bar{ display:flex; align-items:center; justify-content:space-between; padding:8px 12px; border-top:1px solid var(--border); background:var(--bg-soft); }
+    .sig-hint{ font-size:12px; color:var(--text-2); }
+    .sig-clear{ background:#fff; border:1px solid var(--border); border-radius:8px; padding:5px 14px; font-size:12px; font-weight:650; color:var(--text-2); cursor:pointer; font-family:inherit; transition:all .14s; }
+    .sig-clear:hover{ border-color:var(--accent-border); color:var(--accent); background:var(--accent-soft); }
 
 
     /* fix: form pane was clipping (couldn't see/scroll lower fields in edit mode).
@@ -384,6 +394,7 @@
         if (ctor === 'PDFCheckBox') type = 'checkbox';
         else if (ctor === 'PDFDropdown' || ctor === 'PDFOptionList') { type = 'dropdown'; try { options = f.getOptions(); } catch { options = []; } }
         else if (ctor === 'PDFRadioGroup') { type = 'radio'; try { options = f.getOptions(); } catch { options = []; } }
+        else if (ctor === 'PDFSignature') { type = 'signature'; }
         else {
           try { isMultiline = f.isMultiline && f.isMultiline(); } catch {}
           type = inferType(name, isMultiline);
@@ -532,6 +543,34 @@
           continue;
         }
         if (v == null || v === '') continue;
+        // Signature: draw the captured PNG into the field's rectangle, then
+        // remove the form field so it flattens cleanly.
+        if (f.type === 'signature') {
+          try {
+            if (typeof v === 'string' && v.indexOf('data:image') === 0 && f.widgets && f.widgets.length) {
+              const pngBytes = Uint8Array.from(atob(v.split(',')[1]), c => c.charCodeAt(0));
+              const png = await pdfDoc.embedPng(pngBytes);
+              const pages2 = pdfDoc.getPages();
+              for (const wgt of f.widgets) {
+                const pg = pages2[wgt.page - 1]; if (!pg) continue;
+                const ph = pg.getHeight();
+                // widgets store y as top-origin; convert back to PDF bottom-origin
+                const yBottom = ph - wgt.y - wgt.h;
+                // fit the signature inside the box, keep aspect ratio, small pad
+                const pad = 2;
+                const bw = wgt.w - pad * 2, bh = wgt.h - pad * 2;
+                const ar = png.width / png.height;
+                let dw = bw, dh = bw / ar;
+                if (dh > bh) { dh = bh; dw = bh * ar; }
+                pg.drawImage(png, { x: wgt.x + (wgt.w - dw) / 2, y: yBottom + (wgt.h - dh) / 2, width: dw, height: dh });
+              }
+            }
+          } catch (e) { console.warn('signature embed', f.name, e.message); }
+          // Don't removeField here — some signature widgets have broken page
+          // refs that throw. The image is already drawn; flatten (or its
+          // readonly fallback) handles the leftover field.
+          continue;
+        }
         try {
           const fld = form.getField(f.name);
           const ctor = fld.constructor.name;
@@ -545,12 +584,20 @@
             // Use a consistent, readable font size (not auto-size, which blows
             // short values up to fill the whole box and looks ugly). Only shrink
             // for genuinely long values so they still fit on one line.
-            const text = String(v);
+            let text = String(v);
+            // Date fields: normalise to a uniform DD / MM / YYYY so digits line
+            // up consistently (forms often have a pre-printed " / / " — a single
+            // tidy format stops the numbers looking mis-aligned).
+            if (f.type === 'date') {
+              const m = text.match(/^(\d{4})-(\d{2})-(\d{2})$/); // ISO from date input
+              if (m) text = m[3] + ' / ' + m[2] + ' / ' + m[1];  // DD / MM / YYYY
+            }
             let fontSize = 11;
             if (text.length > 40) fontSize = 8;
             else if (text.length > 28) fontSize = 9;
             else if (text.length > 20) fontSize = 10;
             try { fld.setFontSize(fontSize); } catch {}
+            try { fld.setAlignment && fld.setAlignment(f.type === 'date' ? 0 : fld.getAlignment ? fld.getAlignment() : 0); } catch {}
             fld.setText(text);
           }
         } catch (e) { console.warn('fill', f.name, e.message); }
@@ -582,6 +629,15 @@
       // generate appearance streams BEFORE flattening — without this, iLovePDF
       // forms often fail to flatten (boxes stay visible, checks don't render)
       try { form.updateFieldAppearances(); } catch (e) { console.warn('appearances', e); }
+      // Signature fields can have broken widget page-refs that make flatten throw.
+      // Try to remove them (individually, ignoring failures) before flattening.
+      try {
+        form.getFields().forEach(f => {
+          if (f.constructor.name === 'PDFSignature') {
+            try { form.removeField(f); } catch (e) { console.warn('drop sig', e.message); }
+          }
+        });
+      } catch (e) {}
       try {
         form.flatten();
       } catch (e) {
@@ -604,11 +660,13 @@
       text: 'fa-font', multiline: 'fa-align-left', number: 'fa-hashtag',
       email: 'fa-envelope', phone: 'fa-phone', date: 'fa-calendar',
       checkbox: 'fa-square-check', dropdown: 'fa-chevron-down', radio: 'fa-circle-dot',
+      signature: 'fa-signature',
     };
     const TYPE_LABELS = {
       text: 'Text', multiline: 'Multiline', number: 'Number',
       email: 'Email', phone: 'Phone', date: 'Date',
       checkbox: 'Checkbox', dropdown: 'Dropdown', radio: 'Multiple choice',
+      signature: 'Signature',
     };
     const htmlInputType = (t) => ({ number: 'number', email: 'email', phone: 'tel', date: 'date' })[t] || 'text';
     function validate(field, v) {
@@ -732,8 +790,68 @@
       );
     }
 
+    function SignaturePad({ value, onChange }) {
+      const canvasRef = React.useRef(null);
+      const drawing = React.useRef(false);
+      const last = React.useRef(null);
+      const [hasInk, setHasInk] = React.useState(!!value);
+
+      React.useEffect(() => {
+        const c = canvasRef.current; if (!c) return;
+        const ctx = c.getContext('2d');
+        // size the canvas to its display box (retina-aware)
+        const rect = c.getBoundingClientRect();
+        const dpr = window.devicePixelRatio || 1;
+        c.width = rect.width * dpr; c.height = rect.height * dpr;
+        ctx.scale(dpr, dpr);
+        ctx.lineWidth = 2.2; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+        ctx.strokeStyle = '#1a1a2e';
+        if (value) { // restore existing signature image
+          const img = new Image();
+          img.onload = () => ctx.drawImage(img, 0, 0, rect.width, rect.height);
+          img.src = value;
+        }
+      }, []);
+
+      const pos = (e) => {
+        const c = canvasRef.current; const r = c.getBoundingClientRect();
+        const t = e.touches ? e.touches[0] : e;
+        return { x: t.clientX - r.left, y: t.clientY - r.top };
+      };
+      const start = (e) => { e.preventDefault(); drawing.current = true; last.current = pos(e); };
+      const move = (e) => {
+        if (!drawing.current) return; e.preventDefault();
+        const c = canvasRef.current; const ctx = c.getContext('2d');
+        const p = pos(e);
+        ctx.beginPath(); ctx.moveTo(last.current.x, last.current.y); ctx.lineTo(p.x, p.y); ctx.stroke();
+        last.current = p; if (!hasInk) setHasInk(true);
+      };
+      const end = () => {
+        if (!drawing.current) return; drawing.current = false;
+        const c = canvasRef.current;
+        onChange(c.toDataURL('image/png'));
+      };
+      const clear = () => {
+        const c = canvasRef.current; const ctx = c.getContext('2d');
+        ctx.clearRect(0, 0, c.width, c.height); setHasInk(false); onChange('');
+      };
+
+      return (
+        <div className="sig-pad-wrap">
+          <canvas ref={canvasRef} className="sig-pad"
+            onMouseDown={start} onMouseMove={move} onMouseUp={end} onMouseLeave={end}
+            onTouchStart={start} onTouchMove={move} onTouchEnd={end} />
+          <div className="sig-pad-bar">
+            <span className="sig-hint">{hasInk ? '✓ Signed' : 'Sign above with mouse or finger'}</span>
+            <button type="button" className="sig-clear" onClick={clear}>Clear</button>
+          </div>
+        </div>
+      );
+    }
+
     function FieldInput({ field, value, onChange, err }) {
       const cls = 'form-input' + (hasValue(field, value) ? ' has-value' : '') + (err ? ' invalid' : '');
+      if (field.type === 'signature') return <SignaturePad value={value} onChange={onChange} />;
       if (field.type === 'checkbox') return (
         <label className="form-check">
           <input type="checkbox" checked={!!value} onChange={(e) => onChange(e.target.checked)} />
