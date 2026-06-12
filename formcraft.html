@@ -542,9 +542,16 @@
           else if (ctor === 'PDFDropdown' || ctor === 'PDFOptionList') { try { fld.select(String(v)); } catch { try { fld.setText && fld.setText(String(v)); } catch {} } }
           else if (ctor === 'PDFRadioGroup') fld.select(String(v));
           else {
-            // text: shrink font to fit so long values stay inside the box
-            try { fld.setFontSize(0); } catch {}   // 0 = auto-size to fit the field
-            fld.setText(String(v));
+            // Use a consistent, readable font size (not auto-size, which blows
+            // short values up to fill the whole box and looks ugly). Only shrink
+            // for genuinely long values so they still fit on one line.
+            const text = String(v);
+            let fontSize = 11;
+            if (text.length > 40) fontSize = 8;
+            else if (text.length > 28) fontSize = 9;
+            else if (text.length > 20) fontSize = 10;
+            try { fld.setFontSize(fontSize); } catch {}
+            fld.setText(text);
           }
         } catch (e) { console.warn('fill', f.name, e.message); }
       }
