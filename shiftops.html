@@ -1018,6 +1018,40 @@ body{ background:
 .sub-tabs-bar .sub-tab.active{ background:#fff!important; color:var(--accent-deep)!important; box-shadow:0 2px 8px -2px rgba(79,70,229,.28),0 0 0 1px rgba(79,70,229,.08)!important; }
 [data-theme="dark"] .sub-tabs-bar{ background:#0f1923; border-color:#243446; }
 [data-theme="dark"] .sub-tabs-bar .sub-tab.active{ background:#16222f!important; color:#a5b4fc!important; }
+
+/* ── Leave request cards ── */
+.lv-card{ display:flex; align-items:center; gap:13px; padding:14px 16px; background:#fff; border:1px solid var(--border); border-radius:14px; margin-bottom:9px; box-shadow:0 1px 2px rgba(30,27,75,.04),0 8px 22px -20px rgba(30,27,75,.18); transition:box-shadow .22s,transform .18s,border-color .2s; position:relative; overflow:hidden; }
+.lv-card:hover{ box-shadow:0 3px 8px rgba(30,27,75,.06),0 14px 30px -20px rgba(30,27,75,.26); transform:translateY(-1px); border-color:#d6dbe8; }
+.lv-card::before{ content:''; position:absolute; left:0; top:0; bottom:0; width:4px; }
+.lv-pending::before{ background:linear-gradient(180deg,#fbbf24,#f59e0b); }
+.lv-approved::before{ background:linear-gradient(180deg,#34d399,#059669); }
+.lv-declined::before{ background:linear-gradient(180deg,#f87171,#e11d48); }
+.lv-ava{ width:38px!important; height:38px!important; font-size:11px!important; flex-shrink:0; border-radius:12px!important; box-shadow:inset 0 -6px 12px rgba(0,0,0,.14),0 2px 5px rgba(30,27,75,.16); }
+.lv-body{ flex:1; min-width:0; }
+.lv-name{ font-size:13.5px; font-weight:750; color:var(--text); display:flex; align-items:center; gap:7px; }
+.lv-web{ font-family:var(--mono); font-size:8px; font-weight:700; background:rgba(99,102,241,.12); color:var(--accent2); border:1px solid rgba(99,102,241,.25); border-radius:5px; padding:1px 6px; }
+.lv-dates{ font-size:12px; color:var(--text-dim); margin-top:3px; display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+.lv-arrow{ color:var(--muted); }
+.lv-days{ font-family:var(--mono); font-size:10px; font-weight:700; background:var(--accent-dim); color:var(--accent-text); border-radius:20px; padding:2px 9px; }
+.lv-reason{ font-size:11.5px; color:var(--text-dim); margin-top:4px; font-style:italic; }
+.lv-right{ display:flex; flex-direction:column; align-items:flex-end; gap:7px; flex-shrink:0; }
+.lv-status{ font-family:var(--mono); font-size:8.5px; font-weight:800; text-transform:uppercase; letter-spacing:.8px; padding:3px 10px; border-radius:20px; }
+.lv-status-pending{ background:#fef3c7; color:#92400e; }
+.lv-status-approved{ background:#d1fae5; color:#065f46; }
+.lv-status-declined{ background:#fee2e2; color:#991b1b; }
+.lv-actions{ display:flex; gap:5px; flex-wrap:wrap; justify-content:flex-end; }
+.lv-btn{ border-radius:8px; padding:5px 12px; font-size:11px; font-weight:700; cursor:pointer; font-family:inherit; transition:all .14s; border:1px solid var(--border); background:#fff; color:var(--text-mid); }
+.lv-btn:hover{ transform:translateY(-1px); box-shadow:0 3px 8px -3px rgba(30,27,75,.25); }
+.lv-approve{ background:#ecfdf5; color:#059669; border-color:#a7f3d0; }
+.lv-approve:hover{ background:#d1fae5; }
+.lv-decline{ background:#fef2f2; color:var(--warn); border-color:#fecaca; }
+.lv-decline:hover{ background:#fee2e2; }
+.lv-del{ padding:5px 9px; color:var(--muted); }
+.lv-del:hover{ color:var(--warn); border-color:#fecaca; }
+.lv-section-hd{ font-family:var(--mono); font-size:9px; font-weight:800; letter-spacing:1.5px; text-transform:uppercase; margin:0 0 9px; display:flex; align-items:center; gap:6px; }
+[data-theme="dark"] .lv-card{ background:#16222f; border-color:#243446; }
+[data-theme="dark"] .lv-name{ color:#dde8f5; }
+[data-theme="dark"] .lv-btn{ background:#0f1923; border-color:#243446; color:#a8bccf; }
 /* per-staff access rows in Edit modal */
 .sa-acc-row{display:flex;align-items:center;gap:11px;padding:11px 13px;border:1px solid var(--border);border-radius:11px;cursor:pointer;transition:all .14s;background:#fff;}
 .sa-acc-row:hover{border-color:var(--accent-border);background:var(--accent-dim);}
@@ -3458,23 +3492,21 @@ function renderLeave(filterName){
     const name=s?`${s.first} ${s.last}`:(r.staffName||'Unknown');
     const color=s?s.color:'#666';
     const days=countLeaveDays(r.from||r.from_date||'',(r.to||r.to_date||''),(r.staffId||null));
-    const statusCol={pending:'#f9a825',approved:'var(--accent)',declined:'var(--warn)'}[r.status];
     const isWeb=!!r.supabaseId; // came from web form
-    return `<div style="display:flex;align-items:center;gap:12px;padding:13px 16px;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:10px;margin-bottom:8px">
-      <div class="avatar" style="background:${color};width:32px;height:32px;font-size:10px;flex-shrink:0">${s?initials(s):name.slice(0,2).toUpperCase()}</div>
-      <div style="flex:1;min-width:0">
-        <div style="font-size:13.5px;font-weight:700;display:flex;align-items:center;gap:7px">${name}${isWeb?`<span style="font-family:var(--mono);font-size:8px;background:rgba(61,158,255,.15);color:var(--accent2);border:1px solid rgba(61,158,255,.25);border-radius:4px;padding:1px 6px">WEB</span>`:''}
-        </div>
-        <div style="font-size:11.5px;color:var(--text-dim);margin-top:2px">${fmtLeaveDate(r.from||r.from_date)} → ${fmtLeaveDate(r.to||r.to_date)} <span style="font-family:var(--mono);font-size:10px;color:var(--muted)">(${days} day${days!==1?'s':''})</span></div>
-        ${r.reason?`<div style="font-size:11px;color:var(--text-dim);margin-top:2px;font-style:italic">"${r.reason}"</div>`:''}
+    return `<div class="lv-card lv-${r.status}">
+      <div class="avatar lv-ava" style="background:${color}">${s?initials(s):name.slice(0,2).toUpperCase()}</div>
+      <div class="lv-body">
+        <div class="lv-name">${name}${isWeb?`<span class="lv-web">WEB</span>`:''}</div>
+        <div class="lv-dates">${fmtLeaveDate(r.from||r.from_date)} <span class="lv-arrow">→</span> ${fmtLeaveDate(r.to||r.to_date)} <span class="lv-days">${days} day${days!==1?'s':''}</span></div>
+        ${r.reason?`<div class="lv-reason">"${r.reason}"</div>`:''}
       </div>
-      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0">
-        <div style="font-family:var(--mono);font-size:9px;font-weight:700;color:${statusCol};text-transform:uppercase;letter-spacing:.5px">${r.status}</div>
-        ${showActions?`<div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end">
-          <button onclick="openLeaveEdit(${r.id})" style="background:rgba(255,255,255,.06);color:var(--text);border:1px solid var(--border);border-radius:5px;padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer">Edit</button>
-          ${r.status!=='approved'?`<button onclick="updateLeave(${r.id},'approved')" style="background:rgba(0,200,150,.12);color:var(--accent);border:1px solid rgba(0,200,150,.25);border-radius:5px;padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer">Approve</button>`:''}
-          ${r.status!=='declined'?`<button onclick="updateLeave(${r.id},'declined')" style="background:rgba(255,92,53,.1);color:var(--warn);border:1px solid rgba(255,92,53,.2);border-radius:5px;padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer">Decline</button>`:''}
-          <button onclick="deleteLeave(${r.id})" style="background:transparent;color:var(--text-dim);border:1px solid var(--border);border-radius:5px;padding:3px 8px;font-size:11px;cursor:pointer">✕</button>
+      <div class="lv-right">
+        <div class="lv-status lv-status-${r.status}">${r.status}</div>
+        ${showActions?`<div class="lv-actions">
+          <button class="lv-btn lv-edit" onclick="openLeaveEdit(${r.id})">Edit</button>
+          ${r.status!=='approved'?`<button class="lv-btn lv-approve" onclick="updateLeave(${r.id},'approved')">Approve</button>`:''}
+          ${r.status!=='declined'?`<button class="lv-btn lv-decline" onclick="updateLeave(${r.id},'declined')">Decline</button>`:''}
+          <button class="lv-btn lv-del" onclick="deleteLeave(${r.id})">✕</button>
         </div>`:''}
       </div>
     </div>`;
@@ -3505,17 +3537,17 @@ function renderLeave(filterName){
   </div>`;
 
   if(pending.length){
-    html+=`<div style="font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#f9a825;margin-bottom:8px">⏳ Pending (${pending.length})</div>`;
+    html+=`<div class="lv-section-hd" style="color:#f59e0b">⏳ Pending (${pending.length})</div>`;
     pending.forEach(r=>html+=renderRow(r,true));
     html+=`<div style="height:16px"></div>`;
   }
   if(approved.length){
-    html+=`<div style="font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--accent);margin-bottom:8px">✓ Approved (${approved.length})</div>`;
+    html+=`<div class="lv-section-hd" style="color:#059669">✓ Approved (${approved.length})</div>`;
     approved.forEach(r=>html+=renderRow(r,true));
     html+=`<div style="height:16px"></div>`;
   }
   if(declined.length){
-    html+=`<div style="font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--warn);margin-bottom:8px">✕ Declined (${declined.length})</div>`;
+    html+=`<div class="lv-section-hd" style="color:var(--warn)">✕ Declined (${declined.length})</div>`;
     declined.forEach(r=>html+=renderRow(r,true));
   }
   if(!leaveRequests.length){
