@@ -518,12 +518,11 @@
             // short values up to fill the whole box and looks ugly). Only shrink
             // for genuinely long values so they still fit on one line.
             let text = String(v);
-            // Date fields: normalise to a uniform DD / MM / YYYY so digits line
-            // up consistently (forms often have a pre-printed " / / " — a single
-            // tidy format stops the numbers looking mis-aligned).
+            // Date fields: keep it simple — DD MM YYYY with plain spaces, no
+            // slash separators (the form's own separators caused misalignment).
             if (f.type === 'date') {
               const m = text.match(/^(\d{4})-(\d{2})-(\d{2})$/); // ISO from date input
-              if (m) text = m[3] + ' / ' + m[2] + ' / ' + m[1];  // DD / MM / YYYY
+              if (m) text = m[3] + '  ' + m[2] + '  ' + m[1];  // DD  MM  YYYY
             }
             let fontSize = 11;
             if (text.length > 40) fontSize = 8;
@@ -711,10 +710,10 @@
                   const common = {
                     autoFocus: true,
                     className: 'pdf-inline-input',
-                    style: { left: o.x, top: o.y, width: o.w, height: o.h },
+                    style: { left: o.x, top: o.y, width: Math.max(o.w, 60), height: o.h, minHeight: t === 'multiline' ? Math.max(o.h, 40) : o.h },
                     value: v || '',
                     onChange: (e) => commit(e.target.value),
-                    onBlur: () => setEditing(null),
+                    onBlur: () => { setTimeout(() => setEditing(cur => cur === o.fieldName ? null : cur), 120); },
                     onKeyDown: (e) => { if (e.key === 'Enter' && t !== 'multiline') { e.preventDefault(); setEditing(null); } if (e.key === 'Escape') setEditing(null); },
                   };
                   return (
@@ -726,7 +725,7 @@
                   );
                 }
 
-                // Checkbox toggles in place
+                // Click handling
                 const onBoxClick = (e) => {
                   e.stopPropagation();
                   onFieldClick(o.fieldName);
@@ -746,7 +745,7 @@
                       {!filled && (t === 'checkbox' ? '' : (o.field.label || '').slice(0, 20))}
                     </div>
                     {filled && t !== 'checkbox' && (
-                      <div className="pdf-value-overlay" style={{ left: o.x, top: o.y, width: o.w, height: o.h }} onClick={(e) => { e.stopPropagation(); if (canInline) setEditing(o.fieldName); }}>
+                      <div className="pdf-value-overlay" style={{ left: o.x, top: o.y, width: o.w, height: o.h }} onClick={(e) => { e.stopPropagation(); onFieldClick(o.fieldName); if (canInline) setEditing(o.fieldName); }}>
                         {String(v).slice(0, 60)}
                       </div>
                     )}
@@ -765,21 +764,35 @@
       const last = React.useRef(null);
       const [hasInk, setHasInk] = React.useState(!!value);
 
-      React.useEffect(() => {
-        const c = canvasRef.current; if (!c) return;
-        const ctx = c.getContext('2d');
-        // size the canvas to its display box (retina-aware)
+      const setupCanvas = React.useCallback(() => {
+        const c = canvasRef.current; if (!c) return null;
         const rect = c.getBoundingClientRect();
+        if (!rect.width) return null;
         const dpr = window.devicePixelRatio || 1;
-        c.width = rect.width * dpr; c.height = rect.height * dpr;
-        ctx.scale(dpr, dpr);
-        ctx.lineWidth = 2.2; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-        ctx.strokeStyle = '#1a1a2e';
-        if (value) { // restore existing signature image
-          const img = new Image();
-          img.onload = () => ctx.drawImage(img, 0, 0, rect.width, rect.height);
-          img.src = value;
+        // only resize if needed (resizing clears the canvas)
+        if (c.width !== Math.round(rect.width * dpr)) {
+          c.width = rect.width * dpr; c.height = rect.height * dpr;
         }
+        const ctx = c.getContext('2d');
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.lineWidth = 2.2; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+        ctx.strokeStyle = '#111';
+        return ctx;
+      }, []);
+
+      React.useEffect(() => {
+        // wait a tick so layout settles, then size + restore
+        const id = setTimeout(() => {
+          const ctx = setupCanvas();
+          if (ctx && value) {
+            const c = canvasRef.current;
+            const rect = c.getBoundingClientRect();
+            const img = new Image();
+            img.onload = () => ctx.drawImage(img, 0, 0, rect.width, rect.height);
+            img.src = value;
+          }
+        }, 50);
+        return () => clearTimeout(id);
       }, []);
 
       const pos = (e) => {
@@ -787,7 +800,11 @@
         const t = e.touches ? e.touches[0] : e;
         return { x: t.clientX - r.left, y: t.clientY - r.top };
       };
-      const start = (e) => { e.preventDefault(); drawing.current = true; last.current = pos(e); };
+      const start = (e) => {
+        e.preventDefault();
+        setupCanvas(); // ensure sized before first stroke
+        drawing.current = true; last.current = pos(e);
+      };
       const move = (e) => {
         if (!drawing.current) return; e.preventDefault();
         const c = canvasRef.current; const ctx = c.getContext('2d');
@@ -798,10 +815,11 @@
       const end = () => {
         if (!drawing.current) return; drawing.current = false;
         const c = canvasRef.current;
-        onChange(c.toDataURL('image/png'));
+        if (c) onChange(c.toDataURL('image/png'));
       };
       const clear = () => {
-        const c = canvasRef.current; const ctx = c.getContext('2d');
+        const c = canvasRef.current; if (!c) return;
+        const ctx = c.getContext('2d');
         ctx.clearRect(0, 0, c.width, c.height); setHasInk(false); onChange('');
       };
 
