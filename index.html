@@ -16091,6 +16091,16 @@ async function loadSharedTasksFromOthers(silent){
       const localId = 'shared_'+r.id;
       const existing = _tasks.find(function(x){return x.id===localId;});
       if(existing){
+        // Repair tasks imported before sharedFrom was persisted: if this row
+        // is from a sender but the local copy lost its "shared by" marker,
+        // restore it so the "From X" chip + banner show and re-share is blocked.
+        if(r.sender && !existing.sharedFrom){
+          existing.sharedFrom = r.sender;
+          existing.sharedRowId = r.id;
+          if(!existing.originalNote) existing.originalNote = r.notes || '';
+          added++;
+          try{ pushTaskToSupabase(existing); }catch(e){}   // persist the repair
+        }
         // keep recipient's completion in sync with remote
         if(r.done && !existing.done){ existing.done = true; existing.doneAt = r.completed_at || new Date().toISOString(); added++; }
         // pick up the sharer's edits while the task is still pending
