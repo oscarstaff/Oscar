@@ -11047,7 +11047,12 @@ async function loadTasks(){
           shareStatus: (sm && sm.status) || undefined,
           sharedRowIds: (sm && sm.rowIds) || undefined,
           completedByOther: (sm && sm.doneBy) || undefined,
-          doneAt: (sm && sm.doneAt) || undefined
+          doneAt: (sm && sm.doneAt) || undefined,
+          // incoming-share fields (task shared TO me) — must survive reloads or
+          // the "From X" chip + shared-by banner vanish after a refresh
+          sharedFrom: (sm && sm.from) || undefined,
+          sharedRowId: (sm && sm.fromRowId) || undefined,
+          originalNote: (sm && sm.fromNote) || undefined
         };
       });
       // Cache to localStorage for offline + instant render
@@ -11083,10 +11088,14 @@ async function pushTaskToSupabase(t){
     notes: t.notes || '',
     done: !!t.done,
     created_at: t.createdAt || new Date().toISOString(),
-    share_meta: (t.sharedTo && t.sharedTo.length) ? {
-      to: t.sharedTo, rowIds: t.sharedRowIds || [],
+    share_meta: ((t.sharedTo && t.sharedTo.length) || t.sharedFrom) ? {
+      to: t.sharedTo || null, rowIds: t.sharedRowIds || [],
       doneBy: t.completedByOther || null, doneAt: t.doneAt || null,
-      status: t.shareStatus || null
+      status: t.shareStatus || null,
+      // incoming-share fields (so "From X" chip + banner survive reloads)
+      from: t.sharedFrom || null,
+      fromRowId: t.sharedRowId || null,
+      fromNote: t.originalNote || null
     } : null
   };
   try{
