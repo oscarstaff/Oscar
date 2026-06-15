@@ -4722,7 +4722,7 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
   <!-- ONBOARD LOCK OVERLAY -->
   <div id="onboardLockOverlay" style="display:none;position:fixed;inset:0;z-index:8000;background:rgba(15,23,42,.7);backdrop-filter:blur(6px);align-items:flex-end;justify-content:center;">
     <div style="background:#fff;border-radius:24px 24px 0 0;padding:28px 24px 40px;width:100%;max-width:520px;">
-      <div style="font-size:22px;margin-bottom:10px;">🔒</div>
+      
       <div style="font-size:19px;font-weight:800;color:#0f172a;margin-bottom:8px;">Complete Your Profile</div>
       <div style="font-size:13px;color:#64748b;margin-bottom:6px;line-height:1.5;" id="onboardLockMsg">Please complete your profile before using the portal.</div>
       <div style="font-size:12px;color:#94a3b8;margin-bottom:20px;">You cannot use the portal until this is done.</div>
@@ -5218,7 +5218,7 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
 
         <!-- Status banner -->
         <div class="roster-avail-banner" id="availStatusBanner" style="display:none;">
-          <div class="roster-avail-banner-icon" id="availBannerIcon">📅</div>
+          <div class="roster-avail-banner-icon" id="availBannerIcon"></div>
           <div style="flex:1;min-width:0;">
             <div class="roster-avail-banner-title" id="availBannerTitle">Availability</div>
             <div class="roster-avail-banner-sub" id="availBannerSub"></div>
@@ -5499,7 +5499,7 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
       </div>
     </div>
     <div class="lrn-bar"><div id="trainingProgressBar" class="lrn-bar-fill"></div></div>
-    <div class="lrn-allset" id="trainingAllSet" style="display:none;">🎉 All caught up — nothing pending</div>
+    <div class="lrn-allset" id="trainingAllSet" style="display:none;">All caught up — nothing pending</div>
   </div>
 
   <div class="lrn-toolbar" id="lrnToolbar" style="display:none;">
@@ -8007,7 +8007,7 @@ async function enterHub(){
   document.getElementById("leaveTo").value=today;
   buildAvailForm();
   showSchedTab('leave'); // default schedule sub-tab
-  startBackgroundLocation();Promise.all([loadHomeData(),loadNotifications(),loadLeaveHistory(),refreshAnnBadge(),loadHomeDiscPreview(),loadHomeWeather(),loadHomeCalendar(),maybeShowOnboarding(),checkFeedbackInvites(),checkNewNotifications(),loadAnnReads(),loadClockState(),loadAllClockLogs()]).then(function(){
+  startBackgroundLocation();ensureStaffSettingsRow();Promise.all([loadHomeData(),loadNotifications(),loadLeaveHistory(),refreshAnnBadge(),loadHomeDiscPreview(),loadHomeWeather(),loadHomeCalendar(),maybeShowOnboarding(),checkFeedbackInvites(),checkNewNotifications(),loadAnnReads(),loadClockState(),loadAllClockLogs()]).then(function(){
     setTimeout(function(){
       maybeShowTour();
     }, 300);
@@ -8430,7 +8430,7 @@ function showAvailSuccess(row){
   const banner=document.getElementById("availStatusBanner");
   if(banner){
     const availDays=Object.values(avail).filter(function(a){return a&&a.type!=="no"&&a.type!=="unset";}).length;
-    document.getElementById("availBannerIcon").textContent="✅";
+    document.getElementById("availBannerIcon").textContent="";
     document.getElementById("availBannerTitle").textContent="Availability set";
     document.getElementById("availBannerSub").textContent=availDays+" day"+(availDays!==1?"s":"")+" available · "+period.toLowerCase();
     banner.style.display="flex";
@@ -8456,7 +8456,7 @@ function showAvailForm(){
   document.getElementById("availFormArea").style.display="block";
   const banner=document.getElementById("availStatusBanner");
   if(banner){
-    document.getElementById("availBannerIcon").textContent="📝";
+    document.getElementById("availBannerIcon").textContent="";
     document.getElementById("availBannerTitle").textContent="Set your availability";
     document.getElementById("availBannerSub").textContent="Pick the days and hours you can work so your manager can plan the roster.";
     banner.style.display="flex";
@@ -8527,7 +8527,7 @@ function toggleDarkMode(){
   document.documentElement.setAttribute('data-theme',newTheme);
   localStorage.setItem('oscars_theme',newTheme);
   const btn=document.getElementById('dmToggle');
-  if(btn)btn.textContent=newTheme==='dark'?'☀️':'🌙';
+  if(btn)btn.textContent=newTheme==='dark'?'Light':'Dark';
   updateDmSwitch(newTheme);
 }
 function initTheme(){
@@ -8953,7 +8953,7 @@ async function loadAnnouncements(){
     // Refresh read receipts
     await loadAnnReads();
     if(!rows.length){
-      el.innerHTML='<div class="card" style="text-align:center;color:#94a3b8;padding:40px;"><div style="font-size:28px;margin-bottom:10px;">📢</div><div style="font-size:14px;font-weight:600;">No announcements yet</div></div>';
+      el.innerHTML='<div class="card" style="text-align:center;color:#94a3b8;padding:40px;"><div style="font-size:14px;font-weight:600;">No announcements yet</div></div>';
       return;
     }
     let _lastGrp='';
@@ -8967,7 +8967,7 @@ async function loadAnnouncements(){
       return grpHdr+
         '<div class="ann-card'+(r.pinned?' pinned':'')+(isUrgent?' urgent':'')+'">'+
         (isUrgent?'<div style="display:inline-block;background:#dc2626;color:#fff;font-size:9px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;padding:2px 8px;border-radius:20px;margin-bottom:6px;">Urgent</div>':'')+
-        (r.pinned?'<div class="ann-pin">📌 Pinned'+(myIsAdmin?'<button data-id="'+r.id+'" onclick="togglePin(this.dataset.id,true)" style="margin-left:8px;background:none;border:none;color:#94a3b8;font-size:10px;font-weight:600;cursor:pointer;font-family:inherit;">Unpin</button>':'')+'</div>':'')+
+        (r.pinned?'<div class="ann-pin">Pinned'+(myIsAdmin?'<button data-id="'+r.id+'" onclick="togglePin(this.dataset.id,true)" style="margin-left:8px;background:none;border:none;color:#94a3b8;font-size:10px;font-weight:600;cursor:pointer;font-family:inherit;">Unpin</button>':'')+'</div>':'')+
         (!isRead?'<span class="ann-unread-dot"></span>':'')+
         '<div class="ann-title">'+esc(r.title)+'</div>'+
         '<div class="ann-body rt-content">'+mdToHtml(r.body)+'</div>'+attRenderGrid(r.attachments||[])+
@@ -9805,7 +9805,7 @@ function renderCalPreview(){
   }
 
   const colorMap = {event:'var(--accent)', bday:'#db2777', holiday:'#dc2626'};
-  const iconMap = {event:'●', bday:'🎂', holiday:'●'};
+  const iconMap = {event:'●', bday:'●', holiday:'●'};
   el.innerHTML = top.map(function(it){
     const dateStr = it.date.toLocaleDateString('en-AU',{weekday:'short', day:'numeric', month:'short'});
     const c = colorMap[it.type];
@@ -9813,7 +9813,7 @@ function renderCalPreview(){
     return '<div style="display:flex;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px solid #f1f5f9;">'+
       '<div style="width:4px;height:32px;border-radius:3px;background:'+c+';flex-shrink:0;"></div>'+
       '<div style="flex:1;min-width:0;">'+
-        '<div style="font-size:13px;font-weight:600;color:var(--text, #0f172a);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+(isBday?'🎂 ':'')+it.title.replace('🎂 ','')+'</div>'+
+        '<div style="font-size:13px;font-weight:600;color:var(--text, #0f172a);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+it.title.replace('🎂 ','')+'</div>'+
         '<div style="font-size:11.5px;color:#64748b;margin-top:1px;">'+dateStr+'</div>'+
       '</div>'+
       '</div>';
@@ -10082,7 +10082,7 @@ function renderBdayCalendar(){
     });
     // Birthday pills (blue with first name)
     bdays.forEach(function(b){
-      html+='<div class="cal-pill cal-pill-bday" title="'+esc(b.name)+'\'s birthday">🎂 '+b.name.split(' ')[0]+'</div>';
+      html+='<div class="cal-pill cal-pill-bday" title="'+esc(b.name)+'\'s birthday">'+b.name.split(' ')[0]+'</div>';
     });
     // Task pills (blue, with check or open state)
     const tasksToday = taskMap[d] || [];
@@ -10137,7 +10137,7 @@ function renderBdayCalendar(){
     upcoming.slice(0,8).forEach(function(u){
       const lbl=u.diff===0?'Today':u.diff===1?'Tomorrow':u.date.toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short'});
       const dotCls=u.type==='birthday'?'cal-dot-bday':u.type==='event'?'cal-dot-event':'cal-dot-holiday';
-      const icon=u.type==='birthday'?'🎂':u.type==='event'?'📅':'🏖';
+      const icon=u.type==='birthday'?'':u.type==='event'?'':'';
       html+='<div class="cal-upcoming-item">';
       html+='<div class="cal-dot '+dotCls+'"></div>';
       html+='<div class="cal-upcoming-main"><div class="cal-upcoming-title">'+icon+' '+u.label+'</div><div class="cal-upcoming-when">'+lbl+'</div></div>';
@@ -11138,6 +11138,22 @@ async function loadHomeAnnPreview(){
   }catch(e){console.warn(e);el.innerHTML='<div style="color:#94a3b8;font-size:13px;">No announcements yet.</div>';}
 }
 
+// Ensure the current user has a staff_settings row. Many features PATCH this
+// table (PATCH = update-where-name; it does NOT create a row), so without a
+// seed row those updates (e.g. nexus_tour_done) silently no-op and never sync.
+async function ensureStaffSettingsRow(){
+  if(!me) return;
+  try{
+    const rows = await sbGet('staff_settings','?name=eq.'+encodeURIComponent(me)+'&select=name');
+    if(rows && rows.length) return; // already has a row
+    await fetch(SB+'/rest/v1/staff_settings',{
+      method:'POST',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body: JSON.stringify({name: me})
+    });
+  }catch(e){ /* non-critical — PATCH fallbacks still write localStorage */ }
+}
+
 // Enforce the SQ/DOB lock for new staff, then show the usage tour.
 async function maybeShowOnboarding(){
   if(sessionStorage.getItem('onboard_checked_'+me)==='done'){renderTimesheetPreview();maybeShowTour();return;}
@@ -11771,7 +11787,7 @@ function checkTaskReminders(){
       if(typeof _taskNotifications === 'undefined') window._taskNotifications = [];
       _taskNotifications.unshift({
         id: 'tr_' + key + '_' + Date.now(),
-        title: '🔔 Reminder: ' + t.title,
+        title: 'Reminder: ' + t.title,
         body: (t.remindBefore===0 ? 'Due now' : (t.remindBefore+' min before due')) + (t.dueTime?' · '+t.dueTime:''),
         created_at: new Date().toISOString(),
         taskId: t.id
@@ -13779,7 +13795,7 @@ function clockOutConfirm(){
     ov.style.display = 'flex';
     ov.innerHTML =
       '<div style="max-width:330px;width:100%;background:var(--card);border:1px solid var(--border-hi);border-radius:18px;padding:26px 24px;box-shadow:0 20px 60px rgba(0,0,0,.5);text-align:center;">'+
-        '<div style="width:54px;height:54px;margin:0 auto 14px;border-radius:50%;background:var(--warn-dim);display:flex;align-items:center;justify-content:center;font-size:26px;">🕒</div>'+
+        
         '<div style="font-size:18px;font-weight:700;color:var(--text);margin-bottom:7px;letter-spacing:-0.2px;">Clock out now?</div>'+
         '<div style="font-size:13px;color:var(--text2);margin-bottom:22px;line-height:1.5;">This records your finish time for today.</div>'+
         '<div style="display:flex;gap:10px;">'+
@@ -13813,7 +13829,7 @@ function openShiftBlockedDialog(sinceTs){
     ov.style.display = 'flex';
     ov.innerHTML =
       '<div style="max-width:340px;width:100%;background:var(--card);border:1px solid var(--border-hi);border-radius:18px;padding:26px 24px;box-shadow:0 20px 60px rgba(0,0,0,.5);text-align:center;">'+
-        '<div style="width:54px;height:54px;margin:0 auto 14px;border-radius:50%;background:var(--gold-dim);display:flex;align-items:center;justify-content:center;font-size:26px;">⚠️</div>'+
+        
         '<div style="font-size:18px;font-weight:700;color:var(--text);margin-bottom:7px;letter-spacing:-0.2px;">You\'re still clocked in</div>'+
         '<div style="font-size:13px;color:var(--text2);margin-bottom:22px;line-height:1.55;">You have an open shift'+(since?(' from <b style="color:var(--text)">'+since+'</b>'):'')+' that was never clocked out. Please clock OUT first to close it before starting a new shift.</div>'+
         '<button id="osOk" style="width:100%;padding:12px;border:none;border-radius:11px;background:var(--accent);color:#fff;font-weight:700;font-size:14px;cursor:pointer;font-family:inherit;">Got it</button>'+
@@ -14449,7 +14465,7 @@ const ONBOARDING_TASKS = [
 const TOUR_STEPS = [
   {
     target: null, // welcome — centered card
-    icon: '👋', title: 'Welcome to Nexus',
+    icon: '', title: 'Welcome to Nexus',
     body: 'This quick walkthrough shows you how to use your staff portal. Follow the highlights — it takes under a minute.',
     advance: 'next'
   },
@@ -14492,13 +14508,13 @@ const TOUR_STEPS = [
   },
   {
     target: null,
-    icon: '🔐', title: 'Secure your account',
+    icon: '', title: 'Secure your account',
     body: 'In your Profile, set your security questions and date of birth. The security questions let you reset your own password if you forget it — don\'t skip this.',
     advance: 'next'
   },
   {
     target: null,
-    icon: '🎉', title: 'You\'re ready to go',
+    icon: '', title: 'You\'re ready to go',
     body: 'That\'s it! Explore each tab at your own pace. Welcome to the team.',
     advance: 'next', last: true
   }
@@ -17008,18 +17024,22 @@ async function loadHomeWeather(){
   try{
     const lat = -33.8688, lon = 151.2093; // Sydney
     const url = 'https://api.open-meteo.com/v1/forecast?latitude='+lat+'&longitude='+lon+
-                '&current=temperature_2m,weather_code&daily=temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=1';
+                '&current=temperature_2m,weather_code,is_day&daily=temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=1';
     const r = await fetch(url);
     if(!r.ok) return;
     const d = await r.json();
     const cur = d.current || {};
     const day = d.daily || {};
     const code = cur.weather_code;
+    const isDay = cur.is_day !== 0; // 1/undefined = day, 0 = night
+    // Day icons
     const map = {0:['☀️','Clear'],1:['🌤️','Mainly clear'],2:['⛅','Partly cloudy'],3:['☁️','Overcast'],
       45:['🌫️','Fog'],48:['🌫️','Fog'],51:['🌦️','Light drizzle'],53:['🌦️','Drizzle'],55:['🌦️','Drizzle'],
       61:['🌧️','Light rain'],63:['🌧️','Rain'],65:['🌧️','Heavy rain'],71:['🌨️','Snow'],73:['🌨️','Snow'],75:['🌨️','Snow'],
       80:['🌦️','Showers'],81:['🌦️','Showers'],82:['⛈️','Heavy showers'],95:['⛈️','Thunderstorm'],96:['⛈️','Thunderstorm'],99:['⛈️','Thunderstorm']};
-    const m = map[code] || ['⛅',''];
+    // Night overrides for clear/partly-cloudy codes (moon instead of sun)
+    const nightMap = {0:['🌙','Clear'],1:['🌙','Mainly clear'],2:['☁️','Partly cloudy'],3:['☁️','Overcast']};
+    const m = (!isDay && nightMap[code]) ? nightMap[code] : (map[code] || ['⛅','']);
     const temp = Math.round(cur.temperature_2m);
     const hi = day.temperature_2m_max ? Math.round(day.temperature_2m_max[0]) : null;
     const lo = day.temperature_2m_min ? Math.round(day.temperature_2m_min[0]) : null;
