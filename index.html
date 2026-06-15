@@ -6382,6 +6382,48 @@ let _quizBuilder = null;
 
 
 let docSelectedFileP=null;
+// ── PRIVATE-DRIVE RELAY ──────────────────────────────────────────────
+// Files stay private in Drive. The client can't auth to Drive, so it asks
+// the Apps Script (which owns the Drive) to hand back the bytes as base64.
+// Used by both doc-open (blob view) and quiz-gen (feed base64 to edge fn).
+function _driveIdFromUrl(url){
+  if(!url) return '';
+  // matches /file/d/<ID>/...  OR  ?id=<ID>  OR  /d/<ID>
+  const m = String(url).match(/\/file\/d\/([a-zA-Z0-9_-]+)/) ||
+            String(url).match(/[?&]id=([a-zA-Z0-9_-]+)/) ||
+            String(url).match(/\/d\/([a-zA-Z0-9_-]+)/);
+  return m ? m[1] : '';
+}
+async function fetchDriveDocBase64(driveId){
+  if(!driveId) throw new Error('No Drive id');
+  const sheetUrl = localStorage.getItem('oscars_sheet_url') || 'https://script.google.com/macros/s/AKfycby0Bq97bCZAsmnruXFuJuCqXQE_kOxhYE2KFuJnVzLXtT5CV0Y12k5176dxZbdaYVGE/exec';
+  const r = await fetch(sheetUrl, {
+    method:'POST',
+    headers:{'Content-Type':'text/plain;charset=utf-8'},
+    body: JSON.stringify({ action:'fetchDoc', id: driveId })
+  });
+  if(!r.ok) throw new Error('Drive fetch failed: '+r.status);
+  const j = await r.json();
+  if(!j.ok) throw new Error(j.error || 'Drive fetch failed');
+  return j; // {ok, name, mime, base64}
+}
+// Open a private Drive doc by streaming its bytes through Apps Script into a blob.
+async function openPrivateDoc(url, title){
+  const id = _driveIdFromUrl(url);
+  if(!id){ window.open(url,'_blank','noopener'); return; } // non-Drive url (legacy/storage) — open directly
+  try{
+    showToast && showToast('Opening '+(title||'document')+'…','info');
+    const j = await fetchDriveDocBase64(id);
+    const bytes = Uint8Array.from(atob(j.base64), c=>c.charCodeAt(0));
+    const blob = new Blob([bytes], {type: j.mime || 'application/octet-stream'});
+    const blobUrl = URL.createObjectURL(blob);
+    window.open(blobUrl,'_blank','noopener');
+    setTimeout(()=>URL.revokeObjectURL(blobUrl), 60000);
+  }catch(e){
+    showToast && showToast('Could not open: '+e.message,'error');
+  }
+}
+
 async function loadDocuments(){
   // Pre-fetch custom quizzes so renderDocs can show "Take quiz" buttons
   try{
@@ -6454,7 +6496,12 @@ function renderDocs(docs){
       quizBtn = '<span style="background:#f1f5f9;color:#94a3b8;font-size:10px;font-weight:600;padding:3px 8px;border-radius:6px;margin-right:6px;">No Quiz</span>';
     }
     const isStorageFile=url.includes('/storage/v1/object/public/');
-    const linkAttr=isStorageFile?'href="'+url+'" download':'href="'+url+'" target="_blank" rel="noopener"';
+    const isDriveFile=!!_driveIdFromUrl(url);
+    // Drive files are PRIVATE — open via authenticated relay (blob), never a raw link.
+    // Storage/legacy public files keep their direct link.
+    const linkAttr = isDriveFile
+      ? 'href="#" onclick="event.preventDefault();openPrivateDoc(\''+url.replace(/'/g,"\\'")+'\',\''+esc(d.title).replace(/'/g,"\\'")+'\')"'
+      : (isStorageFile?'href="'+url+'" download':'href="'+url+'" target="_blank" rel="noopener"');
     return'<a '+linkAttr+' class="doc-item">'+
       '<div class="doc-icon '+iconClass+'">'+iconSvg+'</div>'+
       '<div style="flex:1;min-width:0;">'+
@@ -6571,7 +6618,8 @@ async function uploadDocument(){
       throw new Error(uploadJson.error || 'Drive upload failed');
     }
     if(progressBar)progressBar.style.width='80%';
-    const fileUrl = uploadJson.url; // Drive view URL
+    const fileUrl = uploadJson.url || (uploadJson.id ? 'https://drive.google.com/file/d/'+uploadJson.id+'/view' : ''); // Drive view URL (fallback builds from id if Apps Script didn't return url)
+    if(!fileUrl) throw new Error('Drive upload returned no file id/url');
     if(progressLabel)progressLabel.textContent='Saving document info...';
     // Save metadata to documents table
     const res=await fetch(SB+'/rest/v1/documents',{
@@ -18446,6 +18494,21 @@ async function autoGenerateQuizFromDoc(docId, docTitle, docUrl){
   }
   
   try{
+    // Private Drive file: stream bytes via authenticated Apps Script relay,
+    // then send the base64 PDF to the edge function (which no longer touches Drive).
+    let pdfBase64 = '';
+    const driveId = _driveIdFromUrl(docUrl);
+    if(driveId){
+      try{
+        const j = await fetchDriveDocBase64(driveId);
+        pdfBase64 = j.base64 || '';
+      }catch(e){
+        closeQuizGenModal();
+        showToast('Could not read document from Drive: '+e.message, 'error');
+        openQuizBuilder(docId, docTitle);
+        return;
+      }
+    }
     const resp = await fetch(GENERATE_QUIZ_URL, {
       method:'POST',
       headers:{
@@ -18454,7 +18517,9 @@ async function autoGenerateQuizFromDoc(docId, docTitle, docUrl){
         'Content-Type':'application/json'
       },
       body: JSON.stringify({
-        document_url: docUrl,
+        // New private-safe path: send the PDF bytes directly.
+        pdf_base64: pdfBase64,
+        document_url: docUrl,        // kept for backward-compat / legacy storage docs
         document_title: docTitle,
         num_questions: 10,
         pass_pct: 80
