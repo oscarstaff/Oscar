@@ -1249,11 +1249,27 @@
           setValues({});
 
           const fp = pdfFingerprint(bytes);
-          loadLibrary(fp);
+          // Pull the team library and auto-apply the newest TEAM template that
+          // matches this exact PDF (by fingerprint). This is what makes field
+          // edits propagate to every staff member: whoever opens the same form
+          // gets the team's saved field setup, and saving updates that one row
+          // instead of spawning a new template each time.
+          const rows = await loadLibrary(fp);
+          const teamTpl = (rows || []).find(r => r.pdf_fingerprint === fp);
+
           let stored = null;
           try { const raw = localStorage.getItem(fp); if (raw) stored = JSON.parse(raw); } catch {}
 
-          if (stored) {
+          if (teamTpl) {
+            const { fields: applied, groups } = applyTemplate(fresh, teamTpl.data);
+            setFields(applied);
+            setGroups(groups);
+            setPendingSuggestions([]);
+            setLoadedTplId(teamTpl.id);
+            setLoadedTplName(teamTpl.name);
+            try { localStorage.setItem(fp, JSON.stringify(teamTpl.data)); } catch {}
+            showToast('Loaded ' + applied.length + ' fields · team template "' + teamTpl.name + '" applied', 'ok');
+          } else if (stored) {
             const { fields: applied, groups } = applyTemplate(fresh, stored);
             setFields(applied);
             setGroups(groups);
@@ -1426,6 +1442,7 @@
       const loadLibrary = useCallback(async (fp) => {
         const rows = await fetchTemplates(fp);
         setLibrary(rows);
+        return rows;
       }, []);
 
       const openTemplatePdf = useCallback(async (tplRow) => {
@@ -1509,6 +1526,9 @@
           }
           downloadBytes(out, outName);
           showToast('Filled PDF downloaded', 'ok');
+          // After a successful export, offer to empty the form for the next
+          // person (keeps the same PDF loaded — no re-upload needed).
+          setTimeout(() => { if (confirm('Exported! Clear the form for the next person?')) clearValues(true); }, 300);
         } catch (e) {
           console.error(e);
           showToast('Export failed: ' + e.message, 'err');
@@ -1522,6 +1542,14 @@
         setOriginalFields([]); setFields([]); setGroups([]);
         setFileName(''); setValues({}); setPendingSuggestions([]);
         setLoadedTplId(null); setLoadedTplName(null);
+      }, []);
+
+      // Empty all filled values but keep the SAME PDF + field setup loaded, so
+      // the form is fresh for the next person without re-uploading.
+      const clearValues = useCallback((silent) => {
+        if (!silent && !confirm('Clear all filled values? The form stays loaded.')) return;
+        setValues({});
+        if (!silent && typeof showToast === 'function') showToast('Form cleared', 'ok');
       }, []);
 
       const handleFieldClick = useCallback((fieldName) => {
@@ -1565,6 +1593,7 @@
                 <React.Fragment>
                   <button className="btn btn-ghost" onClick={() => setShowLibrary(s => !s)}><i className="fa-solid fa-folder-open" /> Team templates{library.length ? ' (' + library.length + ')' : ''}</button>
                   <button className="btn btn-ghost" onClick={saveTemplate}><i className="fa-solid fa-save" /> Save template</button>
+                  {mode === 'fill' && <button className="btn btn-ghost" onClick={() => clearValues(false)} title="Empty the form, keep it loaded"><i className="fa-solid fa-eraser" /> Clear</button>}
                   <button className="btn btn-ghost" onClick={onReset}><i className="fa-solid fa-file-arrow-up" /> New PDF</button>
                   <button className="btn btn-primary" onClick={onExport} disabled={busy || fields.length === 0}>
                     {busy
