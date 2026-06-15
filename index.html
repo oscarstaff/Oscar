@@ -14551,6 +14551,7 @@ function showTour(){
     window.addEventListener('scroll', _repositionTour, true);
   }
   ov.style.display = 'block';
+  ov.style.opacity = '1';
   renderTourStep();
 }
 
@@ -14582,9 +14583,20 @@ function renderTourStep(){
     // Spotlight the real element; user taps it to advance.
     nextBtn.textContent = 'Skip step';
     _spotlightOn(targetEl);
-    // Let the real element receive the tap (its own onclick runs), then advance.
+    // Let the real element receive the tap (its own onclick runs), then REVEAL
+    // the page for ~1.6s so they can see what opened, then show the next step.
     const handler = function(){
-      setTimeout(function(){ _tourStep++; if(_tourStep>=TOUR_STEPS.length){ skipTour(); } else { renderTourStep(); } }, 350);
+      const ov = document.getElementById('spotlightTour');
+      // Fade the dim away so they clearly see the page they just opened.
+      if(ov){ ov.style.opacity = '0'; }
+      setTimeout(function(){
+        if(ov) ov.style.display = 'none';
+      }, 350);
+      setTimeout(function(){
+        _tourStep++;
+        if(_tourStep >= TOUR_STEPS.length){ skipTour(); return; }
+        if(ov){ ov.style.display = 'block'; renderTourStep(); requestAnimationFrame(function(){ ov.style.opacity = '1'; }); }
+      }, 1700);
     };
     targetEl.addEventListener('click', handler, { once:true });
     _tourCleanup = function(){ targetEl.removeEventListener('click', handler); };
@@ -21400,7 +21412,7 @@ window.addEventListener('resize', function(){
 <!-- ONBOARDING TOUR -->
 <style>
 /* ── SPOTLIGHT TOUR ── */
-#spotlightTour{display:none;position:fixed;inset:0;z-index:9990;pointer-events:none;}
+#spotlightTour{display:none;position:fixed;inset:0;z-index:9990;pointer-events:none;transition:opacity .35s ease;}
 #spotMask{position:absolute;inset:0;background:rgba(15,23,42,.72);pointer-events:auto;}
 #spotRing{display:none;position:absolute;border-radius:14px;box-shadow:0 0 0 9999px rgba(15,23,42,.72), 0 0 0 3px var(--accent,#10b981);transition:left .3s ease,top .3s ease,width .3s ease,height .3s ease;pointer-events:none;animation:spotPulse 1.8s ease-in-out infinite;}
 @keyframes spotPulse{0%,100%{box-shadow:0 0 0 9999px rgba(15,23,42,.72),0 0 0 3px var(--accent,#10b981);}50%{box-shadow:0 0 0 9999px rgba(15,23,42,.72),0 0 0 7px rgba(16,185,129,.45);}}
