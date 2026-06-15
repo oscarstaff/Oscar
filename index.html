@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://jcfgldqrdbfkgbixszds.supabase.co wss://jcfgldqrdbfkgbixszds.supabase.co https://api.klipy.co https://script.google.com https://script.googleusercontent.com https://*.googleapis.com; frame-src 'self'; object-src 'none'; base-uri 'self';">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://jcfgldqrdbfkgbixszds.supabase.co wss://jcfgldqrdbfkgbixszds.supabase.co https://api.klipy.co https://script.google.com https://script.googleusercontent.com https://*.googleapis.com https://api.open-meteo.com; frame-src 'self'; object-src 'none'; base-uri 'self';">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -447,6 +447,38 @@ html[data-sb="collapsed"] .sb-user > div:nth-child(2) {
 
 
 .roster-day:last-child{border-bottom:none;}
+
+/* ── ROSTER REVAMP ── */
+.roster-segment{display:flex;gap:4px;background:#f1f5f9;border-radius:12px;padding:4px;margin-bottom:16px;}
+.roster-seg-btn{flex:1;border:none;background:transparent;color:#64748b;font-size:13.5px;font-weight:600;font-family:inherit;padding:9px 12px;border-radius:9px;cursor:pointer;transition:all .15s;}
+.roster-seg-btn.active{background:#fff;color:#0f172a;box-shadow:0 1px 3px rgba(15,23,42,.08);font-weight:700;}
+.roster-summary{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px;}
+.roster-stat{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:14px 12px;text-align:center;}
+.roster-stat-val{font-size:24px;font-weight:800;color:#0f172a;letter-spacing:-.02em;line-height:1.1;}
+.roster-stat-lbl{font-size:10.5px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;margin-top:4px;}
+.roster-card{margin-bottom:14px;}
+.roster-card-hd{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #f1f5f9;padding-bottom:12px;margin-bottom:16px;}
+.roster-card-title{font-size:14px;font-weight:700;color:#0f172a;letter-spacing:-.01em;}
+.roster-daycount{font-size:12px;font-weight:700;color:#3b82f6;background:#eff6ff;padding:3px 10px;border-radius:7px;}
+.roster-daycount:empty{display:none;}
+.roster-avail-banner{display:flex;align-items:center;gap:14px;background:linear-gradient(120deg,#f8fafc,#f1f5f9);border:1px solid #e2e8f0;border-radius:12px;padding:14px 16px;margin-bottom:14px;}
+.roster-avail-banner-icon{font-size:26px;line-height:1;flex-shrink:0;}
+.roster-avail-banner-title{font-size:14px;font-weight:700;color:#0f172a;}
+.roster-avail-banner-sub{font-size:12px;color:#64748b;margin-top:2px;}
+/* leave history rows — status pills */
+.lv-row{display:flex;align-items:flex-start;gap:12px;padding:13px 0;border-bottom:1px solid #f8fafc;}
+.lv-row:last-child{border-bottom:none;}
+.lv-bar{width:3px;align-self:stretch;border-radius:2px;flex-shrink:0;}
+.lv-body{flex:1;min-width:0;}
+.lv-dates{font-size:13.5px;font-weight:700;color:#0f172a;}
+.lv-meta{font-size:11.5px;color:#64748b;margin-top:2px;}
+.lv-reason{font-size:12px;color:#475569;margin-top:5px;line-height:1.4;}
+.lv-note{font-size:11.5px;color:#92400e;background:#fffbeb;border:1px solid #fef3c7;border-radius:7px;padding:7px 9px;margin-top:7px;line-height:1.4;}
+.lv-pill{font-size:11px;font-weight:700;padding:3px 11px;border-radius:20px;flex-shrink:0;white-space:nowrap;}
+.lv-pill.pending{background:#fef3c7;color:#92400e;}
+.lv-pill.approved{background:#dcfce7;color:#166534;}
+.lv-pill.declined{background:#fee2e2;color:#991b1b;}
+
 
 
 
@@ -4858,6 +4890,37 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
       <!-- Stats -->
       <div class="stats-row" id="homeStats"></div>
 
+      <!-- Weather strip (shift planning) -->
+      <div id="homeWeatherCard" style="display:none;margin-bottom:12px;background:linear-gradient(120deg,#eff6ff,#f0f9ff);border:1px solid #e0f2fe;border-radius:12px;padding:12px 16px;align-items:center;gap:14px;">
+        <div id="homeWeatherIcon" style="font-size:30px;line-height:1;flex-shrink:0;">⛅</div>
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;align-items:baseline;gap:8px;">
+            <span id="homeWeatherTemp" style="font-size:22px;font-weight:800;color:#0f172a;letter-spacing:-.02em;">—°</span>
+            <span id="homeWeatherDesc" style="font-size:12.5px;font-weight:600;color:#475569;text-transform:capitalize;"></span>
+          </div>
+          <div id="homeWeatherMeta" style="font-size:11px;color:#64748b;margin-top:1px;"></div>
+        </div>
+        <div id="homeWeatherHi" style="font-size:11px;font-weight:700;color:#94a3b8;text-align:right;flex-shrink:0;"></div>
+      </div>
+
+      <!-- My tasks due -->
+      <div class="card" id="homeTasksCard" style="margin-bottom:12px;display:none;">
+        <div class="card-hd" style="border-bottom:1px solid #f1f5f9;padding-bottom:10px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;">
+          <div class="card-title">Tasks due</div>
+          <button onclick="goTo('tasks')" style="background:none;border:none;color:#3b82f6;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">View all →</button>
+        </div>
+        <div id="homeTasksList"></div>
+      </div>
+
+      <!-- Upcoming events (calendar preview) -->
+      <div class="card" id="homeCalCard" style="margin-bottom:12px;">
+        <div class="card-hd" style="border-bottom:1px solid #f1f5f9;padding-bottom:10px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;">
+          <div class="card-title">Upcoming events</div>
+          <button onclick="goTo('calendar')" style="background:none;border:none;color:#3b82f6;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">Calendar →</button>
+        </div>
+        <div id="homeCalList"><div style="padding:18px;text-align:center;color:#94a3b8;font-size:12px;">Loading...</div></div>
+      </div>
+
       <!-- Onboarding card — compact strip style -->
       <div id="homeOnboardingCard" style="display:none;cursor:pointer;margin-bottom:12px;background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:10px 14px;display:none;align-items:center;gap:12px;transition:border-color .15s,background .15s;" onclick="openOnboardingPanel()" onmouseover="this.style.borderColor='#cbd5e1';this.style.background='#fafbfc'" onmouseout="this.style.borderColor='#e2e8f0';this.style.background='#fff'">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
@@ -5093,27 +5156,46 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
         <div class="page-title">Roster</div>
       </div>
 
-      <!-- Sub-tabs -->
-      <div class="tab-bar">
-        <button class="sched-tab active" id="stab-leave" onclick="showSchedTab('leave')">Leave</button>
-        <button class="sched-tab" id="stab-availability" onclick="showSchedTab('availability')">Availability</button>
+      <!-- Sub-tabs (segmented control) -->
+      <div class="roster-segment">
+        <button class="roster-seg-btn active" id="stab-leave" onclick="showSchedTab('leave')">Leave</button>
+        <button class="roster-seg-btn" id="stab-availability" onclick="showSchedTab('availability')">Availability</button>
       </div>
 
       <!-- LEAVE sub-section -->
       <div id="ssec-leave">
-<!-- Admin leave approval moved to ShiftOps only -->
-        <div class="card">
-          <div class="card-title" style="margin-bottom:18px">New Request</div>
+        <!-- Summary strip -->
+        <div class="roster-summary" id="leaveSummary">
+          <div class="roster-stat">
+            <div class="roster-stat-val" id="leaveStatDays">–</div>
+            <div class="roster-stat-lbl">Days this year</div>
+          </div>
+          <div class="roster-stat">
+            <div class="roster-stat-val" id="leaveStatPending" style="color:#f59e0b;">–</div>
+            <div class="roster-stat-lbl">Pending</div>
+          </div>
+          <div class="roster-stat">
+            <div class="roster-stat-val" id="leaveStatNext" style="font-size:14px;">–</div>
+            <div class="roster-stat-lbl">Next approved</div>
+          </div>
+        </div>
+
+        <!-- Request form -->
+        <div class="card roster-card">
+          <div class="roster-card-hd">
+            <div class="roster-card-title">Request leave</div>
+            <div class="roster-daycount" id="leaveDayCount"></div>
+          </div>
           <div class="alert alert-err" id="leaveErr"></div>
           <div class="alert alert-ok" id="leaveOk"></div>
           <div class="form-grid-2">
             <div class="field">
               <label class="field-label">From <span class="req">*</span></label>
-              <input class="f-input" type="date" id="leaveFrom">
+              <input class="f-input" type="date" id="leaveFrom" onchange="updateLeaveDayCount()">
             </div>
             <div class="field">
               <label class="field-label">To <span class="req">*</span></label>
-              <input class="f-input" type="date" id="leaveTo">
+              <input class="f-input" type="date" id="leaveTo" onchange="updateLeaveDayCount()">
             </div>
           </div>
           <div class="field">
@@ -5122,8 +5204,10 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
           </div>
           <button class="btn btn-green btn-block" id="leaveBtn" onclick="submitLeave()">Submit Leave Request</button>
         </div>
-        <div class="card">
-          <div class="card-title" style="margin-bottom:16px">My Leave History</div>
+
+        <!-- History -->
+        <div class="card roster-card">
+          <div class="roster-card-hd"><div class="roster-card-title">My leave history</div></div>
           <div id="leaveHistory"></div>
         </div>
       </div>
@@ -5131,23 +5215,34 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
       <!-- AVAILABILITY sub-section -->
       <div id="ssec-availability" style="display:none;">
         <div class="lock-notice" id="availLock" style="display:none"></div>
+
+        <!-- Status banner -->
+        <div class="roster-avail-banner" id="availStatusBanner" style="display:none;">
+          <div class="roster-avail-banner-icon" id="availBannerIcon">📅</div>
+          <div style="flex:1;min-width:0;">
+            <div class="roster-avail-banner-title" id="availBannerTitle">Availability</div>
+            <div class="roster-avail-banner-sub" id="availBannerSub"></div>
+          </div>
+        </div>
+
         <div id="availSuccess" style="display:none">
-          <div class="card" style="text-align:center;padding:28px 20px;">
+          <div class="card roster-card" style="text-align:center;padding:28px 20px;">
             <div style="width:44px;height:44px;border-radius:50%;background:#dcfce7;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;color:#16a34a;margin:0 auto 12px;">&#10003;</div>
-            <div style="font-size:16px;font-weight:700;color:#0f172a;margin-bottom:6px;">Availability Saved</div>
+            <div style="font-size:16px;font-weight:700;color:#0f172a;margin-bottom:6px;">Availability saved</div>
             <div style="font-size:13px;color:#64748b;margin-bottom:8px;line-height:1.6;" id="availSavedPeriod"></div>
-            <button onclick="showAvailForm()" class="btn btn-outline" style="padding:9px 20px;font-size:13px;margin-top:10px;">Edit Availability</button>
+            <button onclick="showAvailForm()" class="btn btn-outline" style="padding:9px 20px;font-size:13px;margin-top:10px;">Edit availability</button>
           </div>
           <div id="availSuccessSummary"></div>
         </div>
+
         <div id="availFormArea">
-          <div class="card" style="margin-bottom:12px">
-            <div class="card-title" style="margin-bottom:12px">Period</div>
-            <div style="display:flex;gap:8px;margin-bottom:12px;">
-              <button id="period-ongoing" onclick="setPeriod('ongoing')" class="ao yes" style="flex:1;padding:9px;font-size:13px;">Ongoing</button>
-              <button id="period-range" onclick="setPeriod('range')" class="ao" style="flex:1;padding:9px;font-size:13px;">Date Range</button>
+          <div class="card roster-card" style="margin-bottom:12px">
+            <div class="roster-card-hd"><div class="roster-card-title">Period</div></div>
+            <div style="display:flex;gap:8px;margin-bottom:4px;">
+              <button id="period-ongoing" onclick="setPeriod('ongoing')" class="ao yes" style="flex:1;padding:11px;font-size:13px;">Ongoing</button>
+              <button id="period-range" onclick="setPeriod('range')" class="ao" style="flex:1;padding:11px;font-size:13px;">Date range</button>
             </div>
-            <div id="dateRangeFields" style="display:none;gap:10px;grid-template-columns:1fr 1fr;">
+            <div id="dateRangeFields" style="display:none;gap:10px;grid-template-columns:1fr 1fr;margin-top:10px;">
               <div>
                 <div style="font-size:11px;font-weight:600;color:#94a3b8;margin-bottom:5px;text-transform:uppercase;">From</div>
                 <input type="date" id="availFrom" class="f-input">
@@ -5158,22 +5253,23 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
               </div>
             </div>
           </div>
-          <div class="card">
-            <div class="card-title" style="margin-bottom:16px">Weekly Schedule</div>
+          <div class="card roster-card">
+            <div class="roster-card-hd"><div class="roster-card-title">Weekly schedule</div></div>
             <div id="availForm"></div>
           </div>
           <div class="alert alert-err" id="availErr"></div>
           <div id="availBtnArea">
-            <button class="btn btn-green btn-block" id="availBtn" onclick="submitAvail()">Save Availability</button>
+            <button class="btn btn-green btn-block" id="availBtn" onclick="submitAvail()">Save availability</button>
           </div>
         </div>
         <!-- Admin: all staff availability grid -->
         <div id="adminAvailSection" style="display:none;margin-top:20px;">
-          <div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;">All Staff Availability</div>
+          <div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;">All staff availability</div>
           <div id="adminContent"><div style="color:#94a3b8;text-align:center;padding:24px;font-size:13px;">Loading...</div></div>
         </div>
       </div>
     </div>
+
 
         <!-- DOCUMENTS -->
     <div class="page" id="page-documents">
@@ -7911,7 +8007,7 @@ async function enterHub(){
   document.getElementById("leaveTo").value=today;
   buildAvailForm();
   showSchedTab('leave'); // default schedule sub-tab
-  startBackgroundLocation();Promise.all([loadHomeData(),loadNotifications(),loadLeaveHistory(),refreshAnnBadge(),loadHomeDiscPreview(),maybeShowOnboarding(),checkFeedbackInvites(),checkNewNotifications(),loadAnnReads(),loadClockState(),loadAllClockLogs(),refreshHomeOnboardingCard()]).then(function(){
+  startBackgroundLocation();Promise.all([loadHomeData(),loadNotifications(),loadLeaveHistory(),refreshAnnBadge(),loadHomeDiscPreview(),loadHomeWeather(),loadHomeCalendar(),maybeShowOnboarding(),checkFeedbackInvites(),checkNewNotifications(),loadAnnReads(),loadClockState(),loadAllClockLogs()]).then(function(){
     setTimeout(function(){
       maybeShowTour();
     }, 300);
@@ -7922,7 +8018,7 @@ async function enterHub(){
   setTimeout(startActivityPolling, 4000);
   setInterval(loadSharedTasksFromOthers, 45000); // poll for tasks shared to me
   setInterval(loadMySharedOutStatus, 45000); // poll completion of tasks I shared out
-  await loadTasks();updateTaskBadge();scheduleTaskReminders();
+  await loadTasks();updateTaskBadge();scheduleTaskReminders();if(typeof renderHomeTasks==='function')renderHomeTasks();
   loadSharedTasksFromOthers(true); loadMySharedOutStatus();
   startAutoRefresh();
   initRealtime();
@@ -8112,12 +8208,11 @@ function goTo(p){
   // Nodes — load app access gating
   if(p === 'hub'){ setTimeout(loadHubAccess, 50); }
   if(p === 'kudos'){ setTimeout(loadKudos, 50); }
-  // Track onboarding visits
+  // Track page visits (kept for analytics; onboarding card removed)
   const myName = window.me || (typeof me !== 'undefined' && me) || null;
   if(myName){
     if(p === 'engagement') localStorage.setItem('nexus_visited_engagement_'+myName,'1');
     if(p === 'myreports' || p === 'reports') localStorage.setItem('nexus_visited_reports_'+myName,'1');
-    setTimeout(function(){ if(typeof refreshHomeOnboardingCard === 'function') refreshHomeOnboardingCard(); }, 300);
   }
   setActiveNavChild(p);
   if(typeof _setBottomNavActive==='function') _setBottomNavActive(p);
@@ -8137,7 +8232,7 @@ function goTo(p){
   }
   if(p==="schedule"){showSchedTab("leave");}
   if(p==="profile")loadProfilePage();
-  if(p==="home"){loadHomeData();loadClockState();refreshHomeOnboardingCard();}
+  if(p==="home"){loadHomeData();loadClockState();loadHomeWeather();loadHomeCalendar();renderHomeTasks();}
   if(p==="notifs"){renderNotifsPage();}
   
   if(p==="training"){renderMyTraining();}
@@ -8331,6 +8426,15 @@ function showAvailSuccess(row){
   }
   const periodEl=document.getElementById("availSavedPeriod");
   if(periodEl)periodEl.textContent=period;
+  // Status banner
+  const banner=document.getElementById("availStatusBanner");
+  if(banner){
+    const availDays=Object.values(avail).filter(function(a){return a&&a.type!=="no"&&a.type!=="unset";}).length;
+    document.getElementById("availBannerIcon").textContent="✅";
+    document.getElementById("availBannerTitle").textContent="Availability set";
+    document.getElementById("availBannerSub").textContent=availDays+" day"+(availDays!==1?"s":"")+" available · "+period.toLowerCase();
+    banner.style.display="flex";
+  }
   // Day summary
   const days=["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
   let html='<div class="card"><div class="card-title" style="margin-bottom:14px">Your Availability</div>';
@@ -8350,6 +8454,13 @@ function showAvailSuccess(row){
 function showAvailForm(){
   document.getElementById("availSuccess").style.display="none";
   document.getElementById("availFormArea").style.display="block";
+  const banner=document.getElementById("availStatusBanner");
+  if(banner){
+    document.getElementById("availBannerIcon").textContent="📝";
+    document.getElementById("availBannerTitle").textContent="Set your availability";
+    document.getElementById("availBannerSub").textContent="Pick the days and hours you can work so your manager can plan the roster.";
+    banner.style.display="flex";
+  }
 }
 
 async function submitAvail(){
@@ -8384,7 +8495,7 @@ async function submitAvail(){
     }
     if(res.ok||res.status===201||res.status===204){
       showAvailSuccess({availability:avail,is_ongoing:isOngoing,valid_from:validFrom,valid_until:validUntil});
-      loadHomeData();loadOnboardingChecklist();
+      loadHomeData();
     }else throw new Error("Server error "+res.status);
   }catch(e){err.textContent="Failed to save. Please check your connection.";err.classList.add("show");}
   finally{btn.disabled=false;btn.textContent="Save Availability";}
@@ -10041,6 +10152,12 @@ function renderBdayCalendar(){
 
 // ── ONBOARDING CHECKLIST ──
 async function loadOnboardingChecklist(){
+  // Replaced by the step-by-step usage tour — kept as a no-op for legacy callers.
+  const card=document.getElementById('onboardCard');
+  if(card)card.style.display='none';
+  return;
+}
+async function _legacy_loadOnboardingChecklist(){
   const el=document.getElementById('onboardChecklist');
   if(!el)return;
   try{
@@ -11021,24 +11138,23 @@ async function loadHomeAnnPreview(){
   }catch(e){console.warn(e);el.innerHTML='<div style="color:#94a3b8;font-size:13px;">No announcements yet.</div>';}
 }
 
-// Show onboarding card only if not fully onboarded
+// Enforce the SQ/DOB lock for new staff, then show the usage tour.
 async function maybeShowOnboarding(){
-  // Skip if already confirmed done this session
-  if(sessionStorage.getItem('onboard_checked_'+me)==='done'){renderTimesheetPreview();return;}
+  if(sessionStorage.getItem('onboard_checked_'+me)==='done'){renderTimesheetPreview();maybeShowTour();return;}
   try{
     const creds=await sbGet('staff_credentials','?staff_name=eq.'+encodeURIComponent(me)+'&select=password_hash,sq1_question,birthday');
-    const avail=await sbGet('staff_availability','?staff_name=eq.'+encodeURIComponent(me)+'&limit=1');
     const c=creds.length?creds[0]:{};
     const hasSQ=!!c.sq1_question;
     const hasDOB=!!c.birthday;
-    const hasAvail=avail.length>0;
-    const allDone=hasSQ&&hasDOB&&hasAvail;
+    // Hide the old checklist card (replaced by the usage tour)
     const card=document.getElementById('onboardCard');
-    if(card){card.style.display=allDone?'none':'block';}
-    if(!allDone){
-      loadOnboardingChecklist();
-      // Show lock overlay if critical items missing
-      if(!hasSQ||!hasDOB){showOnboardLock(hasSQ,hasDOB,hasAvail);}
+    if(card)card.style.display='none';
+    // Critical items still LOCKED before portal use
+    if(!hasSQ||!hasDOB){
+      showOnboardLock(hasSQ,hasDOB,false);
+    } else {
+      // Lock cleared — show the step-by-step usage tour (once)
+      maybeShowTour();
     }
     renderTimesheetPreview();
   }catch(e){renderTimesheetPreview();}
@@ -14327,10 +14443,64 @@ const ONBOARDING_TASKS = [
 ];
 
 const TOUR_STEPS = [
-  {emoji:'WELCOME', title:'Welcome to Nexus', body:'Your team\'s digital workspace. Let me show you around in 30 seconds.'},
-  {emoji:'BASICS', title:'Clock in & out', body:'Tap the green button on Home to start your shift. GPS-locked to the office.'},
-  {emoji:'CONNECT', title:'Stay connected', body:'Discussions for team chat. Calendar for events. Tasks for personal reminders.'},
-  {emoji:'TRACK', title:'Track your hours', body:'My Reports shows fortnightly hours, breaks, and coffee allowances.'}
+  {
+    icon:'👋', kicker:'Welcome',
+    title:'Welcome to Nexus',
+    body:'This is your team workspace — clock in, request leave, see your hours, chat with the team, and complete training. This quick walkthrough shows you the essentials. Takes about a minute.'
+  },
+  {
+    icon:'⏱️', kicker:'Step 1',
+    title:'Clock in and out',
+    body:'On the Home tab, tap the green Clock In button when you start your shift, and Clock Out when you finish. It records your time automatically. If you forget to clock out, the system closes it at 8pm.',
+    cta:'Show me Home', page:'home'
+  },
+  {
+    icon:'📅', kicker:'Step 2',
+    title:'Set your availability',
+    body:'Go to Roster → Availability and tell us which days and hours you can work. Your manager uses this to build the roster, so keep it up to date.',
+    cta:'Open Roster', page:'availability'
+  },
+  {
+    icon:'🌴', kicker:'Step 3',
+    title:'Request time off',
+    body:'Need a day off? Roster → Leave. Pick your dates, add a reason, and submit. You\'ll see the status (Pending, Approved, Declined) in your leave history.',
+    cta:'Open Leave', page:'leave'
+  },
+  {
+    icon:'✅', kicker:'Step 4',
+    title:'Tasks and calendar',
+    body:'The Tasks tab holds your personal reminders — they chime in your notifications. The Calendar shows team events and birthdays. Due tasks also appear on your Home screen.',
+    cta:'Open Tasks', page:'tasks'
+  },
+  {
+    icon:'📄', kicker:'Step 5',
+    title:'Documents and training',
+    body:'Find policies and guides under Documents. Some come with a short quiz under My Training — complete these to confirm you\'ve read them.',
+    cta:'Open Documents', page:'documents'
+  },
+  {
+    icon:'💬', kicker:'Step 6',
+    title:'Stay connected',
+    body:'The Engagement tab is where the team chats, shares announcements, and gives kudos. Check in regularly so you don\'t miss anything.',
+    cta:'Open Engagement', page:'engagement'
+  },
+  {
+    icon:'📊', kicker:'Step 7',
+    title:'Track your hours',
+    body:'My Reports shows your fortnightly hours, breaks, and coffee allowances. Check it any time to see what you\'ve worked.',
+    cta:'Open Reports', page:'myreports'
+  },
+  {
+    icon:'🔐', kicker:'Step 8',
+    title:'Secure your account',
+    body:'In Profile, set your security questions and date of birth. The security questions let you reset your own password if you ever forget it — don\'t skip this.',
+    cta:'Open Profile', action:"goTo('profile');setTimeout(function(){if(typeof showProfileSection==='function')showProfileSection('account');},400)"
+  },
+  {
+    icon:'🎉', kicker:'All done',
+    title:'You\'re ready to go',
+    body:'That\'s the tour. You can always explore each tab at your own pace. Welcome to the team!'
+  }
 ];
 let _tourStep = 0;
 
@@ -14343,14 +14513,46 @@ function showTour(){
 function renderTourStep(){
   const step = TOUR_STEPS[_tourStep];
   if(!step) return;
-  document.getElementById('tourEmoji').textContent = step.emoji; document.getElementById('tourEmoji').style.fontSize="11px"; document.getElementById('tourEmoji').style.fontWeight="700"; document.getElementById('tourEmoji').style.letterSpacing=".15em"; document.getElementById('tourEmoji').style.color="var(--accent)"; document.getElementById('tourEmoji').style.textTransform="uppercase";
+  const total = TOUR_STEPS.length;
+  document.getElementById('tourEmoji').textContent = step.icon || '';
+  document.getElementById('tourKicker').textContent = step.kicker || '';
   document.getElementById('tourTitle').textContent = step.title;
   document.getElementById('tourBody').textContent = step.body;
-  // Update dots
-  const dots = document.querySelectorAll('.tour-dot');
-  dots.forEach(function(d,i){ d.classList.toggle('active', i===_tourStep); });
-  // Update next button text
-  document.getElementById('tourNext').textContent = (_tourStep === TOUR_STEPS.length-1) ? 'Get started' : 'Next';
+  document.getElementById('tourStepNum').textContent = (_tourStep+1) + ' / ' + total;
+  // Build dots dynamically
+  const dotsWrap = document.getElementById('tourDots');
+  if(dotsWrap){
+    dotsWrap.innerHTML = TOUR_STEPS.map(function(_,i){
+      return '<span class="tour-dot'+(i===_tourStep?' active':'')+'"></span>';
+    }).join('');
+  }
+  // "Go there" button — only when the step has a page/action
+  const goBtn = document.getElementById('tourGo');
+  if(goBtn){
+    if(step.cta && (step.page || step.action)){
+      goBtn.textContent = step.cta;
+      goBtn.style.display = 'block';
+    } else {
+      goBtn.style.display = 'none';
+    }
+  }
+  document.getElementById('tourNext').textContent = (_tourStep === total-1) ? 'Finish' : 'Next';
+  document.getElementById('tourBack').style.visibility = _tourStep === 0 ? 'hidden' : 'visible';
+}
+
+function tourGoToPage(){
+  const step = TOUR_STEPS[_tourStep];
+  if(!step) return;
+  // Let them peek at the page, but keep the tour open so they can continue.
+  if(step.action){
+    try{ eval(step.action); }catch(e){}
+  } else if(step.page){
+    if(typeof goTo === 'function') goTo(step.page);
+  }
+}
+
+function prevTourStep(){
+  if(_tourStep > 0){ _tourStep--; renderTourStep(); }
 }
 
 function nextTourStep(){
@@ -14369,18 +14571,20 @@ function skipTour(){
 
 async function maybeShowTour(){
   if(!me) return;
-  // DISABLED — replaced by interactive onboarding checklist
-  return;
   if(localStorage.getItem('nexus_tour_done_'+me) === '1') return;
   // Cross-device check via supabase
   try{
     const rows = await sbGet('staff_settings','?name=eq.'+encodeURIComponent(me)+'&select=nexus_tour_done');
     if(rows && rows.length && rows[0].nexus_tour_done === true){
-      // Mark local too, so we never re-query
       localStorage.setItem('nexus_tour_done_'+me,'1');
       return;
     }
   }catch(e){ /* ignore */ }
+  // Don't show the tour while the SQ/DOB lock overlay is up — let them finish that first.
+  const lock = document.getElementById('onboardLockOverlay');
+  if(lock && lock.style.display !== 'none' && lock.style.display !== ''){
+    return;
+  }
   setTimeout(showTour, 800);
 }
 
@@ -14592,9 +14796,12 @@ function dismissOnboardingCard(){
 }
 
 async function refreshHomeOnboardingCard(){
-  if(!me) return;
+  // Replaced by the step-by-step usage tour — keep the strip hidden.
   const card = document.getElementById('homeOnboardingCard');
-  if(!card) return;
+  if(card) card.style.display = 'none';
+  return;
+}
+async function _legacy_refreshHomeOnboardingCard(){
   // Local fast-path: if either flag is set locally, hide instantly without DB hit
   if(localStorage.getItem('nexus_onboarding_done_'+me) === '1'){
     card.style.display = 'none';
@@ -16508,6 +16715,8 @@ async function recheckOnboarding(){
     if(c.sq1_question&&c.birthday){
       dismissOnboardLock();
       sessionStorage.setItem('onboard_checked_'+me,'done');
+      // Lock cleared — now run the usage tour
+      if(typeof maybeShowTour==='function') maybeShowTour();
     } else {
       showOnboardLock(!!c.sq1_question,!!c.birthday,true);
     }
@@ -16694,6 +16903,112 @@ function filterWhosWorking(){
   renderWhosWorking(filtered);
 }
 
+// ── HOME WIDGETS ─────────────────────────────────────────────────────
+// Weather strip — uses Open-Meteo (no key needed). Sydney coords fallback.
+async function loadHomeWeather(){
+  const card = document.getElementById('homeWeatherCard');
+  if(!card) return;
+  try{
+    const lat = -33.8688, lon = 151.2093; // Sydney
+    const url = 'https://api.open-meteo.com/v1/forecast?latitude='+lat+'&longitude='+lon+
+                '&current=temperature_2m,weather_code&daily=temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=1';
+    const r = await fetch(url);
+    if(!r.ok) return;
+    const d = await r.json();
+    const cur = d.current || {};
+    const day = d.daily || {};
+    const code = cur.weather_code;
+    const map = {0:['☀️','Clear'],1:['🌤️','Mainly clear'],2:['⛅','Partly cloudy'],3:['☁️','Overcast'],
+      45:['🌫️','Fog'],48:['🌫️','Fog'],51:['🌦️','Light drizzle'],53:['🌦️','Drizzle'],55:['🌦️','Drizzle'],
+      61:['🌧️','Light rain'],63:['🌧️','Rain'],65:['🌧️','Heavy rain'],71:['🌨️','Snow'],73:['🌨️','Snow'],75:['🌨️','Snow'],
+      80:['🌦️','Showers'],81:['🌦️','Showers'],82:['⛈️','Heavy showers'],95:['⛈️','Thunderstorm'],96:['⛈️','Thunderstorm'],99:['⛈️','Thunderstorm']};
+    const m = map[code] || ['⛅',''];
+    const temp = Math.round(cur.temperature_2m);
+    const hi = day.temperature_2m_max ? Math.round(day.temperature_2m_max[0]) : null;
+    const lo = day.temperature_2m_min ? Math.round(day.temperature_2m_min[0]) : null;
+    document.getElementById('homeWeatherIcon').textContent = m[0];
+    document.getElementById('homeWeatherTemp').textContent = temp+'°';
+    document.getElementById('homeWeatherDesc').textContent = m[1];
+    document.getElementById('homeWeatherMeta').textContent = 'Sydney · now';
+    document.getElementById('homeWeatherHi').innerHTML = (hi!=null?('H '+hi+'°'):'')+(lo!=null?('<br>L '+lo+'°'):'');
+    card.style.display = 'flex';
+  }catch(e){ /* silent — weather is non-critical */ }
+}
+
+// My tasks due — next 3 incomplete tasks, soonest first. Tick to complete.
+function renderHomeTasks(){
+  const card = document.getElementById('homeTasksCard');
+  const list = document.getElementById('homeTasksList');
+  if(!card || !list) return;
+  const tasks = (typeof _tasks !== 'undefined' && Array.isArray(_tasks)) ? _tasks : [];
+  const pending = tasks.filter(function(t){ return t && !t.done; });
+  // Sort by due date+time ascending; undated go last
+  pending.sort(function(a,b){
+    const da = a.dueDate ? (a.dueDate+'T'+(a.dueTime||'23:59')) : '9999';
+    const db = b.dueDate ? (b.dueDate+'T'+(b.dueTime||'23:59')) : '9999';
+    return da < db ? -1 : da > db ? 1 : 0;
+  });
+  const show = pending.slice(0,3);
+  if(!show.length){ card.style.display = 'none'; return; }
+  const today = new Date(); today.setHours(0,0,0,0);
+  list.innerHTML = show.map(function(t){
+    let due = '', dueColor = '#94a3b8';
+    if(t.dueDate){
+      const dd = new Date(t.dueDate+'T00:00:00');
+      const diff = Math.round((dd - today)/86400000);
+      if(diff < 0){ due = 'Overdue'; dueColor = '#dc2626'; }
+      else if(diff === 0){ due = 'Today'+(t.dueTime?' · '+t.dueTime:''); dueColor = '#f59e0b'; }
+      else if(diff === 1){ due = 'Tomorrow'+(t.dueTime?' · '+t.dueTime:''); dueColor = '#3b82f6'; }
+      else { due = dd.toLocaleDateString(undefined,{weekday:'short',day:'numeric',month:'short'}); }
+    }
+    const fromChip = t.sharedFrom ? '<span style="font-size:10px;font-weight:600;color:#7c3aed;background:rgba(139,92,246,.1);padding:1px 6px;border-radius:5px;margin-left:6px;">From '+esc(t.sharedFrom)+'</span>' : '';
+    return '<div style="display:flex;align-items:center;gap:11px;padding:9px 2px;border-bottom:1px solid #f8fafc;">'+
+      '<button onclick="toggleTaskDone(\''+t.id+'\');setTimeout(renderHomeTasks,30)" style="width:20px;height:20px;border-radius:50%;border:2px solid #cbd5e1;background:#fff;cursor:pointer;flex-shrink:0;padding:0;" title="Mark complete"></button>'+
+      '<div style="flex:1;min-width:0;">'+
+        '<div style="font-size:13.5px;font-weight:600;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+esc(t.title||'Untitled')+fromChip+'</div>'+
+        (due?'<div style="font-size:11px;font-weight:600;color:'+dueColor+';margin-top:1px;">'+due+'</div>':'')+
+      '</div>'+
+    '</div>';
+  }).join('');
+  card.style.display = 'block';
+}
+
+// Upcoming events — next events from calendar_events, today onward.
+async function loadHomeCalendar(){
+  const list = document.getElementById('homeCalList');
+  if(!list) return;
+  try{
+    const todayStr = new Date().toISOString().slice(0,10);
+    const rows = await sbGet('calendar_events','?event_date=gte.'+todayStr+'&order=event_date.asc&limit=4');
+    if(!rows.length){
+      list.innerHTML = '<div style="padding:20px;text-align:center;color:#94a3b8;font-size:12px;">No upcoming events.</div>';
+      return;
+    }
+    const today = new Date(); today.setHours(0,0,0,0);
+    list.innerHTML = rows.map(function(ev){
+      const dd = new Date(ev.event_date+'T00:00:00');
+      const diff = Math.round((dd - today)/86400000);
+      const when = diff===0?'Today':diff===1?'Tomorrow':dd.toLocaleDateString(undefined,{weekday:'short',day:'numeric',month:'short'});
+      const dayNum = dd.getDate();
+      const monShort = dd.toLocaleDateString(undefined,{month:'short'});
+      const accent = diff===0?'#f59e0b':diff===1?'#3b82f6':'#64748b';
+      return '<div style="display:flex;align-items:center;gap:12px;padding:9px 2px;border-bottom:1px solid #f8fafc;">'+
+        '<div style="width:42px;height:42px;border-radius:10px;background:#f8fafc;border:1px solid #f1f5f9;display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0;">'+
+          '<div style="font-size:15px;font-weight:800;color:'+accent+';line-height:1;">'+dayNum+'</div>'+
+          '<div style="font-size:9px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.04em;">'+monShort+'</div>'+
+        '</div>'+
+        '<div style="flex:1;min-width:0;">'+
+          '<div style="font-size:13.5px;font-weight:600;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+esc(ev.title||'')+'</div>'+
+          '<div style="font-size:11px;font-weight:600;color:'+accent+';margin-top:1px;">'+when+'</div>'+
+          (ev.description?'<div style="font-size:11px;color:#94a3b8;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+esc(ev.description)+'</div>':'')+
+        '</div>'+
+      '</div>';
+    }).join('');
+  }catch(e){
+    list.innerHTML = '<div style="padding:18px;text-align:center;color:#94a3b8;font-size:12px;">Could not load events.</div>';
+  }
+}
+
 async function loadHomeData(){
   const statsEl=document.getElementById("homeStats"),sumEl=document.getElementById("homeAvailSummary");if(!statsEl)return;
   try{
@@ -16753,22 +17068,68 @@ async function loadLeaveHistory(){
   const el=document.getElementById("leaveHistory");
   try{
     const rows=await sbGet("leave_submissions","?staff_name=eq."+encodeURIComponent(me)+"&order=submitted_at.desc");
+    // ── Summary strip ──
+    updateLeaveSummary(rows);
     if(!rows.length){el.innerHTML='<div style="text-align:center;padding:32px 20px;"><svg width="36" height="36" viewBox="0 0 20 20" fill="#e2e8f0" style="margin:0 auto 10px;display:block;"><path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd"/></svg><div style="font-size:13px;font-weight:600;color:#475569;margin-bottom:6px;">No leave requests yet</div><div style="font-size:12px;color:#94a3b8;">Submit a request using the form above.</div></div>';return;}
     el.innerHTML=rows.map(r=>{
       const days=Math.round((new Date(r.to_date)-new Date(r.from_date))/(864e5))+1;
-      const sc={pending:"st-pending",approved:"st-approved",declined:"st-declined"}[r.status]||"st-pending";
-      const sl={pending:"Pending",approved:"Approved",declined:"Declined"}[r.status];
-      return '<div class="leave-item">'+
-        '<div class="leave-item-top">'+
-          '<div><div class="leave-dates">'+fmtF(r.from_date)+' \u2014 '+fmtF(r.to_date)+'</div>'+
-          '<div class="leave-duration">'+days+' day'+(days!==1?'s':'')+'</div></div>'+
-          '<div class="status-tag '+sc+'">'+sl+'</div>'+
+      const st=(r.status||'pending');
+      const sl={pending:"Pending",approved:"Approved",declined:"Declined"}[st]||"Pending";
+      const barColor={pending:"#f59e0b",approved:"#22c55e",declined:"#ef4444"}[st]||"#f59e0b";
+      const submitted=r.submitted_at?new Date(r.submitted_at).toLocaleDateString(undefined,{day:'numeric',month:'short',year:'numeric'}):'';
+      return '<div class="lv-row">'+
+        '<div class="lv-bar" style="background:'+barColor+';"></div>'+
+        '<div class="lv-body">'+
+          '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">'+
+            '<div><div class="lv-dates">'+fmtF(r.from_date)+' \u2013 '+fmtF(r.to_date)+'</div>'+
+            '<div class="lv-meta">'+days+' day'+(days!==1?'s':'')+(submitted?' · requested '+submitted:'')+'</div></div>'+
+            '<div class="lv-pill '+st+'">'+sl+'</div>'+
+          '</div>'+
+          (r.reason?'<div class="lv-reason">'+esc(r.reason)+'</div>':'')+
+          (st==="declined"&&r.decline_reason?'<div class="lv-note"><strong>Manager note:</strong> '+esc(r.decline_reason)+'</div>':'')+
         '</div>'+
-        (r.reason?'<div class="leave-reason-txt">'+esc(r.reason)+'</div>':'')+
-        (r.status==="declined"&&r.decline_reason?'<div class="manager-note"><strong>Manager note:</strong> '+esc(r.decline_reason)+'</div>':'')+
-        '</div>';
+      '</div>';
     }).join("");
   }catch(e){el.innerHTML='<div class="empty" style="padding:12px 0"><div class="empty-sub">Could not load history.</div></div>';}
+}
+
+// Compute + render the leave summary strip from the user's submissions.
+function updateLeaveSummary(rows){
+  const dEl=document.getElementById('leaveStatDays');
+  const pEl=document.getElementById('leaveStatPending');
+  const nEl=document.getElementById('leaveStatNext');
+  if(!dEl) return;
+  const yr=new Date().getFullYear();
+  let daysThisYear=0, pending=0, nextApproved=null;
+  const today=new Date(); today.setHours(0,0,0,0);
+  (rows||[]).forEach(function(r){
+    const from=new Date(r.from_date+'T00:00:00'), to=new Date(r.to_date+'T00:00:00');
+    const days=Math.round((to-from)/86400000)+1;
+    if(r.status==='approved' && from.getFullYear()===yr) daysThisYear+=days;
+    if(r.status==='pending') pending++;
+    if(r.status==='approved' && from>=today){
+      if(!nextApproved || from<nextApproved) nextApproved=from;
+    }
+  });
+  dEl.textContent=daysThisYear;
+  pEl.textContent=pending;
+  nEl.textContent=nextApproved?nextApproved.toLocaleDateString(undefined,{day:'numeric',month:'short'}):'None';
+}
+
+// Live day-count as the user picks leave dates.
+function updateLeaveDayCount(){
+  const f=document.getElementById('leaveFrom'), t=document.getElementById('leaveTo');
+  const out=document.getElementById('leaveDayCount');
+  if(!f||!t||!out) return;
+  if(f.value && t.value){
+    const from=new Date(f.value+'T00:00:00'), to=new Date(t.value+'T00:00:00');
+    if(to>=from){
+      const days=Math.round((to-from)/86400000)+1;
+      out.textContent=days+' day'+(days!==1?'s':'');
+      return;
+    }
+  }
+  out.textContent='';
 }
 
 // NOTIFICATIONS
@@ -20953,18 +21314,21 @@ window.addEventListener('resize', function(){
 
 <!-- ONBOARDING TOUR -->
 <div id="tourBackdrop" style="display:none;position:fixed;inset:0;z-index:9990;background:rgba(15,23,42,.65);backdrop-filter:blur(8px);">
-  <div id="tourCard" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;border-radius:18px;padding:30px 28px;width:90%;max-width:380px;box-shadow:0 24px 60px rgba(0,0,0,.4);text-align:center;">
-    <div id="tourEmoji" style="font-size:48px;margin-bottom:14px;"></div>
-    <div id="tourTitle" style="font-size:20px;font-weight:800;color:#0f172a;margin-bottom:8px;letter-spacing:-.02em;">Welcome to Nexus</div>
-    <div id="tourBody" style="font-size:14px;color:#475569;line-height:1.6;margin-bottom:24px;">Your new digital workspace. Let me show you around in 30 seconds.</div>
-    <div style="display:flex;gap:8px;justify-content:center;margin-bottom:18px;">
-      <span class="tour-dot active"></span>
-      <span class="tour-dot"></span>
-      <span class="tour-dot"></span>
-      <span class="tour-dot"></span>
+  <div id="tourCard" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;border-radius:18px;padding:28px 26px 22px;width:90%;max-width:400px;box-shadow:0 24px 60px rgba(0,0,0,.4);">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <div id="tourKicker" style="font-size:11px;font-weight:800;letter-spacing:.12em;color:var(--accent);text-transform:uppercase;">Welcome</div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div id="tourStepNum" style="font-size:11px;font-weight:700;color:#94a3b8;font-variant-numeric:tabular-nums;">1 / 10</div>
+        <button onclick="skipTour()" style="background:none;border:none;font-size:12px;font-weight:600;color:#94a3b8;cursor:pointer;font-family:inherit;">Skip</button>
+      </div>
     </div>
+    <div id="tourEmoji" style="font-size:46px;margin-bottom:14px;line-height:1;">👋</div>
+    <div id="tourTitle" style="font-size:21px;font-weight:800;color:#0f172a;margin-bottom:9px;letter-spacing:-.02em;">Welcome to Nexus</div>
+    <div id="tourBody" style="font-size:14px;color:#475569;line-height:1.65;margin-bottom:18px;">Your new digital workspace.</div>
+    <button id="tourGo" onclick="tourGoToPage()" style="display:none;width:100%;background:#f1f5f9;color:#0f172a;border:1px solid #e2e8f0;padding:10px;border-radius:10px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:18px;">Show me</button>
+    <div id="tourDots" style="display:flex;gap:6px;justify-content:center;margin-bottom:18px;flex-wrap:wrap;"></div>
     <div style="display:flex;gap:8px;">
-      <button id="tourSkip" onclick="skipTour()" style="flex:1;background:none;border:1px solid #e2e8f0;color:#64748b;padding:11px;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">Skip</button>
+      <button id="tourBack" onclick="prevTourStep()" style="flex:1;background:none;border:1px solid #e2e8f0;color:#64748b;padding:11px;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">Back</button>
       <button id="tourNext" onclick="nextTourStep()" style="flex:2;background:var(--accent);color:#fff;border:none;padding:11px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;">Next</button>
     </div>
   </div>
