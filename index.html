@@ -6485,7 +6485,7 @@ function renderDocs(docs){
     else if(['doc','docx'].includes(ext)||url.includes('docs.google')){iconClass='doc-icon-doc';iconSvg=pdfSvg;}
     else if(['png','jpg','jpeg','gif','webp'].includes(ext)){iconClass='doc-icon-img';iconSvg=linkSvg;}
     const teamTags=(d.teams&&d.teams.length)?d.teams.map(function(t){return'<span class="doc-team-tag">'+t+'</span>';}).join(''):'';
-    const deleteBtn=myIsAdmin?'<button class="doc-delete" data-id="'+d.id+'" onclick="event.preventDefault();deleteDocument(this.dataset.id)">Delete</button>':'';
+    const deleteBtn=myIsAdmin?'<button class="doc-delete" data-id="'+d.id+'" onclick="event.preventDefault();event.stopPropagation();deleteDocument(this.dataset.id)">Delete</button>':'';
     // Quiz indicator — clicking redirects to My Training (or shows 'No Quiz')
     const quizzes = (window._docQuizzes||[]).filter(function(q){return q.document_id===d.id;});
     let quizBtn = '';
@@ -18497,11 +18497,13 @@ async function autoGenerateQuizFromDoc(docId, docTitle, docUrl){
     // Private Drive file: stream bytes via authenticated Apps Script relay,
     // then send the base64 PDF to the edge function (which no longer touches Drive).
     let pdfBase64 = '';
+    let docMime = '';
     const driveId = _driveIdFromUrl(docUrl);
     if(driveId){
       try{
         const j = await fetchDriveDocBase64(driveId);
         pdfBase64 = j.base64 || '';
+        docMime = j.mime || '';
       }catch(e){
         closeQuizGenModal();
         showToast('Could not read document from Drive: '+e.message, 'error');
@@ -18519,6 +18521,7 @@ async function autoGenerateQuizFromDoc(docId, docTitle, docUrl){
       body: JSON.stringify({
         // New private-safe path: send the PDF bytes directly.
         pdf_base64: pdfBase64,
+        doc_mime: docMime,
         document_url: docUrl,        // kept for backward-compat / legacy storage docs
         document_title: docTitle,
         num_questions: 10,
@@ -18649,7 +18652,13 @@ function renderQuizBuilder(){
   html += '</div></div>';
   
   html += '</div>';
+  // Preserve scroll position of the body across re-renders (add/remove no longer jumps to top)
+  const _prevBody = bd.querySelector('[data-qb-body]');
+  const _prevScroll = _prevBody ? _prevBody.scrollTop : 0;
+  html = html.replace('padding:18px 22px;overflow-y:auto;flex:1;"', 'padding:18px 22px;overflow-y:auto;flex:1;" data-qb-body');
   bd.innerHTML = html;
+  const _newBody = bd.querySelector('[data-qb-body]');
+  if(_newBody) _newBody.scrollTop = _prevScroll;
 }
 
 function updateQuizBuilderQ(qi, field, val){ _quizBuilder.questions[qi][field] = val; if(field==='correct') renderQuizBuilder(); }
