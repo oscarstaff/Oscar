@@ -11367,6 +11367,12 @@ function dismissOnboardLock(){
 // ══════════════════════════════════════════════════════════════
 let _tasks = [];
 let _taskFilter = 'open';
+// Tracks shared tasks the user has explicitly un-completed locally, so background
+// pollers (which read a possibly-stale remote row) can never resurrect the "done"
+// state. Persisted so the guard survives reloads. Cleared when the user re-completes.
+let _undoneShared = {};
+try{ _undoneShared = JSON.parse(localStorage.getItem('undoneShared')||'{}'); }catch(e){ _undoneShared = {}; }
+function _saveUndoneShared(){ try{ localStorage.setItem('undoneShared', JSON.stringify(_undoneShared)); }catch(e){} }
 let _taskReminderTimer = null;
 
 function taskKey(){ return 'oscar_tasks_' + me; }
@@ -11706,6 +11712,13 @@ function toggleTaskDone(id){
   // poller doesn't immediately re-mark it done on the next refresh.
   if(t.sharedFrom && wasDone && !t.done && typeof notifyTaskUncompleted==='function'){
     notifyTaskUncompleted(t);
+  }
+  // Maintain the poller guard for any shared task (incoming OR shared-out). Marking
+  // done clears the guard; un-marking sets it so a stale remote read can't undo it.
+  if(t.sharedFrom || (t.sharedTo && t.sharedTo.length)){
+    if(t.done){ delete _undoneShared[t.id]; }
+    else { _undoneShared[t.id] = true; }
+    _saveUndoneShared();
   }
   // Animate the row before re-rendering moves it
   const row = document.querySelector('.task-item[data-id="'+id+'"]');
@@ -16603,21 +16616,12 @@ async function loadMySharedOutStatus(){
       t.shareStatus = status;
       if(JSON.stringify(status) !== prevSig) changed = true;
       // ALL recipients done → flip my copy + record who
-      if(!t.done && doneRows.length === status.length){
+      if(!t.done && doneRows.length === status.length && !_undoneShared[t.id]){
         t.done = true;
         t.doneAt = new Date().toISOString();
         t.completedByOther = doneRows.map(function(x){return x.by;}).join(', ');
         changed = true;
         pushTaskToSupabase(t);   // persist done + doneBy server-side
-      }
-      // A recipient un-completed → my auto-completed copy reverts too (only revert
-      // copies that were completed BY a recipient, never ones I ticked myself).
-      else if(t.done && t.completedByOther && doneRows.length !== status.length){
-        t.done = false;
-        t.doneAt = null;
-        t.completedByOther = null;
-        changed = true;
-        pushTaskToSupabase(t);
       }
     });
     if(changed){
@@ -16652,12 +16656,12 @@ async function loadSharedTasksFromOthers(silent){
           added++;
           try{ pushTaskToSupabase(existing); }catch(e){}   // persist the repair
         }
-        // keep recipient's completion in sync with remote (both directions, so an
-        // undo that already cleared the remote row doesn't get re-marked done)
-        if(!!r.done !== !!existing.done){
-          existing.done = !!r.done;
-          existing.doneAt = r.done ? (r.completed_at || new Date().toISOString()) : null;
-          added++;
+        // keep recipient's completion in sync with remote — but only ever ADD a
+        // completion from remote, never remove one (remote can be stale / on an old
+        // schema). A local undo is authoritative and recorded in _undoneShared so the
+        // poller can't resurrect it.
+        if(r.done && !existing.done && !_undoneShared[existing.id]){
+          existing.done = true; existing.doneAt = r.completed_at || new Date().toISOString(); added++;
         }
         // pick up the sharer's edits while the task is still pending
         if(!existing.done && !r.done){
