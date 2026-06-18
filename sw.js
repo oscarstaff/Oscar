@@ -1,5 +1,5 @@
 // Nexus Service Worker — push notifications + offline cache + cross-device sync
-const CACHE_NAME = 'nexus-v2';
+const CACHE_NAME = 'nexus-v3';
 const CORE_ASSETS = [
   './',
   './index.html'
@@ -27,14 +27,14 @@ self.addEventListener('activate', function(event) {
   );
 });
 
-// Fetch: network-first for HTML, cache-fallback
+// Fetch: network-first for HTML, cache-fallback only when genuinely offline
 self.addEventListener('fetch', function(event) {
   const req = event.request;
   if (req.method !== 'GET') return;
   if (req.url.indexOf('supabase.co') >= 0 || req.url.indexOf('googleapis.com') >= 0) return;
   if (req.url.indexOf('script.google.com') >= 0) return;
   if (req.url.indexOf('jsdelivr.net') >= 0) return;
-  
+
   event.respondWith(
     fetch(req).then(function(resp) {
       if ((resp.ok && req.url.endsWith('.html')) || req.url.endsWith('/')) {
@@ -43,7 +43,13 @@ self.addEventListener('fetch', function(event) {
       }
       return resp;
     }).catch(function() {
-      return caches.match(req);
+      // Only fall back to cache for real navigations / HTML (true offline).
+      // For transient sub-resource errors, fail rather than silently serving
+      // a stale app file — a momentary blip must not pin staff to an old build.
+      if (req.mode === 'navigate' || req.url.endsWith('.html') || req.url.endsWith('/')) {
+        return caches.match(req);
+      }
+      return Response.error();
     })
   );
 });
@@ -58,7 +64,7 @@ self.addEventListener('push', function(event) {
   } catch (e) {
     data = { title: 'Nexus', body: event.data ? event.data.text() : 'New notification' };
   }
-  
+
   // ── SILENT DISMISS ── another device marked it read
   if (data.action === 'dismiss' && data.notif_key) {
     event.waitUntil(
@@ -83,7 +89,7 @@ self.addEventListener('push', function(event) {
     );
     return;
   }
-  
+
   // ── BULK DISMISS ──
   if (data.action === 'dismiss_all') {
     event.waitUntil(
@@ -93,7 +99,7 @@ self.addEventListener('push', function(event) {
     );
     return;
   }
-  
+
   // ── REGULAR NOTIFICATION ──
   const title = data.title || 'Nexus';
   const options = {
@@ -110,7 +116,7 @@ self.addEventListener('push', function(event) {
     requireInteraction: false,
     vibrate: [200, 100, 200]
   };
-  
+
   event.waitUntil(
     self.registration.showNotification(title, options)
   );
@@ -122,14 +128,14 @@ self.addEventListener('push', function(event) {
 self.addEventListener('notificationclick', function(event) {
   const notif = event.notification;
   notif.close();
-  
+
   const notifKey = notif.tag || (notif.data && notif.data.notif_key);
   let targetUrl = (notif.data && notif.data.url) || './';
-  
+
   if (event.action === 'clockin') {
     targetUrl = './#home';
   }
-  
+
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(clientList) {
       for (let i = 0; i < clientList.length; i++) {
