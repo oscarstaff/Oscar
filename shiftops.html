@@ -2585,12 +2585,37 @@ function removeStaff(id){
   const s=staff.find(x=>x.id===id);
   if(!s)return;
   const name=`${s.first} ${s.last}`;
-  if(!confirm(`⚠️ Remove ${name}?\n\nThis will permanently delete them from the roster. Their availability data will also be removed.\n\nThis cannot be undone.`))return;
+  if(!confirm(`⚠️ Remove ${name}?\n\nThis removes them from the roster, deletes their login so they can no longer sign in, and revokes app access.\n\nWork records (hours, leave) are kept for payroll. This cannot be undone.`))return;
   staff=staff.filter(x=>x.id!==id);
   delete shifts[id];
   delete availability[id];
   forceSave();renderAll();showToast(`${name} removed`);
   pushStaffNames();
+  // ── OFFBOARD: kill the login + revoke access (records kept) ──
+  offboardStaffAccess(name);
+}
+
+// Deletes the Supabase Auth user (via Apps Script, which holds the service key)
+// and revokes app access. Work history (clock_log, leave) is intentionally KEPT.
+async function offboardStaffAccess(fullName){
+  try{
+    // 1. Delete the auth login + credentials (server-side, service key)
+    const r = await fetch(GAS_EXEC_URL,{
+      method:'POST',
+      headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body: JSON.stringify({action:'offboardStaff', staff: fullName, token: GAS_TOKEN})
+    });
+    let ok=false;
+    try{ const j=await r.json(); ok = j && j.ok; }catch(e){}
+    // 2. Revoke app access for every app (client-side, anon key is fine for this table)
+    try{
+      const H={apikey:AA_KEY,Authorization:'Bearer '+AA_KEY};
+      await fetch(AA_SB+'/rest/v1/app_access?staff_name=eq.'+encodeURIComponent(fullName),{method:'DELETE',headers:H});
+    }catch(e){}
+    showToast(ok ? (fullName+' login disabled') : (fullName+' removed (login delete needs check)'));
+  }catch(e){
+    showToast('Removed locally — login delete failed, check Apps Script');
+  }
 }
 
 // ── AUTO-ALLOCATE ─────────────────────────────────────────────────────────
