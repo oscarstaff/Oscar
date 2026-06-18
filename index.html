@@ -5203,6 +5203,20 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
                   <option value="1440">1 day before</option>
                 </select>
               </label>
+              <div class="task-form-divider"></div>
+              <label class="task-form-row">
+                <div class="task-form-row-icon" style="background:#8b5cf6;">
+                  <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 2a1 1 0 011 1v1.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-1.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd"/></svg>
+                </div>
+                <div class="task-form-row-label">Repeat</div>
+                <select id="taskRecur" class="task-form-row-input">
+                  <option value="">Never</option>
+                  <option value="daily">Daily</option>
+                  <option value="weekly">Weekly</option>
+                  <option value="fortnightly">Fortnightly</option>
+                  <option value="monthly">Monthly</option>
+                </select>
+              </label>
             </div>
 
             <!-- Priority pills -->
@@ -5217,6 +5231,22 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
                   <button type="button" class="prio-pill active" data-val="med" onclick="setTaskPrio('med')">Medium</button>
                   <button type="button" class="prio-pill" data-val="high" onclick="setTaskPrio('high')">High</button>
                   <input type="hidden" id="taskPriority" value="med">
+                </div>
+              </div>
+            </div>
+
+            <!-- Subtasks / checklist -->
+            <div class="task-form-group" id="taskSubGroup">
+              <div class="task-form-row" style="cursor:default;align-items:flex-start;">
+                <div class="task-form-row-icon" style="background:#0d9488;">
+                  <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h6a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd"/></svg>
+                </div>
+                <div style="flex:1;min-width:0;">
+                  <div class="task-form-row-label" style="margin-bottom:6px;">Checklist</div>
+                  <div id="subList" style="display:flex;flex-direction:column;gap:5px;"></div>
+                  <input type="text" id="subInput" class="task-form-input" placeholder="Add a step + Enter"
+                    style="margin-top:6px;font-size:13px;padding:8px 10px;"
+                    onkeydown="if(event.key==='Enter'){event.preventDefault();addSubtask();}">
                 </div>
               </div>
             </div>
@@ -5236,12 +5266,19 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
       </div>
 
       <!-- Filters -->
-      <div style="display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap;" id="taskFilters">
+      <div style="display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap;align-items:center;" id="taskFilters">
         <button class="font-chip active" data-filter="open" onclick="setTaskFilter('open')">Open</button>
         <button class="font-chip" data-filter="today" onclick="setTaskFilter('today')">Today</button>
         <button class="font-chip" data-filter="overdue" onclick="setTaskFilter('overdue')">Overdue</button>
         <button class="font-chip" data-filter="done" onclick="setTaskFilter('done')">Done</button>
         <button class="font-chip" data-filter="all" onclick="setTaskFilter('all')">All</button>
+        <select id="taskSortSel" onchange="setTaskSort(this.value)" title="Sort tasks"
+          style="margin-left:auto;font-size:12.5px;font-family:inherit;font-weight:600;padding:7px 10px;border-radius:999px;cursor:pointer;border:1px solid var(--m-border-hi,#e2e8f0);background:var(--m-card,#fff);color:var(--m-ink-2,#475569);outline:none;">
+          <option value="due">Sort: Due date</option>
+          <option value="priority">Sort: Priority</option>
+          <option value="created">Sort: Newest</option>
+          <option value="alpha">Sort: A–Z</option>
+        </select>
       </div>
 
       <!-- List -->
@@ -11367,6 +11404,7 @@ function dismissOnboardLock(){
 // ══════════════════════════════════════════════════════════════
 let _tasks = [];
 let _taskFilter = 'open';
+let _taskSort = 'due'; // due | priority | created | alpha
 // Tracks shared tasks the user has explicitly un-completed locally, so background
 // pollers (which read a possibly-stale remote row) can never resurrect the "done"
 // state. Persisted so the guard survives reloads. Cleared when the user re-completes.
@@ -11384,8 +11422,15 @@ async function loadTasks(){
   try{
     const rows = await sbGet('staff_tasks', '?staff_name=eq.'+encodeURIComponent(me)+'&order=created_at.asc');
     if(rows){
+      // Cached copy holds doneAt for normal tasks (not persisted server-side),
+      // so we can restore "completed X ago" after a reload.
+      let cachedById = {};
+      try{
+        (JSON.parse(localStorage.getItem(taskKey())||'[]')||[]).forEach(function(c){ cachedById[c.id] = c; });
+      }catch(e){}
       _tasks = rows.map(function(r){
         const sm = r.share_meta || null;
+        const cached = cachedById[r.id];
         return {
           id: r.id,
           title: r.title,
@@ -11402,12 +11447,15 @@ async function loadTasks(){
           shareStatus: (sm && sm.status) || undefined,
           sharedRowIds: (sm && sm.rowIds) || undefined,
           completedByOther: (sm && sm.doneBy) || undefined,
-          doneAt: (sm && sm.doneAt) || undefined,
+          // doneAt: server share_meta first, else cached local value (normal tasks)
+          doneAt: (sm && sm.doneAt) || (r.done && cached ? cached.doneAt : undefined) || undefined,
           // incoming-share fields (task shared TO me) — must survive reloads or
           // the "From X" chip + shared-by banner vanish after a refresh
           sharedFrom: (sm && sm.from) || undefined,
           sharedRowId: (sm && sm.fromRowId) || undefined,
-          originalNote: (sm && sm.fromNote) || undefined
+          originalNote: (sm && sm.fromNote) || undefined,
+          recur: (sm && sm.recur) || undefined,
+          subtasks: (sm && sm.subtasks) || undefined
         };
       });
       // Cache to localStorage for offline + instant render
@@ -11443,15 +11491,25 @@ async function pushTaskToSupabase(t){
     notes: t.notes || '',
     done: !!t.done,
     created_at: t.createdAt || new Date().toISOString(),
-    share_meta: ((t.sharedTo && t.sharedTo.length) || t.sharedFrom) ? {
-      to: t.sharedTo || null, rowIds: t.sharedRowIds || [],
-      doneBy: t.completedByOther || null, doneAt: t.doneAt || null,
-      status: t.shareStatus || null,
-      // incoming-share fields (so "From X" chip + banner survive reloads)
-      from: t.sharedFrom || null,
-      fromRowId: t.sharedRowId || null,
-      fromNote: t.originalNote || null
-    } : null
+    // share_meta doubles as the task's general metadata blob (no extra columns
+    // needed). Always written so recurrence + subtasks survive reloads.
+    share_meta: (function(){
+      const hasShare = (t.sharedTo && t.sharedTo.length) || t.sharedFrom;
+      const hasExtra = t.recur || (t.subtasks && t.subtasks.length) || t.doneAt;
+      if(!hasShare && !hasExtra) return null;
+      return {
+        to: t.sharedTo || null, rowIds: t.sharedRowIds || [],
+        doneBy: t.completedByOther || null, doneAt: t.doneAt || null,
+        status: t.shareStatus || null,
+        // incoming-share fields (so "From X" chip + banner survive reloads)
+        from: t.sharedFrom || null,
+        fromRowId: t.sharedRowId || null,
+        fromNote: t.originalNote || null,
+        // general task extras
+        recur: t.recur || null,
+        subtasks: (t.subtasks && t.subtasks.length) ? t.subtasks : null
+      };
+    })()
   };
   try{
     await fetch(SB+'/rest/v1/staff_tasks',{
@@ -11501,6 +11559,33 @@ function setTaskPrio(val){
   });
 }
 
+// ── SUBTASK EDITOR (form working state) ──────────────────────
+let _formSubtasks = [];
+function renderSubEditor(){
+  const list = document.getElementById('subList');
+  if(!list) return;
+  list.innerHTML = _formSubtasks.map(function(s, i){
+    return '<div style="display:flex;align-items:center;gap:8px;">'+
+      '<div onclick="toggleSubEdit('+i+')" style="width:18px;height:18px;border-radius:5px;border:2px solid '+(s.done?'var(--accent)':'#cbd5e1')+';background:'+(s.done?'var(--accent)':'transparent')+';flex-shrink:0;cursor:pointer;display:flex;align-items:center;justify-content:center;">'+
+        (s.done?'<svg width="10" height="10" viewBox="0 0 20 20" fill="#fff"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>':'')+
+      '</div>'+
+      '<span style="flex:1;font-size:13px;'+(s.done?'text-decoration:line-through;color:#94a3b8;':'')+'">'+esc(s.text)+'</span>'+
+      '<button type="button" onclick="removeSubEdit('+i+')" style="background:none;border:none;color:#cbd5e1;cursor:pointer;font-size:17px;line-height:1;padding:0 4px;">×</button>'+
+    '</div>';
+  }).join('');
+}
+function addSubtask(){
+  const inp = document.getElementById('subInput');
+  if(!inp) return;
+  const v = inp.value.trim();
+  if(!v) return;
+  _formSubtasks.push({text:v, done:false});
+  inp.value = '';
+  renderSubEditor();
+}
+function toggleSubEdit(i){ if(_formSubtasks[i]){ _formSubtasks[i].done = !_formSubtasks[i].done; renderSubEditor(); } }
+function removeSubEdit(i){ _formSubtasks.splice(i,1); renderSubEditor(); }
+
 function openTaskForm(editId){
   const backdrop = document.getElementById('taskFormBackdrop');
   if(!backdrop) return;
@@ -11519,6 +11604,10 @@ function openTaskForm(editId){
     setTaskPrio(t.priority || 'med');
     document.getElementById('taskRemindBefore').value = (t.remindBefore==null||t.remindBefore===undefined)?'':String(t.remindBefore);
     document.getElementById('taskNotes').value = t.notes || '';
+    const recurEl = document.getElementById('taskRecur');
+    if(recurEl) recurEl.value = t.recur || '';
+    _formSubtasks = (t.subtasks || []).map(function(s){ return {text:s.text, done:!!s.done}; });
+    renderSubEditor();
     // Lock fields for shared tasks
     const lockable = ['taskTitle','taskDueDate','taskDueTime','taskRemindBefore','taskNotes'];
     lockable.forEach(function(id){
@@ -11565,6 +11654,10 @@ function openTaskForm(editId){
     setTaskPrio('med');
     document.getElementById('taskRemindBefore').value = '';
     document.getElementById('taskNotes').value = '';
+    const recurEl = document.getElementById('taskRecur');
+    if(recurEl) recurEl.value = '';
+    _formSubtasks = [];
+    renderSubEditor();
   }
   // Wire NL parser to task title
   const titleEl = document.getElementById('taskTitle');
@@ -11631,6 +11724,8 @@ async function saveTask(){
     priority: document.getElementById('taskPriority').value || 'med',
     remindBefore: document.getElementById('taskRemindBefore').value === '' ? null : Number(document.getElementById('taskRemindBefore').value),
     notes: document.getElementById('taskNotes').value.trim() || null,
+    recur: (document.getElementById('taskRecur') && document.getElementById('taskRecur').value) || null,
+    subtasks: _formSubtasks.length ? _formSubtasks.map(function(s){return {text:s.text, done:!!s.done};}) : null,
     done: false,
     createdAt: new Date().toISOString()
   };
@@ -11696,6 +11791,102 @@ function deleteTask(id){
   }
 }
 
+// Advance a YYYY-MM-DD string by one recurrence step. If no base date, anchor today.
+function nextRecurDate(baseDate, recur){
+  const d = baseDate ? new Date(baseDate+'T00:00:00') : new Date();
+  if(isNaN(d.getTime())) return null;
+  if(recur==='daily') d.setDate(d.getDate()+1);
+  else if(recur==='weekly') d.setDate(d.getDate()+7);
+  else if(recur==='fortnightly') d.setDate(d.getDate()+14);
+  else if(recur==='monthly') d.setMonth(d.getMonth()+1);
+  else return baseDate || null;
+  const yy=d.getFullYear(), mm=String(d.getMonth()+1).padStart(2,'0'), dd=String(d.getDate()).padStart(2,'0');
+  return yy+'-'+mm+'-'+dd;
+}
+// Create the next instance of a recurring task once the current one is completed.
+function spawnNextRecurrence(t){
+  const nextDue = nextRecurDate(t.dueDate, t.recur);
+  const fresh = {
+    id: 't_'+Date.now()+'_'+Math.random().toString(36).slice(2,7),
+    title: t.title,
+    dueDate: nextDue,
+    dueTime: t.dueTime || null,
+    priority: t.priority || 'med',
+    remindBefore: (t.remindBefore==null?null:t.remindBefore),
+    notes: t.notes || null,
+    recur: t.recur,
+    // reset checklist ticks for the new occurrence
+    subtasks: (t.subtasks && t.subtasks.length) ? t.subtasks.map(function(s){return {text:s.text, done:false};}) : null,
+    done: false,
+    createdAt: new Date().toISOString()
+  };
+  _tasks.unshift(fresh);
+  saveTasks();
+  if(typeof pushTaskToSupabase === 'function') pushTaskToSupabase(fresh);
+  if(typeof showToast==='function'){
+    const lbl = nextDue ? (' · next '+disc2Ago(nextDue).replace(' ago','')) : '';
+    showToast('Recurring task renewed'+(nextDue?' for '+new Date(nextDue+'T00:00:00').toLocaleDateString('en-AU',{day:'numeric',month:'short'}):''));
+  }
+}
+
+// Live subtask toggle from a task card. Updates state, persists, re-renders.
+function toggleSubLive(taskId, idx){
+  const t = _tasks.find(function(x){return x.id===taskId;});
+  if(!t || !t.subtasks || !t.subtasks[idx]) return;
+  t.subtasks[idx].done = !t.subtasks[idx].done;
+  saveTasks();
+  if(typeof pushTaskToSupabase === 'function') pushTaskToSupabase(t);
+  renderTasks();
+}
+
+// Quick snooze popover — reschedule a task by a relative amount without the form.
+function openSnooze(ev, taskId){
+  closeSnooze();
+  const t = _tasks.find(function(x){return x.id===taskId;});
+  if(!t) return;
+  const pop = document.createElement('div');
+  pop.id = 'snoozePop';
+  pop.className = 'snooze-pop';
+  const opts = [
+    {lbl:'Later today (+3h)', v:'3h'},
+    {lbl:'Tomorrow', v:'1d'},
+    {lbl:'In 3 days', v:'3d'},
+    {lbl:'Next week', v:'7d'},
+    {lbl:'Clear due date', v:'clear'}
+  ];
+  pop.innerHTML = opts.map(function(o){
+    return '<button type="button" onclick="snoozeTask(\''+taskId+'\',\''+o.v+'\')">'+o.lbl+'</button>';
+  }).join('');
+  document.body.appendChild(pop);
+  const r = ev.currentTarget.getBoundingClientRect();
+  pop.style.top = (r.bottom + window.scrollY + 6) + 'px';
+  pop.style.left = Math.max(8, Math.min(r.left + window.scrollX, window.innerWidth - 190)) + 'px';
+  setTimeout(function(){ document.addEventListener('click', closeSnooze, {once:true}); }, 0);
+}
+function closeSnooze(){ const p = document.getElementById('snoozePop'); if(p) p.remove(); }
+function snoozeTask(taskId, v){
+  closeSnooze();
+  const t = _tasks.find(function(x){return x.id===taskId;});
+  if(!t) return;
+  if(v === 'clear'){
+    t.dueDate = null; t.dueTime = null;
+  } else {
+    let base = t.dueDate ? new Date(t.dueDate+'T'+(t.dueTime||'09:00')) : new Date();
+    if(isNaN(base.getTime()) || base < new Date()) base = new Date();
+    if(v === '3h'){ base.setHours(base.getHours()+3); t.dueTime = String(base.getHours()).padStart(2,'0')+':'+String(base.getMinutes()).padStart(2,'0'); }
+    else if(v === '1d') base.setDate(base.getDate()+1);
+    else if(v === '3d') base.setDate(base.getDate()+3);
+    else if(v === '7d') base.setDate(base.getDate()+7);
+    const yy=base.getFullYear(), mm=String(base.getMonth()+1).padStart(2,'0'), dd=String(base.getDate()).padStart(2,'0');
+    t.dueDate = yy+'-'+mm+'-'+dd;
+  }
+  saveTasks();
+  if(typeof pushTaskToSupabase === 'function') pushTaskToSupabase(t);
+  renderTasks();
+  if(typeof scheduleTaskReminders === 'function') scheduleTaskReminders();
+  if(typeof showToast === 'function') showToast(v==='clear'?'Due date cleared':'Task rescheduled');
+}
+
 function toggleTaskDone(id){
   const t = _tasks.find(function(x){return x.id===id;});
   if(!t) return;
@@ -11704,6 +11895,10 @@ function toggleTaskDone(id){
   t.doneAt = t.done ? new Date().toISOString() : null;
   saveTasks();
   if(typeof pushTaskToSupabase === 'function') pushTaskToSupabase(t);
+  // Recurring task just completed → spawn the next occurrence (own tasks only).
+  if(!wasDone && t.done && t.recur && !t.sharedFrom){
+    spawnNextRecurrence(t);
+  }
   // Shared task: notify the original creator when recipient completes it (ANY-completes model)
   if(t.sharedFrom && !wasDone && t.done && typeof notifyTaskCompleted==='function'){
     notifyTaskCompleted(t);
@@ -11757,6 +11952,11 @@ function setTaskFilter(f){
   renderTasks();
 }
 
+function setTaskSort(v){
+  _taskSort = v;
+  renderTasks();
+}
+
 function taskDueDate(t){
   if(!t.dueDate) return null;
   const timeStr = t.dueTime || '23:59';
@@ -11793,12 +11993,16 @@ function renderTasks(){
     return;
   }
 
-  // Group by section: Overdue / Today / Tomorrow / This week / Later / No date / Done
-  const sections = {overdue:[], today:[], tomorrow:[], week:[], later:[], nodate:[], done:[]};
+  // Group by section: Overdue / Today / Tomorrow / This week / Later / No date / Done.
+  // When a non-date sort is active, collapse the date buckets into a single "all"
+  // section so the chosen sort governs the WHOLE list (not just within a day group).
+  const flat = (_taskSort !== 'due');
+  const sections = {overdue:[], today:[], tomorrow:[], week:[], later:[], nodate:[], done:[], all:[]};
   const weekEnd = new Date(today); weekEnd.setDate(weekEnd.getDate()+7);
 
   filtered.forEach(function(t){
     if(t.done){ sections.done.push(t); return; }
+    if(flat){ sections.all.push(t); return; }
     const d = taskDueDate(t);
     if(!d){ sections.nodate.push(t); return; }
     if(d < now){ sections.overdue.push(t); return; }
@@ -11809,23 +12013,38 @@ function renderTasks(){
     sections.later.push(t);
   });
 
-  // Sort each section
+  // Sort each section by the active sort mode
+  const prioRank = {high:0, med:1, low:2};
   Object.keys(sections).forEach(function(k){
     sections[k].sort(function(a,b){
+      if(_taskSort === 'priority'){
+        const pr = (prioRank[a.priority]||1) - (prioRank[b.priority]||1);
+        if(pr !== 0) return pr;
+        const da = taskDueDate(a), db = taskDueDate(b);
+        if(da && db) return da - db; if(da) return -1; if(db) return 1; return 0;
+      }
+      if(_taskSort === 'created'){
+        return new Date(b.createdAt||0) - new Date(a.createdAt||0); // newest first
+      }
+      if(_taskSort === 'alpha'){
+        return (a.title||'').localeCompare(b.title||'');
+      }
+      // default: due date, then priority
       const da = taskDueDate(a), db = taskDueDate(b);
       if(da && db) return da - db;
-      const prio = {high:0, med:1, low:2};
-      return (prio[a.priority]||1) - (prio[b.priority]||1);
+      return (prioRank[a.priority]||1) - (prioRank[b.priority]||1);
     });
   });
 
+  const sortLabel = {priority:'By priority', created:'Newest first', alpha:'A–Z'}[_taskSort] || 'All tasks';
   const sectionDefs = [
-    {key:'overdue', label:'Overdue', show:_taskFilter!=='done'},
-    {key:'today', label:'Today', show:_taskFilter!=='done'},
-    {key:'tomorrow', label:'Tomorrow', show:_taskFilter!=='done'},
-    {key:'week', label:'This week', show:_taskFilter!=='done'},
-    {key:'later', label:'Later', show:_taskFilter!=='done'},
-    {key:'nodate', label:'No due date', show:_taskFilter!=='done'},
+    {key:'all', label:sortLabel, show:flat && _taskFilter!=='done'},
+    {key:'overdue', label:'Overdue', show:!flat && _taskFilter!=='done'},
+    {key:'today', label:'Today', show:!flat && _taskFilter!=='done'},
+    {key:'tomorrow', label:'Tomorrow', show:!flat && _taskFilter!=='done'},
+    {key:'week', label:'This week', show:!flat && _taskFilter!=='done'},
+    {key:'later', label:'Later', show:!flat && _taskFilter!=='done'},
+    {key:'nodate', label:'No due date', show:!flat && _taskFilter!=='done'},
     {key:'done', label:'Completed', show:_taskFilter==='done'||_taskFilter==='all'}
   ];
 
@@ -11880,6 +12099,59 @@ function renderTasks(){
             return '<span class="task-chip share-tag out" title="'+tip.replace(/"/g,'&quot;')+'">'+SHARE_SVG+lbl+'</span>';
           })()
         : '<button class="task-chip share-btn" onclick="event.stopPropagation();openShareTask(\''+t.id+'\')" title="Share with team">'+SHARE_SVG+' Share</button>');
+    // Timestamp line: when shared/created, plus completion time if done.
+    let tsBits = [];
+    if(t.sharedFrom){
+      // task shared TO me — show when it landed
+      if(t.createdAt) tsBits.push('Shared '+disc2Ago(t.createdAt));
+    } else {
+      // task I created
+      if(t.createdAt) tsBits.push('Created '+disc2Ago(t.createdAt));
+    }
+    if(t.done && t.doneAt){
+      tsBits.push('completed '+disc2Ago(t.doneAt));
+    }
+    const tsHtml = tsBits.length
+      ? '<div class="task-ts" style="font-size:11px;color:#94a3b8;margin-top:5px;">'+esc(tsBits.join(' · '))+'</div>'
+      : '';
+
+    // Recurrence chip
+    const recurLbl = {daily:'Daily',weekly:'Weekly',fortnightly:'Fortnightly',monthly:'Monthly'}[t.recur];
+    const recurChip = recurLbl
+      ? '<span class="task-chip recur"><svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 2a1 1 0 011 1v1.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-1.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd"/></svg>'+recurLbl+'</span>'
+      : '';
+
+    // Subtask progress bar + count
+    let subHtml = '';
+    if(t.subtasks && t.subtasks.length){
+      const total = t.subtasks.length;
+      const doneN = t.subtasks.filter(function(s){return s.done;}).length;
+      const pct = Math.round(doneN/total*100);
+      subHtml = '<div class="task-sub" style="margin-top:8px;">'+
+        '<div style="display:flex;align-items:center;justify-content:space-between;font-size:11px;color:#94a3b8;margin-bottom:4px;">'+
+          '<span>Checklist</span><span>'+doneN+'/'+total+'</span>'+
+        '</div>'+
+        '<div style="height:5px;border-radius:3px;background:rgba(148,163,184,.2);overflow:hidden;">'+
+          '<div style="height:100%;width:'+pct+'%;background:var(--accent);border-radius:3px;transition:width .25s;"></div>'+
+        '</div>'+
+        '<div style="display:flex;flex-direction:column;gap:3px;margin-top:7px;">'+
+          t.subtasks.map(function(s, si){
+            return '<div onclick="event.stopPropagation();toggleSubLive(\''+t.id+'\','+si+')" style="display:flex;align-items:center;gap:7px;cursor:pointer;">'+
+              '<div style="width:15px;height:15px;border-radius:4px;border:2px solid '+(s.done?'var(--accent)':'#cbd5e1')+';background:'+(s.done?'var(--accent)':'transparent')+';flex-shrink:0;display:flex;align-items:center;justify-content:center;">'+
+                (s.done?'<svg width="9" height="9" viewBox="0 0 20 20" fill="#fff"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>':'')+
+              '</div>'+
+              '<span style="font-size:12px;'+(s.done?'text-decoration:line-through;color:#94a3b8;':'color:inherit;')+'">'+esc(s.text)+'</span>'+
+            '</div>';
+          }).join('')+
+        '</div>'+
+      '</div>';
+    }
+
+    // Snooze button (own, not-done tasks only): quick reschedule without opening form
+    const snoozeBtn = (!t.done && !t.sharedFrom)
+      ? '<button class="task-chip snooze-btn" onclick="event.stopPropagation();openSnooze(event,\''+t.id+'\')" title="Reschedule"><svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/></svg>Snooze</button>'
+      : '';
+
     return '<div class="task-item'+(t.done?' done':'')+overdueCls+prioCls+'" data-id="'+t.id+'" onclick="openTaskForm(\''+t.id+'\')">'+
       '<button class="task-del" onclick="event.stopPropagation();deleteTask(\''+t.id+'\')" title="Delete">×</button>'+
       '<div class="task-card-hd">'+
@@ -11889,7 +12161,9 @@ function renderTasks(){
           (t.notes ? '<div class="task-notes">'+esc(t.notes)+'</div>' : '')+
         '</div>'+
       '</div>'+
-      '<div class="task-meta">'+dueChip+remChip+(t.priority==='high'||t.priority==='low'?prioChip:'')+shareChip+'</div>'+
+      subHtml+
+      '<div class="task-meta">'+dueChip+remChip+recurChip+(t.priority==='high'||t.priority==='low'?prioChip:'')+snoozeBtn+shareChip+'</div>'+
+      tsHtml+
     '</div>';
   }).join('');
   allHtml += '</div>'; // close task-grid
@@ -16449,6 +16723,10 @@ async function openShareTask(taskId){
   bd.innerHTML = '<div class="share-modal" onclick="event.stopPropagation()">'+
     '<div class="share-hd"><h3>Share task</h3><button onclick="closeShareTask()" style="background:none;border:none;font-size:22px;color:#94a3b8;cursor:pointer;">×</button></div>'+
     '<div class="share-chips">'+chips+'</div>'+
+    '<div class="share-search-wrap" style="padding:0 12px 8px;">'+
+      '<input id="shareSearch" type="text" placeholder="Search staff…" autocomplete="off" oninput="shareFilter(this.value)" '+
+        'style="width:100%;box-sizing:border-box;border:1.5px solid var(--line,#e2e8f0);border-radius:9px;padding:9px 12px;font-size:13px;font-family:inherit;outline:none;background:var(--card,#fff);color:inherit;">'+
+    '</div>'+
     '<div class="share-staff-list" id="shareStaffList">'+listHtml+'</div>'+
     '<div class="share-actions">'+
       '<span id="shareCount" style="font-size:12px;color:#94a3b8;margin-right:auto;align-self:center;"></span>'+
@@ -16461,6 +16739,33 @@ async function openShareTask(taskId){
 }
 
 // Quick-pick: select all / a team / clear. Toggles .selected on rows.
+// Live search filter for the share modal. Hides non-matching rows and any team
+// label whose members are all filtered out. Selection state is preserved (hidden
+// rows stay selected, so a search then Share still includes earlier picks).
+function shareFilter(q){
+  q = (q||'').trim().toLowerCase();
+  const list = document.getElementById('shareStaffList');
+  if(!list) return;
+  // Walk children in order: labels are .share-team-label, people are .share-staff-row
+  const children = Array.prototype.slice.call(list.children);
+  let currentLabel = null;
+  let labelHasMatch = false;
+  function flushLabel(){ if(currentLabel) currentLabel.style.display = labelHasMatch ? '' : 'none'; }
+  children.forEach(function(el){
+    if(el.classList.contains('share-team-label')){
+      flushLabel();
+      currentLabel = el;
+      labelHasMatch = false;
+    } else if(el.classList.contains('share-staff-row')){
+      const name = (el.dataset.name||'').toLowerCase();
+      const match = !q || name.indexOf(q) !== -1;
+      el.style.display = match ? '' : 'none';
+      if(match) labelHasMatch = true;
+    }
+  });
+  flushLabel();
+}
+
 function sharePick(pick){
   const rows = document.querySelectorAll('#shareStaffList .share-staff-row');
   if(pick==='all'){
@@ -16641,7 +16946,8 @@ async function loadSharedTasksFromOthers(silent){
     if(!resp.ok){ console.warn('loadShared read', resp.status); return; }
     const rows = await resp.json();
     if(!rows || !rows.length) return;
-    let added = 0;
+    let added = 0;       // any change → triggers save + re-render
+    let newlyArrived = 0; // genuinely NEW tasks → the only thing that toasts
     rows.forEach(function(r){
       const localId = 'shared_'+r.id;
       const existing = _tasks.find(function(x){return x.id===localId;});
@@ -16693,6 +16999,7 @@ async function loadSharedTasksFromOthers(silent){
         createdAt: r.created_at
       });
       added++;
+      newlyArrived++;
       // persist to staff_tasks immediately so a parallel/next loadTasks()
       // can never wipe the just-arrived shared task (the "refresh 4 times" race)
       try{ pushTaskToSupabase(_tasks[_tasks.length-1]); }catch(e){}
@@ -16701,7 +17008,7 @@ async function loadSharedTasksFromOthers(silent){
       saveTasks();
       if(typeof renderTasks==='function') renderTasks();
       if(typeof updateTaskBadge==='function') updateTaskBadge();
-      if(!silent && typeof showToast==='function') showToast(added+' shared task'+(added===1?'':'s')+' added');
+      if(!silent && newlyArrived>0 && typeof showToast==='function') showToast(newlyArrived+' shared task'+(newlyArrived===1?'':'s')+' added');
     }
   }catch(e){console.warn('loadSharedTasks:',e);}
 }
@@ -17272,10 +17579,12 @@ async function loadHomeAttention(){
           title: 'Leave '+(ok?'approved':'declined')+': '+fmtF(r.from_date)+(r.from_date!==r.to_date?(' – '+fmtF(r.to_date)):''),
           sub: 'Tap to view your leave',
           action: function(){
-            goTo('schedule'); setTimeout(function(){ if(typeof showSchedTab==='function') showSchedTab('leave'); }, 100);
+            // Record acknowledgement FIRST (synchronously) so navigation/re-render
+            // can't race past the write and resurface this on next load.
             const all = JSON.parse(localStorage.getItem('nexus_seen_leave_'+me)||'[]');
             fresh.forEach(function(f){ if(!all.includes(f.id)) all.push(f.id); });
             localStorage.setItem('nexus_seen_leave_'+me, JSON.stringify(all));
+            goTo('schedule'); setTimeout(function(){ if(typeof showSchedTab==='function') showSchedTab('leave'); }, 100);
           }
         });
       }
@@ -22081,6 +22390,34 @@ input:focus{
   --m-sh-2:0 2px 6px rgba(0,0,0,.32), 0 10px 28px rgba(0,0,0,.38);
   --m-sh-3:0 4px 10px rgba(0,0,0,.36), 0 20px 52px rgba(0,0,0,.48);
 }
+/* ── 11b. NAMED LIGHT THEMES: tint the warm-redesign surfaces so floating UI
+   (share sheet, modals) matches each preset instead of always reading cream ── */
+[data-theme="warm"]{
+  --m-canvas:#fdf6ee; --m-card:#fffaf3; --m-card-2:#fbf2e6;
+  --m-border:#f0e3d3; --m-border-hi:#e3d2bd;
+  --m-ink:#3a2e26; --m-ink-2:#8a6f5c; --m-ink-3:#b29a86;
+}
+[data-theme="ocean"]{
+  --m-canvas:#eef6fb; --m-card:#f9fcfe; --m-card-2:#e9f3fa;
+  --m-border:#dbe9f2; --m-border-hi:#c5dcec;
+  --m-ink:#0f2a3a; --m-ink-2:#4d6f84; --m-ink-3:#85a3b6;
+}
+[data-theme="forest"]{
+  --m-canvas:#f0f6ef; --m-card:#f9fcf8; --m-card-2:#ecf4ea;
+  --m-border:#dceadb; --m-border-hi:#c8ddc6;
+  --m-ink:#1f3326; --m-ink-2:#577062; --m-ink-3:#8aa593;
+}
+[data-theme="rose"]{
+  --m-canvas:#fdf2f6; --m-card:#fffafc; --m-card-2:#fbeef4;
+  --m-border:#f3dde8; --m-border-hi:#ecc9da;
+  --m-ink:#3a2230; --m-ink-2:#8a607a; --m-ink-3:#b78ca6;
+}
+/* midnight: deep violet-charcoal distinct from the warm-charcoal dark */
+[data-theme="midnight"]{
+  --m-canvas:#0a0a14; --m-card:#15131f; --m-card-2:#1d1a2b;
+  --m-border:#2a2640; --m-border-hi:#3a3556;
+  --m-ink:#ece9f5; --m-ink-2:#a39db9; --m-ink-3:#6e6885;
+}
 :is([data-theme="dark"],[data-theme="midnight"]) body{ background:var(--m-canvas) !important; }
 :is([data-theme="dark"],[data-theme="midnight"]) body::before{
   background:
@@ -22227,6 +22564,13 @@ input:focus{
 .share-hd button:hover{ color:var(--m-ink) !important; }
 .share-chips{ padding:12px 20px 14px !important; margin:0 !important; }
 .share-staff-list{ padding:6px 12px 8px !important; }
+.share-search-wrap{ padding:4px 20px 10px !important; }
+#shareSearch{
+  background:var(--m-card-2) !important; color:var(--m-ink) !important;
+  border:1.5px solid var(--m-border-hi) !important; border-radius:var(--m-r-sm) !important;
+}
+#shareSearch:focus{ border-color:var(--accent-bd) !important; box-shadow:0 0 0 3px var(--accent-dim) !important; }
+#shareSearch::placeholder{ color:var(--m-ink-3) !important; }
 .share-staff-row{ padding:9px 12px !important; border-radius:12px !important; }
 .share-staff-row:hover{ background:var(--m-card-2) !important; }
 .share-staff-row.selected{ background:var(--accent-dim) !important; }
@@ -22237,6 +22581,29 @@ input:focus{
 :is([data-theme="dark"],[data-theme="midnight"]) .share-staff-list::-webkit-scrollbar-thumb{ background:var(--m-border-hi); border-radius:4px; }
 .share-team-label{ padding:13px 8px 6px !important; }
 
+/* Task timestamp line — themed muted */
+.task-ts{ color:var(--m-ink-3) !important; }
+/* Recurrence chip */
+.task-chip.recur{ background:rgba(139,92,246,.12) !important; color:#7c3aed !important; border:1px solid rgba(139,92,246,.25) !important; }
+:is([data-theme="dark"],[data-theme="midnight"]) .task-chip.recur{ background:rgba(167,139,250,.16) !important; color:#a78bfa !important; border-color:rgba(167,139,250,.3) !important; }
+/* Snooze button */
+.task-chip.snooze-btn{ cursor:pointer; background:var(--m-card-2) !important; color:var(--m-ink-2) !important; border:1px solid var(--m-border-hi) !important; transition:all .14s; }
+.task-chip.snooze-btn:hover{ border-color:var(--accent-bd) !important; color:var(--accent-text) !important; }
+/* Snooze popover */
+.snooze-pop{
+  position:absolute; z-index:9600; min-width:180px;
+  background:var(--m-card); border:1px solid var(--m-border);
+  border-radius:var(--m-r-sm,12px); box-shadow:var(--m-sh-3); padding:6px;
+  display:flex; flex-direction:column; gap:2px;
+}
+.snooze-pop button{
+  text-align:left; background:none; border:none; font-family:inherit;
+  font-size:13px; color:var(--m-ink); padding:9px 11px; border-radius:8px; cursor:pointer;
+  transition:background .12s;
+}
+.snooze-pop button:hover{ background:var(--accent-dim); color:var(--accent-text); }
+.snooze-pop button:last-child{ color:var(--m-ink-3); }
+.snooze-pop button:last-child:hover{ background:var(--warn-dim,rgba(240,92,78,.1)); color:#dc2626; }
 /* ── 17. Task SHARE — now a meta-row chip (not a corner pill) ── */
 .task-chip.share-btn{
   cursor:pointer;
