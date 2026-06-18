@@ -11702,6 +11702,11 @@ function toggleTaskDone(id){
   if(t.sharedFrom && !wasDone && t.done && typeof notifyTaskCompleted==='function'){
     notifyTaskCompleted(t);
   }
+  // Shared task: un-completing — clear the done flag on the shared_tasks row so the
+  // poller doesn't immediately re-mark it done on the next refresh.
+  if(t.sharedFrom && wasDone && !t.done && typeof notifyTaskUncompleted==='function'){
+    notifyTaskUncompleted(t);
+  }
   // Animate the row before re-rendering moves it
   const row = document.querySelector('.task-item[data-id="'+id+'"]');
   const finishToggle = function(){
@@ -16605,6 +16610,15 @@ async function loadMySharedOutStatus(){
         changed = true;
         pushTaskToSupabase(t);   // persist done + doneBy server-side
       }
+      // A recipient un-completed → my auto-completed copy reverts too (only revert
+      // copies that were completed BY a recipient, never ones I ticked myself).
+      else if(t.done && t.completedByOther && doneRows.length !== status.length){
+        t.done = false;
+        t.doneAt = null;
+        t.completedByOther = null;
+        changed = true;
+        pushTaskToSupabase(t);
+      }
     });
     if(changed){
       saveTasks();
@@ -16638,8 +16652,13 @@ async function loadSharedTasksFromOthers(silent){
           added++;
           try{ pushTaskToSupabase(existing); }catch(e){}   // persist the repair
         }
-        // keep recipient's completion in sync with remote
-        if(r.done && !existing.done){ existing.done = true; existing.doneAt = r.completed_at || new Date().toISOString(); added++; }
+        // keep recipient's completion in sync with remote (both directions, so an
+        // undo that already cleared the remote row doesn't get re-marked done)
+        if(!!r.done !== !!existing.done){
+          existing.done = !!r.done;
+          existing.doneAt = r.done ? (r.completed_at || new Date().toISOString()) : null;
+          added++;
+        }
         // pick up the sharer's edits while the task is still pending
         if(!existing.done && !r.done){
           if(existing.title !== (r.title||existing.title) || existing.notes !== (r.notes||'') ||
@@ -16709,6 +16728,22 @@ async function notifyTaskCompleted(t){
       replied_by: me
     });
   }catch(e){ console.warn('notifyTaskCompleted:',e); }
+}
+
+// Recipient un-completes a shared task → clear the done flag on the shared_tasks row
+// so loadMySharedOutStatus / loadSharedTasksFromOthers don't re-mark it done.
+async function notifyTaskUncompleted(t){
+  try{
+    const rowId = String(t.id||'').indexOf('shared_')===0 ? t.id.slice(7) : null;
+    if(!rowId) return;
+    try{
+      await fetch(SB+'/rest/v1/shared_tasks?id=eq.'+encodeURIComponent(rowId),{
+        method:'PATCH',
+        headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+        body: JSON.stringify({done:false, status:'pending', completed_by:null, completed_at:null})
+      });
+    }catch(e){ /* old schema without status cols */ }
+  }catch(e){ console.warn('notifyTaskUncompleted:',e); }
 }
 
 // ── ATTACHMENTS (Phase 4) ──────────────────
