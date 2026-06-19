@@ -287,6 +287,7 @@
   (async function(){
     try{
       var hash=location.hash||'';
+      if(/[#&?]debug=1/.test(hash)||/[#&?]debug=1/.test(location.search)){window.FC_DEBUG=true;}
       var m=hash.match(/t=([^&]+)/);
       if(!m){fail('No access token.');return;}
       var token=decodeURIComponent(m[1]);
@@ -519,6 +520,10 @@
       };
       for (const f of fields) {
         const v = values[f.name];
+        if (window.FC_DEBUG) {
+          const wc = (f.widgets && f.widgets.length) || 0;
+          console.log('[FC export]', JSON.stringify({ name: f.name, label: f.label, type: f.type, isGroup: !!f.isGroup, widgets: wc, value: v == null ? null : String(v).slice(0, 80) }));
+        }
         if (f.isGroup) {
           for (const opt of f.options || []) {
             const memberName = f.memberMap[opt];
@@ -596,11 +601,11 @@
           if (f.widgets && f.widgets.length) {
             for (const wgt of f.widgets) drawInRect(wgt, (pg, x, y, w, h) => {
               // Date fields often sit over a pre-printed " / / " separator on
-              // the form. Paint a white box over the whole field area (and a
-              // little beyond) first so only our clean value shows — masks the
-              // form's own slashes.
+              // the form. Paint a white box over the field area first so only
+              // our clean value shows. Keep the overhang small so it can't bleed
+              // onto neighbouring printed text (e.g. a course name beside it).
               if (isDate) {
-                pg.drawRectangle({ x: x - 2, y: y - 2, width: w + 60, height: h + 4, color: rgb(1, 1, 1) });
+                pg.drawRectangle({ x: x - 1, y: y - 1, width: w + 10, height: h + 2, color: rgb(1, 1, 1) });
               }
               let size = Math.min(11, h * 0.62);
               let tw = helv.widthOfTextAtSize(text, size);
