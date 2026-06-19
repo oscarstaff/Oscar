@@ -214,6 +214,47 @@
     .modal-overlay { position: fixed; inset: 0; background: rgba(16,24,40,.45); display: flex; align-items: center; justify-content: center; padding: 20px; z-index: 9998; }
     .modal { background: var(--surface); border-radius: var(--radius-lg); width: 100%; max-width: 480px; max-height: 80vh; overflow: hidden; display: flex; flex-direction: column; box-shadow: var(--shadow-lg); }
 
+    /* team templates library modal */
+    @keyframes lib-overlay-in { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes lib-modal-in { from { opacity: 0; transform: translateY(12px) scale(.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
+    .lib-overlay { position: fixed; inset: 0; z-index: 9998; display: flex; align-items: center; justify-content: center; padding: 24px;
+      background: rgba(16,24,40,.5); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); animation: lib-overlay-in .18s ease; }
+    .lib-modal { width: 100%; max-width: 520px; max-height: 82vh; display: flex; flex-direction: column; overflow: hidden;
+      background: var(--surface); border: 1px solid var(--border); border-radius: 18px; box-shadow: 0 24px 64px -16px rgba(16,24,40,.4), 0 0 0 1px rgba(16,24,40,.02);
+      animation: lib-modal-in .22s cubic-bezier(.2,.8,.2,1); }
+    .lib-head { display: flex; align-items: center; gap: 12px; padding: 18px 20px; border-bottom: 1px solid var(--border); }
+    .lib-head .lib-icon { width: 38px; height: 38px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+      border-radius: 10px; background: var(--accent-soft); color: var(--accent); font-size: 16px; }
+    .lib-head .lib-titles { flex: 1; min-width: 0; }
+    .lib-head h3 { margin: 0; font-size: 15px; font-weight: 700; color: var(--text); letter-spacing: -.01em; }
+    .lib-head .lib-sub { margin-top: 2px; font-size: 12px; color: var(--text-3); }
+    .lib-close { width: 32px; height: 32px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+      border: none; background: transparent; color: var(--text-3); font-size: 15px; border-radius: 8px; cursor: pointer; transition: all .12s; }
+    .lib-close:hover { background: var(--surface-2); color: var(--text); }
+    .lib-body { padding: 14px 16px 16px; overflow-y: auto; flex: 1; }
+    .lib-empty { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 10px; padding: 40px 24px; color: var(--text-3); }
+    .lib-empty i { font-size: 30px; color: var(--text-4); }
+    .lib-empty p { margin: 0; font-size: 13px; line-height: 1.5; max-width: 320px; }
+    .lib-row { display: flex; align-items: center; gap: 12px; padding: 12px 13px; border: 1px solid var(--border); border-radius: 12px;
+      margin-bottom: 9px; background: var(--surface); transition: all .12s; }
+    .lib-row:last-child { margin-bottom: 0; }
+    .lib-row:hover { border-color: var(--accent-border); box-shadow: var(--shadow-sm); }
+    .lib-row.match { background: var(--accent-soft); border-color: var(--accent-border); }
+    .lib-row .lib-file { width: 34px; height: 34px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+      border-radius: 9px; background: var(--surface-2); color: var(--text-2); font-size: 14px; }
+    .lib-row.match .lib-file { background: #fff; color: var(--accent); }
+    .lib-row .lib-info { flex: 1; min-width: 0; cursor: pointer; }
+    .lib-row .lib-name { font-size: 13.5px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .lib-row .lib-meta { margin-top: 1px; font-size: 11.5px; color: var(--text-3); display: flex; align-items: center; gap: 5px; }
+    .lib-row .lib-meta .lib-badge { display: inline-flex; align-items: center; gap: 3px; padding: 1px 6px; border-radius: 999px;
+      background: var(--accent); color: #fff; font-size: 10px; font-weight: 600; }
+    .lib-use { flex-shrink: 0; padding: 6px 14px; font-size: 12.5px; font-weight: 600; border: 1px solid var(--accent); border-radius: 8px;
+      background: var(--accent); color: #fff; cursor: pointer; transition: all .12s; }
+    .lib-use:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+    .lib-del { flex-shrink: 0; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; font-size: 12.5px;
+      border: 1px solid var(--border); border-radius: 8px; background: transparent; color: var(--text-3); cursor: pointer; transition: all .12s; }
+    .lib-del:hover { background: var(--err-soft); border-color: var(--err); color: var(--err); }
+
     .divider { width: 5px; flex-shrink: 0; cursor: col-resize; background: transparent; position: relative; }
     .divider::after { content: ''; position: absolute; inset: 0 2px; background: var(--border); transition: background .12s; }
     .divider:hover::after, .divider.dragging::after { background: var(--accent); }
@@ -530,6 +571,22 @@
             .replace(/[\u2022\u00B7]/g, '-')                      // bullets
             .replace(/[^\x00-\xFF]/g, '');                        // drop anything else non-WinAnsi
           let text = toWinAnsi(v);
+          // Hardcoded course/certificate names. The PDF form's course field can
+          // come through blank or with mangled punctuation on export, so force
+          // the correct clean text here. Matches on field name/label or on any
+          // recognisable fragment of the stored value.
+          {
+            const fieldKey = ((f.name || '') + ' ' + (f.label || '')).toLowerCase();
+            const valKey = String(v).toLowerCase();
+            const looksLikeCourseField = /course|certificate|qualification|cert\s*(iii|iv|3|4)/.test(fieldKey);
+            const CERT3 = 'Certificate III - Individual Support (Ageing & Disability)';
+            const CERT4 = 'Certificate IV - Ageing Support with Medication';
+            const mentionsCert4 = /cert\s*(iv|4)|ageing support|medication/.test(valKey) || /cert\s*(iv|4)/.test(fieldKey);
+            const mentionsCert3 = /cert\s*(iii|3)|individual support|disability/.test(valKey) || /cert\s*(iii|3)/.test(fieldKey);
+            if (looksLikeCourseField || mentionsCert3 || mentionsCert4) {
+              text = mentionsCert4 && !mentionsCert3 ? CERT4 : CERT3;
+            }
+          }
           // Treat as a date if the field is typed date OR the value looks like
           // an ISO date (so date masking/format works even when the field name
           // didn't auto-detect as a date).
@@ -1614,26 +1671,43 @@
           <input ref={templateInputRef} type="file" accept=".json,application/json" style={{ display: 'none' }} onChange={(e) => e.target.files[0] && onTemplateFile(e.target.files[0])} />
 
           {showLibrary && (
-            <div style={{ position: 'absolute', top: 64, right: 16, zIndex: 50, width: 340, maxHeight: '70vh', overflow: 'auto', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 14, boxShadow: '0 12px 40px rgba(0,0,0,.3)', padding: 14 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                <strong style={{ fontSize: 14 }}><i className="fa-solid fa-folder-open" style={{ color: 'var(--accent)', marginRight: 6 }} />Team templates</strong>
-                <button className="btn btn-ghost" style={{ padding: '4px 8px' }} onClick={() => setShowLibrary(false)}><i className="fa-solid fa-xmark" /></button>
-              </div>
-              {library.length === 0
-                ? <div style={{ fontSize: 13, color: 'var(--text-3)', padding: '12px 4px' }}>No saved templates yet. Set up this form's fields, then “Save template” to share it with all staff.</div>
-                : library.map(t => {
-                    const mine = pdfBytes && t.pdf_fingerprint === pdfFingerprint(pdfBytes);
-                    return (
-                      <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 10px', border: '1px solid var(--border)', borderRadius: 9, marginBottom: 7, background: mine ? 'var(--accent-soft)' : 'transparent' }}>
-                        <div style={{ flex: 1, minWidth: 0, cursor: 'pointer' }} onClick={() => applyCloudTemplate(t)}>
-                          <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.name}{mine ? '' : ''}</div>
-                          <div style={{ fontSize: 11, color: 'var(--text-3)' }}>{mine ? 'matches this PDF · ' : ''}{t.created_by || 'staff'}</div>
-                        </div>
-                        <button className="btn btn-ghost" style={{ padding: '4px 7px', fontSize: 12 }} onClick={() => applyCloudTemplate(t)}>Use</button>
-                        <button className="btn btn-ghost" style={{ padding: '4px 7px', fontSize: 12, color: 'var(--danger, #c0392b)' }} onClick={() => removeTemplate(t)}><i className="fa-solid fa-trash" /></button>
+            <div className="lib-overlay" onClick={() => setShowLibrary(false)}>
+              <div className="lib-modal" onClick={(e) => e.stopPropagation()}>
+                <div className="lib-head">
+                  <div className="lib-icon"><i className="fa-solid fa-folder-open" /></div>
+                  <div className="lib-titles">
+                    <h3>Team forms</h3>
+                    <div className="lib-sub">{library.length ? library.length + ' saved form' + (library.length === 1 ? '' : 's') : 'Shared across all staff'}</div>
+                  </div>
+                  <button className="lib-close" onClick={() => setShowLibrary(false)} aria-label="Close"><i className="fa-solid fa-xmark" /></button>
+                </div>
+                <div className="lib-body">
+                  {library.length === 0
+                    ? (
+                      <div className="lib-empty">
+                        <i className="fa-solid fa-folder-open" />
+                        <p>No saved forms yet. Set up this form's fields, then “Save template” to share it with all staff.</p>
                       </div>
-                    );
-                  })}
+                    )
+                    : library.map(t => {
+                        const mine = pdfBytes && t.pdf_fingerprint === pdfFingerprint(pdfBytes);
+                        return (
+                          <div key={t.id} className={'lib-row' + (mine ? ' match' : '')}>
+                            <div className="lib-file"><i className="fa-solid fa-file-lines" /></div>
+                            <div className="lib-info" onClick={() => applyCloudTemplate(t)}>
+                              <div className="lib-name">{t.name}</div>
+                              <div className="lib-meta">
+                                {mine && <span className="lib-badge"><i className="fa-solid fa-check" />matches this PDF</span>}
+                                <span>{t.created_by || 'staff'}</span>
+                              </div>
+                            </div>
+                            <button className="lib-use" onClick={() => applyCloudTemplate(t)}>Use</button>
+                            <button className="lib-del" onClick={() => removeTemplate(t)} aria-label="Delete"><i className="fa-solid fa-trash" /></button>
+                          </div>
+                        );
+                      })}
+                </div>
+              </div>
             </div>
           )}
 
