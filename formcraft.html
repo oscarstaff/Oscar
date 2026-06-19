@@ -1570,6 +1570,14 @@
           showToast(errors.length + ' field' + (errors.length === 1 ? '' : 's') + ' need attention', 'err');
           return;
         }
+        if (window.FC_DEBUG) {
+          const dump = fields.map(f => {
+            const v = values[f.name];
+            const wc = (f.widgets && f.widgets.length) || 0;
+            return (f.label || f.name) + '  [' + f.type + (f.isGroup ? '/group' : '') + ', ' + wc + 'w]  =  ' + (v == null || v === '' ? '(empty)' : String(v).slice(0, 60));
+          }).join('\n');
+          alert('FIELD DUMP (screenshot this):\n\n' + dump);
+        }
         setBusy(true);
         try {
           const out = await fillPdf(pdfBytes, fields, values);
