@@ -404,6 +404,28 @@
         return { name, type, label: humanize(name), options, required: false, widgets, order: idx };
       });
 
+      // --- Synthetic "Course" field -------------------------------------------
+      // The certificate name is printed art baked into the PDF (no real form
+      // field exists for it) and can get covered on export. So we add our own
+      // editable Course dropdown that DRAWS the chosen course name on top, at a
+      // fixed page position. Adjust CV (page/x/y/size) to place it exactly over
+      // the printed title. PDF coords: (0,0) = bottom-left, y goes UP. A4 ~ 595x842.
+      const COURSE_DRAW = { page: 1, x: 70, y: 770, size: 12 };
+      fields.push({
+        name: '__course',
+        type: 'dropdown',
+        label: 'Course',
+        required: false,
+        options: [
+          'Certificate III - Individual Support (Ageing & Disability)',
+          'Certificate IV - Ageing Support with Medication',
+        ],
+        widgets: [],
+        order: -1,            // show first in the panel
+        __courseField: true,
+        __draw: COURSE_DRAW,
+      });
+
       return { bytes, fields, pageCount: pdfDoc.getPageCount(), pageSizes };
     }
 
@@ -520,6 +542,17 @@
       };
       for (const f of fields) {
         const v = values[f.name];
+        if (f.__courseField) {
+          if (v && f.__draw) {
+            const d = f.__draw;
+            const pg = pages2[(d.page || 1) - 1];
+            if (pg) {
+              const txt = String(v).replace(/[\u2012\u2013\u2014\u2015\u2212]/g, '-').replace(/[^\x00-\xFF]/g, '');
+              pg.drawText(txt, { x: d.x, y: d.y, size: d.size || 12, font: helv, color: rgb(0.05, 0.05, 0.1) });
+            }
+          }
+          continue;
+        }
         if (f.isGroup) {
           for (const opt of f.options || []) {
             const memberName = f.memberMap[opt];
