@@ -520,10 +520,6 @@
       };
       for (const f of fields) {
         const v = values[f.name];
-        if (window.FC_DEBUG) {
-          const wc = (f.widgets && f.widgets.length) || 0;
-          console.log('[FC export]', JSON.stringify({ name: f.name, label: f.label, type: f.type, isGroup: !!f.isGroup, widgets: wc, value: v == null ? null : String(v).slice(0, 80) }));
-        }
         if (f.isGroup) {
           for (const opt of f.options || []) {
             const memberName = f.memberMap[opt];
@@ -576,22 +572,6 @@
             .replace(/[\u2022\u00B7]/g, '-')                      // bullets
             .replace(/[^\x00-\xFF]/g, '');                        // drop anything else non-WinAnsi
           let text = toWinAnsi(v);
-          // Hardcoded course/certificate names. The PDF form's course field can
-          // come through blank or with mangled punctuation on export, so force
-          // the correct clean text here. Matches on field name/label or on any
-          // recognisable fragment of the stored value.
-          {
-            const fieldKey = ((f.name || '') + ' ' + (f.label || '')).toLowerCase();
-            const valKey = String(v).toLowerCase();
-            const looksLikeCourseField = /course|certificate|qualification|cert\s*(iii|iv|3|4)/.test(fieldKey);
-            const CERT3 = 'Certificate III - Individual Support (Ageing & Disability)';
-            const CERT4 = 'Certificate IV - Ageing Support with Medication';
-            const mentionsCert4 = /cert\s*(iv|4)|ageing support|medication/.test(valKey) || /cert\s*(iv|4)/.test(fieldKey);
-            const mentionsCert3 = /cert\s*(iii|3)|individual support|disability/.test(valKey) || /cert\s*(iii|3)/.test(fieldKey);
-            if (looksLikeCourseField || mentionsCert3 || mentionsCert4) {
-              text = mentionsCert4 && !mentionsCert3 ? CERT4 : CERT3;
-            }
-          }
           // Treat as a date if the field is typed date OR the value looks like
           // an ISO date (so date masking/format works even when the field name
           // didn't auto-detect as a date).
@@ -600,16 +580,17 @@
           if (isoDate) text = isoDate[3] + '  ' + isoDate[2] + '  ' + isoDate[1];
           if (f.widgets && f.widgets.length) {
             for (const wgt of f.widgets) drawInRect(wgt, (pg, x, y, w, h) => {
-              // Date fields often sit over a pre-printed " / / " separator on
-              // the form. Paint a white box over the field area first so only
-              // our clean value shows. Keep the overhang small so it can't bleed
-              // onto neighbouring printed text (e.g. a course name beside it).
-              if (isDate) {
-                pg.drawRectangle({ x: x - 1, y: y - 1, width: w + 10, height: h + 2, color: rgb(1, 1, 1) });
-              }
               let size = Math.min(11, h * 0.62);
               let tw = helv.widthOfTextAtSize(text, size);
               while (tw > w - 6 && size > 6) { size -= 0.5; tw = helv.widthOfTextAtSize(text, size); }
+              // Date fields often sit over a pre-printed " / / " separator. Paint a
+              // white box ONLY behind the date text we're about to draw — sized to
+              // the text's own footprint, never the whole field — so it can't bleed
+              // onto neighbouring printed content (e.g. the course title nearby).
+              if (isDate) {
+                const ty0 = y + (h - size) / 2 + size * 0.12;
+                pg.drawRectangle({ x: x + 1, y: ty0 - size * 0.25, width: Math.min(tw + 6, w - 2), height: size * 1.3, color: rgb(1, 1, 1) });
+              }
               if (f.type === 'multiline') {
                 const words = text.split(/\s+/); const lines = []; let line = '';
                 for (const wd of words) { const t2 = line ? line+' '+wd : wd; if (helv.widthOfTextAtSize(t2,size) > w-6 && line) { lines.push(line); line = wd; } else line = t2; }
@@ -1569,14 +1550,6 @@
         if (errors.length) {
           showToast(errors.length + ' field' + (errors.length === 1 ? '' : 's') + ' need attention', 'err');
           return;
-        }
-        if (window.FC_DEBUG) {
-          const dump = fields.map(f => {
-            const v = values[f.name];
-            const wc = (f.widgets && f.widgets.length) || 0;
-            return (f.label || f.name) + '  [' + f.type + (f.isGroup ? '/group' : '') + ', ' + wc + 'w]  =  ' + (v == null || v === '' ? '(empty)' : String(v).slice(0, 60));
-          }).join('\n');
-          alert('FIELD DUMP (screenshot this):\n\n' + dump);
         }
         setBusy(true);
         try {
