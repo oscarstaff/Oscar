@@ -1709,9 +1709,108 @@ async function saveData(){
   try{
     saveCurrentWeek(); // flush current week into the store
     const res=await window.shiftops.saveData({staff,shiftsStore,availStore,nextStaffId,teams,devices,nextDeviceId,availWeekKey,leaveRequests,nextLeaveId});
-    if(res.ok){isDirty=false;updateSaveStatus();showToast('💾 Saved');}
+    if(res.ok){isDirty=false;updateSaveStatus();showToast('💾 Saved');syncStaffToNexus();}
     else showToast('⚠ Save failed: '+res.error);
   }catch(e){showToast('⚠ '+e.message);}
+}
+
+// ── NEXUS SYNC ────────────────────────────────────────────────────────────
+// ShiftOps is the source of truth for staff + teams; Nexus only reads them.
+// After every save we push each staff member's team into the Nexus-facing
+// tables (staff_credentials, staff_directory) and remove rows for anyone who
+// no longer exists in ShiftOps. This keeps Nexus from showing "no team" or
+// orphaned/ghost accounts. Runs fire-and-forget so it never blocks a save.
+let _nexusSyncRunning=false;
+let _lastSyncSig='';
+async function syncStaffToNexus(){
+  if(_nexusSyncRunning) return;            // avoid overlapping runs
+  // Only sync when the staff/team picture actually changed — saves fire every
+  // couple of seconds during editing, but names/teams rarely change, so this
+  // avoids hammering Supabase with redundant writes.
+  const sig=JSON.stringify(staff.map(function(s){
+    return [s.first,s.last,s.team,(s.isOfficeManager||s.isManager==='office')?1:0];
+  }).sort());
+  if(sig===_lastSyncSig) return;
+  _nexusSyncRunning=true;
+  const NX_SB='https://jcfgldqrdbfkgbixszds.supabase.co';
+  const NX_KEY=(typeof SUPABASE_KEY!=='undefined')?SUPABASE_KEY:'';
+  if(!NX_KEY){ _nexusSyncRunning=false; return; }
+  const H={apikey:NX_KEY,Authorization:'Bearer '+NX_KEY,'Content-Type':'application/json'};
+  const enc=encodeURIComponent;
+  try{
+    // Full name + team for every current ShiftOps staff member. Office managers
+    // have no team; store them under 'Office' so Nexus still shows them placed.
+    const current=staff.map(function(s){
+      const name=((s.first||'').trim()+' '+(s.last||'').trim()).trim();
+      const team=(s.isOfficeManager||s.isManager==='office')?'Office':(s.team||null);
+      return {name:name, team:team};
+    }).filter(function(x){return x.name;});
+
+    // 1) Update team on existing staff_credentials rows (PATCH only the team
+    //    field — never touch password/email/auth). New hires who haven't set up
+    //    a login yet simply have no row; their team lands once they do via the
+    //    directory below + a later sync.
+    for(const c of current){
+      try{
+        await fetch(NX_SB+'/rest/v1/staff_credentials?staff_name=eq.'+enc(c.name),{
+          method:'PATCH',headers:Object.assign({Prefer:'return=minimal'},H),
+          body:JSON.stringify({team:c.team})
+        });
+      }catch(e){}
+    }
+
+    // 2) Mirror name + team into staff_directory (the table Nexus reads for the
+    //    staff list). Try an update first; if no row matched, insert. This avoids
+    //    relying on a unique constraint we can't assume exists.
+    for(const c of current){
+      try{
+        const up=await fetch(NX_SB+'/rest/v1/staff_directory?staff_name=eq.'+enc(c.name),{
+          method:'PATCH',headers:Object.assign({Prefer:'return=representation'},H),
+          body:JSON.stringify({team:c.team})
+        });
+        let rows=[];
+        try{ rows=await up.json(); }catch(e){}
+        if(!Array.isArray(rows) || rows.length===0){
+          // no existing row → insert one
+          await fetch(NX_SB+'/rest/v1/staff_directory',{
+            method:'POST',headers:Object.assign({Prefer:'return=minimal'},H),
+            body:JSON.stringify({staff_name:c.name,team:c.team})
+          });
+        }
+      }catch(e){}
+    }
+
+    // 3) Remove Nexus rows for staff no longer in ShiftOps (deleted accounts).
+    //    Fetch existing names, diff against current, delete the leftovers.
+    const keep={}; current.forEach(function(c){keep[c.name]=true;});
+    async function pruneGhosts(table){
+      try{
+        const r=await fetch(NX_SB+'/rest/v1/'+table+'?select=staff_name',{headers:H});
+        const rows=await r.json();
+        if(!Array.isArray(rows)) return;
+        for(const row of rows){
+          const nm=row.staff_name;
+          if(nm && !keep[nm]){
+            try{
+              await fetch(NX_SB+'/rest/v1/'+table+'?staff_name=eq.'+enc(nm),{
+                method:'DELETE',headers:Object.assign({Prefer:'return=minimal'},H)
+              });
+            }catch(e){}
+          }
+        }
+      }catch(e){}
+    }
+    await pruneGhosts('staff_directory');
+    _lastSyncSig=sig;   // mark this staff/team snapshot as synced
+    // NOTE: we deliberately do NOT auto-delete from staff_credentials here,
+    // because that row also gates the person's login/auth. Removing a deleted
+    // staff member's credentials (and their Supabase auth user) is a heavier
+    // offboarding action handled separately, not on every roster save.
+  }catch(e){
+    console.warn('[syncStaffToNexus] failed:', e);
+  }finally{
+    _nexusSyncRunning=false;
+  }
 }
 
 async function resetData(){
@@ -1744,7 +1843,7 @@ async function forceSave(){
     try{
       saveCurrentWeek();
       const res=await window.shiftops.saveData({staff,shiftsStore,availStore,nextStaffId,teams,devices,nextDeviceId,availWeekKey,leaveRequests,nextLeaveId});
-      if(res && res.ok){isDirty=false;updateSaveStatus();}
+      if(res && res.ok){isDirty=false;updateSaveStatus();syncStaffToNexus();}
     }catch(e){console.warn('[forceSave] failed:', e);}
   }
 }
