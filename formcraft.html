@@ -517,7 +517,19 @@
           continue;
         }
         {
-          let text = String(v);
+          // Helvetica/StandardFonts use WinAnsi encoding, which can't encode
+          // em/en-dashes or smart punctuation. Those chars make drawText throw,
+          // silently aborting the field draw (e.g. "Certificate III — ..." and
+          // "Ageing & Disability" disappearing on export). Map them to safe ASCII.
+          const toWinAnsi = (s) => String(s)
+            .replace(/[\u2012\u2013\u2014\u2015\u2212]/g, '-')   // dashes -> hyphen
+            .replace(/[\u2018\u2019\u201A\u201B]/g, "'")          // smart single quotes
+            .replace(/[\u201C\u201D\u201E\u201F]/g, '"')          // smart double quotes
+            .replace(/\u2026/g, '...')                            // ellipsis
+            .replace(/[\u00A0\u2007\u202F]/g, ' ')                // nbsp variants
+            .replace(/[\u2022\u00B7]/g, '-')                      // bullets
+            .replace(/[^\x00-\xFF]/g, '');                        // drop anything else non-WinAnsi
+          let text = toWinAnsi(v);
           // Treat as a date if the field is typed date OR the value looks like
           // an ISO date (so date masking/format works even when the field name
           // didn't auto-detect as a date).
@@ -1101,19 +1113,13 @@
               <small>or drop it here</small>
               <input ref={pdfRef} type="file" accept=".pdf,application/pdf" onChange={(e) => pick(e.target.files[0])} />
             </div>
-            <div className="template-pill" onClick={onOpenLibrary}>
-              <i className="fa-solid fa-folder-open" />
-              <strong style={{marginLeft:4}}>Load a team template</strong>
-            </div>
             <div className="builtin-forms">
-              <div className="builtin-label">Or start from a ready form</div>
-              {(window.FC_BUILTIN_FORMS||[]).map(bf => (
-                <div key={bf.id} className="builtin-card" onClick={() => onBuiltin(bf)}>
-                  <i className="fa-solid fa-file-lines" />
-                  <span>{bf.name}</span>
-                  <i className="fa-solid fa-arrow-right builtin-go" />
-                </div>
-              ))}
+              <div className="builtin-label">Team forms</div>
+              <div className="builtin-card" onClick={onOpenLibrary}>
+                <i className="fa-solid fa-folder-open" />
+                <span>Browse team forms</span>
+                <i className="fa-solid fa-arrow-right builtin-go" />
+              </div>
             </div>
             <div className="features">
               <div className="feat"><i className="fa-solid fa-wand-magic-sparkles" /> Auto-detects fields</div>
