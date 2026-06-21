@@ -967,6 +967,40 @@ body{ background:
 /* smooth fade-in when switching staff sub-tabs (no abrupt snap) */
 #subsection-list,#subsection-teamview,#subsection-manageteams,#subsection-leave,#subsection-leavesummary{ animation:soFade .28s cubic-bezier(.22,1,.36,1); }
 @keyframes soFade{ from{ opacity:0; transform:translateY(7px); } to{ opacity:1; transform:none; } }
+
+/* ── SMOOTHNESS PASS ── gentle, GPU-friendly transitions site-wide ── */
+.nav-item,.sub-tab,.tab-content,.btn,.role-pill,.type-toggle,.staff-card,.staff-row,
+.team-card,.shift-cell,.avail-cell,.modal,.form-input,.modal-close{
+  transition:background-color .18s ease, color .18s ease, border-color .18s ease,
+             box-shadow .2s ease, transform .15s cubic-bezier(.22,1,.36,1), opacity .2s ease;
+}
+.nav-item{ will-change:transform; }
+.nav-item:hover{ transform:translateX(2px); }
+.nav-item:active,.sub-tab:active{ transform:scale(.97); }
+.btn{ will-change:transform; }
+.btn:hover{ transform:translateY(-1px); }
+.btn:active{ transform:translateY(0) scale(.98); }
+.role-pill:active,.type-toggle:active{ transform:scale(.95); }
+/* cards lift slightly on hover instead of snapping */
+.staff-card:hover,.team-card:hover{ transform:translateY(-2px); box-shadow:0 8px 22px -10px rgba(16,24,40,.22); }
+/* inputs focus smoothly */
+.form-input:focus{ box-shadow:0 0 0 3px rgba(16,185,129,.12); }
+/* subtab underline glides rather than jumps (already has color transition; add the bar) */
+.sub-tab{ position:relative; }
+.sub-tab::after{
+  content:''; position:absolute; left:0; right:0; bottom:-1px; height:2px;
+  background:var(--accent); transform:scaleX(0); transform-origin:center;
+  transition:transform .22s cubic-bezier(.22,1,.36,1);
+}
+.sub-tab.active::after{ transform:scaleX(1); }
+.sub-tab.active{ border-bottom-color:transparent; } /* use the animated bar instead */
+/* modal open feels softer */
+@keyframes soModalIn{ from{ opacity:0; transform:translateY(12px) scale(.98);} to{ opacity:1; transform:none; } }
+.modal-overlay.active .modal,.modal.active{ animation:soModalIn .24s cubic-bezier(.22,1,.36,1); }
+/* respect reduced-motion */
+@media (prefers-reduced-motion:reduce){
+  *{ animation-duration:.001ms !important; transition-duration:.001ms !important; }
+}
 .tab-content.active{ animation:soFade .3s cubic-bezier(.22,1,.36,1); }
 
 /* ── Sidebar ── */
@@ -1523,7 +1557,7 @@ body{ background:
 
     <!-- Set password panel -->
     <div id="rpanel-set">
-      <div class="form-group"><label class="form-label">New Password</label><input type="password" class="form-input" id="resetPassNew" placeholder="Enter new password (min 4 chars)"></div>
+      <div class="form-group"><label class="form-label">New Password</label><input type="password" class="form-input" id="resetPassNew" placeholder="Enter new password (min 8 chars)"></div>
       <div class="form-group"><label class="form-label">Confirm Password</label><input type="password" class="form-input" id="resetPassConfirm" placeholder="Repeat new password"></div>
       <div id="resetPassMsg" style="font-size:12px;padding:8px 12px;border-radius:8px;margin-bottom:8px;display:none"></div>
       <div class="modal-actions">
