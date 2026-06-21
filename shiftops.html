@@ -1747,15 +1747,24 @@ async function syncStaffToNexus(){
     }).filter(function(x){return x.name;});
 
     // 1) Update team on existing staff_credentials rows (PATCH only the team
-    //    field — never touch password/email/auth). New hires who haven't set up
-    //    a login yet simply have no row; their team lands once they do via the
-    //    directory below + a later sync.
+    //    field — never touch password/email/auth). If NO row exists yet (a brand
+    //    new hire with no login set up), INSERT a minimal row carrying name +
+    //    team, so Nexus shows their team immediately instead of "No team". The
+    //    login/password fields stay empty until they migrate via admin set-pw.
     for(const c of current){
       try{
-        await fetch(NX_SB+'/rest/v1/staff_credentials?staff_name=eq.'+enc(c.name),{
-          method:'PATCH',headers:Object.assign({Prefer:'return=minimal'},H),
+        const up=await fetch(NX_SB+'/rest/v1/staff_credentials?staff_name=eq.'+enc(c.name),{
+          method:'PATCH',headers:Object.assign({Prefer:'return=representation'},H),
           body:JSON.stringify({team:c.team})
         });
+        let rows=[];
+        try{ rows=await up.json(); }catch(e){}
+        if(!Array.isArray(rows) || rows.length===0){
+          await fetch(NX_SB+'/rest/v1/staff_credentials',{
+            method:'POST',headers:Object.assign({Prefer:'return=minimal'},H),
+            body:JSON.stringify({staff_name:c.name,team:c.team})
+          });
+        }
       }catch(e){}
     }
 
@@ -4219,6 +4228,19 @@ function _soTok(){
         h.set('Authorization', 'Bearer ' + tok);
         if(!h.has('apikey')) h.set('apikey', SUPABASE_KEY);
         init.headers = h;
+      }
+      // Apps Script relay: attach the admin's Supabase login token so the relay
+      // can verify they're an admin (needed for adminSetPw / offboardStaff /
+      // adminRenameAuth). Without this the relay returns "forbidden".
+      if(tok && url.indexOf('script.google.com/macros') >= 0 &&
+         init && init.body && typeof init.body === 'string'){
+        try{
+          const b = JSON.parse(init.body);
+          if(b && typeof b === 'object' && b.sbAccessToken === undefined){
+            b.sbAccessToken = tok;
+            init = Object.assign({}, init, { body: JSON.stringify(b) });
+          }
+        }catch(e){}
       }
     }catch(e){}
     return _origFetch(input, init);
