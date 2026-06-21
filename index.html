@@ -6548,6 +6548,12 @@ const GAS_TOKEN = "oscars_gas_83235a5f0c1f6ba32b18235e2b2d544ac137167d";
         const b = JSON.parse(opts.body);
         if(b && typeof b === 'object' && b.token === undefined){
           b.token = GAS_TOKEN;
+          // Also attach the logged-in user's Supabase token so the relay can
+          // verify WHO is calling (needed for admin-only actions). Harmless on
+          // non-admin actions; the relay just ignores it there.
+          if(window._sbAuthToken && b.sbAccessToken === undefined){
+            b.sbAccessToken = window._sbAuthToken;
+          }
           opts = Object.assign({}, opts, { body: JSON.stringify(b) });
         }
       }
@@ -13937,10 +13943,6 @@ function renderClockCard(){
 const OFFICE_LAT = -33.95245;
 const OFFICE_LNG = 151.13856;
 const OFFICE_RADIUS_DEFAULT = 30;
-// ── TESTING FLAG ──────────────────────────────────────────────
-// Set to true to BYPASS the clock-in geofence (clock in from anywhere).
-// Set back to false to restore normal location enforcement before going live.
-const GEOFENCE_DISABLED = true;
 let _globalGeofenceM = null; // cached after first load
 
 async function loadGlobalGeofence(){
@@ -14338,14 +14340,6 @@ async function toggleClock(){
     }catch(e){
       // Silent — clock-out proceeds without GPS
     }
-  } else if(GEOFENCE_DISABLED){
-    // TESTING: geofence bypassed — clock in from anywhere. Try to grab GPS for
-    // the record, but never block on it.
-    try{
-      const pos = await getCurrentPosition();
-      lat = pos.coords.latitude;
-      lng = pos.coords.longitude;
-    }catch(e){ /* ignore — no location stored, but punch proceeds */ }
   } else {
     // Clock-IN: enforce geofence
     try{
