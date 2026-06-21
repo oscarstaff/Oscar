@@ -1399,10 +1399,12 @@ body{ background:
       <div class="form-group"><label class="form-label">Team</label>
         <select class="form-input" id="staffTeam">
           <option value="Enrolment">Enrolment</option>
+          <option value="Follow-up">Follow-up</option>
+          <option value="Processing">Processing</option>
           <option value="Placement">Placement</option>
-          <option value="Training">Training</option>
-          <option value="Operations">Operations</option>
-          <option value="Counselling">Counselling</option>
+          <option value="Evershine">Evershine</option>
+          <option value="Accounts">Accounts</option>
+          <option value="Education">Education</option>
         </select>
       </div>
       <div class="form-group"><label class="form-label">Role</label>
@@ -1420,13 +1422,7 @@ body{ background:
     </div>
     <div class="form-group" style="margin-top:4px;">
       <label class="form-label">Also on teams <span style="font-weight:400;color:var(--text-dim);font-size:10.5px;">(optional — for staff on more than one)</span></label>
-      <div id="staffExtraTeams" style="display:flex;flex-wrap:wrap;gap:8px;">
-        <label class="xt-chip"><input type="checkbox" value="Enrolment"><span>Enrolment</span></label>
-        <label class="xt-chip"><input type="checkbox" value="Placement"><span>Placement</span></label>
-        <label class="xt-chip"><input type="checkbox" value="Training"><span>Training</span></label>
-        <label class="xt-chip"><input type="checkbox" value="Operations"><span>Operations</span></label>
-        <label class="xt-chip"><input type="checkbox" value="Counselling"><span>Counselling</span></label>
-      </div>
+      <div id="staffExtraTeams" style="display:flex;flex-wrap:wrap;gap:8px;"><!-- built dynamically from the live teams list by buildExtraTeamChips() --></div>
     </div>
     <div id="staffAdminSection" style="display:none;margin-top:18px;padding-top:18px;border-top:1px solid var(--border);">
       <div style="font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:12px;">🔐 Access &amp; Admin</div>
@@ -1676,7 +1672,7 @@ let staff=[
   {id:2,first:'Jordan',last:'Lee',team:'Enrolment',isManager:false,type:'full',maxHours:38,color:COLORS[1]},
   {id:3,first:'Sam',last:'Patel',team:'Placement',isManager:true,type:'full',maxHours:24,color:COLORS[2]},
   {id:4,first:'Riley',last:'Moore',team:'Placement',isManager:false,type:'casual',maxHours:20,color:COLORS[3]},
-  {id:5,first:'Morgan',last:'Kim',team:'Training',isManager:false,type:'part',maxHours:30,color:COLORS[4]},
+  {id:5,first:'Morgan',last:'Kim',team:'Processing',isManager:false,type:'part',maxHours:30,color:COLORS[4]},
 ];
 // availability[staffId][dayIndex] = {type:'all'|'custom'|'no', start?:'09:00', end?:'17:00'}
 let availability={};
@@ -1693,7 +1689,7 @@ let shifts={
   5:{0:[{start:'09:00',end:'19:00',type:'morning',role:'Training'}],2:[{start:'09:00',end:'19:00',type:'morning',role:'Training'}],3:[{start:'09:00',end:'19:00',type:'morning',role:'Training'}]},
 };
 let nextStaffId=6;
-let teams=['Enrolment','Placement','Training','Operations','Counselling'];
+let teams=['Enrolment','Follow-up','Processing','Placement','Evershine','Accounts','Education'];
 let devices=[]; // [{id, name, assignedTo: staffId|null}]
 let nextDeviceId=1;
 let currentWeekStart=getMonday(new Date());
@@ -2711,6 +2707,17 @@ function modalSetPassword(){
 function populateTeamSelect(selectedTeam){
   const sel=document.getElementById('staffTeam');
   sel.innerHTML=[...teams].sort().map(t=>`<option value="${t}"${t===selectedTeam?' selected':''}>${t}</option>`).join('');
+  // Rebuild the "Also on teams" chips from the SAME live teams list so newly
+  // added/removed teams appear automatically — no hardcoded HTML to maintain.
+  buildExtraTeamChips();
+}
+function buildExtraTeamChips(){
+  const wrap=document.getElementById('staffExtraTeams');
+  if(!wrap) return;
+  const esc=s=>String(s).replace(/"/g,'&quot;').replace(/</g,'&lt;');
+  wrap.innerHTML=[...teams].sort().map(t=>
+    '<label class="xt-chip"><input type="checkbox" value="'+esc(t)+'"><span>'+esc(t)+'</span></label>'
+  ).join('');
 }
 async function saveStaff(){
   const first=document.getElementById('staffFirstName').value.trim();
@@ -3314,6 +3321,11 @@ function removeTeam(name){
   const count=staff.filter(s=>s.team===name).length;
   if(count>0){showToast(`⚠ Reassign ${count} staff before removing "${name}"`);return;}
   teams=teams.filter(t=>t!==name);
+  // Also drop any SECONDARY memberships of this team from staff_teams.
+  try{
+    fetch(SUPABASE_URL+'/rest/v1/staff_teams?team=eq.'+encodeURIComponent(name),
+      {method:'DELETE',headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY}}).catch(function(){});
+  }catch(e){}
   markDirty();renderTeams();showToast(`Team "${name}" removed`);
 }
 
@@ -3323,6 +3335,14 @@ function renameTeam(oldName,newName){
   if(teams.includes(newName)){showToast('⚠ That team name already exists');return;}
   teams=teams.map(t=>t===oldName?newName:t);
   staff.forEach(s=>{if(s.team===oldName)s.team=newName;});
+  // Carry the rename into staff_teams (secondary memberships) too.
+  try{
+    fetch(SUPABASE_URL+'/rest/v1/staff_teams?team=eq.'+encodeURIComponent(oldName),{
+      method:'PATCH',
+      headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({team:newName})
+    }).catch(function(){});
+  }catch(e){}
   markDirty();renderTeams();renderAll();showToast(`✓ Renamed to "${newName}"`);
 }
 // Debounced renderAll — batches rapid consecutive calls into one render
