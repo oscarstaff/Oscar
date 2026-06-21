@@ -8359,6 +8359,7 @@ async function enterHub(){
   startAutoRefresh();
   initRealtime();
   loadBirthdays();
+  setTimeout(maybeBirthdayCelebration, 1400); // happy-birthday + confetti if it's their day
   // Restore from URL hash if present
   const hash=window.location.hash.replace('#','');
   const validPages=['home','schedule','profile','announcements','engagement','tasks','calendar','training','documents','myreports','notifs','leave','availability','hub'];
@@ -15426,6 +15427,64 @@ function showOnboardingConfetti(){
   setTimeout(function(){
     if(container && container.parentNode) container.parentNode.removeChild(container);
   }, 6000);
+}
+
+// ── BIRTHDAY CELEBRATION ON LOGIN ──
+// Shows a happy-birthday banner + confetti when today is the logged-in user's
+// birthday. NEVER calculates or displays age — only month + day are compared.
+async function maybeBirthdayCelebration(){
+  try{
+    if(!me) return;
+    const today = new Date();
+    const todayKey = today.getFullYear()+'-'+(today.getMonth()+1)+'-'+today.getDate();
+    const seenKey = 'nx_bday_'+me;
+    try{ if(localStorage.getItem(seenKey) === todayKey) return; }catch(e){}
+
+    const rows = await sbGet('staff_credentials',
+      '?staff_name=eq.'+encodeURIComponent(me)+'&select=birthday&birthday=not.is.null');
+    if(!rows || !rows.length || !rows[0].birthday) return;
+
+    // birthday stored as YYYY-MM-DD. Compare MONTH + DAY only — the year is
+    // never read, so age is never derived or shown.
+    const parts = String(rows[0].birthday).split('-');
+    if(parts.length < 3) return;
+    const bMonth = parseInt(parts[1],10);
+    const bDay   = parseInt(parts[2],10);
+    if(bMonth !== (today.getMonth()+1) || bDay !== today.getDate()) return;
+
+    try{ localStorage.setItem(seenKey, todayKey); }catch(e){}
+
+    const first = me.split(' ')[0];
+    _showBirthdayBanner(first);
+    if(typeof showOnboardingConfetti === 'function') showOnboardingConfetti();
+  }catch(e){ console.warn('birthday check', e); }
+}
+
+function _showBirthdayBanner(firstName){
+  const ov = document.createElement('div');
+  ov.id = 'bdayOverlay';
+  ov.style.cssText = 'position:fixed;inset:0;z-index:99998;display:flex;align-items:center;justify-content:center;background:rgba(15,23,42,.45);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);animation:bdayFade .3s ease;';
+  const card = document.createElement('div');
+  card.style.cssText = 'background:var(--surface,#fff);border-radius:20px;padding:30px 34px;max-width:340px;width:86%;text-align:center;box-shadow:0 24px 64px -16px rgba(16,24,40,.45);animation:bdayPop .4s cubic-bezier(.34,1.5,.6,1);';
+  const safe = (firstName||'').replace(/[<>&]/g,'');
+  card.innerHTML =
+    '<div style="font-size:46px;line-height:1;margin-bottom:10px;">🎉</div>'+
+    '<div style="font-size:22px;font-weight:800;color:var(--text,#0f172a);letter-spacing:-.02em;margin-bottom:6px;">Happy Birthday, '+safe+'!</div>'+
+    '<div style="font-size:14px;color:var(--text-2,#64748b);line-height:1.5;margin-bottom:20px;">Hope you have a wonderful day. The whole team is celebrating you today.</div>'+
+    '<button id="bdayCloseBtn" style="padding:11px 26px;font-size:14px;font-weight:700;color:#fff;background:var(--accent,#2563eb);border:none;border-radius:11px;cursor:pointer;font-family:inherit;">Thank you!</button>';
+  ov.appendChild(card);
+  if(!document.getElementById('bdayAnimStyle')){
+    const st = document.createElement('style');
+    st.id = 'bdayAnimStyle';
+    st.textContent = '@keyframes bdayFade{from{opacity:0;}to{opacity:1;}}@keyframes bdayPop{from{opacity:0;transform:translateY(14px) scale(.95);}to{opacity:1;transform:none;}}';
+    document.head.appendChild(st);
+  }
+  document.body.appendChild(ov);
+  function close(){ if(ov&&ov.parentNode) ov.parentNode.removeChild(ov); }
+  ov.addEventListener('click', function(e){ if(e.target===ov) close(); });
+  const btn = document.getElementById('bdayCloseBtn');
+  if(btn) btn.addEventListener('click', close);
+  setTimeout(close, 12000);
 }
 
 function handleOnboardingAction(taskId){
