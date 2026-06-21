@@ -13937,6 +13937,10 @@ function renderClockCard(){
 const OFFICE_LAT = -33.95245;
 const OFFICE_LNG = 151.13856;
 const OFFICE_RADIUS_DEFAULT = 30;
+// ── TESTING FLAG ──────────────────────────────────────────────
+// Set to true to BYPASS the clock-in geofence (clock in from anywhere).
+// Set back to false to restore normal location enforcement before going live.
+const GEOFENCE_DISABLED = true;
 let _globalGeofenceM = null; // cached after first load
 
 async function loadGlobalGeofence(){
@@ -14334,6 +14338,14 @@ async function toggleClock(){
     }catch(e){
       // Silent — clock-out proceeds without GPS
     }
+  } else if(GEOFENCE_DISABLED){
+    // TESTING: geofence bypassed — clock in from anywhere. Try to grab GPS for
+    // the record, but never block on it.
+    try{
+      const pos = await getCurrentPosition();
+      lat = pos.coords.latitude;
+      lng = pos.coords.longitude;
+    }catch(e){ /* ignore — no location stored, but punch proceeds */ }
   } else {
     // Clock-IN: enforce geofence
     try{
