@@ -599,6 +599,10 @@ body {
 .sub-tab:hover { color: var(--text-mid); }
 .sub-tab.active { color: var(--accent-text); border-bottom-color: var(--accent); font-weight: 600; }
 
+.xt-chip{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border:1px solid var(--border);border-radius:20px;font-size:12px;cursor:pointer;user-select:none;transition:all .15s;}
+.xt-chip input{margin:0;}
+.xt-chip:has(input:checked){background:var(--accent);border-color:var(--accent);color:#fff;}
+
 /* ══════════════════════════════════════════
    ROLE VIEW
 ══════════════════════════════════════════ */
@@ -1413,6 +1417,16 @@ body{ background:
         <select class="form-input" id="staffType"><option value="full">Full-time</option><option value="part">Part-time</option><option value="casual">Casual</option></select>
       </div>
       <div class="form-group"><label class="form-label">Max Hours / Week</label><input type="number" class="form-input" id="staffMaxHours" value="38" min="1" max="80"></div>
+    </div>
+    <div class="form-group" style="margin-top:4px;">
+      <label class="form-label">Also on teams <span style="font-weight:400;color:var(--text-dim);font-size:10.5px;">(optional — for staff on more than one)</span></label>
+      <div id="staffExtraTeams" style="display:flex;flex-wrap:wrap;gap:8px;">
+        <label class="xt-chip"><input type="checkbox" value="Enrolment"><span>Enrolment</span></label>
+        <label class="xt-chip"><input type="checkbox" value="Placement"><span>Placement</span></label>
+        <label class="xt-chip"><input type="checkbox" value="Training"><span>Training</span></label>
+        <label class="xt-chip"><input type="checkbox" value="Operations"><span>Operations</span></label>
+        <label class="xt-chip"><input type="checkbox" value="Counselling"><span>Counselling</span></label>
+      </div>
     </div>
     <div id="staffAdminSection" style="display:none;margin-top:18px;padding-top:18px;border-top:1px solid var(--border);">
       <div style="font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:12px;">🔐 Access &amp; Admin</div>
@@ -2600,6 +2614,8 @@ function openAddStaff(){
   onRoleChange(document.getElementById('staffIsManager'));
   const opt=document.querySelector('#staffIsManager option[value="office"]');
   if(opt)opt.textContent='Office Manager';
+  const xtw=document.getElementById('staffExtraTeams');
+  if(xtw) xtw.querySelectorAll('input[type=checkbox]').forEach(b=>{ b.checked=false; });
   openModal('staffModal');
 }
 function editStaff(id){
@@ -2619,7 +2635,24 @@ function editStaff(id){
   const adminSec = document.getElementById('staffAdminSection');
   if(adminSec) adminSec.style.display = '';
   loadStaffAccess(s);
+  loadStaffExtraTeams((s.first+' '+s.last).trim(), s.team);
   openModal('staffModal');
+}
+
+// Tick the "Also on teams" boxes from staff_teams (minus the primary team).
+async function loadStaffExtraTeams(fullName, primaryTeam){
+  const wrap=document.getElementById('staffExtraTeams');
+  if(wrap) wrap.querySelectorAll('input[type=checkbox]').forEach(b=>{ b.checked=false; });
+  if(!fullName) return;
+  try{
+    const rows=await fetch(SUPABASE_URL+'/rest/v1/staff_teams?staff_name=eq.'+encodeURIComponent(fullName)+'&select=team',
+      {headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY}}).then(r=>r.json());
+    const mine=(rows||[]).map(r=>r.team);
+    if(wrap) wrap.querySelectorAll('input[type=checkbox]').forEach(b=>{
+      // tick extras, but not the primary (that's the main Team select)
+      if(b.value!==primaryTeam && mine.indexOf(b.value)!==-1) b.checked=true;
+    });
+  }catch(e){ console.warn('loadStaffExtraTeams', e); }
 }
 
 // Load one staff member's app access + admin flag into the edit panel
@@ -2702,6 +2735,7 @@ async function saveStaff(){
     }
     window._editingOldName = null;
     await saveStaffAccess(newName);   // persist app access + admin flag for this person
+    await saveStaffTeams(newName, team); // persist multi-team membership
     // keep local admin flag in sync so the row badge updates without a reload
     if(s){ const isAdmin=!!(document.getElementById('saAccess_admin')||{}).checked; s.isHubAdmin=isAdmin; s.isShiftAdmin=isAdmin; }
     closeModal('staffModal');forceSave();renderAll();showToast('✓ Staff updated');pushStaffNames();
@@ -2710,6 +2744,7 @@ async function saveStaff(){
     staff.push(s);shifts[s.id]={};availability[s.id]={};
     const fullName=(first+' '+last).trim();
     closeModal('staffModal');forceSave();renderAll();pushStaffNames();
+    saveStaffTeams(fullName, team); // persist multi-team membership (fire-and-forget)
     // Create the staff's real auth account (temp password, forced reset on first login)
     // so they can actually log in under auth-only mode.
     try{
@@ -2723,6 +2758,33 @@ async function saveStaff(){
     }catch(e){ showToast(`✓ ${fullName} added, but auth setup failed. Use Set Password to fix.`); }
   }
 }
+// Write this staffer's team memberships to staff_teams: primary team + any
+// ticked "Also on teams". Replaces their full set (removes unticked ones).
+async function saveStaffTeams(fullName, primaryTeam){
+  if(!fullName) return;
+  const want=[];
+  if(primaryTeam) want.push(primaryTeam);
+  const wrap=document.getElementById('staffExtraTeams');
+  if(wrap){
+    wrap.querySelectorAll('input[type=checkbox]:checked').forEach(b=>{
+      if(want.indexOf(b.value)===-1) want.push(b.value);
+    });
+  }
+  const H={apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY};
+  const HJ={...H,'Content-Type':'application/json'};
+  try{
+    // delete this person's existing memberships, then insert the wanted set.
+    await fetch(SUPABASE_URL+'/rest/v1/staff_teams?staff_name=eq.'+encodeURIComponent(fullName),
+      {method:'DELETE',headers:H});
+    if(want.length){
+      await fetch(SUPABASE_URL+'/rest/v1/staff_teams',{
+        method:'POST',headers:{...HJ,'Prefer':'return=minimal'},
+        body:JSON.stringify(want.map(t=>({staff_name:fullName,team:t})))
+      });
+    }
+  }catch(e){ console.warn('saveStaffTeams', e); }
+}
+
 function removeStaff(id){
   const s=staff.find(x=>x.id===id);
   if(!s)return;
@@ -4328,6 +4390,10 @@ async function renameStaffEverywhere(oldName, newName){
       method:'PATCH', headers:H, body:JSON.stringify({staff_name:newName})
     });
     await fetch(SUPABASE_URL+'/rest/v1/clock_overrides?staff_name=eq.'+encodeURIComponent(oldName),{
+      method:'PATCH', headers:H, body:JSON.stringify({staff_name:newName})
+    }).catch(function(){});
+    // 2c. staff_teams: rename membership rows so multi-team data follows the person.
+    await fetch(SUPABASE_URL+'/rest/v1/staff_teams?staff_name=eq.'+encodeURIComponent(oldName),{
       method:'PATCH', headers:H, body:JSON.stringify({staff_name:newName})
     }).catch(function(){});
     // 3. Update the auth account's email (firstname.lastname@oscars.local) + metadata

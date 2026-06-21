@@ -2988,7 +2988,7 @@ html[data-sb="collapsed"] .nav-item:hover::after{
 }
 /* Strip "nav-" prefix from tooltip — handled by content transform won't work, use JS-friendly attr */
 html[data-sb="collapsed"] [id="nav-home"]:hover::after{content:"Home";}
-html[data-sb="collapsed"] [id="nav-schedule"]:hover::after{content:"Roster";}
+html[data-sb="collapsed"] [id="nav-schedule"]:hover::after{content:"My Time";}
 html[data-sb="collapsed"] [id="nav-updates"]:hover::after{content:"Updates";}
 html[data-sb="collapsed"] [id="nav-myreports"]:hover::after{content:"My Reports";}
 html[data-sb="collapsed"] [id="nav-tasks"]:hover::after{content:"Tasks";}
@@ -5124,7 +5124,7 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
       <div class="nav-group" id="navg-roster">
         <div class="nav-item nav-parent" id="nav-schedule" onclick="toggleNavGroup('roster')">
           <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"/></svg>
-          Roster
+          My Time
           <svg class="nav-chevron" viewBox="0 0 20 20" fill="currentColor" style="width:14px;height:14px;margin-left:auto;transition:transform .2s;"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
         </div>
         <div class="nav-children">
@@ -5515,7 +5515,7 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
     <!-- SCHEDULE: Leave + Availability combined -->
     <div class="page" id="page-schedule">
       <div class="page-hd">
-        <div class="page-title">Roster</div>
+        <div class="page-title">My Time</div>
       </div>
 
       <!-- Sub-tabs (segmented control) -->
@@ -6595,7 +6595,7 @@ function switchProfileTab(t){
         <svg class="bn-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h4v-4h2v4h4a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z"/></svg>
       </div>
       <!-- ROSTER — people icon (matches sidebar) -->
-      <div class="bn-item" id="bn-schedule" data-tab="schedule" onclick="if(navigator.vibrate)navigator.vibrate(8);openRoster()" aria-label="Roster">
+      <div class="bn-item" id="bn-schedule" data-tab="schedule" onclick="if(navigator.vibrate)navigator.vibrate(8);openRoster()" aria-label="My Time">
         <svg class="bn-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"/></svg>
       </div>
       <!-- TASKS — checklist icon -->
@@ -6876,6 +6876,14 @@ async function loadDocuments(){
         const creds = await sbGet('staff_credentials','?staff_name=eq.'+encodeURIComponent(me)+'&select=team');
         myTeam = (creds.length && creds[0] && creds[0].team) ? creds[0].team : '';
       }catch(e){ myTeam = ''; }
+    }
+    // Load ALL my teams from staff_teams (multi-team). Falls back to the single
+    // team if the table isn't there yet. window.myTeams is used by channels.
+    if(!window.myTeams){
+      try{
+        const tt = await sbGet('staff_teams','?staff_name=eq.'+encodeURIComponent(me)+'&select=team');
+        window.myTeams = (tt && tt.length) ? tt.map(function(r){return r.team;}) : (myTeam ? [myTeam] : []);
+      }catch(e){ window.myTeams = myTeam ? [myTeam] : []; }
     }
     if(sub) sub.textContent = myTeam ? 'Documents for ' + myTeam + ' team' : 'All documents';
 
@@ -8442,7 +8450,7 @@ function openLibrary(){
 
 function openRoster(){
   openSubtabChooser({
-    title: 'Roster',
+    title: 'My Time',
     navGroupId: 'navg-roster',
     defaultTab: 'schedule',
     options: [
@@ -15082,8 +15090,8 @@ const TOUR_STEPS = [
   },
   {
     target: '#bn-schedule',
-    title: 'Roster',
-    body: 'Tap here to open the Roster. This is where you set your Availability and request Leave.',
+    title: 'My Time',
+    body: 'Tap here to open My Time. This is where you set your Availability and request Leave.',
     advance: 'tap',
     afterTap: function(){ /* navigation handled by the element's own onclick */ }
   },
