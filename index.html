@@ -13943,6 +13943,11 @@ function renderClockCard(){
 const OFFICE_LAT = -33.95245;
 const OFFICE_LNG = 151.13856;
 const OFFICE_RADIUS_DEFAULT = 30;
+// ── TESTING FLAG ──────────────────────────────────────────────
+// true  = clock in from ANYWHERE (geofence off, for testing)
+// false = normal: must be near the office to clock in
+// SET BACK TO false BEFORE STAFF USE IT FOR REAL.
+const GEOFENCE_DISABLED = true;
 let _globalGeofenceM = null; // cached after first load
 
 async function loadGlobalGeofence(){
@@ -14340,6 +14345,14 @@ async function toggleClock(){
     }catch(e){
       // Silent — clock-out proceeds without GPS
     }
+  } else if(GEOFENCE_DISABLED){
+    // TESTING: geofence off — clock in from anywhere. Grab GPS if we can, but
+    // never block on it.
+    try{
+      const pos = await getCurrentPosition();
+      lat = pos.coords.latitude;
+      lng = pos.coords.longitude;
+    }catch(e){ /* ignore */ }
   } else {
     // Clock-IN: enforce geofence
     try{
