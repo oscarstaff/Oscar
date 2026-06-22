@@ -17751,6 +17751,33 @@ async function loadHomeAttention(){
   if(!wrap) return;
   const items = [];
   try{
+    // 0. Availability expired — surface FIRST as an issue
+    try{
+      const av = await sbGet('staff_availability','?staff_name=eq.'+encodeURIComponent(me)+'&limit=1');
+      if(av && av.length){
+        const row = av[0];
+        // Expired only applies to a fixed date-range availability (not "ongoing")
+        if(!row.is_ongoing && row.valid_until){
+          const today = new Date(); today.setHours(0,0,0,0);
+          const until = new Date(row.valid_until+'T00:00:00');
+          if(!isNaN(until.getTime()) && until < today){
+            items.push({
+              color:'#dc2626', icon:'alert',
+              title:'Your availability has expired',
+              sub:'Expired '+fmtF(row.valid_until)+' · tap to update it',
+              action: function(){
+                goTo('schedule');
+                setTimeout(function(){
+                  if(typeof showSchedTab==='function') showSchedTab('availability');
+                  if(typeof showAvailForm==='function') showAvailForm();
+                }, 120);
+              }
+            });
+          }
+        }
+      }
+    }catch(e){}
+
     // 1. Unfinished training quizzes assigned to me
     try{
       const [quizzes, results] = await Promise.all([
@@ -17841,7 +17868,8 @@ async function loadHomeAttention(){
     check:'<path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>',
     cross:'<path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>',
     clock:'<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/>',
-    inbox:'<path d="M2 6a2 2 0 012-2h12a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6zm2 0v8h12V6H4z"/>'
+    inbox:'<path d="M2 6a2 2 0 012-2h12a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6zm2 0v8h12V6H4z"/>',
+    alert:'<path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>'
   };
 
   wrap.innerHTML = items.map(function(it, i){
