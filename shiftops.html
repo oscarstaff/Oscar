@@ -1662,6 +1662,17 @@ body{ background:
   };
 })();
 
+// ── SUPABASE / APPS SCRIPT CONFIG ──────────────────────────────────────────
+// MUST be declared before loadData()/loadStaffFromSupabase() run (the INIT IIFE
+// at the bottom calls them during this same script evaluation). Declaring these
+// further down made them hit the temporal dead zone → loadStaffFromSupabase
+// threw "Cannot access 'SUPABASE_KEY' before initialization", silently failed,
+// and the roster fell back to the cached/seed staff — which then wiped Nexus.
+const SUPABASE_URL='https://jcfgldqrdbfkgbixszds.supabase.co';
+const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpjZmdsZHFyZGJma2diaXhzemRzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1Nzc3NzEsImV4cCI6MjA5MDE1Mzc3MX0.Wj8cCpnlsoZOPj5sKWeEdfvgjG4Nc-UuTTYgbcrPfeI';
+const GAS_EXEC_URL='https://script.google.com/macros/s/AKfycby0Bq97bCZAsmnruXFuJuCqXQE_kOxhYE2KFuJnVzLXtT5CV0Y12k5176dxZbdaYVGE/exec';
+const GAS_TOKEN='oscars_gas_83235a5f0c1f6ba32b18235e2b2d544ac137167d';
+
 const COLORS=['#00e5a0','#0066ff','#ff6b35','#ffd700','#ff69b4','#00bcd4','#9c27b0','#8bc34a','#ff5722','#607d8b'];
 const DAYS=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
 const DAYS_FULL=['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
@@ -4407,11 +4418,9 @@ async function doResetPassword(){
 }
 
 // ── SUPABASE SYNC ─────────────────────────────────────────────────────────
-const SUPABASE_URL='https://jcfgldqrdbfkgbixszds.supabase.co';
-// Apps Script endpoint + token for admin auth-password operations (set password)
-const GAS_EXEC_URL='https://script.google.com/macros/s/AKfycby0Bq97bCZAsmnruXFuJuCqXQE_kOxhYE2KFuJnVzLXtT5CV0Y12k5176dxZbdaYVGE/exec';
-const GAS_TOKEN='oscars_gas_83235a5f0c1f6ba32b18235e2b2d544ac137167d';
-const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpjZmdsZHFyZGJma2diaXhzemRzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1Nzc3NzEsImV4cCI6MjA5MDE1Mzc3MX0.Wj8cCpnlsoZOPj5sKWeEdfvgjG4Nc-UuTTYgbcrPfeI';
+// (SUPABASE_URL / SUPABASE_KEY / GAS_* are now declared at the TOP of this
+//  script, before loadData runs — moving them here caused a temporal-dead-zone
+//  crash where loadStaffFromSupabase ran before the consts existed.)
 
 // ── AUTH TOKEN SWAP ──────────────────────────────────────────────────────
 // ShiftOps inherits Nexus' Supabase session (passed in the launch token) so
