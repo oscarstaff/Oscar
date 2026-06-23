@@ -1667,13 +1667,7 @@ const DAYS=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
 const DAYS_FULL=['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
 
 // ── DEFAULT STATE ─────────────────────────────────────────────────────────
-let staff=[
-  {id:1,first:'Alex',last:'Chen',team:'Enrolment',isManager:true,type:'full',maxHours:38,color:COLORS[0]},
-  {id:2,first:'Jordan',last:'Lee',team:'Enrolment',isManager:false,type:'full',maxHours:38,color:COLORS[1]},
-  {id:3,first:'Sam',last:'Patel',team:'Placement',isManager:true,type:'full',maxHours:24,color:COLORS[2]},
-  {id:4,first:'Riley',last:'Moore',team:'Placement',isManager:false,type:'casual',maxHours:20,color:COLORS[3]},
-  {id:5,first:'Morgan',last:'Kim',team:'Processing',isManager:false,type:'part',maxHours:30,color:COLORS[4]},
-];
+let staff=[]; // no seed/demo data — staff come only from the DB (loadData)
 // availability[staffId][dayIndex] = {type:'all'|'custom'|'no', start?:'09:00', end?:'17:00'}
 let availability={};
 let availWeekKey=''; // tracks which week the availability is for
@@ -1681,14 +1675,8 @@ let shiftsStore={}; // shiftsStore[weekKey] = shifts for that week
 let availStore={}; // availStore[weekKey] = availability for that week
 let leaveRequests=[]; // [{id, staffId, from, to, reason, status:'pending'|'approved'|'declined'}]
 let nextLeaveId=1;
-let shifts={
-  1:{0:[{start:'09:00',end:'19:00',type:'morning',role:'Enrolment Manager'}],1:[{start:'09:00',end:'19:00',type:'morning',role:'Enrolment Manager'}],3:[{start:'09:00',end:'19:00',type:'morning',role:'Enrolment Manager'}],4:[{start:'09:00',end:'19:00',type:'morning',role:'Enrolment Manager'}]},
-  2:{0:[{start:'09:00',end:'19:00',type:'morning',role:'Enrolment'}],2:[{start:'09:00',end:'19:00',type:'morning',role:'Enrolment'}],4:[{start:'09:00',end:'19:00',type:'morning',role:'Enrolment'}]},
-  3:{1:[{start:'09:00',end:'19:00',type:'morning',role:'Placement Manager'}],3:[{start:'09:00',end:'19:00',type:'morning',role:'Placement Manager'}],5:[{start:'09:00',end:'19:00',type:'morning',role:'Placement Manager'}]},
-  4:{5:[{start:'09:00',end:'19:00',type:'morning',role:'Placement'}],6:[{start:'09:00',end:'19:00',type:'morning',role:'Placement'}]},
-  5:{0:[{start:'09:00',end:'19:00',type:'morning',role:'Training'}],2:[{start:'09:00',end:'19:00',type:'morning',role:'Training'}],3:[{start:'09:00',end:'19:00',type:'morning',role:'Training'}]},
-};
-let nextStaffId=6;
+let shifts={};
+let nextStaffId=1; // was 6 to clear the 5 seed staff; no seed data now
 let teams=['Enrolment','Follow-up','Processing','Placement','Evershine','Accounts','Education'];
 let devices=[]; // [{id, name, assignedTo: staffId|null}]
 let nextDeviceId=1;
@@ -1696,29 +1684,124 @@ let currentWeekStart=getMonday(new Date());
 let editingShift=null,editingStaffId=null,isDirty=false,activeRoleFilter=null,staffSortOrder='asc';
 
 // ── PERSISTENCE ───────────────────────────────────────────────────────────
+// Tracks whether the staff roster came from Supabase (the source of truth) vs
+// the local desktop file. When staff is Supabase-backed we must NEVER let the
+// Nexus sync prune the directory (see syncStaffToNexus), because ShiftOps is a
+// VIEW of that data here, not its owner.
+let _staffFromSupabase=false;
+
 async function loadData(){
-  if(!window.shiftops)return;
+  // 1) Local desktop file (only place shifts/availability/devices live).
+  //    Staff from the file is treated as a FALLBACK only — Supabase wins.
+  if(window.shiftops){
+    try{
+      const res=await window.shiftops.loadData();
+      if(res.ok&&res.data&&res.data!==null){
+        if(res.data.staff)staff=res.data.staff;
+        if(res.data.shiftsStore)shiftsStore=res.data.shiftsStore;
+        if(res.data.availStore)availStore=res.data.availStore;
+        // legacy support
+        if(res.data.shifts&&!res.data.shiftsStore){shiftsStore[res.data.availWeekKey||'legacy']=res.data.shifts;}
+        if(res.data.availability&&!res.data.availStore){availStore[res.data.availWeekKey||'legacy']=res.data.availability;}
+        if(res.data.nextStaffId)nextStaffId=res.data.nextStaffId;
+        if(res.data.teams)teams=res.data.teams;
+        if(res.data.devices)devices=res.data.devices;
+        if(res.data.nextDeviceId)nextDeviceId=res.data.nextDeviceId;
+        if(res.data.availWeekKey)availWeekKey=res.data.availWeekKey;
+        if(res.data.leaveRequests)leaveRequests=res.data.leaveRequests;
+        if(res.data.nextLeaveId)nextLeaveId=res.data.nextLeaveId;
+        rekeyAll();
+      }
+      const path=await window.shiftops.getDataPath();
+      const lbl=document.getElementById('dataPathLabel');
+      if(lbl)lbl.textContent=path;
+    }catch(e){console.warn('local load failed',e);}
+  }
+
+  // 2) Staff roster from Supabase — the real, authoritative list (same source
+  //    Nexus uses). This replaces the local/seed staff whenever it succeeds, so
+  //    running ShiftOps inside Nexus (no desktop bridge) shows real staff.
   try{
-    const res=await window.shiftops.loadData();
-    if(res.ok&&res.data&&res.data!==null){
-      if(res.data.staff)staff=res.data.staff;
-      if(res.data.shiftsStore)shiftsStore=res.data.shiftsStore;
-      if(res.data.availStore)availStore=res.data.availStore;
-      // legacy support
-      if(res.data.shifts&&!res.data.shiftsStore){shiftsStore[res.data.availWeekKey||'legacy']=res.data.shifts;}
-      if(res.data.availability&&!res.data.availStore){availStore[res.data.availWeekKey||'legacy']=res.data.availability;}
-      if(res.data.nextStaffId)nextStaffId=res.data.nextStaffId;
-      if(res.data.teams)teams=res.data.teams;
-      if(res.data.devices)devices=res.data.devices;
-      if(res.data.nextDeviceId)nextDeviceId=res.data.nextDeviceId;
-      if(res.data.availWeekKey)availWeekKey=res.data.availWeekKey;
-      if(res.data.leaveRequests)leaveRequests=res.data.leaveRequests;
-      if(res.data.nextLeaveId)nextLeaveId=res.data.nextLeaveId;
-      rekeyAll();
-    }
-    const path=await window.shiftops.getDataPath();
-    document.getElementById('dataPathLabel').textContent=path;
-  }catch(e){console.warn('load failed',e);}
+    await loadStaffFromSupabase();
+  }catch(e){console.warn('supabase staff load failed',e);}
+}
+
+// Build the ShiftOps `staff` array from Nexus's Supabase tables:
+//   • staff_names      → the canonical roster (names)
+//   • staff_directory  → team per person
+//   • staff_settings   → admin flags (is_hub_admin / is_shift_admin)
+// Maps each into ShiftOps's shape. Preserves any existing per-person roster
+// fields (type/maxHours/color/manager) from the local file when the name matches,
+// so desktop-side scheduling settings aren't lost.
+async function loadStaffFromSupabase(){
+  const H={apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY};
+  async function get(path){
+    const r=await fetch(SUPABASE_URL+'/rest/v1/'+path,{headers:H});
+    if(!r.ok) throw new Error(path+' -> '+r.status);
+    return r.json();
+  }
+
+  // Pull all three in parallel.
+  const [names,dir,settings]=await Promise.all([
+    get('staff_names?select=name&order=name.asc').catch(function(){return [];}),
+    get('staff_directory?select=staff_name,team').catch(function(){return [];}),
+    get('staff_settings?select=name,is_hub_admin,is_shift_admin').catch(function(){return [];})
+  ]);
+
+  if(!Array.isArray(names)||names.length===0){
+    // Supabase gave us nothing usable — keep whatever loaded locally, do NOT
+    // wipe to empty, and mark roster as NOT supabase-backed.
+    _staffFromSupabase=false;
+    return;
+  }
+
+  const teamByName={};
+  (dir||[]).forEach(function(r){ if(r.staff_name) teamByName[r.staff_name]=r.team; });
+  const adminByName={};
+  (settings||[]).forEach(function(r){
+    if(r.name) adminByName[r.name]=(r.is_hub_admin===true||r.is_shift_admin===true);
+  });
+
+  // Index existing roster (local file) by full name to preserve scheduling fields.
+  const prevByName={};
+  (staff||[]).forEach(function(s){
+    const full=((s.first||'')+' '+(s.last||'')).trim();
+    if(full) prevByName[full]=s;
+  });
+
+  let idc=1;
+  const built=names.map(function(row){
+    const full=String(row.name||'').trim();
+    if(!full) return null;
+    const parts=full.split(/\s+/);
+    const first=parts.shift()||full;
+    const last=parts.join(' ');
+    const prev=prevByName[full]||{};
+    const team=(full in teamByName && teamByName[full]) ? teamByName[full] : (prev.team||null);
+    const isOffice=(team==='Office');
+    return {
+      id: prev.id || idc++,
+      first:first,
+      last:last,
+      team:isOffice?null:team,
+      isManager: prev.isManager||false,
+      isOfficeManager: isOffice || prev.isOfficeManager || false,
+      type: prev.type||'full',
+      maxHours: (typeof prev.maxHours==='number')?prev.maxHours:38,
+      color: prev.color || COLORS[(idc)%COLORS.length]
+    };
+  }).filter(Boolean);
+
+  // Keep ids unique/co-herent for any preserved ids that collided with idc.
+  const seen={};
+  built.forEach(function(s){
+    while(seen[s.id]){ s.id=idc++; }
+    seen[s.id]=true;
+  });
+
+  staff=built;
+  nextStaffId=Math.max.apply(null,[1].concat(built.map(function(s){return s.id;})))+1;
+  _staffFromSupabase=true;
 }
 
 function rekeyAll(){
@@ -1768,6 +1851,16 @@ let _nexusSyncRunning=false;
 let _lastSyncSig='';
 async function syncStaffToNexus(){
   if(_nexusSyncRunning) return;            // avoid overlapping runs
+
+  // SAFETY: when the roster was loaded FROM Supabase (ShiftOps running inside
+  // Nexus), it is a VIEW of Nexus's data, not its owner — syncing back (and
+  // especially pruneGhosts) could delete real staff. Skip sync entirely.
+  if(_staffFromSupabase){ return; }
+  // SAFETY: never sync an empty or near-empty roster. pruneGhosts would treat
+  // every real Nexus staff member as a "ghost" and delete them. Require a
+  // plausible roster size before any write/prune is allowed.
+  if(!Array.isArray(staff) || staff.length < 3){ return; }
+
   // Only sync when the staff/team picture actually changed — saves fire every
   // couple of seconds during editing, but names/teams rarely change, so this
   // avoids hammering Supabase with redundant writes.
@@ -4436,6 +4529,16 @@ async function renameStaffEverywhere(oldName, newName){
 
 async function pushStaffNames(){
   try{
+    // SAFETY: if the roster is empty or implausibly small, do NOT push — step 2
+    // below deletes any staff_names row not in the local list, which would wipe
+    // the real Nexus roster. Also skip when the roster is Supabase-backed: it
+    // already mirrors Nexus, so there is nothing to push and pruning is unsafe.
+    if(_staffFromSupabase){ return; }
+    if(!Array.isArray(staff) || staff.length < 3){
+      console.warn('[pushStaffNames] skipped — roster too small ('+(staff?staff.length:0)+'), refusing to prune staff_names');
+      return;
+    }
+
     const currentNames=staff.map(s=>`${s.first} ${s.last}`);
 
     // 1. Get what's currently in Supabase
