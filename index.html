@@ -14092,6 +14092,14 @@ function renderClockCard(){
 // ── GPS / GEOFENCE ──────────────────────
 const OFFICE_LAT = -33.95245;
 const OFFICE_LNG = 151.13856;
+// All valid clock-in locations. A staff member passes the geofence if they are
+// within the radius of ANY office below. Add new offices here.
+//   Sydney  — Rockdale NSW (head office)
+//   Nepal   — Bagbazar, Kathmandu
+const OFFICES = [
+  { name: 'Sydney', lat: -33.95245,            lng: 151.13856,            radiusM: 30 },
+  { name: 'Nepal',  lat: 27.705566882043552,   lng: 85.32147759609747,    radiusM: 30 }
+];
 const OFFICE_RADIUS_DEFAULT = 30;
 // ── TESTING FLAG ──────────────────────────────────────────────
 // true  = clock in from ANYWHERE (geofence off, for testing)
@@ -14129,6 +14137,17 @@ function distanceMeters(lat1, lng1, lat2, lng2){
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 }
 
+// Returns the closest office to the given point and the distance to it, checking
+// every entry in OFFICES. Used so clock-in passes if you're near ANY office.
+function nearestOffice(lat, lng){
+  let best = null;
+  for(const o of OFFICES){
+    const d = distanceMeters(lat, lng, o.lat, o.lng);
+    if(!best || d < best.dist){ best = { office:o, dist:d }; }
+  }
+  return best; // { office:{name,lat,lng,radiusM}, dist }
+}
+
 // Cached background position — refreshed every 15s while app open
 let _bgPosition = null;
 let _bgWatchId = null;
@@ -14160,9 +14179,10 @@ function startBackgroundLocation(){
 
 function checkInsideGeofence(coords){
   if(!coords) return false;
-  const dist = distanceMeters(coords.latitude, coords.longitude, OFFICE_LAT, OFFICE_LNG);
+  const near = nearestOffice(coords.latitude, coords.longitude);
+  if(!near) return false;
   const acc = coords.accuracy || 0;
-  return Math.max(0, dist - acc) <= getGeofenceRadius();
+  return Math.max(0, near.dist - acc) <= near.office.radiusM;
 }
 
 function maybeShowClockInPrompt(){
@@ -14509,10 +14529,11 @@ async function toggleClock(){
       const pos = await getCurrentPosition();
       lat = pos.coords.latitude;
       lng = pos.coords.longitude;
-      const dist = distanceMeters(lat, lng, OFFICE_LAT, OFFICE_LNG);
+      const near = nearestOffice(lat, lng);
+      const dist = near.dist;
       const acc = pos.coords.accuracy;
       const effectiveDist = Math.max(0, dist - acc);
-      if(effectiveDist > getGeofenceRadius()){
+      if(effectiveDist > near.office.radiusM){
         const distFmt = dist > 1000 ? (dist/1000).toFixed(1)+'km' : Math.round(dist)+'m';
         const accFmt = Math.round(acc)+'m';
         showToast('Too far ('+distFmt+', ±'+accFmt+' accuracy). Move closer or wait for better GPS.', 'warning');
