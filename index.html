@@ -4448,6 +4448,193 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
 .slack-send-btn:hover{background:#148567;}
 .slack-send-btn:disabled{background:#c8c8c8;cursor:not-allowed;}
 
+/* ═══════════════ TEAM CHANNELS ═══════════════ */
+/* ═══════════════ ENGAGEMENT SUBTABS — glass segmented control ═══════════════ */
+.eng-tabs{
+  position:sticky;top:0;z-index:20;
+  display:inline-flex;gap:2px;
+  margin:0 0 20px;padding:5px;
+  border-radius:14px;
+  /* frosted glass — surgical, only on this floating control */
+  background:rgba(255,255,255,.62);
+  -webkit-backdrop-filter:saturate(180%) blur(14px);
+  backdrop-filter:saturate(180%) blur(14px);
+  border:1px solid rgba(255,255,255,.7);
+  box-shadow:0 1px 2px rgba(15,23,42,.04),0 8px 24px rgba(15,23,42,.06),inset 0 1px 0 rgba(255,255,255,.6);
+}
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+  .eng-tabs{background:#fff;}      /* opaque fallback keeps text legible */
+}
+.eng-tab{
+  position:relative;z-index:1;
+  display:inline-flex;align-items:center;gap:7px;
+  background:none;border:none;cursor:pointer;font-family:inherit;
+  font-size:14px;font-weight:700;color:#64748b;
+  padding:9px 18px;border-radius:10px;
+  transition:color .28s cubic-bezier(.4,0,.2,1);
+  white-space:nowrap;
+}
+.eng-tab svg{width:16px;height:16px;flex-shrink:0;transition:transform .28s cubic-bezier(.4,0,.2,1);}
+.eng-tab:hover{color:#334155;}
+.eng-tab.active{color:var(--accent-text);}
+.eng-tab.active svg{transform:scale(1.06);}
+/* the sliding pill behind the active tab */
+.eng-tab-glider{
+  position:absolute;top:5px;left:5px;z-index:0;
+  height:calc(100% - 10px);
+  border-radius:10px;
+  background:#fff;
+  box-shadow:0 1px 2px rgba(15,23,42,.06),0 2px 8px rgba(5,150,105,.10);
+  border:1px solid rgba(5,150,105,.14);
+  transition:transform .34s cubic-bezier(.34,1.2,.4,1), width .34s cubic-bezier(.34,1.2,.4,1);
+  pointer-events:none;
+}
+:is([data-theme="dark"],[data-theme="midnight"]) .eng-tabs{
+  background:rgba(22,28,40,.55);border-color:rgba(255,255,255,.08);
+}
+:is([data-theme="dark"],[data-theme="midnight"]) .eng-tab-glider{
+  background:rgba(40,48,66,.9);border-color:rgba(5,150,105,.3);
+}
+
+/* section crossfade/slide between Discussions and Channels */
+.eng-sec{animation:engSecIn .34s cubic-bezier(.22,.61,.36,1);}
+@keyframes engSecIn{
+  from{opacity:0;transform:translateY(8px);}
+  to{opacity:1;transform:translateY(0);}
+}
+@media(prefers-reduced-motion:reduce){
+  .eng-tab,.eng-tab svg,.eng-tab-glider{transition:none;}
+  .eng-sec{animation:none;}
+}
+.chan-wrap{
+  display:flex;gap:20px;
+  height:calc(100dvh - 188px);min-height:520px;
+}
+/* Channels escapes the 820px .page cap to fill the main column.
+   .page is centered in .main (margin:0 auto, max-width:820px); we pull the
+   channels block out to the full main width with symmetric negative margins
+   sized to the page's own horizontal padding + the centering gutters.
+   Implemented via a wrapper class on the page when the channels tab is open. */
+#page-engagement.chan-wide{max-width:1240px;}
+.chan-sidebar{
+  width:288px;flex-shrink:0;overflow-y:auto;
+  background:#fff;border:1px solid #e8edf3;border-radius:16px;
+  padding:14px 12px;
+  box-shadow:0 1px 2px rgba(15,23,42,.04),0 6px 20px rgba(15,23,42,.04);
+}
+.chan-side-skel{color:#94a3b8;font-size:13.5px;padding:18px 14px;}
+.chan-group-label{
+  font-size:11px;font-weight:800;color:#94a3b8;
+  text-transform:uppercase;letter-spacing:.8px;
+  padding:18px 14px 8px;
+}
+.chan-group-label:first-child{padding-top:8px;}
+.chan-item{
+  display:flex;align-items:center;gap:10px;
+  padding:11px 14px;border-radius:11px;cursor:pointer;
+  font-size:15px;font-weight:600;color:#334155;
+  transition:background .12s,color .12s;
+  user-select:none;margin-bottom:2px;
+}
+.chan-item:hover{background:#f1f5f9;}
+.chan-item.active{background:var(--accent-dim);color:var(--accent);font-weight:800;}
+.chan-item .chan-hash{color:#94a3b8;font-weight:700;flex-shrink:0;}
+.chan-item.active .chan-hash{color:var(--accent);}
+.chan-item .chan-nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.chan-item .chan-dot{
+  margin-left:auto;width:8px;height:8px;border-radius:50%;
+  background:var(--accent);flex-shrink:0;display:none;
+}
+.chan-item.unread .chan-dot{display:block;}
+.chan-main{flex:1;min-width:0;display:flex;}
+.chan-main .slack-thread{flex:1;height:100%;min-height:0;border-radius:16px;}
+.chan-main .slack-thread-hd{
+  padding:16px 22px;
+  position:sticky;top:0;z-index:5;
+  background:rgba(255,255,255,.72);
+  -webkit-backdrop-filter:saturate(180%) blur(16px);
+  backdrop-filter:saturate(180%) blur(16px);
+  border-bottom:1px solid rgba(226,232,240,.8);
+}
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+  .chan-main .slack-thread-hd{background:#fff;}
+}
+.chan-main .slack-msg-list{padding:16px 0;}
+.chan-main .slack-msg-row{padding:6px 24px 2px;}
+.chan-main .slack-msg-row.grouped{padding:2px 24px;}
+.chan-main .slack-compose-wrap{padding:16px 22px;}
+.chan-empty{
+  flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  text-align:center;color:#94a3b8;gap:10px;padding:40px;
+  border:1px dashed #e2e8f0;border-radius:16px;background:#fafbfc;
+}
+.chan-empty-ico{font-size:46px;opacity:.65;}
+.chan-empty-t{font-size:18px;font-weight:800;color:#64748b;}
+.chan-empty-s{font-size:14px;max-width:300px;line-height:1.55;}
+.chan-hd-title{display:flex;align-items:center;gap:4px;font-size:15px;font-weight:900;color:#1d1c1d;flex:1;min-width:0;}
+.chan-hd-hash{color:#94a3b8;font-weight:700;}
+.chan-hd-kind{
+  font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;
+  padding:3px 9px;border-radius:20px;flex-shrink:0;
+}
+.chan-hd-kind.k-team{background:#fef3c7;color:#b45309;}
+.chan-hd-kind.k-ask{background:#dbeafe;color:#1d4ed8;}
+.chan-hd-kind.k-all{background:#dcfce7;color:#15803d;}
+.chan-back-btn{display:none;font-size:22px;line-height:1;padding:2px 8px;}
+.chan-attach-btn{
+  background:none;border:none;cursor:pointer;color:#64748b;
+  padding:4px;border-radius:7px;flex-shrink:0;align-self:flex-end;
+  display:flex;align-items:center;justify-content:center;transition:color .12s,background .12s;
+}
+.chan-attach-btn:hover{color:var(--accent);background:var(--accent-dim);}
+.chan-attach-chip{
+  display:flex;align-items:center;gap:8px;margin-bottom:8px;
+  background:#f1f5f9;border:1px solid #e2e8f0;border-radius:10px;
+  padding:7px 10px;font-size:12.5px;color:#475569;font-weight:600;
+}
+.chan-attach-chip .cac-x{
+  margin-left:auto;cursor:pointer;color:#94a3b8;font-size:16px;
+  background:none;border:none;padding:0 2px;line-height:1;
+}
+.chan-attach-chip .cac-x:hover{color:#dc2626;}
+.chan-msg-file{
+  display:inline-flex;align-items:center;gap:7px;margin-top:5px;
+  background:#f8fafc;border:1px solid #e2e8f0;border-radius:9px;
+  padding:7px 11px;font-size:13px;font-weight:600;color:var(--accent);
+  text-decoration:none;max-width:320px;
+}
+.chan-msg-file:hover{background:#f1f5f9;}
+.chan-msg-file .cmf-nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.chan-empty-thread{text-align:center;color:#94a3b8;font-size:13px;padding:40px 20px;}
+
+/* smooth channel-switch: fade the message list + header on swap */
+.chan-main .slack-msg-list{
+  transition:opacity .16s ease, transform .22s cubic-bezier(.22,.61,.36,1);
+}
+.chan-main .slack-msg-list.chan-swapping{
+  opacity:0;transform:translateY(6px);
+}
+.chan-hd-title{transition:opacity .18s ease;}
+.chan-hd-title.chan-swapping{opacity:0;}
+.chan-main .slack-thread.chan-loading .slack-msg-list{opacity:.4;}
+@media(prefers-reduced-motion:reduce){
+  .chan-main .slack-msg-list,.chan-hd-title{transition:none;}
+  .chan-main .slack-msg-list.chan-swapping{opacity:1;transform:none;}
+}
+@media(max-width:760px){
+  #page-engagement.chan-wide{max-width:100%;}
+  .chan-wrap{
+    height:calc(100dvh - 150px);gap:0;
+    margin:0 -16px;                           /* full-bleed inside .page padding */
+  }
+  .chan-sidebar{width:100%;border-radius:0;border-left:none;border-right:none;padding:10px 8px;}
+  .chan-main{display:none;}
+  .chan-wrap.thread-open .chan-sidebar{display:none;}
+  .chan-wrap.thread-open .chan-main{display:flex;}
+  .chan-main .slack-thread{border-radius:0;}
+  .chan-back-btn{display:block;}
+}
+
 /* Conversation list — Slack channel list style */
 .slack-convo-row{
   display:flex;align-items:center;gap:10px;
@@ -5132,10 +5319,18 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
           <div class="nav-child" data-tab="schedule-availability" onclick="goTo('schedule');setTimeout(function(){showSchedTab('availability');setActiveNavChild('schedule-availability');},50);">Availability</div>
         </div>
       </div>
-      <div class="nav-item" id="nav-engagement" data-tab="engagement" onclick="goTo('engagement')">
-        <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 3a1 1 0 00-1.447-.894L8.763 6H5a3 3 0 000 6h.28l1.771 5.316A1 1 0 008 18h1a1 1 0 001-1v-4.382l6.553 3.276A1 1 0 0018 15V3z" clip-rule="evenodd"/></svg>
-        Discussions
-        <span class="nav-badge" id="discBadge"></span>
+      <!-- Engagement group -->
+      <div class="nav-group" id="navg-engagement">
+        <div class="nav-item nav-parent" id="nav-engagement" onclick="toggleNavGroup('engagement')">
+          <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 3a1 1 0 00-1.447-.894L8.763 6H5a3 3 0 000 6h.28l1.771 5.316A1 1 0 008 18h1a1 1 0 001-1v-4.382l6.553 3.276A1 1 0 0018 15V3z" clip-rule="evenodd"/></svg>
+          Engagement
+          <span class="nav-badge" id="discBadge"></span>
+          <svg class="nav-chevron" viewBox="0 0 20 20" fill="currentColor" style="width:14px;height:14px;margin-left:auto;transition:transform .2s;"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+        </div>
+        <div class="nav-children">
+          <div class="nav-child" data-tab="engagement-discussions" onclick="goTo('engagement');setTimeout(function(){showEngagementTab('discussions');setActiveNavChild('engagement-discussions');},50);">Discussions</div>
+          <div class="nav-child" data-tab="engagement-channels" onclick="goTo('engagement');setTimeout(function(){showEngagementTab('channels');setActiveNavChild('engagement-channels');},50);">Channels</div>
+        </div>
       </div>
 
       <div class="nav-item" id="nav-kudos" data-tab="kudos" onclick="goTo('kudos')">
@@ -5697,10 +5892,21 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
     <!-- DISCUSSIONS PAGE -->
     <div class="page" id="page-engagement">
       <div class="page-hd">
-        <div class="page-title">Discussions</div>
+        <div class="page-title">Engagement</div>
+      </div>
+      <div class="eng-tabs" id="engTabs">
+        <span class="eng-tab-glider" id="engGlider"></span>
+        <button class="eng-tab active" id="etab-discussions" onclick="showEngagementTab('discussions')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          Discussions
+        </button>
+        <button class="eng-tab" id="etab-channels" onclick="showEngagementTab('channels')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-6l-4 4v-4H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/></svg>
+          Channels
+        </button>
       </div>
       <!-- DISCUSSIONS -->
-      <div id="esec-discussions">
+      <div id="esec-discussions" class="eng-sec">
         <div class="disc2-composer" id="disc2Composer">
           <div class="disc2-collapsed" onclick="disc2Expand()">
             <div class="disc2-ava" id="disc2MyAva" style="width:36px;height:36px;font-size:11px;background:#64748b;">?</div>
@@ -5758,6 +5964,46 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
           <input class="disc2-search" id="disc2Search" placeholder="Search discussions…" oninput="disc2RenderList()">
         </div>
         <div id="discList"><div class="skel-card"><div class="skel skel-line" style="width:50%;height:14px;"></div><div class="skel skel-line" style="width:90%;"></div><div class="skel skel-line" style="width:80%;"></div><div class="skel skel-line skel-meta"></div></div><div class="skel-card"><div class="skel skel-line" style="width:60%;height:14px;"></div><div class="skel skel-line" style="width:88%;"></div><div class="skel skel-line skel-meta"></div></div></div>
+      </div>
+
+      <!-- CHANNELS -->
+      <div id="esec-channels" class="eng-sec" style="display:none;">
+        <div class="chan-wrap">
+          <aside class="chan-sidebar" id="chanSidebar">
+            <div class="chan-side-skel">Loading channels…</div>
+          </aside>
+          <div class="chan-main" id="chanMain">
+            <div class="chan-empty" id="chanEmpty">
+              <div class="chan-empty-ico">💬</div>
+              <div class="chan-empty-t">Pick a channel</div>
+              <div class="chan-empty-s">Choose a channel on the left to start chatting with your team.</div>
+            </div>
+            <div class="slack-thread" id="chanThread" style="display:none;">
+              <div class="slack-thread-hd">
+                <button class="slack-back chan-back-btn" onclick="chanCloseThread()" aria-label="Back">‹</button>
+                <div class="chan-hd-title">
+                  <span class="chan-hd-hash" id="chanHdHash">#</span>
+                  <span id="chanHdName">channel</span>
+                </div>
+                <div class="chan-hd-kind" id="chanHdKind"></div>
+              </div>
+              <div class="slack-msg-list" id="chanMsgList"></div>
+              <div class="slack-compose-wrap">
+                <div id="chanAttachChip" class="chan-attach-chip" style="display:none;"></div>
+                <div class="slack-compose">
+                  <button class="chan-attach-btn" id="chanAttachBtn" onclick="document.getElementById('chanFileInput').click()" title="Attach a file" aria-label="Attach">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                  </button>
+                  <input type="file" id="chanFileInput" style="display:none;" onchange="chanPickFile(this)">
+                  <textarea id="chanCompose" rows="1" placeholder="Message…" oninput="chanComposeGrow(this)" onkeydown="chanComposeKey(event)"></textarea>
+                  <button class="slack-send-btn" id="chanSendBtn" onclick="sendChannelMessage()" aria-label="Send">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
     </div>
@@ -6595,7 +6841,7 @@ function switchProfileTab(t){
         <div class="bn-badge" id="bnLibraryBadge"></div>
       </div>
       <!-- DISCUSSIONS — speech icon (matches sidebar) -->
-      <div class="bn-item" id="bn-engagement" data-tab="engagement" onclick="if(navigator.vibrate)navigator.vibrate(8);goTo('engagement')" aria-label="Discussions">
+      <div class="bn-item" id="bn-engagement" data-tab="engagement" onclick="if(navigator.vibrate)navigator.vibrate(8);goTo('engagement')" aria-label="Engagement">
         <svg class="bn-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 3a1 1 0 00-1.447-.894L8.763 6H5a3 3 0 000 6h.28l1.771 5.316A1 1 0 008 18h1a1 1 0 001-1v-4.382l6.553 3.276A1 1 0 0018 15V3z" clip-rule="evenodd"/></svg>
         <div class="bn-badge" id="bnAnnBadge"></div>
       </div>
@@ -7100,13 +7346,324 @@ async function deleteDocument(id){
 
 // ── ENGAGEMENT TAB ──
 function showEngagementTab(tab){
-  ['discussions'].forEach(s=>{
+  ['discussions','channels'].forEach(s=>{
     const el=document.getElementById('esec-'+s);
-    if(el)el.style.display=s===tab?'block':'none';
+    if(el){
+      if(s===tab){
+        el.style.display='block';
+        // retrigger the entrance animation
+        el.classList.remove('eng-sec'); void el.offsetWidth; el.classList.add('eng-sec');
+      } else {
+        el.style.display='none';
+      }
+    }
     const t=document.getElementById('etab-'+s);
     if(t)t.classList.toggle('active',s===tab);
   });
   if(tab==='discussions'){loadDiscussions();markAllDiscussionsSeen();const ao=document.getElementById('discAdminOptions');if(ao)ao.style.display=myIsAdmin?'block':'none';}
+  if(tab==='channels'){ loadChannels(); }
+  // Channels needs a wider canvas than the 820px reading column; Discussions keeps the narrow column.
+  const pg=document.getElementById('page-engagement');
+  if(pg) pg.classList.toggle('chan-wide', tab==='channels');
+  // slide the glass glider to the active tab + sync the sidebar sub-nav
+  engSyncGlider();
+  if(typeof setActiveNavChild==='function') setActiveNavChild('engagement-'+tab);
+}
+
+// Position the sliding glass pill under the active subtab
+function engSyncGlider(){
+  const bar=document.getElementById('engTabs');
+  const glider=document.getElementById('engGlider');
+  if(!bar||!glider) return;
+  const active=bar.querySelector('.eng-tab.active');
+  if(!active) return;
+  const place=function(){
+    const r=active.getBoundingClientRect(), br=bar.getBoundingClientRect();
+    if(r.width===0){ return; } // not laid out yet — wait for next frame
+    glider.style.width=r.width+'px';
+    glider.style.transform='translateX('+(r.left-br.left-5)+'px)';
+  };
+  place();
+  // first-paint safety: the engagement page may have just become visible
+  requestAnimationFrame(place);
+}
+window.addEventListener('resize', function(){
+  const pg=document.getElementById('page-engagement');
+  if(pg && pg.classList.contains('active')) engSyncGlider();
+});
+
+// ═══════════════════════ TEAM CHANNELS ═══════════════════════
+let _chanList = [];           // all channels visible to me
+let _chanCurrent = null;      // current channel object
+let _chanMsgs = [];           // messages in current channel
+let _chanFile = null;         // staged attachment File
+let _chanLoaded = false;
+let _chanUnread = {};         // slug -> true when a new msg arrives off-screen
+
+async function loadChannels(){
+  const side = document.getElementById('chanSidebar');
+  if(!side) return;
+  try{
+    // My teams drive which #team channels I can see; ask-* and all-staff are global.
+    const teams = (window.myTeams && window.myTeams.length) ? window.myTeams.slice() : [];
+    // RLS already filters #team channels to my teams, so a plain select is safe & correct.
+    const rows = await sbGet('channels','?order=sort_order.asc');
+    _chanList = rows || [];
+    renderChannelSidebar();
+    _chanLoaded = true;
+    // Auto-open first channel on desktop only (mobile shows the list first)
+    if(!_chanCurrent && window.innerWidth > 760 && _chanList.length){
+      const first = _chanList.find(c=>c.kind==='all') || _chanList[0];
+      if(first) openChannel(first.slug);
+    }
+  }catch(e){
+    console.warn('loadChannels', e);
+    side.innerHTML='<div class="chan-side-skel" style="color:#dc2626;">Could not load channels.</div>';
+  }
+}
+
+function renderChannelSidebar(){
+  const side = document.getElementById('chanSidebar');
+  if(!side) return;
+  const mk = c =>
+    '<div class="chan-item'+(_chanCurrent&&_chanCurrent.slug===c.slug?' active':'')+(_chanUnread[c.slug]?' unread':'')+'" '+
+    'data-slug="'+esc(c.slug)+'" onclick="openChannel(\''+esc(c.slug)+'\')">'+
+      '<span class="chan-hash">#</span>'+
+      '<span class="chan-nm">'+esc(channelLabel(c))+'</span>'+
+      '<span class="chan-dot"></span>'+
+    '</div>';
+  const all  = _chanList.filter(c=>c.kind==='all');
+  const team = _chanList.filter(c=>c.kind==='team');
+  const ask  = _chanList.filter(c=>c.kind==='ask');
+  let h='';
+  if(all.length){ h+='<div class="chan-group-label">Company</div>'+all.map(mk).join(''); }
+  if(team.length){ h+='<div class="chan-group-label">My teams</div>'+team.map(mk).join(''); }
+  if(ask.length){ h+='<div class="chan-group-label">Ask a team</div>'+ask.map(mk).join(''); }
+  if(!h) h='<div class="chan-side-skel">No channels available.</div>';
+  side.innerHTML=h;
+}
+
+function channelLabel(c){
+  if(c.kind==='all') return c.name;          // "All Staff"
+  if(c.kind==='ask') return 'ask-'+c.team;   // "ask-Enrolment"
+  return c.name;                             // team display name
+}
+
+async function openChannel(slug){
+  const c = _chanList.find(x=>x.slug===slug);
+  if(!c) return;
+  const switching = _chanCurrent && _chanCurrent.slug!==slug;
+  _chanCurrent = c;
+  _chanUnread[slug] = false;
+  renderChannelSidebar();
+  // show thread, hide empty
+  const empty=document.getElementById('chanEmpty');
+  const thread=document.getElementById('chanThread');
+  if(empty)empty.style.display='none';
+  if(thread)thread.style.display='flex';
+  document.querySelector('.chan-wrap') && document.querySelector('.chan-wrap').classList.add('thread-open');
+
+  const list=document.getElementById('chanMsgList');
+  const titleEl=document.querySelector('.chan-hd-title');
+
+  // begin fade-out of the outgoing messages (only when actually switching channels)
+  if(switching && list){ list.classList.add('chan-swapping'); }
+  if(switching && titleEl){ titleEl.classList.add('chan-swapping'); }
+
+  // update header (under cover of the fade)
+  const applyHeader=function(){
+    document.getElementById('chanHdName').textContent = channelLabel(c);
+    const kindEl=document.getElementById('chanHdKind');
+    const kindMap={team:['k-team','Team only'],ask:['k-ask','Company-wide'],all:['k-all','Everyone']};
+    const km=kindMap[c.kind]||['k-all',''];
+    kindEl.className='chan-hd-kind '+km[0];
+    kindEl.textContent=km[1];
+  };
+  chanClearFile();
+
+  // dim (not blank) the list only if the fetch is genuinely slow
+  let slowTimer=null;
+  if(thread){
+    slowTimer=setTimeout(function(){ thread.classList.add('chan-loading'); }, 250);
+  }
+
+  // run the fade-out and the fetch in parallel; swap when both are ready
+  const minFade = switching ? new Promise(function(r){ setTimeout(r,160); }) : Promise.resolve();
+  let rows=[];
+  let failed=false;
+  try{
+    rows = await sbGet('channel_messages','?channel_slug=eq.'+encodeURIComponent(slug)+'&order=created_at.asc&limit=200') || [];
+  }catch(e){
+    console.warn('openChannel msgs', e); failed=true;
+  }
+  await minFade;
+  // guard: user may have clicked another channel mid-fetch
+  if(_chanCurrent.slug!==slug) return;
+
+  if(slowTimer) clearTimeout(slowTimer);
+  if(thread) thread.classList.remove('chan-loading');
+
+  applyHeader();
+  if(titleEl) titleEl.classList.remove('chan-swapping');
+
+  if(failed){
+    list.innerHTML='<div class="chan-empty-thread" style="color:#dc2626;">Could not load messages.</div>';
+    if(list) list.classList.remove('chan-swapping');
+    return;
+  }
+  _chanMsgs = rows;
+  renderChannelMessages();
+  // fade the new messages in on the next frame
+  if(switching && list){
+    requestAnimationFrame(function(){ list.classList.remove('chan-swapping'); });
+  }
+}
+
+function renderChannelMessages(){
+  const list=document.getElementById('chanMsgList');
+  if(!list) return;
+  if(!_chanMsgs.length){
+    list.innerHTML='<div class="chan-empty-thread">No messages yet. Say hello 👋</div>';
+    return;
+  }
+  let h='', lastDay='', lastSender='', lastTs=0;
+  _chanMsgs.forEach(function(m){
+    const dt=new Date(m.created_at);
+    const dayKey=dt.toDateString();
+    if(dayKey!==lastDay){
+      h+='<div class="slack-date-divider"><span class="slack-date-label">'+chanDayLabel(dt)+'</span></div>';
+      lastDay=dayKey; lastSender=''; lastTs=0;
+    }
+    // group consecutive messages from same sender within 5 min
+    const grouped = (m.sender_name===lastSender) && (dt.getTime()-lastTs < 5*60*1000);
+    const col=rtAvaColor(m.sender_name||'?');
+    const ini=chanInitials(m.sender_name||'?');
+    const time=dt.toLocaleTimeString([], {hour:'numeric',minute:'2-digit'});
+    h+='<div class="slack-msg-row'+(grouped?' grouped':'')+'">';
+    h+='<div class="slack-msg-ava-wrap"><div class="slack-msg-ava" style="background:'+col+';">'+esc(ini)+'</div></div>';
+    h+='<div class="slack-msg-body">';
+    if(!grouped){
+      h+='<div class="slack-msg-header"><span class="slack-msg-author">'+esc(m.sender_name||'Unknown')+'</span><span class="slack-msg-time">'+time+'</span></div>';
+    }
+    if(m.body) h+='<div class="slack-msg-text">'+esc(m.body)+'</div>';
+    if(m.attachment_url){
+      h+='<a class="chan-msg-file" href="'+esc(m.attachment_url)+'" target="_blank" rel="noopener">'+
+         '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>'+
+         '<span class="cmf-nm">'+esc(m.attachment_name||'Attachment')+'</span></a>';
+    }
+    h+='</div></div>';
+    lastSender=m.sender_name; lastTs=dt.getTime();
+  });
+  list.innerHTML=h;
+  list.scrollTop=list.scrollHeight;
+}
+
+function chanDayLabel(dt){
+  const today=new Date(), y=new Date(); y.setDate(today.getDate()-1);
+  if(dt.toDateString()===today.toDateString()) return 'Today';
+  if(dt.toDateString()===y.toDateString()) return 'Yesterday';
+  return dt.toLocaleDateString([], {weekday:'long', month:'short', day:'numeric'});
+}
+function chanInitials(name){
+  const p=String(name).trim().split(/\s+/);
+  return ((p[0]||'')[0]||'').toUpperCase()+((p[1]||'')[0]||'').toUpperCase() || '?';
+}
+
+function chanCloseThread(){
+  const wrap=document.querySelector('.chan-wrap');
+  if(wrap) wrap.classList.remove('thread-open');
+}
+
+function chanComposeGrow(el){
+  el.style.height='auto';
+  el.style.height=Math.min(el.scrollHeight,120)+'px';
+}
+function chanComposeKey(e){
+  if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); sendChannelMessage(); }
+}
+
+function chanPickFile(input){
+  const f=input.files && input.files[0];
+  if(!f) return;
+  if(f.size > 10*1024*1024){
+    alert('File is too large (max 10MB).');
+    input.value=''; return;
+  }
+  _chanFile=f;
+  const chip=document.getElementById('chanAttachChip');
+  chip.style.display='flex';
+  chip.innerHTML='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>'+
+    '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+esc(f.name)+'</span>'+
+    '<button class="cac-x" onclick="chanClearFile()" title="Remove">×</button>';
+}
+function chanClearFile(){
+  _chanFile=null;
+  const inp=document.getElementById('chanFileInput'); if(inp) inp.value='';
+  const chip=document.getElementById('chanAttachChip'); if(chip){ chip.style.display='none'; chip.innerHTML=''; }
+}
+
+async function sendChannelMessage(){
+  if(!_chanCurrent) return;
+  const ta=document.getElementById('chanCompose');
+  const btn=document.getElementById('chanSendBtn');
+  const body=(ta.value||'').trim();
+  if(!body && !_chanFile) return;
+  btn.disabled=true;
+  let attachment_url=null, attachment_name=null;
+  try{
+    // 1) upload attachment via Apps Script relay -> Drive (same flow as documents)
+    if(_chanFile){
+      const f=_chanFile;
+      const base64 = await new Promise(function(res,rej){
+        const r=new FileReader();
+        r.onload=function(){ res(r.result.split(',')[1]); };
+        r.onerror=rej;
+        r.readAsDataURL(f);
+      });
+      const sheetUrl = localStorage.getItem('oscars_sheet_url') || 'https://script.google.com/macros/s/AKfycby0Bq97bCZAsmnruXFuJuCqXQE_kOxhYE2KFuJnVzLXtT5CV0Y12k5176dxZbdaYVGE/exec';
+      const up = await fetch(sheetUrl, {
+        method:'POST',
+        headers:{'Content-Type':'text/plain;charset=utf-8'},
+        body: JSON.stringify({ action:'uploadDoc', filename:f.name, mime:f.type||'application/octet-stream', base64:base64, uploadedBy:me })
+      });
+      if(!up.ok) throw new Error('Upload failed: '+up.status);
+      const uj = await up.json();
+      if(!uj.ok) throw new Error(uj.error||'Upload failed');
+      attachment_url = uj.url || (uj.id ? 'https://drive.google.com/file/d/'+uj.id+'/view' : '');
+      attachment_name = f.name;
+      if(!attachment_url) throw new Error('Upload returned no URL');
+    }
+    // 2) insert message (RLS enforces sender_name == me and channel visibility)
+    const res = await sbPost('channel_messages', {
+      channel_slug: _chanCurrent.slug,
+      sender_name: me,
+      body: body || null,
+      attachment_url, attachment_name
+    });
+    if(!(res.ok || res.status===201)) throw new Error('Send failed: '+res.status);
+    // optimistic local append (realtime will also fire; dedupe by guarding)
+    ta.value=''; chanComposeGrow(ta); chanClearFile();
+  }catch(e){
+    console.warn('sendChannelMessage', e);
+    alert('Could not send: '+(e.message||e));
+  }finally{
+    btn.disabled=false;
+  }
+}
+
+// realtime handler — called from setupRealtimeChannels subscription
+function chanOnRealtimeInsert(row){
+  if(!row) return;
+  // if it's the open channel, append (dedupe by id)
+  if(_chanCurrent && row.channel_slug===_chanCurrent.slug){
+    if(_chanMsgs.some(m=>m.id===row.id)) return;
+    _chanMsgs.push(row);
+    renderChannelMessages();
+  } else if(row.sender_name!==me){
+    // mark unread on its sidebar item
+    _chanUnread[row.channel_slug]=true;
+    if(_chanLoaded) renderChannelSidebar();
+  }
 }
 
 
@@ -8550,7 +9107,12 @@ function goTo(p){
   if(p==="training"){renderMyTraining();}
 
   if(p==="announcements"){loadAnnouncements();}
-  if(p==="engagement"){showEngagementTab('discussions');}
+  if(p==="engagement"){
+    showEngagementTab('discussions');
+    // open the Engagement nav group and mark the Discussions child active
+    const g=document.getElementById('navg-engagement'); if(g) g.classList.add('open');
+    if(typeof setActiveNavChild==='function') setActiveNavChild('engagement-discussions');
+  }
   if(p==="documents"){loadDocuments();refreshQuizStrip();}
   if(p==="tasks"){ loadTasks().then(function(){ renderTasks(); updateTaskBadge(); maybeShowNotifyBanner(); loadSharedTasksFromOthers(); loadMySharedOutStatus(); }); }
   if(p==="announcements" || p==="engagement"){ setTimeout(rtUpgradeAll, 50); }
@@ -21900,6 +22462,14 @@ function setupRealtimeChannels(){
     })
     .subscribe();
   _realtimeChannels.push(discCh);
+
+  // Team channels — live message delivery
+  const chanCh = _realtimeClient.channel('channel-messages-live')
+    .on('postgres_changes', {event:'INSERT', schema:'public', table:'channel_messages'}, function(payload){
+      if(payload.new && typeof chanOnRealtimeInsert==='function') chanOnRealtimeInsert(payload.new);
+    })
+    .subscribe();
+  _realtimeChannels.push(chanCh);
 
   // Announcements
   const annCh = _realtimeClient.channel('announcements-live')
