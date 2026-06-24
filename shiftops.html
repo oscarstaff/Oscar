@@ -2854,7 +2854,8 @@ async function saveStaff(){
     const s={id:nextStaffId++,first,last,team,isManager:isOfficeManager?'office':isManager,isOfficeManager,type,maxHours,color:COLORS[(nextStaffId-2)%COLORS.length]};
     staff.push(s);shifts[s.id]={};availability[s.id]={};
     const fullName=(first+' '+last).trim();
-    closeModal('staffModal');forceSave();renderAll();pushStaffNames();
+    closeModal('staffModal');forceSave();renderAll();
+    await addStaffToSupabase(fullName, team); // insert-only — safe, won't prune
     saveStaffTeams(fullName, team); // persist multi-team membership (fire-and-forget)
     // Create the staff's real auth account (temp password, forced reset on first login)
     // so they can actually log in under auth-only mode.
@@ -2869,6 +2870,53 @@ async function saveStaff(){
     }catch(e){ showToast(`✓ ${fullName} added, but auth setup failed. Use Set Password to fix.`); }
   }
 }
+// Insert ONE new staff member into the Nexus-facing tables. INSERT-ONLY — it
+// never deletes/prunes, so it's safe to call even when the roster is
+// Supabase-backed (unlike pushStaffNames, which prunes and is guarded off).
+// Writes name → staff_names, name+team → staff_directory + staff_credentials,
+// using merge-duplicates so re-adding an existing name just updates the team.
+async function addStaffToSupabase(fullName, team){
+  if(!fullName) return;
+  const H={apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY,'Content-Type':'application/json'};
+  const enc=encodeURIComponent;
+  const t=(team==='Office')?null:(team||null);
+  try{
+    // staff_names (canonical roster that loadStaffFromSupabase reads on reload)
+    await fetch(SUPABASE_URL+'/rest/v1/staff_names',{
+      method:'POST',headers:Object.assign({Prefer:'resolution=merge-duplicates,return=minimal'},H),
+      body:JSON.stringify({name:fullName})
+    }).catch(function(){});
+
+    // staff_directory (name + team) — update if present, else insert
+    const up=await fetch(SUPABASE_URL+'/rest/v1/staff_directory?staff_name=eq.'+enc(fullName),{
+      method:'PATCH',headers:Object.assign({Prefer:'return=representation'},H),
+      body:JSON.stringify({team:t})
+    });
+    let rows=[]; try{ rows=await up.json(); }catch(e){}
+    if(!Array.isArray(rows) || rows.length===0){
+      await fetch(SUPABASE_URL+'/rest/v1/staff_directory',{
+        method:'POST',headers:Object.assign({Prefer:'return=minimal'},H),
+        body:JSON.stringify({staff_name:fullName,team:t})
+      }).catch(function(){});
+    }
+
+    // staff_credentials — set team if a row exists (auth created separately via
+    // adminSetPw); if none yet, insert a minimal row carrying name+team so the
+    // directory shows them immediately. password_hash='' satisfies NOT NULL.
+    const cu=await fetch(SUPABASE_URL+'/rest/v1/staff_credentials?staff_name=eq.'+enc(fullName),{
+      method:'PATCH',headers:Object.assign({Prefer:'return=representation'},H),
+      body:JSON.stringify({team:t})
+    });
+    let crows=[]; try{ crows=await cu.json(); }catch(e){}
+    if(!Array.isArray(crows) || crows.length===0){
+      await fetch(SUPABASE_URL+'/rest/v1/staff_credentials',{
+        method:'POST',headers:Object.assign({Prefer:'return=minimal'},H),
+        body:JSON.stringify({staff_name:fullName,team:t,password_hash:''})
+      }).catch(function(){});
+    }
+  }catch(e){ console.warn('addStaffToSupabase failed', e); }
+}
+
 // Write this staffer's team memberships to staff_teams: primary team + any
 // ticked "Also on teams". Replaces their full set (removes unticked ones).
 async function saveStaffTeams(fullName, primaryTeam){
