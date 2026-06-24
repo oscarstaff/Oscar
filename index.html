@@ -13547,46 +13547,26 @@ let _annReads = {}; // {ann_id: [name, name, ...]}
 let _annReadsLoaded = false;
 
 async function loadAnnReads(){
-  try{
-    const rows = await sbGet('announcement_reads', '?select=announcement_id,staff_name&order=read_at.desc&limit=1000');
-    const map = {};
-    (rows||[]).forEach(function(r){
-      if(!map[r.announcement_id]) map[r.announcement_id] = [];
-      map[r.announcement_id].push(r.staff_name);
-    });
-    _annReads = map;
-    _annReadsLoaded = true;
-  }catch(e){console.warn('loadAnnReads:',e);}
+  // Announcements deprecated → announcement_reads table removed. Skip the network
+  // call (was 404-ing) but keep the in-memory map so render code stays safe.
+  _annReads = _annReads || {};
+  _annReadsLoaded = true;
+  return;
 }
 
 async function markAnnRead(annId){
   if(!annId || !me) return;
-  // Optimistic update
+  // Optimistic in-memory only (announcement_reads table removed)
   if(!_annReads[annId]) _annReads[annId] = [];
   if(_annReads[annId].indexOf(me) < 0) _annReads[annId].push(me);
-  try{
-    await fetch(SB+'/rest/v1/announcement_reads', {
-      method:'POST',
-      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},
-      body: JSON.stringify({announcement_id: annId, staff_name: me})
-    });
-  }catch(e){console.warn('markAnnRead:',e);}
 }
 
 async function markAllAnnsRead(annIds){
   if(!annIds || !annIds.length || !me) return;
+  // Optimistic in-memory only (announcement_reads table removed)
   for(const id of annIds){
     if(!_annReads[id]) _annReads[id] = [];
-    if(_annReads[id].indexOf(me) < 0){
-      _annReads[id].push(me);
-      try{
-        await fetch(SB+'/rest/v1/announcement_reads', {
-          method:'POST',
-          headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},
-          body: JSON.stringify({announcement_id: id, staff_name: me})
-        });
-      }catch(e){}
-    }
+    if(_annReads[id].indexOf(me) < 0) _annReads[id].push(me);
   }
 }
 
@@ -22415,6 +22395,16 @@ async function initRealtime(){
   }
   try{
     _realtimeClient = window.supabase.createClient(SB, KEY);
+    // RLS-filtered tables (e.g. channel_messages) only stream postgres_changes to
+    // connections authenticated as the user. Make sure the socket carries the user's
+    // token BEFORE we subscribe, otherwise the Realtime server treats us as anon and
+    // silently drops events our SELECT policy would otherwise allow.
+    try{ await refreshSbAuthToken(); }catch(e){}
+    try{
+      if(_realtimeClient.realtime && _realtimeClient.realtime.setAuth){
+        _realtimeClient.realtime.setAuth(window._sbAuthToken || KEY);
+      }
+    }catch(e){}
     setupRealtimeChannels();
   }catch(e){ console.error('[Realtime] init failed:', e); }
 }
