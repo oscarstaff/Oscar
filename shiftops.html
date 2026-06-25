@@ -1125,6 +1125,7 @@ body{ background:
 [data-theme="dark"] .sa-acc-label{color:#dde8f5;}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 </head>
 <body>
 <!-- NEXUS TOKEN GATE — app only opens when launched from Nexus -->
@@ -3353,17 +3354,45 @@ async function exportPDF(dayFilter=null){
 <div class="footer"><span>Oscar Roster</span><span>Confidential &mdash; Internal Use Only</span></div>
 </div></body></html>`;
 
+  const pdfFilename=`Oscar-Roster-${weekLabel.replace(/[^a-zA-Z0-9]/g,'-')}.pdf`;
+
   if(window.shiftops&&window.shiftops.exportPdf){
+    // Native desktop bridge (if present)
     showToast('⏳ Generating PDF…');
-    const filename=`Oscar-Roster-${weekLabel.replace(/[^a-zA-Z0-9]/g,'-')}.pdf`;
-    const res=await window.shiftops.exportPdf(html,filename);
+    const res=await window.shiftops.exportPdf(html,pdfFilename);
     if(res.ok)showToast('✅ PDF saved to '+res.filePath.split('/').pop());
     else if(!res.canceled)showToast('⚠ PDF failed: '+(res.error||'unknown error'));
+  } else if(typeof html2pdf!=='undefined'){
+    // PRIMARY browser path: render to a real downloaded PDF (no flaky print dialog).
+    // We render the export HTML's <body> in an offscreen container so html2pdf
+    // sees the exact same markup + CSS, then let it paginate to A4 landscape.
+    showToast('⏳ Generating PDF…');
+    try{
+      const doc=new DOMParser().parseFromString(html,'text/html');
+      // move the <style> + body content into a detached element html2pdf can read
+      const holder=document.createElement('div');
+      const styleEl=doc.querySelector('style');
+      if(styleEl) holder.appendChild(styleEl.cloneNode(true));
+      const pageEl=doc.querySelector('#page');
+      holder.appendChild(document.importNode(pageEl,true));
+      holder.style.cssText='position:fixed;left:-99999px;top:0;width:1400px;background:#fff;';
+      document.body.appendChild(holder);
+      await html2pdf().set({
+        margin:[5,5,5,5],
+        filename:pdfFilename,
+        image:{type:'jpeg',quality:0.98},
+        html2canvas:{scale:2,useCORS:true,backgroundColor:'#fff'},
+        jsPDF:{unit:'mm',format:'a4',orientation:isSingleDay?'portrait':'landscape'},
+        pagebreak:{mode:['css','legacy'],avoid:'tr'}
+      }).from(holder).save();
+      document.body.removeChild(holder);
+      showToast('✅ PDF downloaded');
+    }catch(e){
+      showToast('⚠ PDF failed: '+(e.message||'error'));
+    }
   } else {
-    // Browser path -> user picks "Save as PDF" in the print dialog.
-    // The <title> becomes the default PDF filename. Wait for layout before
-    // printing so styles are fully applied (printing too early caused odd scaling).
-    const pdfTitle=`Oscar-Roster-${weekLabel.replace(/[^a-zA-Z0-9]/g,'-')}`;
+    // LAST-RESORT fallback: print dialog (only if html2pdf failed to load).
+    const pdfTitle=pdfFilename.replace(/\.pdf$/,'');
     const titledHtml=html.replace('<title>Oscars Staff Management</title>','<title>'+pdfTitle+'</title>');
     const win=window.open('','_blank');
     if(!win){ showToast('\u26a0 Allow pop-ups to export the PDF'); return; }
