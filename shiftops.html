@@ -1125,7 +1125,8 @@ body{ background:
 [data-theme="dark"] .sa-acc-label{color:#dde8f5;}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.4/dist/jspdf.plugin.autotable.min.js"></script>
 </head>
 <body>
 <!-- NEXUS TOKEN GATE — app only opens when launched from Nexus -->
@@ -3211,198 +3212,127 @@ async function exportPDF(dayFilter=null){
   const singleDate=isSingleDay?fmtDate(addDays(currentWeekStart,dayFilter)):'';
   const weekLabel=isSingleDay?`${singleDayName} — ${singleDate}`:`${fmtDate(currentWeekStart)} – ${fmtDate(addDays(currentWeekStart,6))}`;
   const daysToShow=isSingleDay?[dayFilter]:[0,1,2,3,4,5,6];
-  const colSpan=isSingleDay?2:9;
+  const pdfFilename=`Oscar-Roster-${weekLabel.replace(/[^a-zA-Z0-9]/g,'-')}.pdf`;
 
-  const sortedTeams=[...new Set(staff.map(s=>s.team))].sort();
-  let tableRows='';
-
-  sortedTeams.forEach(team=>{
-    let teamStaff=staff.filter(s=>s.team===team&&!s.isOfficeManager&&s.isManager!=='office').sort((a,b)=>a.first.localeCompare(b.first)||a.last.localeCompare(b.last));
-    // For single day export, only include staff rostered that day
-    if(isSingleDay)teamStaff=teamStaff.filter(s=>((shifts[s.id]||{})[dayFilter]||[]).length>0);
-    if(!teamStaff.length)return;
-
-    tableRows+=`<tr><td colspan="${colSpan}" style="background:#0d1b2a;color:#fff;padding:5px 10px;font-size:9px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase">${team}</td></tr>`;
-
-    teamStaff.forEach(s=>{
-      const hrs=isSingleDay?staffHoursDay(s.id,dayFilter):staffHoursWeek(s.id);
-      const roleLabel=staffRoleLabel(s);
-      let cells='';
-      for(const d of daysToShow){
-        const ds=(shifts[s.id]||{})[d]||[];
-        if(!ds.length){
-          cells+=`<td class="empty-cell">—</td>`;
-        } else {
-          const inner=ds.map(sh=>{
-            if(sh.type==='leave')return`<div class="shift-box shift-leave">LEAVE</div>`;
-            const dev=sh.deviceId?devices.find(x=>x.id===sh.deviceId):null;
-            const devHours=sh.deviceStart&&sh.deviceEnd?' '+sh.deviceStart+'–'+sh.deviceEnd:'';
-            const devHtml=dev?('<br><span class="staff-dev">\u{1F4BB} '+dev.name+devHours+'</span>'):'';
-            return'<div class="shift-box shift-normal"><strong>'+sh.start+'\u2013'+sh.end+'</strong>'+devHtml+'</div>';
-          }).join('');
-          cells+=`<td class="shift-cell">${inner}</td>`;
-        }
+  // Build a cell's text from a staff member's shifts that day
+  function cellText(s,d){
+    const ds=(shifts[s.id]||{})[d]||[];
+    if(!ds.length) return '—';
+    return ds.map(sh=>{
+      if(sh.type==='leave') return 'LEAVE';
+      let t=sh.start+'–'+sh.end;
+      if(sh.deviceId){
+        const dev=devices.find(x=>x.id===sh.deviceId);
+        if(dev){ t+='\n'+dev.name+((sh.deviceStart&&sh.deviceEnd)?(' '+sh.deviceStart+'–'+sh.deviceEnd):''); }
       }
-      tableRows+=`<tr>
-        <td class="name-cell">
-          <div class="staff-name">${s.first} ${s.last}</div>
-          <div class="staff-role">${roleLabel}</div>
-          <div class="staff-hrs">${hrs.toFixed(1)}h</div>
-        </td>${cells}
-      </tr>`;
-    });
-  });
+      return t;
+    }).join('\n');
+  }
+  function cellKind(s,d){
+    const ds=(shifts[s.id]||{})[d]||[];
+    if(!ds.length) return 'empty';
+    if(ds.some(sh=>sh.type==='leave')) return 'leave';
+    return 'work';
+  }
 
-  // Office manager
+  // Assemble body rows: team banner rows + staff rows. Track styling per row/cell.
+  const sortedTeams=[...new Set(staff.map(s=>s.team))].sort();
+  const body=[];               // array of {cells:[...], banner?:team, leaveCols:[...], emptyCols:[...]}
+  let totalHrs=0;
+
+  // Office managers first
   let om=staff.filter(s=>s.isOfficeManager||s.isManager==='office');
   if(isSingleDay)om=om.filter(s=>((shifts[s.id]||{})[dayFilter]||[]).length>0);
   if(om.length){
-    let omRows='';
+    body.push({banner:'Office'});
     om.forEach(s=>{
       const hrs=isSingleDay?staffHoursDay(s.id,dayFilter):staffHoursWeek(s.id);
-      let cells='';
-      for(const d of daysToShow){
-        const ds=(shifts[s.id]||{})[d]||[];
-        if(!ds.length){cells+=`<td style="text-align:center;color:#bbb;font-size:10px;padding:6px 4px">—</td>`;}
-        else{
-          const inner=ds.map(sh=>sh.type==='leave'?`<div class="shift-box shift-leave">LEAVE</div>`:`<div class="shift-box shift-office"><strong>${sh.start}–${sh.end}</strong></div>`).join('');
-          cells+=`<td style="padding:4px;vertical-align:top">${inner}</td>`;
-        }
-      }
-      omRows+=`<tr>
-        <td class="name-cell" style="background:#fffde7">
-          <div class="staff-name">${s.first} ${s.last}</div>
-          <div class="staff-role" style="color:#f57f17">Office Manager</div>
-          <div class="staff-hrs">${hrs.toFixed(1)}h</div>
-        </td>${cells}
-      </tr>`;
+      totalHrs+=hrs;
+      const cells=[`${s.first} ${s.last}\nOffice Manager · ${hrs.toFixed(1)}h`];
+      const kinds=['name'];
+      daysToShow.forEach(d=>{cells.push(cellText(s,d));kinds.push(cellKind(s,d));});
+      body.push({cells,kinds});
     });
-    tableRows=`<tr><td colspan="${colSpan}" style="background:#5d4037;color:#fff;padding:5px 10px;font-size:9px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase">Office</td></tr>${omRows}`+tableRows;
   }
 
-  const totalHrs=isSingleDay
-    ? Math.round(staff.reduce((a,s)=>a+staffHoursDay(s.id,dayFilter),0))
-    : Math.round(staff.reduce((a,s)=>a+staffHoursWeek(s.id),0));
+  sortedTeams.forEach(team=>{
+    let teamStaff=staff.filter(s=>s.team===team&&!s.isOfficeManager&&s.isManager!=='office').sort((a,b)=>a.first.localeCompare(b.first)||a.last.localeCompare(b.last));
+    if(isSingleDay)teamStaff=teamStaff.filter(s=>((shifts[s.id]||{})[dayFilter]||[]).length>0);
+    if(!teamStaff.length)return;
+    body.push({banner:team});
+    teamStaff.forEach(s=>{
+      const hrs=isSingleDay?staffHoursDay(s.id,dayFilter):staffHoursWeek(s.id);
+      totalHrs+=hrs;
+      const cells=[`${s.first} ${s.last}\n${staffRoleLabel(s)} · ${hrs.toFixed(1)}h`];
+      const kinds=['name'];
+      daysToShow.forEach(d=>{cells.push(cellText(s,d));kinds.push(cellKind(s,d));});
+      body.push({cells,kinds});
+    });
+  });
 
-  const colGroup=isSingleDay
-    ? '<col class="name-col"><col style="width:92.5%">'
-    : `<col class="name-col">${Array(7).fill('<col class="day-col">').join('')}`;
+  if(typeof window.jspdf==='undefined' || !window.jspdf || !window.jspdf.jsPDF){
+    showToast('⚠ PDF library not loaded — check connection');
+    return;
+  }
+  showToast('⏳ Generating PDF…');
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({orientation:isSingleDay?'portrait':'landscape',unit:'mm',format:'a4'});
+  const pageW=doc.internal.pageSize.getWidth();
 
-  const dayHeaders=isSingleDay
-    ? `<th>${singleDayName}<br><span style="font-weight:500;opacity:.75;font-size:6.5px">${singleDate}</span></th>`
-    : DAYS_FULL.map((d,i)=>'<th>'+d.slice(0,3)+'<br><span style="font-weight:500;opacity:.75;font-size:6.5px">'+fmtDate(addDays(currentWeekStart,i))+'</span></th>').join('');
+  // header text
+  const headLabels=['STAFF',...daysToShow.map(d=>DAYS_FULL[d].slice(0,3).toUpperCase()+'  '+fmtDate(addDays(currentWeekStart,d)))];
 
-  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Oscars Staff Management</title>
-<style>
-  *{box-sizing:border-box;margin:0;padding:0;}
-  body{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;padding:0;color:#111;background:#fff;}
-  #page{width:100%;}
-  .header{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:5px;padding-bottom:5px;border-bottom:2px solid #0d1b2a;}
-  h1{font-size:14px;font-weight:900;color:#0d1b2a;}
-  .meta{font-size:7.5px;color:#444;margin-top:1px;font-weight:600;}
-  .summary{font-size:7.5px;color:#333;text-align:right;line-height:1.4;font-weight:600;}
-  table{width:100%;border-collapse:collapse;table-layout:fixed;}
-  col.name-col{width:7.5%;}
-  col.day-col{width:13.2%;}
-  thead tr{background:#0d1b2a;}
-  thead th{color:#fff;padding:4px 3px;text-align:left;font-size:7px;text-transform:uppercase;letter-spacing:.5px;font-weight:800;word-break:break-word;}
-  tbody td{vertical-align:top;}
-  .staff-name{font-size:8.5px;font-weight:800;color:#111;}
-  .staff-role{font-size:7px;color:#444;margin-top:1px;font-weight:600;}
-  .staff-hrs{font-size:7px;color:#888;}
-  .staff-dev{font-size:7px;color:#1565c0;font-weight:700;}
-  .shift-box{border-radius:2px;padding:1px 3px;margin-bottom:1px;font-size:7.5px;font-weight:700;}
-  .shift-normal{background:#e8f5e9;border-left:2px solid #43a047;color:#1b5e20;}
-  .shift-leave{background:#ffebee;border-left:2px solid #e53935;color:#c62828;font-weight:900;text-align:center;}
-  .shift-office{background:#fff8e1;border-left:2px solid #f9a825;color:#5d4037;}
-  td.name-cell{padding:4px 5px;vertical-align:top;border-right:1px solid #eee;border-bottom:1px solid #eee;}
-  td.shift-cell{padding:3px;vertical-align:top;border-bottom:1px solid #eee;}
-  td.empty-cell{text-align:center;color:#ccc;font-size:8px;padding:4px 3px;border-bottom:1px solid #eee;}
-  .footer{margin-top:5px;padding-top:4px;border-top:1px solid #ccc;font-size:7px;color:#666;display:flex;justify-content:space-between;font-weight:600;}
-  @page{margin:5mm;size:A4 ${isSingleDay?'portrait':'landscape'};}
+  // column widths
+  const nameW=isSingleDay?60:34;
+  const dayW=(pageW-10-nameW)/daysToShow.length;
+  const colStyles={0:{cellWidth:nameW,halign:'left',fontStyle:'bold'}};
+  for(let i=1;i<=daysToShow.length;i++) colStyles[i]={cellWidth:dayW,halign:'left'};
 
-  /* ── PRINT PAGINATION: keep each staff ROW whole, but pack the table tight ── */
-  /* Only rows avoid splitting — NOT every cell (that wastes vertical space and
-     inflates the page count). Shift boxes stay intact too. */
-  tr{ page-break-inside:avoid; break-inside:avoid; }
-  .shift-box{ page-break-inside:avoid; break-inside:avoid; }
-  /* repeat the column header at the top of each page */
-  thead{ display:table-header-group; }
-  /* keep a team banner glued to the first staff row beneath it (no orphan banner) */
-  tr:has(td[colspan]){ page-break-after:avoid; break-after:avoid; }
-  /* render exact colours and don't let the browser rescale the table up */
-  *{ -webkit-print-color-adjust:exact; print-color-adjust:exact; }
-  html,body{ width:100%; }
-
-.staff-menu-btn:hover{ background:rgba(255,255,255,.06) !important; }
-.staff-popmenu{ animation: popmenuFadeIn .15s ease-out; }
-@keyframes popmenuFadeIn{ from{ opacity:0; transform:translateY(-4px); } to{ opacity:1; transform:translateY(0); } }
-</style>
-</head><body><div id="page">
-<div class="header">
-  <div><h1>Oscar Roster</h1><div class="meta">${isSingleDay?singleDayName+' — '+singleDate:'Week of '+weekLabel}</div></div>
-  <div class="summary">${staff.length} staff &nbsp;&middot;&nbsp; ${totalHrs}h total &nbsp;&middot;&nbsp; Generated ${new Date().toLocaleDateString('en-AU',{day:'numeric',month:'long',year:'numeric'})}</div>
-</div>
-<table>
-  <colgroup>${colGroup}</colgroup>
-  <thead><tr>
-    <th>Staff</th>
-    ${dayHeaders}
-  </tr></thead>
-  <tbody>${tableRows}</tbody>
-</table>
-<div class="footer"><span>Oscar Roster</span><span>Confidential &mdash; Internal Use Only</span></div>
-</div></body></html>`;
-
-  const pdfFilename=`Oscar-Roster-${weekLabel.replace(/[^a-zA-Z0-9]/g,'-')}.pdf`;
-
-  if(window.shiftops&&window.shiftops.exportPdf){
-    // Native desktop bridge (if present)
-    showToast('⏳ Generating PDF…');
-    const res=await window.shiftops.exportPdf(html,pdfFilename);
-    if(res.ok)showToast('✅ PDF saved to '+res.filePath.split('/').pop());
-    else if(!res.canceled)showToast('⚠ PDF failed: '+(res.error||'unknown error'));
-  } else if(typeof html2pdf!=='undefined'){
-    // PRIMARY browser path: render to a real downloaded PDF (no flaky print dialog).
-    showToast('⏳ Generating PDF…');
-    try{
-      const doc=new DOMParser().parseFromString(html,'text/html');
-      // Inject the export styles into THIS document's head so they apply to the clone.
-      const styleEl=doc.querySelector('style');
-      const injected=document.createElement('style');
-      injected.textContent=styleEl?styleEl.textContent:'';
-      document.head.appendChild(injected);
-      // Append #page with an EXPLICIT width so the fixed-layout table has a real
-      // box — without this the canvas measures 0 height and the PDF comes out blank.
-      const pageEl=document.importNode(doc.querySelector('#page'),true);
-      pageEl.style.cssText='width:1400px;background:#fff;position:absolute;left:0;top:0;';
-      document.body.appendChild(pageEl);
-      await html2pdf().set({
-        margin:[5,5,5,5],
-        filename:pdfFilename,
-        image:{type:'jpeg',quality:0.98},
-        html2canvas:{scale:2,useCORS:true,backgroundColor:'#fff',windowWidth:1400,width:1400,height:pageEl.scrollHeight},
-        jsPDF:{unit:'mm',format:'a4',orientation:isSingleDay?'portrait':'landscape'},
-        pagebreak:{mode:['css','legacy'],avoid:'tr'}
-      }).from(pageEl).save();
-      document.body.removeChild(pageEl);
-      document.head.removeChild(injected);
-      showToast('✅ PDF downloaded');
-    }catch(e){
-      showToast('⚠ PDF failed: '+(e.message||'error'));
+  doc.autoTable({
+    head:[headLabels],
+    body:body.map(r=>r.banner?[{content:r.banner.toUpperCase(),colSpan:daysToShow.length+1}]:r.cells),
+    startY:18,
+    margin:{left:5,right:5,top:14,bottom:10},
+    theme:'grid',
+    styles:{fontSize:6.5,cellPadding:1.3,overflow:'linebreak',valign:'top',lineColor:[230,230,230],lineWidth:0.1,textColor:[17,17,17]},
+    headStyles:{fillColor:[13,27,42],textColor:[255,255,255],fontSize:6.5,fontStyle:'bold',cellPadding:1.5},
+    columnStyles:colStyles,
+    didParseCell:function(data){
+      const row=body[data.row.index];
+      if(!row) return;
+      if(row.banner){
+        data.cell.styles.fillColor=[13,27,42];
+        data.cell.styles.textColor=[255,255,255];
+        data.cell.styles.fontStyle='bold';
+        data.cell.styles.fontSize=7;
+        data.cell.styles.cellPadding=1.6;
+        return;
+      }
+      if(data.section!=='body') return;
+      const kind=row.kinds&&row.kinds[data.column.index];
+      if(kind==='work'){ data.cell.styles.fillColor=[232,245,233]; data.cell.styles.textColor=[27,94,32]; }
+      else if(kind==='leave'){ data.cell.styles.fillColor=[255,235,238]; data.cell.styles.textColor=[198,40,40]; data.cell.styles.fontStyle='bold'; data.cell.styles.halign='center'; }
+      else if(kind==='empty'){ data.cell.styles.textColor=[200,200,200]; data.cell.styles.halign='center'; }
+      else if(kind==='name'){ data.cell.styles.fontStyle='bold'; data.cell.styles.fontSize=6.8; }
+    },
+    didDrawPage:function(data){
+      doc.setFontSize(13);doc.setTextColor(13,27,42);doc.setFont(undefined,'bold');
+      doc.text('Oscar Roster',5,11);
+      doc.setFontSize(7);doc.setTextColor(80,80,80);doc.setFont(undefined,'normal');
+      const sub=isSingleDay?(singleDayName+' — '+singleDate):('Week of '+weekLabel);
+      doc.text(sub,5,15.5);
+      const summary=`${staff.length} staff  ·  ${Math.round(totalHrs)}h total  ·  Generated ${new Date().toLocaleDateString('en-AU',{day:'numeric',month:'long',year:'numeric'})}`;
+      doc.text(summary,pageW-5,11,{align:'right'});
+      doc.setFontSize(6);doc.setTextColor(120,120,120);
+      doc.text('Oscar Roster — Confidential, Internal Use Only',5,doc.internal.pageSize.getHeight()-5);
+      doc.text('Page '+doc.internal.getNumberOfPages(),pageW-5,doc.internal.pageSize.getHeight()-5,{align:'right'});
     }
-  } else {
-    // LAST-RESORT fallback: print dialog (only if html2pdf failed to load).
-    const pdfTitle=pdfFilename.replace(/\.pdf$/,'');
-    const titledHtml=html.replace('<title>Oscars Staff Management</title>','<title>'+pdfTitle+'</title>');
-    const win=window.open('','_blank');
-    if(!win){ showToast('\u26a0 Allow pop-ups to export the PDF'); return; }
-    win.document.write(titledHtml+'<script>window.onload=()=>{setTimeout(()=>{window.focus();window.print();},250);};window.onafterprint=()=>window.close();<\/script>');
-    win.document.close();
-  }
+  });
+
+  doc.save(pdfFilename);
+  showToast('✅ PDF downloaded');
 }
 
-// ── EXPORT CSV / TXT ──────────────────────────────────────────────────────
 function exportTXT(){
   let text=`ShiftOps Roster — Week of ${fmtDate(currentWeekStart)}\n${'─'.repeat(50)}\n\n`;
   staff.forEach(s=>{
