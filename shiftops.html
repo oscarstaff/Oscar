@@ -3320,6 +3320,16 @@ async function exportPDF(dayFilter=null){
   .footer{margin-top:5px;padding-top:4px;border-top:1px solid #ccc;font-size:7px;color:#666;display:flex;justify-content:space-between;font-weight:600;}
   @page{margin:5mm;size:A4 ${isSingleDay?'portrait':'landscape'};}
 
+  /* ── PRINT PAGINATION: never slice a row, cell, or shift box across pages ── */
+  tr{ page-break-inside:avoid; break-inside:avoid; }
+  td,th{ page-break-inside:avoid; break-inside:avoid; }
+  .shift-box{ page-break-inside:avoid; break-inside:avoid; }
+  /* repeat the header row at the top of every printed page */
+  thead{ display:table-header-group; }
+  tfoot{ display:table-footer-group; }
+  /* keep a team banner with the first staff row beneath it (avoid orphaned header) */
+  tr:has(td[colspan]){ page-break-after:avoid; break-after:avoid; }
+
 .staff-menu-btn:hover{ background:rgba(255,255,255,.06) !important; }
 .staff-popmenu{ animation: popmenuFadeIn .15s ease-out; }
 @keyframes popmenuFadeIn{ from{ opacity:0; transform:translateY(-4px); } to{ opacity:1; transform:translateY(0); } }
