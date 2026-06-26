@@ -15478,14 +15478,30 @@ function skipTour(){
 
 async function maybeShowTour(){
   if(!me) return;
-  if(localStorage.getItem('nexus_tour_done_'+me) === '1') return;
+  const localDone = localStorage.getItem('nexus_tour_done_'+me) === '1';
+  // DB is the source of truth. Read it first so an admin resetting
+  // nexus_tour_done=false re-fires the tour even if this browser has a
+  // stale "done" flag cached.
   try{
     const rows = await sbGet('staff_settings','?name=eq.'+encodeURIComponent(me)+'&select=nexus_tour_done');
-    if(rows && rows.length && rows[0].nexus_tour_done === true){
-      localStorage.setItem('nexus_tour_done_'+me,'1');
-      return;
+    if(rows && rows.length){
+      if(rows[0].nexus_tour_done === true){
+        localStorage.setItem('nexus_tour_done_'+me,'1');
+        return;
+      }
+      // DB explicitly says NOT done → clear any stale local flag and continue.
+      if(rows[0].nexus_tour_done === false){
+        localStorage.removeItem('nexus_tour_done_'+me);
+      }
+    } else {
+      // No settings row yet → fall back to local flag to avoid re-showing
+      // the tour every load for users without a row.
+      if(localDone) return;
     }
-  }catch(e){ /* ignore */ }
+  }catch(e){
+    // Network/DB failure → fall back to local flag so we don't loop the tour.
+    if(localDone) return;
+  }
   // Don't show while the SQ/DOB lock overlay is up.
   const lock = document.getElementById('onboardLockOverlay');
   if(lock && lock.style.display !== 'none' && lock.style.display !== ''){ return; }
