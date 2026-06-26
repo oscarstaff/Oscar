@@ -7,7 +7,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>Nexus — Workspace</title>
+<title>Nexus</title>
 <meta name="theme-color" content="#0f172a">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -258,6 +258,107 @@ body::before{
   font-family:'Inter',system-ui,sans-serif;
 }
 .auth-link:hover{text-decoration:underline;}
+
+/* ── SPLIT-SCREEN LOGIN (login page only) ───────────────────
+   Desktop: brand panel left (colored), form right.
+   Phone: stacks to a single centered column, no card. */
+#authLayer.login-edge{
+  justify-content:stretch;
+  align-items:stretch;
+  padding:0;
+}
+#authLayer.login-edge .auth-box{
+  max-width:none;width:100%;
+  display:block;min-height:100dvh;
+}
+/* the page becomes the split grid */
+#authLayer.login-edge #pg-login{
+  display:grid;
+  grid-template-columns:1.05fr 1fr;
+  grid-template-rows:100dvh;
+  min-height:100dvh;width:100%;
+}
+/* LEFT brand panel — wordmark + tagline, accent wash */
+#authLayer.login-edge .auth-logo{
+  grid-column:1;grid-row:1;
+  align-self:center;justify-self:end;
+  width:100%;max-width:420px;
+  box-sizing:border-box;
+  padding:0 clamp(32px,5vw,72px);
+  font-size:clamp(44px,4vw,60px);
+  animation:none;margin:0 0 12px;letter-spacing:-1.2px;
+  text-align:left;z-index:1;
+}
+#authLayer.login-edge .auth-tagline{
+  grid-column:1;grid-row:1;
+  align-self:center;justify-self:end;
+  width:100%;max-width:420px;
+  box-sizing:border-box;
+  padding:0 clamp(32px,5vw,72px);
+  transform:translateY(46px);            /* sit just under the wordmark */
+  text-transform:none;letter-spacing:.1px;
+  font-size:16px;color:var(--accent-text);opacity:.85;
+  text-align:left;margin:0;z-index:1;
+}
+/* the colored panel itself (painted via a pseudo so markup stays put) */
+#authLayer.login-edge #pg-login::before{
+  content:"";grid-column:1;grid-row:1;
+  background:linear-gradient(160deg,var(--accent-dim),transparent 70%),
+             var(--accent-dim);
+  border-right:1px solid var(--accent-bd);
+}
+/* RIGHT form panel — card + both links share one cell, stacked */
+#authLayer.login-edge .auth-card,
+#authLayer.login-edge #pg-login .auth-link{
+  grid-column:2;grid-row:1;
+}
+#authLayer.login-edge .auth-card{
+  align-self:center;justify-self:start;
+  width:100%;max-width:380px;
+  margin:0;padding:0 clamp(32px,5vw,72px) !important;
+  background:transparent !important;border:none !important;border-radius:0 !important;
+  box-shadow:none !important;animation:none !important;
+}
+/* links flow right under the card via a translate from the card's center line */
+#authLayer.login-edge #pg-login .auth-link{
+  align-self:center;justify-self:start;
+  width:100%;max-width:380px;box-sizing:border-box;
+  padding-left:clamp(32px,5vw,72px);
+  padding-right:clamp(32px,5vw,72px);
+  text-align:left;
+}
+#authLayer.login-edge #pg-login .auth-link:nth-of-type(1){ transform:translateY(150px); }
+#authLayer.login-edge #pg-login .auth-link:nth-of-type(2){ transform:translateY(188px); }
+#authLayer.login-edge #pg-login .f-input{
+  background:#fff;border-color:#e2e8f0;
+}
+
+/* ── Phone / narrow: stack to single column, no panel ── */
+@media (max-width:760px){
+  #authLayer.login-edge #pg-login{
+    display:block;min-height:100dvh;
+    max-width:440px;margin:0 auto;
+    padding:max(56px,10vh) 24px 40px;
+  }
+  #authLayer.login-edge #pg-login::before{ display:none; }
+  #authLayer.login-edge .auth-logo{
+    max-width:none;padding:0;font-size:clamp(40px,9vw,52px);
+    margin-bottom:10px;justify-self:auto;
+  }
+  #authLayer.login-edge .auth-tagline{
+    max-width:none;padding:0;transform:none;
+    color:#64748b;opacity:1;margin-bottom:36px;justify-self:auto;
+  }
+  #authLayer.login-edge .auth-card{
+    max-width:none;padding:0 !important;justify-self:auto;
+  }
+  #authLayer.login-edge #pg-login .auth-link{
+    max-width:none;padding-left:0;padding-right:0;
+    transform:none;align-self:auto;
+  }
+  #authLayer.login-edge #pg-login .auth-link:nth-of-type(1){ transform:none;margin-top:14px; }
+  #authLayer.login-edge #pg-login .auth-link:nth-of-type(2){ transform:none; }
+}
 
 /* ── SHELL ── */
 .shell{display:flex;height:100dvh;height:calc(var(--vh,1vh)*100);overflow:hidden;width:100%;position:relative;}
@@ -4949,12 +5050,12 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
 
 <!-- ── AUTH ── -->
 
-<div id="authLayer" style="display:none">
+<div id="authLayer" class="login-edge" style="display:none">
   <div class="auth-box">
 
     <div id="pg-login">
       <div class="auth-logo">Nexus</div>
-      <div class="auth-tagline">Workspace</div>
+      <div class="auth-tagline">Your Times, in One Place</div>
       <div class="auth-card">
         <div class="alert alert-err" id="loginErr"></div>
         <div class="field">
@@ -5095,7 +5196,7 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
   <aside class="sidebar">
     <div class="sb-brand">
       <div class="sb-brand-name">Nexus</div>
-      <div class="sb-brand-sub">Workspace</div>
+      <div class="sb-brand-sub">Your Times</div>
     </div>
     <div class="sb-user" onclick="goTo('profile')" style="cursor:pointer;" title="Open profile">
       <div class="sb-avatar" id="sbAvatar"></div>
@@ -7988,6 +8089,7 @@ async function hash(p){const e=new TextEncoder().encode(p+"oscar_roster_salt_202
 function showAuth(s){
   ["login","setpass","resetkey"].forEach(p=>document.getElementById("pg-"+p).style.display="none");
   document.getElementById("pg-"+s).style.display="block";
+  try{ document.getElementById("authLayer").classList.toggle("login-edge", s==="login"); }catch(e){}
 }
 function saveMe(n){me=n;sessionStorage.setItem("ou",n);}
 function loadMe(){const n=sessionStorage.getItem("ou");if(n){me=n;return true;}return false;}
@@ -8539,7 +8641,7 @@ function goTo(p){
   // Update URL hash + document title
   const titles={home:'Home',schedule:'Schedule',profile:'Profile',announcements:'Announcements',engagement:'Engagement',documents:'Documents',messages:'Messages',kudos:'Kudos'};
   const appName='Nexus';
-  document.title='Nexus · '+(titles[p]||'Workspace');
+  document.title='Nexus · '+(titles[p]||'Nexus');
   if(history.replaceState)history.replaceState(null,'','#'+p);
   // Use data-tab for cleaner state management
   document.querySelectorAll(".page").forEach(pg=>pg.classList.toggle("active",pg.id==="page-"+p));
