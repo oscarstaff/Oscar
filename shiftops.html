@@ -1772,7 +1772,7 @@ async function loadStaffFromSupabase(){
   (dir||[]).forEach(function(r){ if(r.staff_name) teamByName[r.staff_name]=r.team; });
   const adminByName={};
   (settings||[]).forEach(function(r){
-    if(r.name) adminByName[r.name]=(r.is_hub_admin===true||r.is_shift_admin===true);
+    if(r.name) adminByName[r.name]={hub:r.is_hub_admin===true, shift:r.is_shift_admin===true};
   });
 
   // Index existing roster (local file) by full name to preserve scheduling fields.
@@ -1799,6 +1799,8 @@ async function loadStaffFromSupabase(){
       team:isOffice?null:team,
       isManager: prev.isManager||false,
       isOfficeManager: isOffice || prev.isOfficeManager || false,
+      isHubAdmin: !!(adminByName[full] && adminByName[full].hub),
+      isShiftAdmin: !!(adminByName[full] && adminByName[full].shift),
       type: prev.type||'full',
       maxHours: (typeof prev.maxHours==='number')?prev.maxHours:38,
       color: prev.color || COLORS[(idc)%COLORS.length]
