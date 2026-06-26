@@ -11494,19 +11494,32 @@ async function ensureStaffSettingsRow(){
   }catch(e){ /* non-critical — PATCH fallbacks still write localStorage */ }
 }
 
+// True only if the staff member has a CURRENTLY-VALID availability row:
+// an ongoing one, or a dated one whose valid_until is today or later.
+function _hasValidAvailability(rows){
+  if(!Array.isArray(rows)||!rows.length) return false;
+  const today=new Date(); today.setHours(0,0,0,0);
+  return rows.some(function(r){
+    if(r.is_ongoing) return true;
+    if(!r.valid_until) return true;            // dated start, no end → treat as valid
+    const until=new Date(r.valid_until+'T00:00:00');
+    return until>=today;                        // not yet expired
+  });
+}
+
 // Enforce the AVAILABILITY lock for staff, then show the usage tour.
 // Availability is mandatory; DOB/security questions are encouraged but not blockers.
 async function maybeShowOnboarding(){
   if(sessionStorage.getItem('onboard_checked_'+me)==='done'){renderTimesheetPreview();maybeShowTour();return;}
   try{
-    const avail=await sbGet('staff_availability','?staff_name=eq.'+encodeURIComponent(me)+'&limit=1');
-    const hasAvail=Array.isArray(avail)&&avail.length>0;
+    const avail=await sbGet('staff_availability','?staff_name=eq.'+encodeURIComponent(me)+'&order=updated_at.desc&limit=5');
+    const hasAvail=_hasValidAvailability(avail);
     // Hide the old checklist card (replaced by the usage tour)
     const card=document.getElementById('onboardCard');
     if(card)card.style.display='none';
-    // Availability is REQUIRED before portal use — hard lock until submitted.
+    // Availability is REQUIRED (and must not be expired) before portal use.
     if(!hasAvail){
-      showOnboardLock(true,true,false);
+      showOnboardLock(true,true,false, (Array.isArray(avail)&&avail.length>0));
     } else {
       sessionStorage.setItem('onboard_checked_'+me,'done');
       maybeShowTour();
@@ -11515,13 +11528,17 @@ async function maybeShowOnboarding(){
   }catch(e){renderTimesheetPreview();}
 }
 
-function showOnboardLock(hasSQ,hasDOB,hasAvail){
+function showOnboardLock(hasSQ,hasDOB,hasAvail,isExpired){
   // Availability is the hard requirement. Lock stays up and CANNOT be dismissed
-  // until availability is submitted.
+  // until a currently-valid availability is submitted.
   const overlay=document.getElementById('onboardLockOverlay');
   if(overlay){
     const msg=document.getElementById('onboardLockMsg');
-    if(msg)msg.textContent='Please submit your weekly availability before using the portal.';
+    if(msg){
+      msg.textContent=isExpired
+        ? 'Your availability has expired. Please submit your updated weekly availability before using the portal.'
+        : 'Please submit your weekly availability before using the portal.';
+    }
     overlay.style.display='flex';
     overlay.dataset.locked='1';   // marks the lock as active for the bypass guard
   }
@@ -17564,10 +17581,11 @@ async function checkAndHighlightMissing(){
 }
 
 async function recheckOnboarding(){
-  // Called after submitting availability — re-checks and clears the lock if done.
+  // Called after submitting availability — re-checks and clears the lock if a
+  // currently-valid (non-expired) availability now exists.
   try{
-    const avail=await sbGet('staff_availability','?staff_name=eq.'+encodeURIComponent(me)+'&limit=1');
-    const hasAvail=Array.isArray(avail)&&avail.length>0;
+    const avail=await sbGet('staff_availability','?staff_name=eq.'+encodeURIComponent(me)+'&order=updated_at.desc&limit=5');
+    const hasAvail=_hasValidAvailability(avail);
     const overlay=document.getElementById('onboardLockOverlay');
     if(hasAvail){
       if(overlay)overlay.dataset.locked='';   // release the guard
@@ -17575,7 +17593,7 @@ async function recheckOnboarding(){
       sessionStorage.setItem('onboard_checked_'+me,'done');
       if(typeof maybeShowTour==='function') maybeShowTour();
     } else {
-      showOnboardLock(true,true,false);
+      showOnboardLock(true,true,false,(Array.isArray(avail)&&avail.length>0));
     }
   }catch(e){}
 }
