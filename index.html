@@ -8721,12 +8721,18 @@ async function checkLock(){
   document.getElementById("availBtnArea").style.display=locked?"none":"block";
 
   if(!locked){
-    // Show success if already saved — don't build form yet (lazy load on Edit click)
+    // Show success if already saved AND still valid — otherwise prompt re-entry.
     try{
-      const existing=await sbGet("staff_availability","?staff_name=eq."+encodeURIComponent(me)+"&limit=1");
-      if(existing.length){
+      const existing=await sbGet("staff_availability","?staff_name=eq."+encodeURIComponent(me)+"&order=updated_at.desc&limit=5");
+      const valid=(typeof _hasValidAvailability==='function')?_hasValidAvailability(existing):(existing&&existing.length>0);
+      if(existing && existing.length && valid){
         buildAvailForm(); // still build so Edit works
         showAvailSuccess(existing[0]);
+      }else if(existing && existing.length && !valid){
+        // Expired: build the form, pre-fill nothing stale, and flag it clearly.
+        buildAvailForm();
+        showAvailForm();
+        showAvailExpiredNotice(existing[0]);
       }else{
         buildAvailForm();
         showAvailForm();
@@ -8739,11 +8745,24 @@ function showAvailSuccess(row){
   document.getElementById("availSuccess").style.display="block";
   document.getElementById("availFormArea").style.display="none";
   const avail=row.availability||{};
+  // Is this row already expired?
+  //  • dated   → end date has passed
+  //  • ongoing → last saved (updated_at) more than 3 months ago
+  let expired=false;
+  if(row && !row.is_ongoing && row.valid_until){
+    const until=new Date(row.valid_until+'T00:00:00');
+    const today=new Date(); today.setHours(0,0,0,0);
+    expired=until<today;
+  } else if(row && row.is_ongoing && row.updated_at){
+    const cutoff=new Date(); cutoff.setMonth(cutoff.getMonth()-3);
+    expired=new Date(row.updated_at)<cutoff;
+  }
   // Period label
   let period="Ongoing availability";
   if(!row.is_ongoing&&row.valid_from){
     period="Valid from "+fmtF(row.valid_from)+(row.valid_until?" until "+fmtF(row.valid_until):"");
   }
+  if(expired) period="Expired — "+period.toLowerCase();
   const periodEl=document.getElementById("availSavedPeriod");
   if(periodEl)periodEl.textContent=period;
   // Status banner
@@ -8783,6 +8802,40 @@ function showAvailForm(){
   }
 }
 
+// Shown when a staff member's previously-saved availability has expired:
+// makes it unmistakable that they need to set it AGAIN, not that it's still active.
+function showAvailExpiredNotice(row){
+  const banner=document.getElementById("availStatusBanner");
+  // Compute the expiry date for the message:
+  //  • dated → valid_until
+  //  • ongoing → 3 months after it was last saved
+  let until="";
+  if(row && !row.is_ongoing && row.valid_until){
+    until=fmtF(row.valid_until);
+  } else if(row && row.is_ongoing && row.updated_at){
+    const exp=new Date(row.updated_at); exp.setMonth(exp.getMonth()+3);
+    until=fmtF(exp.toISOString().slice(0,10));
+  }
+  if(banner){
+    const t=document.getElementById("availBannerTitle");
+    const s=document.getElementById("availBannerSub");
+    if(t)t.textContent="Your availability has expired";
+    if(s)s.textContent=(until?("It was valid until "+until+". "):"")+"Please set your availability again below.";
+    banner.style.display="flex";
+    banner.classList.add("avail-expired");
+  }
+  // Inline amber strip above the form so it's impossible to miss.
+  const area=document.getElementById("availFormArea");
+  if(area && !document.getElementById("availExpiredStrip")){
+    const strip=document.createElement("div");
+    strip.id="availExpiredStrip";
+    strip.style.cssText="display:flex;align-items:center;gap:10px;background:#fef3c7;border:1px solid #fcd34d;color:#92400e;border-radius:12px;padding:12px 14px;margin-bottom:14px;font-size:13px;font-weight:600;line-height:1.45;";
+    strip.innerHTML='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>'+
+      '<span>'+(until?("Your availability expired on "+until+". "):"Your availability has expired. ")+'Please set it again before using the portal.</span>';
+    area.insertBefore(strip, area.firstChild);
+  }
+}
+
 async function submitAvail(){
   const avail={},err=document.getElementById("availErr");err.classList.remove("show");
   for(let i=0;i<7;i++){
@@ -8814,6 +8867,11 @@ async function submitAvail(){
       res=await sbPost("staff_availability",payload);
     }
     if(res.ok||res.status===201||res.status===204){
+      // Clear any expired-availability notice now that fresh availability is saved.
+      const _strip=document.getElementById("availExpiredStrip");
+      if(_strip)_strip.remove();
+      const _bn=document.getElementById("availStatusBanner");
+      if(_bn)_bn.classList.remove("avail-expired");
       showAvailSuccess({availability:avail,is_ongoing:isOngoing,valid_from:validFrom,valid_until:validUntil});
       loadHomeData();
       if(typeof recheckOnboarding==='function') recheckOnboarding();
@@ -11495,15 +11553,20 @@ async function ensureStaffSettingsRow(){
 }
 
 // True only if the staff member has a CURRENTLY-VALID availability row:
-// an ongoing one, or a dated one whose valid_until is today or later.
+//  • ongoing  → valid for 3 months from when it was last saved (updated_at)
+//  • dated    → valid while valid_until is today or later
 function _hasValidAvailability(rows){
   if(!Array.isArray(rows)||!rows.length) return false;
   const today=new Date(); today.setHours(0,0,0,0);
+  const cutoff=new Date(); cutoff.setMonth(cutoff.getMonth()-3);  // 3 months ago
   return rows.some(function(r){
-    if(r.is_ongoing) return true;
-    if(!r.valid_until) return true;            // dated start, no end → treat as valid
+    if(r.is_ongoing){
+      if(!r.updated_at) return true;            // legacy row with no timestamp → don't lock
+      return new Date(r.updated_at) >= cutoff;  // re-confirmed within last 3 months
+    }
+    if(!r.valid_until) return true;             // dated start, no end → valid
     const until=new Date(r.valid_until+'T00:00:00');
-    return until>=today;                        // not yet expired
+    return until>=today;                         // not yet expired
   });
 }
 
