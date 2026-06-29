@@ -66,6 +66,7 @@ body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);min-
 .mode-btn.sel{border-color:var(--gold);color:var(--gold);background:rgba(232,184,74,.08);}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 </head>
 <body>
@@ -80,7 +81,7 @@ body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);min-
       </div>
       <div class="game-card" style="--accent:#e05a3f;" onclick="openGame('kart')">
         <span class="ico">🏎️</span><h3>GRAND KART</h3>
-        <p>One long lap against three CPU karts — big straights, sweeping turns. First across the line wins.</p>
+        <p>Five circuits, three rides, five boosters — super speed, teleport, push, shockwave, fire trails. Pick your setup and dominate.</p>
         <div class="best" id="best-kart" style="color:#e05a3f;">WINS: 0</div>
       </div>
     </div>
@@ -158,12 +159,15 @@ body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);min-
           <button class="kbtn" id="kbtn-right" style="left:78px;bottom:12px;">►</button>
           <button class="kbtn" id="kbtn-gas"   style="right:10px;bottom:12px;background:rgba(63,184,175,.85);">GAS</button>
           <button class="kbtn" id="kbtn-brake" style="right:80px;bottom:12px;background:rgba(224,90,63,.85);">BRK</button>
+          <button class="kbtn" id="kbtn-fire" style="right:10px;bottom:84px;background:rgba(63,184,175,.92);font-size:22px;">🚀</button>
+          <button class="kbtn" id="kbtn-cycle" style="right:80px;bottom:84px;background:rgba(40,46,56,.9);font-size:18px;">🔄</button>
         </div>
       </div>
       <div class="pool-hud">
         <button class="btn-primary" onclick="kartNewRace()">Restart race</button>
+        <button class="btn-primary" onclick="showTrackPicker()" style="background:#262c34;">🗺 Tracks</button>
       </div>
-      <div class="hint">Desktop: <b>↑/W</b> gas, <b>↓/S</b> brake/reverse, <b>←→/AD</b> steer. Mobile: use the on-screen buttons. One long lap, four karts — get to the front and hold the line.</div>
+      <div class="hint">Desktop: <b>↑/W</b> gas, <b>↓/S</b> brake, <b>←→/AD</b> steer, <b>Space</b> fire power, <b>Shift/E</b> cycle power. Mobile: on-screen buttons (🚀 fire, 🔄 cycle). Pick a track + vehicle, charge your booster by driving, then unleash 🚀✨💥🌊🔥.</div>
     </div>
   </div>
 </div>
@@ -173,12 +177,15 @@ body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);min-
 .kbtn:active{transform:scale(.92);filter:brightness(1.2);}
 #kartCanvas{border-radius:14px;background:#3a7d3a;display:block;width:100%;max-width:560px;touch-action:none;}
 @media(hover:hover) and (pointer:fine){#kartTouch{display:none;}}
-.track-picker{position:absolute;inset:0;display:none;grid-template-columns:repeat(3,1fr);gap:8px;padding:14px;background:rgba(18,22,28,.92);border-radius:14px;align-content:center;}
+.track-picker{position:absolute;inset:0;display:none;grid-template-columns:repeat(3,1fr);gap:8px;padding:14px;background:rgba(18,22,28,.92);border-radius:14px;align-content:start;overflow-y:auto;}
 .track-card{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;background:#262c34;border:1.5px solid #3a424c;border-radius:11px;padding:12px 6px;color:#fff;cursor:pointer;font-family:'Outfit';transition:transform .12s,border-color .12s;}
 .track-card:hover{transform:translateY(-3px);border-color:var(--gold);}
 .tc-flag{font-size:26px;}
 .tc-name{font-weight:700;font-size:13px;}
 .tc-desc{font-size:10px;color:#9aa3ad;text-align:center;line-height:1.2;}
+.picker-title{grid-column:1/-1;text-align:center;font-family:'Outfit';font-weight:800;color:#fff;font-size:15px;letter-spacing:1px;padding:2px 0 6px;}
+.vstats{display:flex;flex-direction:column;gap:1px;margin-top:4px;}
+.vstat{font-size:9px;color:#7fd8d0;letter-spacing:1px;font-family:monospace;}
 @media(max-width:520px){.track-picker{grid-template-columns:repeat(2,1fr);}}
 </style>
 
@@ -210,10 +217,89 @@ const KTRACKS={
       // left end sweep, down (gentle)
       {x:288,y:780},{x:213,y:1000},{x:231,y:1240},{x:300,y:1400}
     ]
+  },
+  serpent:{
+    name:'Snake Pass', flag:'🐍', desc:'Twisty technical run — back-to-back esses, little rest', scenery:'kathmandu',
+    roadw:26,
+    grass:'#3a5a4a', road:'#3a4150', edge:'#4a5260', line:'rgba(200,240,210,.4)',
+    wp:[
+      {x:400,y:1460},{x:800,y:1496},{x:1200,y:1492},{x:1600,y:1454},{x:2000,y:1422},{x:2400,y:1432},{x:2800,y:1472},{x:3200,y:1500},{x:3500,y:1483},{x:3700,y:1360},{x:3800,y:1140},{x:3780,y:920},{x:3650,y:740},{x:3400,y:640},{x:3050,y:620},{x:2650,y:656},{x:2250,y:652},{x:1850,y:614},{x:1450,y:582},{x:1050,y:592},{x:700,y:632},{x:470,y:720},{x:320,y:900},{x:250,y:1120},{x:270,y:1340}
+    ]
+  },
+  bowl:{
+    name:'Harbour Bowl', flag:'🌀', desc:'Big fast oval — one tight inner hairpin to brake for', scenery:'hongkong',
+    roadw:32,
+    grass:'#1f3548', road:'#3a4150', edge:'#4a5260', line:'rgba(120,200,255,.4)',
+    wp:[
+      {x:500,y:1460},{x:1100,y:1500},{x:1800,y:1490},{x:2500,y:1500},{x:3150,y:1470},
+      {x:3600,y:1340},{x:3820,y:1100},{x:3800,y:860},{x:3580,y:660},{x:3150,y:560},
+      {x:2500,y:540},{x:1900,y:560},
+      // inner hairpin pinch
+      {x:1650,y:760},{x:1900,y:960},{x:1700,y:1120},{x:1350,y:1040},{x:1250,y:780},
+      {x:950,y:600},{x:560,y:640},{x:300,y:820},{x:240,y:1080},{x:300,y:1320}
+    ]
+  },
+  altiplano:{
+    name:'Altiplano', flag:'⛰️', desc:'Wide sweeping highland loop — flowing, momentum-friendly', scenery:'almaty',
+    roadw:34,
+    grass:'#43607c', road:'#3a4150', edge:'#4a5260', line:'rgba(200,225,255,.4)',
+    wp:[
+      {x:450,y:1380},{x:1000,y:1480},{x:1650,y:1500},{x:2300,y:1460},{x:2850,y:1500},
+      {x:3350,y:1420},{x:3720,y:1220},{x:3850,y:960},{x:3760,y:720},{x:3480,y:600},
+      {x:3000,y:640},{x:2600,y:820},{x:2200,y:760},{x:1900,y:560},{x:1450,y:580},
+      {x:1050,y:740},{x:800,y:980},{x:560,y:820},{x:300,y:980},{x:230,y:1220}
+    ]
+  },
+  citadel:{
+    name:'Steppe Citadel', flag:'🏯', desc:'Stop-go circuit — long straight into a tight complex', scenery:'ulaanbaatar',
+    roadw:28,
+    grass:'#4a6e54', road:'#3a4150', edge:'#4a5260', line:'rgba(210,235,215,.4)',
+    wp:[
+      // long bottom straight
+      {x:400,y:1500},{x:1100,y:1520},{x:1850,y:1505},{x:2600,y:1520},{x:3300,y:1500},
+      {x:3680,y:1380},{x:3840,y:1140},{x:3700,y:940},{x:3380,y:900},
+      // tight infield complex
+      {x:3050,y:1040},{x:2800,y:880},{x:2950,y:660},{x:2600,y:560},{x:2250,y:680},
+      {x:2350,y:920},{x:2050,y:1020},{x:1750,y:880},{x:1880,y:640},{x:1500,y:560},
+      {x:1150,y:680},{x:1280,y:920},{x:980,y:1040},
+      {x:650,y:880},{x:760,y:640},{x:430,y:620},
+      {x:250,y:820},{x:220,y:1080},{x:280,y:1320}
+    ]
   }
 };
 let kartTrackId='grandmile';
 let KTRACK=null;
+
+// ── VEHICLES: each tweaks the base physics. accel/top/grip are multipliers. ──
+// model: relative path to a .glb in ./models/ (commit these to the repo alongside
+// arcade.html). scale/yaw/yOff are tuned per-model so it sits on the track facing
+// forward; they're auto-corrected at load from the model's bounding box too.
+const KVEHICLES={
+  porsche:{ name:'Porsche 962C', emoji:'🏎️', color:'#e05a3f', desc:'Balanced Le Mans prototype', accel:1.0, top:1.0, grip:1.0,
+            model:'./models/1987_porsche_962c.glb' },
+  mclaren:{ name:'McLaren F1 GTR', emoji:'⚡', color:'#3fb8af', desc:'High top speed, looser grip', accel:0.95, top:1.16, grip:0.9,
+            model:'./models/mclaren_f1_gtr_longtail_ams2.glb' },
+  mach6:{   name:'Mach 6', emoji:'🏁', color:'#e8e8ee', desc:'Grippy & punchy, lower top end', accel:1.18, top:0.92, grip:1.18,
+            model:'./models/speed_racers_mach_6.glb' }
+};
+let kartVehicleId='porsche';
+// cache of loaded GLTF scenes, keyed by url, so we only fetch each once
+const KMODELS={};
+
+// ── BOOSTERS: charge fills with distance travelled; all 5 carried; cycle+fire ──
+const KPOWERS=[
+  {id:'speed',   name:'Super Speed', emoji:'🚀', cost:0.25, cool:0.0},
+  {id:'teleport',name:'Teleport',    emoji:'✨', cost:0.40, cool:0.0},
+  {id:'push',    name:'Push',        emoji:'💥', cost:0.30, cool:0.0},
+  {id:'shock',   name:'Shockwave',   emoji:'🌊', cost:0.45, cool:0.0},
+  {id:'fire',    name:'Fire Trail',  emoji:'🔥', cost:0.35, cool:0.0}
+];
+let kartCharge=0;          // 0..1 booster meter (fills with distance)
+let kartPowerIdx=0;        // which power is selected
+let kartLastChargeX=0, kartLastChargeY=0; // for distance accumulation
+let kartFx=[];             // transient visual effects (fire trail dots, shock rings)
+let kartActive={};         // active timed effects on player, e.g. {speed:secondsLeft}
+let kartChargeFlash=0;     // brief red flash when a fire fails for lack of charge
 
 function setKartTrack(id){
   kartTrackId=id;
@@ -234,30 +320,59 @@ function kartInit(){
   kcv=document.getElementById('kartCanvas');
   if(!window.THREE){alert('3D engine still loading — try again in a moment.');return;}
   kart3DSetup();
-  setKartTrack('grandmile');
-  kartNewRace();
+  if(kartRAF)cancelAnimationFrame(kartRAF);
+  // Start at the MAP picker — player chooses track, then vehicle, then races.
+  showTrackPicker();
 }
+
+// Shared picker overlay renderer. step = 'track' | 'vehicle'
 function showTrackPicker(){
   if(kartRAF)cancelAnimationFrame(kartRAF);
   document.getElementById('kartMsg').classList.remove('show');
-  document.getElementById('kartStatus').textContent='Pick a track';
+  document.getElementById('kartStatus').textContent='Choose your track';
   const wrap=document.getElementById('kartPicker');
-  wrap.innerHTML='';
+  wrap.innerHTML='<div class="picker-title">🗺 CHOOSE TRACK</div>';
   Object.entries(KTRACKS).forEach(([id,t])=>{
     const b=document.createElement('button');
     b.className='track-card';
     b.innerHTML='<span class="tc-flag">'+t.flag+'</span><span class="tc-name">'+t.name+'</span><span class="tc-desc">'+t.desc+'</span>';
-    b.onclick=()=>{setKartTrack(id);wrap.style.display='none';kartNewRace();};
+    b.onclick=()=>{ setKartTrack(id); showVehiclePicker(); };
     wrap.appendChild(b);
   });
+  wrap.style.display='grid';
+}
+function showVehiclePicker(){
+  if(kartRAF)cancelAnimationFrame(kartRAF);
+  document.getElementById('kartStatus').textContent='Choose your ride';
+  const wrap=document.getElementById('kartPicker');
+  wrap.innerHTML='<div class="picker-title">🏁 CHOOSE VEHICLE</div>';
+  Object.entries(KVEHICLES).forEach(([id,v])=>{
+    const b=document.createElement('button');
+    b.className='track-card';
+    const stat=(lbl,n)=>'<span class="vstat">'+lbl+' '+'▮'.repeat(Math.round(n*4)).padEnd(5,'▯')+'</span>';
+    b.innerHTML='<span class="tc-flag">'+v.emoji+'</span><span class="tc-name" style="color:'+v.color+'">'+v.name+'</span>'+
+      '<span class="tc-desc">'+v.desc+'</span>'+
+      '<span class="vstats">'+stat('SPD',v.top)+stat('ACC',v.accel)+stat('GRP',v.grip)+'</span>';
+    b.onclick=()=>{ kartVehicleId=id; wrap.style.display='none'; kartNewRace(); };
+    wrap.appendChild(b);
+  });
+  // back to track choice
+  const back=document.createElement('button');
+  back.className='track-card'; back.style.opacity='.8';
+  back.innerHTML='<span class="tc-flag">↩</span><span class="tc-name">Back</span><span class="tc-desc">Pick a different track</span>';
+  back.onclick=()=>showTrackPicker();
+  wrap.appendChild(back);
   wrap.style.display='grid';
 }
 function kartNewRace(){
   document.getElementById('kartMsg').classList.remove('show');
   kartPlacements=[];
-  const colors=['#e05a3f','#3fb8af','#c9952e','#7a5cd0'];
+  const veh=KVEHICLES[kartVehicleId]||KVEHICLES.striker;
+  const colors=[veh.color,'#3fb8af','#c9952e','#7a5cd0'];
   const names=['You','CPU Rosa','CPU Vito','CPU Kim'];
   karts=[];
+  // reset booster meter + effects for the new race
+  kartCharge=0; kartPowerIdx=0; kartFx=[]; kartActive={}; kartChargeFlash=0;
   // grid start just behind wp0, offset perpendicular to the wp0->wp1 direction
   const w0=KTRACK.wp[0], w1=KTRACK.wp[1];
   const startA=Math.atan2(w1.y-w0.y,w1.x-w0.x);
@@ -275,9 +390,11 @@ function kartNewRace(){
       lap:0, wpIdx:1,
       progress:0,
       finished:false, finishT:0,
+      veh:i===0?kartVehicleId:null,
       skill:i===0?1:(0.82+Math.random()*0.12)
     });
   }
+  kartLastChargeX=karts[0].x; kartLastChargeY=karts[0].y;
   kartState='ready';kartCountdown=3.2;
   T3._cx=undefined;T3._cz=undefined;
   // dispose old scene + build fresh 3D scene for this track
@@ -329,11 +446,13 @@ function kartPhysics(k,dt){
     gas*=k.skill;
   }
   // turning rate depends on speed (can't turn standing still)
-  const turnRate=3.7*dt;
+  const veh=(k.isPlayer&&KVEHICLES[k.veh])?KVEHICLES[k.veh]:{accel:1,top:1,grip:1};
+  const turnRate=3.7*dt*veh.grip;
   k.a+=steer*turnRate*Math.min(1,Math.abs(k.v)/(0.6*KK.WORLD));
   // acceleration (scaled to the larger world so karts cover ground at a good pace)
   const S=KK.WORLD;
-  const ACC=3.4*S,BRK=4.2*S,MAXV=2.5*S,REV=-1.0*S;
+  const boosting=(k.isPlayer&&kartActive.speed>0);
+  const ACC=3.4*S*veh.accel*(boosting?1.7:1),BRK=4.2*S,MAXV=2.5*S*veh.top*(boosting?1.5:1),REV=-1.0*S;
   if(gas>0)k.v+=ACC*gas*dt;
   if(brake>0)k.v-=BRK*dt;
   // off-track friction: slow down hard if outside road
@@ -369,6 +488,81 @@ function kartCollisions(){
     if(d<HIT&&d>0){const o=(HIT-d)/2,nx=dx/d,ny=dy/d;a.x-=nx*o;a.y-=ny*o;b.x+=nx*o;b.y+=ny*o;a.v*=0.85;b.v*=0.85;
       const nowt=performance.now();if(nowt-(kartCollisions._lastBump||0)>140){kartCollisions._lastBump=nowt;KS.bump();}}
   }
+}
+
+// ════════════════════ BOOSTERS ════════════════════
+// Charge fills with DISTANCE travelled by the player. A full lap-ish of driving
+// fills the meter; powers spend a slice of it.
+function updateCharge(dt){
+  const p=karts[0]; if(!p) return;
+  const moved=Math.hypot(p.x-kartLastChargeX, p.y-kartLastChargeY);
+  kartLastChargeX=p.x; kartLastChargeY=p.y;
+  // normalise: ~ one full charge per ~6000 world units of driving
+  kartCharge=Math.min(1, kartCharge + moved/4200);
+}
+function updateActiveFx(dt){
+  if(kartChargeFlash>0) kartChargeFlash-=dt;
+  // tick down timed player effects (e.g. super speed, fire-trail emitter)
+  for(const k in kartActive){ kartActive[k]-=dt; if(kartActive[k]<=0) delete kartActive[k]; }
+  // fire-trail emits hazard dots behind the player while active
+  if(kartActive.fire>0){
+    const p=karts[0];
+    kartFx.push({type:'fire', x:p.x-Math.cos(p.a)*14, y:p.y-Math.sin(p.a)*14, life:1.6, r:10, harm:true});
+  }
+  // age effects + apply fire-dot damage to CPUs that drive over them
+  for(let i=kartFx.length-1;i>=0;i--){
+    const f=kartFx[i]; f.life-=dt;
+    if(f.type==='shock'){ f.r+=520*dt; } // expanding ring
+    if(f.harm){
+      for(let j=1;j<karts.length;j++){ const c=karts[j];
+        if(Math.hypot(c.x-f.x,c.y-f.y) < (f.r||12)){ c.v*=0.55; }
+      }
+    }
+    if(f.life<=0) kartFx.splice(i,1);
+  }
+}
+function kartCyclePower(){
+  if(kartState!=='race') return;
+  kartPowerIdx=(kartPowerIdx+1)%KPOWERS.length;
+  if(typeof KS!=='undefined'&&KS.beep)KS.beep();
+  updateKartHud();
+}
+function kartFirePower(){
+  if(kartState!=='race') return;
+  const pw=KPOWERS[kartPowerIdx];
+  if(kartCharge < pw.cost){ kartChargeFlash=0.5; return; } // not enough meter — flash the bar
+  const p=karts[0];
+  kartCharge-=pw.cost;
+  if(pw.id==='speed'){
+    kartActive.speed=2.2;            // 2.2s of boosted accel/top
+  }else if(pw.id==='teleport'){
+    // jump forward along the racing line by up to 3 waypoints, but never PAST
+    // the start/finish line (wp0) — otherwise a lap could be skipped/uncounted.
+    let idx=p.wpIdx;
+    for(let n=0;n<3;n++){
+      const next=(idx+1)%KTRACK.wp.length;
+      if(next<=idx) break; // wrapping past wp0 — stop here
+      idx=next;
+    }
+    const tgt=KTRACK.wp[idx];
+    p.x=tgt.x; p.y=tgt.y; p.wpIdx=(idx+1)%KTRACK.wp.length;
+    p.a=Math.atan2(KTRACK.wp[p.wpIdx].y-p.y, KTRACK.wp[p.wpIdx].x-p.x);
+    kartFx.push({type:'spark', x:p.x, y:p.y, life:0.5, r:40});
+  }else if(pw.id==='push'){
+    // shove nearby rivals away from the player
+    for(let j=1;j<karts.length;j++){ const c=karts[j];
+      const dx=c.x-p.x, dy=c.y-p.y, d=Math.hypot(dx,dy)||1;
+      if(d<900){ const f=(900-d)/900; c.x+=dx/d*260*f; c.y+=dy/d*260*f; c.v*=0.5; }
+    }
+    kartFx.push({type:'push', x:p.x, y:p.y, life:0.45, r:120});
+  }else if(pw.id==='shock'){
+    // expanding ring that spins out any rival it passes through
+    kartFx.push({type:'shock', x:p.x, y:p.y, life:0.9, r:40, harm:true});
+  }else if(pw.id==='fire'){
+    kartActive.fire=2.4;             // emit a hazardous fire trail for 2.4s
+  }
+  if(typeof KS!=='undefined'&&KS.go)KS.go();
+  updateKartHud();
 }
 
 let kartPlacements=[];
@@ -563,7 +757,7 @@ function toggleKartSfx(){
   if(!KSFX.on)ksfxStopEngine();
 }
 
-let T3={scene:null,cam:null,renderer:null,trackGroup:null,kartMeshes:[],ready:false};
+let T3={scene:null,cam:null,renderer:null,trackGroup:null,kartMeshes:[],fxMeshes:[],ready:false};
 
 function kart3DSetup(){
   if(T3.renderer)return; // once
@@ -579,6 +773,7 @@ function buildScene3D(){
   if(T3.scene){
     T3.scene.traverse(o=>{if(o.geometry)o.geometry.dispose&&o.geometry.dispose();if(o.material){(Array.isArray(o.material)?o.material:[o.material]).forEach(m=>m.dispose&&m.dispose());}});
     T3.scene=null;
+    T3.fxMeshes=[];
   }
   const scene=new THREE.Scene();
   const sk=skyColors(KTRACK.scenery);
@@ -630,20 +825,60 @@ function buildScene3D(){
   }
   // city components as 3D meshes around the track
   build3DScenery(scene);
-  // kart meshes (rivals) — simple 3D karts
+  // kart meshes — real GLB car models when available, primitive kart as fallback.
   T3.kartMeshes=[];
   for(let i=0;i<karts.length;i++){
     const k=karts[i];
     const grp=new THREE.Group();
+    // primitive placeholder (shown until/unless a model loads)
+    const ph=new THREE.Group();
     const body=new THREE.Mesh(new THREE.BoxGeometry(16,8,26),new THREE.MeshLambertMaterial({color:new THREE.Color(k.color).getHex()}));
-    body.position.y=6;grp.add(body);
+    body.position.y=6;ph.add(body);
     const cabin=new THREE.Mesh(new THREE.BoxGeometry(12,7,12),new THREE.MeshLambertMaterial({color:0x222a33}));
-    cabin.position.set(0,12,-2);grp.add(cabin);
-    [[-9,-9],[9,-9],[-9,9],[9,9]].forEach(([wx,wz])=>{const wh=new THREE.Mesh(new THREE.CylinderGeometry(4,4,4,10),new THREE.MeshLambertMaterial({color:0x111111}));wh.rotation.z=Math.PI/2;wh.position.set(wx,3,wz);grp.add(wh);});
-    grp.visible=(i!==0); // hide player's own kart (cockpit view)
+    cabin.position.set(0,12,-2);ph.add(cabin);
+    [[-9,-9],[9,-9],[-9,9],[9,9]].forEach(([wx,wz])=>{const wh=new THREE.Mesh(new THREE.CylinderGeometry(4,4,4,10),new THREE.MeshLambertMaterial({color:0x111111}));wh.rotation.z=Math.PI/2;wh.position.set(wx,3,wz);ph.add(wh);});
+    ph.name='placeholder'; grp.add(ph);
+    grp.visible=true; // player kart now visible too (chase cam sits behind it)
     scene.add(grp);T3.kartMeshes.push(grp);
+    // async-load the car model for this kart's vehicle (player) or a default for CPUs
+    const vid = (i===0) ? kartVehicleId : ['porsche','mclaren','mach6'][i % 3];
+    const veh = KVEHICLES[vid];
+    if(veh && veh.model) loadCarModel(veh.model, grp, k.color);
   }
   T3.scene=scene;T3.ready=true;
+}
+
+// Load a GLB once (cached), clone it per kart, auto-normalize size+orientation,
+// and swap it in for the primitive placeholder. Fails silently to the placeholder.
+function loadCarModel(url, targetGrp, tint){
+  function place(srcScene){
+    const model=srcScene.clone(true);
+    // normalize: scale so the longest HORIZONTAL axis ≈ 30 units (kart length),
+    // recentre on x/z, and sit it on the ground (y=0 at the bottom).
+    const box=new THREE.Box3().setFromObject(model);
+    const size=new THREE.Vector3(); box.getSize(size);
+    const longest=Math.max(size.x, size.z, size.y);
+    const s = 30/(Math.max(size.x,size.z)||longest||1);
+    model.scale.setScalar(s);
+    const box2=new THREE.Box3().setFromObject(model);
+    const c=new THREE.Vector3(); box2.getCenter(c);
+    const min=box2.min;
+    model.position.set(-c.x, -min.y, -c.z);
+    // wrap so we can yaw the whole car to face +x (the kart's forward axis)
+    const wrap=new THREE.Group(); wrap.add(model);
+    // if the model is longer along Z than X, rotate 90° so its nose points along x
+    const sz2=new THREE.Vector3(); box2.getSize(sz2);
+    if(sz2.z>sz2.x) wrap.rotation.y=Math.PI/2;
+    const ph=targetGrp.getObjectByName('placeholder'); if(ph) ph.visible=false;
+    targetGrp.add(wrap);
+  }
+  if(KMODELS[url]){ place(KMODELS[url]); return; }
+  if(typeof THREE.GLTFLoader==='undefined') return; // loader CDN missing → keep placeholder
+  try{
+    new THREE.GLTFLoader().load(url, gltf=>{
+      KMODELS[url]=gltf.scene; place(gltf.scene);
+    }, undefined, err=>{ /* keep placeholder on error */ });
+  }catch(e){ /* keep placeholder */ }
 }
 
 function build3DScenery(scene){
@@ -655,7 +890,7 @@ function build3DScenery(scene){
     const dx=b.x-a.x,dy=b.y-a.y,dl=Math.hypot(dx,dy)||1;const nx=-dy/dl,ny=dx/dl;
     [1,-1].forEach(side=>{
       if(rnd()>0.55)return;
-      const off=(KTRACK.roadw*1.9+70+rnd()*180)*side;
+      const off=(KTRACK.roadw*2.6+140+rnd()*200)*side;
       const px=a.x+nx*off, pz=a.y+ny*off;
       let mesh;
       if(kind==='shanghai'||kind==='hongkong'){
@@ -681,11 +916,18 @@ function build3DScenery(scene){
       scene.add(mesh);
     });
   }
-  // big distant mountains for alpine themes (ring of large cones far out)
+  // big distant mountains for alpine themes — placed OUTSIDE the track's real
+  // extent (was a fixed R=1800 ring that dropped cones onto the road). Compute
+  // the track's actual radius from its waypoints and ring the mountains well
+  // beyond it so they sit on the horizon, never on the circuit.
   if(['almaty','kathmandu','ulaanbaatar'].includes(kind)){
-    for(let i=0;i<14;i++){const ang=i/14*Math.PI*2;const R=1800;const h=400+Math.random()*500;
-      const m=new THREE.Mesh(new THREE.ConeGeometry(300,h,5),new THREE.MeshLambertMaterial({color:0x8893a6}));
-      m.position.set(KTRACK.cx/1+Math.cos(ang)*R, h/2-20, KTRACK.cy/1+Math.sin(ang)*R);scene.add(m);}
+    const wp=KTRACK.wp;
+    let maxR=0;
+    for(let i=0;i<wp.length;i++){ maxR=Math.max(maxR,Math.hypot(wp[i].x-KTRACK.cx,wp[i].y-KTRACK.cy)); }
+    const R=maxR+1400; // safely past the outermost corner
+    for(let i=0;i<16;i++){const ang=i/16*Math.PI*2;const h=600+Math.random()*700;
+      const m=new THREE.Mesh(new THREE.ConeGeometry(360,h,5),new THREE.MeshLambertMaterial({color:0x8893a6}));
+      m.position.set(KTRACK.cx+Math.cos(ang)*R, h/2-20, KTRACK.cy+Math.sin(ang)*R);scene.add(m);}
   }
 }
 
@@ -701,16 +943,42 @@ function kart3DRender(){
   // 3rd-person chase camera: sit behind + above the kart, look ahead over it
   const p=karts[0];
   const cosA=Math.cos(p.a),sinA=Math.sin(p.a);
-  const camBack=95, camHeight=58, lookAhead=70, lookH=10;
+  const camBack=120, camHeight=66, lookAhead=80, lookH=12;
   // smooth follow position
   const tx=p.x-cosA*camBack, tz=p.y-sinA*camBack;
   if(T3._cx===undefined){T3._cx=tx;T3._cz=tz;}
   T3._cx=lerp(T3._cx,tx,0.18); T3._cz=lerp(T3._cz,tz,0.18);
   T3.cam.position.set(T3._cx,camHeight,T3._cz);
   T3.cam.lookAt(p.x+cosA*lookAhead, lookH, p.y+sinA*lookAhead);
+  // ── booster FX: sync a mesh pool to kartFx ──
+  renderKartFx();
+  // ── super-speed glow on player kart ──
+  if(T3.kartMeshes[0]) T3.kartMeshes[0].scale.setScalar(kartActive.speed>0?1.18:1);
   T3.renderer.render(T3.scene,T3.cam);
   // HUD overlays drawn via DOM (status pill / lap) already exist; countdown via overlay
   drawKartOverlay();
+}
+
+function renderKartFx(){
+  if(!T3.scene)return;
+  const pool=T3.fxMeshes;
+  // ensure enough meshes
+  while(pool.length<kartFx.length){
+    const g=new THREE.Mesh(new THREE.SphereGeometry(1,8,6), new THREE.MeshBasicMaterial({color:0xffaa33,transparent:true,opacity:0.9}));
+    T3.scene.add(g); pool.push(g);
+  }
+  for(let i=0;i<pool.length;i++){
+    const m=pool[i], f=kartFx[i];
+    if(!f){ m.visible=false; continue; }
+    m.visible=true;
+    let col=0xffaa33, r=f.r||10, op=Math.max(0,Math.min(1,f.life));
+    if(f.type==='fire'){ col=0xff5522; r=f.r||10; }
+    else if(f.type==='shock'){ col=0x55ccff; r=f.r; op=Math.max(0,f.life); }
+    else if(f.type==='push'){ col=0xffffff; r=f.r; }
+    else if(f.type==='spark'){ col=0xaad4ff; r=f.r; }
+    m.material.color.setHex(col); m.material.opacity=op*0.85;
+    m.scale.setScalar(r); m.position.set(f.x, (f.type==='fire'?6:14), f.y);
+  }
 }
 
 // countdown / labels as a DOM overlay on top of the WebGL canvas
@@ -721,7 +989,30 @@ function drawKartOverlay(){
     const n=Math.ceil(kartCountdown-0.2);
     ov.innerHTML='<div style="font-size:70px;font-weight:800;">'+(n>0?n:'GO!')+'</div><div style="font-size:20px;font-weight:700;">'+KTRACK.flag+' '+KTRACK.name+'</div>';
     ov.style.display='flex';
+  }else if(kartState==='race'){
+    // booster HUD: charge bar + selected power
+    let bv=document.getElementById('kartBooster');
+    if(!bv){
+      bv=document.createElement('div');bv.id='kartBooster';
+      bv.style.cssText='position:absolute;left:0;right:0;bottom:8px;display:flex;flex-direction:column;align-items:center;gap:4px;pointer-events:none;font-family:Outfit;';
+      document.getElementById('kartWrap').appendChild(bv);
+    }
+    const pw=KPOWERS[kartPowerIdx];
+    const ready=kartCharge>=pw.cost;
+    const pct=Math.round(kartCharge*100);
+    const borderCol=kartChargeFlash>0?'#e05a3f':(ready?'#3fb8af':'#3a424c');
+    bv.innerHTML=
+      '<div style="display:flex;align-items:center;gap:8px;background:rgba(18,22,28,.72);padding:5px 12px;border-radius:20px;color:#fff;font-weight:700;font-size:14px;border:1.5px solid '+borderCol+';">'+
+        '<span style="font-size:18px;">'+pw.emoji+'</span><span>'+pw.name.toUpperCase()+'</span>'+
+        '<span style="width:120px;height:9px;background:#2a2f38;border-radius:6px;overflow:hidden;display:inline-block;">'+
+          '<span style="display:block;height:100%;width:'+pct+'%;background:'+(ready?'linear-gradient(90deg,#3fb8af,#9ef)':'#566')+';transition:width .12s;"></span>'+
+        '</span>'+
+        '<span style="font-size:12px;opacity:.85;">'+(ready?'FIRE!':pct+'%')+'</span>'+
+      '</div>';
+    bv.style.display='flex';
+    if(ov)ov.style.display='none';
   }else if(ov){ov.style.display='none';}
+  if(kartState!=='race'){ const bv=document.getElementById('kartBooster'); if(bv)bv.style.display='none'; }
 }
 
 function kartLoop(){
@@ -737,6 +1028,8 @@ function kartLoop(){
   }else if(kartState==='race'){
     karts.forEach(k=>kartPhysics(k,dt));
     kartCollisions();
+    updateCharge(dt);
+    updateActiveFx(dt);
     updateKartHud();
     // engine pitch from player speed + off-road rumble
     const p=karts[0];const spdFrac=Math.min(1,Math.abs(p.v)/(2.5*KK.WORLD));
@@ -1339,6 +1632,8 @@ window.addEventListener('load',()=>{
   const keymap={ArrowUp:'up',KeyW:'up',ArrowDown:'down',KeyS:'down',ArrowLeft:'left',KeyA:'left',ArrowRight:'right',KeyD:'right'};
   window.addEventListener('keydown',e=>{
     if(!document.getElementById('screen-kart').classList.contains('active'))return;
+    if(e.code==='Space'){ kartFirePower(); e.preventDefault(); return; }
+    if(e.code==='ShiftLeft'||e.code==='ShiftRight'||e.code==='KeyE'){ kartCyclePower(); e.preventDefault(); return; }
     const k=keymap[e.code];if(k){kartKeys[k]=true;e.preventDefault();}
   });
   window.addEventListener('keyup',e=>{const k=keymap[e.code];if(k){kartKeys[k]=false;}});
@@ -1353,6 +1648,15 @@ window.addEventListener('load',()=>{
     el.addEventListener('mousedown',on);el.addEventListener('mouseup',off);el.addEventListener('mouseleave',off);
   };
   bind('kbtn-left','left');bind('kbtn-right','right');bind('kbtn-gas','up');bind('kbtn-brake','down');
+  // booster buttons (tap actions, not held keys)
+  const tapBind=(id,fn)=>{
+    const el=document.getElementById(id);if(!el)return;
+    const h=e=>{e.preventDefault();fn();};
+    el.addEventListener('touchstart',h,{passive:false});
+    el.addEventListener('mousedown',h);
+  };
+  tapBind('kbtn-fire',kartFirePower);
+  tapBind('kbtn-cycle',kartCyclePower);
 });
 </script>
 </body>
