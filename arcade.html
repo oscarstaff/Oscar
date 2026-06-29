@@ -277,11 +277,14 @@ let KTRACK=null;
 // forward; they're auto-corrected at load from the model's bounding box too.
 const KVEHICLES={
   porsche:{ name:'Porsche 962C', emoji:'🏎️', color:'#e05a3f', desc:'Balanced Le Mans prototype', accel:1.0, top:1.0, grip:1.0,
-            model:'./models/1987_porsche_962c.glb', yaw:Math.PI/2, sizeMul:1.0 },
+            model:'./models/1987_porsche_962c.glb', yaw:Math.PI/2, sizeMul:1.0,
+            cockpit:{back:3, height:13, lookH:9, hasInterior:true} },
   mclaren:{ name:'McLaren F1 GTR', emoji:'⚡', color:'#3fb8af', desc:'High top speed, looser grip', accel:0.95, top:1.16, grip:0.9,
-            model:'./models/mclaren_f1_gtr_longtail_ams2.glb', yaw:Math.PI/2, sizeMul:1.0 },
+            model:'./models/mclaren_f1_gtr_longtail_ams2.glb', yaw:Math.PI/2, sizeMul:1.0,
+            cockpit:{back:3, height:13, lookH:9, hasInterior:true} },
   mach6:{   name:'Mach 6', emoji:'🏁', color:'#e8e8ee', desc:'Grippy & punchy, lower top end', accel:1.18, top:0.92, grip:1.18,
-            model:'./models/speed_racers_mach_6.glb', yaw:Math.PI/2, sizeMul:1.0 }
+            model:'./models/speed_racers_mach_6.glb', yaw:Math.PI/2, sizeMul:1.0,
+            cockpit:{back:-6, height:16, lookH:9, hasInterior:false} }  // no interior → bonnet-cam
 };
 let kartVehicleId='porsche';
 // cache of loaded GLTF scenes, keyed by url, so we only fetch each once
@@ -992,13 +995,15 @@ function kart3DRender(){
   const p=karts[0];
   const cosA=Math.cos(p.a),sinA=Math.sin(p.a);
   if(kartFirstPerson){
-    // cockpit view: sit where the driver would be (a little behind centre + low),
-    // look forward and slightly down over the bonnet.
-    const eyeX=p.x-cosA*2, eyeZ=p.y-sinA*2;   // just behind the car's centre
-    T3.cam.position.set(eyeX, 15, eyeZ);       // low, driver-height
-    T3.cam.lookAt(p.x+cosA*90, 9, p.y+sinA*90);// look ahead, dipped over the bonnet
+    // cockpit view: sit at the driver's eye using per-car offsets (cars without a
+    // modelled interior fall back to a bonnet-cam via a negative `back`).
+    const veh=KVEHICLES[kartVehicleId]||{};
+    const cp=veh.cockpit||{back:2,height:15,lookH:9,hasInterior:false};
+    const eyeX=p.x-cosA*cp.back, eyeZ=p.y-sinA*cp.back;
+    T3.cam.position.set(eyeX, cp.height, eyeZ);
+    T3.cam.lookAt(p.x+cosA*90, cp.lookH, p.y+sinA*90);
     T3._cx=undefined; // reset chase smoothing so switching back doesn't lurch
-    // keep the car visible so you can see the bonnet/cockpit ahead of you
+    // keep the car visible so the cockpit/bonnet renders around you
     if(T3.kartMeshes[0]) T3.kartMeshes[0].visible=true;
   }else{
     if(T3.kartMeshes[0]) T3.kartMeshes[0].visible=true;
