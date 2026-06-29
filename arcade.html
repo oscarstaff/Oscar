@@ -161,13 +161,14 @@ body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);min-
           <button class="kbtn" id="kbtn-brake" style="right:80px;bottom:12px;background:rgba(224,90,63,.85);">BRK</button>
           <button class="kbtn" id="kbtn-fire" style="right:10px;bottom:84px;background:rgba(63,184,175,.92);font-size:22px;">🚀</button>
           <button class="kbtn" id="kbtn-cycle" style="right:80px;bottom:84px;background:rgba(40,46,56,.9);font-size:18px;">🔄</button>
+          <button class="kbtn" id="kbtn-view" style="left:10px;bottom:84px;background:rgba(40,46,56,.9);font-size:18px;">👁</button>
         </div>
       </div>
       <div class="pool-hud">
         <button class="btn-primary" onclick="kartNewRace()">Restart race</button>
         <button class="btn-primary" onclick="showTrackPicker()" style="background:#262c34;">🗺 Tracks</button>
       </div>
-      <div class="hint">Desktop: <b>↑/W</b> gas, <b>↓/S</b> brake, <b>←→/AD</b> steer, <b>Space</b> fire power, <b>Shift/E</b> cycle power. Mobile: on-screen buttons (🚀 fire, 🔄 cycle). Pick a track + vehicle, charge your booster by driving, then unleash 🚀🌊🔥.</div>
+      <div class="hint">Desktop: <b>↑/W</b> gas, <b>↓/S</b> brake, <b>←→/AD</b> steer, <b>Space</b> fire power, <b>Shift/E</b> cycle, <b>C</b> camera view. Mobile: on-screen buttons (🚀 fire, 🔄 cycle, 👁 view). Pick a track + vehicle, charge your booster by driving, then unleash 🚀🌊🔥.</div>
     </div>
   </div>
 </div>
@@ -276,11 +277,11 @@ let KTRACK=null;
 // forward; they're auto-corrected at load from the model's bounding box too.
 const KVEHICLES={
   porsche:{ name:'Porsche 962C', emoji:'🏎️', color:'#e05a3f', desc:'Balanced Le Mans prototype', accel:1.0, top:1.0, grip:1.0,
-            model:'./models/1987_porsche_962c.glb', yaw:0 },
+            model:'./models/1987_porsche_962c.glb', yaw:0, sizeMul:1.0 },
   mclaren:{ name:'McLaren F1 GTR', emoji:'⚡', color:'#3fb8af', desc:'High top speed, looser grip', accel:0.95, top:1.16, grip:0.9,
-            model:'./models/mclaren_f1_gtr_longtail_ams2.glb', yaw:0 },
+            model:'./models/mclaren_f1_gtr_longtail_ams2.glb', yaw:0, sizeMul:1.0 },
   mach6:{   name:'Mach 6', emoji:'🏁', color:'#e8e8ee', desc:'Grippy & punchy, lower top end', accel:1.18, top:0.92, grip:1.18,
-            model:'./models/speed_racers_mach_6.glb', yaw:0 }
+            model:'./models/speed_racers_mach_6.glb', yaw:0, sizeMul:1.0 }
 };
 let kartVehicleId='porsche';
 // cache of loaded GLTF scenes, keyed by url, so we only fetch each once
@@ -309,6 +310,7 @@ const KGEARS={
 let kartGear=1;            // current gear (1-based index into ratios)
 let kartRpm=900;
 let kartDrift=0;           // 0..1 how sideways the car is (for tyre-smoke/feel)
+let kartFirstPerson=false; // camera view toggle (C key / 👁 button)
 
 function setKartTrack(id){
   kartTrackId=id;
@@ -493,7 +495,7 @@ function kartPhysics(k,dt){
     // (higher veh.grip) snap back faster, looser cars slide more.
     if(k._vh===undefined) k._vh=k.a;            // velocity heading
     let hd=k.a-k._vh; while(hd>Math.PI)hd-=2*Math.PI; while(hd<-Math.PI)hd+=2*Math.PI;
-    const gripBlend=Math.min(1, dt*(3.2*veh.grip) * (1 - 0.45*spdFrac)); // less grip at speed
+    const gripBlend=Math.min(1, dt*(5.0*veh.grip) * (1 - 0.30*spdFrac)); // firmer grip, less slide
     k._vh += hd*gripBlend;
     // actual travel follows the (laggy) velocity heading → that's the slide
     const slide=Math.abs(hd)*Math.min(1,Math.abs(k.v)/(1.2*S));
@@ -723,7 +725,7 @@ function drawScenery(g,id){
 // ════════════ REAL 3D (Three.js) — COCKPIT VIEW ════════════
 // Physics/AI run in 2D world (x,y,a). 3D maps: world x -> X, world y -> Z, height -> Y.
 // ════════════════════ KART SFX (WebAudio) ════════════════════
-const KSFX={ctx:null,on:true,engine:null,engGain:null,engOsc2:null,offNoise:null,offGain:null,started:false};
+const KSFX={ctx:null,on:true,engine:null,engGain:null,engOsc2:null,engLP:null,offNoise:null,offGain:null,started:false};
 function ksfxCtx(){
   if(!KSFX.ctx){try{KSFX.ctx=new (window.AudioContext||window.webkitAudioContext)();}catch(e){KSFX.on=false;}}
   if(KSFX.ctx&&KSFX.ctx.state==='suspended')KSFX.ctx.resume();
@@ -741,20 +743,22 @@ function ktone(freq,dur,type,vol,slideTo){
 }
 function ksfxStartEngine(){
   const c=ksfxCtx();if(!c||!KSFX.on||KSFX.started)return;
-  // two detuned saws through a lowpass = engine drone
+  // Smoother engine: a triangle "body" + a soft sine sub an octave down, through
+  // a gentle lowpass. Triangle/sine are far mellower than the old detuned saws.
   const o1=c.createOscillator(),o2=c.createOscillator(),g=c.createGain(),lp=c.createBiquadFilter();
-  o1.type='sawtooth';o2.type='sawtooth';o2.detune.value=18;
-  lp.type='lowpass';lp.frequency.value=900;
-  g.gain.value=0.0; o1.frequency.value=55;o2.frequency.value=55;
-  o1.connect(lp);o2.connect(lp);lp.connect(g).connect(c.destination);
-  o1.start();o2.start();
+  o1.type='triangle'; o2.type='sine';
+  o2.detune.value=-1200;                 // sub an octave below for body
+  lp.type='lowpass'; lp.frequency.value=520; lp.Q.value=0.6;
+  g.gain.value=0.0; o1.frequency.value=60; o2.frequency.value=60;
+  o1.connect(lp); o2.connect(lp); lp.connect(g).connect(c.destination);
+  o1.start(); o2.start();
   // off-road tyre rumble (filtered noise), gated by gain
   const buf=c.createBuffer(1,c.sampleRate*1,c.sampleRate);const d=buf.getChannelData(0);
   for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;
   const noise=c.createBufferSource();noise.buffer=buf;noise.loop=true;
-  const ng=c.createGain();ng.gain.value=0;const nf=c.createBiquadFilter();nf.type='bandpass';nf.frequency.value=420;
+  const ng=c.createGain();ng.gain.value=0;const nf=c.createBiquadFilter();nf.type='bandpass';nf.frequency.value=320;
   noise.connect(nf).connect(ng).connect(c.destination);noise.start();
-  KSFX.engine=o1;KSFX.engOsc2=o2;KSFX.engGain=g;KSFX.offNoise=noise;KSFX.offGain=ng;KSFX.started=true;
+  KSFX.engine=o1;KSFX.engOsc2=o2;KSFX.engGain=g;KSFX.engLP=lp;KSFX.offNoise=noise;KSFX.offGain=ng;KSFX.started=true;
 }
 function ksfxStopEngine(){
   if(!KSFX.started)return;
@@ -764,15 +768,16 @@ function ksfxStopEngine(){
 // called each frame with player's RPM (0..maxRpm), gear, speed fraction + offroad
 function ksfxEngineUpdate(rpm,gear,spdFrac,offroad){
   if(!KSFX.started||!KSFX.on)return;const c=KSFX.ctx;
-  // map RPM to a pitch; each gear has its own band so an upshift audibly drops
-  // the note then climbs again (the signature engine-shift sound).
   const rpmFrac=Math.max(0,Math.min(1,rpm/KGEARS.maxRpm));
-  const gearBase=70 - gear*4;              // higher gears sit a touch lower
-  const f=gearBase + rpmFrac*235;          // idle ~66Hz → ~300Hz at redline
-  KSFX.engine.frequency.setTargetAtTime(f,c.currentTime,0.04);
-  KSFX.engOsc2.frequency.setTargetAtTime(f,c.currentTime,0.04);
-  KSFX.engGain.gain.setTargetAtTime(0.04+rpmFrac*0.11,c.currentTime,0.08);
-  KSFX.offGain.gain.setTargetAtTime(offroad?Math.min(0.12,0.03+spdFrac*0.14):0,c.currentTime,0.05);
+  const gearBase=58 - gear*3;              // higher gears sit a touch lower
+  const f=gearBase + rpmFrac*150;          // gentler range: ~55Hz idle → ~205Hz redline
+  KSFX.engine.frequency.setTargetAtTime(f,c.currentTime,0.05);
+  KSFX.engOsc2.frequency.setTargetAtTime(f,c.currentTime,0.05);
+  // open the lowpass a little with revs so it brightens under load, not screechy
+  if(KSFX.engLP) KSFX.engLP.frequency.setTargetAtTime(420+rpmFrac*520,c.currentTime,0.08);
+  // quieter overall, fades in from idle so it's not a constant harsh drone
+  KSFX.engGain.gain.setTargetAtTime(0.025+rpmFrac*0.06,c.currentTime,0.1);
+  KSFX.offGain.gain.setTargetAtTime(offroad?Math.min(0.10,0.02+spdFrac*0.12):0,c.currentTime,0.05);
 }
 const KS={
   beep:()=>ktone(520,0.18,'square',0.2),
@@ -874,37 +879,46 @@ function buildScene3D(){
     // async-load the car model for this kart's vehicle (player) or a default for CPUs
     const vid = (i===0) ? kartVehicleId : ['porsche','mclaren','mach6'][i % 3];
     const veh = KVEHICLES[vid];
-    if(veh && veh.model) loadCarModel(veh.model, grp, k.color, veh.yaw||0);
+    if(veh && veh.model) loadCarModel(veh.model, grp, k.color, veh);
   }
   T3.scene=scene;T3.ready=true;
 }
 
 // Load a GLB once (cached), clone it per kart, auto-normalize size+orientation,
 // and swap it in for the primitive placeholder. Fails silently to the placeholder.
-function loadCarModel(url, targetGrp, tint, yaw){
+function loadCarModel(url, targetGrp, tint, veh){
+  veh=veh||{};
   function place(srcScene){
     const model=srcScene.clone(true);
-    // normalize: scale so the longest HORIZONTAL axis ≈ 30 units (kart length),
-    // recentre on x/z, and sit it on the ground (y=0 at the bottom).
-    const box=new THREE.Box3().setFromObject(model);
-    const size=new THREE.Vector3(); box.getSize(size);
-    const longest=Math.max(size.x, size.z, size.y);
-    const s = 30/(Math.max(size.x,size.z)||longest||1);
-    model.scale.setScalar(s);
-    const box2=new THREE.Box3().setFromObject(model);
-    const c=new THREE.Vector3(); box2.getCenter(c);
-    const min=box2.min;
-    model.position.set(-c.x, -min.y, -c.z);
-    // wrap so we can yaw the whole car to face +x (the kart's forward axis).
+    // ── orient: find the model's longest axis (its length) and rotate so that
+    //    length points along +x (the kart's forward). Handles X / Y / Z models. ──
+    const b0=new THREE.Box3().setFromObject(model);
+    const s0=new THREE.Vector3(); b0.getSize(s0);
     const wrap=new THREE.Group(); wrap.add(model);
-    // Most car models point down their own length (Z); the kart's forward is +x,
-    // so rotate -90° to bring the nose to +x. A per-vehicle `yaw` then corrects
-    // any model that was authored facing a different way (sideways/backwards).
-    const sz2=new THREE.Vector3(); box2.getSize(sz2);
-    let base = (sz2.z>=sz2.x) ? -Math.PI/2 : 0;   // length-along-Z → turn to +x
-    wrap.rotation.y = base + (yaw||0);
+    let lengthVal;
+    if(s0.y>s0.x && s0.y>s0.z){            // length is along Y (Porsche): tip it down onto +z, then to +x
+      model.rotation.x=-Math.PI/2;         // lay it flat (Y-length → Z-length)
+      lengthVal=s0.y;
+    }else{
+      lengthVal=Math.max(s0.x,s0.z);
+    }
+    // after any tip, re-measure and turn length-along-Z to point along +x
+    const b1=new THREE.Box3().setFromObject(model);
+    const s1=new THREE.Vector3(); b1.getSize(s1);
+    if(s1.z>=s1.x) wrap.rotation.y=-Math.PI/2;
+    // per-car manual yaw correction on top (set in KVEHICLES if a car faces wrong)
+    wrap.rotation.y += (veh.yaw||0);
+    // ── scale: make the TRUE length ≈ 34 units (kart ~26, a bit bigger reads better) ──
+    const targetLen=34*(veh.sizeMul||1);
+    const s=targetLen/(lengthVal||1);
+    model.scale.setScalar(s);
+    // ── recentre on x/z and drop onto the ground (after all rotations/scale) ──
+    const b2=new THREE.Box3().setFromObject(wrap);
+    const c=new THREE.Vector3(); b2.getCenter(c);
+    wrap.position.set(-c.x, -b2.min.y, -c.z);
     const ph=targetGrp.getObjectByName('placeholder'); if(ph) ph.visible=false;
     targetGrp.add(wrap);
+    targetGrp.userData.carModel=wrap;
   }
   if(KMODELS[url]){ place(KMODELS[url]); return; }
   if(typeof THREE.GLTFLoader==='undefined') return; // loader CDN missing → keep placeholder
@@ -974,20 +988,30 @@ function kart3DRender(){
     m.rotation.y=-k.a+Math.PI/2;
     m.visible=true;
   }
-  // 3rd-person chase camera: sit behind + above the kart, look ahead over it
+  // camera: toggle between 3rd-person chase and 1st-person cockpit (key C / 👁 btn)
   const p=karts[0];
   const cosA=Math.cos(p.a),sinA=Math.sin(p.a);
-  const camBack=120, camHeight=66, lookAhead=80, lookH=12;
-  // smooth follow position
-  const tx=p.x-cosA*camBack, tz=p.y-sinA*camBack;
-  if(T3._cx===undefined){T3._cx=tx;T3._cz=tz;}
-  T3._cx=lerp(T3._cx,tx,0.18); T3._cz=lerp(T3._cz,tz,0.18);
-  T3.cam.position.set(T3._cx,camHeight,T3._cz);
-  T3.cam.lookAt(p.x+cosA*lookAhead, lookH, p.y+sinA*lookAhead);
+  if(kartFirstPerson){
+    // 1st-person: sit just above the nose, look forward down the track
+    const eyeX=p.x+cosA*8, eyeZ=p.y+sinA*8;
+    T3.cam.position.set(eyeX, 22, eyeZ);
+    T3.cam.lookAt(p.x+cosA*120, 16, p.y+sinA*120);
+    T3._cx=undefined; // reset chase smoothing so switching back doesn't lurch
+    // hide the player's own car so it doesn't block the view
+    if(T3.kartMeshes[0]) T3.kartMeshes[0].visible=false;
+  }else{
+    if(T3.kartMeshes[0]) T3.kartMeshes[0].visible=true;
+    const camBack=120, camHeight=66, lookAhead=80, lookH=12;
+    const tx=p.x-cosA*camBack, tz=p.y-sinA*camBack;
+    if(T3._cx===undefined){T3._cx=tx;T3._cz=tz;}
+    T3._cx=lerp(T3._cx,tx,0.18); T3._cz=lerp(T3._cz,tz,0.18);
+    T3.cam.position.set(T3._cx,camHeight,T3._cz);
+    T3.cam.lookAt(p.x+cosA*lookAhead, lookH, p.y+sinA*lookAhead);
+  }
   // ── booster FX: sync a mesh pool to kartFx ──
   renderKartFx();
   // ── super-speed glow on player kart ──
-  if(T3.kartMeshes[0]) T3.kartMeshes[0].scale.setScalar(kartActive.speed>0?1.18:1);
+  if(T3.kartMeshes[0]&&!kartFirstPerson) T3.kartMeshes[0].scale.setScalar(kartActive.speed>0?1.18:1);
   T3.renderer.render(T3.scene,T3.cam);
   // HUD overlays drawn via DOM (status pill / lap) already exist; countdown via overlay
   drawKartOverlay();
@@ -1685,6 +1709,7 @@ window.addEventListener('load',()=>{
     if(!document.getElementById('screen-kart').classList.contains('active'))return;
     if(e.code==='Space'){ kartFirePower(); e.preventDefault(); return; }
     if(e.code==='ShiftLeft'||e.code==='ShiftRight'||e.code==='KeyE'){ kartCyclePower(); e.preventDefault(); return; }
+    if(e.code==='KeyC'){ kartFirstPerson=!kartFirstPerson; e.preventDefault(); return; }
     const k=keymap[e.code];if(k){kartKeys[k]=true;e.preventDefault();}
   });
   window.addEventListener('keyup',e=>{const k=keymap[e.code];if(k){kartKeys[k]=false;}});
@@ -1708,6 +1733,7 @@ window.addEventListener('load',()=>{
   };
   tapBind('kbtn-fire',kartFirePower);
   tapBind('kbtn-cycle',kartCyclePower);
+  tapBind('kbtn-view',()=>{ kartFirstPerson=!kartFirstPerson; });
 });
 </script>
 </body>
