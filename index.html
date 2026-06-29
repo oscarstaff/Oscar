@@ -864,7 +864,7 @@ body.ready{visibility:visible;}
   to{opacity:1;transform:translateY(0);}
 }
 
-/* ── COLD-LOAD STAR→N SPLASH ── */
+/* ── COLD-LOAD NODES→N SPLASH ── */
 #nxSplash{
   position:fixed; inset:0; z-index:10000;
   display:flex; align-items:center; justify-content:center;
@@ -872,54 +872,36 @@ body.ready{visibility:visible;}
   opacity:1; transition:opacity .5s ease;
 }
 #nxSplash.nx-done{ opacity:0; pointer-events:none; }
-#nxStage{ display:flex; flex-direction:column; align-items:center; gap:14px; }
+#nxStage{ display:flex; flex-direction:column; align-items:center; gap:18px; }
 #nxLogo{ overflow:visible; }
 #nxWord{
-  font-family:'Inter',system-ui,sans-serif; font-weight:800; font-size:20px;
-  letter-spacing:.14em; text-transform:uppercase;
-  background:linear-gradient(90deg,#c8d2e0,#ffffff,#8a93a6,#eef2f8);
-  background-size:200% auto; -webkit-background-clip:text; background-clip:text;
-  -webkit-text-fill-color:transparent; color:transparent;
+  font-family:'Inter',system-ui,sans-serif; font-weight:700; font-size:20px;
+  letter-spacing:.16em; text-transform:uppercase; color:#e8edf5;
   opacity:0; transform:translateY(6px);
-  animation:nxWordIn .5s 1.15s ease forwards, nxWordShine 2.2s 1.6s linear infinite;
-}
-/* star flies in from top-left, arcs to the N centre, then vanishes at impact */
-#nxStar{ transform:translate(18px,14px) scale(.5); opacity:0; }
-#nxStar.go{ animation:nxStarFly 1.05s cubic-bezier(.5,.1,.3,1) forwards; }
-@keyframes nxStarFly{
-  0%   { transform:translate(18px,14px) scale(.5)   rotate(0deg);   opacity:0; }
-  18%  { opacity:1; }
-  70%  { transform:translate(86px,84px) scale(1.05) rotate(220deg); opacity:1; }
-  88%  { transform:translate(100px,100px) scale(1.25) rotate(300deg); opacity:1; }
-  100% { transform:translate(100px,100px) scale(.2)  rotate(340deg); opacity:0; }
-}
-/* the N sits dim/flat, then on impact pops + swaps to metal */
-#nxN{ transform-origin:100px 100px; }
-#nxN.hit{ animation:nxNHit .5s cubic-bezier(.34,1.5,.6,1) forwards; }
-@keyframes nxNHit{
-  0%   { transform:scale(1); }
-  35%  { transform:scale(1.12); }
-  100% { transform:scale(1); }
-}
-/* spark burst at the moment of contact */
-#nxBurst.go{ animation:nxBurst .5s ease-out forwards; transform-origin:100px 100px; }
-@keyframes nxBurst{
-  0%  { opacity:0; transform:scale(.3); }
-  25% { opacity:1; }
-  100%{ opacity:0; transform:scale(1.6); }
-}
-/* glare band sweeps across the metal N after the swap */
-#nxGlareRect.go{ animation:nxGlare 1.1s .15s ease-out forwards; }
-@keyframes nxGlare{
-  0%   { transform:translateX(0);   opacity:0; }
-  20%  { opacity:1; }
-  100% { transform:translateX(320px); opacity:0; }
+  animation:nxWordIn .6s 1.5s ease forwards;
 }
 @keyframes nxWordIn{ to{ opacity:1; transform:translateY(0); } }
-@keyframes nxWordShine{ to{ background-position:200% center; } }
+.nx-edge{
+  stroke:#6366f1; stroke-width:6; stroke-linecap:round; stroke-linejoin:round; fill:none;
+  stroke-dasharray:var(--len); stroke-dashoffset:var(--len);
+  animation:nxDraw .55s var(--d) cubic-bezier(.6,0,.3,1) forwards;
+}
+@keyframes nxDraw{ to{ stroke-dashoffset:0; } }
+.nx-node{
+  fill:#8b5cf6; opacity:0; transform:scale(0);
+  transform-box:fill-box; transform-origin:center;
+  animation:nxPop .4s var(--nd) cubic-bezier(.34,1.5,.6,1) forwards;
+}
+@keyframes nxPop{ to{ opacity:1; transform:scale(1); } }
+#nxN.glow{ animation:nxGlow 1s 1.2s ease forwards; }
+@keyframes nxGlow{
+  0%   { filter:drop-shadow(0 0 0 rgba(139,92,246,0)); }
+  40%  { filter:drop-shadow(0 0 10px rgba(139,92,246,.55)); }
+  100% { filter:drop-shadow(0 0 4px rgba(139,92,246,.25)); }
+}
 @media (prefers-reduced-motion:reduce){
-  #nxStar,#nxBurst,#nxGlareRect{ display:none; }
-  #nxN{ fill:url(#nxMetal); }
+  .nx-edge{ stroke-dashoffset:0; animation:none; }
+  .nx-node{ opacity:1; transform:none; animation:none; }
   #nxWord{ opacity:1; transform:none; animation:none; }
 }
 
@@ -4955,56 +4937,15 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
 <!-- ── COLD-LOAD SPLASH: star strikes the N, N turns metallic ── -->
 <div id="nxSplash" aria-hidden="true">
   <div id="nxStage">
-    <svg id="nxLogo" viewBox="0 0 200 200" width="160" height="160" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <linearGradient id="nxMetal" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%"  stop-color="#c8d2e0"/>
-          <stop offset="22%" stop-color="#ffffff"/>
-          <stop offset="42%" stop-color="#8a93a6"/>
-          <stop offset="58%" stop-color="#eef2f8"/>
-          <stop offset="78%" stop-color="#9aa3b5"/>
-          <stop offset="100%" stop-color="#d7deea"/>
-        </linearGradient>
-        <linearGradient id="nxFlat" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stop-color="#6366f1"/>
-          <stop offset="100%" stop-color="#8b5cf6"/>
-        </linearGradient>
-        <linearGradient id="nxGlare" x1="0%" y1="0%" x2="100%" y2="0%">
-          <stop offset="0%"   stop-color="#ffffff" stop-opacity="0"/>
-          <stop offset="48%"  stop-color="#ffffff" stop-opacity="0"/>
-          <stop offset="50%"  stop-color="#ffffff" stop-opacity="0.9"/>
-          <stop offset="52%"  stop-color="#ffffff" stop-opacity="0"/>
-          <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
-        </linearGradient>
-        <clipPath id="nxClip"><path d="M52 150 L52 50 L72 50 L128 120 L128 50 L148 50 L148 150 L128 150 L72 80 L72 150 Z"/></clipPath>
-        <filter id="nxGlow" x="-50%" y="-50%" width="200%" height="200%">
-          <feGaussianBlur stdDeviation="3" result="b"/>
-          <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
-        </filter>
-      </defs>
-
-      <path id="nxN" d="M52 150 L52 50 L72 50 L128 120 L128 50 L148 50 L148 150 L128 150 L72 80 L72 150 Z"
-            fill="url(#nxFlat)"/>
-      <g clip-path="url(#nxClip)">
-        <rect id="nxGlareRect" x="-120" y="0" width="120" height="200" fill="url(#nxGlare)" opacity="0"/>
-      </g>
-
-      <g id="nxStar" filter="url(#nxGlow)">
-        <path d="M0,-13 L3.8,-4 L13,-4 L5.5,2 L8.5,11 L0,5 L-8.5,11 L-5.5,2 L-13,-4 L-3.8,-4 Z"
-              fill="#fde68a" stroke="#fbbf24" stroke-width="1"/>
-      </g>
-
-      <g id="nxBurst" opacity="0">
-        <g stroke="#fde68a" stroke-width="2.5" stroke-linecap="round">
-          <line x1="100" y1="100" x2="100" y2="74"/>
-          <line x1="100" y1="100" x2="100" y2="126"/>
-          <line x1="100" y1="100" x2="74"  y2="100"/>
-          <line x1="100" y1="100" x2="126" y2="100"/>
-          <line x1="100" y1="100" x2="82"  y2="82"/>
-          <line x1="100" y1="100" x2="118" y2="118"/>
-          <line x1="100" y1="100" x2="118" y2="82"/>
-          <line x1="100" y1="100" x2="82"  y2="118"/>
-        </g>
+    <svg id="nxLogo" width="150" height="150" viewBox="0 0 200 200" overflow="visible" xmlns="http://www.w3.org/2000/svg">
+      <g id="nxN">
+        <path class="nx-edge" style="--len:100;--d:.05s" d="M62 150 L62 50"/>
+        <path class="nx-edge" style="--len:126;--d:.55s" d="M62 50 L138 150"/>
+        <path class="nx-edge" style="--len:100;--d:1.0s" d="M138 150 L138 50"/>
+        <circle class="nx-node" style="--nd:0s"    cx="62"  cy="150" r="7"/>
+        <circle class="nx-node" style="--nd:.5s"   cx="62"  cy="50"  r="7"/>
+        <circle class="nx-node" style="--nd:1.0s"  cx="138" cy="150" r="7"/>
+        <circle class="nx-node" style="--nd:1.45s" cx="138" cy="50"  r="7"/>
       </g>
     </svg>
     <div id="nxWord">Nexus</div>
@@ -5022,25 +4963,16 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
   }catch(e){}
 
   function run(){
-    var star=document.getElementById('nxStar');
     var N=document.getElementById('nxN');
-    var burst=document.getElementById('nxBurst');
-    var glare=document.getElementById('nxGlareRect');
     var splash=document.getElementById('nxSplash');
-    if(!star||!N||!splash) return;
+    if(!N||!splash) return;
 
-    star.classList.add('go');               // star flies in (~1.05s)
-    // impact at ~0.95s into the flight
-    setTimeout(function(){
-      N.setAttribute('fill','url(#nxMetal)'); // swap to metallic
-      N.classList.add('hit');                 // pop
-      if(burst){ burst.classList.add('go'); }
-      if(glare){ glare.setAttribute('opacity','1'); glare.classList.add('go'); }
-    }, 950);
+    // soft glow pulse once the N is mostly drawn
+    setTimeout(function(){ N.classList.add('glow'); }, 1200);
 
-    // hold the shiny N a beat, then fade the whole splash away
-    setTimeout(function(){ splash.classList.add('nx-done'); }, 2600);
-    setTimeout(function(){ if(splash&&splash.parentNode) splash.parentNode.removeChild(splash); }, 3150);
+    // hold a beat, then fade the whole splash away
+    setTimeout(function(){ splash.classList.add('nx-done'); }, 2700);
+    setTimeout(function(){ if(splash&&splash.parentNode) splash.parentNode.removeChild(splash); }, 3250);
   }
 
   if(document.readyState!=='loading') requestAnimationFrame(run);
@@ -8834,14 +8766,14 @@ function showAvailSuccess(row){
   const avail=row.availability||{};
   // Is this row already expired?
   //  • dated   → end date has passed
-  //  • ongoing → last saved (updated_at) more than 3 months ago
+  //  • ongoing → last saved (updated_at) more than 1 month ago
   let expired=false;
   if(row && !row.is_ongoing && row.valid_until){
     const until=new Date(row.valid_until+'T00:00:00');
     const today=new Date(); today.setHours(0,0,0,0);
     expired=until<today;
   } else if(row && row.is_ongoing && row.updated_at){
-    const cutoff=new Date(); cutoff.setMonth(cutoff.getMonth()-3);
+    const cutoff=new Date(); cutoff.setMonth(cutoff.getMonth()-1);
     expired=new Date(row.updated_at)<cutoff;
   }
   // Period label
@@ -8895,12 +8827,12 @@ function showAvailExpiredNotice(row){
   const banner=document.getElementById("availStatusBanner");
   // Compute the expiry date for the message:
   //  • dated → valid_until
-  //  • ongoing → 3 months after it was last saved
+  //  • ongoing → 1 month after it was last saved
   let until="";
   if(row && !row.is_ongoing && row.valid_until){
     until=fmtF(row.valid_until);
   } else if(row && row.is_ongoing && row.updated_at){
-    const exp=new Date(row.updated_at); exp.setMonth(exp.getMonth()+3);
+    const exp=new Date(row.updated_at); exp.setMonth(exp.getMonth()+1);
     until=fmtF(exp.toISOString().slice(0,10));
   }
   if(banner){
@@ -11639,16 +11571,16 @@ async function ensureStaffSettingsRow(){
 }
 
 // True only if the staff member has a CURRENTLY-VALID availability row:
-//  • ongoing  → valid for 3 months from when it was last saved (updated_at)
+//  • ongoing  → valid for 1 month from when it was last saved (updated_at)
 //  • dated    → valid while valid_until is today or later
 function _hasValidAvailability(rows){
   if(!Array.isArray(rows)||!rows.length) return false;
   const today=new Date(); today.setHours(0,0,0,0);
-  const cutoff=new Date(); cutoff.setMonth(cutoff.getMonth()-3);  // 3 months ago
+  const cutoff=new Date(); cutoff.setMonth(cutoff.getMonth()-1);  // 1 month ago
   return rows.some(function(r){
     if(r.is_ongoing){
       if(!r.updated_at) return true;            // legacy row with no timestamp → don't lock
-      return new Date(r.updated_at) >= cutoff;  // re-confirmed within last 3 months
+      return new Date(r.updated_at) >= cutoff;  // re-confirmed within last 1 month
     }
     if(!r.valid_until) return true;             // dated start, no end → valid
     const until=new Date(r.valid_until+'T00:00:00');
