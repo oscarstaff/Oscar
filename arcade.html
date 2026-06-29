@@ -803,7 +803,7 @@ function kart3DSetup(){
   const renderer=new THREE.WebGLRenderer({canvas:kcv,antialias:true});
   renderer.setSize(KK.W,KK.H,false);
   renderer.setPixelRatio(Math.min(2,window.devicePixelRatio||1));
-  const cam=new THREE.PerspectiveCamera(72,KK.W/KK.H,1,12000);
+  const cam=new THREE.PerspectiveCamera(72,KK.W/KK.H,0.3,12000);
   T3.renderer=renderer;T3.cam=cam;
 }
 
@@ -922,6 +922,15 @@ function loadCarModel(url, targetGrp, tint, veh){
     const ph=targetGrp.getObjectByName('placeholder'); if(ph) ph.visible=false;
     targetGrp.add(wrap);
     targetGrp.userData.carModel=wrap;
+    // find the steering wheel (if the model has one) so the cockpit cam can anchor
+    // to its real position rather than guessed numbers. Stored in LOCAL group space.
+    let sw=null;
+    wrap.traverse(o=>{ if(!sw && o.name && /steer/i.test(o.name)) sw=o; });
+    if(sw){
+      const wp=new THREE.Vector3(); sw.getWorldPosition(wp);
+      // convert to targetGrp-local (the group is at origin pre-placement, so world≈local here)
+      targetGrp.userData.cockpitAnchor={x:wp.x, y:wp.y, z:wp.z};
+    }
   }
   if(KMODELS[url]){ place(KMODELS[url]); return; }
   if(typeof THREE.GLTFLoader==='undefined') return; // loader CDN missing → keep placeholder
@@ -995,15 +1004,23 @@ function kart3DRender(){
   const p=karts[0];
   const cosA=Math.cos(p.a),sinA=Math.sin(p.a);
   if(kartFirstPerson){
-    // cockpit view: sit at the driver's eye using per-car offsets (cars without a
-    // modelled interior fall back to a bonnet-cam via a negative `back`).
     const veh=KVEHICLES[kartVehicleId]||{};
     const cp=veh.cockpit||{back:2,height:15,lookH:9,hasInterior:false};
-    const eyeX=p.x-cosA*cp.back, eyeZ=p.y-sinA*cp.back;
-    T3.cam.position.set(eyeX, cp.height, eyeZ);
-    T3.cam.lookAt(p.x+cosA*90, cp.lookH, p.y+sinA*90);
+    const anchor=T3.kartMeshes[0]&&T3.kartMeshes[0].userData.cockpitAnchor;
+    if(anchor){
+      // sit the eye just behind the steering wheel, at its height; the anchor is in
+      // the car's local space, so rotate it by the car's heading into world space.
+      const ex=anchor.x, ez=anchor.z;
+      const wx=p.x + (ex*cosA - ez*sinA);   // local→world (heading rotation)
+      const wz=p.y + (ex*sinA + ez*cosA);
+      T3.cam.position.set(wx - cosA*6, anchor.y+6, wz - sinA*6);
+      T3.cam.lookAt(p.x+cosA*90, anchor.y+3, p.y+sinA*90);
+    }else{
+      // no steering wheel in this model → bonnet-cam fallback
+      T3.cam.position.set(p.x-cosA*cp.back, cp.height, p.y-sinA*cp.back);
+      T3.cam.lookAt(p.x+cosA*90, cp.lookH, p.y+sinA*90);
+    }
     T3._cx=undefined; // reset chase smoothing so switching back doesn't lurch
-    // keep the car visible so the cockpit/bonnet renders around you
     if(T3.kartMeshes[0]) T3.kartMeshes[0].visible=true;
   }else{
     if(T3.kartMeshes[0]) T3.kartMeshes[0].visible=true;
