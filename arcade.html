@@ -81,7 +81,7 @@ body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);min-
       </div>
       <div class="game-card" style="--accent:#e05a3f;" onclick="openGame('kart')">
         <span class="ico">🏎️</span><h3>GRAND KART</h3>
-        <p>Five circuits, three rides, five boosters — super speed, teleport, push, shockwave, fire trails. Pick your setup and dominate.</p>
+        <p>Five circuits, three rides, three boosters — super speed, shockwave, fire trails. Pick your setup and dominate.</p>
         <div class="best" id="best-kart" style="color:#e05a3f;">WINS: 0</div>
       </div>
     </div>
@@ -167,7 +167,7 @@ body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);min-
         <button class="btn-primary" onclick="kartNewRace()">Restart race</button>
         <button class="btn-primary" onclick="showTrackPicker()" style="background:#262c34;">🗺 Tracks</button>
       </div>
-      <div class="hint">Desktop: <b>↑/W</b> gas, <b>↓/S</b> brake, <b>←→/AD</b> steer, <b>Space</b> fire power, <b>Shift/E</b> cycle power. Mobile: on-screen buttons (🚀 fire, 🔄 cycle). Pick a track + vehicle, charge your booster by driving, then unleash 🚀✨💥🌊🔥.</div>
+      <div class="hint">Desktop: <b>↑/W</b> gas, <b>↓/S</b> brake, <b>←→/AD</b> steer, <b>Space</b> fire power, <b>Shift/E</b> cycle power. Mobile: on-screen buttons (🚀 fire, 🔄 cycle). Pick a track + vehicle, charge your booster by driving, then unleash 🚀🌊🔥.</div>
     </div>
   </div>
 </div>
@@ -276,11 +276,11 @@ let KTRACK=null;
 // forward; they're auto-corrected at load from the model's bounding box too.
 const KVEHICLES={
   porsche:{ name:'Porsche 962C', emoji:'🏎️', color:'#e05a3f', desc:'Balanced Le Mans prototype', accel:1.0, top:1.0, grip:1.0,
-            model:'./models/1987_porsche_962c.glb' },
+            model:'./models/1987_porsche_962c.glb', yaw:0 },
   mclaren:{ name:'McLaren F1 GTR', emoji:'⚡', color:'#3fb8af', desc:'High top speed, looser grip', accel:0.95, top:1.16, grip:0.9,
-            model:'./models/mclaren_f1_gtr_longtail_ams2.glb' },
+            model:'./models/mclaren_f1_gtr_longtail_ams2.glb', yaw:0 },
   mach6:{   name:'Mach 6', emoji:'🏁', color:'#e8e8ee', desc:'Grippy & punchy, lower top end', accel:1.18, top:0.92, grip:1.18,
-            model:'./models/speed_racers_mach_6.glb' }
+            model:'./models/speed_racers_mach_6.glb', yaw:0 }
 };
 let kartVehicleId='porsche';
 // cache of loaded GLTF scenes, keyed by url, so we only fetch each once
@@ -289,9 +289,7 @@ const KMODELS={};
 // ── BOOSTERS: charge fills with distance travelled; all 5 carried; cycle+fire ──
 const KPOWERS=[
   {id:'speed',   name:'Super Speed', emoji:'🚀', cost:0.25, cool:0.0},
-  {id:'teleport',name:'Teleport',    emoji:'✨', cost:0.40, cool:0.0},
-  {id:'push',    name:'Push',        emoji:'💥', cost:0.30, cool:0.0},
-  {id:'shock',   name:'Shockwave',   emoji:'🌊', cost:0.45, cool:0.0},
+  {id:'shock',   name:'Shockwave',   emoji:'🌊', cost:0.40, cool:0.0},
   {id:'fire',    name:'Fire Trail',  emoji:'🔥', cost:0.35, cool:0.0}
 ];
 let kartCharge=0;          // 0..1 booster meter (fills with distance)
@@ -300,6 +298,17 @@ let kartLastChargeX=0, kartLastChargeY=0; // for distance accumulation
 let kartFx=[];             // transient visual effects (fire trail dots, shock rings)
 let kartActive={};         // active timed effects on player, e.g. {speed:secondsLeft}
 let kartChargeFlash=0;     // brief red flash when a fire fails for lack of charge
+
+// ── DRIVETRAIN: simple automatic gearbox + RPM model (player car) ──
+const KGEARS={
+  ratios:[2.9,2.0,1.5,1.18,0.95,0.80], // 6-speed; higher = more torque, lower top
+  final:3.4,
+  idleRpm:900, maxRpm:7200,
+  upShift:6600, downShift:2600        // auto-shift thresholds
+};
+let kartGear=1;            // current gear (1-based index into ratios)
+let kartRpm=900;
+let kartDrift=0;           // 0..1 how sideways the car is (for tyre-smoke/feel)
 
 function setKartTrack(id){
   kartTrackId=id;
@@ -373,6 +382,7 @@ function kartNewRace(){
   karts=[];
   // reset booster meter + effects for the new race
   kartCharge=0; kartPowerIdx=0; kartFx=[]; kartActive={}; kartChargeFlash=0;
+  kartGear=1; kartRpm=KGEARS.idleRpm; kartDrift=0;
   // grid start just behind wp0, offset perpendicular to the wp0->wp1 direction
   const w0=KTRACK.wp[0], w1=KTRACK.wp[1];
   const startA=Math.atan2(w1.y-w0.y,w1.x-w0.x);
@@ -465,6 +475,38 @@ function kartPhysics(k,dt){
   // move
   k.x+=Math.cos(k.a)*k.v;
   k.y+=Math.sin(k.a)*k.v;
+  // ── PLAYER DRIVETRAIN + DRIFT (Forza-like feel) ──
+  // Runs only for the human car; CPUs keep the simpler model for stable AI.
+  if(k.isPlayer){
+    // RPM from speed within the current gear's band. Faster speed and lower
+    // gears spin the engine higher; an automatic box shifts up/down at limits.
+    const spdFrac=Math.min(1,Math.abs(k.v)/(2.5*S*veh.top||1));
+    const ratio=KGEARS.ratios[kartGear-1]||1;
+    let targetRpm=KGEARS.idleRpm + spdFrac*ratio*2400 + (gas>0?260:0);
+    targetRpm=Math.max(KGEARS.idleRpm,Math.min(KGEARS.maxRpm,targetRpm));
+    kartRpm += (targetRpm-kartRpm)*Math.min(1,dt*8);
+    // auto-shift (with a tiny guard so it doesn't hunt back and forth)
+    if(kartRpm>KGEARS.upShift && kartGear<KGEARS.ratios.length){ kartGear++; kartRpm*=0.62; }
+    else if(kartRpm<KGEARS.downShift && kartGear>1 && k.v>0){ kartGear--; kartRpm*=1.5; }
+    // lateral grip: at speed, hard steering makes the car slip sideways (drift).
+    // We blend the velocity heading toward the facing direction; grippier cars
+    // (higher veh.grip) snap back faster, looser cars slide more.
+    if(k._vh===undefined) k._vh=k.a;            // velocity heading
+    let hd=k.a-k._vh; while(hd>Math.PI)hd-=2*Math.PI; while(hd<-Math.PI)hd+=2*Math.PI;
+    const gripBlend=Math.min(1, dt*(3.2*veh.grip) * (1 - 0.45*spdFrac)); // less grip at speed
+    k._vh += hd*gripBlend;
+    // actual travel follows the (laggy) velocity heading → that's the slide
+    const slide=Math.abs(hd)*Math.min(1,Math.abs(k.v)/(1.2*S));
+    kartDrift = kartDrift + (Math.min(1,slide*2.2)-kartDrift)*Math.min(1,dt*6);
+    // re-apply movement along the velocity heading instead of pure facing
+    k.x-=Math.cos(k.a)*k.v; k.y-=Math.sin(k.a)*k.v;       // undo the facing-based move above
+    k.x+=Math.cos(k._vh)*k.v; k.y+=Math.sin(k._vh)*k.v;   // move along velocity heading
+    // a little scrub: drifting bleeds a bit of speed (and adds tyre smoke fx)
+    if(kartDrift>0.35){
+      k.v*=Math.pow(0.985,dt*60);
+      if(Math.random()<dt*30*kartDrift) kartFx.push({type:'fire',x:k.x-Math.cos(k.a)*12,y:k.y-Math.sin(k.a)*12,life:0.9,r:8,harm:false,smoke:true});
+    }
+  }
   // keep within the world bounds
   k.x=Math.max(10,Math.min(worldW()-10,k.x));
   k.y=Math.max(10,Math.min(worldH()-10,k.y));
@@ -515,11 +557,16 @@ function updateActiveFx(dt){
     if(f.type==='shock'){ f.r+=520*dt; } // expanding ring
     if(f.harm){
       for(let j=1;j<karts.length;j++){ const c=karts[j];
-        if(Math.hypot(c.x-f.x,c.y-f.y) < (f.r||12)){ c.v*=0.55; }
+        const dx=c.x-f.x, dy=c.y-f.y, d=Math.hypot(dx,dy)||1;
+        if(d < (f.r||12)){
+          c.v*=0.55;
+          if(f.push){ c.x+=dx/d*340*dt*8; c.y+=dy/d*340*dt*8; } // knocked outward by the ring
+        }
       }
     }
     if(f.life<=0) kartFx.splice(i,1);
   }
+  if(kartFx.length>80) kartFx.splice(0, kartFx.length-80); // cap for perf
 }
 function kartCyclePower(){
   if(kartState!=='race') return;
@@ -535,29 +582,9 @@ function kartFirePower(){
   kartCharge-=pw.cost;
   if(pw.id==='speed'){
     kartActive.speed=2.2;            // 2.2s of boosted accel/top
-  }else if(pw.id==='teleport'){
-    // jump forward along the racing line by up to 3 waypoints, but never PAST
-    // the start/finish line (wp0) — otherwise a lap could be skipped/uncounted.
-    let idx=p.wpIdx;
-    for(let n=0;n<3;n++){
-      const next=(idx+1)%KTRACK.wp.length;
-      if(next<=idx) break; // wrapping past wp0 — stop here
-      idx=next;
-    }
-    const tgt=KTRACK.wp[idx];
-    p.x=tgt.x; p.y=tgt.y; p.wpIdx=(idx+1)%KTRACK.wp.length;
-    p.a=Math.atan2(KTRACK.wp[p.wpIdx].y-p.y, KTRACK.wp[p.wpIdx].x-p.x);
-    kartFx.push({type:'spark', x:p.x, y:p.y, life:0.5, r:40});
-  }else if(pw.id==='push'){
-    // shove nearby rivals away from the player
-    for(let j=1;j<karts.length;j++){ const c=karts[j];
-      const dx=c.x-p.x, dy=c.y-p.y, d=Math.hypot(dx,dy)||1;
-      if(d<900){ const f=(900-d)/900; c.x+=dx/d*260*f; c.y+=dy/d*260*f; c.v*=0.5; }
-    }
-    kartFx.push({type:'push', x:p.x, y:p.y, life:0.45, r:120});
   }else if(pw.id==='shock'){
-    // expanding ring that spins out any rival it passes through
-    kartFx.push({type:'shock', x:p.x, y:p.y, life:0.9, r:40, harm:true});
+    // expanding ring that spins out + shoves any rival it passes through
+    kartFx.push({type:'shock', x:p.x, y:p.y, life:1.0, r:40, harm:true, push:true});
   }else if(pw.id==='fire'){
     kartActive.fire=2.4;             // emit a hazardous fire trail for 2.4s
   }
@@ -734,13 +761,17 @@ function ksfxStopEngine(){
   try{KSFX.engine.stop();KSFX.engOsc2.stop();KSFX.offNoise.stop();}catch(e){}
   KSFX.started=false;KSFX.engine=KSFX.engOsc2=KSFX.engGain=KSFX.offNoise=KSFX.offGain=null;
 }
-// called each frame with player's speed fraction (0..1) + offroad flag
-function ksfxEngineUpdate(spdFrac,offroad){
+// called each frame with player's RPM (0..maxRpm), gear, speed fraction + offroad
+function ksfxEngineUpdate(rpm,gear,spdFrac,offroad){
   if(!KSFX.started||!KSFX.on)return;const c=KSFX.ctx;
-  const f=55+spdFrac*220;                 // idle 55Hz → ~275Hz flat out
-  KSFX.engine.frequency.setTargetAtTime(f,c.currentTime,0.06);
-  KSFX.engOsc2.frequency.setTargetAtTime(f,c.currentTime,0.06);
-  KSFX.engGain.gain.setTargetAtTime(0.04+spdFrac*0.10,c.currentTime,0.1);
+  // map RPM to a pitch; each gear has its own band so an upshift audibly drops
+  // the note then climbs again (the signature engine-shift sound).
+  const rpmFrac=Math.max(0,Math.min(1,rpm/KGEARS.maxRpm));
+  const gearBase=70 - gear*4;              // higher gears sit a touch lower
+  const f=gearBase + rpmFrac*235;          // idle ~66Hz → ~300Hz at redline
+  KSFX.engine.frequency.setTargetAtTime(f,c.currentTime,0.04);
+  KSFX.engOsc2.frequency.setTargetAtTime(f,c.currentTime,0.04);
+  KSFX.engGain.gain.setTargetAtTime(0.04+rpmFrac*0.11,c.currentTime,0.08);
   KSFX.offGain.gain.setTargetAtTime(offroad?Math.min(0.12,0.03+spdFrac*0.14):0,c.currentTime,0.05);
 }
 const KS={
@@ -843,14 +874,14 @@ function buildScene3D(){
     // async-load the car model for this kart's vehicle (player) or a default for CPUs
     const vid = (i===0) ? kartVehicleId : ['porsche','mclaren','mach6'][i % 3];
     const veh = KVEHICLES[vid];
-    if(veh && veh.model) loadCarModel(veh.model, grp, k.color);
+    if(veh && veh.model) loadCarModel(veh.model, grp, k.color, veh.yaw||0);
   }
   T3.scene=scene;T3.ready=true;
 }
 
 // Load a GLB once (cached), clone it per kart, auto-normalize size+orientation,
 // and swap it in for the primitive placeholder. Fails silently to the placeholder.
-function loadCarModel(url, targetGrp, tint){
+function loadCarModel(url, targetGrp, tint, yaw){
   function place(srcScene){
     const model=srcScene.clone(true);
     // normalize: scale so the longest HORIZONTAL axis ≈ 30 units (kart length),
@@ -864,11 +895,14 @@ function loadCarModel(url, targetGrp, tint){
     const c=new THREE.Vector3(); box2.getCenter(c);
     const min=box2.min;
     model.position.set(-c.x, -min.y, -c.z);
-    // wrap so we can yaw the whole car to face +x (the kart's forward axis)
+    // wrap so we can yaw the whole car to face +x (the kart's forward axis).
     const wrap=new THREE.Group(); wrap.add(model);
-    // if the model is longer along Z than X, rotate 90° so its nose points along x
+    // Most car models point down their own length (Z); the kart's forward is +x,
+    // so rotate -90° to bring the nose to +x. A per-vehicle `yaw` then corrects
+    // any model that was authored facing a different way (sideways/backwards).
     const sz2=new THREE.Vector3(); box2.getSize(sz2);
-    if(sz2.z>sz2.x) wrap.rotation.y=Math.PI/2;
+    let base = (sz2.z>=sz2.x) ? -Math.PI/2 : 0;   // length-along-Z → turn to +x
+    wrap.rotation.y = base + (yaw||0);
     const ph=targetGrp.getObjectByName('placeholder'); if(ph) ph.visible=false;
     targetGrp.add(wrap);
   }
@@ -972,10 +1006,8 @@ function renderKartFx(){
     if(!f){ m.visible=false; continue; }
     m.visible=true;
     let col=0xffaa33, r=f.r||10, op=Math.max(0,Math.min(1,f.life));
-    if(f.type==='fire'){ col=0xff5522; r=f.r||10; }
+    if(f.type==='fire'){ col=f.smoke?0xcccccc:0xff5522; r=f.r||10; }
     else if(f.type==='shock'){ col=0x55ccff; r=f.r; op=Math.max(0,f.life); }
-    else if(f.type==='push'){ col=0xffffff; r=f.r; }
-    else if(f.type==='spark'){ col=0xaad4ff; r=f.r; }
     m.material.color.setHex(col); m.material.opacity=op*0.85;
     m.scale.setScalar(r); m.position.set(f.x, (f.type==='fire'?6:14), f.y);
   }
@@ -1011,8 +1043,27 @@ function drawKartOverlay(){
       '</div>';
     bv.style.display='flex';
     if(ov)ov.style.display='none';
+    // ── tachometer: gear + RPM bar, top-right ──
+    let tach=document.getElementById('kartTach');
+    if(!tach){
+      tach=document.createElement('div');tach.id='kartTach';
+      tach.style.cssText='position:absolute;right:10px;top:10px;display:flex;flex-direction:column;align-items:flex-end;gap:3px;pointer-events:none;font-family:Outfit;';
+      document.getElementById('kartWrap').appendChild(tach);
+    }
+    const rf=Math.max(0,Math.min(1,kartRpm/KGEARS.maxRpm));
+    const redline=rf>0.9;
+    tach.innerHTML=
+      '<div style="display:flex;align-items:center;gap:7px;background:rgba(18,22,28,.72);padding:4px 11px;border-radius:14px;border:1.5px solid '+(redline?'#e05a3f':'#3a424c')+';">'+
+        '<span style="font-size:11px;color:#9aa3ad;font-weight:700;">GEAR</span>'+
+        '<span style="font-size:22px;font-weight:800;color:'+(redline?'#e05a3f':'#fff')+';min-width:18px;text-align:center;">'+kartGear+'</span>'+
+        '<span style="width:90px;height:8px;background:#2a2f38;border-radius:5px;overflow:hidden;display:inline-block;">'+
+          '<span style="display:block;height:100%;width:'+Math.round(rf*100)+'%;background:'+(redline?'#e05a3f':'linear-gradient(90deg,#3fb8af,#c9952e)')+';"></span>'+
+        '</span>'+
+      '</div>'+
+      (kartDrift>0.4?'<div style="font-size:11px;font-weight:800;color:#c9952e;letter-spacing:1px;">DRIFT!</div>':'');
+    tach.style.display='flex';
   }else if(ov){ov.style.display='none';}
-  if(kartState!=='race'){ const bv=document.getElementById('kartBooster'); if(bv)bv.style.display='none'; }
+  if(kartState!=='race'){ const bv=document.getElementById('kartBooster'); if(bv)bv.style.display='none'; const tach=document.getElementById('kartTach'); if(tach)tach.style.display='none'; }
 }
 
 function kartLoop(){
@@ -1031,10 +1082,10 @@ function kartLoop(){
     updateCharge(dt);
     updateActiveFx(dt);
     updateKartHud();
-    // engine pitch from player speed + off-road rumble
+    // engine pitch from RPM/gear + off-road rumble
     const p=karts[0];const spdFrac=Math.min(1,Math.abs(p.v)/(2.5*KK.WORLD));
     const off=nearestSeg(p.x,p.y).dist>KTRACK.roadw;
-    ksfxEngineUpdate(spdFrac,off);
+    ksfxEngineUpdate(kartRpm,kartGear,spdFrac,off);
   }
   kart3DRender();
   if(kartState!=='done')kartRAF=requestAnimationFrame(kartLoop);
