@@ -992,13 +992,14 @@ function kart3DRender(){
   const p=karts[0];
   const cosA=Math.cos(p.a),sinA=Math.sin(p.a);
   if(kartFirstPerson){
-    // 1st-person: sit just above the nose, look forward down the track
-    const eyeX=p.x+cosA*8, eyeZ=p.y+sinA*8;
-    T3.cam.position.set(eyeX, 22, eyeZ);
-    T3.cam.lookAt(p.x+cosA*120, 16, p.y+sinA*120);
+    // cockpit view: sit where the driver would be (a little behind centre + low),
+    // look forward and slightly down over the bonnet.
+    const eyeX=p.x-cosA*2, eyeZ=p.y-sinA*2;   // just behind the car's centre
+    T3.cam.position.set(eyeX, 15, eyeZ);       // low, driver-height
+    T3.cam.lookAt(p.x+cosA*90, 9, p.y+sinA*90);// look ahead, dipped over the bonnet
     T3._cx=undefined; // reset chase smoothing so switching back doesn't lurch
-    // hide the player's own car so it doesn't block the view
-    if(T3.kartMeshes[0]) T3.kartMeshes[0].visible=false;
+    // keep the car visible so you can see the bonnet/cockpit ahead of you
+    if(T3.kartMeshes[0]) T3.kartMeshes[0].visible=true;
   }else{
     if(T3.kartMeshes[0]) T3.kartMeshes[0].visible=true;
     const camBack=120, camHeight=66, lookAhead=80, lookH=12;
