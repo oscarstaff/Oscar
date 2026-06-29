@@ -960,12 +960,15 @@
                 const ph = pg.getHeight();
                 // widgets store y as top-origin; convert back to PDF bottom-origin
                 const yBottom = ph - wgt.y - wgt.h;
-                // fit the signature inside the box, keep aspect ratio, small pad
-                const pad = 2;
+                // fit the signature inside the box, then scale up so it reads bigger
+                const pad = 0;
                 const bw = wgt.w - pad * 2, bh = wgt.h - pad * 2;
                 const ar = png.width / png.height;
                 let dw = bw, dh = bw / ar;
                 if (dh > bh) { dh = bh; dw = bh * ar; }
+                // enlarge ~25% beyond the fitted size for a clearer, bigger signature
+                const SCALE = 1.25;
+                dw *= SCALE; dh *= SCALE;
                 pg.drawImage(png, { x: wgt.x + (wgt.w - dw) / 2, y: yBottom + (wgt.h - dh) / 2, width: dw, height: dh });
               }
             }
@@ -1258,8 +1261,30 @@
         return ctx;
       }, []);
 
+      const lastSynced = React.useRef(value);
       React.useEffect(() => {
-        // wait a tick so layout settles, then size + restore
+        // Only react to EXTERNAL value changes (form cleared, template loaded),
+        // not the onChange we fire mid-signing — avoids flicker while drawing.
+        if (value === lastSynced.current) return;
+        lastSynced.current = value;
+        const id = setTimeout(() => {
+          const ctx = setupCanvas();
+          if (!ctx) return;
+          const c = canvasRef.current;
+          const rect = c.getBoundingClientRect();
+          ctx.clearRect(0, 0, c.width, c.height); // wipe old ink first
+          if (value) {
+            const img = new Image();
+            img.onload = () => ctx.drawImage(img, 0, 0, rect.width, rect.height);
+            img.src = value;
+          }
+          setHasInk(!!value);
+        }, 50);
+        return () => clearTimeout(id);
+      }, [value]);
+
+      // initial mount: paint existing value if any
+      React.useEffect(() => {
         const id = setTimeout(() => {
           const ctx = setupCanvas();
           if (ctx && value) {
