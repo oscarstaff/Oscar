@@ -4099,6 +4099,44 @@ function saveLeaveRequest(){
   if(from>to){showToast('⚠ End date must be after start date');return;}
   leaveRequests.push({id:nextLeaveId++,staffId,from,to,reason,status:'pending'});
   closeModal('leaveModal');markDirty();renderLeave();showToast('✓ Leave request added');
+  // Sync to the shared leave_submissions table so it appears on the staff's own
+  // portal record (Nexus reads this table). Admin-entered leave lands pre-approved.
+  // Best-effort: a failure here never blocks the local ShiftOps save above.
+  syncLeaveToPortal(staffId,from,to,reason);
+}
+
+// Push an admin-entered leave to the shared leave_submissions table that the
+// staff portal (Nexus) reads — via the Apps Script relay (service key bypasses
+// RLS; direct anon writes are blocked by the table's authenticated-only policy).
+// The staff_name MUST match what Nexus uses, so we build it the same way
+// ShiftOps does everywhere else: `first last`. The fetch interceptor auto-adds
+// sbAccessToken for the relay's admin gate.
+function syncLeaveToPortal(staffId,from,to,reason){
+  try{
+    const s=staff.find(x=>x.id===staffId);
+    if(!s){return;}
+    const fullName=((s.first||'').trim()+' '+(s.last||'').trim()).trim();
+    if(!fullName){return;}
+    fetch(GAS_EXEC_URL,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        action:'addLeave',
+        staff:fullName,
+        from:from,        // yyyy-MM-dd from the date inputs
+        to:to,
+        reason:reason||'',
+        token:GAS_TOKEN
+      })
+    }).then(function(r){ return r.json().catch(function(){return {};}); })
+      .then(function(res){
+        if(!res || res.ok!==true){
+          showToast('⚠ Leave saved locally, portal sync failed'+(res&&res.error?(' ('+res.error+')'):''));
+        }
+      }).catch(function(){
+        showToast('⚠ Leave saved locally, portal sync failed (offline)');
+      });
+  }catch(e){ /* never block the local save */ }
 }
 
 function updateLeave(id,status){
