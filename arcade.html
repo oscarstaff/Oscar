@@ -281,10 +281,14 @@ const KVEHICLES={
             cockpit:{back:3, height:13, lookH:9, hasInterior:true} },
   mclaren:{ name:'McLaren F1 GTR', emoji:'⚡', color:'#3fb8af', desc:'High top speed, looser grip', accel:0.95, top:1.16, grip:0.9,
             model:'./models/mclaren_f1_gtr_longtail_ams2.glb', yaw:Math.PI/2, sizeMul:1.0,
-            cockpit:{back:3, height:13, lookH:9, hasInterior:true} },
-  mach6:{   name:'Mach 6', emoji:'🏁', color:'#e8e8ee', desc:'Grippy & punchy, lower top end', accel:1.18, top:0.92, grip:1.18,
-            model:'./models/speed_racers_mach_6.glb', yaw:Math.PI/2, sizeMul:1.0,
-            cockpit:{back:-6, height:16, lookH:9, hasInterior:false} }  // no interior → bonnet-cam
+            cockpit:{back:3, height:13, lookH:9, hasInterior:true} }
+  ,rusty:{  name:'Old Rusty', emoji:'🚗', color:'#9a7b4f', desc:'Heavy & grippy, modest top end', accel:1.12, top:0.9, grip:1.15,
+            model:'./models/old_rusty_car.glb', yaw:Math.PI/2, sizeMul:1.0,
+            cockpit:{back:-6, height:16, lookH:9, hasInterior:false} }
+  // To add a 3rd car: drop its .glb in ./models/ and copy a block above, e.g.
+  // ,newcar:{ name:'Name', emoji:'🏁', color:'#e8e8ee', desc:'...', accel:1.0, top:1.0, grip:1.0,
+  //           model:'./models/your_car.glb', yaw:Math.PI/2, sizeMul:1.0,
+  //           cockpit:{back:3, height:13, lookH:9, hasInterior:false} }
 };
 let kartVehicleId='porsche';
 // cache of loaded GLTF scenes, keyed by url, so we only fetch each once
@@ -828,13 +832,18 @@ function buildScene3D(){
   // track mesh: build a flat ribbon from waypoint samples
   if(!KTRACK._samples)buildSamples(KTRACK);
   const sm=KTRACK._samples,half=KTRACK.roadw;
-  const verts=[],idx=[];
+  const verts=[],idx=[],uvs=[];
+  let dist=0;
   for(let i=0;i<sm.length;i++){
     const a=sm[i],b=sm[(i+1)%sm.length];
     const dx=b.x-a.x,dy=b.y-a.y,dl=Math.hypot(dx,dy)||1;
     const nx=-dy/dl,ny=dx/dl;
     verts.push(a.x+nx*half,0,a.y+ny*half);
     verts.push(a.x-nx*half,0,a.y-ny*half);
+    // U across width (0..1), V along length (repeats every ~80 units)
+    uvs.push(0, dist/80);
+    uvs.push(1, dist/80);
+    dist+=dl;
   }
   const n=sm.length;
   for(let i=0;i<n;i++){
@@ -843,9 +852,10 @@ function buildScene3D(){
   }
   const tg=new THREE.BufferGeometry();
   tg.setAttribute('position',new THREE.Float32BufferAttribute(verts,3));
+  tg.setAttribute('uv',new THREE.Float32BufferAttribute(uvs,2));
   tg.setIndex(idx);tg.computeVertexNormals();
   const roadCol=new THREE.Color(KTRACK.road||'#565c66').getHex();
-  const track=new THREE.Mesh(tg,new THREE.MeshLambertMaterial({color:roadCol}));
+  const track=new THREE.Mesh(tg,new THREE.MeshLambertMaterial({color:roadCol,map:makeAsphaltTexture()}));
   track.position.y=0.1;scene.add(track);
   // center dashes + edge lines (simple line strips)
   const centerPts=sm.map(p=>new THREE.Vector3(p.x,0.2,p.y));
@@ -880,7 +890,8 @@ function buildScene3D(){
     grp.visible=true; // player kart now visible too (chase cam sits behind it)
     scene.add(grp);T3.kartMeshes.push(grp);
     // async-load the car model for this kart's vehicle (player) or a default for CPUs
-    const vid = (i===0) ? kartVehicleId : ['porsche','mclaren','mach6'][i % 3];
+    const vehIds = Object.keys(KVEHICLES);
+    const vid = (i===0) ? kartVehicleId : vehIds[i % vehIds.length];
     const veh = KVEHICLES[vid];
     if(veh && veh.model) loadCarModel(veh.model, grp, k.color, veh);
   }
@@ -912,7 +923,7 @@ function loadCarModel(url, targetGrp, tint, veh){
     // per-car manual yaw correction on top (set in KVEHICLES if a car faces wrong)
     wrap.rotation.y += (veh.yaw||0);
     // ── scale: make the TRUE length ≈ 34 units (kart ~26, a bit bigger reads better) ──
-    const targetLen=34*(veh.sizeMul||1);
+    const targetLen=46*(veh.sizeMul||1);
     const s=targetLen/(lengthVal||1);
     model.scale.setScalar(s);
     // ── recentre on x/z and drop onto the ground (after all rotations/scale) ──
@@ -941,6 +952,44 @@ function loadCarModel(url, targetGrp, tint, veh){
   }catch(e){ /* keep placeholder */ }
 }
 
+// procedural asphalt texture (no external file) — dark noise + faint lane dashes
+let _asphaltTex=null;
+function makeAsphaltTexture(){
+  if(_asphaltTex) return _asphaltTex;
+  const c=document.createElement('canvas');c.width=64;c.height=128;const g=c.getContext('2d');
+  g.fillStyle='#3a3f47';g.fillRect(0,0,64,128);
+  // speckle for asphalt grain
+  for(let i=0;i<2200;i++){
+    const v=40+Math.random()*40;g.fillStyle='rgba('+v+','+v+','+(v+4)+','+(0.15+Math.random()*0.25)+')';
+    g.fillRect(Math.random()*64,Math.random()*128,1.4,1.4);
+  }
+  // centre lane dash
+  g.fillStyle='rgba(230,220,170,0.55)';
+  g.fillRect(30,10,4,40); g.fillRect(30,78,4,40);
+  const t=new THREE.CanvasTexture(c);
+  t.wrapS=t.wrapT=THREE.RepeatWrapping; t.repeat.set(1,1);
+  _asphaltTex=t; return t;
+}
+// a proper low-poly tree: tapered trunk + 2–3 stacked foliage cones
+function makeTree(rnd){
+  const g=new THREE.Group();
+  const h=70+rnd()*70;
+  const trunkH=h*0.4;
+  const trunk=new THREE.Mesh(new THREE.CylinderGeometry(2.5,4.5,trunkH,6),
+    new THREE.MeshLambertMaterial({color:0x6b4a2a}));
+  trunk.position.y=trunkH/2; g.add(trunk);
+  const greens=[0x2f7d3a,0x357f3c,0x2b6e33];
+  const layers=2+Math.floor(rnd()*2);
+  for(let i=0;i<layers;i++){
+    const r=26-i*6+rnd()*4, ch=30+rnd()*10;
+    const cone=new THREE.Mesh(new THREE.ConeGeometry(r,ch,7),
+      new THREE.MeshLambertMaterial({color:greens[i%greens.length]}));
+    cone.position.y=trunkH + i*ch*0.55 + ch*0.3;
+    g.add(cone);
+  }
+  return g;
+}
+
 function build3DScenery(scene){
   if(!KTRACK._samples)buildSamples(KTRACK);
   const sm=KTRACK._samples;const kind=KTRACK.scenery;let seed=99;
@@ -958,20 +1007,19 @@ function build3DScenery(scene){
         const col=kind==='shanghai'?0x2a3a5e:0x33424f;
         mesh=new THREE.Mesh(new THREE.BoxGeometry(w,h,w),new THREE.MeshLambertMaterial({color:col}));
         mesh.position.set(px,h/2,pz);
-      }else if(kind==='almaty'||kind==='kathmandu'){
-        const h=60+rnd()*120;
-        mesh=new THREE.Mesh(new THREE.ConeGeometry(20+rnd()*16,h,7),new THREE.MeshLambertMaterial({color:0x2e5a36}));
-        mesh.position.set(px,h/2,pz);
-      }else if(kind==='lima'){
-        const h=50+rnd()*40;
-        mesh=new THREE.Group();
-        const trunk=new THREE.Mesh(new THREE.CylinderGeometry(3,4,h,6),new THREE.MeshLambertMaterial({color:0x7a5a2a}));trunk.position.y=h/2;mesh.add(trunk);
-        const top=new THREE.Mesh(new THREE.SphereGeometry(16,8,6),new THREE.MeshLambertMaterial({color:0x2f8a3f}));top.position.y=h;mesh.add(top);
+      }else if(kind==='almaty'||kind==='kathmandu'||kind==='lima'){
+        // proper trees lining these greener circuits
+        mesh=makeTree(rnd);
         mesh.position.set(px,0,pz);
-      }else{ // ulaanbaatar yurt
-        const h=24;
-        mesh=new THREE.Mesh(new THREE.CylinderGeometry(18,20,h,12),new THREE.MeshLambertMaterial({color:0xf0efe8}));
-        mesh.position.set(px,h/2,pz);
+      }else{ // ulaanbaatar — mix of trees + the occasional yurt
+        if(rnd()<0.7){
+          mesh=makeTree(rnd);
+          mesh.position.set(px,0,pz);
+        }else{
+          const h=24;
+          mesh=new THREE.Mesh(new THREE.CylinderGeometry(18,20,h,12),new THREE.MeshLambertMaterial({color:0xf0efe8}));
+          mesh.position.set(px,h/2,pz);
+        }
       }
       scene.add(mesh);
     });
@@ -1154,12 +1202,21 @@ function skyColors(id){
     ulaanbaatar:['#9cc4e0','#cfe6f0'], almaty:['#acc8e4','#dceaf4']
   }[id]||['#9cc4e0','#cfe6f0']);
 }
-// build a dense centerline sample list for smooth road projection
+// build a dense centerline sample list for smooth road projection.
+// Uses a Catmull-Rom spline through the waypoints so corners curve smoothly
+// instead of forming hard angles (the old version lerped straight lines).
 function buildSamples(T){
-  const wp=T.wp;const out=[];const per=10;
-  for(let i=0;i<wp.length;i++){
-    const a=wp[i],b=wp[(i+1)%wp.length];
-    for(let s=0;s<per;s++){out.push({x:lerp(a.x,b.x,s/per),y:lerp(a.y,b.y,s/per)});}
+  const wp=T.wp;const out=[];const per=14;const n=wp.length;
+  const cr=(p0,p1,p2,p3,t)=>{
+    const t2=t*t,t3=t2*t;
+    return 0.5*((2*p1)+(-p0+p2)*t+(2*p0-5*p1+4*p2-p3)*t2+(-p0+3*p1-3*p2+p3)*t3);
+  };
+  for(let i=0;i<n;i++){
+    const p0=wp[(i-1+n)%n],p1=wp[i],p2=wp[(i+1)%n],p3=wp[(i+2)%n];
+    for(let s=0;s<per;s++){
+      const t=s/per;
+      out.push({x:cr(p0.x,p1.x,p2.x,p3.x,t), y:cr(p0.y,p1.y,p2.y,p3.y,t)});
+    }
   }
   T._samples=out;
 }
