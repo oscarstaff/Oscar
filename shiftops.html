@@ -1840,13 +1840,16 @@ async function loadData(){
   // can't identify them AND the gate flag says team-lead, stay locked down.
   try{
     const meName = (sessionStorage.getItem('so_me')||'').trim().toLowerCase();
+    console.log('[TL-DEBUG] so_me =', JSON.stringify(sessionStorage.getItem('so_me')), '| so_is_team_lead =', sessionStorage.getItem('so_is_team_lead'), '| so_my_team =', JSON.stringify(sessionStorage.getItem('so_my_team')));
     if(meName){
       const meRec = staff.find(function(s){ return (`${s.first} ${s.last}`).trim().toLowerCase() === meName; });
+      console.log('[TL-DEBUG] matched staff record:', meRec ? (meRec.first+' '+meRec.last+' | team='+meRec.team+' | isTeamLead='+meRec.isTeamLead+' | isHubAdmin='+meRec.isHubAdmin) : 'NOT FOUND in staff array');
       if(meRec){
         AM_TEAM_LEAD = !!meRec.isTeamLead && !meRec.isHubAdmin;
         MY_TEAM = meRec.team || MY_TEAM || '';
       }
     }
+    console.log('[TL-DEBUG] FINAL → AM_TEAM_LEAD =', AM_TEAM_LEAD, '| MY_TEAM =', JSON.stringify(MY_TEAM));
     applyTeamLeadMode();
     // Re-render visible views so the team filter + read-only actually apply.
     try{ if(typeof renderStaffList==='function') renderStaffList(); }catch(e){}
