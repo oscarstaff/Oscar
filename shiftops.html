@@ -1150,16 +1150,17 @@ body.tl-readonly .avail-chip{ pointer-events:none !important; cursor:default !im
 body.tl-readonly #subtab-manageteams{ display:none !important; }
 /* Rows not on the team lead's own team, hidden by JS-added attribute */
 body.tl-readonly [data-tl-hide="1"]{ display:none !important; }
-/* Bottom-left Team Lead pill */
+/* Bottom-right Team Lead pill — fixed, above everything, clear of the sidebar */
 #tlPill{
-  position:fixed; left:14px; bottom:12px; z-index:80;
-  background:rgba(0,229,160,.14); color:#047857;
-  border:1px solid rgba(0,229,160,.45); border-radius:20px;
-  padding:5px 13px; font-size:11px; font-weight:700;
+  position:fixed; right:18px; bottom:16px; z-index:9999;
+  background:#059669; color:#fff;
+  border:1px solid rgba(255,255,255,.25); border-radius:20px;
+  padding:7px 15px; font-size:11.5px; font-weight:700;
   font-family:var(--mono); letter-spacing:.3px;
-  box-shadow:var(--shadow-md); display:none; align-items:center; gap:6px;
+  box-shadow:0 6px 20px -4px rgba(5,150,105,.5);
+  display:none; align-items:center; gap:7px; pointer-events:none;
 }
-#tlPill::before{ content:''; width:7px; height:7px; border-radius:50%; background:#00e5a0; }
+#tlPill::before{ content:''; width:7px; height:7px; border-radius:50%; background:#a7f3d0; }
 body.tl-readonly #tlPill{ display:inline-flex; }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -1875,6 +1876,13 @@ async function loadStaffFromSupabase(){
   staff=built;
   nextStaffId=Math.max.apply(null,[1].concat(built.map(function(s){return s.id;})))+1;
   _staffFromSupabase=true;
+
+  // Roles are now authoritative on the staff array — resolve + latch team-lead
+  // state here so the read-only lock can't be defeated by a later render that
+  // runs before roles are populated. Then apply the lock immediately.
+  _tlResolved=false;
+  try{ computeTeamLeadState(); }catch(e){}
+  try{ applyTeamLeadLock(); }catch(e){}
 }
 
 function rekeyAll(){
@@ -3560,18 +3568,23 @@ function renderAll(){
 // never from the URL or client-settable state.
 let AM_TEAM_LEAD=false;
 let MY_TEAM=null;
+let _tlResolved=false;   // once we know the signed-in user's role, latch it
 function computeTeamLeadState(){
-  AM_TEAM_LEAD=false; MY_TEAM=null;
+  // Latched: never downgrade a confirmed team lead on a transient empty pass
+  // (blob load strips isTeamLead before the Supabase rebuild restores it).
+  if(_tlResolved) return;
+
   let me='';
   try{ me=(sessionStorage.getItem('so_me')||'').trim(); }catch(e){}
   if(!me) return;
   const meRec=(staff||[]).find(function(s){
     return ((s.first||'')+' '+(s.last||'')).trim().toLowerCase()===me.toLowerCase();
   });
-  if(!meRec) return;
-  // admin always wins — an admin is never treated as a team lead
-  if(meRec.isHubAdmin) return;
-  if(meRec.isTeamLead){ AM_TEAM_LEAD=true; MY_TEAM=meRec.team||null; }
+  if(!meRec) return;                 // staff not loaded yet — try again next render
+  if(meRec.isHubAdmin){ AM_TEAM_LEAD=false; MY_TEAM=null; _tlResolved=true; return; }
+  if(meRec.isTeamLead){ AM_TEAM_LEAD=true; MY_TEAM=meRec.team||null; _tlResolved=true; return; }
+  // meRec exists but flags not populated yet (isTeamLead undefined) → don't latch,
+  // don't downgrade; leave state as-is and resolve on a later pass.
 }
 function applyTeamLeadLock(){
   computeTeamLeadState();
