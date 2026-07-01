@@ -1198,7 +1198,10 @@ body.tl-readonly select.tl-allow{
   function pass(){var g=document.getElementById('__gate');if(g)g.remove();}
   async function hmacHex(secret,msg){var enc=new TextEncoder();var k=await crypto.subtle.importKey('raw',enc.encode(secret),{name:'HMAC',hash:'SHA-256'},false,['verify','sign']);var s=await crypto.subtle.sign('HMAC',k,enc.encode(msg));return Array.from(new Uint8Array(s)).map(x=>x.toString(16).padStart(2,'0')).join('');}
   // session unlock — once verified, stay in for this tab session
-  if(sessionStorage.getItem('ngate_'+APP)==='1'){pass();return;}
+  // Session unlock — but only skip if we ALSO already resolved the team-lead
+  // role this session. Otherwise fall through so so_is_team_lead gets set
+  // (a stale ngate from before this feature must not grant full access).
+  if(sessionStorage.getItem('ngate_'+APP)==='1' && sessionStorage.getItem('so_is_team_lead')!==null){pass();return;}
   (async function(){
     try{
       var hash=location.hash||'';
@@ -1829,6 +1832,27 @@ async function loadData(){
   try{
     await loadStaffFromSupabase();
   }catch(e){console.warn('supabase staff load failed',e);}
+
+  // ── Authoritative team-lead recompute ──
+  // Don't rely solely on the sessionStorage flag from the gate (it can be stale
+  // or missing). Cross-check the CURRENT user against the freshly-loaded staff
+  // list: they're a team lead iff their derived record says so. Fail-safe: if we
+  // can't identify them AND the gate flag says team-lead, stay locked down.
+  try{
+    const meName = (sessionStorage.getItem('so_me')||'').trim().toLowerCase();
+    if(meName){
+      const meRec = staff.find(function(s){ return (`${s.first} ${s.last}`).trim().toLowerCase() === meName; });
+      if(meRec){
+        AM_TEAM_LEAD = !!meRec.isTeamLead && !meRec.isHubAdmin;
+        MY_TEAM = meRec.team || MY_TEAM || '';
+      }
+    }
+    applyTeamLeadMode();
+    // Re-render visible views so the team filter + read-only actually apply.
+    try{ if(typeof renderStaffList==='function') renderStaffList(); }catch(e){}
+    try{ if(typeof renderRoster==='function') renderRoster(); }catch(e){}
+    try{ if(typeof renderAvailability==='function') renderAvailability(); }catch(e){}
+  }catch(e){ console.warn('team-lead recompute', e); }
 }
 
 // Build the ShiftOps `staff` array from Nexus's Supabase tables:
