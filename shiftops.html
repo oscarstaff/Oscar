@@ -1123,6 +1123,44 @@ body{ background:
 .sa-acc-admin .sa-acc-label{color:#b45309;}
 [data-theme="dark"] .sa-acc-row{background:#16222f;border-color:#243446;}
 [data-theme="dark"] .sa-acc-label{color:#dde8f5;}
+/* ═══ TEAM LEAD READ-ONLY LOCKDOWN ═══
+   Applied when the signed-in user is a team lead (ShiftOps access, not hub admin).
+   They can browse every tab but cannot edit anything, and see only their own team. */
+body.tl-readonly .btn-primary,
+body.tl-readonly .btn-warn,
+body.tl-readonly .btn-save,
+body.tl-readonly #addStaffBtn,
+body.tl-readonly [onclick*="openAddStaff"],
+body.tl-readonly [onclick*="clearWeek"],
+body.tl-readonly [onclick*="runAutoAllocate"],
+body.tl-readonly [onclick*="addTeam"],
+body.tl-readonly [onclick*="removeTeam"],
+body.tl-readonly [onclick*="removeStaff"],
+body.tl-readonly [onclick*="editStaff"],
+body.tl-readonly [onclick*="renameTeam"],
+body.tl-readonly [onclick*="doExportPDF"]{
+  display:none !important;
+}
+/* Block roster cell editing (add/edit shifts) */
+body.tl-readonly .shift-cell.empty-clickable{ pointer-events:none !important; }
+body.tl-readonly .shift-cell.empty-clickable:hover::after{ content:none !important; }
+body.tl-readonly .shift-badge{ pointer-events:none !important; cursor:default !important; }
+body.tl-readonly .avail-chip{ pointer-events:none !important; cursor:default !important; }
+/* Hide the whole "Manage Teams" sub-tab for team leads */
+body.tl-readonly #subtab-manageteams{ display:none !important; }
+/* Rows not on the team lead's own team, hidden by JS-added attribute */
+body.tl-readonly [data-tl-hide="1"]{ display:none !important; }
+/* Bottom-left Team Lead pill */
+#tlPill{
+  position:fixed; left:14px; bottom:12px; z-index:80;
+  background:rgba(0,229,160,.14); color:#047857;
+  border:1px solid rgba(0,229,160,.45); border-radius:20px;
+  padding:5px 13px; font-size:11px; font-weight:700;
+  font-family:var(--mono); letter-spacing:.3px;
+  box-shadow:var(--shadow-md); display:none; align-items:center; gap:6px;
+}
+#tlPill::before{ content:''; width:7px; height:7px; border-radius:50%; background:#00e5a0; }
+body.tl-readonly #tlPill{ display:inline-flex; }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
@@ -1188,6 +1226,7 @@ body{ background:
 <!-- END GATE -->
 
 
+<div id="tlPill" title="You have read-only access to your team's roster.">Team Lead</div>
 <div class="shell">
   <aside class="sidebar">
     <div class="logo">
@@ -2129,10 +2168,10 @@ function renderRoster(){
     const teamStaff=staff.filter(s=>s.team===team&&!s.isOfficeManager&&s.isManager!=='office');
     const ordered=teamStaff.sort((a,b)=>a.first.localeCompare(b.first)||a.last.localeCompare(b.last));
     if(!ordered.length)return;
-    html+=`<div style="display:grid;grid-template-columns:155px repeat(7,1fr);background:var(--accent-dim);border-bottom:1px solid var(--border);border-top:1px solid var(--border)"><div style="padding:7px 14px;font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--accent-deep);border-right:1px solid var(--border)">${team}</div>${Array(7).fill(`<div style="border-right:1px solid var(--border)"></div>`).join('')}</div>`;
+    html+=`<div data-team="${(team||'').replace(/"/g,'&quot;')}" style="display:grid;grid-template-columns:155px repeat(7,1fr);background:var(--accent-dim);border-bottom:1px solid var(--border);border-top:1px solid var(--border)"><div style="padding:7px 14px;font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--accent-deep);border-right:1px solid var(--border)">${team}</div>${Array(7).fill(`<div style="border-right:1px solid var(--border)"></div>`).join('')}</div>`;
     ordered.forEach(s=>{
       const hrs=staffHoursWeek(s.id),pct=Math.min(100,(hrs/s.maxHours)*100);
-      html+=`<div class="grid-row"><div class="staff-cell"><div class="avatar" style="background:${s.color}">${initials(s)}</div><div style="min-width:0;flex:1;overflow:hidden"><div class="staff-name">${s.first} ${s.last}</div><div class="staff-role">${s.team}</div><div class="hours-bar"><div class="hours-bar-bg"><div class="hours-bar-fill${pct>90?' warn':''}" style="width:${pct}%"></div></div></div></div></div>`;
+      html+=`<div class="grid-row" data-team="${(s.team||'').replace(/"/g,'&quot;')}"><div class="staff-cell"><div class="avatar" style="background:${s.color}">${initials(s)}</div><div style="min-width:0;flex:1;overflow:hidden"><div class="staff-name">${s.first} ${s.last}</div><div class="staff-role">${s.team}</div><div class="hours-bar"><div class="hours-bar-bg"><div class="hours-bar-fill${pct>90?' warn':''}" style="width:${pct}%"></div></div></div></div></div>`;
       for(let d=0;d<7;d++){
         const av=getAvail(s.id,d),dayShifts=(shifts[s.id]||{})[d]||[];
         const hasNonLeave=dayShifts.some(sh=>sh.type!=='leave');
@@ -2470,7 +2509,7 @@ function renderStaffList(){
     const roleBadge = isAdmin
       ? ` <span style="background:rgba(61,158,255,.2);color:var(--accent2);border:1px solid rgba(61,158,255,.4);border-radius:3px;padding:1px 5px;font-size:8px;font-weight:700;font-family:var(--mono)">ADMIN</span>`
       : (isTeamLead ? ` <span style="background:rgba(0,229,160,.18);color:#00e5a0;border:1px solid rgba(0,229,160,.4);border-radius:3px;padding:1px 5px;font-size:8px;font-weight:700;font-family:var(--mono)">TEAM LEAD</span>` : '');
-    html+=`<div class="staff-list-row">
+    html+=`<div class="staff-list-row" data-team="${(s.team||'').replace(/"/g,'&quot;')}">
       <div style="display:flex;align-items:center;gap:8px"><div class="avatar" style="background:${s.color}">${initials(s)}</div><div><div style="font-weight:600;font-size:12.5px">${s.first} ${s.last}${roleBadge}</div><div style="display:flex;align-items:center;gap:5px;margin-top:2px"><span style="font-family:var(--mono);font-size:8.5px;color:var(--text-dim)">${s.team}</span></div></div></div>
       <div><span class="badge ${tb[s.type]}">${tl[s.type]}</span></div>
       <div style="font-family:var(--mono);font-size:12px">${s.maxHours}h</div>
@@ -2608,7 +2647,7 @@ function renderRoleView(){
     if(!teamStaff.length)return;
     const totalS=teamStaff.reduce((a,s)=>{let c=0;for(let d=0;d<7;d++)c+=((shifts[s.id]||{})[d]||[]).length;return a+c;},0);
 
-    html+=`<div class="role-view-card"><div class="role-view-header">
+    html+=`<div class="role-view-card" data-team="${(team||'').replace(/"/g,'&quot;')}"><div class="role-view-header">
       <div style="display:flex;align-items:center;gap:10px">
         <div class="role-view-title">${team}</div>
         <span style="background:rgba(0,229,160,.12);color:var(--accent);border:1px solid rgba(0,229,160,.25);border-radius:4px;padding:2px 8px;font-size:9px;font-family:var(--mono);font-weight:700">${teamStaff.length} STAFF</span>
@@ -3377,6 +3416,7 @@ function showSubTab(id){
   if(id==='manageteams')renderTeams();
   if(id==='leave')renderLeave();
   if(id==='leavesummary')renderLeaveSummary();
+  try{ applyTeamLeadLock(); }catch(e){}
 }
 
 function showSection(id){
@@ -3395,6 +3435,7 @@ function showSection(id){
   if(id==='staff')renderStaffList();
   if(id==='leave')renderLeave();
   if(id==='leavesummary')renderLeaveSummary();
+  try{ applyTeamLeadLock(); }catch(e){}
 }let _navSwitchPending=false;
 function switchNav(id,el){
   if(_navSwitchPending)return;
@@ -3504,7 +3545,69 @@ function renderAll(){
     if(id==='section-staff')renderStaffList();
     updateStats();
     updateLeaveBadge();
+    try{ applyTeamLeadLock(); }catch(e){ console.warn('tl lock', e); }
   });
+}
+
+// ═══ TEAM LEAD READ-ONLY ENFORCEMENT ═══
+// A team lead = has ShiftOps access AND is NOT a hub admin. They may browse
+// every tab but cannot edit, and see only their own team. Identity comes from
+// so_me (the verified signed-in name) matched against the loaded staff array —
+// never from the URL or client-settable state.
+let AM_TEAM_LEAD=false;
+let MY_TEAM=null;
+function computeTeamLeadState(){
+  AM_TEAM_LEAD=false; MY_TEAM=null;
+  let me='';
+  try{ me=(sessionStorage.getItem('so_me')||'').trim(); }catch(e){}
+  if(!me) return;
+  const meRec=(staff||[]).find(function(s){
+    return ((s.first||'')+' '+(s.last||'')).trim().toLowerCase()===me.toLowerCase();
+  });
+  if(!meRec) return;
+  // admin always wins — an admin is never treated as a team lead
+  if(meRec.isHubAdmin) return;
+  if(meRec.isTeamLead){ AM_TEAM_LEAD=true; MY_TEAM=meRec.team||null; }
+}
+function applyTeamLeadLock(){
+  computeTeamLeadState();
+  document.body.classList.toggle('tl-readonly', AM_TEAM_LEAD);
+  if(!AM_TEAM_LEAD) return;
+
+  // Hide any staff-list / roster / team-view / availability row that isn't the
+  // team lead's own team. We tag rows by scanning their visible team label.
+  const mine=(MY_TEAM||'').trim().toLowerCase();
+
+  // Staff list rows: tagged with data-team at render — reliable exact match.
+  document.querySelectorAll('#staffList .staff-list-row').forEach(function(row){
+    const rowTeam=(row.getAttribute('data-team')||'').trim().toLowerCase();
+    row.setAttribute('data-tl-hide', (rowTeam===mine)?'0':'1');
+  });
+
+  // Roster: header block + each member row tagged with data-team at render.
+  document.querySelectorAll('#rosterGrid [data-team]').forEach(function(node){
+    const t=(node.getAttribute('data-team')||'').trim().toLowerCase();
+    node.setAttribute('data-tl-hide', (t===mine)?'0':'1');
+  });
+
+  // Team View cards tagged with data-team.
+  document.querySelectorAll('#subsection-teamview [data-team], .role-view-card[data-team]').forEach(function(node){
+    const t=(node.getAttribute('data-team')||'').trim().toLowerCase();
+    node.setAttribute('data-tl-hide', (t===mine)?'0':'1');
+  });
+
+  // Availability grid rows carry the staff name; hide rows whose staffer isn't on my team.
+  const myIds=new Set((staff||[]).filter(function(s){return (s.team||'').toLowerCase()===mine;}).map(function(s){return s.id;}));
+  document.querySelectorAll('#availGrid .avail-row').forEach(function(row){
+    // best-effort: match by staff name text
+    const nm=(row.querySelector('.avail-name span, .avail-name')||{}).textContent||'';
+    const rec=(staff||[]).find(function(s){return ((s.first||'')+' '+(s.last||'')).trim()===nm.trim();});
+    row.setAttribute('data-tl-hide', (rec && (rec.team||'').toLowerCase()===mine)?'0':'1');
+  });
+}
+function teamsIncludes(v){
+  try{ return (teams||[]).some(function(t){return String(t).toLowerCase()===String(v).toLowerCase();}); }
+  catch(e){ return false; }
 }
 
 document.querySelectorAll('.modal-overlay').forEach(o=>{o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('open');});});
@@ -4866,6 +4969,7 @@ async function aaSave(){
   if(!availWeekKey)availWeekKey=weekKey(currentWeekStart);
   loadWeek(availWeekKey);
   renderAll();
+  try{ applyTeamLeadLock(); }catch(e){}
   // Push staff names to Supabase for the web form
   pushStaffNames();
   updateSaveStatus();
