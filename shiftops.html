@@ -1421,10 +1421,6 @@ body{ background:
       </div>
       <div class="form-group"><label class="form-label">Max Hours / Week</label><input type="number" class="form-input" id="staffMaxHours" value="38" min="1" max="80"></div>
     </div>
-    <div class="form-group" style="margin-top:4px;">
-      <label class="form-label">Also on teams <span style="font-weight:400;color:var(--text-dim);font-size:10.5px;">(optional — for staff on more than one)</span></label>
-      <div id="staffExtraTeams" style="display:flex;flex-wrap:wrap;gap:8px;"><!-- built dynamically from the live teams list by buildExtraTeamChips() --></div>
-    </div>
     <div id="staffAdminSection" style="display:none;margin-top:18px;padding-top:18px;border-top:1px solid var(--border);">
       <div style="font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:12px;">Access &amp; Admin</div>
       <div style="font-size:11px;color:var(--text-dim);margin-bottom:12px;line-height:1.5;">Choose which Nexus apps this person can open. <b>Admin</b>grants full manager rights (roster + timesheet + auto ShiftOps access).</div>
@@ -2735,8 +2731,6 @@ function openAddStaff(){
   onRoleChange(document.getElementById('staffIsManager'));
   const opt=document.querySelector('#staffIsManager option[value="office"]');
   if(opt)opt.textContent='Office Manager';
-  const xtw=document.getElementById('staffExtraTeams');
-  if(xtw) xtw.querySelectorAll('input[type=checkbox]').forEach(b=>{ b.checked=false; });
   openModal('staffModal');
 }
 function editStaff(id){
@@ -2760,21 +2754,9 @@ function editStaff(id){
   openModal('staffModal');
 }
 
-// Tick the "Also on teams" boxes from staff_teams (minus the primary team).
-async function loadStaffExtraTeams(fullName, primaryTeam){
-  const wrap=document.getElementById('staffExtraTeams');
-  if(wrap) wrap.querySelectorAll('input[type=checkbox]').forEach(b=>{ b.checked=false; });
-  if(!fullName) return;
-  try{
-    const rows=await fetch(SUPABASE_URL+'/rest/v1/staff_teams?staff_name=eq.'+encodeURIComponent(fullName)+'&select=team',
-      {headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY}}).then(r=>r.json());
-    const mine=(rows||[]).map(r=>r.team);
-    if(wrap) wrap.querySelectorAll('input[type=checkbox]').forEach(b=>{
-      // tick extras, but not the primary (that's the main Team select)
-      if(b.value!==primaryTeam && mine.indexOf(b.value)!==-1) b.checked=true;
-    });
-  }catch(e){ console.warn('loadStaffExtraTeams', e); }
-}
+// Multi-team ("Also on teams") removed — single team per staffer via staff_directory.
+// Kept as a no-op so existing call sites don't error.
+async function loadStaffExtraTeams(fullName, primaryTeam){ /* no-op: single-team model */ }
 
 // Load one staff member's app access + admin flag into the edit panel
 async function loadStaffAccess(s){
@@ -2839,18 +2821,9 @@ function modalSetPassword(){
 function populateTeamSelect(selectedTeam){
   const sel=document.getElementById('staffTeam');
   sel.innerHTML=[...teams].sort().map(t=>`<option value="${t}"${t===selectedTeam?' selected':''}>${t}</option>`).join('');
-  // Rebuild the "Also on teams" chips from the SAME live teams list so newly
-  // added/removed teams appear automatically — no hardcoded HTML to maintain.
-  buildExtraTeamChips();
 }
-function buildExtraTeamChips(){
-  const wrap=document.getElementById('staffExtraTeams');
-  if(!wrap) return;
-  const esc=s=>String(s).replace(/"/g,'&quot;').replace(/</g,'&lt;');
-  wrap.innerHTML=[...teams].sort().map(t=>
-    '<label class="xt-chip"><input type="checkbox" value="'+esc(t)+'"><span>'+esc(t)+'</span></label>'
-  ).join('');
-}
+// Multi-team chips removed — single team per staffer. No-op kept for safety.
+function buildExtraTeamChips(){ /* no-op: single-team model */ }
 async function saveStaff(){
   const first=document.getElementById('staffFirstName').value.trim();
   const last=document.getElementById('staffLastName').value.trim();
@@ -2945,28 +2918,20 @@ async function addStaffToSupabase(fullName, team){
   }catch(e){ console.warn('addStaffToSupabase failed', e); }
 }
 
-// Write this staffer's team memberships to staff_teams: primary team + any
-// ticked "Also on teams". Replaces their full set (removes unticked ones).
+// Single-team model: mirror the staffer's ONE primary team into staff_teams.
+// (Multi-team "Also on teams" removed — this can no longer create extra rows.)
 async function saveStaffTeams(fullName, primaryTeam){
   if(!fullName) return;
-  const want=[];
-  if(primaryTeam) want.push(primaryTeam);
-  const wrap=document.getElementById('staffExtraTeams');
-  if(wrap){
-    wrap.querySelectorAll('input[type=checkbox]:checked').forEach(b=>{
-      if(want.indexOf(b.value)===-1) want.push(b.value);
-    });
-  }
   const H={apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY};
   const HJ={...H,'Content-Type':'application/json'};
   try{
-    // delete this person's existing memberships, then insert the wanted set.
+    // delete this person's existing memberships, then insert the single primary team.
     await fetch(SUPABASE_URL+'/rest/v1/staff_teams?staff_name=eq.'+encodeURIComponent(fullName),
       {method:'DELETE',headers:H});
-    if(want.length){
+    if(primaryTeam){
       await fetch(SUPABASE_URL+'/rest/v1/staff_teams',{
         method:'POST',headers:{...HJ,'Prefer':'return=minimal'},
-        body:JSON.stringify(want.map(t=>({staff_name:fullName,team:t})))
+        body:JSON.stringify([{staff_name:fullName,team:primaryTeam}])
       });
     }
   }catch(e){ console.warn('saveStaffTeams', e); }
