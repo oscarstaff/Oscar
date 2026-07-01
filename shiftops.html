@@ -2998,7 +2998,11 @@ async function offboardStaffAccess(fullName){
     });
     let ok=false;
     try{ const j=await r.json(); ok = j && j.ok; }catch(e){}
-    // 2. Revoke app access for every app (client-side, anon key is fine for this table)
+    // 2. Revoke app access (anon can delete app_access). The roster tables
+    //    (staff_names/directory/settings/availability) are deleted server-side
+    //    by the relay's offboardStaff handler, because RLS blocks anon DELETE
+    //    on those — doing it here would silently fail and the staff would
+    //    resurrect on reload. Work history (clock_log, leave) is KEPT.
     try{
       const H={apikey:AA_KEY,Authorization:'Bearer '+AA_KEY};
       await fetch(AA_SB+'/rest/v1/app_access?staff_name=eq.'+encodeURIComponent(fullName),{method:'DELETE',headers:H});
@@ -3492,6 +3496,15 @@ function renameTeam(oldName,newName){
   if(teams.includes(newName)){showToast('That team name already exists');return;}
   teams=teams.map(t=>t===oldName?newName:t);
   staff.forEach(s=>{if(s.team===oldName)s.team=newName;});
+  // CANONICAL: update staff_directory — the team source ShiftOps reads on load.
+  // Without this the old team resurrects on refresh.
+  try{
+    fetch(SUPABASE_URL+'/rest/v1/staff_directory?team=eq.'+encodeURIComponent(oldName),{
+      method:'PATCH',
+      headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({team:newName})
+    }).catch(function(){});
+  }catch(e){}
   // Carry the rename into staff_teams (secondary memberships) too.
   try{
     fetch(SUPABASE_URL+'/rest/v1/staff_teams?team=eq.'+encodeURIComponent(oldName),{
