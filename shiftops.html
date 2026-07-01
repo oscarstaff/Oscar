@@ -1716,7 +1716,16 @@ async function loadData(){
     try{
       const res=await window.shiftops.loadData();
       if(res.ok&&res.data&&res.data!==null){
-        if(res.data.staff)staff=res.data.staff;
+        if(res.data.staff){
+          // Role identity (admin / team-lead) must come ONLY from Supabase
+          // (staff_settings + app_access), never from the saved blob — a stale
+          // blob was showing admins as TEAM LEAD. Keep scheduling fields, drop roles.
+          staff=(res.data.staff||[]).map(function(s){
+            const c=Object.assign({},s);
+            delete c.isHubAdmin; delete c.isShiftAdmin; delete c.isTeamLead;
+            return c;
+          });
+        }
         if(res.data.shiftsStore)shiftsStore=res.data.shiftsStore;
         if(res.data.availStore)availStore=res.data.availStore;
         // legacy support
@@ -2457,7 +2466,7 @@ function renderStaffList(){
   sortedStaff.forEach(s=>{
     const hrs=staffHoursWeek(s.id),pct=Math.min(100,Math.round((hrs/s.maxHours)*100));
     const isAdmin=!!s.isHubAdmin;
-    const isTeamLead=!!s.isTeamLead;
+    const isTeamLead=!isAdmin && !!s.isTeamLead;  // admin always wins; never both
     const roleBadge = isAdmin
       ? ` <span style="background:rgba(61,158,255,.2);color:var(--accent2);border:1px solid rgba(61,158,255,.4);border-radius:3px;padding:1px 5px;font-size:8px;font-weight:700;font-family:var(--mono)">ADMIN</span>`
       : (isTeamLead ? ` <span style="background:rgba(0,229,160,.18);color:#00e5a0;border:1px solid rgba(0,229,160,.4);border-radius:3px;padding:1px 5px;font-size:8px;font-weight:700;font-family:var(--mono)">TEAM LEAD</span>` : '');
