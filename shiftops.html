@@ -1768,6 +1768,10 @@ async function loadData(){
         }
         if(res.data.shiftsStore)shiftsStore=res.data.shiftsStore;
         if(res.data.availStore)availStore=res.data.availStore;
+        // Normalize legacy week-key format drift ("29 June" → "29 Jun") so save
+        // and load always agree. Re-key any store entry whose key doesn't match
+        // the canonical fmtDate() output for its Monday.
+        try{ _normalizeStoreKeys(); }catch(e){ console.warn('[WEEK-DEBUG] normalize failed', e); }
         // legacy support
         if(res.data.shifts&&!res.data.shiftsStore){shiftsStore[res.data.availWeekKey||'legacy']=res.data.shifts;}
         if(res.data.availability&&!res.data.availStore){availStore[res.data.availWeekKey||'legacy']=res.data.availability;}
@@ -1775,7 +1779,7 @@ async function loadData(){
         if(res.data.teams)teams=res.data.teams;
         if(res.data.devices)devices=res.data.devices;
         if(res.data.nextDeviceId)nextDeviceId=res.data.nextDeviceId;
-        if(res.data.availWeekKey)availWeekKey=res.data.availWeekKey;
+        if(res.data.availWeekKey)availWeekKey=_canonicalWeekKey(res.data.availWeekKey);
         if(res.data.leaveRequests)leaveRequests=res.data.leaveRequests;
         if(res.data.nextLeaveId)nextLeaveId=res.data.nextLeaveId;
         rekeyAll();
@@ -2259,6 +2263,10 @@ function weekKey(date){return fmtDate(getMonday(date));}
 
 function saveCurrentWeek(){
   const key=availWeekKey||weekKey(currentWeekStart);
+  const _liveStaff=Object.keys(shifts||{}).length;
+  let _liveShiftDays=0;
+  try{ Object.values(shifts||{}).forEach(function(byDay){ Object.values(byDay||{}).forEach(function(arr){ if(arr&&arr.length)_liveShiftDays++; }); }); }catch(e){}
+  console.log('[WEEK-DEBUG] saveCurrentWeek writing to key="'+key+'" liveStaff='+_liveStaff+' liveNonEmptyDays='+_liveShiftDays);
   // Merge: keep existing leave entries from store, overlay current shifts
   const existing=shiftsStore[key]||{};
   const merged=JSON.parse(JSON.stringify(existing));
@@ -2287,22 +2295,89 @@ function saveCurrentWeek(){
   availStore[key]=JSON.parse(JSON.stringify(availability));
 }
 
+// Canonicalize all shiftsStore / availStore keys to the short-month format that
+// fmtDate() produces, so read (loadWeek) and write (saveCurrentWeek) always agree.
+function _canonicalWeekKey(key){
+  const monthsLong=['january','february','march','april','may','june','july','august','september','october','november','december'];
+  const monthsShort=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const parts=String(key).trim().split(/\s+/);
+  if(parts.length!==2) return key;
+  const day=parts[0].replace(/\D/g,'');
+  const mraw=parts[1].toLowerCase();
+  let idx=monthsLong.indexOf(mraw);
+  if(idx<0) idx=['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'].indexOf(mraw.slice(0,3));
+  if(idx<0 || !day) return key;
+  return day+' '+monthsShort[idx];   // e.g. "29 Jun"
+}
+function _normalizeStoreKeys(){
+  ['shiftsStore','availStore'].forEach(function(storeName){
+    const store=(storeName==='shiftsStore')?shiftsStore:availStore;
+    if(!store || typeof store!=='object') return;
+    const remap={};
+    Object.keys(store).forEach(function(k){
+      const canon=_canonicalWeekKey(k);
+      if(canon!==k){
+        // merge into canonical (prefer existing canonical if present, else move)
+        if(!store[canon]) remap[canon]=store[k];
+        delete store[k];
+      }
+    });
+    Object.keys(remap).forEach(function(k){ store[k]=remap[k]; });
+  });
+}
+// Resolve a week key against shiftsStore tolerating month-format drift.// Legacy data mixed "29 Jun" (short) and "29 June" (long) — match either.
+function _resolveStoreKey(key){
+  if(shiftsStore[key]) return key;                 // exact hit
+  // Build normalized candidates: swap short<->long month, and match case-insensitively.
+  const monthsLong=['january','february','march','april','may','june','july','august','september','october','november','december'];
+  const monthsShort=['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
+  const norm=function(s){ return String(s).trim().toLowerCase(); };
+  const parts=String(key).trim().split(/\s+/); // ["29","Jun"] or ["29","June"]
+  if(parts.length===2){
+    const day=parts[0], mon=norm(parts[1]);
+    let li=monthsLong.indexOf(mon), si=monthsShort.indexOf(mon);
+    let idx = li>=0?li : (si>=0?si : -1);
+    if(idx>=0){
+      const cand=[
+        day+' '+monthsShort[idx].charAt(0).toUpperCase()+monthsShort[idx].slice(1),
+        day+' '+monthsLong[idx].charAt(0).toUpperCase()+monthsLong[idx].slice(1)
+      ];
+      for(const c of cand){ if(shiftsStore[c]) return c; }
+    }
+  }
+  // Last resort: case-insensitive scan of existing keys.
+  const want=norm(key).replace(/\s+/g,' ');
+  for(const k of Object.keys(shiftsStore)){
+    const kn=norm(k).replace(/\s+/g,' ');
+    if(kn===want) return k;
+    // compare day + first 3 letters of month
+    const wp=want.split(' '), kp=kn.split(' ');
+    if(wp.length===2 && kp.length===2 && wp[0]===kp[0] && kp[1].slice(0,3)===wp[1].slice(0,3)) return k;
+  }
+  return null;
+}
 function loadWeek(key){
-  shifts=shiftsStore[key]?JSON.parse(JSON.stringify(shiftsStore[key])):{};
+  const resolved=_resolveStoreKey(key);
+  const _has = !!resolved;
+  const _cnt = _has ? Object.keys(shiftsStore[resolved]).length : 0;
+  console.log('[WEEK-DEBUG] loadWeek key="'+key+'" resolved="'+resolved+'" storeHasKey='+_has+' staffInStore='+_cnt+' storeKeys='+JSON.stringify(Object.keys(shiftsStore)));
+  shifts=resolved?JSON.parse(JSON.stringify(shiftsStore[resolved])):{};
   // Availability is NOT week-specific — it persists across weeks
   staff.forEach(s=>{if(!shifts[s.id])shifts[s.id]={};if(!availability[s.id])availability[s.id]={};});
 }
 
 function switchWeek(newStart){
+  console.log('[WEEK-DEBUG] switchWeek → from currentWeekStart="'+weekKey(currentWeekStart)+'" (availWeekKey="'+availWeekKey+'") to newStart="'+weekKey(newStart)+'"');
   saveCurrentWeek();
   currentWeekStart=newStart;
   availWeekKey=weekKey(currentWeekStart);
+  console.log('[WEEK-DEBUG] switchWeek: after save, now availWeekKey="'+availWeekKey+'"');
   loadWeek(availWeekKey);
 }
 
 function prevWeek(){switchWeek(addDays(currentWeekStart,-7));renderRoster();updateStats();}
 function nextWeek(){switchWeek(addDays(currentWeekStart,7));renderRoster();updateStats();}
-function goToday(){switchWeek(getMonday(new Date()));renderRoster();updateStats();}
+function goToday(){console.log('[WEEK-DEBUG] === goToday clicked === today='+new Date().toString()+' getMonday(today)="'+weekKey(getMonday(new Date()))+'"');switchWeek(getMonday(new Date()));renderRoster();updateStats();}
 
 
 // ── AVAILABILITY ──────────────────────────────────────────────────────────
