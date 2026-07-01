@@ -1123,58 +1123,7 @@ body{ background:
 .sa-acc-admin .sa-acc-label{color:#b45309;}
 [data-theme="dark"] .sa-acc-row{background:#16222f;border-color:#243446;}
 [data-theme="dark"] .sa-acc-label{color:#dde8f5;}
-/* ── TEAM-LEAD READ-ONLY MODE ── */
-/* Disable every edit control: buttons, inputs, toggles, add/remove, roster cells.
-   Leaves navigation (tabs, filters, sort) alone so they can still browse. */
-body.tl-readonly .btn:not(.sub-tab):not(.nav-item),
-body.tl-readonly button.btn-primary,
-body.tl-readonly button.btn-danger,
-body.tl-readonly .type-toggle,
-body.tl-readonly .role-pill,
-body.tl-readonly input[type="checkbox"],
-body.tl-readonly input[type="text"]:not(.tl-allow),
-body.tl-readonly input[type="date"]:not(.tl-allow),
-body.tl-readonly input[type="time"],
-body.tl-readonly input[type="number"],
-body.tl-readonly textarea,
-body.tl-readonly select:not(.tl-allow),
-body.tl-readonly .lv-btn,
-body.tl-readonly .staff-list-row .staff-actions,
-body.tl-readonly [onclick*="openLeaveModal"],
-body.tl-readonly [onclick*="openLeaveEdit"],
-body.tl-readonly [onclick*="deleteLeave"],
-body.tl-readonly [onclick*="clearWeek"],
-body.tl-readonly [onclick*="publishRoster"],
-body.tl-readonly [onclick*="openStaffModal"],
-body.tl-readonly [onclick*="openAddStaff"],
-body.tl-readonly [onclick*="saveStaff"],
-body.tl-readonly [onclick*="editShift"],
-body.tl-readonly [onclick*="addShift"],
-body.tl-readonly .roster-cell,
-body.tl-readonly .shift-block{
-  pointer-events:none !important;
-  opacity:.5 !important;
-  cursor:not-allowed !important;
-  filter:grayscale(.4);
-}
-/* Fully hide the most dangerous actions rather than just grey them */
-body.tl-readonly [onclick*="clearWeek"],
-body.tl-readonly [onclick*="publishRoster"],
-body.tl-readonly [onclick*="openAddStaff"],
-body.tl-readonly [onclick*="wipeRoster"]{
-  display:none !important;
-}
-/* Keep tabs/sub-tabs/filters usable so they can look around */
-body.tl-readonly .sub-tab,
-body.tl-readonly .nav-item,
-body.tl-readonly select.tl-allow{
-  pointer-events:auto !important;
-  opacity:1 !important;
-  filter:none !important;
-  cursor:pointer !important;
-}
 </style>
-
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.4/dist/jspdf.plugin.autotable.min.js"></script>
@@ -1183,7 +1132,7 @@ body.tl-readonly select.tl-allow{
 <!-- NEXUS TOKEN GATE — app only opens when launched from Nexus -->
 <div id="__gate" style="position:fixed;inset:0;z-index:99999;background:linear-gradient(135deg,#0f1117,#1a1d27);display:flex;align-items:center;justify-content:center;font-family:system-ui,sans-serif;">
   <div style="background:#1e2230;border:1px solid #2e3344;border-radius:18px;padding:40px 36px;width:min(380px,90vw);text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.5);">
-    <div style="font-size:42px;margin-bottom:14px;">🔒</div>
+    <div style="font-size:42px;margin-bottom:14px;"></div>
     <div style="font-size:20px;font-weight:700;color:#fff;margin-bottom:8px;">ShiftOps</div>
     <div id="__gateMsg" style="font-size:13.5px;color:#8b94a8;line-height:1.5;">Checking access…</div>
   </div>
@@ -1198,10 +1147,7 @@ body.tl-readonly select.tl-allow{
   function pass(){var g=document.getElementById('__gate');if(g)g.remove();}
   async function hmacHex(secret,msg){var enc=new TextEncoder();var k=await crypto.subtle.importKey('raw',enc.encode(secret),{name:'HMAC',hash:'SHA-256'},false,['verify','sign']);var s=await crypto.subtle.sign('HMAC',k,enc.encode(msg));return Array.from(new Uint8Array(s)).map(x=>x.toString(16).padStart(2,'0')).join('');}
   // session unlock — once verified, stay in for this tab session
-  // Session unlock — but only skip if we ALSO already resolved the team-lead
-  // role this session. Otherwise fall through so so_is_team_lead gets set
-  // (a stale ngate from before this feature must not grant full access).
-  if(sessionStorage.getItem('ngate_'+APP)==='1' && sessionStorage.getItem('so_is_team_lead')!==null){pass();return;}
+  if(sessionStorage.getItem('ngate_'+APP)==='1'){pass();return;}
   (async function(){
     try{
       var hash=location.hash||'';
@@ -1221,21 +1167,7 @@ body.tl-readonly select.tl-allow{
       var r=await fetch(SB+'/rest/v1/app_access?app=eq.'+APP+'&staff_name=eq.'+encodeURIComponent(name)+'&select=staff_name',{headers:{apikey:KEY,Authorization:'Bearer '+KEY}});
       var rows=r.ok?await r.json():[];
       if(!rows.length){fail('You no longer have access to this app.');return;}
-      // Stash WHO is using ShiftOps (from the signed token) so the app can
-      // enforce the team-lead read-only role. Name is trusted (HMAC-verified).
       try{ sessionStorage.setItem('so_me', name); }catch(e){}
-      // Resolve team-lead status: has shiftops access (proven above) AND is NOT
-      // a hub admin. Hub admins get full access; everyone else here is read-only.
-      try{
-        var ar=await fetch(SB+'/rest/v1/staff_settings?name=eq.'+encodeURIComponent(name)+'&select=is_hub_admin',{headers:{apikey:KEY,Authorization:'Bearer '+KEY}});
-        var arows=ar.ok?await ar.json():[];
-        var isHub=arows.length && arows[0].is_hub_admin===true;
-        sessionStorage.setItem('so_is_team_lead', isHub ? '0' : '1');
-        // resolve their team for the read-only filter
-        var dr=await fetch(SB+'/rest/v1/staff_directory?staff_name=eq.'+encodeURIComponent(name)+'&select=team',{headers:{apikey:KEY,Authorization:'Bearer '+KEY}});
-        var drows=dr.ok?await dr.json():[];
-        sessionStorage.setItem('so_my_team', (drows.length && drows[0].team) ? drows[0].team : '');
-      }catch(e){ sessionStorage.setItem('so_is_team_lead','0'); }
       // Capture Nexus' Supabase session so ShiftOps writes as an authenticated
       // user (RLS-locked tables reject the anon key). Stash for the tab session.
       try{
@@ -1268,22 +1200,22 @@ body.tl-readonly select.tl-allow{
     </div>
     <nav class="nav">
       <div class="nav-item active" onclick="switchNav('roster',this)">
-        <span class="icon"><svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd"/></svg></span> Roster
+        <span class="icon"><svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd"/></svg></span>Roster
       </div>
       <div class="nav-item" onclick="switchNav('availability',this);clearAvailBadge()">
-        <span class="icon"><svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/></svg></span> Availability
+        <span class="icon"><svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/></svg></span>Availability
         <span id="availNavBadge" style="display:none;margin-left:auto;background:var(--warn);color:#fff;border-radius:10px;padding:1px 7px;font-size:8px;font-weight:800;font-family:var(--mono);">NEW</span>
       </div>
       <div class="nav-item" onclick="switchNav('staff',this)">
-        <span class="icon"><svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"/></svg></span> Staff
+        <span class="icon"><svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"/></svg></span>Staff
       </div>
       <div class="nav-section"></div>
       <div class="nav-item" onclick="syncAvailability()">
-        <span class="icon"><svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd"/></svg></span> Sync Availability
+        <span class="icon"><svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd"/></svg></span>Sync Availability
       </div>
       <div class="nav-section"></div>
       <div class="nav-item" onclick="resetData()">
-        <span class="icon"><svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd"/></svg></span> Reset All Data
+        <span class="icon"><svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd"/></svg></span>Reset All Data
       </div>
     </nav>
     <div class="sidebar-footer">
@@ -1295,23 +1227,22 @@ body.tl-readonly select.tl-allow{
   <main class="main">
     <div class="topbar">
       <div class="topbar-left">
-        <div class="topbar-title" id="topbarTitle">Oscars <span style="color:var(--muted);font-weight:400;">›</span> Roster</div>
+        <div class="topbar-title" id="topbarTitle">Oscars <span style="color:var(--muted);font-weight:400;">></span>Roster</div>
       </div>
 <div class="topbar-week" id="topbarWeekCenter"><span id="topbarWeekLabel" style="font-size:12px;font-weight:600;color:var(--text-dim);"></span></div>
       <div class="topbar-actions">
+        <div id="topbarWhoami" style="font-size:11px;font-weight:600;color:var(--text-dim);margin-right:8px;white-space:nowrap;-webkit-app-region:no-drag;"></div>
         <div class="save-status" id="saveStatusTopbar" style="font-size:10px;gap:5px;display:flex;align-items:center;-webkit-app-region:no-drag;margin-right:4px;"><div class="dot" style="width:5px;height:5px;border-radius:50%;background:currentColor;flex-shrink:0"></div><span id="saveLabelTopbar">loading…</span></div>
         <button class="btn btn-save" onclick="saveData()" style="padding:6px 12px;">Save</button>
         <button class="btn btn-ghost" onclick="openAddShift()" style="padding:6px 12px;">+ Shift</button>
         <div class="tools-dropdown">
-          <button class="btn btn-ghost" onclick="toggleToolsMenu()" id="toolsBtn" style="padding:6px 12px;">Tools ▾</button>
+          <button class="btn btn-ghost" onclick="toggleToolsMenu()" id="toolsBtn" style="padding:6px 12px;">Tools </button>
           <div class="tools-menu" id="toolsMenu">
             <div class="tools-menu-item" onclick="closeToolsMenu();openAutoAllocate()">
-              <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM14 11a1 1 0 011 1v1h1a1 1 0 110 2h-1v1a1 1 0 11-2 0v-1h-1a1 1 0 110-2h1v-1a1 1 0 011-1z"/></svg>
-              Rostering Menu
+              <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM14 11a1 1 0 011 1v1h1a1 1 0 110 2h-1v1a1 1 0 11-2 0v-1h-1a1 1 0 110-2h1v-1a1 1 0 011-1z"/></svg>Rostering Menu
             </div>
             <div class="tools-menu-item" onclick="closeToolsMenu();openExportModal()">
-              <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V7.414A2 2 0 0015.414 6L12 2.586A2 2 0 0010.586 2H6zm5 6a1 1 0 10-2 0v3.586l-1.293-1.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V8z" clip-rule="evenodd"/></svg>
-              Export PDF
+              <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V7.414A2 2 0 0015.414 6L12 2.586A2 2 0 0010.586 2H6zm5 6a1 1 0 10-2 0v3.586l-1.293-1.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V8z" clip-rule="evenodd"/></svg>Export PDF
             </div>
           </div>
         </div>
@@ -1321,12 +1252,12 @@ body.tl-readonly select.tl-allow{
     <div class="content">
       <div class="stats-row">
         <div class="stat-card"><div class="stat-label">Shifts This Week</div><div class="stat-value green" id="statShifts">0</div><div class="stat-delta">across all staff</div></div>
-        <div class="stat-card"><div class="stat-label">Staff Rostered</div><div class="stat-value blue" id="statRostered">0</div><div class="stat-delta">of <span id="totalStaff">0</span> total</div></div>
+        <div class="stat-card"><div class="stat-label">Staff Rostered</div><div class="stat-value blue" id="statRostered">0</div><div class="stat-delta">of <span id="totalStaff">0</span>total</div></div>
         <div class="stat-card"><div class="stat-label">Total Hours</div><div class="stat-value" id="statHours">0</div><div class="stat-delta">scheduled this week</div></div>
         <div class="stat-card"><div class="stat-label">Open Slots</div><div class="stat-value orange" id="statOpen">0</div><div class="stat-delta">unfilled this week</div></div>
       </div>
 
-      <div class="conflict-banner" id="conflictBanner" style="display:none">⚠ <strong>Conflicts detected.</strong>&nbsp; Some staff are rostered on unavailable days.</div>
+      <div class="conflict-banner" id="conflictBanner" style="display:none"> <strong>Conflicts detected.</strong>&nbsp; Some staff are rostered on unavailable days.</div>
 
       <div class="tab-content active" id="section-roster">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
@@ -1424,14 +1355,14 @@ body.tl-readonly select.tl-allow{
 <div class="modal-overlay" id="deviceAllocModal">
   <div class="modal" style="width:min(520px,92vw);max-height:88vh;overflow-y:auto;padding:28px 32px;">
     <div class="modal-title" style="font-size:18px;margin-bottom:6px;">
-      <span>💻 Device Allocation</span>
+      <span>Device Allocation</span>
       <button class="modal-close" onclick="closeModal('deviceAllocModal')">×</button>
     </div>
     <div style="font-family:var(--mono);font-size:9px;color:var(--text-dim);margin-bottom:20px;letter-spacing:.5px">Assign devices to staff. Two people can share a device — enter the hours each person uses it.</div>
     <div id="deviceAllocList" style="display:flex;flex-direction:column;gap:8px;margin-bottom:20px;"></div>
     <div style="border-top:1px solid var(--border);padding-top:16px;display:flex;justify-content:flex-end;gap:10px;">
       <button class="btn btn-ghost" style="padding:9px 20px;font-size:13px" onclick="closeModal('deviceAllocModal')">Cancel</button>
-      <button class="btn btn-primary" style="padding:9px 24px;font-size:13px;font-weight:700" onclick="applyDeviceAllocation()">💻 Apply Devices</button>
+      <button class="btn btn-primary" style="padding:9px 24px;font-size:13px;font-weight:700" onclick="applyDeviceAllocation()">Apply Devices</button>
     </div>
   </div>
 </div>
@@ -1440,7 +1371,7 @@ body.tl-readonly select.tl-allow{
 <div class="modal-overlay" id="accessAdminModal">
   <div class="modal" style="width:min(560px,94vw);max-height:88vh;overflow-y:auto;padding:28px 32px;">
     <div class="modal-title" style="font-size:18px;margin-bottom:6px;">
-      <span>🔐 Access &amp; Admin</span>
+      <span>Access &amp; Admin</span>
       <button class="modal-close" onclick="closeModal('accessAdminModal')">×</button>
     </div>
     <div style="font-family:var(--mono);font-size:9px;color:var(--text-dim);margin-bottom:18px;letter-spacing:.5px">Control who can open each Nexus app and who is an Admin. ADMIN = full manager rights (roster + timesheet + auto ShiftOps access).</div>
@@ -1481,7 +1412,6 @@ body.tl-readonly select.tl-allow{
       <div class="form-group"><label class="form-label">Role</label>
         <select class="form-input" id="staffIsManager" onchange="onRoleChange(this)">
           <option value="false">Team Member</option>
-          <option value="office">Office Manager</option>
         </select>
       </div>
     </div>
@@ -1496,15 +1426,15 @@ body.tl-readonly select.tl-allow{
       <div id="staffExtraTeams" style="display:flex;flex-wrap:wrap;gap:8px;"><!-- built dynamically from the live teams list by buildExtraTeamChips() --></div>
     </div>
     <div id="staffAdminSection" style="display:none;margin-top:18px;padding-top:18px;border-top:1px solid var(--border);">
-      <div style="font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:12px;">🔐 Access &amp; Admin</div>
-      <div style="font-size:11px;color:var(--text-dim);margin-bottom:12px;line-height:1.5;">Choose which Nexus apps this person can open. <b>Team Lead</b> gives read-only ShiftOps for their own team. <b>Admin</b> grants full manager rights (roster + timesheet + full ShiftOps).</div>
+      <div style="font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:12px;">Access &amp; Admin</div>
+      <div style="font-size:11px;color:var(--text-dim);margin-bottom:12px;line-height:1.5;">Choose which Nexus apps this person can open. <b>Admin</b>grants full manager rights (roster + timesheet + auto ShiftOps access).</div>
       <div id="staffAccessChecks" style="display:flex;flex-direction:column;gap:9px;margin-bottom:14px;">
         <label class="sa-acc-row"><input type="checkbox" id="saAccess_formcraft"><span class="sa-acc-label">FormCraft</span><span class="sa-acc-desc">PDF form filler</span></label>
         <label class="sa-acc-row"><input type="checkbox" id="saAccess_slip"><span class="sa-acc-label">Slip</span><span class="sa-acc-desc">Tax invoices</span></label>
-        <label class="sa-acc-row"><input type="checkbox" id="saAccess_shiftops"><span class="sa-acc-label">Team Lead</span><span class="sa-acc-desc">Read-only ShiftOps · own team</span></label>
-        <label class="sa-acc-row sa-acc-admin"><input type="checkbox" id="saAccess_admin" onchange="onStaffAdminToggle(this)"><span class="sa-acc-label">⭐ Admin</span><span class="sa-acc-desc">Full manager rights</span></label>
+        <label class="sa-acc-row"><input type="checkbox" id="saAccess_shiftops"><span class="sa-acc-label">Team Lead</span><span class="sa-acc-desc">Read-only ShiftOps, own team</span></label>
+        <label class="sa-acc-row sa-acc-admin"><input type="checkbox" id="saAccess_admin" onchange="onStaffAdminToggle(this)"><span class="sa-acc-label">Admin</span><span class="sa-acc-desc">Full manager rights</span></label>
       </div>
-      <button type="button" id="modalSetPasswordBtn" onclick="modalSetPassword()" class="btn btn-ghost" style="padding:8px 14px;font-size:12.5px;font-weight:600;background:rgba(61,158,255,.12);color:#3d9eff;border:1px solid rgba(61,158,255,.35);">🔑 Set Password</button>
+      <button type="button" id="modalSetPasswordBtn" onclick="modalSetPassword()" class="btn btn-ghost" style="padding:8px 14px;font-size:12.5px;font-weight:600;background:rgba(61,158,255,.12);color:#3d9eff;border:1px solid rgba(61,158,255,.35);">Set Password</button>
     </div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeModal('staffModal')">Cancel</button>
@@ -1517,7 +1447,7 @@ body.tl-readonly select.tl-allow{
 <div class="modal-overlay" id="allocModal">
   <div class="modal" style="width:min(860px,92vw);max-height:88vh;overflow-y:auto;padding:32px 36px;">
     <div class="modal-title" style="font-size:20px;margin-bottom:24px;">
-      <span>📋 Rostering Menu</span>
+      <span>Rostering Menu</span>
       <button class="modal-close" onclick="closeModal('allocModal')">×</button>
     </div>
 
@@ -1571,8 +1501,8 @@ body.tl-readonly select.tl-allow{
 
     <div style="border-top:1px solid var(--border);padding-top:18px;display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap;">
       <button class="btn btn-ghost" style="padding:10px 22px;font-size:13px" onclick="closeModal('allocModal')">Cancel</button>
-      <button class="btn btn-save" style="padding:10px 24px;font-size:13px;font-weight:700" onclick="rosterByAvailability()">📅 Roster as per Availability</button>
-      <button class="btn btn-primary" style="padding:10px 28px;font-size:13px;font-weight:700" onclick="runAutoAllocate()">📋 Apply Roster</button>
+      <button class="btn btn-save" style="padding:10px 24px;font-size:13px;font-weight:700" onclick="rosterByAvailability()">Roster as per Availability</button>
+      <button class="btn btn-primary" style="padding:10px 28px;font-size:13px;font-weight:700" onclick="runAutoAllocate()">Apply Roster</button>
     </div>
   </div>
 </div>
@@ -1580,9 +1510,8 @@ body.tl-readonly select.tl-allow{
 <!-- SHARED FOLDER MODAL -->
 <div class="modal-overlay" id="sharedFolderModal">
   <div class="modal" style="width:500px">
-    <div class="modal-title"><span>🔗 Shared Folder</span><button class="modal-close" onclick="closeModal('sharedFolderModal')">×</button></div>
-    <div style="background:rgba(0,229,160,.07);border:1px solid rgba(0,229,160,.2);border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:12px;color:var(--text-dim);line-height:1.7">
-      Point Oscars Staff Management to a <strong style="color:var(--accent)">Google Drive or Dropbox folder</strong> shared with your coworker. Both of you set the same folder — whoever saves last wins, so coordinate who edits when.
+    <div class="modal-title"><span>Shared Folder</span><button class="modal-close" onclick="closeModal('sharedFolderModal')">×</button></div>
+    <div style="background:rgba(0,229,160,.07);border:1px solid rgba(0,229,160,.2);border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:12px;color:var(--text-dim);line-height:1.7">Point Oscars Staff Management to a <strong style="color:var(--accent)">Google Drive or Dropbox folder</strong>shared with your coworker. Both of you set the same folder — whoever saves last wins, so coordinate who edits when.
     </div>
     <div class="form-group">
       <label class="form-label">Current Data Location</label>
@@ -1592,7 +1521,7 @@ body.tl-readonly select.tl-allow{
       <button class="btn btn-warn" id="sharedFolderClearBtn" style="display:none" onclick="clearSharedFolder()">Use Local Storage</button>
       <div style="flex:1"></div>
       <button class="btn btn-ghost" onclick="closeModal('sharedFolderModal')">Close</button>
-      <button class="btn btn-primary" onclick="pickSharedFolder()">📂 Choose Shared Folder</button>
+      <button class="btn btn-primary" onclick="pickSharedFolder()">Choose Shared Folder</button>
     </div>
   </div>
 </div>
@@ -1633,7 +1562,7 @@ body.tl-readonly select.tl-allow{
 <!-- RESET PASSWORD MODAL -->
 <div class="modal-overlay" id="resetPassModal">
   <div class="modal" style="width:420px">
-    <div class="modal-title"><span>🔑 Password Management</span><button class="modal-close" onclick="closeModal('resetPassModal')">×</button></div>
+    <div class="modal-title"><span>Password Management</span><button class="modal-close" onclick="closeModal('resetPassModal')">×</button></div>
     <div id="resetPassName" style="font-size:13.5px;font-weight:700;color:var(--text-mid);margin-bottom:16px"></div>
 
     <!-- Set password panel -->
@@ -1736,37 +1665,22 @@ body.tl-readonly select.tl-allow{
 // ── SUPABASE / APPS SCRIPT CONFIG ──────────────────────────────────────────
 // MUST be declared before loadData()/loadStaffFromSupabase() run (the INIT IIFE
 // at the bottom calls them during this same script evaluation). Declaring these
-// further down made them hit the temporal dead zone → loadStaffFromSupabase
+// further down made them hit the temporal dead zone ->loadStaffFromSupabase
 // threw "Cannot access 'SUPABASE_KEY' before initialization", silently failed,
 // and the roster fell back to the cached/seed staff — which then wiped Nexus.
 const SUPABASE_URL='https://jcfgldqrdbfkgbixszds.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpjZmdsZHFyZGJma2diaXhzemRzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1Nzc3NzEsImV4cCI6MjA5MDE1Mzc3MX0.Wj8cCpnlsoZOPj5sKWeEdfvgjG4Nc-UuTTYgbcrPfeI';
 
-// ─────────── TEAM-LEAD READ-ONLY ROLE ───────────
-// Resolved by the gate (HMAC-verified). A team lead sees only their own team
-// and cannot edit anything. Hub admins are never team leads (full access).
-let AM_TEAM_LEAD = false;
-let MY_TEAM = '';
-try{
-  AM_TEAM_LEAD = sessionStorage.getItem('so_is_team_lead') === '1';
-  MY_TEAM = sessionStorage.getItem('so_my_team') || '';
-}catch(e){}
-
-function applyTeamLeadMode(){
-  if(!AM_TEAM_LEAD) return;
-  document.body.classList.add('tl-readonly');
-  // Badge in the header so it's obvious they're in read-only mode.
-  if(!document.getElementById('tlBanner')){
-    const b = document.createElement('div');
-    b.id = 'tlBanner';
-    b.style.cssText = 'position:fixed;bottom:14px;left:50%;transform:translateX(-50%);z-index:9998;background:#00e5a0;color:#04231a;font-size:12px;font-weight:700;padding:7px 16px;border-radius:20px;box-shadow:0 6px 20px -4px rgba(0,0,0,.3);font-family:var(--sans);pointer-events:none;';
-    b.textContent = '👁 Team Lead — read-only view of ' + (MY_TEAM || 'your team');
-    document.body.appendChild(b);
-  }
+// Show the signed-in staff name in the topbar.
+function _renderWhoami(){
+  try{
+    const me = sessionStorage.getItem('so_me') || '';
+    const el = document.getElementById('topbarWhoami');
+    if(el && me) el.textContent = 'Signed in as ' + me;
+  }catch(e){}
 }
-document.addEventListener('DOMContentLoaded', applyTeamLeadMode);
-// also run immediately in case DOM is already ready
-if(document.readyState !== 'loading') setTimeout(applyTeamLeadMode, 0);
+document.addEventListener('DOMContentLoaded', _renderWhoami);
+if(document.readyState !== 'loading') setTimeout(_renderWhoami, 0);
 const GAS_EXEC_URL='https://script.google.com/macros/s/AKfycby0Bq97bCZAsmnruXFuJuCqXQE_kOxhYE2KFuJnVzLXtT5CV0Y12k5176dxZbdaYVGE/exec';
 const GAS_TOKEN='oscars_gas_83235a5f0c1f6ba32b18235e2b2d544ac137167d';
 
@@ -1832,36 +1746,12 @@ async function loadData(){
   try{
     await loadStaffFromSupabase();
   }catch(e){console.warn('supabase staff load failed',e);}
-
-  // ── Authoritative team-lead recompute ──
-  // Don't rely solely on the sessionStorage flag from the gate (it can be stale
-  // or missing). Cross-check the CURRENT user against the freshly-loaded staff
-  // list: they're a team lead iff their derived record says so. Fail-safe: if we
-  // can't identify them AND the gate flag says team-lead, stay locked down.
-  try{
-    const meName = (sessionStorage.getItem('so_me')||'').trim().toLowerCase();
-    console.log('[TL-DEBUG] so_me =', JSON.stringify(sessionStorage.getItem('so_me')), '| so_is_team_lead =', sessionStorage.getItem('so_is_team_lead'), '| so_my_team =', JSON.stringify(sessionStorage.getItem('so_my_team')));
-    if(meName){
-      const meRec = staff.find(function(s){ return (`${s.first} ${s.last}`).trim().toLowerCase() === meName; });
-      console.log('[TL-DEBUG] matched staff record:', meRec ? (meRec.first+' '+meRec.last+' | team='+meRec.team+' | isTeamLead='+meRec.isTeamLead+' | isHubAdmin='+meRec.isHubAdmin) : 'NOT FOUND in staff array');
-      if(meRec){
-        AM_TEAM_LEAD = !!meRec.isTeamLead && !meRec.isHubAdmin;
-        MY_TEAM = meRec.team || MY_TEAM || '';
-      }
-    }
-    console.log('[TL-DEBUG] FINAL → AM_TEAM_LEAD =', AM_TEAM_LEAD, '| MY_TEAM =', JSON.stringify(MY_TEAM));
-    applyTeamLeadMode();
-    // Re-render visible views so the team filter + read-only actually apply.
-    try{ if(typeof renderStaffList==='function') renderStaffList(); }catch(e){}
-    try{ if(typeof renderRoster==='function') renderRoster(); }catch(e){}
-    try{ if(typeof renderAvailability==='function') renderAvailability(); }catch(e){}
-  }catch(e){ console.warn('team-lead recompute', e); }
 }
 
 // Build the ShiftOps `staff` array from Nexus's Supabase tables:
-//   • staff_names      → the canonical roster (names)
-//   • staff_directory  → team per person
-//   • staff_settings   → admin flags (is_hub_admin / is_shift_admin)
+//   • staff_names      ->the canonical roster (names)
+//   • staff_directory  ->team per person
+//   • staff_settings   ->admin flags (is_hub_admin / is_shift_admin)
 // Maps each into ShiftOps's shape. Preserves any existing per-person roster
 // fields (type/maxHours/color/manager) from the local file when the name matches,
 // so desktop-side scheduling settings aren't lost.
@@ -1918,9 +1808,9 @@ async function loadStaffFromSupabase(){
       id: prev.id || idc++,
       first:first,
       last:last,
-      team:isOffice?null:team,
-      isManager: prev.isManager||false,
-      isOfficeManager: isOffice || prev.isOfficeManager || false,
+      team:team,
+      isManager: false,
+      isOfficeManager: false,
       isHubAdmin: !!(adminByName[full] && adminByName[full].hub),
       isShiftAdmin: !!(adminByName[full] && adminByName[full].shift),
       isTeamLead: (!!hasShiftopsByName[full]) && !(adminByName[full] && adminByName[full].hub),
@@ -1970,13 +1860,13 @@ function rekeyAll(){
 }
 
 async function saveData(){
-  if(!window.shiftops){showToast('⚠ Save only works in the desktop app');return;}
+  if(!window.shiftops){showToast('Save only works in the desktop app');return;}
   try{
     saveCurrentWeek(); // flush current week into the store
     const res=await window.shiftops.saveData({staff,shiftsStore,availStore,nextStaffId,teams,devices,nextDeviceId,availWeekKey,leaveRequests,nextLeaveId});
-    if(res.ok){isDirty=false;updateSaveStatus();showToast('💾 Saved');syncStaffToNexus();}
-    else showToast('⚠ Save failed: '+res.error);
-  }catch(e){showToast('⚠ '+e.message);}
+    if(res.ok){isDirty=false;updateSaveStatus();showToast('Saved');syncStaffToNexus();}
+    else showToast('Save failed: '+res.error);
+  }catch(e){showToast(''+e.message);}
 }
 
 // ── NEXUS SYNC ────────────────────────────────────────────────────────────
@@ -2055,7 +1945,7 @@ async function syncStaffToNexus(){
         let rows=[];
         try{ rows=await up.json(); }catch(e){}
         if(!Array.isArray(rows) || rows.length===0){
-          // no existing row → insert one
+          // no existing row ->insert one
           await fetch(NX_SB+'/rest/v1/staff_directory',{
             method:'POST',headers:Object.assign({Prefer:'return=minimal'},H),
             body:JSON.stringify({staff_name:c.name,team:c.team})
@@ -2211,7 +2101,7 @@ function renderRoster(){
   let html='<div class="grid-header"><div class="grid-col-head">STAFF</div>';
   for(let d=0;d<7;d++){const day=addDays(currentWeekStart,d);html+=`<div class="grid-col-head${isToday(day)?' today':''}">${DAYS[d]}<br><span style="font-size:9px;opacity:.6">${fmtDate(day)}</span></div>`;}
   html+='</div>';
-  const officeManager = AM_TEAM_LEAD ? [] : staff.filter(s=>s.isOfficeManager||s.isManager==='office');
+  const officeManager=staff.filter(s=>s.isOfficeManager||s.isManager==='office');
   if(officeManager.length>0){
     html+=`<div style="display:grid;grid-template-columns:155px repeat(7,1fr);background:rgba(255,215,0,.08);border-bottom:1px solid var(--border);"><div style="padding:6px 12px;font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#ffd700;border-right:1px solid var(--border)">&#9733; Office</div>${Array(7).fill(`<div style="border-right:1px solid var(--border)"></div>`).join('')}</div>`;
     officeManager.forEach(s=>{
@@ -2222,14 +2112,13 @@ function renderRoster(){
         const hasNonLeave=dayShifts.some(sh=>sh.type!=='leave');
         const conflict=av.type==='no'&&hasNonLeave;
         html+=`<div class="shift-cell${dayShifts.length===0?' empty-clickable':''} ${conflict?' shift-conflict':''}" ${dayShifts.length===0?`onclick="clickCell(${s.id},${d})"`:''}>`;
-        dayShifts.forEach((sh,i)=>{const il=sh.type==='leave';const dev=sh.deviceId?devices.find(x=>x.id===sh.deviceId):null;html+=`<div class="shift-badge ${il?'shift-leave':''}" style="${il?'':`background:rgba(255,215,0,.15);color:#ffd700;border:1px solid rgba(255,215,0,.3)`}" onclick="event.stopPropagation();editShift(${s.id},${d},${i})">${il?'LEAVE':`${sh.start}–${sh.end}`}${dev?`<br><span style="font-size:8px;opacity:.85">💻 ${dev.name}</span>`:`<br><span style="font-size:8px;opacity:.7">Office Mgr</span>`}</div>`;});
+        dayShifts.forEach((sh,i)=>{const il=sh.type==='leave';const dev=sh.deviceId?devices.find(x=>x.id===sh.deviceId):null;html+=`<div class="shift-badge ${il?'shift-leave':''}" style="${il?'':`background:rgba(255,215,0,.15);color:#ffd700;border:1px solid rgba(255,215,0,.3)`}" onclick="event.stopPropagation();editShift(${s.id},${d},${i})">${il?'LEAVE':`${sh.start}–${sh.end}`}${dev?`<br><span style="font-size:8px;opacity:.85"> ${dev.name}</span>`:`<br><span style="font-size:8px;opacity:.7">Office Mgr</span>`}</div>`;});
         html+='</div>';
       }
       html+='</div>';
     });
   }
-  let sortedTeams=[...new Set(staff.filter(s=>!s.isOfficeManager&&s.isManager!=='office').map(s=>s.team))].sort();
-  if(AM_TEAM_LEAD) sortedTeams = sortedTeams.filter(function(t){ return t===MY_TEAM; });
+  const sortedTeams=[...new Set(staff.filter(s=>!s.isOfficeManager&&s.isManager!=='office').map(s=>s.team))].sort();
   sortedTeams.forEach(team=>{
     const teamStaff=staff.filter(s=>s.team===team&&!s.isOfficeManager&&s.isManager!=='office');
     const ordered=teamStaff.sort((a,b)=>a.first.localeCompare(b.first)||a.last.localeCompare(b.last));
@@ -2255,7 +2144,7 @@ function renderRoster(){
                 if(osh.deviceId!==sh.deviceId)return;
                 // If both have time slots, check overlap
                 if(sh.deviceStart&&sh.deviceEnd&&osh.deviceStart&&osh.deviceEnd){
-                  // Overlap if start < other end AND end > other start
+                  // Overlap if start < other end AND end >other start
                   if(sh.deviceStart<osh.deviceEnd&&sh.deviceEnd>osh.deviceStart)devConflict=true;
                 }else{
                   // No time slots — it's a conflict
@@ -2264,7 +2153,7 @@ function renderRoster(){
               });
             });
           }
-          html+=`<div class="shift-badge ${il?'shift-leave':'shift-slot'}" onclick="event.stopPropagation();editShift(${s.id},${d},${i})">${il?'LEAVE':`${sh.start}–${sh.end}`}${dev?`<br><span style="font-size:8px;opacity:.85;color:${devConflict?'#ff6432':'inherit'}">💻 ${dev.name}${sh.deviceStart?` ${sh.deviceStart}–${sh.deviceEnd}`:''}${devConflict?' ⚠':''}</span>`:`${staffRoleLabel(s)?`<br><span style="font-size:8px;opacity:.7">${staffRoleLabel(s)}</span>`:''}`}</div>`;
+          html+=`<div class="shift-badge ${il?'shift-leave':'shift-slot'}" onclick="event.stopPropagation();editShift(${s.id},${d},${i})">${il?'LEAVE':`${sh.start}–${sh.end}`}${dev?`<br><span style="font-size:8px;opacity:.85;color:${devConflict?'#ff6432':'inherit'}"> ${dev.name}${sh.deviceStart?` ${sh.deviceStart}–${sh.deviceEnd}`:''}${devConflict?' ':''}</span>`:`${staffRoleLabel(s)?`<br><span style="font-size:8px;opacity:.7">${staffRoleLabel(s)}</span>`:''}`}</div>`;
         });
         html+='</div>';
       }
@@ -2385,7 +2274,7 @@ function renderAvailability(){
       <div style="font-family:var(--mono);font-size:8.5px;color:var(--text-dim);margin-top:3px">Week of ${weekLabel}</div>
     </div>
     <button class="btn btn-save" onclick="syncAvailability()" style="font-size:11.5px;gap:5px;display:flex;align-items:center">
-      <svg width="13" height="13" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd"/></svg> Sync Availability
+      <svg width="13" height="13" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd"/></svg>Sync Availability
     </button>
   </div>
 
@@ -2406,16 +2295,16 @@ function renderAvailability(){
       const av=getAvail(s.id,d);
       let chip='';
       if(av.type==='no'){
-        chip=`<div class="avail-chip avail-no" onclick="cycleAvail(${s.id},${d})">✗ Unavail</div>`;
+        chip=`<div class="avail-chip avail-no" onclick="cycleAvail(${s.id},${d})">Unavail</div>`;
       } else if(av.type==='custom'){
         chip=`<div class="avail-chip avail-pref" onclick="openCustomAvail(${s.id},${d})" style="font-size:7.5px">${av.start}–${av.end}</div>`;
       } else if(av.type==='all'){
-        chip=`<div class="avail-chip avail-yes" onclick="cycleAvail(${s.id},${d})">✓ All Day</div>`;
+        chip=`<div class="avail-chip avail-yes" onclick="cycleAvail(${s.id},${d})">All Day</div>`;
       } else {
         chip=`<div class="avail-chip avail-unset" onclick="cycleAvail(${s.id},${d})">— Not Set</div>`;
       }
       // Small custom button always visible
-      const customBtn=`<div onclick="openCustomAvail(${s.id},${d})" title="Set custom hours" style="font-size:10px;color:var(--text-dim);cursor:pointer;text-align:center;margin-top:2px;opacity:.8;display:flex;align-items:center;justify-content:center;gap:3px"><span style="font-size:12px">✏</span><span style="font-family:var(--mono);font-size:8px;font-weight:600">Custom</span></div>`;
+      const customBtn=`<div onclick="openCustomAvail(${s.id},${d})" title="Set custom hours" style="font-size:10px;color:var(--text-dim);cursor:pointer;text-align:center;margin-top:2px;opacity:.8;display:flex;align-items:center;justify-content:center;gap:3px"><span style="font-size:12px"></span><span style="font-family:var(--mono);font-size:8px;font-weight:600">Custom</span></div>`;
       html+=`<div class="avail-cell" style="flex-direction:column;gap:2px">${chip}${customBtn}</div>`;
     }
     html+='</div>';
@@ -2449,7 +2338,7 @@ async function loadSubmittedAvailability(){
     ).then(r=>r.ok?r.json():[]);
 
     if(!rows.length){
-      el.innerHTML='<div style="text-align:center;padding:48px;color:var(--text-dim);"><div style="font-size:36px;margin-bottom:12px;">📅</div><div style="font-size:14px;font-weight:600;">No availability submitted yet</div><div style="font-size:12px;margin-top:6px;color:var(--muted);">Staff submit availability via the Employee Portal</div></div>';
+      el.innerHTML='<div style="text-align:center;padding:48px;color:var(--text-dim);"><div style="font-size:36px;margin-bottom:12px;"></div><div style="font-size:14px;font-weight:600;">No availability submitted yet</div><div style="font-size:12px;margin-top:6px;color:var(--muted);">Staff submit availability via the Employee Portal</div></div>';
       return;
     }
 
@@ -2460,11 +2349,6 @@ async function loadSubmittedAvailability(){
     let html='<div style="display:flex;flex-direction:column;gap:12px;">';
 
     rows.forEach(row=>{
-      // Team-lead read-only: only show your own team's availability.
-      if(AM_TEAM_LEAD){
-        const _st = staff.find(x=>`${x.first} ${x.last}`.toLowerCase()===String(row.staff_name||'').toLowerCase());
-        if(!_st || (_st.team||'') !== MY_TEAM) return;
-      }
       const av=row.availability||{};
       // Period label
       let period='Ongoing';
@@ -2528,7 +2412,7 @@ function isAvailLocked(){return false;}
 
 function cycleAvail(staffId,day){
   const av=getAvail(staffId,day);
-  // Cycle: unset → all → no → unset
+  // Cycle: unset ->all ->no ->unset
   if(av.type==='unset')setAvail(staffId,day,{type:'all'});
   else if(av.type==='all')setAvail(staffId,day,{type:'no'});
   else setAvail(staffId,day,{type:'unset'});
@@ -2548,7 +2432,7 @@ function openCustomAvail(staffId,day){
 function saveCustomAvail(){
   const start=document.getElementById('availTimeStart').value;
   const end=document.getElementById('availTimeEnd').value;
-  if(!start||!end||start>=end){showToast('⚠ End time must be after start time');return;}
+  if(!start||!end||start>=end){showToast('End time must be after start time');return;}
   setAvail(editingAvail.staffId,editingAvail.day,{type:'custom',start,end});
   closeModal('availTimeModal');
   renderAvailability();renderRoster();
@@ -2559,20 +2443,17 @@ function renderStaffList(){
   const el=document.getElementById('staffList');
   const tl={full:'Full-time',part:'Part-time',casual:'Casual'},tb={full:'badge-full',part:'badge-part',casual:'badge-casual'};
   let html=`<div class="staff-list-header">
-    <div class="section-title">Staff Members (${AM_TEAM_LEAD ? staff.filter(function(s){return (s.team||'')===MY_TEAM;}).length + ' · ' + (MY_TEAM||'your team') : staff.length})</div>
+    <div class="section-title">Staff Members (${staff.length})</div>
     <div style="display:flex;align-items:center;gap:8px">
       <div style="display:flex;border:1px solid var(--border);border-radius:6px;overflow:hidden">
-        <button onclick="setStaffSort('asc')" style="padding:5px 12px;font-size:11px;font-family:var(--mono);font-weight:600;cursor:pointer;border:none;transition:all .15s;background:${staffSortOrder==='asc'?'rgba(0,229,160,.15)':'transparent'};color:${staffSortOrder==='asc'?'var(--accent)':'var(--text-dim)'}">A → Z</button>
-        <button onclick="setStaffSort('desc')" style="padding:5px 12px;font-size:11px;font-family:var(--mono);font-weight:600;cursor:pointer;border:none;border-left:1px solid var(--border);transition:all .15s;background:${staffSortOrder==='desc'?'rgba(0,229,160,.15)':'transparent'};color:${staffSortOrder==='desc'?'var(--accent)':'var(--text-dim)'}">Z → A</button>
+        <button onclick="setStaffSort('asc')" style="padding:5px 12px;font-size:11px;font-family:var(--mono);font-weight:600;cursor:pointer;border:none;transition:all .15s;background:${staffSortOrder==='asc'?'rgba(0,229,160,.15)':'transparent'};color:${staffSortOrder==='asc'?'var(--accent)':'var(--text-dim)'}">A ->Z</button>
+        <button onclick="setStaffSort('desc')" style="padding:5px 12px;font-size:11px;font-family:var(--mono);font-weight:600;cursor:pointer;border:none;border-left:1px solid var(--border);transition:all .15s;background:${staffSortOrder==='desc'?'rgba(0,229,160,.15)':'transparent'};color:${staffSortOrder==='desc'?'var(--accent)':'var(--text-dim)'}">Z ->A</button>
       </div>
       <button class="btn btn-primary" onclick="openAddStaff()">+ Add Staff</button>
     </div>
   </div>
   <div class="staff-list-head"><div class="col-head">Name / Role</div><div class="col-head">Type</div><div class="col-head">Max Hrs</div><div class="col-head">Scheduled</div><div class="col-head">Utilisation</div><div class="col-head">Actions</div></div>`;
-  const _visibleStaff = AM_TEAM_LEAD
-    ? staff.filter(function(s){ return (s.team||'') === MY_TEAM; })
-    : staff;
-  const sortedStaff=[..._visibleStaff].sort((a,b)=>{
+  const sortedStaff=[...staff].sort((a,b)=>{
     const cmp=a.first.localeCompare(b.first)||a.last.localeCompare(b.last);
     return staffSortOrder==='asc'?cmp:-cmp;
   });
@@ -2584,7 +2465,7 @@ function renderStaffList(){
       ? ` <span style="background:rgba(61,158,255,.2);color:var(--accent2);border:1px solid rgba(61,158,255,.4);border-radius:3px;padding:1px 5px;font-size:8px;font-weight:700;font-family:var(--mono)">ADMIN</span>`
       : (isTeamLead ? ` <span style="background:rgba(0,229,160,.18);color:#00e5a0;border:1px solid rgba(0,229,160,.4);border-radius:3px;padding:1px 5px;font-size:8px;font-weight:700;font-family:var(--mono)">TEAM LEAD</span>` : '');
     html+=`<div class="staff-list-row">
-      <div style="display:flex;align-items:center;gap:8px"><div class="avatar" style="background:${s.color};${s.isOfficeManager||s.isManager==='office'?'background:#ffd700;color:#3a2a00':''}">${initials(s)}</div><div><div style="font-weight:600;font-size:12.5px;${s.isOfficeManager||s.isManager==='office'?'color:#ffd700':''}">${s.first} ${s.last}${roleBadge}</div><div style="display:flex;align-items:center;gap:5px;margin-top:2px"><span style="font-family:var(--mono);font-size:8.5px;color:var(--text-dim)">${s.isOfficeManager||s.isManager==='office'?'Office':s.team}</span>${s.isOfficeManager||s.isManager==='office'?`<span style="background:rgba(255,215,0,.2);color:#ffd700;border:1px solid rgba(255,215,0,.4);border-radius:3px;padding:1px 5px;font-size:8px;font-weight:700;font-family:var(--mono)">OFFICE MGR</span>`:''}'</div></div></div>
+      <div style="display:flex;align-items:center;gap:8px"><div class="avatar" style="background:${s.color}">${initials(s)}</div><div><div style="font-weight:600;font-size:12.5px">${s.first} ${s.last}${roleBadge}</div><div style="display:flex;align-items:center;gap:5px;margin-top:2px"><span style="font-family:var(--mono);font-size:8.5px;color:var(--text-dim)">${s.team}</span></div></div></div>
       <div><span class="badge ${tb[s.type]}">${tl[s.type]}</span></div>
       <div style="font-family:var(--mono);font-size:12px">${s.maxHours}h</div>
       <div style="font-family:var(--mono);font-size:12px;color:${pct>100?'var(--warn)':'inherit'}">${hrs.toFixed(1)}h</div>
@@ -2605,7 +2486,7 @@ function toggleAvailEdit(id){
   s.canEditAvail=s.canEditAvail===false?true:false;
   markDirty();setTimeout(renderStaffList,0);
   pushStaffSettings();
-  showToast(s.canEditAvail?`✓ ${s.first} can now edit availability`:`🔒 ${s.first}'s availability editing locked`);
+  showToast(s.canEditAvail?` ${s.first} can now edit availability`:` ${s.first}'s availability editing locked`);
 }
 
 function toggleHubAdmin(id){
@@ -2614,7 +2495,7 @@ function toggleHubAdmin(id){
   s.isHubAdmin=!s.isHubAdmin;
   markDirty();renderStaffList();
   pushStaffSettings();
-  showToast(s.isHubAdmin?`✓ ${s.first} is now a Hub Admin`:`${s.first} is no longer a Hub Admin`);
+  showToast(s.isHubAdmin?` ${s.first} is now a Hub Admin`:`${s.first} is no longer a Hub Admin`);
 }
 
 async function pushStaffSettings(){
@@ -2663,17 +2544,17 @@ function toggleStaffMenu(id, btn){
   let top = rect.bottom + 4;
   let left = rect.right - menuRect.width;
   // Flip ABOVE if below would clip
-  if(top + menuRect.height > window.innerHeight - PAD){
+  if(top + menuRect.height >window.innerHeight - PAD){
     top = rect.top - menuRect.height - 4;
   }
   // Clamp top to viewport
   if(top < PAD) top = PAD;
-  if(top + menuRect.height > window.innerHeight - PAD){
+  if(top + menuRect.height >window.innerHeight - PAD){
     top = window.innerHeight - menuRect.height - PAD;
   }
   // Clamp left to viewport
   if(left < PAD) left = PAD;
-  if(left + menuRect.width > window.innerWidth - PAD){
+  if(left + menuRect.width >window.innerWidth - PAD){
     left = window.innerWidth - menuRect.width - PAD;
   }
   menu.style.top = top + 'px';
@@ -2805,7 +2686,7 @@ function saveShift(){
   const isLeave=type==='leave';
   const start=isLeave?'':document.getElementById('shiftStart').value;
   const end=isLeave?'':document.getElementById('shiftEnd').value;
-  if(!isLeave&&(!start||!end||start>=end)){showToast('⚠ End time must be after start time');return;}
+  if(!isLeave&&(!start||!end||start>=end)){showToast('End time must be after start time');return;}
   if(!shifts[staffId])shifts[staffId]={};
   if(!shifts[staffId][day])shifts[staffId][day]=[];
   const sh={start,end,type,role:isLeave?'Leave':role};
@@ -2827,12 +2708,12 @@ function saveShift(){
     });
     if(conflicts.length){
       const dname=devices.find(x=>x.id===deviceId)?.name||'Device';
-      showToast(`⚠ ${dname} also assigned to: ${conflicts.join(', ')} on this day!`);
+      showToast(` ${dname} also assigned to: ${conflicts.join(', ')} on this day!`);
       markDirty();renderAll();return;
     }
   }
 
-  closeModal('shiftModal');markDirty();renderAll();showToast(isLeave?'🔴 Leave marked':'✓ Shift saved');
+  closeModal('shiftModal');markDirty();renderAll();showToast(isLeave?' Leave marked':' Shift saved');
 }
 
 function onRoleChange(sel){
@@ -2898,9 +2779,16 @@ async function loadStaffExtraTeams(fullName, primaryTeam){
 // Load one staff member's app access + admin flag into the edit panel
 async function loadStaffAccess(s){
   const full = (s.first + ' ' + s.last).trim();
-  // admin flag from what we already know
   const adminBox = document.getElementById('saAccess_admin');
-  if(adminBox) adminBox.checked = !!s.isHubAdmin || !!s.isShiftAdmin;
+  // Read the admin flag fresh from the DB (the in-memory staff object can be
+  // stale, which left the Admin box unticked for real admins).
+  if(adminBox){
+    adminBox.checked = !!s.isHubAdmin; // optimistic, corrected below
+    try{
+      const arows = await aaGet('staff_settings?select=is_hub_admin&name=eq.'+encodeURIComponent(full));
+      if(arows && arows.length){ adminBox.checked = arows[0].is_hub_admin === true; }
+    }catch(e){ console.warn('loadStaffAccess admin flag', e); }
+  }
   // app access — read this person's rows from app_access
   ['formcraft','slip','shiftops'].forEach(a=>{ const b=document.getElementById('saAccess_'+a); if(b) b.checked=false; });
   try{
@@ -2938,10 +2826,8 @@ async function saveStaffAccess(fullName){
       jobs.push(fetch(AA_SB+'/rest/v1/app_access?app=eq.'+encodeURIComponent(app)+'&staff_name=eq.'+encodeURIComponent(fullName),{method:'DELETE',headers:H}));
     }
   }
-  // Admin flag → is_hub_admin only. Team-lead is DERIVED at load time from
-  // "has shiftops app_access AND not hub admin" — no is_shift_admin write here
-  // (the DB guard trigger blocks anon writes to admin flags anyway).
-  jobs.push(fetch(AA_SB+'/rest/v1/staff_settings',{method:'POST',headers:{...HJ,'Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({name:fullName,is_hub_admin:isAdmin})}));
+  // admin flag ->both is_hub_admin + is_shift_admin
+  jobs.push(fetch(AA_SB+'/rest/v1/staff_settings',{method:'POST',headers:{...HJ,'Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({name:fullName,is_hub_admin:isAdmin,is_shift_admin:isAdmin})}));
   try{ await Promise.all(jobs.map(p=>p.catch(e=>{console.warn('saveStaffAccess job',e);}))); }catch(e){ console.warn('saveStaffAccess',e); }
 }
 
@@ -2974,7 +2860,7 @@ async function saveStaff(){
   const isOfficeManager=roleVal==='office';
   const type=document.getElementById('staffType').value;
   const maxHours=parseInt(document.getElementById('staffMaxHours').value);
-  if(!first||!last){showToast('⚠ Please enter a full name');return;}
+  if(!first||!last){showToast('Please enter a full name');return;}
   // Multiple office managers allowed
   if(editingStaffId){
     const s=staff.find(x=>x.id===editingStaffId);
@@ -2991,7 +2877,7 @@ async function saveStaff(){
     await saveStaffTeams(newName, team); // persist multi-team membership
     // keep local admin flag in sync so the row badge updates without a reload
     if(s){ const isAdmin=!!(document.getElementById('saAccess_admin')||{}).checked; s.isHubAdmin=isAdmin; s.isShiftAdmin=isAdmin; }
-    closeModal('staffModal');forceSave();renderAll();showToast('✓ Staff updated');pushStaffNames();
+    closeModal('staffModal');forceSave();renderAll();showToast('Staff updated');pushStaffNames();
   }else{
     const s={id:nextStaffId++,first,last,team,isManager:isOfficeManager?'office':isManager,isOfficeManager,type,maxHours,color:COLORS[(nextStaffId-2)%COLORS.length]};
     staff.push(s);shifts[s.id]={};availability[s.id]={};
@@ -3007,15 +2893,15 @@ async function saveStaff(){
         body:JSON.stringify({action:'adminSetPw',staff:fullName,newPassword:'Oscars2026!',token:GAS_TOKEN})
       });
       const j=await resp.json().catch(()=>({}));
-      if(j&&j.ok){ showToast(`✓ ${fullName} added — temp password: Oscars2026!`); }
-      else { showToast(`✓ ${fullName} added, but auth setup failed: ${(j&&j.error)||'error'}. Use Set Password.`); }
-    }catch(e){ showToast(`✓ ${fullName} added, but auth setup failed. Use Set Password to fix.`); }
+      if(j&&j.ok){ showToast(` ${fullName} added — temp password: Oscars2026!`); }
+      else { showToast(` ${fullName} added, but auth setup failed: ${(j&&j.error)||'error'}. Use Set Password.`); }
+    }catch(e){ showToast(` ${fullName} added, but auth setup failed. Use Set Password to fix.`); }
   }
 }
 // Insert ONE new staff member into the Nexus-facing tables. INSERT-ONLY — it
 // never deletes/prunes, so it's safe to call even when the roster is
 // Supabase-backed (unlike pushStaffNames, which prunes and is guarded off).
-// Writes name → staff_names, name+team → staff_directory + staff_credentials,
+// Writes name ->staff_names, name+team ->staff_directory + staff_credentials,
 // using merge-duplicates so re-adding an existing name just updates the team.
 async function addStaffToSupabase(fullName, team){
   if(!fullName) return;
@@ -3090,7 +2976,7 @@ function removeStaff(id){
   const s=staff.find(x=>x.id===id);
   if(!s)return;
   const name=`${s.first} ${s.last}`;
-  if(!confirm(`⚠️ Remove ${name}?\n\nThis removes them from the roster, deletes their login so they can no longer sign in, and revokes app access.\n\nWork records (hours, leave) are kept for payroll. This cannot be undone.`))return;
+  if(!confirm(` Remove ${name}?\n\nThis removes them from the roster, deletes their login so they can no longer sign in, and revokes app access.\n\nWork records (hours, leave) are kept for payroll. This cannot be undone.`))return;
   staff=staff.filter(x=>x.id!==id);
   delete shifts[id];
   delete availability[id];
@@ -3143,8 +3029,7 @@ function openAutoAllocate(){
   }
 
   // Then team staff
-  let sortedTeams=[...new Set(staff.filter(s=>!s.isOfficeManager&&s.isManager!=='office').map(s=>s.team))].sort();
-  if(AM_TEAM_LEAD) sortedTeams = sortedTeams.filter(function(t){ return t===MY_TEAM; });
+  const sortedTeams=[...new Set(staff.filter(s=>!s.isOfficeManager&&s.isManager!=='office').map(s=>s.team))].sort();
   sortedTeams.forEach(team=>{
     const teamMembers=staff.filter(s=>s.team===team&&!s.isOfficeManager&&s.isManager!=='office').sort((a,b)=>a.first.localeCompare(b.first)||a.last.localeCompare(b.last));
     staffListHtml+=`<div style="font-family:var(--mono);font-size:8.5px;color:var(--accent);letter-spacing:1.5px;text-transform:uppercase;padding:4px 2px;margin-top:4px">${team}</div>`;
@@ -3205,7 +3090,7 @@ function applyPreset(preset){
     if(s)cb.checked=c.types.includes(s.type);
   });
 
-  showToast('✓ Preset applied');
+  showToast('Preset applied');
 }
 
 function setAllocAll(checked){
@@ -3219,8 +3104,8 @@ function runAutoAllocate(){
   const overwrite=document.getElementById('allocOverwrite').value==='yes';
   const selectedIds=new Set([...document.querySelectorAll('#allocStaffList input[type=checkbox]:checked')].map(el=>parseInt(el.dataset.sid)));
 
-  if(!activeDays.length){showToast('⚠ Select at least one working day');return;}
-  if(!startTime||!endTime||startTime>=endTime){showToast('⚠ Invalid shift times');return;}
+  if(!activeDays.length){showToast('Select at least one working day');return;}
+  if(!startTime||!endTime||startTime>=endTime){showToast('Invalid shift times');return;}
 
   const startHr=parseInt(startTime.split(':')[0]);
   const shiftType=startHr<12?'morning':startHr<17?'afternoon':'evening';
@@ -3259,7 +3144,7 @@ function runAutoAllocate(){
 
   closeModal('allocModal');
   markDirty();renderAll();
-  const msg=skipped>0?`⚡ ${allocated} shifts allocated · ${skipped} skipped (unavailable)`:`⚡ Allocated ${allocated} shifts`;
+  const msg=skipped>0?` ${allocated} shifts allocated · ${skipped} skipped (unavailable)`:` Allocated ${allocated} shifts`;
   showToast(msg);
 }
 
@@ -3269,7 +3154,7 @@ function rosterByAvailability(){
   const overwrite=document.getElementById('allocOverwrite').value==='yes';
   const selectedIds=new Set([...document.querySelectorAll('#allocStaffList input[type=checkbox]:checked')].map(el=>parseInt(el.dataset.sid)));
 
-  if(!startTime||!endTime||startTime>=endTime){showToast('⚠ Invalid shift times');return;}
+  if(!startTime||!endTime||startTime>=endTime){showToast('Invalid shift times');return;}
 
   let allocated=0;
   let skipped=0;
@@ -3304,11 +3189,11 @@ function rosterByAvailability(){
   markDirty();renderAll();
 
   if(allocated===0&&skipped===0){
-    showToast('⚠ No availability found — ask staff to submit via the web form');
+    showToast('No availability found — ask staff to submit via the web form');
   } else {
     const msg=skipped>0
-      ?`📅 ${allocated} shifts rostered · ${skipped} days skipped (unavailable)`
-      :`📅 ${allocated} shifts rostered from availability`;
+      ?` ${allocated} shifts rostered · ${skipped} days skipped (unavailable)`
+      :` ${allocated} shifts rostered from availability`;
     showToast(msg);
   }
 }
@@ -3377,8 +3262,7 @@ async function exportPDF(dayFilter=null){
   }
 
   // Assemble body rows: team banner rows + staff rows. Track styling per row/cell.
-  let sortedTeams=[...new Set(staff.map(s=>s.team))].sort();
-  if(AM_TEAM_LEAD) sortedTeams = sortedTeams.filter(function(t){ return t===MY_TEAM; });
+  const sortedTeams=[...new Set(staff.map(s=>s.team))].sort();
   const body=[];               // array of {cells:[...], banner?:team, leaveCols:[...], emptyCols:[...]}
   let totalHrs=0;
 
@@ -3413,7 +3297,7 @@ async function exportPDF(dayFilter=null){
   });
 
   if(typeof window.jspdf==='undefined' || !window.jspdf || !window.jspdf.jsPDF){
-    showToast('⚠ PDF library not loaded — check connection');
+    showToast('PDF library not loaded — check connection');
     return;
   }
   showToast('⏳ Generating PDF…');
@@ -3472,7 +3356,7 @@ async function exportPDF(dayFilter=null){
   });
 
   doc.save(pdfFilename);
-  showToast('✅ PDF downloaded');
+  showToast('PDF downloaded');
 }
 
 function exportTXT(){
@@ -3484,7 +3368,7 @@ function exportTXT(){
     if(!had)text+='  (no shifts this week)\n';
     text+='\n';
   });
-  dlFile('roster.txt',text,'text/plain');showToast('📄 TXT exported');
+  dlFile('roster.txt',text,'text/plain');showToast('TXT exported');
 }
 function exportCSV(){
   let csv='Staff,Role,Day,Date,Start,End,Type,Position\n';
@@ -3494,7 +3378,7 @@ function exportCSV(){
       ds.forEach(sh=>{csv+=`"${s.first} ${s.last}","${s.role}","${DAYS_FULL[d]}","${date}","${sh.start}","${sh.end}","${sh.type}","${sh.role}"\n`;});
     }
   });
-  dlFile('roster.csv',csv,'text/csv');showToast('📊 CSV exported');
+  dlFile('roster.csv',csv,'text/csv');showToast('CSV exported');
 }
 function dlFile(name,text,mime){
   const a=document.createElement('a');
@@ -3526,7 +3410,7 @@ function showSection(id){
   });
   const crumbs={roster:'Roster',availability:'Availability',staff:'Staff'};
   const titleEl=document.getElementById('topbarTitle');
-  if(titleEl)titleEl.innerHTML='<span style="color:var(--muted);font-weight:400">Oscars</span><span style="color:var(--muted);margin:0 6px;font-weight:400">›</span>'+crumbs[id];
+  if(titleEl)titleEl.innerHTML='<span style="color:var(--muted);font-weight:400">Oscars</span><span style="color:var(--muted);margin:0 6px;font-weight:400">></span>'+crumbs[id];
   if(id==='roster')renderRoster();
   if(id==='availability')renderAvailability();
   if(id==='staff')renderStaffList();
@@ -3540,7 +3424,7 @@ function switchNav(id,el){
   el.classList.add('active');
   const crumbs={roster:'Roster',availability:'Availability',staff:'Staff'};
   const titleEl=document.getElementById('topbarTitle');
-  if(titleEl)titleEl.innerHTML='<span style="color:var(--muted);font-weight:400">Oscars</span><span style="color:var(--muted);margin:0 6px;font-weight:400">›</span>'+crumbs[id];
+  if(titleEl)titleEl.innerHTML='<span style="color:var(--muted);font-weight:400">Oscars</span><span style="color:var(--muted);margin:0 6px;font-weight:400">></span>'+crumbs[id];
   requestAnimationFrame(()=>{
     showSection(id);
     _navSwitchPending=false;
@@ -3583,16 +3467,16 @@ function renderTeams(){
 function addTeam(){
   const input=document.getElementById('newTeamInput');
   const name=input.value.trim();
-  if(!name){showToast('⚠ Enter a team name');return;}
-  if(teams.includes(name)){showToast('⚠ Team already exists');return;}
+  if(!name){showToast('Enter a team name');return;}
+  if(teams.includes(name)){showToast('Team already exists');return;}
   teams.push(name);
   input.value='';
-  markDirty();renderTeams();showToast(`✓ Team "${name}" added`);
+  markDirty();renderTeams();showToast(` Team "${name}" added`);
 }
 
 function removeTeam(name){
   const count=staff.filter(s=>s.team===name).length;
-  if(count>0){showToast(`⚠ Reassign ${count} staff before removing "${name}"`);return;}
+  if(count>0){showToast(` Reassign ${count} staff before removing "${name}"`);return;}
   teams=teams.filter(t=>t!==name);
   // Also drop any SECONDARY memberships of this team from staff_teams.
   try{
@@ -3605,7 +3489,7 @@ function removeTeam(name){
 function renameTeam(oldName,newName){
   newName=newName.trim();
   if(!newName||newName===oldName)return;
-  if(teams.includes(newName)){showToast('⚠ That team name already exists');return;}
+  if(teams.includes(newName)){showToast('That team name already exists');return;}
   teams=teams.map(t=>t===oldName?newName:t);
   staff.forEach(s=>{if(s.team===oldName)s.team=newName;});
   // Carry the rename into staff_teams (secondary memberships) too.
@@ -3616,7 +3500,7 @@ function renameTeam(oldName,newName){
       body:JSON.stringify({team:newName})
     }).catch(function(){});
   }catch(e){}
-  markDirty();renderTeams();renderAll();showToast(`✓ Renamed to "${newName}"`);
+  markDirty();renderTeams();renderAll();showToast(` Renamed to "${newName}"`);
 }
 // Debounced renderAll — batches rapid consecutive calls into one render
 let _renderTimer=null;
@@ -3685,7 +3569,7 @@ function refreshDevMgmtList(){
   if(!devices.length){list.innerHTML=`<div style="color:var(--text-dim);font-size:12px;padding:8px 0">No devices yet.</div>`;return;}
   list.innerHTML=devices.map(d=>`
     <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--bg);border:1px solid var(--border);border-radius:6px">
-      <span style="font-size:14px">💻</span>
+      <span style="font-size:14px"></span>
       <span style="flex:1;font-size:12.5px;font-weight:600">${d.name}</span>
       <button onclick="removeDeviceFromPanel(${d.id})" style="background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:15px;padding:0 4px">×</button>
     </div>`).join('');
@@ -3694,15 +3578,15 @@ function refreshDevMgmtList(){
 function addDeviceFromPanel(){
   const input=document.getElementById('devMgmtInput');
   const name=input.value.trim();
-  if(!name){showToast('⚠ Enter a device name');return;}
-  if(devices.find(d=>d.name.toLowerCase()===name.toLowerCase())){showToast('⚠ Device already exists');return;}
+  if(!name){showToast('Enter a device name');return;}
+  if(devices.find(d=>d.name.toLowerCase()===name.toLowerCase())){showToast('Device already exists');return;}
   devices.push({id:nextDeviceId++,name});
   input.value='';
   markDirty();refreshDevMgmtList();
   // Refresh device dropdown in shift modal if open
   const sel=document.getElementById('shiftDevice');
   if(sel)populateShiftDeviceSelect(parseInt(sel.value)||null);
-  showToast(`✓ ${name} added`);
+  showToast(` ${name} added`);
 }
 
 function removeDeviceFromPanel(id){
@@ -3743,7 +3627,7 @@ function getDeviceConflicts(){
 
 // ── SHARED FOLDER ─────────────────────────────────────────────────────────
 async function openSharedFolderSettings(){
-  if(!window.shiftops){showToast('⚠ Only available in the desktop app');return;}
+  if(!window.shiftops){showToast('Only available in the desktop app');return;}
   const res=await window.shiftops.getSharedFolder();
   const pathEl=document.getElementById('sharedFolderPath');
   const clearBtn=document.getElementById('sharedFolderClearBtn');
@@ -3766,12 +3650,12 @@ async function pickSharedFolder(){
   const migrate=confirm('Copy your current data to the shared folder?\n\nClick OK to bring your existing roster with you, or Cancel to start fresh in the shared folder.');
   const res=await window.shiftops.setSharedFolder(migrate);
   if(res.canceled)return;
-  if(!res.ok){showToast('⚠ Could not set folder: '+(res.error||''));return;}
+  if(!res.ok){showToast('Could not set folder: '+(res.error||''));return;}
   // Reload data from new location
   document.getElementById('sharedFolderPath').textContent=res.folder+'/shiftops-data.json';
   document.getElementById('sharedFolderPath').style.color='var(--accent)';
   document.getElementById('sharedFolderClearBtn').style.display='';
-  showToast('✓ Shared folder set — saving here from now on');
+  showToast('Shared folder set — saving here from now on');
   closeModal('sharedFolderModal');
   await loadData();renderAll();
 }
@@ -3779,7 +3663,7 @@ async function pickSharedFolder(){
 async function clearSharedFolder(){
   if(!window.shiftops)return;
   await window.shiftops.clearSharedFolder();
-  showToast('✓ Reverted to local storage');
+  showToast('Reverted to local storage');
   closeModal('sharedFolderModal');
 }
 
@@ -3790,7 +3674,7 @@ function openDeviceAllocation(){
 
   let html='';
   if(!devices.length){
-    html=`<div style="text-align:center;padding:24px;color:var(--text-dim);font-size:13px">No devices set up yet.<br><br>Use <strong>⚙️ Manage Devices</strong> in the sidebar to add devices first.</div>`;
+    html=`<div style="text-align:center;padding:24px;color:var(--text-dim);font-size:13px">No devices set up yet.<br><br>Use <strong>Manage Devices</strong>in the sidebar to add devices first.</div>`;
   } else {
     sortedStaff.forEach(s=>{
       let currentDevice='';
@@ -3870,8 +3754,8 @@ function applyDeviceAllocation(){
   const conflictCount=Object.keys(conflicts).length;
   closeModal('deviceAllocModal');
   markDirty();renderAll();
-  if(conflictCount>0)showToast(`💻 Devices applied · ⚠ ${conflictCount} day conflict${conflictCount>1?'s':''} detected`);
-  else showToast(`💻 Devices applied to ${applied} shift${applied!==1?'s':''}`);
+  if(conflictCount>0)showToast(` Devices applied ·  ${conflictCount} day conflict${conflictCount>1?'s':''} detected`);
+  else showToast(` Devices applied to ${applied} shift${applied!==1?'s':''}`);
 }
 
 // ── LEAVE REQUESTS ────────────────────────────────────────────────────────
@@ -4040,7 +3924,7 @@ function renderLeave(filterName){
       <div class="avatar lv-ava" style="background:${color}">${s?initials(s):name.slice(0,2).toUpperCase()}</div>
       <div class="lv-body">
         <div class="lv-name">${name}${isWeb?`<span class="lv-web">WEB</span>`:''}</div>
-        <div class="lv-dates">${fmtLeaveDate(r.from||r.from_date)} <span class="lv-arrow">→</span> ${fmtLeaveDate(r.to||r.to_date)} <span class="lv-days">${days} day${days!==1?'s':''}</span></div>
+        <div class="lv-dates">${fmtLeaveDate(r.from||r.from_date)} <span class="lv-arrow">-></span> ${fmtLeaveDate(r.to||r.to_date)} <span class="lv-days">${days} day${days!==1?'s':''}</span></div>
         ${r.reason?`<div class="lv-reason">"${r.reason}"</div>`:''}
       </div>
       <div class="lv-right">
@@ -4049,7 +3933,7 @@ function renderLeave(filterName){
           <button class="lv-btn lv-edit" onclick="openLeaveEdit(${r.id})">Edit</button>
           ${r.status!=='approved'?`<button class="lv-btn lv-approve" onclick="updateLeave(${r.id},'approved')">Approve</button>`:''}
           ${r.status!=='declined'?`<button class="lv-btn lv-decline" onclick="updateLeave(${r.id},'declined')">Decline</button>`:''}
-          <button class="lv-btn lv-del" onclick="deleteLeave(${r.id})">✕</button>
+          <button class="lv-btn lv-del" onclick="deleteLeave(${r.id})"></button>
         </div>`:''}
       </div>
     </div>`;
@@ -4067,7 +3951,7 @@ function renderLeave(filterName){
       <div style="font-family:var(--mono);font-size:9px;color:var(--text-dim);margin-top:3px">${leaveRequests.length} total · ${pending.length} pending</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center;">
-      <button class="btn btn-save" onclick="syncLeaveRequests()" style="font-size:11.5px">🔄 Sync from Staff</button>
+      <button class="btn btn-save" onclick="syncLeaveRequests()" style="font-size:11.5px">Sync from Staff</button>
       <button class="btn btn-primary" onclick="openLeaveModal()">+ Add Leave</button>
     </div>
   </div>
@@ -4076,7 +3960,7 @@ function renderLeave(filterName){
       <option value="">All Staff</option>
       ${staffNames.map(n=>`<option value="${n}"${n===activeFilter?' selected':''}>${n}</option>`).join('')}
     </select>
-    ${activeFilter?`<button onclick="renderLeave('')" style="font-size:11px;color:var(--warn);background:none;border:none;cursor:pointer;font-family:var(--sans);">✕ Clear filter</button>`:''}
+    ${activeFilter?`<button onclick="renderLeave('')" style="font-size:11px;color:var(--warn);background:none;border:none;cursor:pointer;font-family:var(--sans);">Clear filter</button>`:''}
   </div>`;
 
   if(pending.length){
@@ -4085,16 +3969,16 @@ function renderLeave(filterName){
     html+=`<div style="height:16px"></div>`;
   }
   if(approved.length){
-    html+=`<div class="lv-section-hd" style="color:#059669">✓ Approved (${approved.length})</div>`;
+    html+=`<div class="lv-section-hd" style="color:#059669">Approved (${approved.length})</div>`;
     approved.forEach(r=>html+=renderRow(r,true));
     html+=`<div style="height:16px"></div>`;
   }
   if(declined.length){
-    html+=`<div class="lv-section-hd" style="color:var(--warn)">✕ Declined (${declined.length})</div>`;
+    html+=`<div class="lv-section-hd" style="color:var(--warn)">Declined (${declined.length})</div>`;
     declined.forEach(r=>html+=renderRow(r,true));
   }
   if(!leaveRequests.length){
-    html+=`<div style="text-align:center;padding:48px 20px;color:var(--text-dim)"><div style="font-size:36px;margin-bottom:12px">🏖</div><div style="font-size:14px;font-weight:600">No leave requests yet</div><div style="font-size:12px;margin-top:6px;color:var(--muted)">Staff can submit requests via the web form, or click + Add Leave</div></div>`;
+    html+=`<div style="text-align:center;padding:48px 20px;color:var(--text-dim)"><div style="font-size:36px;margin-bottom:12px"></div><div style="font-size:14px;font-weight:600">No leave requests yet</div><div style="font-size:12px;margin-top:6px;color:var(--muted)">Staff can submit requests via the web form, or click + Add Leave</div></div>`;
   }
 
   el.innerHTML=html;
@@ -4120,13 +4004,13 @@ function openLeaveModal(){
 let editingLeaveId = null;
 
 function openLeaveEdit(id){
-  const r = leaveRequests.find(x => x.id === id);
+  const r = leaveRequests.find(x =>x.id === id);
   if(!r) return;
   editingLeaveId = id;
   document.getElementById('leaveModalTitle').textContent = 'Edit Leave';
   // Populate staff dropdown
   document.getElementById('leaveStaff').innerHTML = staff
-    .sort((a,b) => a.first.localeCompare(b.first))
+    .sort((a,b) =>a.first.localeCompare(b.first))
     .map(s => `<option value="${s.id}"${s.id===r.staffId?' selected':''}>${s.first} ${s.last}</option>`)
     .join('');
   document.getElementById('leaveFrom').value = r.from || r.from_date || '';
@@ -4143,14 +4027,14 @@ function openLeaveEdit(id){
 
 function saveLeaveEdit(){
   if(!editingLeaveId) return;
-  const r = leaveRequests.find(x => x.id === editingLeaveId);
+  const r = leaveRequests.find(x =>x.id === editingLeaveId);
   if(!r){ closeModal('leaveModal'); return; }
   const newStaffId = parseInt(document.getElementById('leaveStaff').value);
   const newFrom = document.getElementById('leaveFrom').value;
   const newTo = document.getElementById('leaveTo').value;
   const newReason = document.getElementById('leaveReason').value.trim();
-  if(!newFrom || !newTo){ showToast('⚠ Please select dates'); return; }
-  if(newFrom > newTo){ showToast('⚠ End date must be after start date'); return; }
+  if(!newFrom || !newTo){ showToast('Please select dates'); return; }
+  if(newFrom >newTo){ showToast('End date must be after start date'); return; }
 
   const oldStaffId = r.staffId;
   const oldFrom = r.from || r.from_date || '';
@@ -4159,7 +4043,7 @@ function saveLeaveEdit(){
 
   // If was approved, first REMOVE old LEAVE blocks
   if(wasApproved){
-    const oldStaff = staff.find(x => x.id === oldStaffId) ||
+    const oldStaff = staff.find(x =>x.id === oldStaffId) ||
                      staff.find(x => `${x.first} ${x.last}`.toLowerCase() === (r.staffName||'').toLowerCase());
     if(oldStaff && oldFrom && oldTo){
       if(typeof saveCurrentWeek === 'function') saveCurrentWeek();
@@ -4170,7 +4054,7 @@ function saveLeaveEdit(){
         const dow = cur.getDay();
         const di = dow === 0 ? 6 : dow - 1;
         if(shiftsStore[wk] && shiftsStore[wk][oldStaff.id] && shiftsStore[wk][oldStaff.id][di]){
-          shiftsStore[wk][oldStaff.id][di] = shiftsStore[wk][oldStaff.id][di].filter(sh => sh.type !== 'leave');
+          shiftsStore[wk][oldStaff.id][di] = shiftsStore[wk][oldStaff.id][di].filter(sh =>sh.type !== 'leave');
           if(!shiftsStore[wk][oldStaff.id][di].length) delete shiftsStore[wk][oldStaff.id][di];
         }
       }
@@ -4187,7 +4071,7 @@ function saveLeaveEdit(){
 
   // If was approved, re-add LEAVE blocks for new range
   if(wasApproved){
-    const newStaff = staff.find(x => x.id === newStaffId);
+    const newStaff = staff.find(x =>x.id === newStaffId);
     if(newStaff){
       const fromDate = new Date(newFrom+'T00:00:00');
       const toDate = new Date(newTo+'T00:00:00');
@@ -4212,7 +4096,7 @@ function saveLeaveEdit(){
       `${SUPABASE_URL}/rest/v1/leave_submissions?id=eq.${r.supabaseId}`,
       {method:'PATCH', headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`,'Content-Type':'application/json','Prefer':'return=minimal'},
        body: JSON.stringify({from_date: newFrom, to_date: newTo, reason: newReason})}
-    ).catch(e => console.warn('Supabase update failed:', e));
+    ).catch(e =>console.warn('Supabase update failed:', e));
   }
 
   // Reset modal back to "add" mode for next time
@@ -4227,7 +4111,7 @@ function saveLeaveEdit(){
   renderAll();
   renderLeave();
   if(typeof renderLeaveSummary === 'function') renderLeaveSummary();
-  showToast('✓ Leave updated');
+  showToast('Leave updated');
 }
 
 function saveLeaveRequest(){
@@ -4235,10 +4119,10 @@ function saveLeaveRequest(){
   const from=document.getElementById('leaveFrom').value;
   const to=document.getElementById('leaveTo').value;
   const reason=document.getElementById('leaveReason').value.trim();
-  if(!from||!to){showToast('⚠ Please select dates');return;}
-  if(from>to){showToast('⚠ End date must be after start date');return;}
+  if(!from||!to){showToast('Please select dates');return;}
+  if(from>to){showToast('End date must be after start date');return;}
   leaveRequests.push({id:nextLeaveId++,staffId,from,to,reason,status:'pending'});
-  closeModal('leaveModal');markDirty();renderLeave();showToast('✓ Leave request added');
+  closeModal('leaveModal');markDirty();renderLeave();showToast('Leave request added');
   // Sync to the shared leave_submissions table so it appears on the staff's own
   // portal record (Nexus reads this table). Admin-entered leave lands pre-approved.
   // Best-effort: a failure here never blocks the local ShiftOps save above.
@@ -4271,10 +4155,10 @@ function syncLeaveToPortal(staffId,from,to,reason){
     }).then(function(r){ return r.json().catch(function(){return {};}); })
       .then(function(res){
         if(!res || res.ok!==true){
-          showToast('⚠ Leave saved locally, portal sync failed'+(res&&res.error?(' ('+res.error+')'):''));
+          showToast('Leave saved locally, portal sync failed'+(res&&res.error?(' ('+res.error+')'):''));
         }
       }).catch(function(){
-        showToast('⚠ Leave saved locally, portal sync failed (offline)');
+        showToast('Leave saved locally, portal sync failed (offline)');
       });
   }catch(e){ /* never block the local save */ }
 }
@@ -4340,10 +4224,10 @@ function applyLeaveUpdate(id,status,declineReason){
       shiftsStore[wk][s.id][di]=[{start:'09:00',end:'17:00',type:'leave',role:'Leave'}];
     });
   } else if(status==='declined' && wasApproved){
-    // Was previously approved → now declined: REMOVE the LEAVE blocks
+    // Was previously approved ->now declined: REMOVE the LEAVE blocks
     walkLeaveDays(function(wk, di){
       if(!shiftsStore[wk] || !shiftsStore[wk][s.id] || !shiftsStore[wk][s.id][di]) return;
-      shiftsStore[wk][s.id][di] = shiftsStore[wk][s.id][di].filter(sh => sh.type !== 'leave');
+      shiftsStore[wk][s.id][di] = shiftsStore[wk][s.id][di].filter(sh =>sh.type !== 'leave');
       if(!shiftsStore[wk][s.id][di].length) delete shiftsStore[wk][s.id][di];
     });
   }
@@ -4377,7 +4261,7 @@ function applyLeaveUpdate(id,status,declineReason){
         headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`,'Content-Type':'application/json'},
         body:JSON.stringify({
           staff_name: staffName,
-          title: status==='approved' ? 'Leave approved ✓' : 'Leave declined',
+          title: status==='approved' ? 'Leave approved ' : 'Leave declined',
           body: msg,
           url: './#schedule',
           tag: 'leave-'+r.supabaseId
@@ -4390,7 +4274,7 @@ function applyLeaveUpdate(id,status,declineReason){
   renderAll();
   renderLeave();
   if(typeof renderLeaveSummary === 'function') renderLeaveSummary();
-  if(status==='approved') showToast('✓ Leave approved — roster updated');
+  if(status==='approved') showToast('Leave approved — roster updated');
   else if(status==='declined' && wasApproved) showToast('Leave declined — blocks removed from roster');
   else showToast('Leave declined');
 }
@@ -4418,7 +4302,7 @@ function deleteLeave(id){
         const dow = cur.getDay();
         const di = dow === 0 ? 6 : dow - 1;
         if(shiftsStore[wk][s.id][di]){
-          shiftsStore[wk][s.id][di] = shiftsStore[wk][s.id][di].filter(sh => sh.type !== 'leave');
+          shiftsStore[wk][s.id][di] = shiftsStore[wk][s.id][di].filter(sh =>sh.type !== 'leave');
           if(!shiftsStore[wk][s.id][di].length) delete shiftsStore[wk][s.id][di];
         }
       }
@@ -4436,7 +4320,7 @@ function deleteLeave(id){
 }
 
 async function syncLeaveRequests(){
-  showToast('🔄 Syncing leave requests…');
+  showToast('Syncing leave requests…');
   try{
     const res=await fetch(
       `${SUPABASE_URL}/rest/v1/leave_submissions?order=submitted_at.desc`,
@@ -4478,12 +4362,12 @@ async function syncLeaveRequests(){
 
     markDirty();renderLeave();
     const msg=added>0||updated>0
-      ?`✅ ${added} new · ${updated} updated`
+      ?` ${added} new · ${updated} updated`
       :'All leave requests up to date';
     showToast(msg);
     await saveData();
   }catch(e){
-    showToast('⚠ Sync failed: '+e.message);
+    showToast('Sync failed: '+e.message);
   }
 }
 
@@ -4570,7 +4454,7 @@ async function generateResetKey(){
       btn.textContent='Regenerate Key';
     } else throw new Error();
   }catch(e){
-    showToast('⚠ Failed to generate key');
+    showToast('Failed to generate key');
   }finally{
     btn.disabled=false;
   }
@@ -4578,7 +4462,7 @@ async function generateResetKey(){
 
 function copyResetKey(){
   const key=document.getElementById('resetKeyValue').textContent;
-  navigator.clipboard.writeText(key).then(()=>showToast('✓ Key copied to clipboard'));
+  navigator.clipboard.writeText(key).then(()=>showToast('Key copied to clipboard'));
 }
 
 async function doResetPassword(){
@@ -4612,7 +4496,7 @@ async function doResetPassword(){
     const j=await resp.json().catch(()=>({}));
     if(j&&j.ok){
       closeModal('resetPassModal');
-      showToast(`✅ Password set for ${name} — they'll set their own on first login`);
+      showToast(` Password set for ${name} — they'll set their own on first login`);
     } else {
       throw new Error((j&&j.error)||'Failed');
     }
@@ -4701,7 +4585,7 @@ async function renameStaffEverywhere(oldName, newName){
     const clash=await fetch(SUPABASE_URL+'/rest/v1/staff_credentials?staff_name=eq.'+encodeURIComponent(newName)+'&select=staff_name',{headers:H});
     const clashRows=clash.ok?await clash.json():[];
     if(clashRows.length){
-      showToast('⚠ "'+newName+'" already exists — not renaming to avoid a clash');
+      showToast('"'+newName+'" already exists — not renaming to avoid a clash');
       return;
     }
     // 1. staff_credentials: rename the row (keeps password, auth_uid, SQ, team, admin)
@@ -4735,10 +4619,10 @@ async function renameStaffEverywhere(oldName, newName){
       });
       const j=await resp.json().catch(()=>({}));
       if(!(j&&j.ok)){
-        showToast('⚠ Renamed, but auth email update failed: '+((j&&j.error)||'error')+'. Staff may need a password reset to log in.');
+        showToast('Renamed, but auth email update failed: '+((j&&j.error)||'error')+'. Staff may need a password reset to log in.');
       }
     }catch(e){
-      showToast('⚠ Renamed, but auth email update failed (network). Staff may need a password reset.');
+      showToast('Renamed, but auth email update failed (network). Staff may need a password reset.');
     }
   }catch(e){ console.warn('renameStaffEverywhere failed',e); }
 }
@@ -4766,8 +4650,7 @@ async function pushStaffNames(){
 
     // 2. Delete names that no longer exist
     const toDelete=existingNames.filter(n=>!currentNames.includes(n));
-    await Promise.all(toDelete.map(name=>
-      fetch(`${SUPABASE_URL}/rest/v1/staff_names?name=eq.${encodeURIComponent(name)}`,{
+    await Promise.all(toDelete.map(name=>fetch(`${SUPABASE_URL}/rest/v1/staff_names?name=eq.${encodeURIComponent(name)}`,{
         method:'DELETE',
         headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`}
       })
@@ -4798,7 +4681,7 @@ async function pushStaffNames(){
 }
 
 async function syncAvailability(){
-  showToast('🔄 Syncing availability…');
+  showToast('Syncing availability…');
   try {
     // Fetch persistent availability from staff_availability table
     const res=await fetch(
@@ -4837,12 +4720,12 @@ async function syncAvailability(){
     });
 
     markDirty();renderAvailability();renderRoster();
-    showToast(`✅ Synced availability for ${applied} staff member${applied!==1?'s':''}`);
+    showToast(` Synced availability for ${applied} staff member${applied!==1?'s':''}`);
     await saveData();
     // Refresh submitted view if open
     if(document.getElementById('availsec-submitted')&&document.getElementById('availsec-submitted').style.display!=='none'){loadSubmittedAvailability();}
   } catch(e){
-    showToast('⚠ Sync failed: '+e.message);
+    showToast('Sync failed: '+e.message);
   }
 }
 
@@ -4924,7 +4807,7 @@ function aaRender(filter){
     const on=sel.has(n);
     const row=document.createElement('div');
     row.style.cssText='display:flex;align-items:center;justify-content:space-between;padding:9px 12px;border-radius:9px;cursor:pointer;border:1px solid '+(on?'var(--accent)':'var(--border)')+';background:'+(on?'var(--accent-dim)':'transparent')+';';
-    row.innerHTML='<span style="font-size:13px;font-weight:'+(on?'600':'400')+';">'+n+'</span><span style="font-size:16px;">'+(on?'✅':'⬜')+'</span>';
+    row.innerHTML='<span style="font-size:13px;font-weight:'+(on?'600':'400')+';">'+n+'</span><span style="font-size:16px;">'+(on?'':'')+'</span>';
     row.onclick=()=>{ if(sel.has(n))sel.delete(n); else sel.add(n); aaRender(filter); };
     c.appendChild(row);
   });
@@ -4978,9 +4861,9 @@ async function aaSave(){
   }catch(e){ failed=-1; }
 
   if(failed>0){
-    showToast('⚠ Saved with '+failed+' error(s) — check staff_settings has a unique(name) constraint');
+    showToast('Saved with '+failed+' error(s) — check staff_settings has a unique(name) constraint');
   }else{
-    showToast('✅ Access & admin updated');
+    showToast('Access & admin updated');
   }
 
   // update originals to current so reopening reflects saved state (no false reverts)
