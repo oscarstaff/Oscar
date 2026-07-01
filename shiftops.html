@@ -2211,6 +2211,7 @@ function renderRoster(){
   const tb=document.getElementById('topbarWeek');
   if(tb){tb.textContent=wl;tb.style.display='';}
   updateStats();
+  try{ if(typeof applyTeamLeadLock==='function' && document.body.classList.contains('tl-readonly')) applyTeamLeadLock(); }catch(e){}
 }
 
 function clickCell(staffId,day){
@@ -2356,6 +2357,7 @@ function renderAvailability(){
   });
 
   grid.innerHTML=html;
+  try{ if(typeof applyTeamLeadLock==='function' && document.body.classList.contains('tl-readonly')) applyTeamLeadLock(); }catch(e){}
 }
 
 
@@ -2524,6 +2526,7 @@ function renderStaffList(){
     </div>`;
   });
   el.innerHTML=html;
+  try{ if(typeof applyTeamLeadLock==='function' && document.body.classList.contains('tl-readonly')) applyTeamLeadLock(); }catch(e){}
 }
 
 function toggleAvailEdit(id){
@@ -4816,10 +4819,11 @@ async function syncAvailability(){
     });
 
     markDirty();renderAvailability();renderRoster();
+    try{ applyTeamLeadLock(); }catch(e){}
     showToast(` Synced availability for ${applied} staff member${applied!==1?'s':''}`);
     await saveData();
     // Refresh submitted view if open
-    if(document.getElementById('availsec-submitted')&&document.getElementById('availsec-submitted').style.display!=='none'){loadSubmittedAvailability();}
+    if(document.getElementById('availsec-submitted')&&document.getElementById('availsec-submitted').style.display!=='none'){loadSubmittedAvailability().then(function(){ try{ applyTeamLeadLock(); }catch(e){} });}
   } catch(e){
     showToast('Sync failed: '+e.message);
   }
