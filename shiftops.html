@@ -1123,7 +1123,57 @@ body{ background:
 .sa-acc-admin .sa-acc-label{color:#b45309;}
 [data-theme="dark"] .sa-acc-row{background:#16222f;border-color:#243446;}
 [data-theme="dark"] .sa-acc-label{color:#dde8f5;}
-</style>
+/* ── TEAM-LEAD READ-ONLY MODE ── */
+/* Disable every edit control: buttons, inputs, toggles, add/remove, roster cells.
+   Leaves navigation (tabs, filters, sort) alone so they can still browse. */
+body.tl-readonly .btn:not(.sub-tab):not(.nav-item),
+body.tl-readonly button.btn-primary,
+body.tl-readonly button.btn-danger,
+body.tl-readonly .type-toggle,
+body.tl-readonly .role-pill,
+body.tl-readonly input[type="checkbox"],
+body.tl-readonly input[type="text"]:not(.tl-allow),
+body.tl-readonly input[type="date"]:not(.tl-allow),
+body.tl-readonly input[type="time"],
+body.tl-readonly input[type="number"],
+body.tl-readonly textarea,
+body.tl-readonly select:not(.tl-allow),
+body.tl-readonly .lv-btn,
+body.tl-readonly .staff-list-row .staff-actions,
+body.tl-readonly [onclick*="openLeaveModal"],
+body.tl-readonly [onclick*="openLeaveEdit"],
+body.tl-readonly [onclick*="deleteLeave"],
+body.tl-readonly [onclick*="clearWeek"],
+body.tl-readonly [onclick*="publishRoster"],
+body.tl-readonly [onclick*="openStaffModal"],
+body.tl-readonly [onclick*="openAddStaff"],
+body.tl-readonly [onclick*="saveStaff"],
+body.tl-readonly [onclick*="editShift"],
+body.tl-readonly [onclick*="addShift"],
+body.tl-readonly .roster-cell,
+body.tl-readonly .shift-block{
+  pointer-events:none !important;
+  opacity:.5 !important;
+  cursor:not-allowed !important;
+  filter:grayscale(.4);
+}
+/* Fully hide the most dangerous actions rather than just grey them */
+body.tl-readonly [onclick*="clearWeek"],
+body.tl-readonly [onclick*="publishRoster"],
+body.tl-readonly [onclick*="openAddStaff"],
+body.tl-readonly [onclick*="wipeRoster"]{
+  display:none !important;
+}
+/* Keep tabs/sub-tabs/filters usable so they can look around */
+body.tl-readonly .sub-tab,
+body.tl-readonly .nav-item,
+body.tl-readonly select.tl-allow{
+  pointer-events:auto !important;
+  opacity:1 !important;
+  filter:none !important;
+  cursor:pointer !important;
+}
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.4/dist/jspdf.plugin.autotable.min.js"></script>
@@ -1167,6 +1217,21 @@ body{ background:
       var r=await fetch(SB+'/rest/v1/app_access?app=eq.'+APP+'&staff_name=eq.'+encodeURIComponent(name)+'&select=staff_name',{headers:{apikey:KEY,Authorization:'Bearer '+KEY}});
       var rows=r.ok?await r.json():[];
       if(!rows.length){fail('You no longer have access to this app.');return;}
+      // Stash WHO is using ShiftOps (from the signed token) so the app can
+      // enforce the team-lead read-only role. Name is trusted (HMAC-verified).
+      try{ sessionStorage.setItem('so_me', name); }catch(e){}
+      // Resolve team-lead status: has shiftops access (proven above) AND is NOT
+      // a hub admin. Hub admins get full access; everyone else here is read-only.
+      try{
+        var ar=await fetch(SB+'/rest/v1/staff_settings?name=eq.'+encodeURIComponent(name)+'&select=is_hub_admin',{headers:{apikey:KEY,Authorization:'Bearer '+KEY}});
+        var arows=ar.ok?await ar.json():[];
+        var isHub=arows.length && arows[0].is_hub_admin===true;
+        sessionStorage.setItem('so_is_team_lead', isHub ? '0' : '1');
+        // resolve their team for the read-only filter
+        var dr=await fetch(SB+'/rest/v1/staff_directory?staff_name=eq.'+encodeURIComponent(name)+'&select=team',{headers:{apikey:KEY,Authorization:'Bearer '+KEY}});
+        var drows=dr.ok?await dr.json():[];
+        sessionStorage.setItem('so_my_team', (drows.length && drows[0].team) ? drows[0].team : '');
+      }catch(e){ sessionStorage.setItem('so_is_team_lead','0'); }
       // Capture Nexus' Supabase session so ShiftOps writes as an authenticated
       // user (RLS-locked tables reject the anon key). Stash for the tab session.
       try{
@@ -1672,6 +1737,32 @@ body{ background:
 // and the roster fell back to the cached/seed staff — which then wiped Nexus.
 const SUPABASE_URL='https://jcfgldqrdbfkgbixszds.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpjZmdsZHFyZGJma2diaXhzemRzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1Nzc3NzEsImV4cCI6MjA5MDE1Mzc3MX0.Wj8cCpnlsoZOPj5sKWeEdfvgjG4Nc-UuTTYgbcrPfeI';
+
+// ─────────── TEAM-LEAD READ-ONLY ROLE ───────────
+// Resolved by the gate (HMAC-verified). A team lead sees only their own team
+// and cannot edit anything. Hub admins are never team leads (full access).
+let AM_TEAM_LEAD = false;
+let MY_TEAM = '';
+try{
+  AM_TEAM_LEAD = sessionStorage.getItem('so_is_team_lead') === '1';
+  MY_TEAM = sessionStorage.getItem('so_my_team') || '';
+}catch(e){}
+
+function applyTeamLeadMode(){
+  if(!AM_TEAM_LEAD) return;
+  document.body.classList.add('tl-readonly');
+  // Badge in the header so it's obvious they're in read-only mode.
+  if(!document.getElementById('tlBanner')){
+    const b = document.createElement('div');
+    b.id = 'tlBanner';
+    b.style.cssText = 'position:fixed;bottom:14px;left:50%;transform:translateX(-50%);z-index:9998;background:#00e5a0;color:#04231a;font-size:12px;font-weight:700;padding:7px 16px;border-radius:20px;box-shadow:0 6px 20px -4px rgba(0,0,0,.3);font-family:var(--sans);pointer-events:none;';
+    b.textContent = '👁 Team Lead — read-only view of ' + (MY_TEAM || 'your team');
+    document.body.appendChild(b);
+  }
+}
+document.addEventListener('DOMContentLoaded', applyTeamLeadMode);
+// also run immediately in case DOM is already ready
+if(document.readyState !== 'loading') setTimeout(applyTeamLeadMode, 0);
 const GAS_EXEC_URL='https://script.google.com/macros/s/AKfycby0Bq97bCZAsmnruXFuJuCqXQE_kOxhYE2KFuJnVzLXtT5CV0Y12k5176dxZbdaYVGE/exec';
 const GAS_TOKEN='oscars_gas_83235a5f0c1f6ba32b18235e2b2d544ac137167d';
 
@@ -2092,7 +2183,7 @@ function renderRoster(){
   let html='<div class="grid-header"><div class="grid-col-head">STAFF</div>';
   for(let d=0;d<7;d++){const day=addDays(currentWeekStart,d);html+=`<div class="grid-col-head${isToday(day)?' today':''}">${DAYS[d]}<br><span style="font-size:9px;opacity:.6">${fmtDate(day)}</span></div>`;}
   html+='</div>';
-  const officeManager=staff.filter(s=>s.isOfficeManager||s.isManager==='office');
+  const officeManager = AM_TEAM_LEAD ? [] : staff.filter(s=>s.isOfficeManager||s.isManager==='office');
   if(officeManager.length>0){
     html+=`<div style="display:grid;grid-template-columns:155px repeat(7,1fr);background:rgba(255,215,0,.08);border-bottom:1px solid var(--border);"><div style="padding:6px 12px;font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#ffd700;border-right:1px solid var(--border)">&#9733; Office</div>${Array(7).fill(`<div style="border-right:1px solid var(--border)"></div>`).join('')}</div>`;
     officeManager.forEach(s=>{
@@ -2109,7 +2200,8 @@ function renderRoster(){
       html+='</div>';
     });
   }
-  const sortedTeams=[...new Set(staff.filter(s=>!s.isOfficeManager&&s.isManager!=='office').map(s=>s.team))].sort();
+  let sortedTeams=[...new Set(staff.filter(s=>!s.isOfficeManager&&s.isManager!=='office').map(s=>s.team))].sort();
+  if(AM_TEAM_LEAD) sortedTeams = sortedTeams.filter(function(t){ return t===MY_TEAM; });
   sortedTeams.forEach(team=>{
     const teamStaff=staff.filter(s=>s.team===team&&!s.isOfficeManager&&s.isManager!=='office');
     const ordered=teamStaff.sort((a,b)=>a.first.localeCompare(b.first)||a.last.localeCompare(b.last));
@@ -2340,6 +2432,11 @@ async function loadSubmittedAvailability(){
     let html='<div style="display:flex;flex-direction:column;gap:12px;">';
 
     rows.forEach(row=>{
+      // Team-lead read-only: only show your own team's availability.
+      if(AM_TEAM_LEAD){
+        const _st = staff.find(x=>`${x.first} ${x.last}`.toLowerCase()===String(row.staff_name||'').toLowerCase());
+        if(!_st || (_st.team||'') !== MY_TEAM) return;
+      }
       const av=row.availability||{};
       // Period label
       let period='Ongoing';
@@ -2434,7 +2531,7 @@ function renderStaffList(){
   const el=document.getElementById('staffList');
   const tl={full:'Full-time',part:'Part-time',casual:'Casual'},tb={full:'badge-full',part:'badge-part',casual:'badge-casual'};
   let html=`<div class="staff-list-header">
-    <div class="section-title">Staff Members (${staff.length})</div>
+    <div class="section-title">Staff Members (${AM_TEAM_LEAD ? staff.filter(function(s){return (s.team||'')===MY_TEAM;}).length + ' · ' + (MY_TEAM||'your team') : staff.length})</div>
     <div style="display:flex;align-items:center;gap:8px">
       <div style="display:flex;border:1px solid var(--border);border-radius:6px;overflow:hidden">
         <button onclick="setStaffSort('asc')" style="padding:5px 12px;font-size:11px;font-family:var(--mono);font-weight:600;cursor:pointer;border:none;transition:all .15s;background:${staffSortOrder==='asc'?'rgba(0,229,160,.15)':'transparent'};color:${staffSortOrder==='asc'?'var(--accent)':'var(--text-dim)'}">A → Z</button>
@@ -2444,7 +2541,10 @@ function renderStaffList(){
     </div>
   </div>
   <div class="staff-list-head"><div class="col-head">Name / Role</div><div class="col-head">Type</div><div class="col-head">Max Hrs</div><div class="col-head">Scheduled</div><div class="col-head">Utilisation</div><div class="col-head">Actions</div></div>`;
-  const sortedStaff=[...staff].sort((a,b)=>{
+  const _visibleStaff = AM_TEAM_LEAD
+    ? staff.filter(function(s){ return (s.team||'') === MY_TEAM; })
+    : staff;
+  const sortedStaff=[..._visibleStaff].sort((a,b)=>{
     const cmp=a.first.localeCompare(b.first)||a.last.localeCompare(b.last);
     return staffSortOrder==='asc'?cmp:-cmp;
   });
@@ -3015,7 +3115,8 @@ function openAutoAllocate(){
   }
 
   // Then team staff
-  const sortedTeams=[...new Set(staff.filter(s=>!s.isOfficeManager&&s.isManager!=='office').map(s=>s.team))].sort();
+  let sortedTeams=[...new Set(staff.filter(s=>!s.isOfficeManager&&s.isManager!=='office').map(s=>s.team))].sort();
+  if(AM_TEAM_LEAD) sortedTeams = sortedTeams.filter(function(t){ return t===MY_TEAM; });
   sortedTeams.forEach(team=>{
     const teamMembers=staff.filter(s=>s.team===team&&!s.isOfficeManager&&s.isManager!=='office').sort((a,b)=>a.first.localeCompare(b.first)||a.last.localeCompare(b.last));
     staffListHtml+=`<div style="font-family:var(--mono);font-size:8.5px;color:var(--accent);letter-spacing:1.5px;text-transform:uppercase;padding:4px 2px;margin-top:4px">${team}</div>`;
@@ -3248,7 +3349,8 @@ async function exportPDF(dayFilter=null){
   }
 
   // Assemble body rows: team banner rows + staff rows. Track styling per row/cell.
-  const sortedTeams=[...new Set(staff.map(s=>s.team))].sort();
+  let sortedTeams=[...new Set(staff.map(s=>s.team))].sort();
+  if(AM_TEAM_LEAD) sortedTeams = sortedTeams.filter(function(t){ return t===MY_TEAM; });
   const body=[];               // array of {cells:[...], banner?:team, leaveCols:[...], emptyCols:[...]}
   let totalHrs=0;
 
