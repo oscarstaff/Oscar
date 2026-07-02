@@ -1806,16 +1806,34 @@ async function loadData(){
     await loadStaffFromSupabase();
   }catch(e){console.warn('supabase staff load failed',e);}
 
-  // Now that staff + leaveRequests + normalized store are all loaded, self-heal
-  // stale leave staffIds and repaint every approved leave onto the correct grid
-  // (fixes leaves showing on the wrong person / not showing at all) — once, on load.
+  // Now that staff is loaded, rebuild leaveRequests from the DATABASE (the
+  // authoritative source) rather than trusting the blob, which can carry
+  // phantom leaves from old sessions. Then repaint approved leaves on the grid.
   try{
-    (leaveRequests||[]).forEach(function(r){
-      const m=_staffForLeave(r);
-      if(m) r.staffId=m.id;
-    });
+    const lr=await fetch(`${SUPABASE_URL}/rest/v1/leave_submissions?order=submitted_at.desc`,
+      {headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`}});
+    if(lr.ok){
+      const rows=await lr.json();
+      leaveRequests=(rows||[]).map(function(row){
+        const m=staff.find(function(x){return _normName(x.first+' '+x.last)===_normName(row.staff_name);});
+        return {
+          id:nextLeaveId++,
+          staffId:m?m.id:null,
+          staffName:row.staff_name,
+          staff_name:row.staff_name,
+          from:row.from_date, to:row.to_date,
+          reason:row.reason||'',
+          status:row.status||'pending',
+          declineReason:row.decline_reason||'',
+          supabaseId:row.id
+        };
+      });
+    }
     if(typeof repaintAllApprovedLeaves==='function') repaintAllApprovedLeaves();
-  }catch(e){ console.warn('leave repaint on load failed', e); }
+  }catch(e){ console.warn('leave load/repaint failed', e);
+    // fallback: at least self-heal whatever is in memory
+    try{ (leaveRequests||[]).forEach(function(r){ const m=_staffForLeave(r); if(m) r.staffId=m.id; }); if(typeof repaintAllApprovedLeaves==='function') repaintAllApprovedLeaves(); }catch(_){}
+  }
 }
 
 // Build the ShiftOps `staff` array from Nexus's Supabase tables:
@@ -4746,6 +4764,23 @@ async function syncLeaveRequests(){
       });
       added++;
     });
+
+    // RECONCILE: drop any local leave that no longer exists in the DB (deleted
+    // server-side) or that doesn't resolve to a current staff member. This is
+    // what removes phantom entries (e.g. a "Nidhi Subedi" row with no DB record)
+    // that were left behind by old buggy sessions.
+    const dbIds={};
+    rows.forEach(function(row){ dbIds[row.id]=true; });
+    const before=leaveRequests.length;
+    leaveRequests=leaveRequests.filter(function(r){
+      // keep unsynced local-only rows (no supabaseId) only if they resolve to a real staffer
+      if(!r.supabaseId){ return !!_staffForLeave(r); }
+      // drop synced rows whose DB record is gone
+      if(!dbIds[r.supabaseId]) return false;
+      // drop rows that don't match any current staff by name
+      return !!_staffForLeave(r);
+    });
+    const removed=before-leaveRequests.length;
 
     // Self-heal: re-resolve staffId from the authoritative name for ALL leave
     // rows (fixes stale/colliding ids that painted leaves on the wrong person),
