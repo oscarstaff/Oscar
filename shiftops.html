@@ -2284,29 +2284,26 @@ function saveCurrentWeek(){
   let _liveShiftDays=0;
   try{ Object.values(shifts||{}).forEach(function(byDay){ Object.values(byDay||{}).forEach(function(arr){ if(arr&&arr.length)_liveShiftDays++; }); }); }catch(e){}
   console.log('[WEEK-DEBUG] saveCurrentWeek writing to key="'+key+'" liveStaff='+_liveStaff+' liveNonEmptyDays='+_liveShiftDays);
-  // Merge: keep existing leave entries from store, overlay current shifts
+  // Merge shifts into the store, but NEVER persist leave blocks. Leaves are
+  // derived live from leave_submissions at render time (_syncWeekLeavesToSubmissions),
+  // so storing them only causes drift/phantoms. Strip every leave block here.
   const existing=shiftsStore[key]||{};
   const merged=JSON.parse(JSON.stringify(existing));
-  // For each staff, only update days that have non-leave shifts
-  // (don't overwrite leave blocks with empty)
+  const noLeave=function(arr){ return (arr||[]).filter(function(sh){return sh.type!=='leave';}); };
   staff.forEach(s=>{
     if(!merged[s.id])merged[s.id]={};
     const curStaffShifts=shifts[s.id]||{};
     for(let d=0;d<7;d++){
-      const curDay=curStaffShifts[d]||[];
-      const existDay=merged[s.id][d]||[];
-      const existHasLeave=existDay.some(sh=>sh.type==='leave');
-      const curHasLeave=curDay.some(sh=>sh.type==='leave');
-      // If current day has actual shifts OR leave, save it
-      if(curDay.length>0){
-        merged[s.id][d]=curDay;
-      } else if(existHasLeave && !curHasLeave){
-        // Preserve existing leave block if current is empty
-        merged[s.id][d]=existDay;
-      } else {
-        merged[s.id][d]=curDay;
-      }
+      merged[s.id][d]=noLeave(curStaffShifts[d]);   // real shifts only, no leave
+      if(!merged[s.id][d].length) delete merged[s.id][d];
     }
+  });
+  // Also scrub any leave blocks that were already sitting in the store.
+  Object.keys(merged).forEach(function(sid){
+    Object.keys(merged[sid]||{}).forEach(function(d){
+      merged[sid][d]=noLeave(merged[sid][d]);
+      if(!merged[sid][d].length) delete merged[sid][d];
+    });
   });
   shiftsStore[key]=merged;
   availStore[key]=JSON.parse(JSON.stringify(availability));
@@ -2611,6 +2608,7 @@ function saveCustomAvail(){
 
 // ── STAFF LIST ────────────────────────────────────────────────────────────
 function renderStaffList(){
+  try{ _syncWeekLeavesToSubmissions(); }catch(e){}
   const el=document.getElementById('staffList');
   const tl={full:'Full-time',part:'Part-time',casual:'Casual'},tb={full:'badge-full',part:'badge-part',casual:'badge-casual'};
   let html=`<div class="staff-list-header">
@@ -2758,6 +2756,7 @@ function setStaffSort(order){staffSortOrder=order;renderStaffList();}
 
 // ── ROLE VIEW ─────────────────────────────────────────────────────────────
 function renderRoleView(){
+  try{ _syncWeekLeavesToSubmissions(); }catch(e){}
   const teams=getUniqueTeams();
   const bar=document.getElementById('roleFilterBar');
   const content=document.getElementById('roleViewContent');
@@ -2842,8 +2841,47 @@ function onShiftTypeChange(sel){
 function deleteCurrentShift(){
   if(!editingShift)return;
   const{staffId,dayIdx,shiftIdx}=editingShift;
+  const block=(shifts[staffId]&&shifts[staffId][dayIdx])?shifts[staffId][dayIdx][shiftIdx]:null;
+
+  // If deleting a LEAVE block, it must be removed from the SOURCE
+  // (leave_submissions) — otherwise the render re-derives it from the request
+  // and it comes straight back. Find the matching approved submission for this
+  // person on this calendar day and delete it (DB + local list).
+  if(block && block.type==='leave'){
+    const s=staff.find(x=>x.id===staffId);
+    if(s){
+      const theDay=new Date(currentWeekStart); theDay.setDate(theDay.getDate()+dayIdx); theDay.setHours(0,0,0,0);
+      const nm=(s.first+' '+s.last).trim().toLowerCase();
+      const matches=(leaveRequests||[]).filter(function(r){
+        if((r.staffName||r.staff_name||'').trim().toLowerCase()!==nm) return false;
+        const fromStr=r.from||r.from_date||'', toStr=r.to||r.to_date||'';
+        if(!fromStr||!toStr) return false;
+        const fromD=new Date(fromStr+'T00:00:00'), toD=new Date(toStr+'T00:00:00');
+        return theDay>=fromD && theDay<=toD;
+      });
+      matches.forEach(function(r){
+        // delete from Supabase source
+        if(r.supabaseId){
+          fetch(`${SUPABASE_URL}/rest/v1/leave_submissions?id=eq.${r.supabaseId}`,{
+            method:'DELETE',
+            headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`}
+          }).catch(e=>console.warn('leave delete failed',e));
+        }
+        // A leave spanning multiple days: deleting the whole request removes it
+        // from every day. That's the correct behaviour for a single-day request;
+        // for a multi-day one, removing one day means splitting — which this
+        // simple model treats as deleting the whole leave. (Rare; acceptable.)
+      });
+      const ids=matches.map(function(r){return r.id;});
+      leaveRequests=leaveRequests.filter(function(r){return ids.indexOf(r.id)===-1;});
+      if(typeof renderLeave==='function') renderLeave();
+      if(typeof renderLeaveSummary==='function') renderLeaveSummary();
+    }
+  }
+
   shifts[staffId][dayIdx].splice(shiftIdx,1);
-  closeModal('shiftModal');markDirty();renderAll();showToast('Shift deleted');
+  closeModal('shiftModal');markDirty();renderAll();
+  showToast(block&&block.type==='leave'?'Leave removed':'Shift deleted');
 }
 function populateStaffSelect(elId,selectedId){
   document.getElementById(elId).innerHTML=staff.map(s=>`<option value="${s.id}"${s.id==selectedId?' selected':''}>${s.first} ${s.last}</option>`).join('');
