@@ -2168,6 +2168,11 @@ function closeToolsMenuOutside(e){ if(!e.target.closest('.tools-dropdown'))close
 
 function renderRoster(){
   const grid=document.getElementById('rosterGrid');
+  // GUARD: strip any leave block in the current week that has no matching
+  // approved leave_submission for that person+date. Prevents phantom leaves
+  // (from stale sessions or old bad paints) from ever displaying, regardless
+  // of how they got into the store. Self-corrects on every render.
+  try{ _stripPhantomLeaves(); }catch(e){}
   let html='<div class="grid-header"><div class="grid-col-head">STAFF</div>';
   for(let d=0;d<7;d++){const day=addDays(currentWeekStart,d);html+=`<div class="grid-col-head${isToday(day)?' today':''}">${DAYS[d]}<br><span style="font-size:9px;opacity:.6">${fmtDate(day)}</span></div>`;}
   html+='</div>';
@@ -4424,6 +4429,41 @@ function confirmDecline(){
 // Paint EVERY approved leave onto the correct person's roster grid, keyed by the
 // authoritative staff name. Also clears stray leave blocks so a previously
 // mis-attributed leave (wrong person) is corrected. Safe to run repeatedly.
+// Remove leave blocks in the CURRENT week (shifts) that don't correspond to an
+// approved leave_submission for that staffer+date. Kills phantoms on render.
+function _stripPhantomLeaves(){
+  if(typeof shifts!=='object'||!shifts) return;
+  // Build a set of "staffId|dayIndex" that SHOULD have leave this week.
+  const validSet={};
+  const weekStart = (typeof currentWeekStart!=='undefined') ? new Date(currentWeekStart) : null;
+  if(!weekStart) return;
+  (leaveRequests||[]).forEach(function(r){
+    if((r.status||'')!=='approved') return;
+    const nm=(r.staffName||r.staff_name||'').trim();
+    const s=(nm ? staff.find(x=>`${x.first} ${x.last}`.trim().toLowerCase()===nm.toLowerCase()) : null) ||
+            (r.staffId!=null ? staff.find(x=>x.id===r.staffId) : null);
+    if(!s) return;
+    const fromStr=r.from||r.from_date||'', toStr=r.to||r.to_date||'';
+    if(!fromStr||!toStr) return;
+    const fromD=new Date(fromStr+'T00:00:00'), toD=new Date(toStr+'T00:00:00');
+    for(let di=0; di<7; di++){
+      const day=new Date(weekStart); day.setDate(day.getDate()+di); day.setHours(0,0,0,0);
+      if(day>=fromD && day<=toD) validSet[s.id+'|'+di]=true;
+    }
+  });
+  // Strip leave blocks not in the valid set.
+  Object.keys(shifts).forEach(function(sid){
+    const byDay=shifts[sid]; if(!byDay) return;
+    Object.keys(byDay).forEach(function(di){
+      if(!Array.isArray(byDay[di])) return;
+      byDay[di]=byDay[di].filter(function(sh){
+        if(sh.type!=='leave') return true;         // keep real shifts
+        return !!validSet[sid+'|'+di];             // keep leave only if it matches a submission
+      });
+      if(!byDay[di].length) delete byDay[di];
+    });
+  });
+}
 function repaintAllApprovedLeaves(){
   if(typeof saveCurrentWeek === 'function') saveCurrentWeek();
 
