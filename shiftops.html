@@ -4102,8 +4102,19 @@ function renderLeave(filterName){
   const fmtLeaveDate=d=>new Date(d).toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'});
 
   const renderRow=(r,showActions)=>{
-    const s=staff.find(x=>x.id===r.staffId);
-    const name=s?`${s.first} ${s.last}`:(r.staffName||'Unknown');
+    // Resolve the staffer by NAME first — leave rows from the web form carry the
+    // authoritative staff_name (snake_case) from Supabase, while staffId can be
+    // missing or stale and collide with the wrong person's id. Fall back to
+    // staffId only for legacy local rows that predate the web form.
+    const rName=(r.staff_name||r.staffName||'').trim();
+    let s=null;
+    if(rName){
+      s=staff.find(x=>`${x.first} ${x.last}`.trim().toLowerCase()===rName.toLowerCase());
+    }
+    if(!s && r.staffId!=null){
+      s=staff.find(x=>x.id===r.staffId);
+    }
+    const name=rName||(s?`${s.first} ${s.last}`:'Unknown');
     const color=s?s.color:'#666';
     const days=countLeaveDays(r.from||r.from_date||'',(r.to||r.to_date||''),(r.staffId||null));
     const isWeb=!!r.supabaseId; // came from web form

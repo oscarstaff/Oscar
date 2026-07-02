@@ -14579,11 +14579,21 @@ async function toggleClock(){
   // only an accidental in→in or out→out double-fire is blocked.
   const _now = Date.now();
   const _nextAction = (_clockState === 'in') ? 'out' : 'in';
+  // HARD LOCKOUT: ignore ANY punch within 8s of the last one, regardless of
+  // action. This kills the rapid in→out→in triple-fire (observed: 3 events in
+  // 8 seconds) that produced phantom out-before-in / 2-second-shift rows. A real
+  // clock-in and clock-out are always minutes apart, never seconds, so this
+  // never blocks a legitimate punch.
+  if(window._lastClockAnyToggle && (_now - window._lastClockAnyToggle) < 8000){
+    console.warn('[clock] hard lockout — punch ignored (', _now - window._lastClockAnyToggle, 'ms since last)');
+    return;
+  }
   if(window._lastClockToggle && window._lastClockAction === _nextAction
      && (_now - window._lastClockToggle) < 4000){
     console.warn('[clock] ignored rapid duplicate', _nextAction, '(', _now - window._lastClockToggle, 'ms)');
     return;
   }
+  window._lastClockAnyToggle = _now;
   window._lastClockToggle = _now;
   window._lastClockAction = _nextAction;
   const next = (_clockState === 'in') ? 'out' : 'in';
@@ -14603,6 +14613,32 @@ async function toggleClock(){
   }
   // Ask for confirmation before clocking OUT — prevents accidental taps.
   if(next === 'out'){
+    // GUARD: never fire a clock-OUT unless the source of truth confirms the
+    // person is actually clocked in (last punch is an 'in'). If local state is
+    // a stale 'in' (e.g. cached from a prior day, or a desync), tapping would
+    // otherwise write a phantom 'out' — the out-before-in rows that corrupt the
+    // timesheet. Verify first; if not actually in, correct state and abort.
+    try{
+      const last = await sbGet('clock_log','?staff_name=eq.'+encodeURIComponent(me)+'&order=ts.desc&limit=1');
+      if(last && last.length && last[0].action === 'out'){
+        // Not actually clocked in — state was stale. Fix the UI, write nothing.
+        _clockState = 'out';
+        try{ localStorage.setItem('clock_state_'+me, JSON.stringify({state:'out', ts:last[0].ts})); }catch(e){}
+        renderClockCard();
+        showToast("You're already clocked out");
+        window._lastClockToggle = 0;
+        return;
+      }
+      if(last && (!last.length)){
+        // No punches at all — can't clock out. Correct state, abort.
+        _clockState = 'out';
+        renderClockCard();
+        showToast("You're not clocked in");
+        window._lastClockToggle = 0;
+        return;
+      }
+    }catch(e){ /* network blip — fall through, don't hard-block a genuine clock-out */ }
+
     const ok = await clockOutConfirm();
     if(!ok){
       // user cancelled — reset debounce so they can act again immediately
