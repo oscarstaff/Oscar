@@ -1805,6 +1805,19 @@ async function loadData(){
   try{
     await loadStaffFromSupabase();
   }catch(e){console.warn('supabase staff load failed',e);}
+
+  // Now that staff + leaveRequests + normalized store are all loaded, self-heal
+  // stale leave staffIds and repaint every approved leave onto the correct grid
+  // (fixes leaves showing on the wrong person / not showing at all) — once, on load.
+  try{
+    (leaveRequests||[]).forEach(function(r){
+      const nm=(r.staffName||r.staff_name||'').trim();
+      if(!nm) return;
+      const m=staff.find(function(x){return (x.first+' '+x.last).trim().toLowerCase()===nm.toLowerCase();});
+      if(m) r.staffId=m.id;
+    });
+    if(typeof repaintAllApprovedLeaves==='function') repaintAllApprovedLeaves();
+  }catch(e){ console.warn('leave repaint on load failed', e); }
 }
 
 // Build the ShiftOps `staff` array from Nexus's Supabase tables:
@@ -2313,16 +2326,39 @@ function _normalizeStoreKeys(){
   ['shiftsStore','availStore'].forEach(function(storeName){
     const store=(storeName==='shiftsStore')?shiftsStore:availStore;
     if(!store || typeof store!=='object') return;
-    const remap={};
     Object.keys(store).forEach(function(k){
       const canon=_canonicalWeekKey(k);
-      if(canon!==k){
-        // merge into canonical (prefer existing canonical if present, else move)
-        if(!store[canon]) remap[canon]=store[k];
-        delete store[k];
+      if(canon===k) return;
+      if(!store[canon]){
+        // No canonical version yet — just move it.
+        store[canon]=store[k];
+      }else{
+        // BOTH formats exist for the same week — DEEP MERGE so no data is lost.
+        // Merge per-staff, per-day; keep any day that has data, prefer the
+        // version that actually has shifts/leave for that day.
+        const dst=store[canon], src=store[k];
+        Object.keys(src||{}).forEach(function(sid){
+          if(!dst[sid]){ dst[sid]=src[sid]; return; }
+          Object.keys(src[sid]||{}).forEach(function(di){
+            const srcDay=src[sid][di];
+            const dstDay=dst[sid][di];
+            const srcHas=Array.isArray(srcDay)&&srcDay.length;
+            const dstHas=Array.isArray(dstDay)&&dstDay.length;
+            if(srcHas && !dstHas){ dst[sid][di]=srcDay; }
+            else if(srcHas && dstHas){
+              // union, de-duped by start+end+type
+              const seen={}; const merged=[];
+              dstDay.concat(srcDay).forEach(function(sh){
+                const key=(sh.type||'')+'|'+(sh.start||'')+'|'+(sh.end||'');
+                if(!seen[key]){ seen[key]=1; merged.push(sh); }
+              });
+              dst[sid][di]=merged;
+            }
+          });
+        });
       }
+      delete store[k];
     });
-    Object.keys(remap).forEach(function(k){ store[k]=remap[k]; });
   });
 }
 // Resolve a week key against shiftsStore tolerating month-format drift.// Legacy data mixed "29 Jun" (short) and "29 June" (long) — match either.
