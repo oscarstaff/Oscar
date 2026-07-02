@@ -3416,6 +3416,10 @@ function doExportPDF(){
 }
 
 async function exportPDF(dayFilter=null){
+  // Ensure the PDF reflects leaves derived from leave_submissions (same as the
+  // on-screen grid) — not stale in-memory blocks. Without this the export can
+  // show phantom leaves for people who have no request.
+  try{ _syncWeekLeavesToSubmissions(); }catch(e){}
   const isSingleDay=dayFilter!==null;
   const singleDayName=isSingleDay?DAYS_FULL[dayFilter]:'';
   const singleDate=isSingleDay?fmtDate(addDays(currentWeekStart,dayFilter)):'';
@@ -4479,11 +4483,11 @@ function _syncWeekLeavesToSubmissions(){
   // valid[staffId][dayIndex] = true  when that person has an approved leave that day
   const valid={};
   (leaveRequests||[]).forEach(function(r){
-    if((r.status||'')!=='approved') return;
-    const nm=(r.staffName||r.staff_name||'').trim();
-    const s=(nm ? staff.find(x=>`${x.first} ${x.last}`.trim().toLowerCase()===nm.toLowerCase()) : null) ||
-            (r.staffId!=null ? staff.find(x=>x.id===r.staffId) : null);
-    if(!s) return;
+    if((r.status||'')!=='approved') return;           // only approved
+    const nm=(r.staff_name||r.staffName||'').trim();
+    if(!nm) return;                                    // no authoritative name → skip
+    const s=staff.find(x=>`${x.first} ${x.last}`.trim().toLowerCase()===nm.toLowerCase());
+    if(!s) return;                                     // name not on staff list → skip (no staffId fallback)
     const fromStr=r.from||r.from_date||'', toStr=r.to||r.to_date||'';
     if(!fromStr||!toStr) return;
     const fromD=new Date(fromStr+'T00:00:00'), toD=new Date(toStr+'T00:00:00');
@@ -4536,13 +4540,13 @@ function repaintAllApprovedLeaves(){
     });
   });
 
-  // 2. Re-paint each approved leave onto its correct staffer, by name.
+  // 2. Re-paint each approved leave onto its correct staffer, strictly by name.
   (leaveRequests||[]).forEach(function(r){
     if((r.status||'')!=='approved') return;
-    const nm=(r.staffName||r.staff_name||'').trim();
-    const s=(nm ? staff.find(x=>`${x.first} ${x.last}`.trim().toLowerCase()===nm.toLowerCase()) : null) ||
-            (r.staffId!=null ? staff.find(x=>x.id===r.staffId) : null);
-    if(!s) return;
+    const nm=(r.staff_name||r.staffName||'').trim();
+    if(!nm) return;                                    // no name → skip
+    const s=staff.find(x=>`${x.first} ${x.last}`.trim().toLowerCase()===nm.toLowerCase());
+    if(!s) return;                                     // not on staff list → skip (no staffId fallback)
     const fromStr=r.from||r.from_date||'', toStr=r.to||r.to_date||'';
     if(!fromStr||!toStr) return;
     const fromDate=new Date(fromStr+'T00:00:00'), toDate=new Date(toStr+'T00:00:00');
@@ -4573,11 +4577,10 @@ function applyLeaveUpdate(id,status,declineReason){
   r.status=status;
   if(declineReason)r.declineReason=declineReason;
 
-  // Resolve by NAME first (authoritative) — staffId can be stale/colliding and
-  // paint the leave onto the WRONG person's grid (e.g. Sachin's leave on Roshana).
-  const rNm=(r.staffName||r.staff_name||'').trim();
-  const s=(rNm ? staff.find(x=>`${x.first} ${x.last}`.trim().toLowerCase()===rNm.toLowerCase()) : null) ||
-          (r.staffId!=null ? staff.find(x=>x.id===r.staffId) : null);
+  // Resolve strictly by NAME — staffId can be stale/colliding and paint the
+  // leave onto the WRONG person's grid (e.g. Sachin's leave on Roshana).
+  const rNm=(r.staff_name||r.staffName||'').trim();
+  const s=rNm ? staff.find(x=>`${x.first} ${x.last}`.trim().toLowerCase()===rNm.toLowerCase()) : null;
   const fromStr=r.from||r.from_date||'';
   const toStr=r.to||r.to_date||'';
 
