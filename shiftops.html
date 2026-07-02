@@ -3148,24 +3148,9 @@ async function addStaffToSupabase(fullName, team){
   }catch(e){ console.warn('addStaffToSupabase failed', e); }
 }
 
-// Single-team model: mirror the staffer's ONE primary team into staff_teams.
-// (Multi-team "Also on teams" removed — this can no longer create extra rows.)
-async function saveStaffTeams(fullName, primaryTeam){
-  if(!fullName) return;
-  const H={apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY};
-  const HJ={...H,'Content-Type':'application/json'};
-  try{
-    // delete this person's existing memberships, then insert the single primary team.
-    await fetch(SUPABASE_URL+'/rest/v1/staff_teams?staff_name=eq.'+encodeURIComponent(fullName),
-      {method:'DELETE',headers:H});
-    if(primaryTeam){
-      await fetch(SUPABASE_URL+'/rest/v1/staff_teams',{
-        method:'POST',headers:{...HJ,'Prefer':'return=minimal'},
-        body:JSON.stringify([{staff_name:fullName,team:primaryTeam}])
-      });
-    }
-  }catch(e){ console.warn('saveStaffTeams', e); }
-}
+// staff_teams retired — a staffer's team lives in staff_directory/staff_credentials
+// (written elsewhere). This is now a no-op kept so existing call sites don't break.
+async function saveStaffTeams(fullName, primaryTeam){ /* no-op: staff_teams retired */ }
 
 function removeStaff(id){
   const s=staff.find(x=>x.id===id);
@@ -3683,11 +3668,6 @@ function removeTeam(name){
   const count=staff.filter(s=>s.team===name).length;
   if(count>0){showToast(` Reassign ${count} staff before removing "${name}"`);return;}
   teams=teams.filter(t=>t!==name);
-  // Also drop any SECONDARY memberships of this team from staff_teams.
-  try{
-    fetch(SUPABASE_URL+'/rest/v1/staff_teams?team=eq.'+encodeURIComponent(name),
-      {method:'DELETE',headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY}}).catch(function(){});
-  }catch(e){}
   markDirty();renderTeams();showToast(`Team "${name}" removed`);
 }
 
@@ -3701,14 +3681,6 @@ function renameTeam(oldName,newName){
   // Without this the old team resurrects on refresh.
   try{
     fetch(SUPABASE_URL+'/rest/v1/staff_directory?team=eq.'+encodeURIComponent(oldName),{
-      method:'PATCH',
-      headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
-      body:JSON.stringify({team:newName})
-    }).catch(function(){});
-  }catch(e){}
-  // Carry the rename into staff_teams (secondary memberships) too.
-  try{
-    fetch(SUPABASE_URL+'/rest/v1/staff_teams?team=eq.'+encodeURIComponent(oldName),{
       method:'PATCH',
       headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
       body:JSON.stringify({team:newName})
@@ -5036,10 +5008,7 @@ async function renameStaffEverywhere(oldName, newName){
     await fetch(SUPABASE_URL+'/rest/v1/clock_overrides?staff_name=eq.'+encodeURIComponent(oldName),{
       method:'PATCH', headers:H, body:JSON.stringify({staff_name:newName})
     }).catch(function(){});
-    // 2c. staff_teams: rename membership rows so multi-team data follows the person.
-    await fetch(SUPABASE_URL+'/rest/v1/staff_teams?staff_name=eq.'+encodeURIComponent(oldName),{
-      method:'PATCH', headers:H, body:JSON.stringify({staff_name:newName})
-    }).catch(function(){});
+    // (staff_teams retired — team follows the person via staff_directory/credentials)
     // 3. Update the auth account's email (firstname.lastname@oscars.local) + metadata
     //    to match the new name — otherwise login (which builds the email from the
     //    name) would break after a rename.

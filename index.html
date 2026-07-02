@@ -6880,13 +6880,10 @@ async function loadDocuments(){
         myTeam = (creds.length && creds[0] && creds[0].team) ? creds[0].team : '';
       }catch(e){ myTeam = ''; }
     }
-    // Load ALL my teams from staff_teams (multi-team). Falls back to the single
-    // team if the table isn't there yet. window.myTeams is used by channels.
+    // Single-team model: derive myTeams from the authoritative credentials team
+    // (staff_teams retired). window.myTeams is used by channels.
     if(!window.myTeams){
-      try{
-        const tt = await sbGet('staff_teams','?staff_name=eq.'+encodeURIComponent(me)+'&select=team');
-        window.myTeams = (tt && tt.length) ? tt.map(function(r){return r.team;}) : (myTeam ? [myTeam] : []);
-      }catch(e){ window.myTeams = myTeam ? [myTeam] : []; }
+      window.myTeams = myTeam ? [myTeam] : [];
     }
     if(sub) sub.textContent = myTeam ? 'Documents for ' + myTeam + ' team' : 'All documents';
 
