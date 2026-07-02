@@ -1811,9 +1811,7 @@ async function loadData(){
   // (fixes leaves showing on the wrong person / not showing at all) — once, on load.
   try{
     (leaveRequests||[]).forEach(function(r){
-      const nm=(r.staffName||r.staff_name||'').trim();
-      if(!nm) return;
-      const m=staff.find(function(x){return (x.first+' '+x.last).trim().toLowerCase()===nm.toLowerCase();});
+      const m=_staffForLeave(r);
       if(m) r.staffId=m.id;
     });
     if(typeof repaintAllApprovedLeaves==='function') repaintAllApprovedLeaves();
@@ -4470,6 +4468,17 @@ function confirmDecline(){
 // Paint EVERY approved leave onto the correct person's roster grid, keyed by the
 // authoritative staff name. Also clears stray leave blocks so a previously
 // mis-attributed leave (wrong person) is corrected. Safe to run repeatedly.
+// Normalize a person's name for reliable matching: trim, lowercase, collapse
+// any run of whitespace to a single space. Handles double-spaces / trailing
+// whitespace / inconsistent spacing between the two data sources.
+function _normName(v){ return String(v||'').trim().toLowerCase().replace(/\s+/g,' '); }
+// Find the staff record for a leave request STRICTLY by normalized name.
+// Returns null (never a guess) if there's no name or no exact normalized match.
+function _staffForLeave(r){
+  const nm=_normName(r.staff_name||r.staffName||'');
+  if(!nm) return null;
+  return staff.find(function(x){ return _normName(x.first+' '+x.last)===nm; }) || null;
+}
 // Make the CURRENT week's leave blocks exactly match approved leave_submissions:
 // remove any leave that has no matching submission, and add any approved leave
 // that's missing — all matched by staff NAME (authoritative). Called on every
@@ -4484,10 +4493,8 @@ function _syncWeekLeavesToSubmissions(){
   const valid={};
   (leaveRequests||[]).forEach(function(r){
     if((r.status||'')!=='approved') return;           // only approved
-    const nm=(r.staff_name||r.staffName||'').trim();
-    if(!nm) return;                                    // no authoritative name → skip
-    const s=staff.find(x=>`${x.first} ${x.last}`.trim().toLowerCase()===nm.toLowerCase());
-    if(!s) return;                                     // name not on staff list → skip (no staffId fallback)
+    const s=_staffForLeave(r);                         // strict normalized-name match
+    if(!s) return;                                     // no name / no match → skip (no staffId fallback)
     const fromStr=r.from||r.from_date||'', toStr=r.to||r.to_date||'';
     if(!fromStr||!toStr) return;
     const fromD=new Date(fromStr+'T00:00:00'), toD=new Date(toStr+'T00:00:00');
@@ -4543,10 +4550,8 @@ function repaintAllApprovedLeaves(){
   // 2. Re-paint each approved leave onto its correct staffer, strictly by name.
   (leaveRequests||[]).forEach(function(r){
     if((r.status||'')!=='approved') return;
-    const nm=(r.staff_name||r.staffName||'').trim();
-    if(!nm) return;                                    // no name → skip
-    const s=staff.find(x=>`${x.first} ${x.last}`.trim().toLowerCase()===nm.toLowerCase());
-    if(!s) return;                                     // not on staff list → skip (no staffId fallback)
+    const s=_staffForLeave(r);
+    if(!s) return;                                     // no name / no match → skip (no staffId fallback)
     const fromStr=r.from||r.from_date||'', toStr=r.to||r.to_date||'';
     if(!fromStr||!toStr) return;
     const fromDate=new Date(fromStr+'T00:00:00'), toDate=new Date(toStr+'T00:00:00');
@@ -4577,10 +4582,8 @@ function applyLeaveUpdate(id,status,declineReason){
   r.status=status;
   if(declineReason)r.declineReason=declineReason;
 
-  // Resolve strictly by NAME — staffId can be stale/colliding and paint the
-  // leave onto the WRONG person's grid (e.g. Sachin's leave on Roshana).
-  const rNm=(r.staff_name||r.staffName||'').trim();
-  const s=rNm ? staff.find(x=>`${x.first} ${x.last}`.trim().toLowerCase()===rNm.toLowerCase()) : null;
+  // Resolve strictly by normalized NAME — staffId can be stale/colliding.
+  const s=_staffForLeave(r);
   const fromStr=r.from||r.from_date||'';
   const toStr=r.to||r.to_date||'';
 
@@ -4748,9 +4751,7 @@ async function syncLeaveRequests(){
     // rows (fixes stale/colliding ids that painted leaves on the wrong person),
     // then repaint every approved leave onto the correct grid.
     leaveRequests.forEach(function(r){
-      const nm=(r.staffName||r.staff_name||'').trim();
-      if(!nm) return;
-      const m=staff.find(x=>`${x.first} ${x.last}`.trim().toLowerCase()===nm.toLowerCase());
+      const m=_staffForLeave(r);
       if(m) r.staffId=m.id;
     });
     try{ repaintAllApprovedLeaves(); }catch(e){ console.warn('repaint leaves', e); }
