@@ -1267,9 +1267,6 @@ body.tl-readonly #tlPill{ display:inline-flex; }
         <span class="icon"><svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd"/></svg></span>Sync Availability
       </div>
       <div class="nav-section"></div>
-      <div class="nav-item" onclick="resetData()">
-        <span class="icon"><svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd"/></svg></span>Reset All Data
-      </div>
     </nav>
     <div class="sidebar-footer">
       <div class="save-status" id="saveStatus"><div class="dot"></div><span id="saveLabel">loading…</span></div>
@@ -2054,15 +2051,6 @@ async function syncStaffToNexus(){
   }finally{
     _nexusSyncRunning=false;
   }
-}
-
-async function resetData(){
-  if(!confirm('Are you sure you want to reset ALL data?'))return;
-  if(!confirm('This will permanently delete all staff, shifts and settings. Continue?'))return;
-  if(!confirm('This cannot be undone. Are you absolutely sure?'))return;
-  if(!confirm('Final confirmation — reset everything?'))return;
-  if(window.shiftops)await window.shiftops.saveData(null);
-  location.reload();
 }
 
 function markDirty(){isDirty=true;updateSaveStatus();debouncedAutoSave();}
@@ -4397,6 +4385,55 @@ function confirmDecline(){
   pendingDeclineId=null;
 }
 
+// Paint EVERY approved leave onto the correct person's roster grid, keyed by the
+// authoritative staff name. Also clears stray leave blocks so a previously
+// mis-attributed leave (wrong person) is corrected. Safe to run repeatedly.
+function repaintAllApprovedLeaves(){
+  if(typeof saveCurrentWeek === 'function') saveCurrentWeek();
+
+  // 1. Wipe all existing leave blocks everywhere (we'll re-add the correct ones).
+  Object.keys(shiftsStore||{}).forEach(function(wk){
+    const byStaff=shiftsStore[wk]; if(!byStaff) return;
+    Object.keys(byStaff).forEach(function(sid){
+      const byDay=byStaff[sid]; if(!byDay) return;
+      Object.keys(byDay).forEach(function(di){
+        if(Array.isArray(byDay[di])){
+          byDay[di]=byDay[di].filter(function(sh){ return sh.type!=='leave'; });
+          if(!byDay[di].length) delete byDay[di];
+        }
+      });
+    });
+  });
+
+  // 2. Re-paint each approved leave onto its correct staffer, by name.
+  (leaveRequests||[]).forEach(function(r){
+    if((r.status||'')!=='approved') return;
+    const nm=(r.staffName||r.staff_name||'').trim();
+    const s=(nm ? staff.find(x=>`${x.first} ${x.last}`.trim().toLowerCase()===nm.toLowerCase()) : null) ||
+            (r.staffId!=null ? staff.find(x=>x.id===r.staffId) : null);
+    if(!s) return;
+    const fromStr=r.from||r.from_date||'', toStr=r.to||r.to_date||'';
+    if(!fromStr||!toStr) return;
+    const fromDate=new Date(fromStr+'T00:00:00'), toDate=new Date(toStr+'T00:00:00');
+    for(let cur=new Date(fromDate); cur<=toDate; cur.setDate(cur.getDate()+1)){
+      if(cur.getDay()===0) continue; // skip Sundays (no roster)
+      const wk=weekKey(new Date(cur));
+      const dow=cur.getDay(); const di=dow===0?6:dow-1;
+      if(!shiftsStore[wk]) shiftsStore[wk]={};
+      if(!shiftsStore[wk][s.id]) shiftsStore[wk][s.id]={};
+      const day=shiftsStore[wk][s.id][di]||[];
+      if(!day.some(function(sh){return sh.type==='leave';})){
+        day.push({start:'09:00',end:'17:00',type:'leave',role:'Leave'});
+      }
+      shiftsStore[wk][s.id][di]=day;
+    }
+  });
+
+  // 3. Refresh the visible week from the store.
+  if(typeof availWeekKey!=='undefined' && typeof loadWeek==='function') loadWeek(availWeekKey);
+  if(typeof renderRoster==='function') renderRoster();
+}
+
 function applyLeaveUpdate(id,status,declineReason){
   const r=leaveRequests.find(x=>x.id===id);
   if(!r)return;
@@ -4405,8 +4442,11 @@ function applyLeaveUpdate(id,status,declineReason){
   r.status=status;
   if(declineReason)r.declineReason=declineReason;
 
-  const s=staff.find(x=>x.id===r.staffId) ||
-          staff.find(x=>`${x.first} ${x.last}`.toLowerCase()===(r.staffName||'').toLowerCase());
+  // Resolve by NAME first (authoritative) — staffId can be stale/colliding and
+  // paint the leave onto the WRONG person's grid (e.g. Sachin's leave on Roshana).
+  const rNm=(r.staffName||r.staff_name||'').trim();
+  const s=(rNm ? staff.find(x=>`${x.first} ${x.last}`.trim().toLowerCase()===rNm.toLowerCase()) : null) ||
+          (r.staffId!=null ? staff.find(x=>x.id===r.staffId) : null);
   const fromStr=r.from||r.from_date||'';
   const toStr=r.to||r.to_date||'';
 
@@ -4569,6 +4609,17 @@ async function syncLeaveRequests(){
       });
       added++;
     });
+
+    // Self-heal: re-resolve staffId from the authoritative name for ALL leave
+    // rows (fixes stale/colliding ids that painted leaves on the wrong person),
+    // then repaint every approved leave onto the correct grid.
+    leaveRequests.forEach(function(r){
+      const nm=(r.staffName||r.staff_name||'').trim();
+      if(!nm) return;
+      const m=staff.find(x=>`${x.first} ${x.last}`.trim().toLowerCase()===nm.toLowerCase());
+      if(m) r.staffId=m.id;
+    });
+    try{ repaintAllApprovedLeaves(); }catch(e){ console.warn('repaint leaves', e); }
 
     markDirty();renderLeave();
     const msg=added>0||updated>0
