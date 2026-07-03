@@ -3077,7 +3077,7 @@ async function saveStaff(){
     }
     window._editingOldName = null;
     await saveStaffAccess(newName);   // persist app access + admin flag for this person
-    await saveStaffTeams(newName, team); // persist multi-team membership
+    await addStaffToSupabase(newName, team); // persist team → staff_directory + staff_credentials (staff_teams retired)
     // keep local admin flag in sync so the row badge updates without a reload
     if(s){ const isAdmin=!!(document.getElementById('saAccess_admin')||{}).checked; s.isHubAdmin=isAdmin; s.isShiftAdmin=isAdmin; }
     closeModal('staffModal');forceSave();renderAll();showToast('Staff updated');pushStaffNames();
@@ -3087,7 +3087,7 @@ async function saveStaff(){
     const fullName=(first+' '+last).trim();
     closeModal('staffModal');forceSave();renderAll();
     await addStaffToSupabase(fullName, team); // insert-only — safe, won't prune
-    saveStaffTeams(fullName, team); // persist multi-team membership (fire-and-forget)
+    // (team persisted to directory + credentials above; staff_teams retired)
     // Create the staff's real auth account (temp password, forced reset on first login)
     // so they can actually log in under auth-only mode.
     try{
@@ -3677,10 +3677,10 @@ function renameTeam(oldName,newName){
   if(teams.includes(newName)){showToast('That team name already exists');return;}
   teams=teams.map(t=>t===oldName?newName:t);
   staff.forEach(s=>{if(s.team===oldName)s.team=newName;});
-  // CANONICAL: update staff_directory — the team source ShiftOps reads on load.
-  // Without this the old team resurrects on refresh.
+  // CANONICAL: update staff_credentials — the base table (staff_directory is a
+  // view of it). Writing the base table is what makes the rename stick on reload.
   try{
-    fetch(SUPABASE_URL+'/rest/v1/staff_directory?team=eq.'+encodeURIComponent(oldName),{
+    fetch(SUPABASE_URL+'/rest/v1/staff_credentials?team=eq.'+encodeURIComponent(oldName),{
       method:'PATCH',
       headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
       body:JSON.stringify({team:newName})
