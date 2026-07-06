@@ -182,7 +182,7 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent);}
 <div class="topnav">
   <div class="brand"><span class="logo">🧾</span> Slip</div>
   <div class="nav-tabs">
-    <button class="nav-tab active" id="tab-new" onclick="showPage('new')">New Receipt</button>
+    <button class="nav-tab active" id="tab-new" onclick="newReceiptTab()">New Receipt</button>
     <button class="nav-tab" id="tab-history" onclick="showPage('history')">History</button>
     <button class="nav-tab" id="tab-settings" onclick="showPage('settings')">Settings</button>
   </div>
@@ -395,11 +395,16 @@ function delLine(i){if(lineData.length===1){lineData=[{desc:'',qty:'',price:'',d
 function updLine(i,k,v){lineData[i][k]=v;renderReceipt();}
 
 function renderReceipt(){
-  getNextNum().then(function(nn){
-    const disp = (nn==null) ? '…' : nn;
-    document.getElementById('r-num').textContent=disp;
-    document.getElementById('f-num').value=disp;
-  });
+  // When viewing a saved invoice from History, do NOT peek the live counter —
+  // that async write would clobber the saved number with the next new one.
+  if(!window._viewingSaved){
+    getNextNum().then(function(nn){
+      if(window._viewingSaved) return;  // a load started mid-flight — bail
+      const disp = (nn==null) ? '…' : nn;
+      document.getElementById('r-num').textContent=disp;
+      document.getElementById('f-num').value=disp;
+    });
+  }
   _renderReceiptBody();
 }
 function _renderReceiptBody(){
@@ -509,7 +514,16 @@ async function saveReceipt(){
   resetForm();
   renderHistory();
 }
+function newReceiptTab(){
+  // If we were viewing a saved invoice, start a fresh one (live number).
+  // If we were already editing a new invoice, just show it — don't wipe work.
+  if(window._viewingSaved){
+    resetForm();      // clears the flag + fields, resumes live counter
+  }
+  showPage('new');
+}
 function resetForm(){
+  window._viewingSaved = false;   // fresh invoice → resume live counter number
   lineData=[{desc:'',qty:'',price:'',disc:''}];
   ['f-name','f-addr','f-phone','f-email','f-notes','f-ship','f-due','f-ref'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
   renderLines();renderReceipt();
@@ -543,6 +557,7 @@ async function deleteReceipt(num){
   toast('Invoice #'+num+' deleted');
 }
 function loadReceipt(r){
+  window._viewingSaved = true;   // suppress live-counter peek while viewing a saved invoice
   showPage('new');
   document.getElementById('f-name').value=r.name||'';
   document.getElementById('f-addr').value=r.addr||'';
