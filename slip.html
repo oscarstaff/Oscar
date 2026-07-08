@@ -202,10 +202,10 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 
         <div class="sub">Fill the details — the receipt updates live on the right.</div>
         <div class="row">
           <div class="field"><label>Invoice Number</label><input id="f-num" readonly></div>
-          <div class="field"><label>Issue Date</label><input id="f-date" readonly></div>
+          <div class="field"><label>Issue Date</label><input id="f-date" type="date" oninput="onIssueDateChange()"></div>
         </div>
         <div class="row">
-          <div class="field"><label>Due Date</label><input id="f-due" type="date" oninput="renderReceipt()"></div>
+          <div class="field"><label>Due Date <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--ink-dim)">(auto: +14 days)</span></label><input id="f-due" type="date" oninput="renderReceipt()"></div>
           <div class="field"><label>Reference</label><input id="f-ref" placeholder="e.g. CERT-III enrolment" oninput="renderReceipt()"></div>
         </div>
         <div class="field"><label>Student / Client Name</label><input id="f-name" placeholder="ABC Singh" oninput="renderReceipt()"></div>
@@ -381,6 +381,19 @@ async function consumeNextNum(){
 function fmtDate(d){const dd=String(d.getDate()).padStart(2,'0'),mm=String(d.getMonth()+1).padStart(2,'0');return dd+'/'+mm+'/'+d.getFullYear();}
 function money(n){return '$'+(Math.round(n*100)/100).toLocaleString('en-AU',{minimumFractionDigits:2,maximumFractionDigits:2});}
 function addDays(d,n){const x=new Date(d);x.setDate(x.getDate()+n);return x;}
+// Convert a Date to YYYY-MM-DD (the format <input type="date"> needs).
+function toISODate(d){const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),dd=String(d.getDate()).padStart(2,'0');return y+'-'+m+'-'+dd;}
+// Convert a stored "DD/MM/YYYY" string back to ISO "YYYY-MM-DD" for date inputs.
+function ddmmyyyyToISO(s){if(!s)return '';const m=String(s).match(/^(\d{2})\/(\d{2})\/(\d{4})$/);return m?`${m[3]}-${m[2]}-${m[1]}`:'';}
+// When the user changes the issue date, auto-set the due date to +14 days.
+function onIssueDateChange(){
+  const issueEl=document.getElementById('f-date');
+  if(issueEl.value){
+    const issue=new Date(issueEl.value+'T00:00:00');
+    document.getElementById('f-due').value=toISODate(addDays(issue,14));
+  }
+  renderReceipt();
+}
 
 function renderLines(){
   const c=document.getElementById('lineItems');c.innerHTML='';
@@ -410,14 +423,18 @@ function renderReceipt(){
   _renderReceiptBody();
 }
 function _renderReceiptBody(){
-  const today=new Date();
-  document.getElementById('r-date').textContent=fmtDate(today);
-  document.getElementById('f-date').value=fmtDate(today);
-  // due date: from field, else today + default terms
+  // Issue date comes from the field (settable). Default to today if empty.
+  const issueEl=document.getElementById('f-date');
+  let issueDate;
+  if(issueEl.value){ issueDate=new Date(issueEl.value+'T00:00:00'); }
+  else{ issueDate=new Date(); issueEl.value=toISODate(issueDate); }
+  document.getElementById('r-date').textContent=fmtDate(issueDate);
+
+  // Due date: from the field if set, else auto = issue date + 14 days.
   let dueVal=document.getElementById('f-due').value;
   let dueDate;
-  if(dueVal){dueDate=new Date(dueVal+'T00:00:00');}
-  else{const terms=parseInt(document.getElementById('s-terms')?.value)||7;dueDate=addDays(today,terms);}
+  if(dueVal){ dueDate=new Date(dueVal+'T00:00:00'); }
+  else{ dueDate=addDays(issueDate,14); document.getElementById('f-due').value=toISODate(dueDate); }
   document.getElementById('r-due').textContent=fmtDate(dueDate);
   document.getElementById('r-ref').textContent=document.getElementById('f-ref').value||'—';
   document.getElementById('r-name').textContent=document.getElementById('f-name').value||'—';
@@ -500,7 +517,9 @@ async function saveReceipt(){
   // Atomically reserve the invoice number (no collisions across devices)
   const num=await consumeNextNum();
   if(num==null){toast('Could not reach server — invoice not saved');return;}
-  const rec={num:num,date:fmtDate(new Date()),
+  const issueEl=document.getElementById('f-date');
+  const issueDate = issueEl.value ? new Date(issueEl.value+'T00:00:00') : new Date();
+  const rec={num:num,date:fmtDate(issueDate),
     due:document.getElementById('f-due').value,ref:document.getElementById('f-ref').value,
     name:name,
     addr:document.getElementById('f-addr').value,phone:document.getElementById('f-phone').value,
@@ -523,7 +542,11 @@ function newReceiptTab(){
 function resetForm(){
   window._viewingSaved = false;
   lineData=[{desc:'',qty:'',price:'',disc:''}];
-  ['f-name','f-addr','f-phone','f-email','f-notes','f-ship','f-due','f-ref'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
+  ['f-name','f-addr','f-phone','f-email','f-notes','f-ship','f-due','f-ref','f-date'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
+  // reset issue date to today and due date to +14
+  const today=new Date();
+  document.getElementById('f-date').value=toISODate(today);
+  document.getElementById('f-due').value=toISODate(addDays(today,14));
   renderLines();renderReceipt();
 }
 async function renderHistory(){
@@ -570,7 +593,8 @@ function loadReceipt(r){
   renderReceiptStatic(r); // render preview using THIS invoice's saved values (no async next-num)
   // set original number/date
   document.getElementById('r-num').textContent=r.num;document.getElementById('f-num').value=r.num;
-  document.getElementById('r-date').textContent=r.date;document.getElementById('f-date').value=r.date;
+  document.getElementById('r-date').textContent=r.date;
+  document.getElementById('f-date').value=ddmmyyyyToISO(r.date);
   toast('Loaded #'+r.num+' (view)');
 }
 // Render the printable invoice for a loaded record without touching the live counter.
