@@ -1248,6 +1248,7 @@ body.tl-readonly #tlPill{ display:inline-flex; }
 .mb-chip.warn b{ color:var(--gold); }
 .mb-chip.miss b{ color:var(--warn); }
 .mb-chip.leave b{ color:var(--muted); }
+.mb-chip.done b{ color:var(--accent-text); }
 .mb-chip.zero{ opacity:.45; }
 .mb-refresh{
   margin-left:auto; background:transparent; border:none; border-left:1px solid var(--border);
@@ -1266,6 +1267,7 @@ body.tl-readonly #tlPill{ display:inline-flex; }
 .mb-lbl.warn{ color:var(--gold); }  .mb-lbl.warn::before{ background:var(--gold); }
 .mb-lbl.miss{ color:var(--warn); }  .mb-lbl.miss::before{ background:var(--warn); }
 .mb-lbl.leave{ color:var(--muted); }.mb-lbl.leave::before{ background:var(--muted); }
+.mb-lbl.done{ color:var(--accent-text); } .mb-lbl.done::before{ background:var(--accent); }
 .mb-person{
   display:flex; align-items:center; gap:7px; font-size:12px; color:var(--text-mid);
   padding:3px 0; line-height:1.35;
@@ -1325,6 +1327,26 @@ body.tl-readonly .wk-tools{ display:none !important; }
 .lv-fchip:hover{ border-color:var(--border2); color:var(--text); }
 .lv-fchip.active{ background:var(--accent); border-color:var(--accent-deep); color:#fff; }
 .lv-count{ font-family:var(--mono); font-size:10px; opacity:.75; margin-left:4px; }
+
+
+/* ── Availability grouped by team ── */
+.avail-team-hd{
+  display:flex; align-items:center; gap:10px;
+  padding:8px 14px; margin-top:4px;
+  background:var(--surface2); border-top:1px solid var(--border); border-bottom:1px solid var(--border);
+}
+.avail-team-name{
+  font-family:var(--mono); font-size:9px; font-weight:700;
+  letter-spacing:.11em; text-transform:uppercase; color:var(--accent-text);
+}
+.avail-team-meta{ font-size:10.5px; color:var(--muted); }
+.avail-team-tally{
+  margin-left:auto; display:flex; align-items:center; gap:5px;
+  font-family:var(--mono); font-size:10px; color:var(--text-dim);
+}
+.avail-team-tally i{ width:6px; height:6px; border-radius:2px; display:inline-block; margin-left:6px; }
+.avail-team-tally .tt-yes{ background:var(--success); }
+.avail-team-tally .tt-no{ background:var(--warn); }
 
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -1442,11 +1464,10 @@ body.tl-readonly .wk-tools{ display:none !important; }
         <div class="stat"><span class="stat-value orange" id="statOpen">0</span><span class="stat-label">open slots</span></div>
       </div>
 
-      <div class="morning-board" id="morningBoard"></div>
-
       <div class="conflict-banner" id="conflictBanner" style="display:none"> <strong>Conflicts detected.</strong>&nbsp; Some staff are rostered on unavailable days.</div>
 
       <div class="tab-content active" id="section-roster">
+        <div class="morning-board" id="morningBoard"></div>
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
           <button class="week-btn" onclick="prevWeek()">◀</button>
           <div class="week-label" id="weekLabel" style="font-size:13px;font-weight:600;color:var(--text);min-width:180px;text-align:center;"></div>
@@ -2607,7 +2628,24 @@ function renderAvailability(){
   }
   html+='</div>';
 
-  const sorted=[...staff].sort((a,b)=>a.first.localeCompare(b.first)||a.last.localeCompare(b.last));
+  // ── Group by TEAM (mirrors the roster grid) ──
+  const byTeam = {};
+  [...staff].sort((a,b)=>a.first.localeCompare(b.first)||a.last.localeCompare(b.last))
+    .forEach(s=>{ const t=s.team||'Unassigned'; (byTeam[t]=byTeam[t]||[]).push(s); });
+  const teamNames = Object.keys(byTeam).sort((a,b)=>a.localeCompare(b));
+
+  const sorted=[];
+  teamNames.forEach(t=>{
+    // team header row: name + a live availability tally for the week
+    let yes=0,no=0,tot=0;
+    byTeam[t].forEach(s=>{ for(let d=0;d<7;d++){ const a=getAvail(s.id,d); tot++;
+      if(a.type==='no') no++; else if(a.type==='all'||a.type==='custom') yes++; } });
+    html+=`<div class="avail-team-hd"><span class="avail-team-name">${t}</span>
+      <span class="avail-team-meta">${byTeam[t].length} staff</span>
+      <span class="avail-team-tally"><i class="tt-yes"></i>${yes}<i class="tt-no"></i>${no}</span></div>`;
+    byTeam[t].forEach(s=>sorted.push(s));
+  });
+
   sorted.forEach(s=>{
     html+=`<div class="avail-row" data-team="${(s.team||'').replace(/"/g,'&quot;')}"><div class="avail-name"><div class="avail-dot" style="background:${s.color};flex-shrink:0"></div><span style="font-size:11px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${s.first} ${s.last}">${s.first} ${s.last}</span></div>`;
     for(let d=0;d<7;d++){
@@ -3737,7 +3775,8 @@ function showSection(id){
   const crumbs={roster:'Roster',availability:'Availability',staff:'Staff'};
   const titleEl=document.getElementById('topbarTitle');
   if(titleEl)titleEl.innerHTML='<span style="color:var(--muted);font-weight:400">Oscars</span><span style="color:var(--muted);margin:0 6px;font-weight:400">></span>'+crumbs[id];
-  if(id==='roster')renderRoster();
+  if(id==='roster'){ renderRoster(); try{ startMorningBoard(); }catch(e){} }
+  else { try{ stopMorningBoard(); }catch(e){} }
   if(id==='availability')renderAvailability();
   if(id==='staff')renderStaffList();
   if(id==='leave')renderLeave();
@@ -5640,7 +5679,7 @@ async function refreshMorningBoard(){
   punches.forEach(p=>{ last[_normName(p.staff_name)] = p; });
 
   const dayIdx = _todayDayIndex();
-  const inNow=[], lateList=[], leaveList=[], notInList=[];
+  const inNow=[], lateList=[], leaveList=[], notInList=[], doneList=[];
 
   staff.forEach(s=>{
     const key = _normName(s.first+' '+s.last);
@@ -5648,49 +5687,66 @@ async function refreshMorningBoard(){
     const onLeave = dayShifts.some(x=>x.type==='leave');
     const rostered = dayShifts.filter(x=>x.type!=='leave');
     const p = last[key];
-    const clockedIn = p && p.action==='in';
+    const clockedIn  = p && p.action==='in';
+    const clockedOut = p && p.action==='out';
+    const startTime  = rostered.length ? rostered.map(x=>x.start).sort()[0] : null;
 
     if(onLeave){ leaveList.push({s}); return; }
+
     if(clockedIn){
-      // late? compare punch time to earliest rostered start
+      // late only if we know their rostered start and they beat it
       let late = null;
-      if(rostered.length){
-        const start = rostered.map(x=>x.start).sort()[0];
+      if(startTime){
         const t = _hhmmSydney(p.ts);
-        if(start && t > start) late = {start, actual:t};
+        if(t > startTime) late = {start:startTime, actual:t};
       }
       if(late) lateList.push({s, ...late}); else inNow.push({s, at:_hhmmSydney(p.ts)});
       return;
     }
-    if(rostered.length) notInList.push({s, start:rostered.map(x=>x.start).sort()[0]});
+
+    if(clockedOut){ doneList.push({s, at:_hhmmSydney(p.ts)}); return; }
+
+    // NOT CLOCKED IN — anyone with no punch today.
+    // Rostered staff show their due time; unrostered staff still appear
+    // (previously they were silently skipped, so the list looked empty).
+    notInList.push({s, start:startTime, rostered:!!startTime});
   });
+  // rostered-but-absent first, then everyone else
+  notInList.sort((a,b)=> (b.rostered?1:0)-(a.rostered?1:0) || a.s.first.localeCompare(b.s.first));
 
   const chip = (cls,label,n) => `<span class="mb-chip ${cls}${n===0?' zero':''}"><b>${n}</b>${label}</span>`;
   const person = (o,meta='') => `<div class="mb-person"><i class="mb-dot" style="background:${o.s.color||'#94a3b8'}"></i><span>${o.s.first} ${o.s.last.charAt(0)}.</span>${meta?`<s class="mb-meta">${meta}</s>`:''}</div>`;
   const dateLbl = new Intl.DateTimeFormat('en-AU',{timeZone:'Australia/Sydney',weekday:'short',day:'numeric',month:'short'}).format(new Date());
 
-  const anyone = lateList.length||notInList.length||inNow.length||leaveList.length;
+  const anyone = lateList.length||notInList.length||inNow.length||leaveList.length||doneList.length;
   host.innerHTML = `
     <div class="mb-head">
       <span class="mb-title">${dateLbl}</span>
       ${chip('ok','on shift',inNow.length)}
       ${chip('warn','late',lateList.length)}
       ${chip('miss','not in',notInList.length)}
+      ${chip('done','finished',doneList.length)}
       ${chip('leave','leave',leaveList.length)}
       <button class="mb-refresh" onclick="refreshMorningBoard()" title="Refresh now">↻</button>
     </div>
     ${anyone?`<div class="mb-lists">
       ${lateList.length?`<div class="mb-col"><div class="mb-lbl warn">Late</div>${lateList.map(o=>person(o,`${o.actual} · due ${o.start}`)).join('')}</div>`:''}
-      ${notInList.length?`<div class="mb-col"><div class="mb-lbl miss">Not clocked in</div>${notInList.map(o=>person(o,`due ${o.start}`)).join('')}</div>`:''}
+      ${notInList.length?`<div class="mb-col"><div class="mb-lbl miss">Not clocked in</div>${notInList.map(o=>person(o, o.rostered?`due ${o.start}`:'not rostered')).join('')}</div>`:''}
       ${inNow.length?`<div class="mb-col"><div class="mb-lbl ok">On shift</div>${inNow.map(o=>person(o,o.at)).join('')}</div>`:''}
+      ${doneList.length?`<div class="mb-col"><div class="mb-lbl done">Finished</div>${doneList.map(o=>person(o,`out ${o.at}`)).join('')}</div>`:''}
       ${leaveList.length?`<div class="mb-col"><div class="mb-lbl leave">On leave</div>${leaveList.map(o=>person(o)).join('')}</div>`:''}
-    </div>`:`<div class="mb-empty">No one rostered today.</div>`}`;
+    </div>`:`<div class="mb-empty">Nothing to report today.</div>`}`;
 }
 
 function startMorningBoard(){
+  const host=document.getElementById('morningBoard');
+  if(!host || !host.offsetParent) return;   // only when the roster tab is visible
   refreshMorningBoard();
   if(_boardTimer) clearInterval(_boardTimer);
   _boardTimer = setInterval(refreshMorningBoard, 120000); // refresh every 2 min
+}
+function stopMorningBoard(){
+  if(_boardTimer){ clearInterval(_boardTimer); _boardTimer=null; }   // don't poll off-tab
 }
 
 </script>
