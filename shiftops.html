@@ -1348,6 +1348,25 @@ body.tl-readonly .wk-tools{ display:none !important; }
 .avail-team-tally .tt-yes{ background:var(--success); }
 .avail-team-tally .tt-no{ background:var(--warn); }
 
+
+/* ── Availability: per-team cards (mirrors Team View) ── */
+.avail-team-card{ margin-bottom:16px; }
+.avail-team-badge{
+  background:var(--accent-dim); color:var(--accent-text); border:1px solid var(--accent-border);
+  border-radius:4px; padding:2px 8px; font-size:9px; font-family:var(--mono); font-weight:700;
+}
+.avail-team-tally{ display:flex; align-items:center; gap:12px; }
+.avail-team-tally .tt{
+  display:flex; align-items:center; gap:5px;
+  font-family:var(--mono); font-size:9.5px; color:var(--text-dim);
+}
+.avail-team-tally i{ width:6px; height:6px; border-radius:2px; display:inline-block; }
+.avail-team-tally .tt-yes{ background:var(--success); }
+.avail-team-tally .tt-no{ background:var(--warn); }
+.avail-team-tally .tt-unset{ background:var(--border2); }
+.avail-hd-row{ background:var(--surface2); border-bottom:1px solid var(--border); }
+@media(max-width:760px){ .avail-team-tally{ display:none; } }
+
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
@@ -2620,33 +2639,53 @@ function renderAvailability(){
 
   `;
 
-  // Header row
-  html+=`<div class="avail-row"><div class="avail-name" style="font-family:var(--mono);font-size:8.5px;color:var(--text-dim);font-weight:700">STAFF</div>`;
-  for(let d=0;d<7;d++){
-    const day=addDays(currentWeekStart,d);
-    html+=`<div class="avail-cell" style="flex-direction:column;gap:1px;padding:6px 2px"><div style="font-family:var(--mono);font-size:8.5px;color:var(--text-dim);font-weight:700">${DAYS[d]}</div><div style="font-family:var(--mono);font-size:7.5px;color:var(--muted)">${fmtDate(day)}</div></div>`;
-  }
-  html+='</div>';
+  // ── Team filter pills (same behaviour as Team View) ──
+  const _teams = getUniqueTeams();
+  let fbar = `<div class="role-filter-bar" style="margin-bottom:14px">
+    <span style="font-family:var(--mono);font-size:9px;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;padding:4px 0">Team:</span>
+    <div class="role-pill${_availTeamFilter===null?' active':''}" onclick="setAvailTeamFilter(null)">All Teams</div>`;
+  _teams.forEach(t=>{ const enc=t.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    fbar += `<div class="role-pill${_availTeamFilter===t?' active':''}" onclick="setAvailTeamFilter('${enc}')">${t}</div>`; });
+  fbar += `</div>`;
+  html += fbar;
 
-  // ── Group by TEAM (mirrors the roster grid) ──
-  const byTeam = {};
+  // ── Group staff by team, render one card per team (mirrors Team View) ──
+  const _byTeam = {};
   [...staff].sort((a,b)=>a.first.localeCompare(b.first)||a.last.localeCompare(b.last))
-    .forEach(s=>{ const t=s.team||'Unassigned'; (byTeam[t]=byTeam[t]||[]).push(s); });
-  const teamNames = Object.keys(byTeam).sort((a,b)=>a.localeCompare(b));
+    .forEach(p=>{ const t=p.team||'Unassigned'; (_byTeam[t]=_byTeam[t]||[]).push(p); });
+  const _showTeams = _availTeamFilter ? [_availTeamFilter] : Object.keys(_byTeam).sort((a,b)=>a.localeCompare(b));
 
-  const sorted=[];
-  teamNames.forEach(t=>{
-    // team header row: name + a live availability tally for the week
-    let yes=0,no=0,tot=0;
-    byTeam[t].forEach(s=>{ for(let d=0;d<7;d++){ const a=getAvail(s.id,d); tot++;
-      if(a.type==='no') no++; else if(a.type==='all'||a.type==='custom') yes++; } });
-    html+=`<div class="avail-team-hd"><span class="avail-team-name">${t}</span>
-      <span class="avail-team-meta">${byTeam[t].length} staff</span>
-      <span class="avail-team-tally"><i class="tt-yes"></i>${yes}<i class="tt-no"></i>${no}</span></div>`;
-    byTeam[t].forEach(s=>sorted.push(s));
-  });
+  _showTeams.forEach(team=>{
+    const members = _byTeam[team]||[];
+    if(!members.length) return;
 
-  sorted.forEach(s=>{
+    // week tally for this team
+    let tYes=0,tNo=0,tUnset=0;
+    members.forEach(p=>{ for(let d=0;d<7;d++){ const a=getAvail(p.id,d);
+      if(a.type==='no') tNo++; else if(a.type==='all'||a.type==='custom') tYes++; else tUnset++; } });
+
+    html += `<div class="role-view-card avail-team-card" data-team="${(team||'').replace(/"/g,'&quot;')}">
+      <div class="role-view-header">
+        <div style="display:flex;align-items:center;gap:10px">
+          <div class="role-view-title">${team}</div>
+          <span class="avail-team-badge">${members.length} STAFF</span>
+        </div>
+        <div class="avail-team-tally">
+          <span class="tt"><i class="tt-yes"></i>${tYes} available</span>
+          <span class="tt"><i class="tt-no"></i>${tNo} unavailable</span>
+          <span class="tt"><i class="tt-unset"></i>${tUnset} not set</span>
+        </div>
+      </div>`;
+
+    // per-team day header
+    html+=`<div class="avail-row avail-hd-row"><div class="avail-name" style="font-family:var(--mono);font-size:8.5px;color:var(--text-dim);font-weight:700">STAFF</div>`;
+    for(let d=0;d<7;d++){
+      const day=addDays(currentWeekStart,d);
+      html+=`<div class="avail-cell" style="flex-direction:column;gap:1px;padding:6px 2px"><div style="font-family:var(--mono);font-size:8.5px;color:var(--text-dim);font-weight:700">${DAYS[d]}</div><div style="font-family:var(--mono);font-size:7.5px;color:var(--muted)">${fmtDate(day)}</div></div>`;
+    }
+    html+='</div>';
+
+    members.forEach(s=>{
     html+=`<div class="avail-row" data-team="${(s.team||'').replace(/"/g,'&quot;')}"><div class="avail-name"><div class="avail-dot" style="background:${s.color};flex-shrink:0"></div><span style="font-size:11px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${s.first} ${s.last}">${s.first} ${s.last}</span></div>`;
     for(let d=0;d<7;d++){
       const av=getAvail(s.id,d);
@@ -2664,12 +2703,20 @@ function renderAvailability(){
       const customBtn=`<div onclick="openCustomAvail(${s.id},${d})" title="Set custom hours" style="font-size:10px;color:var(--text-dim);cursor:pointer;text-align:center;margin-top:2px;opacity:.8;display:flex;align-items:center;justify-content:center;gap:3px"><span style="font-size:12px"></span><span style="font-family:var(--mono);font-size:8px;font-weight:600">Custom</span></div>`;
       html+=`<div class="avail-cell" style="flex-direction:column;gap:2px">${chip}${customBtn}</div>`;
     }
-    html+='</div>';
-  });
+    html+='</div>';   // close staff row
+    });               // close members.forEach
+
+    html+='</div>';   // close team card
+  });                 // close _showTeams.forEach
+
+  if(!_showTeams.length) html+=`<div style="padding:40px;text-align:center;color:var(--text-dim);font-family:var(--mono);font-size:12px">No staff found.</div>`;
 
   grid.innerHTML=html;
   try{ if(typeof applyTeamLeadLock==='function' && document.body.classList.contains('tl-readonly')) applyTeamLeadLock(); }catch(e){}
 }
+// team filter state + setter for the Availability tab
+let _availTeamFilter = null;
+function setAvailTeamFilter(t){ _availTeamFilter = t; renderAvailability(); }
 
 
 // ── SUBMITTED AVAILABILITY VIEW ──
