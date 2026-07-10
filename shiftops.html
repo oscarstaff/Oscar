@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Oscars Staff Management</title>
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600;700&display=swap');
 
 :root {
   /* ══ DAYLIGHT — light & airy, soft greys, white cards ══ */
@@ -39,9 +39,9 @@
   --muted: #8b93a3;
 
   /* ── Type — restrained sans, mono for data ── */
-  --sans: 'Inter', -apple-system, system-ui, sans-serif;
-  --display: 'Inter', system-ui, sans-serif;
-  --mono: 'JetBrains Mono','SF Mono','Menlo',monospace;
+  --sans: 'IBM Plex Sans', -apple-system, system-ui, sans-serif;
+  --display: 'IBM Plex Sans', system-ui, sans-serif;
+  --mono: 'IBM Plex Mono','SF Mono','Menlo',monospace;
 
   /* ── Radii — tighter, console-like ── */
   --r4: 5px; --r6: 7px; --r8: 9px; --r10: 11px; --r12: 13px; --r16: 16px;
@@ -69,7 +69,7 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
-h1,h2,h3,.section-title,.modal-title{ font-family: var(--display); letter-spacing: -0.02em; font-weight:700; }
+h1,h2,h3,.section-title,.modal-title{ font-family: var(--display); letter-spacing: -0.015em; font-weight:600; }
 .stat-value{ font-family: var(--mono); letter-spacing: -0.5px; font-variant-numeric: tabular-nums; }
 
 /* ══════════════════════════════════════════
@@ -992,17 +992,16 @@ select.form-input { cursor: pointer; }
 
 /* ── Sidebar ── */
 .sidebar{ background:var(--surface)!important; border-right:1px solid var(--border)!important; box-shadow:none; }
-.logo{ background:transparent!important; border-bottom:1px solid rgba(255,255,255,.1)!important; }
-.logo-mark{ color:#fff!important; letter-spacing:-.02em; font-size:15px!important; }
-.logo-mark::before{ background:linear-gradient(135deg,#7b83eb,#5e6ad2)!important; box-shadow:0 2px 8px rgba(0,0,0,.3)!important; }
-.logo-sub{ color:rgba(255,255,255,.5)!important; }
-.nav-item{ color:rgba(255,255,255,.72)!important; border-radius:11px!important; margin:2px 10px!important; padding:10px 13px!important; transition:all .16s!important; font-weight:600!important; }
-.nav-item:hover{ background:rgba(255,255,255,.09)!important; color:#fff!important; }
-.nav-item.active{ background:rgba(255,255,255,.16)!important; color:#fff!important; box-shadow:inset 0 0 0 1px rgba(255,255,255,.12); }
-.nav-item .icon{ opacity:.92; }
-.nav-section{ border-top:1px solid rgba(255,255,255,.1)!important; margin:10px 18px!important; }
-.sidebar-footer{ border-top:1px solid rgba(255,255,255,.1)!important; }
-.sidebar-footer .save-status{ color:rgba(255,255,255,.6)!important; }
+/* legacy dark-sidebar rules — scoped to .sidebar so they can't bleed onto the app bar */
+.sidebar .logo{ background:transparent!important; border-bottom:1px solid rgba(255,255,255,.1)!important; }
+.sidebar .logo-mark{ color:#fff!important; letter-spacing:-.02em; font-size:15px!important; }
+.sidebar .logo-sub{ color:rgba(255,255,255,.5)!important; }
+.sidebar .nav-item{ color:rgba(255,255,255,.72)!important; border-radius:11px!important; margin:2px 10px!important; padding:10px 13px!important; font-weight:600!important; }
+.sidebar .nav-item:hover{ background:rgba(255,255,255,.09)!important; color:#fff!important; }
+.sidebar .nav-item.active{ background:rgba(255,255,255,.16)!important; color:#fff!important; }
+.sidebar .nav-section{ border-top:1px solid rgba(255,255,255,.1)!important; margin:10px 18px!important; }
+.sidebar-footer{ border-top:1px solid var(--border)!important; }
+.sidebar-footer .save-status{ color:var(--text-dim)!important; }
 .sidebar-footer #dataPathLabel{ color:rgba(255,255,255,.32)!important; }
 
 /* ── Main / topbar ── */
@@ -1218,39 +1217,62 @@ body.tl-readonly #tlPill{ display:inline-flex; }
    NEW FEATURES — Morning Board · Conflict Radar · Week Copy/Paste
    ═══════════════════════════════════════════════════════════════ */
 
-/* ── Morning Board ── */
+/* ── Morning Board — compact status bar ── */
 .morning-board{
-  background:var(--surface); border:1px solid var(--border); border-radius:12px;
-  padding:12px 16px; margin-bottom:14px; box-shadow:var(--shadow-sm);
+  background:var(--surface); border:1px solid var(--border); border-radius:10px;
+  margin-bottom:14px; box-shadow:var(--shadow-sm); overflow:hidden;
 }
-.mb-head{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
-.mb-title{ font-weight:700; font-size:13px; letter-spacing:-.01em; margin-right:2px; }
+.mb-head{
+  display:flex; align-items:stretch; gap:0; flex-wrap:wrap;
+  border-bottom:1px solid var(--border); background:var(--surface2);
+}
+.mb-title{
+  display:flex; align-items:center; gap:7px; padding:9px 14px;
+  font-weight:600; font-size:12px; color:var(--text);
+  border-right:1px solid var(--border); white-space:nowrap;
+}
+.mb-title::before{
+  content:''; width:6px; height:6px; border-radius:50%; background:var(--success);
+  box-shadow:0 0 0 3px rgba(14,138,95,.15); animation:mbPulse 2.4s ease-in-out infinite;
+}
+@keyframes mbPulse{ 0%,100%{opacity:1} 50%{opacity:.45} }
 .mb-chip{
-  display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:600;
-  padding:3px 9px; border-radius:20px; border:1px solid transparent;
+  display:flex; align-items:center; gap:6px; padding:9px 14px;
+  font-size:11.5px; font-weight:500; color:var(--text-dim);
+  border-right:1px solid var(--border); background:transparent;
+  cursor:default; transition:background .12s;
 }
-.mb-chip b{ font-family:var(--mono); font-size:12px; font-weight:700; }
-.mb-chip.ok{ background:var(--success-dim); color:#0b6a49; border-color:#bde8d4; }
-.mb-chip.warn{ background:var(--gold-dim); color:#8a5a08; border-color:#f0dcb0; }
-.mb-chip.miss{ background:var(--warn-dim); color:#a81e33; border-color:#f6cdd4; }
-.mb-chip.leave{ background:var(--surface2); color:var(--text-dim); border-color:var(--border); }
+.mb-chip:hover{ background:var(--surface); }
+.mb-chip b{ font-family:var(--mono); font-size:13px; font-weight:700; color:var(--text); }
+.mb-chip.ok b{ color:var(--success); }
+.mb-chip.warn b{ color:var(--gold); }
+.mb-chip.miss b{ color:var(--warn); }
+.mb-chip.leave b{ color:var(--muted); }
+.mb-chip.zero{ opacity:.45; }
 .mb-refresh{
-  margin-left:auto; background:transparent; border:1px solid var(--border); color:var(--text-dim);
-  width:24px; height:24px; border-radius:6px; cursor:pointer; font-size:12px; line-height:1;
+  margin-left:auto; background:transparent; border:none; border-left:1px solid var(--border);
+  color:var(--muted); padding:0 13px; cursor:pointer; font-size:13px;
 }
-.mb-refresh:hover{ color:var(--text); border-color:var(--border2); }
-.mb-lists{ display:flex; gap:26px; flex-wrap:wrap; margin-top:10px; }
-.mb-col{ min-width:150px; }
+.mb-refresh:hover{ color:var(--accent-text); background:var(--surface); }
+.mb-lists{ display:flex; flex-wrap:wrap; }
+.mb-col{ flex:1; min-width:170px; padding:10px 14px; border-right:1px solid var(--border); }
+.mb-col:last-child{ border-right:none; }
 .mb-lbl{
-  font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:.09em;
-  margin-bottom:5px; font-family:var(--mono);
+  font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.1em;
+  margin-bottom:7px; font-family:var(--mono); display:flex; align-items:center; gap:5px;
 }
-.mb-lbl.ok{ color:#0b6a49; } .mb-lbl.warn{ color:#8a5a08; }
-.mb-lbl.miss{ color:#a81e33; } .mb-lbl.leave{ color:var(--muted); }
-.mb-person{ display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-mid); padding:2px 0; }
-.mb-dot{ width:7px; height:7px; border-radius:50%; flex-shrink:0; }
-.mb-meta{ font-family:var(--mono); font-size:9.5px; color:var(--muted); text-decoration:none; }
-.mb-empty,.mb-err{ font-size:12px; color:var(--muted); padding:4px 0; }
+.mb-lbl::before{ content:''; width:5px; height:5px; border-radius:1px; }
+.mb-lbl.ok{ color:var(--success); } .mb-lbl.ok::before{ background:var(--success); }
+.mb-lbl.warn{ color:var(--gold); }  .mb-lbl.warn::before{ background:var(--gold); }
+.mb-lbl.miss{ color:var(--warn); }  .mb-lbl.miss::before{ background:var(--warn); }
+.mb-lbl.leave{ color:var(--muted); }.mb-lbl.leave::before{ background:var(--muted); }
+.mb-person{
+  display:flex; align-items:center; gap:7px; font-size:12px; color:var(--text-mid);
+  padding:3px 0; line-height:1.35;
+}
+.mb-dot{ width:6px; height:6px; border-radius:50%; flex-shrink:0; }
+.mb-meta{ font-family:var(--mono); font-size:9.5px; color:var(--muted); text-decoration:none; margin-left:auto; }
+.mb-empty,.mb-err{ font-size:12px; color:var(--muted); padding:12px 14px; }
 .mb-err{ color:var(--warn); }
 
 /* ── Conflict Radar: shading while dragging ── */
@@ -5643,25 +5665,26 @@ async function refreshMorningBoard(){
     if(rostered.length) notInList.push({s, start:rostered.map(x=>x.start).sort()[0]});
   });
 
-  const chip = (cls,label,n) => `<span class="mb-chip ${cls}"><b>${n}</b>${label}</span>`;
-  const person = (o,extra='') => `<span class="mb-person"><i class="mb-dot" style="background:${o.s.color||'#94a3b8'}"></i>${o.s.first} ${o.s.last.charAt(0)}.${extra}</span>`;
+  const chip = (cls,label,n) => `<span class="mb-chip ${cls}${n===0?' zero':''}"><b>${n}</b>${label}</span>`;
+  const person = (o,meta='') => `<div class="mb-person"><i class="mb-dot" style="background:${o.s.color||'#94a3b8'}"></i><span>${o.s.first} ${o.s.last.charAt(0)}.</span>${meta?`<s class="mb-meta">${meta}</s>`:''}</div>`;
+  const dateLbl = new Intl.DateTimeFormat('en-AU',{timeZone:'Australia/Sydney',weekday:'short',day:'numeric',month:'short'}).format(new Date());
 
+  const anyone = lateList.length||notInList.length||inNow.length||leaveList.length;
   host.innerHTML = `
     <div class="mb-head">
-      <span class="mb-title">Today</span>
-      ${chip('ok','in',inNow.length)}
+      <span class="mb-title">${dateLbl}</span>
+      ${chip('ok','on shift',inNow.length)}
       ${chip('warn','late',lateList.length)}
       ${chip('miss','not in',notInList.length)}
-      ${chip('leave','on leave',leaveList.length)}
-      <button class="mb-refresh" onclick="refreshMorningBoard()" title="Refresh">↻</button>
+      ${chip('leave','leave',leaveList.length)}
+      <button class="mb-refresh" onclick="refreshMorningBoard()" title="Refresh now">↻</button>
     </div>
-    <div class="mb-lists">
-      ${lateList.length?`<div class="mb-col"><div class="mb-lbl warn">Late</div>${lateList.map(o=>person(o,` <s class="mb-meta">${o.actual} vs ${o.start}</s>`)).join('')}</div>`:''}
-      ${notInList.length?`<div class="mb-col"><div class="mb-lbl miss">Not clocked in</div>${notInList.map(o=>person(o,` <s class="mb-meta">due ${o.start}</s>`)).join('')}</div>`:''}
-      ${inNow.length?`<div class="mb-col"><div class="mb-lbl ok">On shift</div>${inNow.map(o=>person(o,` <s class="mb-meta">${o.at}</s>`)).join('')}</div>`:''}
+    ${anyone?`<div class="mb-lists">
+      ${lateList.length?`<div class="mb-col"><div class="mb-lbl warn">Late</div>${lateList.map(o=>person(o,`${o.actual} · due ${o.start}`)).join('')}</div>`:''}
+      ${notInList.length?`<div class="mb-col"><div class="mb-lbl miss">Not clocked in</div>${notInList.map(o=>person(o,`due ${o.start}`)).join('')}</div>`:''}
+      ${inNow.length?`<div class="mb-col"><div class="mb-lbl ok">On shift</div>${inNow.map(o=>person(o,o.at)).join('')}</div>`:''}
       ${leaveList.length?`<div class="mb-col"><div class="mb-lbl leave">On leave</div>${leaveList.map(o=>person(o)).join('')}</div>`:''}
-      ${(!lateList.length&&!notInList.length&&!inNow.length&&!leaveList.length)?`<div class="mb-empty">No one rostered today.</div>`:''}
-    </div>`;
+    </div>`:`<div class="mb-empty">No one rostered today.</div>`}`;
 }
 
 function startMorningBoard(){
