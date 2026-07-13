@@ -682,6 +682,7 @@ html[data-sb="collapsed"] .sb-user > div:nth-child(2) {
 .ao:hover{border-color:#475569;color:#475569;}
 .ao.yes{background:var(--accent-dim);border-color:var(--accent-bd);color:var(--accent-text);font-weight:700;}
 .ao.custom{background:#f0f9ff;border-color:#bae6fd;color:#0284c7;font-weight:700;}
+.ao.avail-preset{flex:0 0 auto !important;min-width:64px;padding:6px 12px;font-size:12px;}
 .ao.no{background:#fef2f2;border-color:rgba(255,107,71,.3);color:#dc2626;}
 .custom-time-row{
   display:none;align-items:center;gap:10px;
@@ -2401,6 +2402,126 @@ width:none !important;
 .hours-tab.active{background:var(--accent-dim);color:var(--accent-text);border-color:var(--accent-bd);}
 :is([data-theme="dark"],[data-theme="midnight"]) .hours-tab{background:#0d1117;border-color:#1f2530;color:#94a3b8;}
 :is([data-theme="dark"],[data-theme="midnight"]) .hours-tab:hover{background:#181d26;color:#f1f5f9;}
+
+/* Fortnight report — lowkey centered modal */
+.fr-back{
+  position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;
+  padding:20px;box-sizing:border-box;background:rgba(15,18,32,.55);
+  -webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);
+  animation:frFade .22s ease;
+}
+.fr-back.closing{ animation:frFadeOut .18s ease forwards; }
+@keyframes frFade{ from{opacity:0;} to{opacity:1;} }
+@keyframes frFadeOut{ from{opacity:1;} to{opacity:0;} }
+.fr-card{
+  position:relative;width:100%;max-width:400px;
+  background:#fbfbfd;border:1px solid #ececf2;border-radius:20px;
+  padding:30px 24px 22px;box-sizing:border-box;text-align:center;
+  box-shadow:0 24px 60px rgba(15,18,32,.28);
+  animation:frPop .26s cubic-bezier(.16,1,.3,1);
+  overflow:hidden;
+}
+@keyframes frPop{ from{opacity:0;transform:translateY(14px) scale(.97);} to{opacity:1;transform:none;} }
+/* muted accent tints per slide kind — soft, not loud */
+.fr-card[data-kind="hero"]{ background:linear-gradient(180deg,#f4f3fb,#fbfbfd); }
+.fr-card[data-kind="thanks"]{ background:linear-gradient(180deg,#eef4f1,#fbfbfd); }
+.fr-close{
+  position:absolute;top:12px;right:12px;width:30px;height:30px;border-radius:50%;
+  background:#f1f1f5;border:none;color:#9096a4;font-size:17px;cursor:pointer;line-height:1;z-index:2;
+}
+.fr-dots{ display:flex;gap:5px;justify-content:center;margin-bottom:20px; }
+.fr-dots span{ width:5px;height:5px;border-radius:50%;background:#dcdce4;transition:all .25s; }
+.fr-dots span.on{ background:#6b6f86;width:16px;border-radius:3px; }
+.fr-inner{ animation:frIn .42s cubic-bezier(.16,1,.3,1);cursor:pointer;min-height:180px;display:flex;flex-direction:column;justify-content:center; }
+@keyframes frIn{ from{opacity:0;transform:translateY(12px);} to{opacity:1;transform:none;} }
+.fr-icon{ font-size:34px;margin-bottom:10px; }
+.fr-label{ font-size:11.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#9498a8;margin-bottom:12px; }
+.fr-big{ font-size:clamp(52px,16vw,72px);font-weight:800;line-height:1;letter-spacing:-.03em;color:#2b2f45;font-variant-numeric:tabular-nums; }
+.fr-hero{ font-size:clamp(30px,8vw,40px);font-weight:800;line-height:1.05;letter-spacing:-.02em;color:#2b2f45; }
+.fr-sub{ font-size:14px;font-weight:500;color:#71768a;margin-top:14px;line-height:1.45;padding:0 6px; }
+.fr-thanks-sub{ font-size:15px;font-weight:600;color:#4a4f63;margin-top:12px;line-height:1.5;padding:0 6px; }
+.fr-muted{ font-size:13px;color:#9498a8; }
+.fr-you{ font-size:12.5px;color:#9498a8;margin-top:8px; }
+/* leaderboard rows */
+.fr-lb{ margin-top:4px;text-align:left; }
+.fr-lb-row{ display:flex;align-items:center;gap:9px;padding:7px 9px;border-radius:9px;margin-bottom:4px;background:#f3f3f7; }
+.fr-lb-row.me{ background:#e7e9f6;box-shadow:inset 0 0 0 1px #cdd2ef; }
+.fr-lb-rank{ width:20px;text-align:center;font-weight:800;font-size:13px;color:#6b6f86;flex-shrink:0; }
+.fr-lb-name{ flex:1;min-width:0;font-size:13px;font-weight:600;color:#2b2f45;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+.fr-lb-row.me .fr-lb-name{ font-weight:800; }
+.fr-lb-ratio{ font-size:11px;color:#9498a8;flex-shrink:0; }
+.fr-lb-score{ font-weight:800;font-size:15px;color:#4b4f97;flex-shrink:0;min-width:30px;text-align:right;font-variant-numeric:tabular-nums; }
+/* nav */
+.fr-nav{ display:flex;gap:10px;justify-content:center;margin-top:22px; }
+.fr-btn-ghost{ padding:11px 20px;border-radius:999px;border:1px solid #e0e0e8;background:transparent;color:#71768a;font-family:inherit;font-size:13.5px;font-weight:700;cursor:pointer; }
+.fr-btn-solid{ padding:11px 30px;border-radius:999px;border:none;background:#4b4f97;color:#fff;font-family:inherit;font-size:13.5px;font-weight:800;cursor:pointer; }
+/* subtle confetti on the thank-you slide */
+.fr-confetti{ position:absolute;inset:0;pointer-events:none;overflow:hidden; }
+.fr-confetti span{
+  position:absolute;top:-12px;left:calc(6% + (var(--i) * 6.4%));
+  width:7px;height:7px;border-radius:2px;opacity:0;
+  background:hsl(calc(var(--i) * 44), 55%, 68%);
+  animation:frConf 2.4s ease-in forwards;animation-delay:calc(var(--i) * 90ms);
+}
+@keyframes frConf{
+  0%{ transform:translateY(0) rotate(0);opacity:0; }
+  12%{ opacity:.9; }
+  100%{ transform:translateY(320px) rotate(320deg);opacity:0; }
+}
+@media(prefers-reduced-motion:reduce){
+  .fr-inner,.fr-card,.fr-back{ animation:none; }
+  .fr-confetti span{ display:none; }
+}
+@media(max-width:380px){
+  .fr-card{ padding:26px 18px 20px; }
+  .fr-big{ font-size:56px; }
+}
+
+/* Tap-to-open banner */
+.fr-tap{
+  width:100%;text-align:left;cursor:pointer;font-family:inherit;
+  border:1px solid #e7e6ee;background:#f8f8fb;border-radius:12px;
+  padding:13px 14px;display:flex;align-items:center;gap:12px;
+  transition:transform .12s ease, box-shadow .12s ease, background .12s ease;
+  -webkit-tap-highlight-color:transparent;
+}
+.fr-tap:hover{ background:#f4f4f9; }
+.fr-tap:active{ transform:scale(.975); background:#eeeef5; box-shadow:inset 0 1px 3px rgba(15,18,32,.06); }
+.fr-tap-ic{
+  width:34px;height:34px;border-radius:9px;background:#4b4f97;color:#fff;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+}
+.fr-tap-tx{ flex:1;min-width:0; }
+.fr-tap-t{ font-size:13.5px;font-weight:700;color:#2b2f45; }
+.fr-tap-s{ font-size:11.5px;color:#71768a;margin-top:1px; }
+.fr-tap-arrow{ color:#4b4f97;font-size:22px;font-weight:700;flex-shrink:0;transition:transform .18s ease; }
+.fr-tap:hover .fr-tap-arrow{ transform:translateX(3px); }
+
+/* Animated SVG icon (line-draw) */
+.fr-svg{ width:44px;height:44px; }
+.fr-draw .fr-svg path, .fr-draw .fr-svg rect{
+  stroke-dasharray:130;stroke-dashoffset:130;
+  animation:frDraw .9s ease forwards;
+}
+.fr-draw .fr-svg .d2{ animation-delay:.15s; }
+.fr-draw .fr-svg .d3{ animation-delay:.28s; }
+.fr-draw .fr-svg .d4{ animation-delay:.5s; }
+@keyframes frDraw{ to{ stroke-dashoffset:0; } }
+
+/* Count-up big number gets a subtle pop */
+.fr-count{ display:inline-block;animation:frPopNum .5s cubic-bezier(.16,1,.3,1); }
+@keyframes frPopNum{ from{transform:scale(.7);opacity:.3;} to{transform:none;opacity:1;} }
+
+/* Staggered leaderboard rows in the slideshow */
+.fr-stagger{ opacity:0;transform:translateY(8px);animation:frRise .4s ease forwards;animation-delay:var(--d,0ms); }
+@keyframes frRise{ to{opacity:1;transform:none;} }
+.fr-thanks-title{ animation:frPopNum .55s cubic-bezier(.16,1,.3,1); }
+
+@media(prefers-reduced-motion:reduce){
+  .fr-draw .fr-svg path,.fr-draw .fr-svg rect{ stroke-dashoffset:0;animation:none; }
+  .fr-count,.fr-stagger,.fr-thanks-title{ animation:none;opacity:1;transform:none; }
+}
+
 
 .hours-stat{
   display:flex;align-items:baseline;gap:8px;margin-bottom:6px;
@@ -5236,6 +5357,7 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
             <button onclick="setHoursPeriod('month')" id="hp-month" class="hours-tab">This month</button>
           </div>
           <div id="hoursDisplay" style="margin-top:12px;"></div>
+          <div id="punctualityNote" style="margin-top:12px;"></div>
         </div>
         <!-- Today's date — tap to open the full Calendar -->
         <button id="todayChip" onclick="goTo('calendar')" style="margin-top:14px;width:100%;border-top:1px solid #f1f5f9;padding-top:12px;background:none;border-left:none;border-right:none;border-bottom:none;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:10px;text-align:left;">
@@ -5812,6 +5934,13 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
         <button class="eng-tab" id="rtab-manager" onclick="showReportsTab('manager')" style="display:none;">Timesheet Manager</button>
       </div>
       <div id="rsec-hours">
+        <div class="card" id="fortReportCard" style="margin-bottom:14px;padding:16px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:4px;">
+            <div class="card-title" style="margin:0;">Fortnight report</div>
+            <button id="fortReplayBtn" onclick="openFortReport()" style="padding:8px 14px;border:none;border-radius:8px;background:var(--accent);color:#fff;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;">View slideshow ›</button>
+          </div>
+          <div id="fortLeaderboardMount" style="margin-top:10px;"><div style="font-size:12px;color:#94a3b8;">Loading…</div></div>
+        </div>
         <div class="card" style="margin-bottom:14px;">
           <div class="card-title" style="margin-bottom:12px;">Date range</div>
           <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;">
@@ -5854,6 +5983,15 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
           </div>
         </div>
         <div id="debugOut" style="margin-bottom:12px;font-family:monospace;font-size:11px;color:#0f172a;display:none;"></div>
+        <div class="card" style="margin-bottom:14px;padding:16px;">
+          <div style="font-size:14px;font-weight:700;color:#0f172a;margin-bottom:3px;">Class days</div>
+          <div style="font-size:12px;color:#64748b;line-height:1.5;margin-bottom:10px;">Mark class days. On these dates, punctuality is measured against each person's rostered class start (8:00 / 9:00 / 9:30) instead of their availability.</div>
+          <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;">
+            <div style="flex:1;min-width:150px;"><label style="font-size:11px;font-weight:600;color:#64748b;">Add a class day</label><input type="date" id="classDayInput" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:8px 12px;font-size:13px;font-family:inherit;outline:none;margin-top:3px;"></div>
+            <button onclick="addClassDay()" class="btn btn-green" style="padding:9px 16px;font-size:12px;">Add</button>
+          </div>
+          <div id="classDayList" style="margin-top:12px;"></div>
+        </div>
         <div id="mgrReportResults" class="card" style="padding:16px;">Pick a staff member.</div>
       </div>
     </div>
@@ -8652,6 +8790,7 @@ function setPeriod(type){
 
 function buildAvailForm(){
   if(fBuilt)return;
+  loadEarlyStartApproval();
   const el=document.getElementById("availForm");
   DAYS.forEach((day,i)=>{
     dayState[i]={type:"unset"};
@@ -8666,10 +8805,16 @@ function buildAvailForm(){
           '<button class="ao" id="ao-no-'+i+'" onclick="setDay('+i+',\'no\')"> Unavail</button>'+
         '</div>'+
       '</div>'+
-      '<div id="ctr-'+i+'" style="display:none;align-items:center;gap:8px;padding:8px 0;">'+
-        '<input type="time" class="f-input" id="cs-'+i+'" value="09:00" style="width:130px;padding:6px 10px;font-size:13px;">'+
-        '<span style="color:#94a3b8;font-size:13px;">to</span>'+
-        '<input type="time" class="f-input" id="ce-'+i+'" value="19:00" style="width:130px;padding:6px 10px;font-size:13px;">'+
+      '<div id="ctr-'+i+'" style="display:none;flex-direction:column;gap:8px;padding:8px 0;">'+
+        '<div id="apwrap-'+i+'" style="display:none;flex-direction:column;gap:6px;">'+
+          '<div style="font-size:11px;font-weight:600;color:#94a3b8;">Approved early start</div>'+
+          '<div id="aprow-'+i+'" style="display:flex;flex-wrap:wrap;gap:6px;"></div>'+
+        '</div>'+
+        '<div style="display:flex;align-items:center;gap:8px;">'+
+          '<input type="time" class="f-input" id="cs-'+i+'" value="09:00" onchange="syncStartPreset('+i+')" style="width:130px;padding:6px 10px;font-size:13px;">'+
+          '<span style="color:#94a3b8;font-size:13px;">to</span>'+
+          '<input type="time" class="f-input" id="ce-'+i+'" value="19:00" style="width:130px;padding:6px 10px;font-size:13px;">'+
+        '</div>'+
       '</div>';
     el.appendChild(wrap);
   });
@@ -8687,6 +8832,60 @@ function setDay(i,type){
   document.getElementById("ao-no-"+i).className=base+(type==="no"?" no":"");
   const ct=document.getElementById("ctr-"+i);
   if(ct)ct.style.display=type==="custom"?"flex":"none";
+  if(type==="custom"){renderStartPresets(i);enforceStartFloor(i);syncStartPreset(i);}
+}
+
+// Per-staff early-start approval. Null until loaded; false if column absent.
+let _earlyStartOk=null;
+async function loadEarlyStartApproval(){
+  if(_earlyStartOk!==null)return _earlyStartOk;
+  try{
+    const rows=await sbGet("staff_credentials","?staff_name=eq."+encodeURIComponent(me)+"&select=early_start_ok");
+    _earlyStartOk=!!(rows&&rows.length&&rows[0].early_start_ok===true);
+  }catch(e){_earlyStartOk=false;}
+  return _earlyStartOk;
+}
+
+// Approved staff may start from 08:00; everyone else from 09:00.
+function earliestStart(){return _earlyStartOk?"08:00":"09:00";}
+function presetTimes(){return _earlyStartOk?['08:00','08:15','08:30','09:00','09:30']:['09:00','09:30'];}
+
+// Inject the preset chips for a day, but only show early options to approved staff.
+function renderStartPresets(i){
+  const wrap=document.getElementById("apwrap-"+i),row=document.getElementById("aprow-"+i);
+  if(!wrap||!row)return;
+  if(!_earlyStartOk){wrap.style.display="none";return;}
+  wrap.style.display="flex";
+  row.innerHTML=presetTimes().map(function(t){
+    return '<button type="button" class="ao avail-preset" id="ap-'+i+'-'+t.replace(':','')+'" onclick="setStartPreset('+i+',\''+t+'\')">'+t+'</button>';
+  }).join('');
+}
+
+// Clamp a day's start time up to the allowed floor for this staff member.
+function enforceStartFloor(i){
+  const s=document.getElementById("cs-"+i);if(!s)return;
+  const floor=earliestStart();
+  if(s.value&&s.value<floor)s.value=floor;
+  s.min=floor;
+}
+
+// Set the start time from a preset chip. Highlights the active chip.
+function setStartPreset(i,t){
+  const s=document.getElementById("cs-"+i);
+  if(s)s.value=t;
+  enforceStartFloor(i);
+  syncStartPreset(i);
+}
+
+// Highlight whichever preset chip matches the current start time (if any).
+function syncStartPreset(i){
+  enforceStartFloor(i);
+  const s=document.getElementById("cs-"+i);
+  const cur=s?s.value:"";
+  presetTimes().forEach(function(t){
+    const b=document.getElementById("ap-"+i+"-"+t.replace(':',''));
+    if(b)b.className="ao avail-preset"+(cur===t?" yes":"");
+  });
 }
 
 async function loadExistingAvail(){
@@ -8703,6 +8902,7 @@ async function loadExistingAvail(){
       setPeriod("ongoing");
     }
     // Restore day states
+    await loadEarlyStartApproval();
     const av=r.availability;
     Object.keys(av).forEach(k=>{
       const a=av[k];
@@ -8711,6 +8911,9 @@ async function loadExistingAvail(){
         const s=document.getElementById("cs-"+k),e=document.getElementById("ce-"+k);
         if(s&&a.start)s.value=a.start;
         if(e&&a.end)e.value=a.end;
+        renderStartPresets(parseInt(k));
+        enforceStartFloor(parseInt(k));
+        syncStartPreset(parseInt(k));
       }
     });
   }catch(e){console.warn(e);}
@@ -8854,10 +9057,13 @@ function showAvailExpiredNotice(row){
 
 async function submitAvail(){
   const avail={},err=document.getElementById("availErr");err.classList.remove("show");
+  await loadEarlyStartApproval();
+  const floor=earliestStart();
   for(let i=0;i<7;i++){
     const s=dayState[i];
     if(s.type==="custom"){
       const st=document.getElementById("cs-"+i).value,en=document.getElementById("ce-"+i).value;
+      if(st<floor){err.textContent=DAYS[i]+": earliest start you're approved for is "+floor+".";err.classList.add("show");document.getElementById("cs-"+i).value=floor;return;}
       if(st>=en){err.textContent=DAYS[i]+": end time must be after start time.";err.classList.add("show");return;}
       avail[i]={type:"custom",start:st,end:en};
     }else avail[i]={type:s.type};
@@ -8883,6 +9089,12 @@ async function submitAvail(){
       res=await sbPost("staff_availability",payload);
     }
     if(res.ok||res.status===201||res.status===204){
+      // Append an immutable snapshot to history so past fortnights can still be
+      // scored against the availability that applied at the time. Best-effort:
+      // never blocks the main save.
+      try{
+        await sbPost("staff_availability_history",{staff_name:me,availability:avail,is_ongoing:isOngoing,valid_from:validFrom||null,valid_until:validUntil||null,saved_at:payload.updated_at});
+      }catch(_e){ /* history is non-critical */ }
       // Clear any expired-availability notice now that fresh availability is saved.
       const _strip=document.getElementById("availExpiredStrip");
       if(_strip)_strip.remove();
@@ -16162,7 +16374,7 @@ function showReportsTab(tab){
   document.getElementById('rsec-manager').style.display = tab === 'manager' ? '' : 'none'; if(tab === 'manager' && typeof loadExtraBreakRequests === 'function') loadExtraBreakRequests();
   document.getElementById('rtab-hours').classList.toggle('active', tab === 'hours');
   document.getElementById('rtab-manager').classList.toggle('active', tab === 'manager');
-  if(tab === 'manager') populateMgrStaff();
+  if(tab === 'manager'){ populateMgrStaff(); if(typeof loadClassDays==='function') loadClassDays(); }
 }
 
 function initReportsPage(){
@@ -16184,6 +16396,7 @@ function initReportsPage(){
     if(el && !el.value) el.value = fmt(today);
   });
   setTimeout(runHoursReport, 100);
+  if(typeof loadFortLeaderboard==='function') loadFortLeaderboard();
 }
 
 function populateMgrStaff(){
@@ -17026,6 +17239,540 @@ function renderHours(){
     '</div>'+
     '<div class="hours-detail">'+range.label+' · '+stats.sessions+' session'+(stats.sessions===1?'':'s')+(days.length?' · avg '+avgPerDay.toFixed(1)+'h/day':'')+'</div>'+
     barsHtml;
+  renderPunctualityNote();
+}
+
+// ── FORTNIGHT REPORT ──────────────────────
+// Every fortnight (Mon, aligned to the hours tracker anchor), summarise the
+// staff member's last completed fortnight: leaves, hours lost to lateness,
+// times late — plus a shared punctuality leaderboard across all staff.
+// Rules: all-day "Available" implies a 09:00 start; "Custom" uses its own
+// start. Clocking in EARLIER than the start is on time. Approved leave days
+// are skipped entirely (not counted, not penalised).
+const _FORT_ANCHOR_MS = new Date(2026, 4, 4).setHours(0,0,0,0); // Mon 4 May 2026
+const _MS_DAY = 86400000, _MS_FORT = 14*_MS_DAY;
+const _ALLDAY_START = '09:00'; // implied start for a plain "Available" day
+const _PUNCT_GRACE_MIN = 5;    // minutes of slack before "late"
+
+// Availability object active on a date (respects date-range vs ongoing window).
+function _availActiveOn(row, d){
+  if(!row) return null;
+  const ymd = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  if(!row.is_ongoing){
+    if(row.valid_from && ymd < row.valid_from) return null;
+    if(row.valid_until && ymd > row.valid_until) return null;
+  }
+  return row.availability || null;
+}
+
+// The expected start "HH:MM" for a given day slot, or null if the staffer is
+// not expected in that day (unavailable / unset / no slot).
+function _expectedStartFor(avail, date){
+  if(!avail) return null;
+  const slot = avail[(date.getDay()+6)%7]; // avail keys: 0=Mon
+  if(!slot) return null;
+  if(slot.type==='custom' && slot.start) return slot.start;
+  if(slot.type==='all' || slot.type==='available') return _ALLDAY_START; // all-day implies 09:00
+  return null; // 'no' (unavailable), 'unset', or malformed
+}
+
+// First clock-in on a local calendar day, or null.
+function _firstClockInOn(logs, d){
+  const dayStart = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const dayEnd = new Date(dayStart.getTime()+_MS_DAY);
+  let first = null;
+  (logs||[]).forEach(function(r){
+    if(r.action!=='in') return;
+    const t = new Date(r.ts);
+    if(t>=dayStart && t<dayEnd && (!first || t<first)) first = t;
+  });
+  return first;
+}
+
+// Is `date` inside an approved leave submission for this staff member?
+function _onLeave(leaveRows, date){
+  const ymd = date.getFullYear()+'-'+String(date.getMonth()+1).padStart(2,'0')+'-'+String(date.getDate()).padStart(2,'0');
+  return (leaveRows||[]).some(function(l){
+    if((l.status||'')!=='approved') return false;
+    return l.from_date && l.to_date && ymd >= l.from_date && ymd <= l.to_date;
+  });
+}
+
+// Aggregate punctuality score. Rewards both being on time AND working more
+// days, so 6/6 on time ranks above 2/2 on time. Late days drag the rate down.
+// score = onTimeRate*100 * (0.6 + 0.4*min(measuredDays/10,1)); tie-break: measuredDays.
+function _punctScore(onTimeDays, measuredDays){
+  if(measuredDays<=0) return 0;
+  const rate = onTimeDays/measuredDays;
+  const volume = 0.6 + 0.4*Math.min(measuredDays/10, 1);
+  return Math.round(rate*100*volume);
+}
+
+// From a set of availability snapshots, pick the one that applied on `date`.
+// A snapshot applies if it's ongoing, or its [valid_from, valid_until] window
+// covers the date. Among applicable snapshots, prefer the one saved most
+// recently (latest saved_at) — that's the version in effect at the time.
+// `snaps` may be a single row (legacy) or an array of history rows.
+function _resolveAvailForDay(snaps, date){
+  if(!snaps) return null;
+  const list = Array.isArray(snaps) ? snaps : [snaps];
+  const ymd = date.getFullYear()+'-'+String(date.getMonth()+1).padStart(2,'0')+'-'+String(date.getDate()).padStart(2,'0');
+  let best=null, bestTs=-1;
+  for(const s of list){
+    let applies=false;
+    if(s.is_ongoing){ applies=true; }
+    else if(s.valid_from && s.valid_until){ applies = (ymd>=s.valid_from && ymd<=s.valid_until); }
+    else if(s.valid_from && !s.valid_until){ applies = (ymd>=s.valid_from); }
+    if(!applies) continue;
+    const ts = s.saved_at ? new Date(s.saved_at).getTime() : 0;
+    if(ts>=bestTs){ bestTs=ts; best=s; }
+  }
+  return best ? (best.availability||null) : null;
+}
+
+// Compute one staff member's fortnight punctuality from pre-fetched data.
+// `availSnaps` is an array of history snapshots (or a single row).
+// `ctx` = { classDays:Set<'YYYY-MM-DD'>, classStart:'HH:MM'|null } — on a class
+// day, the person's rostered class start overrides availability.
+function _computePunctuality(availSnaps, logs, leaveRows, start, end, ctx){
+  ctx = ctx || {};
+  const classDays = ctx.classDays || null;
+  const classStart = ctx.classStart || null;
+  let measuredDays=0, onTimeDays=0, lateDays=0, totalLateMin=0, worstMin=0, worstDay='', leaveDays=0;
+  const cur=new Date(start);
+  while(cur<end){
+    if(_onLeave(leaveRows, cur)){ leaveDays++; cur.setDate(cur.getDate()+1); continue; }
+    const ymd = cur.getFullYear()+'-'+String(cur.getMonth()+1).padStart(2,'0')+'-'+String(cur.getDate()).padStart(2,'0');
+    const isClassDay = classDays && classDays.has(ymd);
+
+    let expStart=null;
+    if(isClassDay && classStart){
+      // Class day + this person is on the class roster → rostered start wins.
+      expStart = classStart;
+    }else{
+      const avail=_resolveAvailForDay(availSnaps, cur);
+      expStart=_expectedStartFor(avail, cur);
+      // Fallback: no availability info at all but they clocked in → 09:00 default.
+      // (A day covered but marked 'no'/'unset' stays excluded — deliberate off day.)
+      if(!expStart && avail===null && _firstClockInOn(logs, cur)){
+        expStart=_ALLDAY_START;
+      }
+    }
+
+    if(expStart){
+      const firstIn=_firstClockInOn(logs, cur);
+      if(firstIn){
+        measuredDays++;
+        const pp=expStart.split(':');
+        const expected=new Date(cur.getFullYear(),cur.getMonth(),cur.getDate(),+pp[0],+pp[1],0);
+        const lateMin=Math.round((firstIn-expected)/60000); // negative if early
+        if(lateMin>_PUNCT_GRACE_MIN){
+          lateDays++; totalLateMin+=lateMin;
+          if(lateMin>worstMin){ worstMin=lateMin; worstDay=cur.toLocaleDateString('en-AU',{weekday:'long'}); }
+        }else{
+          onTimeDays++; // on time OR early
+        }
+      }
+    }
+    cur.setDate(cur.getDate()+1);
+  }
+  return { measuredDays, onTimeDays, lateDays, totalLateMin, worstMin, worstDay, leaveDays,
+           score:_punctScore(onTimeDays, measuredDays) };
+}
+
+// Load class days (as a Set of YYYY-MM-DD) and the class roster (name->start).
+let _classCtxCache=null;
+async function _loadClassContext(){
+  if(_classCtxCache) return _classCtxCache;
+  let days=new Set(), roster={};
+  try{
+    const d=await sbGet('class_days','?select=class_date')||[];
+    d.forEach(function(r){ if(r.class_date) days.add(r.class_date); });
+  }catch(e){}
+  try{
+    const r=await sbGet('class_roster','?select=staff_name,start_time')||[];
+    r.forEach(function(x){ roster[x.staff_name]=x.start_time; });
+  }catch(e){}
+  _classCtxCache={ days, roster };
+  return _classCtxCache;
+}
+
+// The last COMPLETED fortnight window + storage key.
+function _lastFortnight(){
+  const now=new Date();
+  const today=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+  const curIdx=Math.floor((today.getTime()-_FORT_ANCHOR_MS)/_MS_FORT);
+  if(curIdx<1) return null;
+  const start=new Date(_FORT_ANCHOR_MS+(curIdx-1)*_MS_FORT);
+  const end=new Date(start.getTime()+_MS_FORT);
+  const key='oscars_fortreport_seen_'+start.getFullYear()+String(start.getMonth()+1).padStart(2,'0')+String(start.getDate()).padStart(2,'0');
+  const period=start.toLocaleDateString('en-AU',{day:'numeric',month:'short'})+' \u2013 '+new Date(end.getTime()-_MS_DAY).toLocaleDateString('en-AU',{day:'numeric',month:'short'});
+  return { start, end, key, period };
+}
+
+// The report surfaces from the new fortnight's Monday (= fw.end) through the
+// FRIDAY of that week. It stays visible in that window even after being opened;
+// after Friday it hides until the next fortnight.
+function _fortReportShowable(fw){
+  if(!fw) return false;
+  const friday=new Date(fw.end.getTime()+4*_MS_DAY);
+  friday.setHours(23,59,59,999);
+  const now=new Date();
+  if(now>friday) return false;
+  return true;
+}
+function _markFortReportSeen(fw){
+  if(!fw) return;
+  try{ localStorage.setItem(fw.key,'1'); }catch(e){}
+}
+
+// Cache of my computed fortnight stats.
+let _myFortCache=null;
+async function _computeMyFortnight(){
+  if(_myFortCache) return _myFortCache;
+  const fw=_lastFortnight();
+  if(!fw) return null;
+
+  let myAvail=[], myLeave=[], myLogs=[];
+  try{
+    myAvail=await sbGet('staff_availability_history','?staff_name=eq.'+encodeURIComponent(me)+'&saved_at=lt.'+fw.end.toISOString()+'&select=availability,is_ongoing,valid_from,valid_until,saved_at&order=saved_at.desc&limit=50')||[];
+  }catch(e){ myAvail=[]; }
+  if(!myAvail.length){
+    try{ const a=await sbGet('staff_availability','?staff_name=eq.'+encodeURIComponent(me)+'&order=updated_at.desc&limit=1'); if(a&&a.length) myAvail=a; }catch(e){}
+  }
+  try{ myLeave=await sbGet('leave_submissions','?staff_name=eq.'+encodeURIComponent(me)+'&status=eq.approved&limit=100')||[]; }catch(e){ myLeave=[]; }
+  myLogs=(_hoursLogs||[]).filter(function(r){ const t=new Date(r.ts); return t>=fw.start && t<fw.end; });
+  if(!myLogs.length){
+    try{ myLogs=await sbGet('clock_log','?staff_name=eq.'+encodeURIComponent(me)+'&ts=gte.'+fw.start.toISOString()+'&ts=lt.'+fw.end.toISOString()+'&order=ts.asc&limit=1000')||[]; }catch(e){ myLogs=[]; }
+  }
+
+  const cctx=await _loadClassContext();
+  const mine=_computePunctuality(myAvail, myLogs, myLeave, fw.start, fw.end, { classDays:cctx.days, classStart:cctx.roster[me]||null });
+  const myFortLeaves=(myLeave||[]).filter(function(l){
+    if((l.status||'')!=='approved'||!l.from_date||!l.to_date) return false;
+    const f=new Date(l.from_date+'T00:00:00'), t=new Date(l.to_date+'T23:59:59');
+    return f<fw.end && t>=fw.start;
+  }).length;
+  const lostH=Math.floor(mine.totalLateMin/60), lostM=mine.totalLateMin%60;
+  const lostStr = mine.totalLateMin<=0 ? '0 min' : (lostH>0?(lostH+'h '+(lostM?lostM+'m':'')).trim():mine.totalLateMin+' min');
+  const onTimeDays = mine.measuredDays - mine.lateDays;
+  const onTimePct = mine.measuredDays ? Math.round(onTimeDays/mine.measuredDays*100) : null;
+
+  _myFortCache={ fw, mine, myFortLeaves, lostStr, onTimePct };
+  return _myFortCache;
+}
+
+// Slim clock-card banner: taps through to the slideshow.
+let _fortReportDone=false;
+async function renderPunctualityNote(){
+  const el=document.getElementById('punctualityNote');
+  if(!el) return;
+  if(_fortReportDone) return;
+  _fortReportDone=true;
+  el.innerHTML='';
+
+  const data=await _computeMyFortnight();
+  if(!data) return; // no completed fortnight yet
+  if(!_fortReportShowable(data.fw)) return; // already opened this cycle
+
+  el.innerHTML=
+    '<button onclick="openFortReport()" class="fr-tap">'+
+      '<div class="fr-tap-ic">'+
+        '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><rect x="7" y="10" width="3" height="7"/><rect x="14" y="6" width="3" height="11"/></svg>'+
+      '</div>'+
+      '<div class="fr-tap-tx">'+
+        '<div class="fr-tap-t">Tap to see your fortnightly report</div>'+
+        '<div class="fr-tap-s">'+data.fw.period+'</div>'+
+      '</div>'+
+      '<div class="fr-tap-arrow">\u203A</div>'+
+    '</button>';
+}
+
+function dismissPunctualityNote(fortKey){
+  try{ localStorage.setItem(fortKey,'1'); }catch(e){}
+  const el=document.getElementById('punctualityNote');
+  if(el) el.innerHTML='';
+}
+
+// Render the leaderboard as HTML into a mount element (used by My Reports).
+function _leaderboardHTML(board){
+  if(!board || !board.length) return '<div style="font-size:12.5px;color:#94a3b8;">No punctuality data for this fortnight yet.</div>';
+  const myRank=board.findIndex(function(b){ return b.name===me; });
+  const rankColors=['#c9a227','#8a94a6','#b06b3a']; // gold, silver, bronze
+  return board.slice(0,15).map(function(b,i){
+    const isMe=b.name===me;
+    const rc = i<3 ? rankColors[i] : '#c7ccd6';
+    const rankBadge = '<div style="width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;flex-shrink:0;'+
+      (i<3?('background:'+rc+';color:#fff;'):('background:#f1f3f7;color:#8a94a6;'))+'">'+(i+1)+'</div>';
+    return '<div class="fr-lbmr-row'+(isMe?' me':'')+'" style="display:flex;align-items:center;gap:10px;padding:8px 9px;border-radius:8px;margin-bottom:4px;background:'+(isMe?'var(--accent-dim,#eef2ff)':'transparent')+';">'+
+      rankBadge+
+      '<div style="flex:1;min-width:0;font-size:13px;font-weight:'+(isMe?'800':'600')+';color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+esc(b.name)+(isMe?' (you)':'')+'</div>'+
+      '<div style="font-size:11px;color:#94a3b8;flex-shrink:0;">'+b.onTimeDays+'/'+b.measuredDays+'</div>'+
+      '<div style="font-size:14px;font-weight:800;color:var(--accent-text,#4f46e5);flex-shrink:0;min-width:34px;text-align:right;font-variant-numeric:tabular-nums;">'+b.score+'</div>'+
+    '</div>';
+  }).join('')+
+  (myRank>=15?('<div style="font-size:11px;color:#94a3b8;text-align:center;margin-top:6px;">You\u2019re #'+(myRank+1)+' \u00b7 score '+board[myRank].score+'</div>'):'')+
+  '<div style="font-size:10.5px;color:#94a3b8;margin-top:10px;line-height:1.4;">Score blends on-time rate with days worked. Clocking in early counts as on time. Leave days are skipped.</div>';
+}
+
+// ── CLASS DAYS (admin) ──────────────────────
+async function loadClassDays(){
+  const list=document.getElementById('classDayList');
+  if(!list) return;
+  let rows=[];
+  try{ rows=await sbGet('class_days','?select=class_date&order=class_date.desc&limit=60')||[]; }catch(e){}
+  if(!rows.length){ list.innerHTML='<div style="font-size:12px;color:#94a3b8;">No class days marked yet.</div>'; return; }
+  list.innerHTML=rows.map(function(r){
+    const d=new Date(r.class_date+'T00:00:00');
+    const lbl=d.toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
+    return '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 10px;border-radius:8px;background:#f8fafc;margin-bottom:4px;">'+
+      '<span style="font-size:13px;font-weight:600;color:#0f172a;">'+lbl+'</span>'+
+      '<button onclick="removeClassDay(\''+r.class_date+'\')" style="background:none;border:none;color:#dc2626;cursor:pointer;font-size:12px;font-weight:600;font-family:inherit;">Remove</button>'+
+    '</div>';
+  }).join('');
+}
+async function addClassDay(){
+  const inp=document.getElementById('classDayInput');
+  if(!inp||!inp.value){ showToast('Pick a date'); return; }
+  try{
+    await sbPost('class_days',{class_date:inp.value});
+    _classCtxCache=null; _leaderboardCache=null; _myFortCache=null;
+    inp.value='';
+    showToast('Class day added');
+    loadClassDays();
+  }catch(e){ showToast('Could not add (maybe already exists)'); }
+}
+async function removeClassDay(dateStr){
+  try{
+    await fetch(SB+'/rest/v1/class_days?class_date=eq.'+encodeURIComponent(dateStr),{
+      method:'DELETE', headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Prefer':'return=minimal'}
+    });
+    _classCtxCache=null; _leaderboardCache=null; _myFortCache=null;
+    showToast('Removed');
+    loadClassDays();
+  }catch(e){ showToast('Remove failed'); }
+}
+
+// Mount the leaderboard into My Reports. Only shown Monday-onward until opened.
+async function loadFortLeaderboard(){
+  const card=document.getElementById('fortReportCard');
+  const mount=document.getElementById('fortLeaderboardMount');
+  if(!mount) return;
+  const fw=_lastFortnight();
+  if(!fw || !_fortReportShowable(fw)){ if(card) card.style.display='none'; return; }
+  if(card) card.style.display='';
+  mount.innerHTML='<div style="font-size:12px;color:#94a3b8;">Loading…</div>';
+  const board=await _buildLeaderboard(fw);
+  mount.innerHTML=
+    '<div style="font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#64748b;margin-bottom:8px;">Punctuality leaderboard \u00b7 '+fw.period+'</div>'+
+    _leaderboardHTML(board);
+}
+
+// ── FORTNIGHT SLIDESHOW ──────────────────────
+function _fmtWH(h){ if(h<=0) return '0'; const H=Math.floor(h),M=Math.round((h-H)*60); if(H===0)return M+'m'; if(M===0)return H+'h'; return H+'h '+M+'m'; }
+
+// Tiny WebAudio blips — subtle tap on advance, soft whoosh on finish. No files.
+let _fortAudio=null;
+function _fortSound(kind){
+  try{
+    _fortAudio = _fortAudio || new (window.AudioContext||window.webkitAudioContext)();
+    const ctx=_fortAudio; if(ctx.state==='suspended') ctx.resume();
+    const now=ctx.currentTime;
+    if(kind==='tap'){
+      const o=ctx.createOscillator(), g=ctx.createGain();
+      o.type='sine'; o.frequency.setValueAtTime(520, now); o.frequency.exponentialRampToValueAtTime(660, now+0.06);
+      g.gain.setValueAtTime(0.0001, now); g.gain.exponentialRampToValueAtTime(0.09, now+0.01); g.gain.exponentialRampToValueAtTime(0.0001, now+0.14);
+      o.connect(g); g.connect(ctx.destination); o.start(now); o.stop(now+0.16);
+    }else if(kind==='whoosh'){
+      const o=ctx.createOscillator(), g=ctx.createGain();
+      o.type='triangle'; o.frequency.setValueAtTime(300, now); o.frequency.exponentialRampToValueAtTime(760, now+0.28);
+      g.gain.setValueAtTime(0.0001, now); g.gain.exponentialRampToValueAtTime(0.11, now+0.05); g.gain.exponentialRampToValueAtTime(0.0001, now+0.4);
+      o.connect(g); g.connect(ctx.destination); o.start(now); o.stop(now+0.42);
+      // gentle second note for a "complete" feel
+      const o2=ctx.createOscillator(), g2=ctx.createGain();
+      o2.type='sine'; o2.frequency.setValueAtTime(523, now+0.12); o2.frequency.setValueAtTime(784, now+0.24);
+      g2.gain.setValueAtTime(0.0001, now+0.12); g2.gain.exponentialRampToValueAtTime(0.08, now+0.16); g2.gain.exponentialRampToValueAtTime(0.0001, now+0.5);
+      o2.connect(g2); g2.connect(ctx.destination); o2.start(now+0.12); o2.stop(now+0.52);
+    }
+  }catch(e){}
+}
+
+async function openFortReport(){
+  const data=await _computeMyFortnight();
+  if(!data){ showToast('No completed fortnight yet'); return; }
+  const board=await _buildLeaderboard(data.fw);
+  const m=data.mine, fw=data.fw;
+
+  // Build slides. Each: {label, big, sub, kind}
+  const slides=[];
+  slides.push({kind:'hero', label:'Fortnight report', big:'Your two weeks', sub:fw.period});
+
+  if(m.measuredDays>0){
+    slides.push({label:'Days you clocked in', big:m.measuredDays+'', sub:'tracked working day'+(m.measuredDays===1?'':'s')});
+    slides.push({label:'On time', big:(data.onTimePct!=null?data.onTimePct+'%':'\u2014'),
+      sub:(m.measuredDays-m.lateDays)+' of '+m.measuredDays+' days \u00b7 arriving early counts as on time'});
+    if(m.lateDays>0){
+      slides.push({label:'Late starts', big:m.lateDays+'', sub:'day'+(m.lateDays===1?'':'s')+' after your start time'});
+      slides.push({label:'Time lost to lateness', big:data.lostStr, sub:m.worstMin?('longest wait: '+m.worstDay+', '+m.worstMin+' min'):''});
+    }else{
+      slides.push({label:'Late starts', big:'0', sub:'a flawless fortnight'});
+    }
+  }else{
+    slides.push({label:'Punctuality', big:'\u2014', sub:'no tracked working days this fortnight'});
+  }
+  slides.push({label:'Leave taken', big:data.myFortLeaves+'', sub:data.myFortLeaves===0?'no leave this fortnight':'approved request'+(data.myFortLeaves===1?'':'s')});
+
+  const myRank = board ? board.findIndex(function(b){return b.name===me;}) : -1;
+  slides.push({kind:'leaderboard', board:board, myRank:myRank, label:'Punctuality leaderboard'});
+
+  slides.push({kind:'thanks', big:'Thank you', sub:'for your presence at the workplace this week.'});
+
+  // Modal shell (centered, ~90% width, not full-screen).
+  let bd=document.getElementById('fortShow'); if(bd) bd.remove();
+  bd=document.createElement('div');
+  bd.id='fortShow';
+  bd.className='fr-back';
+
+  let idx=0;
+  // Animated SVG marks (drawn via stroke-dashoffset) replacing emoji.
+  const svgCal='<svg class="fr-svg" viewBox="0 0 48 48" fill="none" stroke="#6b6f86" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><rect class="d1" x="8" y="10" width="32" height="30" rx="4"/><path class="d2" d="M8 18h32"/><path class="d3" d="M16 6v8M32 6v8"/><path class="d4" d="M16 27l4 4 8-8"/></svg>';
+  const svgStar='<svg class="fr-svg" viewBox="0 0 48 48" fill="none" stroke="#3a9e78" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path class="d1" d="M24 7l5.3 10.7 11.8 1.7-8.5 8.3 2 11.8L24 40.9l-10.6 5.6 2-11.8-8.5-8.3 11.8-1.7z"/><path class="d4" d="M18 24l4 4 8-8"/></svg>';
+
+  function slideInner(s){
+    if(s.kind==='leaderboard'){
+      const rankColors=['#c9a227','#8a94a6','#b06b3a'];
+      const rows=(s.board&&s.board.length)? s.board.slice(0,6).map(function(b,i){
+        const isMe=b.name===me; const rc=i<3?rankColors[i]:'#c7ccd6';
+        const badge='<div class="fr-lb-rank" style="'+(i<3?('background:'+rc+';color:#fff;'):('background:#eceef3;color:#8a94a6;'))+'">'+(i+1)+'</div>';
+        return '<div class="fr-lb-row fr-stagger'+(isMe?' me':'')+'" style="--d:'+(i*70)+'ms;">'+
+          badge+
+          '<div class="fr-lb-name">'+esc(b.name)+(isMe?' (you)':'')+'</div>'+
+          '<div class="fr-lb-ratio">'+b.onTimeDays+'/'+b.measuredDays+'</div>'+
+          '<div class="fr-lb-score">'+b.score+'</div>'+
+        '</div>';
+      }).join('') : '<div class="fr-muted">No leaderboard data yet.</div>';
+      const youLine=(s.myRank>=6)?'<div class="fr-you">You\u2019re #'+(s.myRank+1)+'</div>':'';
+      return '<div class="fr-label">'+s.label+'</div><div class="fr-lb">'+rows+youLine+'</div>';
+    }
+    if(s.kind==='hero'){
+      return '<div class="fr-icon fr-draw">'+svgCal+'</div><div class="fr-label">'+s.label+'</div><div class="fr-hero">'+s.big+'</div><div class="fr-sub">'+s.sub+'</div>';
+    }
+    if(s.kind==='thanks'){
+      return '<div class="fr-confetti">'+Array.from({length:16}).map(function(_,i){return '<span style="--i:'+i+';"></span>';}).join('')+'</div>'+
+        '<div class="fr-icon fr-draw">'+svgStar+'</div><div class="fr-hero fr-thanks-title">'+s.big+'</div><div class="fr-thanks-sub">'+s.sub+'</div>';
+    }
+    // Stat slide — big number animates via count-up if numeric.
+    const isNum = /^\d+%?$/.test(s.big);
+    const bigHtml = isNum
+      ? '<div class="fr-big fr-count" data-target="'+parseInt(s.big,10)+'" data-suffix="'+(s.big.indexOf('%')>=0?'%':'')+'">0'+(s.big.indexOf('%')>=0?'%':'')+'</div>'
+      : '<div class="fr-big">'+s.big+'</div>';
+    return '<div class="fr-label">'+s.label+'</div>'+bigHtml+(s.sub?'<div class="fr-sub">'+s.sub+'</div>':'');
+  }
+  function runCountUp(el){
+    const target=parseInt(el.getAttribute('data-target'),10)||0;
+    const suffix=el.getAttribute('data-suffix')||'';
+    if(target<=0){ el.textContent='0'+suffix; return; }
+    const dur=650, t0=performance.now();
+    function step(now){
+      const p=Math.min((now-t0)/dur,1);
+      const eased=1-Math.pow(1-p,3);
+      el.textContent=Math.round(target*eased)+suffix;
+      if(p<1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+  function paint(playSound){
+    const s=slides[idx];
+    const card=bd.querySelector('.fr-card');
+    card.setAttribute('data-kind', s.kind||'stat');
+    const inner=bd.querySelector('#frInner');
+    inner.style.animation='none'; void inner.offsetWidth; inner.style.animation='';
+    inner.innerHTML=slideInner(s);
+    const cnt=inner.querySelector('.fr-count'); if(cnt) runCountUp(cnt);
+    bd.querySelector('#frDots').innerHTML=slides.map(function(_,i){return '<span class="'+(i===idx?'on':'')+'"></span>';}).join('');
+    bd.querySelector('#frNext').textContent = idx===slides.length-1 ? 'Done' : 'Next';
+    bd.querySelector('#frPrev').style.visibility = idx===0 ? 'hidden' : 'visible';
+    if(playSound){ _fortSound(idx===slides.length-1 ? 'whoosh' : 'tap'); }
+  }
+  function next(){ if(idx<slides.length-1){ idx++; paint(true); } else { closeFortReport(); } }
+  function prev(){ if(idx>0){ idx--; paint(true); } }
+
+  bd.innerHTML=
+    '<div class="fr-card" data-kind="hero">'+
+      '<button id="frClose" aria-label="Close" class="fr-close">\u00d7</button>'+
+      '<div id="frDots" class="fr-dots"></div>'+
+      '<div id="frInner" class="fr-inner"></div>'+
+      '<div class="fr-nav">'+
+        '<button id="frPrev" class="fr-btn-ghost">Back</button>'+
+        '<button id="frNext" class="fr-btn-solid">Next</button>'+
+      '</div>'+
+    '</div>';
+  document.body.appendChild(bd);
+  document.body.style.overflow='hidden';
+  bd.querySelector('#frClose').onclick=closeFortReport;
+  bd.querySelector('#frNext').onclick=next;
+  bd.querySelector('#frPrev').onclick=prev;
+  // Tap anywhere on the card body (not buttons) advances.
+  bd.querySelector('#frInner').onclick=next;
+  bd.onclick=function(e){ if(e.target===bd) closeFortReport(); }; // tap backdrop to close
+  paint(false);
+}
+
+function closeFortReport(){
+  const bd=document.getElementById('fortShow');
+  if(bd){ bd.classList.add('closing'); setTimeout(function(){ bd.remove(); }, 180); }
+  document.body.style.overflow='';
+}
+
+// Build the shared leaderboard. Reads every staff member's availability, then
+// their leave + clock logs for the fortnight, and scores each.
+let _leaderboardCache=null;
+async function _buildLeaderboard(fw){
+  if(_leaderboardCache) return _leaderboardCache;
+
+  // Availability HISTORY snapshots saved up to the fortnight end — this lets us
+  // resolve each day against the availability that actually applied then.
+  let histRows=[];
+  try{ histRows=await sbGet('staff_availability_history','?saved_at=lt.'+fw.end.toISOString()+'&select=staff_name,availability,is_ongoing,valid_from,valid_until,saved_at&order=saved_at.desc&limit=5000')||[]; }catch(e){}
+
+  const availBy={};
+  histRows.forEach(function(a){ (availBy[a.staff_name]=availBy[a.staff_name]||[]).push(a); });
+
+  // Fallback: anyone with no history yet uses their current live row.
+  try{
+    const live=await sbGet('staff_availability','?select=staff_name,availability,is_ongoing,valid_from,valid_until,updated_at')||[];
+    live.forEach(function(r){
+      if(!availBy[r.staff_name]){ availBy[r.staff_name]=[{availability:r.availability,is_ongoing:r.is_ongoing,valid_from:r.valid_from,valid_until:r.valid_until,saved_at:r.updated_at}]; }
+    });
+  }catch(e){}
+
+  if(!Object.keys(availBy).length) return null;
+
+  // Fetch all approved leave + all clock logs in the window once, then bucket.
+  let allLeave=[], allLogs=[];
+  try{ allLeave=await sbGet('leave_submissions','?status=eq.approved&select=staff_name,from_date,to_date,status&limit=2000')||[]; }catch(e){}
+  try{ allLogs=await sbGet('clock_log','?ts=gte.'+fw.start.toISOString()+'&ts=lt.'+fw.end.toISOString()+'&select=staff_name,action,ts&order=ts.asc&limit=5000')||[]; }catch(e){}
+
+  const leaveBy={}, logsBy={};
+  allLeave.forEach(function(l){ (leaveBy[l.staff_name]=leaveBy[l.staff_name]||[]).push(l); });
+  allLogs.forEach(function(r){ (logsBy[r.staff_name]=logsBy[r.staff_name]||[]).push(r); });
+
+  const cctx=await _loadClassContext();
+  const board=[];
+  Object.keys(availBy).forEach(function(nm){
+    const res=_computePunctuality(availBy[nm], logsBy[nm]||[], leaveBy[nm]||[], fw.start, fw.end, { classDays:cctx.days, classStart:cctx.roster[nm]||null });
+    if(res.measuredDays>0){ // only rank people with tracked working days
+      board.push({ name:nm, score:res.score, onTimeDays:res.onTimeDays, measuredDays:res.measuredDays, lateDays:res.lateDays });
+    }
+  });
+  // Sort: score desc, then more days worked, then fewer late days.
+  board.sort(function(x,y){
+    if(y.score!==x.score) return y.score-x.score;
+    if(y.measuredDays!==x.measuredDays) return y.measuredDays-x.measuredDays;
+    return x.lateDays-y.lateDays;
+  });
+  _leaderboardCache=board;
+  return board;
 }
 
 // ── TASK SHARING ──────────────────────
