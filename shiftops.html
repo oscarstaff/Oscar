@@ -5591,7 +5591,7 @@ async function aaSave(){
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────
-const SHIFTOPS_BUILD='2026-07-13-rosterfix-5-saveguard';
+const SHIFTOPS_BUILD='2026-07-13-rosterfix-6-flextime';
 console.log('%c[ShiftOps build '+SHIFTOPS_BUILD+' loaded]','background:#16a34a;color:#fff;padding:2px 8px;border-radius:4px;font-weight:700;');
 (async()=>{
   await loadData();
@@ -5772,6 +5772,20 @@ function _todayDayIndex(){
 function _hhmmSydney(iso){
   return new Intl.DateTimeFormat('en-GB',{timeZone:'Australia/Sydney',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(iso));
 }
+// Display clock times with the SAME 7-min / nearest-15 flexibility Nexus uses:
+//   :00-07→:00  :08-22→:15  :23-37→:30  :38-52→:45  :53-59→next :00
+// Applied to the Sydney wall-clock h:mm, so the board matches Nexus exactly.
+function _hhmmFlexSydney(iso){
+  const hhmm=_hhmmSydney(iso);            // "09:07" in Sydney time
+  const parts=hhmm.split(':');
+  let h=parseInt(parts[0],10), m=parseInt(parts[1],10);
+  if(m<=7) m=0;
+  else if(m<=22) m=15;
+  else if(m<=37) m=30;
+  else if(m<=52) m=45;
+  else { m=0; h=(h+1)%24; }
+  return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0');
+}
 
 async function refreshMorningBoard(){
   const host = document.getElementById('morningBoard');
@@ -5811,17 +5825,18 @@ async function refreshMorningBoard(){
     if(onLeave){ leaveList.push({s}); return; }
 
     if(clockedIn){
-      // late only if we know their rostered start and they beat it
+      // late only if we know their rostered start and they beat it.
+      // Compare against REAL time for accuracy; DISPLAY the flex-rounded time.
       let late = null;
       if(startTime){
-        const t = _hhmmSydney(p.ts);
-        if(t > startTime) late = {start:startTime, actual:t};
+        const tReal = _hhmmSydney(p.ts);
+        if(tReal > startTime) late = {start:startTime, actual:_hhmmFlexSydney(p.ts)};
       }
-      if(late) lateList.push({s, ...late}); else inNow.push({s, at:_hhmmSydney(p.ts)});
+      if(late) lateList.push({s, ...late}); else inNow.push({s, at:_hhmmFlexSydney(p.ts)});
       return;
     }
 
-    if(clockedOut){ doneList.push({s, at:_hhmmSydney(p.ts)}); return; }
+    if(clockedOut){ doneList.push({s, at:_hhmmFlexSydney(p.ts)}); return; }
 
     // NOT CLOCKED IN — anyone with no punch today.
     // Rostered staff show their due time; unrostered staff still appear
