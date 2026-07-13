@@ -1503,12 +1503,32 @@ body.tl-readonly .wk-tools{ display:none !important; }
         <div style="display:flex;gap:0;margin-bottom:18px;border-bottom:1px solid var(--border);">
           <div class="sub-tab active" id="subtab-avail-edit" onclick="showAvailTab('edit')">Weekly Grid</div>
           <div class="sub-tab" id="subtab-avail-submitted" onclick="showAvailTab('submitted')">Submitted Availability</div>
+          <div class="sub-tab" id="subtab-avail-classdays" onclick="showAvailTab('classdays')">Class Days</div>
         </div>
         <div id="availsec-edit">
           <div class="avail-grid" id="availGrid"></div>
         </div>
         <div id="availsec-submitted" style="display:none;">
           <div id="submittedAvailContent"></div>
+        </div>
+        <div id="availsec-classdays" style="display:none;">
+          <div class="card" style="padding:18px;max-width:640px;">
+            <div style="font-size:15px;font-weight:700;margin-bottom:3px;">Class days</div>
+            <div style="font-size:12.5px;color:var(--text-dim);line-height:1.5;margin-bottom:12px;">Mark class days. On these dates, punctuality is measured against each person's rostered class start (8:00 / 9:00 / 9:30) instead of their availability.</div>
+            <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;">
+              <div style="flex:1;min-width:150px;"><label style="font-size:11px;font-weight:600;color:var(--text-dim);">Add a class day</label><input type="date" id="classDayInput" style="width:100%;border:1.5px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;font-family:inherit;outline:none;margin-top:3px;background:var(--input-bg,#fff);color:inherit;"></div>
+              <button onclick="addClassDay()" class="btn btn-primary" style="padding:9px 16px;font-size:12px;">Add</button>
+            </div>
+            <div id="classDayList" style="margin-top:14px;"></div>
+            <div style="border-top:1px solid var(--border);margin-top:16px;padding-top:14px;">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+                <div style="font-size:13px;font-weight:700;">Class start roster</div>
+                <button onclick="toggleRosterEditor()" id="rosterToggleBtn" class="btn btn-ghost" style="padding:6px 12px;font-size:12px;">Edit</button>
+              </div>
+              <div style="font-size:11.5px;color:var(--text-dim);line-height:1.5;margin-top:3px;">Each person's start time on a class day. Set to <b>none</b> to remove them (they'll use availability instead).</div>
+              <div id="rosterEditor" style="display:none;margin-top:12px;"></div>
+            </div>
+          </div>
         </div>
       </div>
       <div class="tab-content" id="section-staff">
@@ -2766,14 +2786,159 @@ function setAvailTeamFilter(t){ _availTeamFilter = t; renderAvailability(); }
 
 
 // ── SUBMITTED AVAILABILITY VIEW ──
+// ── CLASS DAYS (admin) — ported from Nexus ──────────────────────
+function _cdEsc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function _cdStaffNames(){ return (staff||[]).map(s=>(s.first+' '+s.last).trim()).filter(Boolean).sort(); }
+async function _cdGet(path){ try{ const r=await fetch(SUPABASE_URL+'/rest/v1/'+path,{headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY}}); return r.ok?await r.json():[]; }catch(e){ return []; } }
+const _CD_H={apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY};
+const _CD_HJ={..._CD_H,'Content-Type':'application/json'};
+
+async function loadClassDays(){
+  const list=document.getElementById('classDayList');
+  if(!list) return;
+  const rows=await _cdGet('class_days?select=class_date&order=class_date.desc&limit=60');
+  if(!rows.length){ list.innerHTML='<div style="font-size:12px;color:var(--text-dim);">No class days marked yet.</div>'; return; }
+  list.innerHTML=rows.map(function(r){
+    const d=new Date(r.class_date+'T00:00:00');
+    const lbl=d.toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
+    return '<div style="padding:8px 10px;border-radius:8px;background:var(--panel-2,rgba(127,127,127,.06));margin-bottom:5px;">'+
+      '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">'+
+        '<span style="font-size:13px;font-weight:600;">'+lbl+'</span>'+
+        '<div style="display:flex;gap:12px;align-items:center;flex-shrink:0;">'+
+          '<button onclick="toggleDayException(\''+r.class_date+'\')" style="background:none;border:none;color:var(--accent,#3d9eff);cursor:pointer;font-size:12px;font-weight:700;font-family:inherit;">Exceptions</button>'+
+          '<button onclick="removeClassDay(\''+r.class_date+'\')" style="background:none;border:none;color:#e5484d;cursor:pointer;font-size:12px;font-weight:600;font-family:inherit;">Remove</button>'+
+        '</div>'+
+      '</div>'+
+      '<div id="dayExc-'+r.class_date+'" style="display:none;margin-top:8px;"></div>'+
+    '</div>';
+  }).join('');
+}
+async function addClassDay(){
+  const inp=document.getElementById('classDayInput');
+  if(!inp||!inp.value){ showToast('Pick a date'); return; }
+  try{
+    await fetch(SUPABASE_URL+'/rest/v1/class_days',{method:'POST',headers:{..._CD_HJ,'Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({class_date:inp.value})});
+    inp.value=''; showToast('Class day added'); loadClassDays();
+  }catch(e){ showToast('Could not add (maybe already exists)'); }
+}
+async function removeClassDay(dateStr){
+  try{
+    await fetch(SUPABASE_URL+'/rest/v1/class_days?class_date=eq.'+encodeURIComponent(dateStr),{method:'DELETE',headers:{..._CD_H,'Prefer':'return=minimal'}});
+    showToast('Removed'); loadClassDays();
+  }catch(e){ showToast('Remove failed'); }
+}
+
+// ── CLASS START ROSTER EDITOR ──────────────────────
+let _rosterEditorOpen=false;
+async function toggleRosterEditor(){
+  _rosterEditorOpen=!_rosterEditorOpen;
+  const ed=document.getElementById('rosterEditor');
+  const btn=document.getElementById('rosterToggleBtn');
+  if(!ed) return;
+  ed.style.display=_rosterEditorOpen?'block':'none';
+  if(btn) btn.textContent=_rosterEditorOpen?'Close':'Edit';
+  if(_rosterEditorOpen) renderRosterEditor();
+}
+async function renderRosterEditor(){
+  const ed=document.getElementById('rosterEditor');
+  if(!ed) return;
+  ed.innerHTML='<div style="font-size:12px;color:var(--text-dim);">Loading…</div>';
+  let map={};
+  (await _cdGet('class_roster?select=staff_name,start_time')).forEach(function(r){ map[r.staff_name]=r.start_time; });
+  const names=_cdStaffNames();
+  const opts=['','08:00','08:15','08:30','09:00','09:30'];
+  ed.innerHTML='<div style="max-height:360px;overflow-y:auto;border:1px solid var(--border);border-radius:10px;">'+
+    names.map(function(nm){
+      const cur=map[nm]||'';
+      return '<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-bottom:1px solid var(--border);">'+
+        '<span style="flex:1;min-width:0;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+_cdEsc(nm)+'</span>'+
+        '<select onchange="setRosterStart(this,\''+encodeURIComponent(nm)+'\')" style="border:1.5px solid var(--border);border-radius:7px;padding:5px 8px;font-size:12px;font-family:inherit;background:var(--input-bg,#fff);color:inherit;">'+
+          opts.map(function(o){return '<option value="'+o+'"'+(o===cur?' selected':'')+'>'+(o===''?'none':o)+'</option>';}).join('')+
+        '</select>'+
+      '</div>';
+    }).join('')+
+  '</div>'+
+  '<div style="font-size:10.5px;color:var(--text-dim);margin-top:8px;">Changes save instantly.</div>';
+}
+async function setRosterStart(sel, nmEnc){
+  const nm=decodeURIComponent(nmEnc), val=sel.value;
+  try{
+    if(val===''){
+      await fetch(SUPABASE_URL+'/rest/v1/class_roster?staff_name=eq.'+encodeURIComponent(nm),{method:'DELETE',headers:{..._CD_H,'Prefer':'return=minimal'}});
+    }else{
+      await fetch(SUPABASE_URL+'/rest/v1/class_roster',{method:'POST',headers:{..._CD_HJ,'Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({staff_name:nm,start_time:val,updated_at:new Date().toISOString()})});
+    }
+    showToast(val===''?(nm.split(' ')[0]+' removed'):(nm.split(' ')[0]+' → '+val));
+  }catch(e){ showToast('Save failed'); }
+}
+
+// ── PER-DATE CLASS EXCEPTIONS ──────────────────────
+async function toggleDayException(dateStr){
+  const box=document.getElementById('dayExc-'+dateStr);
+  if(!box) return;
+  if(box.style.display==='none'){ box.style.display='block'; renderDayException(dateStr); }
+  else box.style.display='none';
+}
+async function renderDayException(dateStr){
+  const box=document.getElementById('dayExc-'+dateStr);
+  if(!box) return;
+  box.innerHTML='<div style="font-size:11.5px;color:var(--text-dim);">Loading…</div>';
+  const ov=await _cdGet('class_day_overrides?class_date=eq.'+encodeURIComponent(dateStr)+'&select=staff_name,start_time');
+  const names=_cdStaffNames();
+  const opts=['excluded','08:00','08:15','08:30','09:00','09:30'];
+  const rowsHtml = ov.length ? ov.map(function(o){
+    const cur=(o.start_time===null||o.start_time===undefined)?'excluded':o.start_time;
+    return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;">'+
+      '<span style="flex:1;min-width:0;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+_cdEsc(o.staff_name)+'</span>'+
+      '<select onchange="setDayException(\''+dateStr+'\',\''+encodeURIComponent(o.staff_name)+'\',this.value)" style="border:1.5px solid var(--border);border-radius:7px;padding:4px 7px;font-size:12px;font-family:inherit;background:var(--input-bg,#fff);color:inherit;">'+
+        opts.map(function(x){return '<option value="'+x+'"'+(x===cur?' selected':'')+'>'+x+'</option>';}).join('')+
+      '</select>'+
+      '<button onclick="clearDayException(\''+dateStr+'\',\''+encodeURIComponent(o.staff_name)+'\')" style="background:none;border:none;color:#e5484d;cursor:pointer;font-size:11px;font-weight:600;font-family:inherit;">×</button>'+
+    '</div>';
+  }).join('') : '<div style="font-size:11.5px;color:var(--text-dim);">No exceptions — everyone uses the roster this day.</div>';
+  box.innerHTML=
+    '<div style="font-size:11px;color:var(--text-dim);margin-bottom:6px;">Only add people whose start differs from the roster on this date.</div>'+
+    rowsHtml+
+    '<div style="display:flex;gap:6px;margin-top:8px;">'+
+      '<select id="excAdd-'+dateStr+'" style="flex:1;border:1.5px solid var(--border);border-radius:7px;padding:6px 8px;font-size:12px;font-family:inherit;background:var(--input-bg,#fff);color:inherit;">'+
+        '<option value="">Add person…</option>'+
+        names.map(function(n){return '<option value="'+encodeURIComponent(n)+'">'+_cdEsc(n)+'</option>';}).join('')+
+      '</select>'+
+      '<button onclick="addDayException(\''+dateStr+'\')" class="btn btn-primary" style="padding:6px 12px;font-size:12px;">Add</button>'+
+    '</div>';
+}
+async function addDayException(dateStr){
+  const sel=document.getElementById('excAdd-'+dateStr);
+  if(!sel||!sel.value){ showToast('Pick a person'); return; }
+  const nm=decodeURIComponent(sel.value);
+  await setDayException(dateStr, encodeURIComponent(nm), 'excluded');
+  renderDayException(dateStr);
+}
+async function setDayException(dateStr, nmEnc, val){
+  const nm=decodeURIComponent(nmEnc);
+  const start_time=(val==='excluded')?null:val;
+  try{
+    await fetch(SUPABASE_URL+'/rest/v1/class_day_overrides',{method:'POST',headers:{..._CD_HJ,'Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({class_date:dateStr,staff_name:nm,start_time:start_time,updated_at:new Date().toISOString()})});
+    showToast(nm.split(' ')[0]+': '+(start_time===null?'excluded':start_time));
+  }catch(e){ showToast('Save failed'); }
+}
+async function clearDayException(dateStr, nmEnc){
+  const nm=decodeURIComponent(nmEnc);
+  try{
+    await fetch(SUPABASE_URL+'/rest/v1/class_day_overrides?class_date=eq.'+encodeURIComponent(dateStr)+'&staff_name=eq.'+encodeURIComponent(nm),{method:'DELETE',headers:{..._CD_H,'Prefer':'return=minimal'}});
+    showToast('Exception removed'); renderDayException(dateStr);
+  }catch(e){ showToast('Remove failed'); }
+}
+
 function showAvailTab(tab){
-  ['edit','submitted'].forEach(s=>{
+  ['edit','submitted','classdays'].forEach(s=>{
     const sec=document.getElementById('availsec-'+s);
     const t=document.getElementById('subtab-avail-'+s);
     if(sec)sec.style.display=s===tab?'block':'none';
     if(t)t.classList.toggle('active',s===tab);
   });
   if(tab==='submitted')loadSubmittedAvailability().then(function(){ try{ applyTeamLeadLock(); }catch(e){} });
+  if(tab==='classdays')loadClassDays();
 }
 
 let submittedAvailData=[];
@@ -5593,7 +5758,7 @@ async function aaSave(){
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────
-const SHIFTOPS_BUILD='2026-07-13-rosterfix-8-namereader';
+const SHIFTOPS_BUILD='2026-07-13-rosterfix-9-classdays';
 console.log('%c[ShiftOps build '+SHIFTOPS_BUILD+' loaded]','background:#16a34a;color:#fff;padding:2px 8px;border-radius:4px;font-weight:700;');
 (async()=>{
   await loadData();
