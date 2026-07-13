@@ -1957,7 +1957,17 @@ async function loadData(){
         // Normalize legacy week-key format drift ("29 June" → "29 Jun") so save
         // and load always agree. Re-key any store entry whose key doesn't match
         // the canonical fmtDate() output for its Monday.
+        const _keysBefore = JSON.stringify(Object.keys(shiftsStore||{}).sort())+'|'+JSON.stringify(Object.keys(availStore||{}).sort());
         try{ _normalizeStoreKeys(); }catch(e){ console.warn('[WEEK-DEBUG] normalize failed', e); }
+        const _keysAfter = JSON.stringify(Object.keys(shiftsStore||{}).sort())+'|'+JSON.stringify(Object.keys(availStore||{}).sort());
+        // If normalization actually collapsed any duplicate/long-form keys, persist
+        // the cleaned store back immediately so the DB can't keep re-serving stale
+        // long-form keys (the roster-erasing bug). Deferred slightly so the rest of
+        // load (staff, availWeekKey) settles first.
+        if(_keysBefore!==_keysAfter){
+          console.log('[WEEK-DEBUG] store keys normalized on load; scheduling cleanup save');
+          setTimeout(function(){ try{ if(typeof forceSave==='function') forceSave(); }catch(e){} }, 1500);
+        }
         // legacy support
         if(res.data.shifts&&!res.data.shiftsStore){shiftsStore[res.data.availWeekKey||'legacy']=res.data.shifts;}
         if(res.data.availability&&!res.data.availStore){availStore[res.data.availWeekKey||'legacy']=res.data.availability;}
@@ -2472,7 +2482,7 @@ function editShift(staffId,dayIdx,shiftIdx){
 function weekKey(date){return fmtDate(getMonday(date));}
 
 function saveCurrentWeek(){
-  const key=availWeekKey||weekKey(currentWeekStart);
+  const key=_canonicalWeekKey(availWeekKey||weekKey(currentWeekStart));
   const _liveStaff=Object.keys(shifts||{}).length;
   let _liveShiftDays=0;
   try{ Object.values(shifts||{}).forEach(function(byDay){ Object.values(byDay||{}).forEach(function(arr){ if(arr&&arr.length)_liveShiftDays++; }); }); }catch(e){}
