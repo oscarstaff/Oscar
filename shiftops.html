@@ -5758,7 +5758,7 @@ async function aaSave(){
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────
-const SHIFTOPS_BUILD='2026-07-13-rosterfix-9-classdays';
+const SHIFTOPS_BUILD='2026-07-13-rosterfix-10-classboard';
 console.log('%c[ShiftOps build '+SHIFTOPS_BUILD+' loaded]','background:#16a34a;color:#fff;padding:2px 8px;border-radius:4px;font-weight:700;');
 (async()=>{
   await loadData();
@@ -5976,6 +5976,20 @@ async function refreshMorningBoard(){
   const last = {};
   punches.forEach(p=>{ last[_normName(p.staff_name)] = p; });
 
+  // Class-day context for TODAY: if today is a class day, punctuality is judged
+  // against each person's class-roster start (with any per-date exception), not
+  // their shift/availability. Fetch once; empty when today isn't a class day.
+  const todayIso = today; // YYYY-MM-DD (Sydney)
+  let classToday=false, classRoster={}, classOverrides={};
+  try{
+    const cd = await _cdGet('class_days?class_date=eq.'+todayIso+'&select=class_date');
+    classToday = !!(cd && cd.length);
+    if(classToday){
+      (await _cdGet('class_roster?select=staff_name,start_time')).forEach(r=>{ classRoster[_normName(r.staff_name)]=r.start_time; });
+      (await _cdGet('class_day_overrides?class_date=eq.'+todayIso+'&select=staff_name,start_time')).forEach(o=>{ classOverrides[_normName(o.staff_name)]={has:true,start:o.start_time}; });
+    }
+  }catch(e){ /* board still works without class context */ }
+
   const dayIdx = _todayDayIndex();
   const inNow=[], lateList=[], leaveList=[], notInList=[], doneList=[];
 
@@ -5987,7 +6001,20 @@ async function refreshMorningBoard(){
     const p = last[key];
     const clockedIn  = p && p.action==='in';
     const clockedOut = p && p.action==='out';
-    const startTime  = rostered.length ? rostered.map(x=>x.start).sort()[0] : null;
+    let startTime  = rostered.length ? rostered.map(x=>x.start).sort()[0] : null;
+
+    // On a class day, the rostered class start wins (per-date exception first,
+    // then the class roster). An override with null start = excluded → fall back
+    // to the normal shift start above.
+    if(classToday){
+      const ov = classOverrides[key];
+      if(ov && ov.has){
+        if(ov.start) startTime = ov.start;   // explicit override time
+        // ov.start null → excluded, keep shift-based startTime
+      }else if(classRoster[key]){
+        startTime = classRoster[key];         // class roster start
+      }
+    }
 
     if(onLeave){ leaveList.push({s}); return; }
 
