@@ -2567,34 +2567,34 @@ function _normalizeStoreKeys(){
 }
 // Resolve a week key against shiftsStore tolerating month-format drift.// Legacy data mixed "29 Jun" (short) and "29 June" (long) — match either.
 function _resolveStoreKey(key){
-  if(shiftsStore[key]) return key;                 // exact hit
-  // Build normalized candidates: swap short<->long month, and match case-insensitively.
+  // Collect ALL format-variants of this week that exist in the store, then pick
+  // the one holding the most staff data. This is defensive: if duplicate keys
+  // ("13 Jul" + "13 July") ever coexist, we must never return the emptier one
+  // (that made the whole roster appear to vanish on load).
   const monthsLong=['january','february','march','april','may','june','july','august','september','october','november','december'];
   const monthsShort=['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
-  const norm=function(s){ return String(s).trim().toLowerCase(); };
-  const parts=String(key).trim().split(/\s+/); // ["29","Jun"] or ["29","June"]
-  if(parts.length===2){
-    const day=parts[0], mon=norm(parts[1]);
-    let li=monthsLong.indexOf(mon), si=monthsShort.indexOf(mon);
-    let idx = li>=0?li : (si>=0?si : -1);
-    if(idx>=0){
-      const cand=[
-        day+' '+monthsShort[idx].charAt(0).toUpperCase()+monthsShort[idx].slice(1),
-        day+' '+monthsLong[idx].charAt(0).toUpperCase()+monthsLong[idx].slice(1)
-      ];
-      for(const c of cand){ if(shiftsStore[c]) return c; }
+  const norm=function(s){ return String(s).trim().toLowerCase().replace(/\s+/g,' '); };
+  const want=norm(key);
+  const wp=want.split(' ');
+  const variants=[];
+  if(shiftsStore[key]) variants.push(key);
+  Object.keys(shiftsStore).forEach(function(k){
+    if(k===key) return;
+    const kn=norm(k); const kp=kn.split(' ');
+    // same day + same month (first 3 letters) = same week, different format
+    if(wp.length===2 && kp.length===2 && wp[0]===kp[0] && kp[1].slice(0,3)===wp[1].slice(0,3)){
+      variants.push(k);
     }
-  }
-  // Last resort: case-insensitive scan of existing keys.
-  const want=norm(key).replace(/\s+/g,' ');
-  for(const k of Object.keys(shiftsStore)){
-    const kn=norm(k).replace(/\s+/g,' ');
-    if(kn===want) return k;
-    // compare day + first 3 letters of month
-    const wp=want.split(' '), kp=kn.split(' ');
-    if(wp.length===2 && kp.length===2 && wp[0]===kp[0] && kp[1].slice(0,3)===wp[1].slice(0,3)) return k;
-  }
-  return null;
+  });
+  if(!variants.length) return null;
+  if(variants.length===1) return variants[0];
+  // Multiple variants — return the one with the most staff entries.
+  let best=variants[0], bestCnt=-1;
+  variants.forEach(function(k){
+    const cnt=Object.keys(shiftsStore[k]||{}).length;
+    if(cnt>bestCnt){ bestCnt=cnt; best=k; }
+  });
+  return best;
 }
 function loadWeek(key){
   const resolved=_resolveStoreKey(key);
@@ -5345,52 +5345,72 @@ async function pushStaffNames(){
 
 async function syncAvailability(){
   showToast('Syncing availability…');
+  const applied = await _syncAvailabilityCore();
+  if(applied<0){ showToast('Sync failed'); return; }
+  if(applied===0){ showToast('No availability found — staff haven\'t submitted yet'); return; }
+  showToast(' Synced availability for '+applied+' staff member'+(applied!==1?'s':''));
+}
+
+// Core availability pull. Returns count applied, or -1 on error, 0 if none.
+// `silent` skips the heavy save spam when called on the background timer.
+let _lastAvailSig='';
+async function _syncAvailabilityCore(silent){
   try {
-    // Fetch persistent availability from staff_availability table
     const res=await fetch(
       `${SUPABASE_URL}/rest/v1/staff_availability?select=*`,
       {headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`}}
     );
-    if(!res.ok)throw new Error('Fetch failed');
+    if(!res.ok) return -1;
     const rows=await res.json();
-    if(!rows.length){showToast('No availability found — staff haven\'t submitted yet');return;}
+    if(!rows.length) return 0;
+
+    // Skip re-applying if nothing changed since last pull (avoids needless saves
+    // on the auto-timer). Signature = staff_name+updated_at pairs.
+    const sig=rows.map(function(r){return r.staff_name+'@'+(r.updated_at||'');}).sort().join('|');
+    if(silent && sig===_lastAvailSig) return 0;
+    _lastAvailSig=sig;
 
     let applied=0;
     const today=new Date();today.setHours(0,0,0,0);
-
     rows.forEach(row=>{
-      // Check if this availability is valid for today
-      // Treat is_ongoing=null as ongoing (safe default)
       if(row.is_ongoing===false){
-        if(row.valid_from){
-          const from=new Date(row.valid_from+'T00:00:00');
-          if(today<from)return; // not yet active
-        }
-        if(row.valid_until){
-          const until=new Date(row.valid_until+'T00:00:00');
-          if(today>until)return; // expired
-        }
+        if(row.valid_from){ const from=new Date(row.valid_from+'T00:00:00'); if(today<from)return; }
+        if(row.valid_until){ const until=new Date(row.valid_until+'T00:00:00'); if(today>until)return; }
       }
-      // Find matching staff
       const s=staff.find(x=>`${x.first} ${x.last}`.toLowerCase()===row.staff_name.toLowerCase());
       if(!s)return;
       if(!availability[s.id])availability[s.id]={};
       const av=row.availability;
-      Object.keys(av).forEach(d=>{
-        availability[s.id][parseInt(d)]=av[d];
-      });
+      Object.keys(av).forEach(d=>{ availability[s.id][parseInt(d)]=av[d]; });
       applied++;
     });
 
     markDirty();renderAvailability();renderRoster();
     try{ applyTeamLeadLock(); }catch(e){}
-    showToast(` Synced availability for ${applied} staff member${applied!==1?'s':''}`);
     await saveData();
-    // Refresh submitted view if open
-    if(document.getElementById('availsec-submitted')&&document.getElementById('availsec-submitted').style.display!=='none'){loadSubmittedAvailability().then(function(){ try{ applyTeamLeadLock(); }catch(e){} });}
-  } catch(e){
-    showToast('Sync failed: '+e.message);
-  }
+    if(document.getElementById('availsec-submitted')&&document.getElementById('availsec-submitted').style.display!=='none'){
+      loadSubmittedAvailability().then(function(){ try{ applyTeamLeadLock(); }catch(e){} });
+    }
+    return applied;
+  } catch(e){ return -1; }
+}
+
+// Auto-sync: once shortly after load, then quietly every few minutes so new
+// availability submissions flow into ShiftOps without anyone clicking Sync.
+let _autoAvailTimer=null;
+function startAutoAvailabilitySync(){
+  if(_autoAvailTimer) return;
+  // First pull ~4s after load (once staff list is settled).
+  setTimeout(function(){ _syncAvailabilityCore(true); }, 4000);
+  // Then every 3 minutes.
+  _autoAvailTimer=setInterval(function(){
+    if(document.hidden) return;          // don't sync a backgrounded tab
+    _syncAvailabilityCore(true);
+  }, 3*60*1000);
+  // Also pull when the tab regains focus (someone likely just updated availability).
+  document.addEventListener('visibilitychange', function(){
+    if(!document.hidden) _syncAvailabilityCore(true);
+  });
 }
 
 // ── PUBLISH ROSTER ────────────────────────────────────────────────────────
@@ -5547,6 +5567,7 @@ async function aaSave(){
   // Push staff names to Supabase for the web form
   pushStaffNames();
   updateSaveStatus();
+  try{ startAutoAvailabilitySync(); }catch(e){ console.warn('auto avail sync', e); }
 })();
 
 /* ═══════════════════════════════════════════════════════════════════
