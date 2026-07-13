@@ -1989,9 +1989,22 @@ async function loadData(){
   // 2) Staff roster from Supabase — the real, authoritative list (same source
   //    Nexus uses). This replaces the local/seed staff whenever it succeeds, so
   //    running ShiftOps inside Nexus (no desktop bridge) shows real staff.
-  try{
-    await loadStaffFromSupabase();
-  }catch(e){console.warn('supabase staff load failed',e);}
+  //    Retry a few times on transient network failure — an empty staff list is
+  //    what causes the "roster erased / everyone not clocked in" symptoms.
+  for(let attempt=1; attempt<=3; attempt++){
+    try{
+      await loadStaffFromSupabase();
+    }catch(e){console.warn('supabase staff load failed (attempt '+attempt+')',e);}
+    if(Array.isArray(staff) && staff.length>=3) break; // got a real roster
+    if(attempt<3){
+      console.warn('[INIT] staff list still small ('+((staff||[]).length)+'), retrying in '+(attempt*800)+'ms');
+      await new Promise(function(r){ setTimeout(r, attempt*800); });
+    }
+  }
+  if(!Array.isArray(staff) || staff.length<3){
+    console.error('[INIT] staff never loaded after retries — read-only until reload, saves are blocked to protect data');
+    try{ showToast('Couldn\'t load staff — pull to refresh'); }catch(e){}
+  }
 
   // Now that staff is loaded, rebuild leaveRequests from the DATABASE (the
   // authoritative source) rather than trusting the blob, which can carry
@@ -2143,6 +2156,17 @@ function rekeyAll(){
 
 async function saveData(){
   if(!window.shiftops){showToast('Save only works in the desktop app');return;}
+  // ── HARD WIPE GUARD ──────────────────────────────────────────────────────
+  // If the staff list failed to load (e.g. a network error during init left
+  // `staff` empty), saving would flush an EMPTY roster over the good data in
+  // Supabase. Refuse. A real roster here is 30+ people; anything under 3 is a
+  // load failure, not a legitimate state. This is the last line of defence
+  // against the "roster erased on refresh" bug.
+  if(!Array.isArray(staff) || staff.length < 3){
+    console.warn('[SAVE-GUARD] refusing to save — staff list is empty/too small ('+((staff||[]).length)+'). Load likely failed; not overwriting good data.');
+    try{ showToast('Save skipped — staff not loaded yet'); }catch(e){}
+    return;
+  }
   try{
     saveCurrentWeek(); // flush current week into the store
     const res=await window.shiftops.saveData({staff,shiftsStore,availStore,nextStaffId,teams,devices,nextDeviceId,availWeekKey,leaveRequests,nextLeaveId});
@@ -2269,10 +2293,19 @@ async function syncStaffToNexus(){
   }
 }
 
+// Shared wipe-guard: true if it's SAFE to persist (staff actually loaded).
+function _safeToSave(){
+  if(!Array.isArray(staff) || staff.length < 3){
+    console.warn('[SAVE-GUARD] blocked persist — staff empty/too small ('+((staff||[]).length)+')');
+    return false;
+  }
+  return true;
+}
+
 function markDirty(){isDirty=true;updateSaveStatus();debouncedAutoSave();}
 // Final safeguard: flush any pending changes before window closes
 window.addEventListener('beforeunload', function(e){
-  if(isDirty && window.shiftops){
+  if(isDirty && window.shiftops && _safeToSave()){
     try{
       saveCurrentWeek();
       window.shiftops.saveData({staff,shiftsStore,availStore,nextStaffId,teams,devices,nextDeviceId,availWeekKey,leaveRequests,nextLeaveId});
@@ -2287,6 +2320,7 @@ async function forceSave(){
   updateSaveStatus();
   if(_saveTimer){clearTimeout(_saveTimer);_saveTimer=null;}
   if(window.shiftops){
+    if(!_safeToSave()){ try{ showToast('Save skipped — staff not loaded'); }catch(e){} return; }
     try{
       saveCurrentWeek();
       const res=await window.shiftops.saveData({staff,shiftsStore,availStore,nextStaffId,teams,devices,nextDeviceId,availWeekKey,leaveRequests,nextLeaveId});
@@ -5557,7 +5591,7 @@ async function aaSave(){
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────
-const SHIFTOPS_BUILD='2026-07-13-rosterfix-3';
+const SHIFTOPS_BUILD='2026-07-13-rosterfix-5-saveguard';
 console.log('%c[ShiftOps build '+SHIFTOPS_BUILD+' loaded]','background:#16a34a;color:#fff;padding:2px 8px;border-radius:4px;font-weight:700;');
 (async()=>{
   await loadData();
@@ -5745,7 +5779,10 @@ async function refreshMorningBoard(){
   const today = _todayIsoSydney();
   let punches = [];
   try{
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/clock_log?ts=gte.${today}T00:00:00&select=staff_name,action,ts&order=ts.asc&limit=500`,
+    // IMPORTANT: append the Sydney offset (+10:00) so the lower bound is Sydney
+    // midnight, not UTC midnight. Without it, PostgREST treats the bound as UTC,
+    // which is 10:00 Sydney — silently hiding every clock-in before 10am.
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/clock_log?ts=gte.${today}T00:00:00%2B10:00&select=staff_name,action,ts&order=ts.asc&limit=500`,
       {headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY}});
     if(!r.ok) throw new Error('HTTP '+r.status);
     punches = await r.json();
