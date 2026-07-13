@@ -5591,7 +5591,7 @@ async function aaSave(){
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────
-const SHIFTOPS_BUILD='2026-07-13-rosterfix-6-flextime';
+const SHIFTOPS_BUILD='2026-07-13-rosterfix-7-lateflex';
 console.log('%c[ShiftOps build '+SHIFTOPS_BUILD+' loaded]','background:#16a34a;color:#fff;padding:2px 8px;border-radius:4px;font-weight:700;');
 (async()=>{
   await loadData();
@@ -5825,14 +5825,14 @@ async function refreshMorningBoard(){
     if(onLeave){ leaveList.push({s}); return; }
 
     if(clockedIn){
-      // late only if we know their rostered start and they beat it.
-      // Compare against REAL time for accuracy; DISPLAY the flex-rounded time.
+      // Late only if the DISPLAYED (flex-rounded) time is strictly after the
+      // rostered start — so what you see always matches the late/on-time call.
+      // (Previously we compared real time but showed rounded time, which made
+      // e.g. a 9:03 clock-in read "9:00 · due 09:00" yet sit under "Late".)
+      const shown = _hhmmFlexSydney(p.ts);
       let late = null;
-      if(startTime){
-        const tReal = _hhmmSydney(p.ts);
-        if(tReal > startTime) late = {start:startTime, actual:_hhmmFlexSydney(p.ts)};
-      }
-      if(late) lateList.push({s, ...late}); else inNow.push({s, at:_hhmmFlexSydney(p.ts)});
+      if(startTime && shown > startTime){ late = {start:startTime, actual:shown}; }
+      if(late) lateList.push({s, ...late}); else inNow.push({s, at:shown});
       return;
     }
 
