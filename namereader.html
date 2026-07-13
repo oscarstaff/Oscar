@@ -185,20 +185,26 @@ function cleanName(raw){
   if(n===n.toUpperCase()) n=n.toLowerCase().replace(/\b\w/g,c=>c.toUpperCase());
   return n;
 }
+const SB_URL='https://jcfgldqrdbfkgbixszds.supabase.co';
+const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpjZmdsZHFyZGJma2diaXhzemRzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1Nzc3NzEsImV4cCI6MjA5MDE1Mzc3MX0.Wj8cCpnlsoZOPj5sKWeEdfvgjG4Nc-UuTTYgbcrPfeI';
+
 async function extractName(it){
   it.status='working';render();
   try{
     const b64=await fileToBase64(it.file);
-    const source={type:'base64',media_type:it.media,data:b64};
-    const block=it.media==='application/pdf'?{type:'document',source}:{type:'image',source};
-    const prompt='This document belongs to a student. Extract ONLY the person\u2019s name as "Given Surname", cleanly formatted with normal capitalisation (not ALL CAPS). Include all given names if multiple. No titles, labels, numbers, or other text. If you cannot find a person\u2019s name, reply exactly: NO_NAME_FOUND. Reply with nothing but the name (or NO_NAME_FOUND).';
-    const resp=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1000,messages:[{role:'user',content:[block,{type:'text',text:prompt}]}]})});
-    if(!resp.ok) throw new Error('API '+resp.status);
-    const data=await resp.json();
-    const text=(data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('').trim();
-    if(!text||/NO_NAME_FOUND/i.test(text)){it.status='error';it.name='No name found in this document';}
-    else{it.name=cleanName(text);it.status='done';}
-  }catch(e){it.status='error';it.name='Couldn\u2019t read this file';}
+    const resp=await fetch(SB_URL+'/functions/v1/extract-name',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY},
+      body:JSON.stringify({file_base64:b64,file_mime:it.media})
+    });
+    const data=await resp.json().catch(()=>({}));
+    if(!resp.ok){ throw new Error(data.error||('HTTP '+resp.status)); }
+    if(!data.name){ it.status='error';it.name='No name found in this document'; }
+    else{ it.name=cleanName(data.name);it.status='done'; }
+  }catch(e){
+    it.status='error';
+    it.name=(e&&e.message)? ('Couldn\u2019t read: '+String(e.message).slice(0,60)) : 'Couldn\u2019t read this file';
+  }
   render();
 }
 async function runAll(){
