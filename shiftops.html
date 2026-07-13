@@ -1605,6 +1605,7 @@ body.tl-readonly .wk-tools{ display:none !important; }
     <div style="display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap;">
       <button class="aa-tab" id="aatab-formcraft" onclick="aaSwitch('formcraft')">FormCraft</button>
       <button class="aa-tab" id="aatab-slip" onclick="aaSwitch('slip')">Slip</button>
+      <button class="aa-tab" id="aatab-namereader" onclick="aaSwitch('namereader')">Name Reader</button>
       <button class="aa-tab" id="aatab-shiftops" onclick="aaSwitch('shiftops')">ShiftOps</button>
       <button class="aa-tab" id="aatab-admin" onclick="aaSwitch('admin')">Admin</button>
     </div>
@@ -1654,6 +1655,7 @@ body.tl-readonly .wk-tools{ display:none !important; }
       <div id="staffAccessChecks" style="display:flex;flex-direction:column;gap:9px;margin-bottom:14px;">
         <label class="sa-acc-row"><input type="checkbox" id="saAccess_formcraft"><span class="sa-acc-label">FormCraft</span><span class="sa-acc-desc">PDF form filler</span></label>
         <label class="sa-acc-row"><input type="checkbox" id="saAccess_slip"><span class="sa-acc-label">Slip</span><span class="sa-acc-desc">Tax invoices</span></label>
+        <label class="sa-acc-row"><input type="checkbox" id="saAccess_namereader"><span class="sa-acc-label">Name Reader</span><span class="sa-acc-desc">Reads names off documents</span></label>
         <label class="sa-acc-row"><input type="checkbox" id="saAccess_shiftops"><span class="sa-acc-label">Team Lead</span><span class="sa-acc-desc">Read-only ShiftOps, own team</span></label>
         <label class="sa-acc-row sa-acc-admin"><input type="checkbox" id="saAccess_admin" onchange="onStaffAdminToggle(this)"><span class="sa-acc-label">Admin</span><span class="sa-acc-desc">Full manager rights</span></label>
       </div>
@@ -3268,7 +3270,7 @@ async function loadStaffAccess(s){
     }catch(e){ console.warn('loadStaffAccess admin flag', e); }
   }
   // app access — read this person's rows from app_access
-  ['formcraft','slip','shiftops'].forEach(a=>{ const b=document.getElementById('saAccess_'+a); if(b) b.checked=false; });
+  ['formcraft','slip','namereader','shiftops'].forEach(a=>{ const b=document.getElementById('saAccess_'+a); if(b) b.checked=false; });
   try{
     const rows = await aaGet('app_access?select=app&staff_name=eq.'+encodeURIComponent(full));
     (rows||[]).forEach(r=>{ const b=document.getElementById('saAccess_'+r.app); if(b) b.checked=true; });
@@ -5458,8 +5460,8 @@ const AA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZ
 async function aaGet(path){const r=await fetch(AA_SB+'/rest/v1/'+path,{headers:{apikey:AA_KEY,Authorization:'Bearer '+AA_KEY}});if(!r.ok)return[];return r.json();}
 let aaCurrent='formcraft';
 let aaAllStaff=[];
-let aaWork={formcraft:new Set(),slip:new Set(),shiftops:new Set(),admin:new Set()};
-let aaOrig={formcraft:new Set(),slip:new Set(),shiftops:new Set(),admin:new Set()};
+let aaWork={formcraft:new Set(),slip:new Set(),namereader:new Set(),shiftops:new Set(),admin:new Set()};
+let aaOrig={formcraft:new Set(),slip:new Set(),namereader:new Set(),shiftops:new Set(),admin:new Set()};
 
 async function openAccessAdmin(){
   openModal('accessAdminModal');
@@ -5469,7 +5471,7 @@ async function openAccessAdmin(){
     aaAllStaff=(rows||[]).map(r=>r.name).filter(Boolean);
   }catch(e){ aaAllStaff=[]; }
   // current app_access
-  aaWork={formcraft:new Set(),slip:new Set(),shiftops:new Set(),admin:new Set()};
+  aaWork={formcraft:new Set(),slip:new Set(),namereader:new Set(),shiftops:new Set(),admin:new Set()};
   try{
     const rows=await aaGet('app_access?select=app,staff_name');
     (rows||[]).forEach(r=>{ if(aaWork[r.app]) aaWork[r.app].add(r.staff_name); });
@@ -5482,12 +5484,12 @@ async function openAccessAdmin(){
     });
   }catch(e){}
   // snapshot originals for diffing
-  aaOrig={formcraft:new Set(aaWork.formcraft),slip:new Set(aaWork.slip),shiftops:new Set(aaWork.shiftops),admin:new Set(aaWork.admin)};
+  aaOrig={formcraft:new Set(aaWork.formcraft),slip:new Set(aaWork.slip),namereader:new Set(aaWork.namereader),shiftops:new Set(aaWork.shiftops),admin:new Set(aaWork.admin)};
   aaSwitch('formcraft');
 }
 function aaSwitch(app){
   aaCurrent=app;
-  ['formcraft','slip','shiftops','admin'].forEach(a=>{
+  ['formcraft','slip','namereader','shiftops','admin'].forEach(a=>{
     const t=document.getElementById('aatab-'+a);
     if(t)t.className='aa-tab'+(a===app?' aa-active':'');
   });
@@ -5537,7 +5539,7 @@ async function aaSave(){
   const jobs=[];
 
   // ── app_access: formcraft, slip, shiftops ──
-  for(const app of ['formcraft','slip','shiftops']){
+  for(const app of ['formcraft','slip','namereader','shiftops']){
     const add=[...aaWork[app]].filter(n=>!aaOrig[app].has(n));
     const del=[...aaOrig[app]].filter(n=>!aaWork[app].has(n));
     add.forEach(n=>jobs.push(
@@ -5585,13 +5587,13 @@ async function aaSave(){
   }
 
   // update originals to current so reopening reflects saved state (no false reverts)
-  aaOrig={formcraft:new Set(aaWork.formcraft),slip:new Set(aaWork.slip),shiftops:new Set(aaWork.shiftops),admin:new Set(aaWork.admin)};
+  aaOrig={formcraft:new Set(aaWork.formcraft),slip:new Set(aaWork.slip),namereader:new Set(aaWork.namereader),shiftops:new Set(aaWork.shiftops),admin:new Set(aaWork.admin)};
   // re-render current tab so ticks reflect the (possibly cascaded) state
   aaRender(document.getElementById('aaSearch').value);
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────
-const SHIFTOPS_BUILD='2026-07-13-rosterfix-7-lateflex';
+const SHIFTOPS_BUILD='2026-07-13-rosterfix-8-namereader';
 console.log('%c[ShiftOps build '+SHIFTOPS_BUILD+' loaded]','background:#16a34a;color:#fff;padding:2px 8px;border-radius:4px;font-weight:700;');
 (async()=>{
   await loadData();

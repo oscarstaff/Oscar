@@ -5983,6 +5983,7 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
           </div>
         </div>
         <div id="debugOut" style="margin-bottom:12px;font-family:monospace;font-size:11px;color:#0f172a;display:none;"></div>
+        <div id="mgrReportResults" class="card" style="padding:16px;margin-bottom:14px;">Pick a staff member.</div>
         <div class="card" style="margin-bottom:14px;padding:16px;">
           <div style="font-size:14px;font-weight:700;color:#0f172a;margin-bottom:3px;">Class days</div>
           <div style="font-size:12px;color:#64748b;line-height:1.5;margin-bottom:10px;">Mark class days. On these dates, punctuality is measured against each person's rostered class start (8:00 / 9:00 / 9:30) instead of their availability.</div>
@@ -5991,8 +5992,15 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
             <button onclick="addClassDay()" class="btn btn-green" style="padding:9px 16px;font-size:12px;">Add</button>
           </div>
           <div id="classDayList" style="margin-top:12px;"></div>
+          <div style="border-top:1px solid #f1f5f9;margin-top:14px;padding-top:12px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+              <div style="font-size:13px;font-weight:700;color:#0f172a;">Class start roster</div>
+              <button onclick="toggleRosterEditor()" id="rosterToggleBtn" style="background:none;border:none;color:var(--accent-text,#4f46e5);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;">Edit ›</button>
+            </div>
+            <div style="font-size:11.5px;color:#64748b;line-height:1.5;margin-top:2px;">Each person's start time on a class day. Set to <b>none</b> to remove them (they'll use availability instead).</div>
+            <div id="rosterEditor" style="display:none;margin-top:10px;"></div>
+          </div>
         </div>
-        <div id="mgrReportResults" class="card" style="padding:16px;">Pick a staff member.</div>
       </div>
     </div>
 
@@ -6074,6 +6082,16 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
             </div>
             <div class="hub-card-body">
               <div class="hub-card-title">ShiftOps</div>
+            </div>
+            <svg class="hub-card-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7"/><polyline points="7 7 17 7 17 17"/></svg>
+          </a>
+          <!-- Name Reader — document name extractor (access-gated) -->
+          <a class="hub-card" id="hubcard-namereader" style="display:none;cursor:pointer;" onclick="openGatedApp(event,'namereader','https://oscarstaff.github.io/Oscar/namereader.html')">
+            <div class="hub-card-icon hub-icon-namereader">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><circle cx="10" cy="13" r="2"/><path d="M14 18a4 4 0 0 0-8 0"/></svg>
+            </div>
+            <div class="hub-card-body">
+              <div class="hub-card-title">Name Reader</div>
             </div>
             <svg class="hub-card-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7"/><polyline points="7 7 17 7 17 17"/></svg>
           </a>
@@ -7980,9 +7998,9 @@ async function sbGet(t,f){
 async function sbPost(t,b){return fetch(SB+"/rest/v1/"+t,{method:"POST",headers:{"apikey":KEY,"Authorization":"Bearer "+_sbBearer(),"Content-Type":"application/json","Prefer":"return=minimal"},body:JSON.stringify(b)});}
 
 // ═══════════════ NODES APP ACCESS CONTROL ═══════════════
-let _accessCache={formcraft:[],slip:[],shiftops:[]};
+let _accessCache={formcraft:[],slip:[],shiftops:[],namereader:[]};
 let _accessCurrentApp='formcraft';
-let _accessWorking={formcraft:new Set(),slip:new Set(),shiftops:new Set()};
+let _accessWorking={formcraft:new Set(),slip:new Set(),shiftops:new Set(),namereader:new Set()};
 let _accessAllStaff=[];
 
 async function openGatedApp(ev,app,url){
@@ -8027,7 +8045,7 @@ async function loadHubAccess(){
   // Load access lists from Supabase
   try{
     const rows=await sbGet('app_access','?select=app,staff_name');
-    _accessCache={formcraft:[],slip:[],shiftops:[]};
+    _accessCache={formcraft:[],slip:[],shiftops:[],namereader:[]};
     (rows||[]).forEach(r=>{ if(_accessCache[r.app]) _accessCache[r.app].push(r.staff_name); });
   }catch(e){ console.warn('loadHubAccess',e); }
   // Show/hide cards for current user
@@ -8037,6 +8055,8 @@ async function loadHubAccess(){
   if(sl) sl.style.display=_accessCache.slip.includes(me)?'':'none';
   const so=document.getElementById('hubcard-shiftops');
   if(so) so.style.display=_accessCache.shiftops.includes(me)?'':'none';
+  const nr=document.getElementById('hubcard-namereader');
+  if(nr) nr.style.display=_accessCache.namereader.includes(me)?'':'none';
   // Show admin button
   const adminArea=document.getElementById('hubAdminArea');
   if(adminArea) adminArea.style.display=(typeof myIsAdmin!=='undefined'&&myIsAdmin)?'block':'none';
@@ -8052,10 +8072,10 @@ async function openAccessManager(){
   // refresh access from server
   try{
     const rows=await sbGet('app_access','?select=app,staff_name');
-    _accessCache={formcraft:[],slip:[],shiftops:[]};
+    _accessCache={formcraft:[],slip:[],shiftops:[],namereader:[]};
     (rows||[]).forEach(r=>{ if(_accessCache[r.app]) _accessCache[r.app].push(r.staff_name); });
   }catch(e){}
-  _accessWorking={formcraft:new Set(_accessCache.formcraft),slip:new Set(_accessCache.slip),shiftops:new Set(_accessCache.shiftops)};
+  _accessWorking={formcraft:new Set(_accessCache.formcraft),slip:new Set(_accessCache.slip),shiftops:new Set(_accessCache.shiftops),namereader:new Set(_accessCache.namereader)};
   // load team buttons
   await buildTeamButtons();
   switchAccessApp('formcraft');
@@ -8088,9 +8108,9 @@ function accClearAll(){ _accessWorking[_accessCurrentApp].clear(); renderAccessL
 
 function switchAccessApp(app){
   _accessCurrentApp=app;
-  ['formcraft','slip','shiftops'].forEach(a=>{var t=document.getElementById('acctab-'+a);if(t)t.className='acc-app-tab'+(app===a?' acc-tab-active':'');});
+  ['formcraft','slip','shiftops','namereader'].forEach(a=>{var t=document.getElementById('acctab-'+a);if(t)t.className='acc-app-tab'+(app===a?' acc-tab-active':'');});
   // restyle tabs
-  ['formcraft','slip','shiftops'].forEach(a=>{
+  ['formcraft','slip','shiftops','namereader'].forEach(a=>{
     const el=document.getElementById('acctab-'+a);
     if(a===app){el.style.background='var(--accent)';el.style.color='#fff';el.style.borderColor='var(--accent)';}
     else{el.style.background='transparent';el.style.color='var(--text,#333)';el.style.borderColor='var(--border-color,#ddd)';}
@@ -8118,7 +8138,7 @@ function filterAccessList(v){ renderAccessList(v); }
 
 async function saveAccessChanges(){
   // Diff working set vs cache, apply inserts + deletes
-  for(const app of ['formcraft','slip','shiftops']){
+  for(const app of ['formcraft','slip','shiftops','namereader']){
     const before=new Set(_accessCache[app]);
     const after=_accessWorking[app];
     // inserts
@@ -17332,12 +17352,15 @@ function _resolveAvailForDay(snaps, date){
 
 // Compute one staff member's fortnight punctuality from pre-fetched data.
 // `availSnaps` is an array of history snapshots (or a single row).
-// `ctx` = { classDays:Set<'YYYY-MM-DD'>, classStart:'HH:MM'|null } — on a class
-// day, the person's rostered class start overrides availability.
+// `ctx` = { classDays:Set<'YYYY-MM-DD'>, classStart:'HH:MM'|null,
+//           overrides:{ymd:{name:start|null}}, name:staffName } — on a class day,
+// a per-date override (if present) wins over the roster start.
 function _computePunctuality(availSnaps, logs, leaveRows, start, end, ctx){
   ctx = ctx || {};
   const classDays = ctx.classDays || null;
   const classStart = ctx.classStart || null;
+  const overrides = ctx.overrides || null;
+  const myName = ctx.name || null;
   let measuredDays=0, onTimeDays=0, lateDays=0, totalLateMin=0, worstMin=0, worstDay='', leaveDays=0;
   const cur=new Date(start);
   while(cur<end){
@@ -17346,14 +17369,24 @@ function _computePunctuality(availSnaps, logs, leaveRows, start, end, ctx){
     const isClassDay = classDays && classDays.has(ymd);
 
     let expStart=null;
-    if(isClassDay && classStart){
-      // Class day + this person is on the class roster → rostered start wins.
-      expStart = classStart;
+    if(isClassDay){
+      // Per-date override for this person? (present key wins, even if null = excluded)
+      const dayOv = overrides && overrides[ymd];
+      const hasOv = dayOv && myName && Object.prototype.hasOwnProperty.call(dayOv, myName);
+      if(hasOv){
+        expStart = dayOv[myName]; // 'HH:MM' or null (null = excluded → falls through below)
+        if(expStart===null){
+          // Excluded this class day → use availability instead.
+          const av=_resolveAvailForDay(availSnaps, cur);
+          expStart=_expectedStartFor(av, cur);
+          if(!expStart && av===null && _firstClockInOn(logs, cur)) expStart=_ALLDAY_START;
+        }
+      }else if(classStart){
+        expStart = classStart; // roster default
+      }
     }else{
       const avail=_resolveAvailForDay(availSnaps, cur);
       expStart=_expectedStartFor(avail, cur);
-      // Fallback: no availability info at all but they clocked in → 09:00 default.
-      // (A day covered but marked 'no'/'unset' stays excluded — deliberate off day.)
       if(!expStart && avail===null && _firstClockInOn(logs, cur)){
         expStart=_ALLDAY_START;
       }
@@ -17380,11 +17413,12 @@ function _computePunctuality(availSnaps, logs, leaveRows, start, end, ctx){
            score:_punctScore(onTimeDays, measuredDays) };
 }
 
-// Load class days (as a Set of YYYY-MM-DD) and the class roster (name->start).
+// Load class days (Set of YYYY-MM-DD), roster (name->start), and per-date
+// overrides (ymd -> {name -> start|null}). Overrides win over the roster.
 let _classCtxCache=null;
 async function _loadClassContext(){
   if(_classCtxCache) return _classCtxCache;
-  let days=new Set(), roster={};
+  let days=new Set(), roster={}, overrides={};
   try{
     const d=await sbGet('class_days','?select=class_date')||[];
     d.forEach(function(r){ if(r.class_date) days.add(r.class_date); });
@@ -17393,7 +17427,11 @@ async function _loadClassContext(){
     const r=await sbGet('class_roster','?select=staff_name,start_time')||[];
     r.forEach(function(x){ roster[x.staff_name]=x.start_time; });
   }catch(e){}
-  _classCtxCache={ days, roster };
+  try{
+    const o=await sbGet('class_day_overrides','?select=class_date,staff_name,start_time')||[];
+    o.forEach(function(x){ (overrides[x.class_date]=overrides[x.class_date]||{})[x.staff_name]=x.start_time; }); // start_time may be null
+  }catch(e){}
+  _classCtxCache={ days, roster, overrides };
   return _classCtxCache;
 }
 
@@ -17447,7 +17485,7 @@ async function _computeMyFortnight(){
   }
 
   const cctx=await _loadClassContext();
-  const mine=_computePunctuality(myAvail, myLogs, myLeave, fw.start, fw.end, { classDays:cctx.days, classStart:cctx.roster[me]||null });
+  const mine=_computePunctuality(myAvail, myLogs, myLeave, fw.start, fw.end, { classDays:cctx.days, classStart:cctx.roster[me]||null, overrides:cctx.overrides, name:me });
   const myFortLeaves=(myLeave||[]).filter(function(l){
     if((l.status||'')!=='approved'||!l.from_date||!l.to_date) return false;
     const f=new Date(l.from_date+'T00:00:00'), t=new Date(l.to_date+'T23:59:59');
@@ -17525,9 +17563,15 @@ async function loadClassDays(){
   list.innerHTML=rows.map(function(r){
     const d=new Date(r.class_date+'T00:00:00');
     const lbl=d.toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
-    return '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 10px;border-radius:8px;background:#f8fafc;margin-bottom:4px;">'+
-      '<span style="font-size:13px;font-weight:600;color:#0f172a;">'+lbl+'</span>'+
-      '<button onclick="removeClassDay(\''+r.class_date+'\')" style="background:none;border:none;color:#dc2626;cursor:pointer;font-size:12px;font-weight:600;font-family:inherit;">Remove</button>'+
+    return '<div style="padding:7px 10px;border-radius:8px;background:#f8fafc;margin-bottom:4px;">'+
+      '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">'+
+        '<span style="font-size:13px;font-weight:600;color:#0f172a;">'+lbl+'</span>'+
+        '<div style="display:flex;gap:10px;align-items:center;flex-shrink:0;">'+
+          '<button onclick="toggleDayException(\''+r.class_date+'\')" style="background:none;border:none;color:var(--accent-text,#4f46e5);cursor:pointer;font-size:12px;font-weight:700;font-family:inherit;">Exceptions</button>'+
+          '<button onclick="removeClassDay(\''+r.class_date+'\')" style="background:none;border:none;color:#dc2626;cursor:pointer;font-size:12px;font-weight:600;font-family:inherit;">Remove</button>'+
+        '</div>'+
+      '</div>'+
+      '<div id="dayExc-'+r.class_date+'" style="display:none;margin-top:8px;"></div>'+
     '</div>';
   }).join('');
 }
@@ -17550,6 +17594,130 @@ async function removeClassDay(dateStr){
     _classCtxCache=null; _leaderboardCache=null; _myFortCache=null;
     showToast('Removed');
     loadClassDays();
+  }catch(e){ showToast('Remove failed'); }
+}
+
+// ── CLASS START ROSTER EDITOR ──────────────────────
+let _rosterEditorOpen=false;
+async function toggleRosterEditor(){
+  _rosterEditorOpen=!_rosterEditorOpen;
+  const ed=document.getElementById('rosterEditor');
+  const btn=document.getElementById('rosterToggleBtn');
+  if(!ed) return;
+  ed.style.display=_rosterEditorOpen?'block':'none';
+  if(btn) btn.textContent=_rosterEditorOpen?'Close':'Edit ›';
+  if(_rosterEditorOpen) renderRosterEditor();
+}
+async function renderRosterEditor(){
+  const ed=document.getElementById('rosterEditor');
+  if(!ed) return;
+  ed.innerHTML='<div style="font-size:12px;color:#94a3b8;">Loading…</div>';
+  // Current roster map.
+  let map={};
+  try{ (await sbGet('class_roster','?select=staff_name,start_time')||[]).forEach(function(r){ map[r.staff_name]=r.start_time; }); }catch(e){}
+  const names=(STAFF||[]).filter(Boolean).slice().sort();
+  const opts=['','08:00','08:15','08:30','09:00','09:30'];
+  ed.innerHTML='<div style="max-height:340px;overflow-y:auto;border:1px solid #eef2f7;border-radius:10px;">'+
+    names.map(function(nm){
+      const cur=map[nm]||'';
+      return '<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-bottom:1px solid #f5f7fa;">'+
+        '<span style="flex:1;min-width:0;font-size:12.5px;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+esc(nm)+'</span>'+
+        '<select onchange="setRosterStart(this,\''+encodeURIComponent(nm)+'\')" style="border:1.5px solid #e2e8f0;border-radius:7px;padding:5px 8px;font-size:12px;font-family:inherit;background:#fff;">'+
+          opts.map(function(o){return '<option value="'+o+'"'+(o===cur?' selected':'')+'>'+(o===''?'none':o)+'</option>';}).join('')+
+        '</select>'+
+      '</div>';
+    }).join('')+
+  '</div>'+
+  '<div style="font-size:10.5px;color:#94a3b8;margin-top:8px;">Changes save instantly.</div>';
+}
+async function setRosterStart(sel, nmEnc){
+  const nm=decodeURIComponent(nmEnc);
+  const val=sel.value;
+  try{
+    if(val===''){
+      // Remove from roster.
+      await fetch(SB+'/rest/v1/class_roster?staff_name=eq.'+encodeURIComponent(nm),{
+        method:'DELETE', headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Prefer':'return=minimal'}
+      });
+    }else{
+      // Upsert (POST with merge-duplicates on the PK).
+      await fetch(SB+'/rest/v1/class_roster',{
+        method:'POST',
+        headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},
+        body: JSON.stringify({staff_name:nm, start_time:val, updated_at:new Date().toISOString()})
+      });
+    }
+    _classCtxCache=null; _leaderboardCache=null; _myFortCache=null;
+    showToast(val===''?(nm.split(' ')[0]+' removed'):(nm.split(' ')[0]+' → '+val));
+  }catch(e){ showToast('Save failed'); }
+}
+
+// ── PER-DATE CLASS EXCEPTIONS ──────────────────────
+async function toggleDayException(dateStr){
+  const box=document.getElementById('dayExc-'+dateStr);
+  if(!box) return;
+  if(box.style.display==='none'){ box.style.display='block'; renderDayException(dateStr); }
+  else box.style.display='none';
+}
+async function renderDayException(dateStr){
+  const box=document.getElementById('dayExc-'+dateStr);
+  if(!box) return;
+  box.innerHTML='<div style="font-size:11.5px;color:#94a3b8;">Loading…</div>';
+  let ov=[];
+  try{ ov=await sbGet('class_day_overrides','?class_date=eq.'+encodeURIComponent(dateStr)+'&select=staff_name,start_time')||[]; }catch(e){}
+  const names=(STAFF||[]).filter(Boolean).slice().sort();
+  const opts=['excluded','08:00','08:15','08:30','09:00','09:30'];
+  const rowsHtml = ov.length ? ov.map(function(o){
+    const cur=(o.start_time===null||o.start_time===undefined)?'excluded':o.start_time;
+    return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;">'+
+      '<span style="flex:1;min-width:0;font-size:12.5px;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+esc(o.staff_name)+'</span>'+
+      '<select onchange="setDayException(\''+dateStr+'\',\''+encodeURIComponent(o.staff_name)+'\',this.value)" style="border:1.5px solid #e2e8f0;border-radius:7px;padding:4px 7px;font-size:12px;font-family:inherit;background:#fff;">'+
+        opts.map(function(x){return '<option value="'+x+'"'+(x===cur?' selected':'')+'>'+x+'</option>';}).join('')+
+      '</select>'+
+      '<button onclick="clearDayException(\''+dateStr+'\',\''+encodeURIComponent(o.staff_name)+'\')" style="background:none;border:none;color:#dc2626;cursor:pointer;font-size:11px;font-weight:600;font-family:inherit;">×</button>'+
+    '</div>';
+  }).join('') : '<div style="font-size:11.5px;color:#94a3b8;">No exceptions — everyone uses the roster this day.</div>';
+  box.innerHTML=
+    '<div style="font-size:11px;color:#64748b;margin-bottom:6px;">Only add people whose start differs from the roster on this date.</div>'+
+    rowsHtml+
+    '<div style="display:flex;gap:6px;margin-top:8px;">'+
+      '<select id="excAdd-'+dateStr+'" style="flex:1;border:1.5px solid #e2e8f0;border-radius:7px;padding:6px 8px;font-size:12px;font-family:inherit;background:#fff;">'+
+        '<option value="">Add person…</option>'+
+        names.map(function(n){return '<option value="'+encodeURIComponent(n)+'">'+esc(n)+'</option>';}).join('')+
+      '</select>'+
+      '<button onclick="addDayException(\''+dateStr+'\')" class="btn btn-green" style="padding:6px 12px;font-size:12px;">Add</button>'+
+    '</div>';
+}
+async function addDayException(dateStr){
+  const sel=document.getElementById('excAdd-'+dateStr);
+  if(!sel||!sel.value){ showToast('Pick a person'); return; }
+  const nm=decodeURIComponent(sel.value);
+  // Default a new exception to 'excluded' (null) — user can change the dropdown after.
+  await setDayException(dateStr, encodeURIComponent(nm), 'excluded');
+  renderDayException(dateStr);
+}
+async function setDayException(dateStr, nmEnc, val){
+  const nm=decodeURIComponent(nmEnc);
+  const start_time = (val==='excluded') ? null : val;
+  try{
+    await fetch(SB+'/rest/v1/class_day_overrides',{
+      method:'POST',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},
+      body: JSON.stringify({class_date:dateStr, staff_name:nm, start_time:start_time, updated_at:new Date().toISOString()})
+    });
+    _classCtxCache=null; _leaderboardCache=null; _myFortCache=null;
+    showToast(nm.split(' ')[0]+': '+(start_time===null?'excluded':start_time));
+  }catch(e){ showToast('Save failed'); }
+}
+async function clearDayException(dateStr, nmEnc){
+  const nm=decodeURIComponent(nmEnc);
+  try{
+    await fetch(SB+'/rest/v1/class_day_overrides?class_date=eq.'+encodeURIComponent(dateStr)+'&staff_name=eq.'+encodeURIComponent(nm),{
+      method:'DELETE', headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Prefer':'return=minimal'}
+    });
+    _classCtxCache=null; _leaderboardCache=null; _myFortCache=null;
+    showToast('Exception removed');
+    renderDayException(dateStr);
   }catch(e){ showToast('Remove failed'); }
 }
 
@@ -17760,7 +17928,7 @@ async function _buildLeaderboard(fw){
   const cctx=await _loadClassContext();
   const board=[];
   Object.keys(availBy).forEach(function(nm){
-    const res=_computePunctuality(availBy[nm], logsBy[nm]||[], leaveBy[nm]||[], fw.start, fw.end, { classDays:cctx.days, classStart:cctx.roster[nm]||null });
+    const res=_computePunctuality(availBy[nm], logsBy[nm]||[], leaveBy[nm]||[], fw.start, fw.end, { classDays:cctx.days, classStart:cctx.roster[nm]||null, overrides:cctx.overrides, name:nm });
     if(res.measuredDays>0){ // only rank people with tracked working days
       board.push({ name:nm, score:res.score, onTimeDays:res.onTimeDays, measuredDays:res.measuredDays, lateDays:res.lateDays });
     }
@@ -23098,6 +23266,9 @@ window.addEventListener('resize', function(){
     }
     .hub-icon-shiftops {
       background: linear-gradient(135deg, #f59e0b 0%, #b45309 100%);
+    }
+    .hub-icon-namereader {
+      background: linear-gradient(135deg, #6366f1 0%, #4338ca 100%);
     }
     /* Add more icon classes as needed:
        .hub-icon-myapp { background: linear-gradient(135deg, #3b82f6, #1d4ed8); }
