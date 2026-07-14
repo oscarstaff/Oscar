@@ -17389,6 +17389,18 @@ function _computePunctuality(availSnaps, logs, leaveRows, start, end, ctx){
           onTimeDays++; // on time OR early
         }
       }
+    }else{
+      // No expected start (not rostered/available that day). If the person was
+      // explicitly UNAVAILABLE but still clocked in, reward it: count as a
+      // measured + on-time day. Can never be late (no start to beat), so it only
+      // helps — and their real expected days still count normally, so marking
+      // days unavailable can't be used to dodge late marks.
+      const av=_resolveAvailForDay(availSnaps, cur);
+      const slot=av ? av[(cur.getDay()+6)%7] : null;
+      const isUnavailable = slot && slot.type==='no';
+      if(isUnavailable && _firstClockInOn(logs, cur)){
+        measuredDays++; onTimeDays++;
+      }
     }
     cur.setDate(cur.getDate()+1);
   }
@@ -17518,22 +17530,32 @@ function dismissPunctualityNote(fortKey){
 // Render the leaderboard as HTML into a mount element (used by My Reports).
 function _leaderboardHTML(board){
   if(!board || !board.length) return '<div style="font-size:12.5px;color:#94a3b8;">No punctuality data for this fortnight yet.</div>';
-  const myRank=board.findIndex(function(b){ return b.name===me; });
   const rankColors=['#c9a227','#8a94a6','#b06b3a']; // gold, silver, bronze
-  return board.slice(0,15).map(function(b,i){
+  // Column header
+  const header='<div style="display:flex;align-items:center;gap:10px;padding:2px 9px 6px;font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#b3b9c6;">'+
+    '<div style="width:22px;flex-shrink:0;"></div>'+
+    '<div style="flex:1;min-width:0;">Name</div>'+
+    '<div style="flex-shrink:0;width:44px;text-align:center;">On&nbsp;time</div>'+
+    '<div style="flex-shrink:0;width:36px;text-align:center;">Leave</div>'+
+    '<div style="flex-shrink:0;min-width:34px;text-align:right;">Score</div>'+
+  '</div>';
+  return header + board.map(function(b,i){  // FULL board — no cap
     const isMe=b.name===me;
     const rc = i<3 ? rankColors[i] : '#c7ccd6';
     const rankBadge = '<div style="width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;flex-shrink:0;'+
       (i<3?('background:'+rc+';color:#fff;'):('background:#f1f3f7;color:#8a94a6;'))+'">'+(i+1)+'</div>';
+    const leaveCell = (b.leaveDays>0)
+      ? '<div style="flex-shrink:0;width:36px;text-align:center;font-size:11px;font-weight:700;color:#0ea5e9;">'+b.leaveDays+'</div>'
+      : '<div style="flex-shrink:0;width:36px;text-align:center;font-size:11px;color:#d1d5db;">–</div>';
     return '<div class="fr-lbmr-row'+(isMe?' me':'')+'" style="display:flex;align-items:center;gap:10px;padding:8px 9px;border-radius:8px;margin-bottom:4px;background:'+(isMe?'var(--accent-dim,#eef2ff)':'transparent')+';">'+
       rankBadge+
       '<div style="flex:1;min-width:0;font-size:13px;font-weight:'+(isMe?'800':'600')+';color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+esc(b.name)+(isMe?' (you)':'')+'</div>'+
-      '<div style="font-size:11px;color:#94a3b8;flex-shrink:0;">'+b.onTimeDays+'/'+b.measuredDays+'</div>'+
-      '<div style="font-size:14px;font-weight:800;color:var(--accent-text,#4f46e5);flex-shrink:0;min-width:34px;text-align:right;font-variant-numeric:tabular-nums;">'+b.score+'</div>'+
+      '<div style="flex-shrink:0;width:44px;text-align:center;font-size:11px;color:#94a3b8;">'+b.onTimeDays+'/'+b.measuredDays+'</div>'+
+      leaveCell+
+      '<div style="flex-shrink:0;min-width:34px;text-align:right;font-size:14px;font-weight:800;color:var(--accent-text,#4f46e5);font-variant-numeric:tabular-nums;">'+b.score+'</div>'+
     '</div>';
   }).join('')+
-  (myRank>=15?('<div style="font-size:11px;color:#94a3b8;text-align:center;margin-top:6px;">You\u2019re #'+(myRank+1)+' \u00b7 score '+board[myRank].score+'</div>'):'')+
-  '<div style="font-size:10.5px;color:#94a3b8;margin-top:10px;line-height:1.4;">Score blends on-time rate with days worked. Clocking in early counts as on time. Leave days are skipped.</div>';
+  '<div style="font-size:10.5px;color:#94a3b8;margin-top:10px;line-height:1.4;">Score blends on-time rate with days worked. Clocking in early counts as on time. Leave days are skipped (shown for context, they don\u2019t affect the score).</div>';
 }
 
 // Mount the leaderboard into My Reports. Only shown Monday-onward until opened.
@@ -17745,7 +17767,7 @@ async function _buildLeaderboard(fw){
   Object.keys(availBy).forEach(function(nm){
     const res=_computePunctuality(availBy[nm], logsBy[nm]||[], leaveBy[nm]||[], fw.start, fw.end, { classDays:cctx.days, classStart:cctx.roster[nm]||null, overrides:cctx.overrides, name:nm });
     if(res.measuredDays>0){ // only rank people with tracked working days
-      board.push({ name:nm, score:res.score, onTimeDays:res.onTimeDays, measuredDays:res.measuredDays, lateDays:res.lateDays });
+      board.push({ name:nm, score:res.score, onTimeDays:res.onTimeDays, measuredDays:res.measuredDays, lateDays:res.lateDays, leaveDays:res.leaveDays });
     }
   });
   // Sort: score desc, then more days worked, then fewer late days.
