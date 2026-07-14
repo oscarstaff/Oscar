@@ -17443,15 +17443,20 @@ function _lastFortnight(){
   return { start, end, key, period };
 }
 
-// The report surfaces from the new fortnight's Monday (= fw.end) through the
-// FRIDAY of that week. It stays visible in that window even after being opened;
-// after Friday it hides until the next fortnight.
+// The report surfaces from the new fortnight's TUESDAY through FRIDAY. Monday is
+// skipped on purpose — data is still being compiled that day, so scoring then
+// could be incomplete. It stays visible in that Tue–Fri window even after being
+// opened; outside it, the report is hidden until the next fortnight.
 function _fortReportShowable(fw){
   if(!fw) return false;
+  const now=new Date();
+  // fw.end = Monday that starts the new fortnight. Show from Tuesday (+1 day).
+  const tuesday=new Date(fw.end.getTime()+1*_MS_DAY);
+  tuesday.setHours(0,0,0,0);
+  if(now<tuesday) return false;           // still Monday (or earlier) — hold off
   const friday=new Date(fw.end.getTime()+4*_MS_DAY);
   friday.setHours(23,59,59,999);
-  const now=new Date();
-  if(now>friday) return false;
+  if(now>friday) return false;            // past Friday — hide until next cycle
   return true;
 }
 function _markFortReportSeen(fw){
