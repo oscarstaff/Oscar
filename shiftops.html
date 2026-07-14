@@ -5758,7 +5758,7 @@ async function aaSave(){
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────
-const SHIFTOPS_BUILD='2026-07-13-rosterfix-11-nraccess';
+const SHIFTOPS_BUILD='2026-07-13-rosterfix-12-availcheck';
 console.log('%c[ShiftOps build '+SHIFTOPS_BUILD+' loaded]','background:#16a34a;color:#fff;padding:2px 8px;border-radius:4px;font-weight:700;');
 (async()=>{
   await loadData();
@@ -5990,6 +5990,22 @@ async function refreshMorningBoard(){
     }
   }catch(e){ /* board still works without class context */ }
 
+  // Fresh availability per staff for TODAY, keyed by normalised name → day slot.
+  // Fetched directly so the board never depends on the in-memory availability
+  // object being populated yet. Used to skip people who are unavailable today.
+  const availByName = {};
+  try{
+    const av = await _cdGet('staff_availability?select=staff_name,availability,is_ongoing,valid_from,valid_until');
+    (av||[]).forEach(r=>{
+      // Respect a date-ranged availability's validity window.
+      if(r.is_ongoing===false){
+        if(r.valid_from && todayIso < r.valid_from) return;
+        if(r.valid_until && todayIso > r.valid_until) return;
+      }
+      availByName[_normName(r.staff_name)] = r.availability || null;
+    });
+  }catch(e){ /* fall back to in-memory availability below */ }
+
   const dayIdx = _todayDayIndex();
   const inNow=[], lateList=[], leaveList=[], notInList=[], doneList=[];
 
@@ -6003,10 +6019,17 @@ async function refreshMorningBoard(){
     const clockedOut = p && p.action==='out';
     let startTime  = rostered.length ? rostered.map(x=>x.start).sort()[0] : null;
 
+    // This person's availability for today (0=Mon..6=Sun matches dayIdx).
+    // Prefer the freshly-fetched map; fall back to the in-memory object.
+    const avObj = availByName[key] || availability[s.id] || null;
+    const avToday = avObj ? (avObj[dayIdx] || avObj[String(dayIdx)]) : null;
+    const isUnavailable = avToday && avToday.type === 'no';
+
     // On a class day, the rostered class start wins (per-date exception first,
-    // then the class roster). An override with null start = excluded → fall back
-    // to the normal shift start above.
-    if(classToday){
+    // then the class roster) — BUT only if the person is actually expected in.
+    // Someone who marked themselves unavailable today must NOT get a class "due"
+    // time, or they'd wrongly show as absent.
+    if(classToday && !isUnavailable){
       const ov = classOverrides[key];
       if(ov && ov.has){
         if(ov.start) startTime = ov.start;   // explicit override time
@@ -6015,6 +6038,9 @@ async function refreshMorningBoard(){
         startTime = classRoster[key];         // class roster start
       }
     }
+    // If unavailable today, they're not expected — no due time, and they should
+    // not be surfaced as "not clocked in".
+    if(isUnavailable) startTime = null;
 
     if(onLeave){ leaveList.push({s}); return; }
 
@@ -6032,9 +6058,10 @@ async function refreshMorningBoard(){
 
     if(clockedOut){ doneList.push({s, at:_hhmmFlexSydney(p.ts)}); return; }
 
-    // NOT CLOCKED IN — anyone with no punch today.
-    // Rostered staff show their due time; unrostered staff still appear
-    // (previously they were silently skipped, so the list looked empty).
+    // NOT CLOCKED IN — anyone with no punch today who IS expected.
+    // Unavailable staff (marked 'no' today) are not expected → don't surface
+    // them as absent. Rostered/expected staff show their due time.
+    if(isUnavailable) return; // legitimately off today
     notInList.push({s, start:startTime, rostered:!!startTime});
   });
   // rostered-but-absent first, then everyone else
