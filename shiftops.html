@@ -1539,6 +1539,7 @@ body.tl-readonly .wk-tools{ display:none !important; }
           <div class="sub-tab" id="subtab-manageteams" onclick="showSubTab('manageteams')">Manage Teams</div>
           <div class="sub-tab" id="subtab-leave" onclick="showSubTab('leave')" style="position:relative">Leave Requests<span id="leaveSubBadge" style="display:none;background:var(--warn);color:#fff;border-radius:10px;padding:1px 6px;font-size:8px;font-weight:800;font-family:var(--mono);margin-left:5px"></span></div>
           <div class="sub-tab" id="subtab-leavesummary" onclick="showSubTab('leavesummary')">Leave Summary</div>
+          <div class="sub-tab" id="subtab-health" onclick="showSubTab('health')" style="position:relative">Health<span id="healthBadge" style="display:none;background:var(--danger,#e5484d);color:#fff;border-radius:10px;padding:1px 6px;font-size:8px;font-weight:800;font-family:var(--mono);margin-left:5px"></span></div>
         </div>
         <div id="subsection-list">
           <div class="staff-list" id="staffList"></div>
@@ -1555,6 +1556,16 @@ body.tl-readonly .wk-tools{ display:none !important; }
         </div>
         <div id="subsection-leavesummary" style="display:none">
           <div id="leaveSummaryContent"></div>
+        </div>
+        <div id="subsection-health" style="display:none">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px;flex-wrap:wrap;">
+            <div>
+              <div style="font-size:15px;font-weight:700;">System health</div>
+              <div style="font-size:12px;color:var(--text-dim);line-height:1.5;">Data problems worth knowing about, found automatically.</div>
+            </div>
+            <button onclick="loadHealthChecks()" class="btn btn-ghost" style="padding:7px 14px;font-size:12px;">Re-check</button>
+          </div>
+          <div id="healthContent" style="margin-top:12px;"></div>
         </div>
       </div>
 
@@ -4026,7 +4037,7 @@ function dlFile(name,text,mime){
 
 // ── TABS & NAV ────────────────────────────────────────────────────────────
 function showSubTab(id){
-  ['list','teamview','manageteams','leave','leavesummary'].forEach(s=>{
+  ['list','teamview','manageteams','leave','leavesummary','health'].forEach(s=>{
     const el=document.getElementById(`subsection-${s}`);
     const tab=document.getElementById(`subtab-${s}`);
     if(el)el.style.display=s===id?'block':'none';
@@ -4036,7 +4047,75 @@ function showSubTab(id){
   if(id==='manageteams')renderTeams();
   if(id==='leave')renderLeave();
   if(id==='leavesummary')renderLeaveSummary();
+  if(id==='health')loadHealthChecks();
   try{ applyTeamLeadLock(); }catch(e){}
+}
+
+// ── SYSTEM HEALTH ──────────────────────────────────────────────
+// Surfaces data problems (open shifts, missing availability, name drift,
+// pending leave) so they're caught before they become mysteries.
+async function loadHealthChecks(){
+  const box=document.getElementById('healthContent');
+  if(!box) return;
+  box.innerHTML='<div style="font-size:12.5px;color:var(--text-dim);">Checking…</div>';
+  let rows=[];
+  try{
+    const r=await fetch(SUPABASE_URL+'/rest/v1/rpc/admin_health_checks',{
+      method:'POST',
+      headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY,'Content-Type':'application/json'},
+      body:'{}'
+    });
+    rows = r.ok ? await r.json() : [];
+  }catch(e){
+    box.innerHTML='<div style="font-size:12.5px;color:var(--danger,#e5484d);">Couldn\u2019t run health checks.</div>';
+    return;
+  }
+
+  const badge=document.getElementById('healthBadge');
+  const crit=rows.filter(r=>r.severity==='crit').length;
+  const warn=rows.filter(r=>r.severity==='warn').length;
+  if(badge){
+    const n=crit+warn;
+    badge.textContent=n; badge.style.display=n?'inline-block':'none';
+    badge.style.background = crit?'#e5484d':'#f5a524';
+  }
+
+  if(!rows.length){
+    box.innerHTML='<div style="padding:26px;text-align:center;border:1px solid var(--border);border-radius:12px;background:var(--surface2);">'+
+      '<div style="font-size:26px;margin-bottom:6px;">\u2713</div>'+
+      '<div style="font-size:14px;font-weight:700;">All clear</div>'+
+      '<div style="font-size:12px;color:var(--text-dim);margin-top:3px;">No data problems detected.</div>'+
+    '</div>';
+    return;
+  }
+
+  const tone={crit:{c:'#e5484d',l:'Critical'},warn:{c:'#f5a524',l:'Warning'},info:{c:'#3d9eff',l:'Info'}};
+  const order={crit:0,warn:1,info:2};
+  rows.sort((a,b)=>(order[a.severity]??9)-(order[b.severity]??9));
+
+  // Summary strip
+  const summary='<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">'+
+    ['crit','warn','info'].map(function(s){
+      const n=rows.filter(r=>r.severity===s).length;
+      if(!n) return '';
+      return '<div style="display:flex;align-items:center;gap:6px;padding:5px 11px;border-radius:999px;border:1px solid '+tone[s].c+'55;background:'+tone[s].c+'18;">'+
+        '<span style="width:7px;height:7px;border-radius:50%;background:'+tone[s].c+';"></span>'+
+        '<span style="font-size:11.5px;font-weight:700;color:'+tone[s].c+';">'+n+' '+tone[s].l.toLowerCase()+'</span>'+
+      '</div>';
+    }).join('')+'</div>';
+
+  box.innerHTML = summary + rows.map(function(r){
+    const t=tone[r.severity]||tone.info;
+    return '<div style="display:flex;align-items:flex-start;gap:11px;padding:11px 13px;border:1px solid var(--border);border-left:3px solid '+t.c+';border-radius:10px;margin-bottom:7px;background:var(--surface2);">'+
+      '<div style="flex:1;min-width:0;">'+
+        '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'+
+          '<span style="font-size:9px;font-family:var(--mono);font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:'+t.c+';">'+_cdEsc(r.category)+'</span>'+
+          '<span style="font-size:13px;font-weight:700;">'+_cdEsc(r.staff_name||'')+'</span>'+
+        '</div>'+
+        '<div style="font-size:12px;color:var(--text-dim);margin-top:3px;line-height:1.45;">'+_cdEsc(r.detail)+'</div>'+
+      '</div>'+
+    '</div>';
+  }).join('');
 }
 
 function showSection(id){
@@ -5781,7 +5860,7 @@ async function aaSave(){
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────
-const SHIFTOPS_BUILD='2026-07-13-rosterfix-14-rolefix';
+const SHIFTOPS_BUILD='2026-07-13-v15-health-nudge';
 console.log('%c[ShiftOps build '+SHIFTOPS_BUILD+' loaded]','background:#16a34a;color:#fff;padding:2px 8px;border-radius:4px;font-weight:700;');
 (async()=>{
   await loadData();
@@ -5794,6 +5873,9 @@ console.log('%c[ShiftOps build '+SHIFTOPS_BUILD+' loaded]','background:#16a34a;c
   pushStaffNames();
   updateSaveStatus();
   try{ startAutoAvailabilitySync(); }catch(e){ console.warn('auto avail sync', e); }
+  // Populate the Health badge in the background so problems are visible without
+  // opening the tab.
+  setTimeout(function(){ try{ loadHealthChecks(); }catch(e){} }, 3000);
 })();
 
 /* ═══════════════════════════════════════════════════════════════════
