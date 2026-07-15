@@ -2072,6 +2072,11 @@ async function loadData(){
 // Maps each into ShiftOps's shape. Preserves any existing per-person roster
 // fields (type/maxHours/color/manager) from the local file when the name matches,
 // so desktop-side scheduling settings aren't lost.
+// True only when the role-source fetches (staff_settings + app_access) actually
+// succeeded. Roles must never be latched from failed/partial data — that's what
+// silently demoted admins to Team Lead on a flaky network.
+let _roleDataOk=false;
+
 async function loadStaffFromSupabase(){
   const H={apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY};
   async function get(path){
@@ -2080,13 +2085,18 @@ async function loadStaffFromSupabase(){
     return r.json();
   }
 
-  // Pull all three in parallel.
+  // Pull all three in parallel. Track which ones actually succeeded — a FAILED
+  // fetch must not be treated as "no data", or an admin whose settings didn't
+  // load gets silently demoted to Team Lead (and latched there for the session).
+  let _settingsOk=true, _accessOk=true;
   const [names,dir,settings,access]=await Promise.all([
     get('staff_names?select=name&order=name.asc').catch(function(){return [];}),
     get('staff_directory?select=staff_name,team').catch(function(){return [];}),
-    get('staff_settings?select=name,is_hub_admin,is_shift_admin').catch(function(){return [];}),
-    get('app_access?select=staff_name&app=eq.shiftops').catch(function(){return [];})
+    get('staff_settings?select=name,is_hub_admin,is_shift_admin').catch(function(e){ _settingsOk=false; console.warn('[ROLE] staff_settings fetch failed — roles unresolved', e); return []; }),
+    get('app_access?select=staff_name&app=eq.shiftops').catch(function(e){ _accessOk=false; console.warn('[ROLE] app_access fetch failed — roles unresolved', e); return []; })
   ]);
+  // Expose whether role data is trustworthy this pass.
+  _roleDataOk = _settingsOk && _accessOk;
 
   if(!Array.isArray(names)||names.length===0){
     // Supabase gave us nothing usable — keep whatever loaded locally, do NOT
@@ -4160,6 +4170,12 @@ function computeTeamLeadState(){
   // (blob load strips isTeamLead before the Supabase rebuild restores it).
   if(_tlResolved) return;
 
+  // If the role source data (staff_settings / app_access) failed to load, the
+  // flags on `meRec` are meaningless — an admin would look like a Team Lead
+  // because is_hub_admin came back missing. Never latch a role from bad data;
+  // wait for a pass where the fetches actually succeeded.
+  if(!_roleDataOk) return;
+
   let me='';
   try{ me=(sessionStorage.getItem('so_me')||'').trim(); }catch(e){}
   if(!me) return;
@@ -5765,7 +5781,7 @@ async function aaSave(){
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────
-const SHIFTOPS_BUILD='2026-07-13-rosterfix-13-accesssplit';
+const SHIFTOPS_BUILD='2026-07-13-rosterfix-14-rolefix';
 console.log('%c[ShiftOps build '+SHIFTOPS_BUILD+' loaded]','background:#16a34a;color:#fff;padding:2px 8px;border-radius:4px;font-weight:700;');
 (async()=>{
   await loadData();
