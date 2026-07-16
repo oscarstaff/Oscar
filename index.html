@@ -6149,7 +6149,7 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
             <label style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px;border-radius:10px;background:#f8fafc;border:1px solid #f1f5f9;cursor:pointer;margin-bottom:8px;">
               <div style="flex:1;">
                 <div style="font-size:13.5px;font-weight:600;color:#0f172a;">Push notifications</div>
-                <div id="pushStatusText" style="font-size:12px;color:#475569;margin-top:3px;">Get alerted on your phone even when the portal is closed</div>
+                <div id="pushStatusText" style="font-size:12px;color:#475569;margin-top:3px;">Get alerted even when the portal is closed — works on your phone and this browser</div>
               </div>
               <button id="pushToggleBtn" onclick="togglePushSubscription()" style="background:#0f172a;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;min-width:80px;">Enable</button>
             </label>
@@ -14558,10 +14558,15 @@ async function togglePushSubscription(){
   const subbed = await isPushSubscribed();
   if(subbed){
     const ok = await unsubscribeFromPush();
-    if(ok){ btn.textContent = 'Enable'; if(status) status.textContent = 'Get alerted on your phone even when the portal is closed'; }
+    if(ok){ btn.textContent = 'Enable'; if(status) status.textContent = 'Get alerted even when the portal is closed — works on your phone and this browser'; }
   } else {
     const ok = await subscribeToPush();
-    if(ok){ btn.textContent = 'Disable'; if(status) status.textContent = 'You\'ll get push alerts for replies, reactions, and leave decisions'; }
+    if(ok){
+      btn.textContent = 'Disable';
+      if(status) status.textContent = 'Push is ON for this device — clock-in reminders, leave decisions, and new training';
+    }
+    // subscribeToPush() already toasts the reason on failure; leave the button
+    // on 'Enable' so it's obvious it didn't take.
   }
   btn.disabled = false;
 }
@@ -14573,9 +14578,9 @@ async function refreshPushToggleState(){
   const subbed = await isPushSubscribed();
   btn.textContent = subbed ? 'Disable' : 'Enable';
   if(status){
-    status.textContent = subbed 
-      ? 'Push notifications are ON for this device'
-      : 'Get alerted on your phone even when the portal is closed';
+    status.textContent = subbed
+      ? 'Push is ON for this device — clock-in reminders, leave decisions, and new training'
+      : 'Get alerted even when the portal is closed — works on your phone and this browser';
   }
 }
 
@@ -19749,11 +19754,10 @@ async function isPushSubscribed(){
 }
 
 async function subscribeToPush(){
-  // Skip on desktop — notifications are mobile-only
-  if(window.innerWidth > 900){
-    console.log('[notif] subscribeToPush skipped — desktop mode');
-    return false;
-  }
+  // Desktop is supported: Chrome/Edge/Firefox all do web push fine, and the
+  // whole point of the clock-in nudge is to reach people at their desk.
+  // (Safari on macOS only works if the site is added to the Dock — the generic
+  // "not supported" message below covers that.)
   if(!('serviceWorker' in navigator) || !('PushManager' in window)){
     showToast('Push notifications not supported on this browser', 'warning');
     return false;
