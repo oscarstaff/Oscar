@@ -6141,7 +6141,7 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
             <label style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px;border-radius:10px;background:#f8fafc;border:1px solid #f1f5f9;cursor:pointer;margin-bottom:8px;">
               <div style="flex:1;">
                 <div style="font-size:13.5px;font-weight:600;color:#0f172a;">Notification sounds</div>
-                <div style="font-size:12px;color:#475569;margin-top:3px;">Play a tone when new posts arrive</div>
+                <div style="font-size:12px;color:#475569;margin-top:3px;">Play a tone for leave decisions, availability reminders, and new training</div>
               </div>
               <input type="checkbox" id="notifSoundToggle" onchange="toggleNotifSound(this.checked)" style="width:20px;height:20px;cursor:pointer;accent-color:var(--accent);">
             </label>
@@ -6153,7 +6153,6 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
               </div>
               <button id="pushToggleBtn" onclick="togglePushSubscription()" style="background:#0f172a;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;min-width:80px;">Enable</button>
             </label>
-            <div id="notifTypeToggles" style="display:flex;flex-direction:column;gap:8px;"></div>
           </div>
 
           <!-- Reset -->
@@ -9780,13 +9779,15 @@ function playNotifSound(typeKey){
     if(_audioCtx.state === 'suspended') _audioCtx.resume();
 
     // Different tones per notif type
+    // Tones for the notifications that actually fire today. (The old
+    // discussions/replies/mentions tones were retired with that feature.)
     const tones = {
-      announcements: [{f:880, t:0}, {f:1100, t:0.12}],   // 2-tone chime
-      discussions:   [{f:660, t:0}, {f:880, t:0.10}],     // softer 2-tone
-      mentions:      [{f:1320, t:0}, {f:1320, t:0.08}],   // double-pip
-      replies:       [{f:660, t:0}],                      // single ping
-      tasks:         [{f:440, t:0}, {f:660, t:0.10}, {f:880, t:0.20}], // 3-tone rising
-      default:       [{f:880, t:0}]
+      'leave-approved':     [{f:660, t:0}, {f:880, t:0.10}, {f:1100, t:0.20}], // rising 3-tone, good news
+      'leave-declined':     [{f:660, t:0}, {f:520, t:0.12}],                   // falling 2-tone
+      'availability-expiry':[{f:740, t:0}, {f:740, t:0.14}],                   // gentle double nudge
+      quiz:                 [{f:880, t:0}, {f:1175, t:0.10}],                  // bright 2-tone, new training
+      announcements:        [{f:880, t:0}, {f:1100, t:0.12}],                  // 2-tone chime
+      default:              [{f:880, t:0}]
     };
     const seq = tones[typeKey] || tones.default;
     const now = _audioCtx.currentTime;
@@ -9868,8 +9869,9 @@ function showSystemNotification(title, body, taskId, typeKey){
   if(typeof NotifManager !== 'undefined'){
     let link = null;
     if(typeKey === 'announcements') link = 'announcements';
-    else if(typeKey === 'discussions' || typeKey === 'replies' || typeKey === 'mentions') link = 'engagement';
-    else if(typeKey === 'tasks') link = 'tasks';
+    else if(typeKey === 'quiz') link = 'learning';
+    else if(typeKey === 'leave-approved' || typeKey === 'leave-declined') link = 'schedule';
+    else if(typeKey === 'availability-expiry') link = 'availability';
     NotifManager.push({
       id: tag,
       type: typeKey || 'general',
@@ -10074,49 +10076,24 @@ function toggleNotifSound(on){
   localStorage.setItem('oscars_notif_sound', on ? '1' : '0');
   if(on){
     // Test sound + ensure context active
-    setTimeout(function(){ playNotifSound('discussions'); }, 100);
+    setTimeout(function(){ playNotifSound('quiz'); }, 100);
     showToast('Notification sounds enabled');
   } else {
     showToast('Notification sounds muted');
   }
 }
 
-// ── CENTRAL NOTIFICATION SETTINGS ─────────
-const NOTIF_TYPES = [
-  {key:'announcements', label:'New announcements', desc:'When someone posts an announcement'},
-  {key:'discussions',   label:'New discussions',   desc:'When someone starts a discussion'},
-  {key:'mentions',      label:'@ Mentions',        desc:'When someone mentions you in a post or reply'},
-  {key:'replies',       label:'Replies',           desc:'Replies to your discussions'},
-  {key:'reactions',     label:'Reactions',         desc:'When someone reacts to your post'}
-];
-
-function notifPrefsKey(){ return 'notif_prefs_'+me; }
-function notifPrefs(){
-  try{
-    const stored = JSON.parse(localStorage.getItem(notifPrefsKey())||'{}');
-    const out = {};
-    NOTIF_TYPES.forEach(function(t){ out[t.key] = stored[t.key] !== false; }); // default true
-    return out;
-  }catch(e){
-    const out = {};
-    NOTIF_TYPES.forEach(function(t){ out[t.key] = true; });
-    return out;
-  }
-}
-function notifSetPref(key, val){
-  const prefs = notifPrefs();
-  prefs[key] = !!val;
-  localStorage.setItem(notifPrefsKey(), JSON.stringify(prefs));
-}
-function notifAllowed(key){
-  if(typeof Notification === 'undefined' || Notification.permission !== 'granted') return false;
-  return notifPrefs()[key] !== false;
+// ── NOTIFICATION SETTINGS ─────────
+// Per-type notification toggles were removed: the app now only sends a small,
+// fixed set (leave decisions, new training, availability reminders) and those
+// aren't worth switching individually. Permission is still managed below.
+function notifAllowed(){
+  return typeof Notification !== 'undefined' && Notification.permission === 'granted';
 }
 
 function renderNotifPanel(){
   const status = document.getElementById('notifPermStatus');
-  const toggles = document.getElementById('notifTypeToggles');
-  if(!status || !toggles) return;
+  if(!status) return;
 
   const supported = typeof Notification !== 'undefined';
   // Force-refresh perm value (Chrome can be stale)
@@ -10134,7 +10111,7 @@ function renderNotifPanel(){
       '<span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#10b981;"></span>'+
       '<span style="font-weight:600;color:#0f172a;">System notifications enabled</span>'+
       '</div>'+
-      '<div style="font-size:11.5px;color:#64748b;margin-top:4px;">Choose which types you want below. To disable entirely, use your browser settings.</div>';
+      '<div style="font-size:11.5px;color:#64748b;margin-top:4px;">You\'ll be alerted about leave decisions, new training, and availability reminders. To disable, use your browser settings.</div>';
   } else if(perm === 'denied'){
     status.innerHTML = '<div style="color:#dc2626;font-weight:600;">⚠ Notifications blocked</div>'+
       '<div style="font-size:11.5px;color:#64748b;margin-top:4px;line-height:1.5;">You blocked notifications. To allow them: click the lock icon to the left of the URL → Notifications → Allow → reload this page.</div>';
@@ -10146,19 +10123,6 @@ function renderNotifPanel(){
       '<div style="font-size:11.5px;color:#64748b;margin-top:6px;line-height:1.5;">Get a desktop popup when there\'s new activity. Browser will ask once. <strong>If your browser is asking but the page still says off,</strong> click "Turn on" again or reload the page.</div>';
   }
 
-  // Render type toggles — labels in proper black, descriptions in lighter
-  const prefs = notifPrefs();
-  const disabled = perm !== 'granted';
-  toggles.innerHTML = NOTIF_TYPES.map(function(t){
-    const on = prefs[t.key] !== false;
-    return '<label style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px;border-radius:10px;background:#f8fafc;border:1px solid #f1f5f9;'+(disabled?'opacity:.5;':'')+'cursor:'+(disabled?'not-allowed':'pointer')+';transition:background .15s;" onmouseover="if(!this.querySelector(\'input\').disabled)this.style.background=\'#f1f5f9\'" onmouseout="this.style.background=\'#f8fafc\'">'+
-      '<div style="flex:1;min-width:0;">'+
-        '<div style="font-size:13.5px;font-weight:600;color:#0f172a;">'+t.label+'</div>'+
-        '<div style="font-size:12px;color:#475569;margin-top:3px;">'+t.desc+'</div>'+
-      '</div>'+
-      '<input type="checkbox" '+(on?'checked':'')+' '+(disabled?'disabled':'')+' onchange="notifSetPref(\''+t.key+'\', this.checked)" style="width:20px;height:20px;cursor:'+(disabled?'not-allowed':'pointer')+';accent-color:var(--accent);flex-shrink:0;">'+
-      '</label>';
-  }).join('');
 }
 
 async function requestNotifyFromProfile(){
@@ -12503,70 +12467,40 @@ async function pollForNewActivity(){
     });
     // Discussions retired (team moved to Google Workspace)
 
-    // New replies (reply_notifications where I'm recipient)
-    if(!_lastReplySeen){
+    // New quiz / training assigned to me (quiz_access rows granted to me)
+    if(!_lastQuizSeen){
       try{
-        const r = [];
-        if(r && r[0]) _lastReplySeen = new Date(r[0].created_at).getTime();
-        else _lastReplySeen = Date.now();
-      }catch(e){ _lastReplySeen = Date.now(); }
+        const q = await sbGet('quiz_access','?staff_name=eq.'+encodeURIComponent(me)+'&order=granted_at.desc&limit=1');
+        _lastQuizSeen = (q && q[0] && q[0].granted_at) ? new Date(q[0].granted_at).getTime() : Date.now();
+      }catch(e){ _lastQuizSeen = Date.now(); }
     } else {
-      const replySince = new Date(_lastReplySeen).toISOString();
-      const newReplies = [];
-      (newReplies||[]).forEach(function(r){
-        if(r.replied_by === me) return;
-        _lastReplySeen = Math.max(_lastReplySeen, new Date(r.created_at).getTime());
-        NotifManager.push({
-          id: 'reply-'+r.id,
-          type: 'reply',
-          title: (r.replied_by||'Someone') + ' replied',
-          body: (r.reply_body||'').slice(0,140),
-          ts: new Date(r.created_at).getTime(),
-          link: 'engagement'
-        });
-      });
-    }
-
-    // New reactions — schema: target_id, target_type ('disc'|'reply'|'ann'), staff_name, emoji, created_at
-    if(!_lastReactSeen){
       try{
-        const r = [];
-        if(r && r[0] && r[0].created_at) _lastReactSeen = new Date(r[0].created_at).getTime();
-        else _lastReactSeen = Date.now();
-      }catch(e){ _lastReactSeen = Date.now(); console.warn('[poll] react baseline failed:', e); }
-    } else {
-      const reactSince = new Date(_lastReactSeen).toISOString();
-      let newReacts = [];
-      try{
-        newReacts = [];
-      }catch(e){ console.warn('[poll] reactions fetch failed:', e); }
-      for(let i=0; i<newReacts.length; i++){
-        const r = newReacts[i];
-        // Always advance the seen timestamp so we don't re-check forever
-        if(r.created_at) _lastReactSeen = Math.max(_lastReactSeen, new Date(r.created_at).getTime());
-        if(r.staff_name === me) continue; // skip my own reactions
-        // Determine if I authored the target — schema uses 'disc' / 'reply' / 'ann'
-        let isMyContent = false;
-        let targetLabel = 'content';
-        try{
-          /* discussions retired — only announcements can be reacted to now */
-        }catch(e){ console.warn('[poll] react author check:', e); }
-        if(isMyContent){
-          NotifManager.push({
-            id: 'react-'+r.id,
-            type: 'reaction',
-            title: (r.staff_name||'Someone') + ' reacted ' + (r.emoji||'👍'),
-            body: 'On your '+targetLabel,
-            ts: Date.now(),
-            link: 'engagement'
-          });
+        const since = new Date(_lastQuizSeen).toISOString();
+        const newQ = await sbGet('quiz_access','?staff_name=eq.'+encodeURIComponent(me)+
+                                 '&granted_at=gt.'+encodeURIComponent(since)+'&order=granted_at.asc&limit=5') || [];
+        // Resolve friendly quiz titles once if there's anything new.
+        let titles = {};
+        if(newQ.length){
+          try{
+            const qz = await sbGet('custom_quizzes','?select=id,title') || [];
+            qz.forEach(function(x){ titles[String(x.id)] = x.title; });
+          }catch(e){}
         }
-      }
+        newQ.forEach(function(q){
+          _lastQuizSeen = Math.max(_lastQuizSeen, new Date(q.granted_at).getTime());
+          const nice = titles[String(q.quiz_id)] || 'A new quiz';
+          NotifManager.push({
+            id: 'quiz-'+q.id,
+            type: 'quiz',
+            title: 'New training assigned',
+            body: nice + (q.granted_by ? ' — assigned by '+q.granted_by : ''),
+            ts: new Date(q.granted_at).getTime(),
+            link: 'learning'
+          });
+        });
+      }catch(e){}
     }
 
-    // Leave decisions (my own leave requests being approved/declined)
-    // Realtime handles new leave events now — this poll is now a safety net only
-    // Use submitted_at as fallback timestamp since resolved_at column doesn't exist
     if(!_lastLeaveSeen){
       try{
         const l = await sbGet('leave_submissions','?staff_name=eq.'+encodeURIComponent(me)+'&status=in.(approved,declined)&order=submitted_at.desc&limit=1');
@@ -12601,8 +12535,7 @@ async function pollForNewActivity(){
   }catch(e){}
 }
 
-let _lastReplySeen = null;
-let _lastReactSeen = null;
+let _lastQuizSeen = null;
 let _lastLeaveSeen = null;
 let _activityPollTimer = null;
 function startActivityPolling(){
@@ -20140,6 +20073,13 @@ const NotifManager = (function(){
     if(list.find(function(n){return n.id === notif.id;})) return false; // dedupe
     // Pulse the bell for any new notification
     if(typeof triggerBellPulse === 'function') triggerBellPulse();
+    // Chime for it too (unless the user turned sounds off). Tone varies by type:
+    // leave decisions, availability expiry, new quiz/training.
+    try{
+      if(localStorage.getItem('oscars_notif_sound') !== '0' && typeof playNotifSound === 'function'){
+        playNotifSound(notif.type || 'default');
+      }
+    }catch(e){}
     list.unshift({
       id: notif.id,
       type: notif.type || 'general',
