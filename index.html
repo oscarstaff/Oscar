@@ -5336,8 +5336,6 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
         </div>
       </div>
 
-      <!-- Discussions preview (removed from nav — card hidden) -->
-      </div>
 
     </div>
 
@@ -8233,6 +8231,250 @@ setTimeout(function(){
 
 
 
+
+async function openGatedApp(ev,app,url){
+  if(ev)ev.preventDefault();
+  try{
+    const token=await makeAppToken(app, me);
+    window.open(url+'#t='+encodeURIComponent(token),'_blank','noopener,noreferrer');
+  }catch(e){
+    showToast('Could not open app');
+    console.warn('openGatedApp',e);
+  }
+}
+function showAuth(s){
+  ["login","setpass","resetkey"].forEach(p=>document.getElementById("pg-"+p).style.display="none");
+  document.getElementById("pg-"+s).style.display="block";
+  try{ document.getElementById("authLayer").classList.toggle("login-edge", s==="login"); }catch(e){}
+}
+
+async function sbGet(t,f){
+  const url=SB+"/rest/v1/"+t+(f||"");
+  const r=await fetch(url,{headers:{"apikey":KEY,"Authorization":"Bearer "+_sbBearer()}});
+  if(!r.ok){console.warn("sbGet failed:",t,r.status,await r.text().catch(()=>''));return[];}
+  return r.json();
+}
+async function sbPost(t,b){return fetch(SB+"/rest/v1/"+t,{method:"POST",headers:{"apikey":KEY,"Authorization":"Bearer "+_sbBearer(),"Content-Type":"application/json","Prefer":"return=minimal"},body:JSON.stringify(b)});}
+function _sbBearer(){ return window._sbAuthToken || KEY; }
+async function refreshSbAuthToken(){
+  try{
+    const auth = getAuthClient();
+    if(auth && auth.getSession){
+      const { data } = await auth.getSession();
+      window._sbAuthToken = (data && data.session && data.session.access_token) ? data.session.access_token : null;
+    }
+  }catch(e){ window._sbAuthToken = null; }
+  // keep the realtime socket authenticated too (RLS-locked tables only emit
+  // postgres_changes to connections authorized to see the rows)
+  try{
+    if(_realtimeClient && _realtimeClient.realtime && _realtimeClient.realtime.setAuth){
+      _realtimeClient.realtime.setAuth(window._sbAuthToken || KEY);
+    }
+  }catch(e){}
+  return window._sbAuthToken;
+}
+async function hmacHex(secret,msg){
+  const enc=new TextEncoder();
+  const key=await crypto.subtle.importKey('raw',enc.encode(secret),{name:'HMAC',hash:'SHA-256'},false,['sign']);
+  const sig=await crypto.subtle.sign('HMAC',key,enc.encode(msg));
+  return Array.from(new Uint8Array(sig)).map(x=>x.toString(16).padStart(2,'0')).join('');
+}
+async function makeAppToken(app,name){
+  const payload={app:app,name:name||'',exp:Date.now()+1000*60*5}; // valid 5 min to launch
+  // Hand the launched app our live Supabase session so it can write to
+  // RLS-locked tables as an authenticated user (no anon-key writes).
+  try{
+    const ac = getAuthClient();
+    if(ac && ac.getSession){
+      const { data } = await ac.getSession();
+      if(data && data.session){
+        payload.sb_at = data.session.access_token || null;
+        payload.sb_rt = data.session.refresh_token || null;
+      }
+    }
+  }catch(e){}
+  const json=JSON.stringify(payload);
+  const b64=btoa(unescape(encodeURIComponent(json)));
+  const sig=await hmacHex(APP_GATE_SECRET, b64);
+  return b64+'.'+sig;
+}
+async function loadHubAccess(){
+  // Load access lists from Supabase
+  try{
+    const rows=await sbGet('app_access','?select=app,staff_name');
+    _accessCache={formcraft:[],slip:[],shiftops:[],namereader:[]};
+    (rows||[]).forEach(r=>{ if(_accessCache[r.app]) _accessCache[r.app].push(r.staff_name); });
+  }catch(e){ console.warn('loadHubAccess',e); }
+  // Show/hide cards for current user
+  const fc=document.getElementById('hubcard-formcraft');
+  const sl=document.getElementById('hubcard-slip');
+  if(fc) fc.style.display=_accessCache.formcraft.includes(me)?'':'none';
+  if(sl) sl.style.display=_accessCache.slip.includes(me)?'':'none';
+  const so=document.getElementById('hubcard-shiftops');
+  if(so) so.style.display=_accessCache.shiftops.includes(me)?'':'none';
+  const nr=document.getElementById('hubcard-namereader');
+  if(nr) nr.style.display=_accessCache.namereader.includes(me)?'':'none';
+  // Show admin button
+  const adminArea=document.getElementById('hubAdminArea');
+  if(adminArea) adminArea.style.display=(typeof myIsAdmin!=='undefined'&&myIsAdmin)?'block':'none';
+}
+function loadMe(){const n=sessionStorage.getItem("ou");if(n){me=n;return true;}return false;}
+function saveMe(n){me=n;sessionStorage.setItem("ou",n);}
+function showUndoToast(text, undoFn){
+  let t = document.getElementById('undoToast');
+  if(t) t.remove();
+  t = document.createElement('div');
+  t.id = 'undoToast';
+  t.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#0f172a;color:#fff;padding:10px 14px;border-radius:10px;display:flex;align-items:center;gap:14px;z-index:9999;font-size:13px;font-weight:500;box-shadow:0 8px 24px rgba(0,0,0,.25);animation:taskBackdropFade .25s ease both;';
+  t.innerHTML = '<span>'+text+'</span><button id="undoBtn" style="background:none;border:none;color:#fbbf24;font-size:13px;font-weight:700;cursor:pointer;text-transform:uppercase;letter-spacing:.04em;padding:0;font-family:inherit;">Undo</button>';
+  document.body.appendChild(t);
+  const btn = document.getElementById('undoBtn');
+  let done = false;
+  btn.onclick = function(){
+    if(done) return;
+    done = true;
+    if(undoFn) undoFn();
+    t.remove();
+  };
+  setTimeout(function(){ if(!done && t.parentNode) t.remove(); }, 8000);
+}
+function _findVisibleTa(name){
+  // Find the textarea whose visible UI (rt-editor or the ta itself) is on screen
+  const all = document.querySelectorAll('textarea[id^="'+name+'"]');
+  for(const ta of all){
+    // If RT-upgraded, check the editor's visibility (textarea is hidden by design)
+    if(ta.dataset.rtUpgraded==='1'){
+      if(ta._rtEditor && ta._rtEditor.offsetParent !== null) return ta;
+    } else if(ta.offsetParent !== null){
+      return ta;
+    }
+  }
+  // Fallback: first matching, anywhere
+  return all[0] || null;
+}
+async function hash(p){const e=new TextEncoder().encode(p+"oscar_roster_salt_2024"),b=await crypto.subtle.digest("SHA-256",e);return Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,"0")).join("");}
+async function openAccessManager(){
+  document.getElementById('accessModal').style.display='flex';
+  // load staff list
+  try{
+    const rows=await sbGet('staff_names','?order=name.asc');
+    _accessAllStaff=(rows||[]).map(r=>r.name).filter(Boolean);
+  }catch(e){ _accessAllStaff=[]; }
+  // refresh access from server
+  try{
+    const rows=await sbGet('app_access','?select=app,staff_name');
+    _accessCache={formcraft:[],slip:[],shiftops:[],namereader:[]};
+    (rows||[]).forEach(r=>{ if(_accessCache[r.app]) _accessCache[r.app].push(r.staff_name); });
+  }catch(e){}
+  _accessWorking={formcraft:new Set(_accessCache.formcraft),slip:new Set(_accessCache.slip),shiftops:new Set(_accessCache.shiftops),namereader:new Set(_accessCache.namereader)};
+  // load team buttons
+  await buildTeamButtons();
+  switchAccessApp('formcraft');
+}
+function closeAccessManager(){ document.getElementById('accessModal').style.display='none'; }
+async function saveAccessChanges(){
+  // Diff working set vs cache, apply inserts + deletes
+  for(const app of ['formcraft','slip','shiftops','namereader']){
+    const before=new Set(_accessCache[app]);
+    const after=_accessWorking[app];
+    // inserts
+    const toAdd=[...after].filter(n=>!before.has(n));
+    const toDel=[...before].filter(n=>!after.has(n));
+    for(const n of toAdd){
+      await sbPost('app_access',{app:app,staff_name:n});
+    }
+    for(const n of toDel){
+      await fetch(SB+'/rest/v1/app_access?app=eq.'+encodeURIComponent(app)+'&staff_name=eq.'+encodeURIComponent(n),{method:'DELETE',headers:{"apikey":KEY,"Authorization":"Bearer "+KEY}});
+    }
+  }
+  showToast('Access updated');
+  closeAccessManager();
+  loadHubAccess();
+}
+function switchAccessApp(app){
+  _accessCurrentApp=app;
+  ['formcraft','slip','shiftops','namereader'].forEach(a=>{var t=document.getElementById('acctab-'+a);if(t)t.className='acc-app-tab'+(app===a?' acc-tab-active':'');});
+  // restyle tabs
+  ['formcraft','slip','shiftops','namereader'].forEach(a=>{
+    const el=document.getElementById('acctab-'+a);
+    if(a===app){el.style.background='var(--accent)';el.style.color='#fff';el.style.borderColor='var(--accent)';}
+    else{el.style.background='transparent';el.style.color='var(--text,#333)';el.style.borderColor='var(--border-color,#ddd)';}
+  });
+  document.getElementById('accSearch').value='';
+  renderAccessList('');
+}
+function renderAccessList(filter){
+  const c=document.getElementById('accStaffList');
+  const f=(filter||'').toLowerCase();
+  const sel=_accessWorking[_accessCurrentApp];
+  const list=_accessAllStaff.filter(n=>n.toLowerCase().includes(f));
+  if(!list.length){ c.innerHTML='<div style="text-align:center;color:var(--text-dim,#888);padding:30px;">No staff found</div>'; return; }
+  c.innerHTML='';
+  list.forEach(n=>{
+    const on=sel.has(n);
+    const row=document.createElement('div');
+    row.style.cssText='display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:9px;cursor:pointer;border:1px solid '+(on?'var(--accent)':'var(--border-color,#eee)')+';margin-bottom:6px;background:'+(on?'rgba(45,157,148,.08)':'transparent')+';';
+    row.innerHTML='<span style="font-size:14px;font-weight:'+(on?'600':'400')+';">'+n+'</span><span style="font-size:18px;">'+(on?'✅':'⬜')+'</span>';
+    row.onclick=()=>{ if(sel.has(n))sel.delete(n); else sel.add(n); renderAccessList(filter); };
+    c.appendChild(row);
+  });
+}
+function filterAccessList(v){ renderAccessList(v); }
+function accSelectAll(){ _accessAllStaff.forEach(n=>_accessWorking[_accessCurrentApp].add(n)); renderAccessList(document.getElementById('accSearch').value); }
+function accClearAll(){ _accessWorking[_accessCurrentApp].clear(); renderAccessList(document.getElementById('accSearch').value); }
+async function accSelectTeam(team){
+  try{
+    const rows=await sbGet('staff_credentials','?select=staff_name&team=eq.'+encodeURIComponent(team));
+    (rows||[]).forEach(r=>{ if(r.staff_name) _accessWorking[_accessCurrentApp].add(r.staff_name); });
+  }catch(e){}
+  renderAccessList(document.getElementById('accSearch').value);
+}
+async function buildTeamButtons(){
+  const wrap=document.getElementById('accTeamButtons');
+  let teams=[];
+  try{
+    const rows=await sbGet('staff_credentials','?select=team&team=not.is.null');
+    teams=[...new Set((rows||[]).map(r=>r.team).filter(Boolean))];
+  }catch(e){}
+  wrap.innerHTML='<span style="font-size:12px;color:var(--text-dim,#888);align-self:center;margin-right:4px;">Quick add:</span>';
+  wrap.innerHTML+='<button onclick="accSelectAll()" style="padding:6px 12px;border-radius:8px;border:1.5px solid var(--accent);background:transparent;color:var(--accent);font-size:12px;font-weight:600;cursor:pointer;">Everyone</button>';
+  teams.forEach(t=>{
+    wrap.innerHTML+='<button onclick="accSelectTeam(\''+t.replace(/'/g,"\\'")+'\')" style="padding:6px 12px;border-radius:8px;border:1.5px solid var(--border-color,#ddd);background:transparent;color:var(--text,#333);font-size:12px;font-weight:600;cursor:pointer;">'+t+'</button>';
+  });
+  wrap.innerHTML+='<button onclick="accClearAll()" style="padding:6px 12px;border-radius:8px;border:1.5px solid #f5c2c2;background:transparent;color:#c0392b;font-size:12px;font-weight:600;cursor:pointer;">Clear all</button>';
+}
+
+// ── Globals restored (were removed with the discussions cut) ──
+const APP_GATE_SECRET='oscars_nexus_gate_v1_8f3a2c91';
+let _accessCache={formcraft:[],slip:[],shiftops:[],namereader:[]};
+let _accessCurrentApp='formcraft';
+let _accessWorking={formcraft:new Set(),slip:new Set(),shiftops:new Set()};
+let _accessAllStaff=[];
+let _realtimeClient = null;
+const KUDOS_BADGES = {
+  star:'⭐', rocket:'🚀', heart:'💜', brain:'🧠', handshake:'🤝', fire:'🔥'
+};
+let _kudosRows = [];
+let _kudosFilter = 'all';
+let _kudosPick = { to:'', badge:'star' };
+
+// ── Restored after the Discussions removal ─────────────────────
+// These are still used by Announcements + the notification lists. The
+// reactions/reply_notifications tables are gone, so these are inert
+// no-ops that keep the UI rendering without errors.
+function makeReactHTML(){ return ''; }              // reactions retired
+async function markReactSeen(){ /* reactions retired */ }
+async function markReplySeen(){ /* reply notifications retired */ }
+async function togglePin(id, currentPinned){
+  try{
+    await fetch(SB+'/rest/v1/announcements?id=eq.'+encodeURIComponent(id),{
+      method:'PATCH',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body: JSON.stringify({pinned: !currentPinned, pinned_at: !currentPinned ? new Date().toISOString() : null})
+    });
+    if(typeof loadAnnouncements==='function') loadAnnouncements();
+  }catch(e){ if(typeof showToast==='function') showToast('Could not update pin'); }
+}
 
 async function loadAnnouncements(){
   const el=document.getElementById('annList');
