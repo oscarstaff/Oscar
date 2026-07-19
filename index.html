@@ -6624,6 +6624,31 @@ function getAuthClient(){
     });
     // supabase-js v2: auth methods live under client.auth — expose that directly
     _authClient = client.auth ? client.auth : client;
+    // ── Auto sign-out when the session expires ──────────────────────────────
+    // autoRefreshToken keeps the session alive while the refresh token is valid.
+    // Once it can't (expired/revoked), supabase emits SIGNED_OUT — we catch that
+    // and force a clean logout so the user never sits on a dead token silently
+    // failing DB writes. TOKEN_REFRESHED just re-captures the fresh access token.
+    try{
+      if(_authClient.onAuthStateChange){
+        _authClient.onAuthStateChange(function(event, session){
+          if(event === 'TOKEN_REFRESHED' && session){
+            window._sbAuthToken = session.access_token || window._sbAuthToken;
+            return;
+          }
+          if(event === 'SIGNED_OUT' || (event === 'TOKEN_REFRESHED' && !session)){
+            // only act if the user was actually signed in (ignore pre-login noise)
+            if(window.me || sessionStorage.getItem('ou')){
+              if(!window._authExpiredHandled){
+                window._authExpiredHandled = true;
+                try{ if(typeof showToast === 'function') showToast('Your session expired — signing you out.', 'info'); }catch(e){}
+                setTimeout(function(){ try{ doLogout(); }catch(e){ window.location.reload(); } }, 600);
+              }
+            }
+          }
+        });
+      }
+    }catch(e){ console.warn('[auth] onAuthStateChange wire failed', e); }
   }
   return _authClient;
 }
@@ -7370,6 +7395,37 @@ async function doResetKey(){
   finally{btn.disabled=false;btn.textContent="Reset Password";}
 }
 
+// ── Session-expiry watchdog ─────────────────────────────────────────────
+// onAuthStateChange catches refresh-driven sign-outs, but a token can lapse
+// while the tab is idle and no refresh is attempted. This polls the live
+// session every 60s (and on tab refocus) and forces logout the moment the
+// session is gone or its expiry has passed.
+let _sessionWatchTimer = null;
+async function _checkSessionAlive(){
+  if(!(window.me || sessionStorage.getItem('ou'))) return; // not logged in
+  if(window._authExpiredHandled) return;
+  try{
+    const a = getAuthClient();
+    if(!a || !a.getSession) return;
+    const { data } = await a.getSession();
+    const sess = data && data.session;
+    const expired = !sess || (sess.expires_at && (sess.expires_at * 1000) <= Date.now());
+    if(expired){
+      window._authExpiredHandled = true;
+      try{ if(typeof showToast === 'function') showToast('Your session expired — signing you out.', 'info'); }catch(e){}
+      setTimeout(function(){ try{ doLogout(); }catch(e){ window.location.reload(); } }, 600);
+    }
+  }catch(e){ /* network hiccup — leave it for the next tick */ }
+}
+function startSessionExpiryWatch(){
+  if(_sessionWatchTimer) return; // already running
+  _sessionWatchTimer = setInterval(_checkSessionAlive, 60000);
+  document.addEventListener('visibilitychange', function(){
+    if(document.visibilityState === 'visible') _checkSessionAlive();
+  });
+  _checkSessionAlive(); // check immediately on entry
+}
+
 async function doLogout(){
   try{ teardownRealtime(); }catch(e){}
   // Stop any running timers
@@ -7398,6 +7454,8 @@ async function doLogout(){
 async function enterHub(){
   // Clear any old 'anon' NotifManager bucket so legacy notifs don't surface
   try{ localStorage.removeItem('notif_local_anon'); }catch(e){}
+  // Start the session-expiry watchdog (idempotent).
+  try{ startSessionExpiryWatch(); }catch(e){}
   // Also clear any session-storage realtime dedupe keys (per-tab anyway, just being safe)
   try{
     for(let i = sessionStorage.length - 1; i >= 0; i--){
