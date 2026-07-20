@@ -916,6 +916,80 @@
     }
     const hasValue = (f, v) => f.type === 'checkbox' ? !!v : (v != null && v !== '');
 
+    // Today's date as ISO (YYYY-MM-DD), local time — for auto-dated fields.
+    function todayISO() {
+      const d = new Date();
+      const p = (n) => String(n).padStart(2, '0');
+      return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+    }
+    // A field gets today's date if it's a date field OR a text field clearly
+    // labelled as a date — but NEVER a birth date or an arrival date.
+    // (Many forms leave "Date" fields as plain text, so type alone isn't enough.)
+    function isAutoDateField(f) {
+      const lab = (f.label || '').toLowerCase() + ' ' + (f.name || '').toLowerCase();
+      const looksDate = f.type === 'date' || /\bdate\b|date signed|dated/.test(lab);
+      if (!looksDate) return false;
+      if (/dob|d\.o\.b|date of birth|birth|born/.test(lab)) return false;
+      if (/arriv|entry to australia|first arrival|landed/.test(lab)) return false;
+      // don't touch dropdowns/checkboxes/signatures that happen to say "date"
+      if (f.type === 'checkbox' || f.type === 'signature' || f.type === 'dropdown' || f.type === 'radio') return false;
+      return true;
+    }
+    // Return the seed values to pre-fill on load: today's date in every
+    // auto-date field, and the applicant's name mirrored into a later name field.
+    function seedAutoValues(fieldList) {
+      const seed = {};
+      const today = todayISO();
+      for (const f of fieldList) {
+        if (isAutoDateField(f)) seed[f.name] = today;
+      }
+      applyNameMirror(fieldList, seed);
+      return seed;
+    }
+    // Fill a bottom "Name" field (signature/declaration name) with the
+    // applicant's full name. Handles two layouts:
+    //   (a) one top "Full Name" field  → copy it.
+    //   (b) split "Given Names" + "Surname" fields → combine as "Given Surname".
+    // Skips emergency-contact / next-of-kin / referrer names entirely, and
+    // never overwrites a bottom name the user/AI already filled.
+    function applyNameMirror(fieldList, vals) {
+      const isKin = (lab) => /emergency|next of kin|kin|guardian|referr|contact person|witness/.test(lab);
+      const nameish = fieldList.filter(f => {
+        if (f.type !== 'text') return false;
+        const lab = (f.label || '').toLowerCase();
+        return /name/.test(lab) && !isKin(lab);
+      });
+      if (!nameish.length) return vals;
+
+      // find given + surname among the applicant name fields
+      const given = nameish.find(f => /given|first|christian/.test((f.label || '').toLowerCase()));
+      const surname = nameish.find(f => /surname|last|family/.test((f.label || '').toLowerCase()));
+      const plainFull = nameish.find(f => /full name|full/.test((f.label || '').toLowerCase()));
+
+      // build the applicant's full name string
+      let fullName = '';
+      if (given || surname) {
+        const g = given ? String(vals[given.name] || '').trim() : '';
+        const s = surname ? String(vals[surname.name] || '').trim() : '';
+        fullName = [g, s].filter(Boolean).join(' ');
+      } else if (plainFull) {
+        fullName = String(vals[plainFull.name] || '').trim();
+      } else {
+        fullName = String(vals[nameish[0].name] || '').trim();
+      }
+      if (!fullName) return vals;
+
+      // the target is a name field that ISN'T the given/surname/full source —
+      // i.e. a standalone "Name" (declaration/signature) field, preferring the last one.
+      const sources = new Set([given, surname, plainFull].filter(Boolean).map(f => f.name));
+      const targets = nameish.filter(f => !sources.has(f.name));
+      const target = targets.length ? targets[targets.length - 1] : null;
+      if (target && (vals[target.name] == null || vals[target.name] === '')) {
+        vals[target.name] = fullName;
+      }
+      return vals;
+    }
+
     function PdfPreview({ pdfJsDoc, fields, values, currentPage, onPageChange, pageCount, scale, onZoom, highlightedFieldName, onFieldClick, onValueChange }) {
       const canvasRef = useRef(null);
       const [renderedSize, setRenderedSize] = useState({ width: 0, height: 0 });
@@ -1462,7 +1536,6 @@
           setFileName(file.name);
           setPageCount(pageCount);
           setCurrentPage(1);
-          setValues({});
           setMode('fill');
 
           const fp = pdfFingerprint(bytes);
@@ -1476,6 +1549,7 @@
             const { fields: applied, groups } = applyTemplate(fresh, tplData);
             setFields(applied);
             setGroups(groups);
+            setValues(seedAutoValues(applied));   // today-dates + name mirror
             setPendingSuggestions([]);
             if (teamTpl) { setLoadedTplId(teamTpl.id); setLoadedTplName(teamTpl.name); }
             try { localStorage.setItem(fp, JSON.stringify(tplData)); } catch {}
@@ -1483,6 +1557,7 @@
           } else {
             setFields(fresh);
             setGroups([]);
+            setValues(seedAutoValues(fresh));      // today-dates + name mirror
             setLoadedTplId(null);
             setLoadedTplName(null);
             const sugg = suggestGroups(fresh);
@@ -1700,9 +1775,9 @@
 
       const clearValues = useCallback((silent) => {
         if (!silent && !confirm('Clear all filled values? The form stays loaded.')) return;
-        setValues({});
+        setValues(seedAutoValues(fields));   // keep today's dates for the next person
         if (!silent && typeof showToast === 'function') showToast('Form cleared', 'ok');
-      }, []);
+      }, [fields]);
 
       // Merge AI-returned values into the form, skipping the synthetic Course
       // field's absence gracefully; count how many actually landed.
@@ -1715,6 +1790,13 @@
           for (const k of Object.keys(vals)) {
             if (validNames.has(k)) { next[k] = vals[k]; n++; }
           }
+          // keep auto-dated fields on today's date if the sheet didn't supply one
+          const today = todayISO();
+          for (const f of fields) {
+            if (isAutoDateField(f) && (next[f.name] == null || next[f.name] === '')) next[f.name] = today;
+          }
+          // mirror the top full name into the bottom name field
+          applyNameMirror(fields, next);
           return next;
         });
         return n;
