@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Call Logger</title>
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%232563eb'/><path d='M11 9c-1 0-2 1-2 2 0 6 5 11 11 11 1 0 2-1 2-2v-2l-4-1-1 2c-2-1-4-3-5-5l2-1-1-4z' fill='%23fff'/></svg>" />
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%232563eb'/><path d='M11.5 8.5c-1 0-1.9.8-1.9 1.9 0 6.6 5.4 12 12 12 1 0 1.9-.9 1.9-1.9v-2.2c0-.5-.4-1-.9-1.1l-3-.6c-.5-.1-1 .1-1.2.5l-.9 1.4c-2.3-1.1-4.1-3-5.2-5.2l1.4-.9c.4-.3.6-.8.5-1.2l-.6-3c-.1-.5-.6-.9-1.1-.9z' fill='%23fff'/><circle cx='22' cy='10' r='4.2' fill='%2322c55e' stroke='%232563eb' stroke-width='1.4'/><path d='M20.3 10l1.2 1.2 2.2-2.4' stroke='%23fff' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round' fill='none'/></svg>" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
   <style>
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -103,7 +103,7 @@
   (function(){
     var TEST_CODE='2006', clicks=0, timer=null;
     function reveal(){var w=document.getElementById('__gatePwWrap');if(!w)return;w.style.display='block';var pw=document.getElementById('__gatePw');if(pw)pw.focus();}
-    function tryCode(){var pw=document.getElementById('__gatePw'),err=document.getElementById('__gatePwErr');if(!pw)return;if(pw.value===TEST_CODE){window.NEXUS_USER='Test Staff';try{sessionStorage.setItem('ngate_'+APP,'1');}catch(e){}pass();}else{if(err)err.textContent='Incorrect passcode.';pw.value='';pw.focus();}}
+    function tryCode(){var pw=document.getElementById('__gatePw'),err=document.getElementById('__gatePwErr');if(!pw)return;if(pw.value===TEST_CODE){window.NEXUS_USER='Test Staff';try{sessionStorage.setItem('ngate_'+APP,'1');sessionStorage.setItem('ngate_name_'+APP,'Test Staff');}catch(e){}pass();}else{if(err)err.textContent='Incorrect passcode.';pw.value='';pw.focus();}}
     document.addEventListener('DOMContentLoaded',function(){
       var lock=document.getElementById('__gateLock');
       if(lock){lock.addEventListener('click',function(){clicks++;clearTimeout(timer);timer=setTimeout(function(){clicks=0;},800);if(clicks>=3){clicks=0;reveal();}});}
@@ -197,14 +197,15 @@
     // ─────────────────────────────────────────────────────────────
     //  CONFIG — paste your deployed Apps Script Web App URL + token
     // ─────────────────────────────────────────────────────────────
-    var DIALTRAC_URL   = 'https://script.google.com/macros/s/AKfycbzYOH0Ki7qMvA4CTpEqwJVajHS1Ln41-W3cHRG3T8egHgCI-8GVrxIPAi-TFiPKHA9a/exec';
-    var DIALTRAC_TOKEN = 'AREY BHAIYA SABHA SABHA'; // must match SHARED_TOKEN in Code.gs
+    var DIALTRAC_URL   = 'PASTE_YOUR_APPS_SCRIPT_WEB_APP_URL_HERE';
+    var DIALTRAC_TOKEN = 'dialtrac_oscars_2026_change_me'; // must match SHARED_TOKEN in Code.gs
 
     var sessionLog = [];
 
     window.__dtInit = function(){
-      var who = window.NEXUS_USER || 'Unknown';
-      document.getElementById('whoName').textContent = who;
+      var who = window.NEXUS_USER || sessionStorage.getItem('ngate_name_dialtrac') || '';
+      if(who){ window.NEXUS_USER = who; }
+      document.getElementById('whoName').textContent = who || 'Unknown';
       if(!DIALTRAC_URL || DIALTRAC_URL.indexOf('PASTE_') === 0){
         document.getElementById('configWarn').style.display = 'block';
       }
@@ -295,6 +296,10 @@
       ['fName','fNumber','fReason'].forEach(function(id){
         el(id).addEventListener('keydown',function(e){ if(e.key==='Enter'){ e.preventDefault(); saveCall(); } });
       });
+      // Always run init here too — the gate's pass() may have fired before this
+      // script defined __dtInit (e.g. on refresh with an existing session), so
+      // relying on the gate to call it isn't enough.
+      if(window.__dtInit) window.__dtInit();
     });
   </script>
 </body>
