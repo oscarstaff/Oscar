@@ -5900,6 +5900,16 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
             </div>
             <svg class="hub-card-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7"/><polyline points="7 7 17 7 17 17"/></svg>
           </a>
+          <!-- Call Logger — call logging (access-gated) -->
+          <a class="hub-card" id="hubcard-dialtrac" style="display:none;cursor:pointer;" onclick="openGatedApp(event,'dialtrac','https://oscarstaff.github.io/Oscar/dialtrac.html')">
+            <div class="hub-card-icon hub-icon-dialtrac">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.9.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+            </div>
+            <div class="hub-card-body">
+              <div class="hub-card-title">Call Logger</div>
+            </div>
+            <svg class="hub-card-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7"/><polyline points="7 7 17 7 17 17"/></svg>
+          </a>
           <!-- ShiftOps — roster manager (access-gated) -->
           <a class="hub-card" id="hubcard-shiftops" style="display:none;cursor:pointer;" onclick="openGatedApp(event,'shiftops','https://oscarstaff.github.io/Oscar/shiftops.html')">
             <div class="hub-card-icon hub-icon-shiftops">
@@ -8349,7 +8359,7 @@ async function loadHubAccess(){
   // Load access lists from Supabase
   try{
     const rows=await sbGet('app_access','?select=app,staff_name');
-    _accessCache={formcraft:[],slip:[],shiftops:[]};
+    _accessCache={formcraft:[],slip:[],dialtrac:[],shiftops:[]};
     (rows||[]).forEach(r=>{ if(_accessCache[r.app]) _accessCache[r.app].push(r.staff_name); });
   }catch(e){ console.warn('loadHubAccess',e); }
   // Show/hide cards for current user
@@ -8357,6 +8367,8 @@ async function loadHubAccess(){
   const sl=document.getElementById('hubcard-slip');
   if(fc) fc.style.display=_accessCache.formcraft.includes(me)?'':'none';
   if(sl) sl.style.display=_accessCache.slip.includes(me)?'':'none';
+  const dt=document.getElementById('hubcard-dialtrac');
+  if(dt) dt.style.display=_accessCache.dialtrac.includes(me)?'':'none';
   const so=document.getElementById('hubcard-shiftops');
   if(so) so.style.display=_accessCache.shiftops.includes(me)?'':'none';
   // Show admin button
@@ -8408,10 +8420,10 @@ async function openAccessManager(){
   // refresh access from server
   try{
     const rows=await sbGet('app_access','?select=app,staff_name');
-    _accessCache={formcraft:[],slip:[],shiftops:[]};
+    _accessCache={formcraft:[],slip:[],dialtrac:[],shiftops:[]};
     (rows||[]).forEach(r=>{ if(_accessCache[r.app]) _accessCache[r.app].push(r.staff_name); });
   }catch(e){}
-  _accessWorking={formcraft:new Set(_accessCache.formcraft),slip:new Set(_accessCache.slip),shiftops:new Set(_accessCache.shiftops)};
+  _accessWorking={formcraft:new Set(_accessCache.formcraft),slip:new Set(_accessCache.slip),dialtrac:new Set(_accessCache.dialtrac),shiftops:new Set(_accessCache.shiftops)};
   // load team buttons
   await buildTeamButtons();
   switchAccessApp('formcraft');
@@ -8419,7 +8431,7 @@ async function openAccessManager(){
 function closeAccessManager(){ document.getElementById('accessModal').style.display='none'; }
 async function saveAccessChanges(){
   // Diff working set vs cache, apply inserts + deletes
-  for(const app of ['formcraft','slip','shiftops']){
+  for(const app of ['formcraft','slip','dialtrac','shiftops']){
     const before=new Set(_accessCache[app]);
     const after=_accessWorking[app];
     // inserts
@@ -8438,9 +8450,9 @@ async function saveAccessChanges(){
 }
 function switchAccessApp(app){
   _accessCurrentApp=app;
-  ['formcraft','slip','shiftops'].forEach(a=>{var t=document.getElementById('acctab-'+a);if(t)t.className='acc-app-tab'+(app===a?' acc-tab-active':'');});
+  ['formcraft','slip','dialtrac','shiftops'].forEach(a=>{var t=document.getElementById('acctab-'+a);if(t)t.className='acc-app-tab'+(app===a?' acc-tab-active':'');});
   // restyle tabs
-  ['formcraft','slip','shiftops'].forEach(a=>{
+  ['formcraft','slip','dialtrac','shiftops'].forEach(a=>{
     const el=document.getElementById('acctab-'+a);
     if(a===app){el.style.background='var(--accent)';el.style.color='#fff';el.style.borderColor='var(--accent)';}
     else{el.style.background='transparent';el.style.color='var(--text,#333)';el.style.borderColor='var(--border-color,#ddd)';}
@@ -8491,9 +8503,9 @@ async function buildTeamButtons(){
 
 // ── Globals restored (were removed with the discussions cut) ──
 const APP_GATE_SECRET='oscars_nexus_gate_v1_8f3a2c91';
-let _accessCache={formcraft:[],slip:[],shiftops:[]};
+let _accessCache={formcraft:[],slip:[],dialtrac:[],shiftops:[]};
 let _accessCurrentApp='formcraft';
-let _accessWorking={formcraft:new Set(),slip:new Set(),shiftops:new Set()};
+let _accessWorking={formcraft:new Set(),slip:new Set(),dialtrac:new Set(),shiftops:new Set()};
 let _accessAllStaff=[];
 let _realtimeClient = null;
 const KUDOS_BADGES = {
@@ -22823,6 +22835,9 @@ window.addEventListener('resize', function(){
     }
     .hub-icon-formcraft {
       background: linear-gradient(135deg, #10b981 0%, #047857 100%);
+    }
+    .hub-icon-dialtrac {
+      background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
     }
     .hub-icon-arcade {
       background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%);
