@@ -1376,9 +1376,14 @@ body.tl-readonly .wk-tools{ display:none !important; }
 <!-- NEXUS TOKEN GATE — app only opens when launched from Nexus -->
 <div id="__gate" style="position:fixed;inset:0;z-index:99999;background:linear-gradient(135deg,#0f1117,#1a1d27);display:flex;align-items:center;justify-content:center;font-family:system-ui,sans-serif;">
   <div style="background:#1e2230;border:1px solid #2e3344;border-radius:18px;padding:40px 36px;width:min(380px,90vw);text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.5);">
-    <div style="font-size:42px;margin-bottom:14px;"></div>
+    <div id="__gateLock" style="font-size:42px;margin-bottom:14px;cursor:default;user-select:none;">🔒</div>
     <div style="font-size:20px;font-weight:700;color:#fff;margin-bottom:8px;">ShiftOps</div>
     <div id="__gateMsg" style="font-size:13.5px;color:#8b94a8;line-height:1.5;">Checking access…</div>
+    <div id="__gatePwWrap" style="display:none;margin-top:18px;">
+      <input id="__gatePw" type="password" inputmode="numeric" autocomplete="off" placeholder="Passcode"
+        style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid #2e3344;background:#151824;color:#fff;font-size:14px;text-align:center;letter-spacing:.3em;outline:none;" />
+      <div id="__gatePwErr" style="font-size:11.5px;color:#e06b6b;margin-top:8px;min-height:14px;"></div>
+    </div>
   </div>
 </div>
 <script>
@@ -1389,6 +1394,28 @@ body.tl-readonly .wk-tools{ display:none !important; }
   var KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpjZmdsZHFyZGJma2diaXhzemRzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1Nzc3NzEsImV4cCI6MjA5MDE1Mzc3MX0.Wj8cCpnlsoZOPj5sKWeEdfvgjG4Nc-UuTTYgbcrPfeI';
   function fail(m){var el=document.getElementById('__gateMsg');if(el){el.innerHTML=m+'<br><br><span style=\"color:#6b7585;font-size:12px;\">Open this app from the Nexits page in Nexus.</span>';}}
   function pass(){var g=document.getElementById('__gate');if(g)g.remove();}
+  // ── Hidden test bypass: triple-click the lock to reveal a passcode box.
+  //    Correct code unlocks as a test user; gate otherwise stays fully live. ──
+  (function(){
+    var TEST_CODE='2006', clicks=0, timer=null;
+    function reveal(){var w=document.getElementById('__gatePwWrap');if(!w)return;w.style.display='block';var pw=document.getElementById('__gatePw');if(pw)pw.focus();}
+    function tryCode(){
+      var pw=document.getElementById('__gatePw'), err=document.getElementById('__gatePwErr');
+      if(!pw)return;
+      if(pw.value===TEST_CODE){
+        try{sessionStorage.setItem('so_me','Test Staff');}catch(e){}
+        try{if(typeof _renderWhoami==='function')_renderWhoami();}catch(e){}
+        try{sessionStorage.setItem('ngate_'+APP,'1');}catch(e){}
+        pass();
+      }else{ if(err)err.textContent='Incorrect passcode.'; pw.value=''; pw.focus(); }
+    }
+    document.addEventListener('DOMContentLoaded',function(){
+      var lock=document.getElementById('__gateLock');
+      if(lock){lock.addEventListener('click',function(){clicks++;clearTimeout(timer);timer=setTimeout(function(){clicks=0;},800);if(clicks>=3){clicks=0;reveal();}});}
+      var pw=document.getElementById('__gatePw');
+      if(pw){pw.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();tryCode();}});}
+    });
+  })();
   async function hmacHex(secret,msg){var enc=new TextEncoder();var k=await crypto.subtle.importKey('raw',enc.encode(secret),{name:'HMAC',hash:'SHA-256'},false,['verify','sign']);var s=await crypto.subtle.sign('HMAC',k,enc.encode(msg));return Array.from(new Uint8Array(s)).map(x=>x.toString(16).padStart(2,'0')).join('');}
   // session unlock — once verified, stay in for this tab session
   if(sessionStorage.getItem('ngate_'+APP)==='1'){pass();return;}
@@ -1509,6 +1536,11 @@ body.tl-readonly .wk-tools{ display:none !important; }
           <div class="avail-grid" id="availGrid"></div>
         </div>
         <div id="availsec-submitted" style="display:none;">
+          <div style="display:flex;justify-content:flex-end;margin-bottom:10px;">
+            <button onclick="downloadSubmittedAvailability()" class="btn btn-save" style="padding:8px 16px;font-size:12px;gap:6px;display:flex;align-items:center;">
+              <svg width="13" height="13" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>Download PDF
+            </button>
+          </div>
           <div id="submittedAvailContent"></div>
         </div>
         <div id="availsec-classdays" style="display:none;">
@@ -2789,7 +2821,7 @@ function renderAvailability(){
       } else if(av.type==='custom'){
         chip=`<div class="avail-chip avail-pref" onclick="openCustomAvail(${s.id},${d})" style="font-size:7.5px">${av.start}–${av.end}</div>`;
       } else if(av.type==='all'){
-        chip=`<div class="avail-chip avail-yes" onclick="cycleAvail(${s.id},${d})">All Day</div>`;
+        chip=`<div class="avail-chip avail-yes" onclick="cycleAvail(${s.id},${d})">9-7</div>`;
       } else {
         chip=`<div class="avail-chip avail-unset" onclick="cycleAvail(${s.id},${d})">— Not Set</div>`;
       }
@@ -3033,7 +3065,7 @@ async function loadSubmittedAvailability(){
         let bg='transparent';
         let textCol='var(--muted)';
         let fw='400';
-        if(a.type==='all'){label='All Day';bg='rgba(0,200,150,.08)';textCol='var(--accent)';fw='600';}
+        if(a.type==='all'){label='9-7';bg='rgba(0,200,150,.08)';textCol='var(--accent)';fw='600';}
         else if(a.type==='custom'){label=(a.start||'?')+'–'+(a.end||'?');bg='rgba(79,142,247,.08)';textCol='var(--accent)';fw='600';}
         else if(a.type==='no'){label='Off';bg='rgba(220,38,38,.06)';textCol='var(--warn)';fw='600';}
         html+='<div style="padding:10px 4px;text-align:center;background:'+bg+';border-right:1px solid var(--border);">';
@@ -3054,6 +3086,111 @@ async function loadSubmittedAvailability(){
 }
 
 function isAvailLocked(){return false;}
+
+// ── Download submitted availability as a PDF, grouped by team ──
+function downloadSubmittedAvailability(){
+  const rows=submittedAvailData||[];
+  if(!rows.length){showToast('No availability to download');return;}
+  if(typeof window.jspdf==='undefined' || !window.jspdf || !window.jspdf.jsPDF){
+    showToast('PDF library not loaded');return;
+  }
+  const {jsPDF}=window.jspdf;
+  const DAYS_SHORT=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  const today=new Date();today.setHours(0,0,0,0);
+
+  // respect the current team filter (if one is active)
+  const filtered=rows.filter(row=>{
+    if(!_availTeamFilter)return true;
+    const s=staff.find(x=>`${x.first} ${x.last}`.toLowerCase()===row.staff_name.toLowerCase());
+    return s && String(s.team)===String(_availTeamFilter);
+  });
+  if(!filtered.length){showToast('No availability for this team');return;}
+
+  const cellLabel=(a)=>{
+    if(!a||a.type==='unset'||a.type==null)return '—';
+    if(a.type==='all')return '9-7';
+    if(a.type==='custom')return (a.start||'?')+'–'+(a.end||'?');
+    if(a.type==='no')return 'Off';
+    return '—';
+  };
+  const fmtD=(d)=>{ try{ return new Date(d+'T00:00:00').toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'}); }catch(e){ return d; } };
+  // from / to strings for a row
+  const rangeOf=(row)=>{
+    if(row.is_ongoing===false){
+      const from=row.valid_from?fmtD(row.valid_from):'—';
+      let to=row.valid_until?fmtD(row.valid_until):'Open-ended';
+      if(row.valid_until){ const until=new Date(row.valid_until+'T00:00:00'); if(today>until)to+=' (expired)'; }
+      return [from,to];
+    }
+    return ['Ongoing','—'];
+  };
+
+  // group rows by team name
+  const teamOf=(row)=>{
+    const s=staff.find(x=>`${x.first} ${x.last}`.toLowerCase()===row.staff_name.toLowerCase());
+    return (s&&s.team)?String(s.team):'Unassigned';
+  };
+  const byTeam={};
+  filtered.forEach(row=>{ const t=teamOf(row); (byTeam[t]=byTeam[t]||[]).push(row); });
+  const teamNames=Object.keys(byTeam).sort((a,b)=>a.localeCompare(b));
+
+  const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+  const pageW=doc.internal.pageSize.getWidth();
+  const title='Staff Availability by Team'+(_availTeamFilter?(' — '+_availTeamFilter):'');
+  doc.setFontSize(15);doc.setFont(undefined,'bold');
+  doc.text(title,14,15);
+  doc.setFontSize(9);doc.setFont(undefined,'normal');
+  doc.text('Generated '+new Date().toLocaleString('en-AU',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}),14,21);
+
+  let cursorY=28;
+  teamNames.forEach((team,ti)=>{
+    const members=byTeam[team].slice().sort((a,b)=>a.staff_name.localeCompare(b.staff_name));
+    const body=members.map(row=>{
+      const av=row.availability||{};
+      const days=DAYS_SHORT.map((_,i)=>cellLabel(av[i]||av[String(i)]));
+      const [from,to]=rangeOf(row);
+      return [row.staff_name, ...days, from, to];
+    });
+
+    // team heading (add page if not enough room)
+    if(cursorY>doc.internal.pageSize.getHeight()-40){ doc.addPage(); cursorY=18; }
+    doc.setFontSize(11);doc.setFont(undefined,'bold');
+    doc.setTextColor(0,150,120);
+    doc.text(team+'  ('+members.length+')',14,cursorY);
+    doc.setTextColor(0,0,0);
+    cursorY+=3;
+
+    doc.autoTable({
+      startY:cursorY,
+      head:[['Staff',...DAYS_SHORT,'From','To']],
+      body:body,
+      styles:{fontSize:8,cellPadding:2,halign:'center'},
+      headStyles:{fillColor:[0,150,120],textColor:255,fontStyle:'bold'},
+      columnStyles:{
+        0:{halign:'left',fontStyle:'bold',cellWidth:36},
+        8:{halign:'left',cellWidth:30},
+        9:{halign:'left',cellWidth:34}
+      },
+      alternateRowStyles:{fillColor:[245,247,250]},
+      margin:{left:14,right:14},
+      didParseCell:function(data){
+        if(data.section==='body'){
+          const t=data.cell.raw;
+          if(t==='9-7')data.cell.styles.textColor=[0,150,120];
+          else if(t==='Off')data.cell.styles.textColor=[200,40,40];
+          else if(t==='—')data.cell.styles.textColor=[150,150,150];
+          else if(String(t).indexOf('expired')>=0)data.cell.styles.textColor=[200,40,40];
+        }
+      }
+    });
+    cursorY=doc.lastAutoTable.finalY+10;
+  });
+
+  const stamp=new Date().toISOString().slice(0,10);
+  const fname='availability_by_team'+(_availTeamFilter?('_'+String(_availTeamFilter).replace(/[^\w\-]+/g,'')):'')+'_'+stamp+'.pdf';
+  doc.save(fname);
+  showToast('Availability PDF downloaded');
+}
 
 function cycleAvail(staffId,day){
   const av=getAvail(staffId,day);
