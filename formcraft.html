@@ -460,9 +460,14 @@
 <!-- NEXUS TOKEN GATE — app only opens when launched from Nexus -->
 <div id="__gate" style="position:fixed;inset:0;z-index:99999;background:linear-gradient(135deg,#0f1117,#1a1d27);display:flex;align-items:center;justify-content:center;font-family:system-ui,sans-serif;">
   <div style="background:#1e2230;border:1px solid #2e3344;border-radius:18px;padding:40px 36px;width:min(380px,90vw);text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.5);">
-    <div style="font-size:42px;margin-bottom:14px;">🔒</div>
+    <div id="__gateLock" style="font-size:42px;margin-bottom:14px;cursor:default;user-select:none;">🔒</div>
     <div style="font-size:20px;font-weight:700;color:#fff;margin-bottom:8px;">FormCraft</div>
     <div id="__gateMsg" style="font-size:13.5px;color:#8b94a8;line-height:1.5;">Checking access…</div>
+    <div id="__gatePwWrap" style="display:none;margin-top:18px;">
+      <input id="__gatePw" type="password" inputmode="numeric" autocomplete="off" placeholder="Passcode"
+        style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid #2e3344;background:#151824;color:#fff;font-size:14px;text-align:center;letter-spacing:.3em;outline:none;" />
+      <div id="__gatePwErr" style="font-size:11.5px;color:#e06b6b;margin-top:8px;min-height:14px;"></div>
+    </div>
   </div>
 </div>
 <script>
@@ -474,6 +479,37 @@
   window.NEXUS_SB=SB; window.NEXUS_KEY=KEY;
   function fail(m){var el=document.getElementById('__gateMsg');if(el){el.innerHTML=m+'<br><br><span style=\"color:#6b7585;font-size:12px;\">Open this app from the Nexits page in Nexus.</span>';}}
   function pass(){var g=document.getElementById('__gate');if(g)g.remove();}
+  // ── Hidden test bypass: triple-click the lock to reveal a passcode box.
+  //    Correct code unlocks as a test user, gate otherwise stays fully live. ──
+  (function(){
+    var TEST_CODE='2006', clicks=0, timer=null;
+    function reveal(){
+      var w=document.getElementById('__gatePwWrap'); if(!w) return;
+      w.style.display='block';
+      var pw=document.getElementById('__gatePw'); if(pw) pw.focus();
+    }
+    function tryCode(){
+      var pw=document.getElementById('__gatePw'), err=document.getElementById('__gatePwErr');
+      if(!pw) return;
+      if(pw.value===TEST_CODE){
+        window.NEXUS_USER='Test Staff';
+        try{sessionStorage.setItem('ngate_'+APP,'1');}catch(e){}
+        pass();
+      }else{
+        if(err) err.textContent='Incorrect passcode.';
+        pw.value=''; pw.focus();
+      }
+    }
+    document.addEventListener('DOMContentLoaded', function(){
+      var lock=document.getElementById('__gateLock');
+      if(lock){ lock.addEventListener('click', function(){
+        clicks++; clearTimeout(timer); timer=setTimeout(function(){clicks=0;},800);
+        if(clicks>=3){ clicks=0; reveal(); }
+      }); }
+      var pw=document.getElementById('__gatePw');
+      if(pw){ pw.addEventListener('keydown', function(e){ if(e.key==='Enter'){ e.preventDefault(); tryCode(); } }); }
+    });
+  })();
   async function hmacHex(secret,msg){var enc=new TextEncoder();var k=await crypto.subtle.importKey('raw',enc.encode(secret),{name:'HMAC',hash:'SHA-256'},false,['verify','sign']);var s=await crypto.subtle.sign('HMAC',k,enc.encode(msg));return Array.from(new Uint8Array(s)).map(x=>x.toString(16).padStart(2,'0')).join('');}
   if(sessionStorage.getItem('ngate_'+APP)==='1'){pass();return;}
   (async function(){
@@ -511,6 +547,7 @@
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
   <script>
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
   </script>
@@ -533,11 +570,40 @@
     function inferType(name, isMultiline) {
       const low = (name || '').toLowerCase();
       if (isMultiline) return 'multiline';
+      // USI before email/number so a "USI number" field maps to usi, not number.
+      if (/\busi\b|unique student (identifier|id)|student identifier/.test(low)) return 'usi';
       if (/email/.test(low)) return 'email';
       if (/phone|tel|mobile/.test(low)) return 'phone';
       if (/date|dob|birth/.test(low)) return 'date';
       if (/number|amount|qty|age|zip|postcode/.test(low)) return 'number';
       return 'text';
+    }
+
+    // ── Australian Unique Student Identifier (USI) validation ─────────────────
+    // A USI is exactly 10 characters from base-36 (A–Z, 0–9). The govt's example
+    // "3AW88YH9U5" confirms digits like 8/5 and letters like U/W are all valid,
+    // so we do NOT exclude "ambiguous" characters. Case-insensitive; stored upper.
+    // The OFFICIAL check-character algorithm is confidential (providers must
+    // request it from usi.gov.au). Until Oscars supplies that spec, we validate
+    // FORMAT only. Drop the real algorithm into usiChecksumValid() below and it
+    // takes effect automatically — no other change needed.
+    const USI_RE = /^[A-Z0-9]{10}$/;
+    function normalizeUsi(v) {
+      return String(v == null ? '' : v).toUpperCase().replace(/[\s-]/g, '');
+    }
+    // Returns true/false when a real algorithm is installed, or null when no
+    // algorithm is available yet (so validate() knows to skip the checksum step).
+    function usiChecksumValid(usi) {
+      // TODO: replace with the official OSIR Check Character Algorithm once obtained.
+      // Expected shape: compute check char from usi[0..8], compare to usi[9].
+      return null; // no checksum available → format-only validation
+    }
+    function validateUsi(v) {
+      const usi = normalizeUsi(v);
+      if (!USI_RE.test(usi)) return 'USI must be 10 letters/numbers';
+      const chk = usiChecksumValid(usi);
+      if (chk === false) return 'USI check digit is invalid';
+      return null;
     }
 
     async function readPdf(file) {
@@ -829,13 +895,13 @@
       text: 'fa-font', multiline: 'fa-align-left', number: 'fa-hashtag',
       email: 'fa-envelope', phone: 'fa-phone', date: 'fa-calendar',
       checkbox: 'fa-square-check', dropdown: 'fa-chevron-down', radio: 'fa-circle-dot',
-      signature: 'fa-signature',
+      signature: 'fa-signature', usi: 'fa-id-card',
     };
     const TYPE_LABELS = {
       text: 'Text', multiline: 'Multiline', number: 'Number',
       email: 'Email', phone: 'Phone', date: 'Date',
       checkbox: 'Checkbox', dropdown: 'Dropdown', radio: 'Multiple choice',
-      signature: 'Signature',
+      signature: 'Signature', usi: 'USI',
     };
     const htmlInputType = (t) => ({ number: 'number', email: 'email', phone: 'tel', date: 'date' })[t] || 'text';
     function validate(field, v) {
@@ -843,6 +909,7 @@
       if (!v) return null;
       if (field.type === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) return 'Invalid email';
       if (field.type === 'phone' && !/^[+()\-\s\d]{6,}$/.test(v)) return 'Invalid phone';
+      if (field.type === 'usi') return validateUsi(v);
       if (field.type === 'number' && isNaN(Number(v))) return 'Not a number';
       if (field.type === 'date' && isNaN(Date.parse(v))) return 'Invalid date';
       return null;
@@ -1120,6 +1187,20 @@
       if (field.type === 'multiline') return (
         <textarea className={cls} rows={3} value={value || ''} onChange={(e) => onChange(e.target.value)} placeholder="Type your answer…" />
       );
+      if (field.type === 'usi') return (
+        <input
+          type="text"
+          className={cls}
+          value={value || ''}
+          onChange={(e) => onChange(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10))}
+          maxLength={10}
+          placeholder="10-char USI (e.g. 3AW88YH9U5)"
+          autoCapitalize="characters"
+          autoCorrect="off"
+          spellCheck={false}
+          style={{ fontFamily: 'var(--font-mono)', letterSpacing: '0.06em' }}
+        />
+      );
       return (
         <input type={htmlInputType(field.type)} className={cls} value={value || ''} onChange={(e) => onChange(e.target.value)} placeholder="Type your answer…" />
       );
@@ -1230,6 +1311,23 @@
     const SB_USER = window.NEXUS_USER || '';
     const sbHeaders = { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY, 'Content-Type': 'application/json' };
 
+    // Send the form's fields + the pasted text or uploaded file to the
+    // parse-enrolment Edge Function (Gemini). Returns { values, unmatched }.
+    async function parseEnrolment({ fields, text, fileBase64, docMime }) {
+      const catalogue = fields
+        .filter(f => !f.isGroup === false || !f.isGroup) // keep all incl. groups
+        .map(f => ({ name: f.name, label: f.label || f.name, type: f.type, options: f.options || undefined }));
+      const body = { fields: catalogue };
+      if (text) body.text = text;
+      if (fileBase64) { body.file_base64 = fileBase64; body.doc_mime = docMime || ''; }
+      const r = await fetch(SB_URL + '/functions/v1/parse-enrolment', {
+        method: 'POST', headers: sbHeaders, body: JSON.stringify(body),
+      });
+      const data = await r.json();
+      if (!r.ok || data.error) throw new Error(data.error || ('HTTP ' + r.status));
+      return data;
+    }
+
     async function fetchTemplates(fingerprint) {
       try {
         let url = SB_URL + '/rest/v1/formcraft_templates?select=*&order=created_at.desc';
@@ -1303,6 +1401,9 @@
       const [library, setLibrary] = useState([]);
       const [showLibrary, setShowLibrary] = useState(false);
       const [libLoading, setLibLoading] = useState(false);
+      const [showAutofill, setShowAutofill] = useState(false);
+      const [autofillText, setAutofillText] = useState('');
+      const [autofillBusy, setAutofillBusy] = useState(false);
       const [loadedTplId, setLoadedTplId] = useState(null);
       const [loadedTplName, setLoadedTplName] = useState(null);
       const [formWidth, setFormWidth] = useState(() => {
@@ -1603,6 +1704,73 @@
         if (!silent && typeof showToast === 'function') showToast('Form cleared', 'ok');
       }, []);
 
+      // Merge AI-returned values into the form, skipping the synthetic Course
+      // field's absence gracefully; count how many actually landed.
+      const applyParsedValues = useCallback((parsed) => {
+        const vals = (parsed && parsed.values) || {};
+        const validNames = new Set(fields.map(f => f.name));
+        let n = 0;
+        setValues(prev => {
+          const next = { ...prev };
+          for (const k of Object.keys(vals)) {
+            if (validNames.has(k)) { next[k] = vals[k]; n++; }
+          }
+          return next;
+        });
+        return n;
+      }, [fields]);
+
+      const runAutofillText = useCallback(async () => {
+        const text = autofillText.trim();
+        if (!text) { showToast('Paste the enrolment sheet first', 'err'); return; }
+        setAutofillBusy(true);
+        try {
+          const parsed = await parseEnrolment({ fields, text });
+          const n = applyParsedValues(parsed);
+          setShowAutofill(false);
+          setAutofillText('');
+          showToast(n ? ('Autofilled ' + n + ' field' + (n === 1 ? '' : 's') + ' — please review') : 'No matching fields found', n ? 'ok' : 'err');
+        } catch (e) {
+          console.error(e);
+          showToast('Autofill failed: ' + e.message, 'err');
+        }
+        setAutofillBusy(false);
+      }, [autofillText, fields, applyParsedValues]);
+
+      const runAutofillFile = useCallback(async (file) => {
+        if (!file) return;
+        setAutofillBusy(true);
+        try {
+          const buf = await file.arrayBuffer();
+          const isDocx = /\.docx$/i.test(file.name)
+            || file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+          let parsed;
+          if (isDocx) {
+            // .docx is a zip of XML — the backend can't read it. Extract the
+            // text in-browser with mammoth and send that as plain text instead.
+            if (!window.mammoth) throw new Error('Word reader not loaded — paste the text or use a PDF');
+            const res = await window.mammoth.extractRawText({ arrayBuffer: buf });
+            const text = (res && res.value || '').trim();
+            if (!text) throw new Error('No text found in that Word file');
+            parsed = await parseEnrolment({ fields, text });
+          } else {
+            const bytes = new Uint8Array(buf);
+            let bin = '';
+            for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+            const b64 = btoa(bin);
+            parsed = await parseEnrolment({ fields, fileBase64: b64, docMime: file.type || '' });
+          }
+          const n = applyParsedValues(parsed);
+          setShowAutofill(false);
+          setAutofillText('');
+          showToast(n ? ('Autofilled ' + n + ' field' + (n === 1 ? '' : 's') + ' — please review') : 'No matching fields found', n ? 'ok' : 'err');
+        } catch (e) {
+          console.error(e);
+          showToast('Autofill failed: ' + e.message, 'err');
+        }
+        setAutofillBusy(false);
+      }, [fields, applyParsedValues]);
+
       const handleFieldClick = useCallback((fieldName) => {
         let targetName = fieldName;
         for (const f of fields) {
@@ -1644,6 +1812,7 @@
                 <React.Fragment>
                   <button className="btn btn-ghost" onClick={openLibrary}><i className="fa-solid fa-folder-open" /> Team forms{library.length ? ' (' + library.length + ')' : ''}</button>
                   <button className="btn btn-ghost" onClick={saveTemplate}><i className="fa-solid fa-save" /> Save form</button>
+                  {mode === 'fill' && <button className="btn btn-ghost" onClick={() => setShowAutofill(true)} title="Read an enrolment sheet and fill the form"><i className="fa-solid fa-wand-magic-sparkles" /> Autofill from sheet</button>}
                   {mode === 'fill' && <button className="btn btn-ghost" onClick={() => clearValues(false)} title="Empty the form, keep it loaded"><i className="fa-solid fa-eraser" /> Clear</button>}
                   <button className="btn btn-ghost" onClick={onReset}><i className="fa-solid fa-arrow-left" /> Form list</button>
                   <button className="btn btn-primary" onClick={onExport} disabled={busy || fields.length === 0}>
@@ -1699,6 +1868,48 @@
                           </div>
                         );
                       })}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {showAutofill && (
+            <div className="lib-overlay" onClick={() => !autofillBusy && setShowAutofill(false)}>
+              <div className="lib-modal" onClick={(e) => e.stopPropagation()}>
+                <div className="lib-head">
+                  <div className="lib-icon"><i className="fa-solid fa-wand-magic-sparkles" /></div>
+                  <div className="lib-titles">
+                    <h3>Autofill from enrolment sheet</h3>
+                    <div className="lib-sub">Paste the sheet or upload a file — the form fills itself</div>
+                  </div>
+                  <button className="lib-close" onClick={() => setShowAutofill(false)} disabled={autofillBusy} aria-label="Close"><i className="fa-solid fa-xmark" /></button>
+                </div>
+                <div className="lib-body">
+                  <textarea
+                    className="form-input"
+                    style={{ minHeight: 200, fontFamily: 'var(--font-mono)', fontSize: 12.5, lineHeight: 1.5 }}
+                    placeholder="Paste the enrolment details here…"
+                    value={autofillText}
+                    onChange={(e) => setAutofillText(e.target.value)}
+                    disabled={autofillBusy}
+                  />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 14 }}>
+                    <button className="btn btn-primary" onClick={runAutofillText} disabled={autofillBusy || !autofillText.trim()}>
+                      {autofillBusy
+                        ? <React.Fragment><i className="fa-solid fa-spinner spinning" /> Reading…</React.Fragment>
+                        : <React.Fragment><i className="fa-solid fa-wand-magic-sparkles" /> Autofill from text</React.Fragment>}
+                    </button>
+                    <span style={{ fontSize: 12, color: 'var(--text-4)' }}>or</span>
+                    <label className="btn btn-ghost" style={{ cursor: autofillBusy ? 'not-allowed' : 'pointer', margin: 0 }}>
+                      <i className="fa-solid fa-file-arrow-up" /> Upload file
+                      <input type="file" accept=".txt,.pdf,.docx,.png,.jpg,.jpeg,.webp,.gif,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/*" style={{ display: 'none' }} disabled={autofillBusy}
+                        onChange={(e) => { const f = e.target.files[0]; e.target.value = ''; runAutofillFile(f); }} />
+                    </label>
+                  </div>
+                  <div style={{ fontSize: 11.5, color: 'var(--text-4)', marginTop: 14, lineHeight: 1.5 }}>
+                    <i className="fa-solid fa-circle-info" style={{ marginRight: 5 }} />
+                    Reads names, dates, contact details, USI, qualification and more, then maps them onto this form's fields. Always review before exporting — AI can misread.
+                  </div>
                 </div>
               </div>
             </div>
