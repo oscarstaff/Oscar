@@ -1728,6 +1728,43 @@
         };
       }, [fields, values]);
 
+      // Build the application-draft reference:
+      //   GIVEN NAME SURNAME - CERTIFICATE NAME - APPLICATION NO
+      // Cert name comes from the Course field (or any course/qualification/cert
+      // field). "APPLICATION NO" stays as a literal placeholder to fill in later.
+      const buildDraftName = useCallback(() => {
+        const { first, last } = extractStudent();
+        const name = [first, last].filter(Boolean).join(' ').trim().toUpperCase();
+        let cert = '';
+        for (const f of fields) {
+          if (f.isGroup) continue;
+          const lab = (f.label || '').toLowerCase();
+          if ((f.__courseField || /course|certificate|qualification|cert\b/.test(lab)) && values[f.name]) {
+            cert = String(values[f.name]).trim();
+            break;
+          }
+        }
+        cert = cert.toUpperCase();
+        return [ (name || 'GIVEN NAME SURNAME'), (cert || 'CERTIFICATE NAME'), 'APPLICATION NO' ].join(' - ');
+      }, [fields, values, extractStudent]);
+
+      const copyDraftName = useCallback(async () => {
+        const draft = buildDraftName();
+        try {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(draft);
+          } else {
+            const ta = document.createElement('textarea');
+            ta.value = draft; ta.style.position = 'fixed'; ta.style.opacity = '0';
+            document.body.appendChild(ta); ta.select();
+            document.execCommand('copy'); document.body.removeChild(ta);
+          }
+          showToast('Copied: ' + draft, 'ok');
+        } catch (e) {
+          showToast('Draft: ' + draft, 'ok');
+        }
+      }, [buildDraftName]);
+
       const onExport = useCallback(async () => {
         if (errors.length) {
           showToast(errors.length + ' field' + (errors.length === 1 ? '' : 's') + ' need attention', 'err');
@@ -1895,6 +1932,7 @@
                   <button className="btn btn-ghost" onClick={openLibrary}><i className="fa-solid fa-folder-open" /> Team forms{library.length ? ' (' + library.length + ')' : ''}</button>
                   <button className="btn btn-ghost" onClick={saveTemplate}><i className="fa-solid fa-save" /> Save form</button>
                   {mode === 'fill' && <button className="btn btn-ghost" onClick={() => setShowAutofill(true)} title="Read an enrolment sheet and fill the form"><i className="fa-solid fa-wand-magic-sparkles" /> Autofill from sheet</button>}
+                  {mode === 'fill' && <button className="btn btn-ghost" onClick={copyDraftName} title="Copy: GIVEN SURNAME - CERTIFICATE - APPLICATION NO"><i className="fa-solid fa-copy" /> Draft name</button>}
                   {mode === 'fill' && <button className="btn btn-ghost" onClick={() => clearValues(false)} title="Empty the form, keep it loaded"><i className="fa-solid fa-eraser" /> Clear</button>}
                   <button className="btn btn-ghost" onClick={onReset}><i className="fa-solid fa-arrow-left" /> Form list</button>
                   <button className="btn btn-primary" onClick={onExport} disabled={busy || fields.length === 0}>
