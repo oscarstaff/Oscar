@@ -1468,7 +1468,8 @@ body.tl-readonly .wk-tools{ display:none !important; }
       <span class="brand-name">Oscars</span><span class="brand-prod">ShiftOps</span>
     </div>
     <nav class="appbar-nav">
-      <div class="nav-item active" onclick="switchNav('roster',this)">Roster</div>
+      <div class="nav-item active" onclick="switchNav('home',this)">Home</div>
+      <div class="nav-item" onclick="switchNav('roster',this)">Roster</div>
       <div class="nav-item" onclick="switchNav('availability',this);clearAvailBadge()">Availability<span id="availNavBadge" style="display:none;margin-left:6px;background:var(--warn);color:#fff;border-radius:8px;padding:1px 6px;font-size:8px;font-weight:800;font-family:var(--mono);">NEW</span></div>
       <div class="nav-item" onclick="switchNav('staff',this)">Staff</div>
     </nav>
@@ -1513,8 +1514,11 @@ body.tl-readonly .wk-tools{ display:none !important; }
 
       <div class="conflict-banner" id="conflictBanner" style="display:none"> <strong>Conflicts detected.</strong>&nbsp; Some staff are rostered on unavailable days.</div>
 
-      <div class="tab-content active" id="section-roster">
+      <div class="tab-content active" id="section-home">
         <div class="morning-board" id="morningBoard"></div>
+      </div>
+
+      <div class="tab-content" id="section-roster">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
           <button class="week-btn" onclick="prevWeek()">◀</button>
           <div class="week-label" id="weekLabel" style="font-size:13px;font-weight:600;color:var(--text);min-width:180px;text-align:center;"></div>
@@ -4257,36 +4261,51 @@ async function loadHealthChecks(){
 }
 
 function showSection(id){
-  ['roster','availability','staff'].forEach(s=>{
+  ['home','roster','availability','staff'].forEach(s=>{
     const el=document.getElementById(`section-${s}`);
     if(el)el.classList.toggle('active',s===id);
     // tab elements may no longer exist — guard
     const tab=document.getElementById(`tab-${s}`);
     if(tab)tab.classList.toggle('active',s===id);
   });
-  const crumbs={roster:'Roster',availability:'Availability',staff:'Staff'};
+  const crumbs={home:'Home',roster:'Roster',availability:'Availability',staff:'Staff'};
   const titleEl=document.getElementById('topbarTitle');
-  if(titleEl)titleEl.innerHTML='<span style="color:var(--muted);font-weight:400">Oscars</span><span style="color:var(--muted);margin:0 6px;font-weight:400">></span>'+crumbs[id];
-  if(id==='roster'){ renderRoster(); try{ startMorningBoard(); }catch(e){} }
+  if(titleEl)titleEl.innerHTML='<span style="color:var(--muted);font-weight:400">Oscars</span><span style="color:var(--muted);margin:0 6px;font-weight:400">></span>'+(crumbs[id]||'Home');
+  // Morning Board lives on Home now.
+  if(id==='home'){ try{ startMorningBoard(); }catch(e){} }
   else { try{ stopMorningBoard(); }catch(e){} }
+  if(id==='roster')renderRoster();
   if(id==='availability')renderAvailability();
   if(id==='staff')renderStaffList();
   if(id==='leave')renderLeave();
   if(id==='leavesummary')renderLeaveSummary();
   try{ applyTeamLeadLock(); }catch(e){}
+  // keep the URL hash in sync so each view is bookmarkable / refresh-safe
+  try{ if(('#'+id)!==location.hash) history.replaceState(null,'','#'+id); }catch(e){}
 }let _navSwitchPending=false;
 function switchNav(id,el){
   if(_navSwitchPending)return;
   _navSwitchPending=true;
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
-  el.classList.add('active');
-  const crumbs={roster:'Roster',availability:'Availability',staff:'Staff'};
+  if(el)el.classList.add('active');
+  const crumbs={home:'Home',roster:'Roster',availability:'Availability',staff:'Staff'};
   const titleEl=document.getElementById('topbarTitle');
-  if(titleEl)titleEl.innerHTML='<span style="color:var(--muted);font-weight:400">Oscars</span><span style="color:var(--muted);margin:0 6px;font-weight:400">></span>'+crumbs[id];
+  if(titleEl)titleEl.innerHTML='<span style="color:var(--muted);font-weight:400">Oscars</span><span style="color:var(--muted);margin:0 6px;font-weight:400">></span>'+(crumbs[id]||'Home');
   requestAnimationFrame(()=>{
     showSection(id);
     _navSwitchPending=false;
   });
+}
+// Open the section named in the URL hash (#home/#roster/#availability/#staff).
+// Called on load; defaults to Home. Also highlights the matching nav item.
+function applyHashNav(){
+  var valid={home:1,roster:1,availability:1,staff:1};
+  var h=(location.hash||'').replace(/^#/,'').toLowerCase();
+  var id=valid[h]?h:'home';
+  var nav=document.querySelector('.nav-item[onclick*="switchNav(\''+id+'\'"]');
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  if(nav)nav.classList.add('active');
+  showSection(id);
 }
 
 function renderTeams(){
@@ -6006,7 +6025,11 @@ console.log('%c[ShiftOps build '+SHIFTOPS_BUILD+' loaded]','background:#16a34a;c
   loadWeek(availWeekKey);
   renderAll();
   try{ applyTeamLeadLock(); }catch(e){}
-  try{ startMorningBoard(); }catch(e){ console.warn('morning board', e); }
+  // Open the section named in the URL hash, defaulting to Home (which starts
+  // the Morning Board). Replaces the old unconditional board start.
+  try{ applyHashNav(); }catch(e){ console.warn('hash nav', e); }
+  // React to browser back/forward and manual hash edits.
+  window.addEventListener('hashchange', function(){ try{ applyHashNav(); }catch(e){} });
   // Push staff names to Supabase for the web form
   pushStaffNames();
   updateSaveStatus();
