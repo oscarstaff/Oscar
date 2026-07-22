@@ -1567,15 +1567,8 @@ body.tl-readonly .wk-tools{ display:none !important; }
             </div>
 
             <div style="border-top:1px solid var(--border);margin-top:16px;padding-top:14px;">
-              <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
-                <div style="font-size:13px;font-weight:700;">Class housekeeping roster</div>
-                <div style="display:flex;gap:8px;">
-                  <button onclick="toggleHkPool()" id="hkPoolBtn" class="btn btn-ghost" style="padding:6px 12px;font-size:12px;">Who's in</button>
-                  <button onclick="autoAssignHousekeeping()" class="btn btn-primary" style="padding:6px 12px;font-size:12px;">Auto-assign</button>
-                </div>
-              </div>
-              <div style="font-size:11.5px;color:var(--text-dim);line-height:1.5;margin-top:3px;">Cleaning/tidying after class (~15–20 min from 5:30pm). Picks <b>one person from each team</b> (Enrolment, Processing, Placement, Evershine) who is available until <b>5:50pm</b> that day, rotating fairly and skipping anyone on approved leave.</div>
-              <div id="hkPoolEditor" style="display:none;margin-top:12px;"></div>
+              <div style="font-size:13px;font-weight:700;">Class housekeeping roster</div>
+              <div style="font-size:11.5px;color:var(--text-dim);line-height:1.5;margin-top:3px;">Auto-generated for every class day — the housekeeping head plus one person from each team who's available and actually stays past cleanup (~5:30pm).</div>
               <div id="hkRosterList" style="margin-top:12px;"></div>
             </div>
           </div>
@@ -2951,14 +2944,16 @@ async function setRosterStart(sel, nmEnc){
 }
 
 // ── CLASS HOUSEKEEPING ROSTER ──────────────────────
-// One person from EACH duty team per class day. Every team rotates
-// independently and fairly (fewest turns, then longest since last turn), and
-// anyone on approved leave that day is skipped without losing their place.
+// Auto-generated: one person from each duty team per class day, plus the
+// housekeeping head who oversees every session. Picks people who are available
+// that day AND who actually stay past cleanup time (judged from their real
+// clock-outs), rotating fairly so turns are shared.
 const HK_TEAMS = ['Enrolment','Processing','Placement','Evershine'];
-let _hkPoolOpen=false;
-let _hkTeamMap=null;   // staff_name -> team
+// Oversees every class day — always rostered, and kept out of their own team's
+// rotation so that team's other members still take proper turns.
+const HK_HEAD = 'Muhammad Faizan Azim';
+let _hkTeamMap=null;
 
-// staff_credentials is the source of truth for team membership
 async function _hkLoadTeams(){
   if(_hkTeamMap) return _hkTeamMap;
   const map={};
@@ -2970,7 +2965,8 @@ async function _hkLoadTeams(){
   return map;
 }
 
-// Excluded people (opt-out). Everyone in a duty team is eligible by default.
+// Excluded people (opt-out) — kept so an admin can still exclude someone via
+// the housekeeping_pool table if ever needed.
 async function _hkExcluded(){
   const out=new Set();
   try{
@@ -2979,61 +2975,6 @@ async function _hkExcluded(){
     });
   }catch(e){}
   return out;
-}
-
-async function toggleHkPool(){
-  _hkPoolOpen=!_hkPoolOpen;
-  const ed=document.getElementById('hkPoolEditor');
-  const btn=document.getElementById('hkPoolBtn');
-  if(!ed) return;
-  ed.style.display=_hkPoolOpen?'block':'none';
-  if(btn) btn.textContent=_hkPoolOpen?'Close':"Who's in";
-  if(_hkPoolOpen) renderHkPool();
-}
-
-async function renderHkPool(){
-  const ed=document.getElementById('hkPoolEditor');
-  if(!ed) return;
-  ed.innerHTML='<div style="font-size:12px;color:var(--text-dim);">Loading…</div>';
-  const teams=await _hkLoadTeams();
-  const excl=await _hkExcluded();
-  const habits=await _hkLeavingHabits();
-  const TIER_LBL=['stays ~7','usually past 6','no data','marginal','leaves early'];
-  const TIER_COL=['#22a06b','#3d9eff','var(--text-dim)','#d98324','#e5484d'];
-  let html='';
-  HK_TEAMS.forEach(function(tm){
-    const members=Object.keys(teams).filter(function(nm){ return teams[nm]===tm; }).sort();
-    html+='<div style="margin-bottom:10px;">'+
-      '<div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--text-dim);margin-bottom:4px;">'+tm+' ('+members.length+')</div>'+
-      '<div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;">'+
-      (members.length?members.map(function(nm){
-        const key=_normName(nm);
-        const on=!excl.has(key);
-        const h=habits[key];
-        const t=_hkTier(h);
-        const avg=h?(' · avg out '+String(Math.floor(h.avg/60)).padStart(2,'0')+':'+String(Math.round(h.avg%60)).padStart(2,'0')):'';
-        return '<label style="display:flex;align-items:center;gap:10px;padding:6px 10px;border-bottom:1px solid var(--border);cursor:pointer;">'+
-          '<input type="checkbox" '+(on?'checked':'')+' onchange="setHkPool(this,\''+encodeURIComponent(nm)+'\')" style="width:15px;height:15px;cursor:pointer;">'+
-          '<span style="flex:1;min-width:0;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+_cdEsc(nm)+'</span>'+
-          '<span style="flex-shrink:0;font-size:10px;font-weight:700;color:'+TIER_COL[t]+';">'+TIER_LBL[t]+_cdEsc(avg)+'</span>'+
-        '</label>';
-      }).join(''):'<div style="padding:8px 10px;font-size:12px;color:var(--text-dim);">No one in this team.</div>')+
-      '</div></div>';
-  });
-  ed.innerHTML=html+'<div style="font-size:10.5px;color:var(--text-dim);margin-top:4px;line-height:1.5;">Labels come from actual Tue/Wed clock-outs over the last 10 weeks. People who habitually leave early are skipped automatically; untick anyone else you want excluded.</div>';
-}
-
-async function setHkPool(cb, nmEnc){
-  const nm=decodeURIComponent(nmEnc);
-  try{
-    if(cb.checked){
-      // back in the rotation → remove the exclusion
-      await fetch(SUPABASE_URL+'/rest/v1/housekeeping_pool?staff_name=eq.'+encodeURIComponent(nm),{method:'DELETE',headers:{..._CD_H,'Prefer':'return=minimal'}});
-    }else{
-      await fetch(SUPABASE_URL+'/rest/v1/housekeeping_pool',{method:'POST',headers:{..._CD_HJ,'Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({staff_name:nm,active:false})});
-    }
-    showToast(nm.split(' ')[0]+(cb.checked?' back in rotation':' excluded'));
-  }catch(e){ showToast('Save failed'); cb.checked=!cb.checked; }
 }
 
 // Names on approved leave covering a given ISO date.
@@ -3107,40 +3048,46 @@ function _hkTier(h){
 }
 
 // Who is available late enough on the class date, based on submitted
-// availability. 'all' = the full 9-7 day → fine. 'custom' → only if their end
-// time reaches HK_MIN_END_MIN. 'no'/unset → not available.
+// availability. Returns three sets:
+//   ok        — available and staying late enough
+//   tooEarly  — available but leaving before cleanup
+//   unavail   — explicitly marked unavailable (or no entry for that day)
+// The distinction matters: 'unavail' must never fall through to the
+// timesheet-based fallback, or someone who marked the day off gets rostered.
 async function _hkAvailableLate(dateStr){
-  const ok=new Set(), tooEarly=new Map();
-  // Mon=0..Sun=6 for the class date
+  const ok=new Set(), tooEarly=new Map(), unavail=new Set();
   const d=new Date(dateStr+'T00:00:00');
-  const dayIdx=(d.getDay()+6)%7;
+  const dayIdx=(d.getDay()+6)%7;          // Mon=0..Sun=6
   try{
     const rows=await _cdGet('staff_availability?select=staff_name,availability,is_ongoing,valid_from,valid_until');
     (rows||[]).forEach(function(r){
       if(r.is_ongoing===false){
-        if(r.valid_from && dateStr < r.valid_from) return;
-        if(r.valid_until && dateStr > r.valid_until) return;
+        if(r.valid_from && dateStr < r.valid_from) return;   // window not started
+        if(r.valid_until && dateStr > r.valid_until) return;  // window expired
       }
       const av=r.availability||{};
       const a=av[dayIdx]||av[String(dayIdx)];
-      if(!a) return;
       const key=_normName(r.staff_name);
-      if(a.type==='all'){ ok.add(key); return; }
+      if(!a){ return; }                    // nothing recorded for that weekday
+      if(a.type==='no'){ unavail.add(key); return; }          // explicitly off
+      if(a.type==='all'){ ok.add(key); return; }              // 9-7 full day
       if(a.type==='custom'){
         const end=_hkToMin(a.end);
         if(end!=null && end>=HK_MIN_END_MIN) ok.add(key);
         else if(end!=null) tooEarly.set(key, a.end);
+        else unavail.add(key);
         return;
       }
-      // 'no' / 'unset' → not available
+      // 'unset' or anything unrecognised → treat as not offered
     });
   }catch(e){ console.warn('hk avail',e); }
-  return {ok:ok, tooEarly:tooEarly};
+  return {ok:ok, tooEarly:tooEarly, unavail:unavail};
 }
 
-// Fair pick within one team, but behaviour-aware: people who actually stay late
-// are preferred, and within the same tier it's a fair rotation (fewest turns,
-// then longest since last turn). Habitually-early leavers are last resort.
+// Fair pick within one team. Behaviour (tier) is used as a FILTER upstream —
+// habitual early leavers never reach here — so ranking is purely fairness:
+// fewest turns so far, then whoever went longest ago. Without this, the single
+// "always stays late" person in a small team would draw every duty.
 function _hkPick(eligible, hist, habits){
   if(!eligible.length) return null;
   const counts={}, last={};
@@ -3151,105 +3098,118 @@ function _hkPick(eligible, hist, habits){
     counts[nm]++;
     if(!last[nm] || h.duty_date>last[nm]) last[nm]=h.duty_date;
   });
-  const tier={};
-  eligible.forEach(function(nm){ tier[nm]=_hkTier((habits||{})[_normName(nm)]); });
   const sorted=eligible.slice().sort(function(a,b){
-    if(tier[a]!==tier[b]) return tier[a]-tier[b];            // reliable stayers first
-    if(counts[a]!==counts[b]) return counts[a]-counts[b];    // then fewest turns
-    if(last[a]!==last[b]) return (last[a]||'').localeCompare(last[b]||'');
+    if(counts[a]!==counts[b]) return counts[a]-counts[b];     // fewest turns first
+    if(last[a]!==last[b]) return (last[a]||'').localeCompare(last[b]||''); // longest since last
     return a.localeCompare(b);
   });
   return sorted[0];
 }
 
-// Assign one person from every duty team for a class day.
-async function autoAssignHousekeeping(){
-  const inp=document.getElementById('classDayInput');
-  let dateStr=inp && inp.value ? inp.value : '';
-  if(!dateStr){
-    try{
-      const today=_todayIsoSydney();
-      const cds=await _cdGet('class_days?select=class_date&class_date=gte.'+today+'&order=class_date.asc&limit=1');
-      if(cds.length) dateStr=cds[0].class_date;
-    }catch(e){}
+// Build the roster for one class day: one person per team. Returns rows to
+// insert. Skips teams already covered.
+function _hkBuildDay(dateStr, teams, excl, onLeave, avail, habits, hist, doneTeams){
+  const picks=[];
+  // The housekeeping head oversees every session — rostered unless they're on
+  // leave or have marked themselves unavailable that day.
+  if(!doneTeams || !doneTeams.has('Head')){
+    const hk=_normName(HK_HEAD);
+    if(!onLeave.has(hk) && !avail.unavail.has(hk)){
+      picks.push({duty_date:dateStr, staff_name:HK_HEAD, team:'Head'});
+    }
   }
-  if(!dateStr){ showToast('Pick a date or add a class day first'); return; }
+  HK_TEAMS.forEach(function(tm){
+    if(doneTeams && doneTeams.has(tm)) return;
+    const members=Object.keys(teams).filter(function(nm){ return teams[nm]===tm; });
+    const eligible=members.filter(function(nm){
+      const key=_normName(nm);
+      if(key===_normName(HK_HEAD)) return false; // head has their own slot
+      if(excl.has(key)) return false;            // manually excluded
+      if(onLeave.has(key)) return false;         // on approved leave
+      if(avail.unavail.has(key)) return false;   // marked unavailable that day
+      if(avail.tooEarly.has(key)) return false;  // available but gone before cleanup
+      if(_hkTier(habits[key])>=4) return false;  // habitually gone before cleanup
+      if(avail.ok.has(key)) return true;         // availability says they're here
+      return _hkTier(habits[key])<=1;            // no availability on file → trust timesheets
+    });
+    const teamHist=hist.filter(function(h){ return h.team===tm; });
+    const pick=_hkPick(eligible, teamHist, habits);
+    if(pick) picks.push({duty_date:dateStr, staff_name:pick, team:tm});
+  });
+  return picks;
+}
 
-  const teams=await _hkLoadTeams();
-  const excl=await _hkExcluded();
-  const onLeave=await _hkOnLeave(dateStr);
-  const avail=await _hkAvailableLate(dateStr);
-  const habits=await _hkLeavingHabits();
+// Generate (and save) the roster for any upcoming class day that doesn't have
+// one yet. Runs automatically — no button.
+async function _hkAutoFill(){
+  const today=_todayIsoSydney();
+  let days=[];
+  try{ days=(await _cdGet('class_days?select=class_date&class_date=gte.'+today+'&order=class_date.asc&limit=8')).map(function(r){return r.class_date;}); }catch(e){}
+  if(!days.length) return;
 
   let hist=[];
   try{ hist=await _cdGet('housekeeping_roster?select=staff_name,duty_date,team&order=duty_date.desc&limit=600'); }catch(e){}
 
-  const existing=hist.filter(function(h){ return h.duty_date===dateStr; });
-  if(existing.length){
-    if(!confirm('Housekeeping is already assigned for '+dateStr+'.\n\nOK = re-assign any missing teams.\nCancel = leave it alone.')) return;
-  }
-  const doneTeams=new Set(existing.map(function(h){ return h.team; }));
+  const teams=await _hkLoadTeams();
+  const excl=await _hkExcluded();
+  const habits=await _hkLeavingHabits();
 
-  const picks=[], skipped=[];
-  for(const tm of HK_TEAMS){
-    if(doneTeams.has(tm)) continue;                       // already covered
-    const members=Object.keys(teams).filter(function(nm){ return teams[nm]===tm; });
-    const eligible=members.filter(function(nm){
-      const key=_normName(nm);
-      if(excl.has(key)) return false;           // opted out
-      if(onLeave.has(key)) return false;        // on approved leave
-      if(_hkTier(habits[key])>=4) return false; // habitually gone before cleanup
-      // Submitted availability must allow it; if none on file, trust the
-      // timesheet record instead.
-      if(avail.ok.has(key)) return true;
-      if(avail.tooEarly.has(key)) return false;
-      return _hkTier(habits[key])<=1;
+  const toInsert=[];
+  for(const d of days){
+    const done=new Set(hist.filter(function(h){ return h.duty_date===d; }).map(function(h){ return h.team; }));
+    if(done.size>=HK_TEAMS.length+1) continue;   // head + 4 teams already rostered
+    const onLeave=await _hkOnLeave(d);
+    const avail=await _hkAvailableLate(d);
+    const picks=_hkBuildDay(d, teams, excl, onLeave, avail, habits, hist, done);
+    picks.forEach(function(p){
+      toInsert.push(p);
+      hist.push({staff_name:p.staff_name, duty_date:d, team:p.team});  // keep rotation fair across days
     });
-    const teamHist=hist.filter(function(h){ return h.team===tm; });
-    const pick=_hkPick(eligible, teamHist, habits);
-    if(!pick){ skipped.push(tm); continue; }
-    picks.push({duty_date:dateStr, staff_name:pick, team:tm, assigned_by:(sessionStorage.getItem('so_me')||'')});
   }
-
-  if(!picks.length){
-    showToast(skipped.length?('No one available in: '+skipped.join(', ')):'Nothing to assign');
-    return;
-  }
+  if(!toInsert.length) return;
   try{
     await fetch(SUPABASE_URL+'/rest/v1/housekeeping_roster',{method:'POST',
       headers:{..._CD_HJ,'Prefer':'resolution=merge-duplicates,return=minimal'},
-      body:JSON.stringify(picks)});
-    let msg=picks.length+' assigned for '+dateStr;
-    if(skipped.length) msg+=' · none available in '+skipped.join(', ');
-    showToast(msg);
-    loadHousekeeping();
-  }catch(e){ showToast('Assign failed'); }
+      body:JSON.stringify(toInsert)});
+  }catch(e){ console.warn('hk autofill',e); }
 }
 
 async function loadHousekeeping(){
   const box=document.getElementById('hkRosterList');
   if(!box) return;
+  box.innerHTML='<div style="font-size:12px;color:var(--text-dim);">Building roster…</div>';
+  try{ await _hkAutoFill(); }catch(e){ console.warn('hk',e); }
   let rows=[];
   try{ rows=await _cdGet('housekeeping_roster?select=id,duty_date,staff_name,team&order=duty_date.desc&limit=80'); }catch(e){}
-  if(!rows.length){ box.innerHTML='<div style="font-size:12px;color:var(--text-dim);">No housekeeping assigned yet.</div>'; return; }
+  if(!rows.length){ box.innerHTML='<div style="font-size:12px;color:var(--text-dim);">No class days coming up — add one above and the roster fills itself.</div>'; return; }
   const byDate={};
   rows.forEach(function(r){ (byDate[r.duty_date]=byDate[r.duty_date]||[]).push(r); });
+  const today=_todayIsoSydney();
   box.innerHTML=Object.keys(byDate).sort().reverse().map(function(d){
     const dd=new Date(d+'T00:00:00');
-    const lbl=dd.toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short'});
+    const lbl=dd.toLocaleDateString('en-AU',{weekday:'long',day:'numeric',month:'short'});
+    const upcoming=d>=today;
     const list=byDate[d];
+    const head=list.find(function(x){ return x.team==='Head'; });
+    const headRow=head
+      ? '<div style="display:flex;align-items:center;gap:8px;padding:3px 0 5px;margin-bottom:4px;border-bottom:1px dashed var(--border);">'+
+          '<span style="flex-shrink:0;width:76px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--accent,#3d9eff);">Head</span>'+
+          '<span style="flex:1;font-size:12.5px;font-weight:700;">'+_cdEsc(head.staff_name)+'</span>'+
+          '<button onclick="removeHousekeeping(\''+head.id+'\')" title="Remove" style="background:none;border:none;color:#e5484d;cursor:pointer;font-size:14px;line-height:1;padding:0 2px;font-family:inherit;">&times;</button>'+
+        '</div>'
+      : '';
     const cells=HK_TEAMS.map(function(tm){
       const r=list.find(function(x){ return x.team===tm; });
-      return '<div style="display:flex;align-items:center;gap:8px;padding:4px 0;">'+
-        '<span style="flex-shrink:0;width:78px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--text-dim);">'+tm+'</span>'+
+      return '<div style="display:flex;align-items:center;gap:8px;padding:3px 0;">'+
+        '<span style="flex-shrink:0;width:76px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--text-dim);">'+tm+'</span>'+
         (r
           ? '<span style="flex:1;font-size:12.5px;font-weight:600;">'+_cdEsc(r.staff_name)+'</span>'+
-            '<button onclick="removeHousekeeping(\''+r.id+'\')" title="Remove" style="background:none;border:none;color:#e5484d;cursor:pointer;font-size:14px;line-height:1;padding:0 2px;font-family:inherit;">×</button>'
-          : '<span style="flex:1;font-size:12px;color:var(--text-dim);font-style:italic;">— unassigned</span>')+
+            '<button onclick="removeHousekeeping(\''+r.id+'\')" title="Remove" style="background:none;border:none;color:#e5484d;cursor:pointer;font-size:14px;line-height:1;padding:0 2px;font-family:inherit;">&times;</button>'
+          : '<span style="flex:1;font-size:12px;color:var(--text-dim);font-style:italic;">nobody available</span>')+
       '</div>';
     }).join('');
-    return '<div style="padding:9px 11px;border-radius:9px;background:var(--panel-2,rgba(127,127,127,.06));margin-bottom:6px;">'+
-      '<div style="font-size:12.5px;font-weight:800;margin-bottom:5px;">'+lbl+'</div>'+cells+'</div>';
+    return '<div style="padding:9px 11px;border-radius:9px;background:var(--panel-2,rgba(127,127,127,.06));margin-bottom:6px;'+(upcoming?'border-left:3px solid var(--accent,#3d9eff);':'opacity:.62;')+'">'+
+      '<div style="font-size:12.5px;font-weight:800;margin-bottom:5px;">'+lbl+(upcoming?'':' <span style="font-weight:500;color:var(--text-dim);">(past)</span>')+'</div>'+headRow+cells+'</div>';
   }).join('');
 }
 
