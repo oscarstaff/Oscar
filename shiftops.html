@@ -3089,8 +3089,10 @@ async function _hkAvailableLate(dateStr){
 
 // Fair pick within one team. Behaviour (tier) is used as a FILTER upstream —
 // habitual early leavers never reach here — so ranking is purely fairness:
-// fewest turns so far, then whoever went longest ago. Without this, the single
-// "always stays late" person in a small team would draw every duty.
+// fewest turns so far, then whoever went longest ago.
+// IMPORTANT: only duties actually marked done count as a turn. Someone who was
+// rostered but didn't do it stays "owed" and comes up again, rather than being
+// credited for a turn they never took.
 // When `shuffle` is set, people who are equally owed a turn are ordered
 // randomly, so a reshuffle gives a genuinely different (still fair) roster.
 function _hkPick(eligible, hist, habits, shuffle){
@@ -3098,6 +3100,7 @@ function _hkPick(eligible, hist, habits, shuffle){
   const counts={}, last={};
   eligible.forEach(function(nm){ counts[nm]=0; last[nm]=''; });
   hist.forEach(function(h){
+    if(!h.done) return;                       // only completed duties count
     const nm=eligible.find(function(e){ return _normName(e)===_normName(h.staff_name); });
     if(!nm) return;
     counts[nm]++;
@@ -3157,15 +3160,16 @@ async function _hkAutoFill(shuffle){
   if(!days.length) return;
 
   if(shuffle){
-    // wipe the upcoming roster so it can be rebuilt from scratch
+    // Rebuild upcoming days — but never destroy a duty already marked done,
+    // since that's a record of what actually happened.
     try{
-      await fetch(SUPABASE_URL+'/rest/v1/housekeeping_roster?duty_date=gte.'+today,
+      await fetch(SUPABASE_URL+'/rest/v1/housekeeping_roster?duty_date=gte.'+today+'&done=is.false',
         {method:'DELETE',headers:{..._CD_H,'Prefer':'return=minimal'}});
     }catch(e){ console.warn('hk clear',e); }
   }
 
   let hist=[];
-  try{ hist=await _cdGet('housekeeping_roster?select=staff_name,duty_date,team&order=duty_date.desc&limit=600'); }catch(e){}
+  try{ hist=await _cdGet('housekeeping_roster?select=staff_name,duty_date,team,done&order=duty_date.desc&limit=600'); }catch(e){}
 
   const teams=await _hkLoadTeams();
   const excl=await _hkExcluded();
@@ -3180,7 +3184,7 @@ async function _hkAutoFill(shuffle){
     const picks=_hkBuildDay(d, teams, excl, onLeave, avail, habits, hist, done, shuffle);
     picks.forEach(function(p){
       toInsert.push(p);
-      hist.push({staff_name:p.staff_name, duty_date:d, team:p.team});  // keep rotation fair across days
+      hist.push({staff_name:p.staff_name, duty_date:d, team:p.team, done:true});  // provisionally count so one person isn't picked for every upcoming day
     });
   }
   if(!toInsert.length) return;
@@ -3203,7 +3207,7 @@ async function _hkRender(){
   const box=document.getElementById('hkRosterList');
   if(!box) return;
   let rows=[];
-  try{ rows=await _cdGet('housekeeping_roster?select=id,duty_date,staff_name,team&order=duty_date.desc&limit=80'); }catch(e){}
+  try{ rows=await _cdGet('housekeeping_roster?select=id,duty_date,staff_name,team,done&order=duty_date.desc&limit=80'); }catch(e){}
   if(!rows.length){ box.innerHTML='<div style="font-size:12px;color:var(--text-dim);">No class days coming up — add one above and the roster fills itself.</div>'; return; }
   const byDate={};
   rows.forEach(function(r){ (byDate[r.duty_date]=byDate[r.duty_date]||[]).push(r); });
@@ -3213,27 +3217,44 @@ async function _hkRender(){
     const lbl=dd.toLocaleDateString('en-AU',{weekday:'long',day:'numeric',month:'short'});
     const upcoming=d>=today;
     const list=byDate[d];
+    const rowFor=function(r,label,isHead){
+      const tick='<input type="checkbox" '+(r.done?'checked':'')+
+        ' onchange="setHousekeepingDone(this,\''+r.id+'\')" title="Tick when they\'ve done it"'+
+        ' style="width:15px;height:15px;cursor:pointer;flex-shrink:0;">';
+      return '<div style="display:flex;align-items:center;gap:8px;padding:3px 0;'+(isHead?'padding-bottom:5px;margin-bottom:4px;border-bottom:1px dashed var(--border);':'')+'">'+
+        tick+
+        '<span style="flex-shrink:0;width:74px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:'+(isHead?'var(--accent,#3d9eff)':'var(--text-dim)')+';">'+label+'</span>'+
+        '<span style="flex:1;font-size:12.5px;font-weight:'+(isHead?'700':'600')+';'+(r.done?'':'opacity:.75;')+'">'+_cdEsc(r.staff_name)+'</span>'+
+        (r.done?'<span style="flex-shrink:0;font-size:10px;font-weight:700;color:#22a06b;">done</span>':'')+
+        '<button onclick="removeHousekeeping(\''+r.id+'\')" title="Remove" style="background:none;border:none;color:#e5484d;cursor:pointer;font-size:14px;line-height:1;padding:0 2px;font-family:inherit;">&times;</button>'+
+      '</div>';
+    };
     const head=list.find(function(x){ return x.team==='Head'; });
-    const headRow=head
-      ? '<div style="display:flex;align-items:center;gap:8px;padding:3px 0 5px;margin-bottom:4px;border-bottom:1px dashed var(--border);">'+
-          '<span style="flex-shrink:0;width:76px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--accent,#3d9eff);">Head</span>'+
-          '<span style="flex:1;font-size:12.5px;font-weight:700;">'+_cdEsc(head.staff_name)+'</span>'+
-          '<button onclick="removeHousekeeping(\''+head.id+'\')" title="Remove" style="background:none;border:none;color:#e5484d;cursor:pointer;font-size:14px;line-height:1;padding:0 2px;font-family:inherit;">&times;</button>'+
-        '</div>'
-      : '';
+    const headRow=head?rowFor(head,'Head',true):'';
     const cells=HK_TEAMS.map(function(tm){
       const r=list.find(function(x){ return x.team===tm; });
+      if(r) return rowFor(r,tm,false);
       return '<div style="display:flex;align-items:center;gap:8px;padding:3px 0;">'+
-        '<span style="flex-shrink:0;width:76px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--text-dim);">'+tm+'</span>'+
-        (r
-          ? '<span style="flex:1;font-size:12.5px;font-weight:600;">'+_cdEsc(r.staff_name)+'</span>'+
-            '<button onclick="removeHousekeeping(\''+r.id+'\')" title="Remove" style="background:none;border:none;color:#e5484d;cursor:pointer;font-size:14px;line-height:1;padding:0 2px;font-family:inherit;">&times;</button>'
-          : '<span style="flex:1;font-size:12px;color:var(--text-dim);font-style:italic;">nobody available</span>')+
+        '<span style="width:15px;flex-shrink:0;"></span>'+
+        '<span style="flex-shrink:0;width:74px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--text-dim);">'+tm+'</span>'+
+        '<span style="flex:1;font-size:12px;color:var(--text-dim);font-style:italic;">nobody available</span>'+
       '</div>';
     }).join('');
     return '<div style="padding:9px 11px;border-radius:9px;background:var(--panel-2,rgba(127,127,127,.06));margin-bottom:6px;'+(upcoming?'border-left:3px solid var(--accent,#3d9eff);':'opacity:.62;')+'">'+
       '<div style="font-size:12.5px;font-weight:800;margin-bottom:5px;">'+lbl+(upcoming?'':' <span style="font-weight:500;color:var(--text-dim);">(past)</span>')+'</div>'+headRow+cells+'</div>';
   }).join('');
+}
+
+// Tick/untick who actually did the housekeeping. Only completed duties count
+// toward the fairness rotation, so an unticked person stays "owed" a turn.
+async function setHousekeepingDone(cb, id){
+  const val=cb.checked;
+  try{
+    await fetch(SUPABASE_URL+'/rest/v1/housekeeping_roster?id=eq.'+encodeURIComponent(id),
+      {method:'PATCH',headers:{..._CD_HJ,'Prefer':'return=minimal'},body:JSON.stringify({done:val})});
+    showToast(val?'Marked done':'Unmarked');
+    _hkRender();
+  }catch(e){ showToast('Save failed'); cb.checked=!val; }
 }
 
 // Rebuild the upcoming roster with a different (still fair) arrangement.
