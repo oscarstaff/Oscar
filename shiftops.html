@@ -3206,6 +3206,7 @@ async function loadHousekeeping(){
 async function _hkRender(){
   const box=document.getElementById('hkRosterList');
   if(!box) return;
+  await _hkLoadTeams();   // dropdowns need the team → staff map
   let rows=[];
   try{ rows=await _cdGet('housekeeping_roster?select=id,duty_date,staff_name,team,done&order=duty_date.desc&limit=80'); }catch(e){}
   if(!rows.length){ box.innerHTML='<div style="font-size:12px;color:var(--text-dim);">No class days coming up — add one above and the roster fills itself.</div>'; return; }
@@ -3217,14 +3218,29 @@ async function _hkRender(){
     const lbl=dd.toLocaleDateString('en-AU',{weekday:'long',day:'numeric',month:'short'});
     const upcoming=d>=today;
     const list=byDate[d];
+    const teamOptions=function(tm,current){
+      const members=Object.keys(_hkTeamMap||{}).filter(function(nm){ return _hkTeamMap[nm]===tm; }).sort();
+      // make sure whoever is currently set is always in the list, even if their
+      // team changed since the duty was recorded
+      if(current && members.indexOf(current)===-1) members.unshift(current);
+      return members.map(function(nm){
+        return '<option value="'+_cdEsc(nm)+'"'+(nm===current?' selected':'')+'>'+_cdEsc(nm)+'</option>';
+      }).join('');
+    };
     const rowFor=function(r,label,isHead){
       const tick='<input type="checkbox" '+(r.done?'checked':'')+
         ' onchange="setHousekeepingDone(this,\''+r.id+'\')" title="Tick when they\'ve done it"'+
         ' style="width:15px;height:15px;cursor:pointer;flex-shrink:0;">';
+      const picker=isHead
+        ? '<span style="flex:1;font-size:12.5px;font-weight:700;">'+_cdEsc(r.staff_name)+'</span>'
+        : '<select onchange="setHousekeepingPerson(this,\''+r.id+'\')" title="Who actually did it"'+
+          ' style="flex:1;min-width:0;border:1px solid var(--border);border-radius:7px;padding:4px 7px;font-size:12.5px;font-weight:600;font-family:inherit;background:var(--input-bg,#fff);color:inherit;cursor:pointer;'+(r.done?'':'opacity:.8;')+'">'+
+          teamOptions(r.team, r.staff_name)+
+          '</select>';
       return '<div style="display:flex;align-items:center;gap:8px;padding:3px 0;'+(isHead?'padding-bottom:5px;margin-bottom:4px;border-bottom:1px dashed var(--border);':'')+'">'+
         tick+
         '<span style="flex-shrink:0;width:74px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:'+(isHead?'var(--accent,#3d9eff)':'var(--text-dim)')+';">'+label+'</span>'+
-        '<span style="flex:1;font-size:12.5px;font-weight:'+(isHead?'700':'600')+';'+(r.done?'':'opacity:.75;')+'">'+_cdEsc(r.staff_name)+'</span>'+
+        picker+
         (r.done?'<span style="flex-shrink:0;font-size:10px;font-weight:700;color:#22a06b;">done</span>':'')+
         '<button onclick="removeHousekeeping(\''+r.id+'\')" title="Remove" style="background:none;border:none;color:#e5484d;cursor:pointer;font-size:14px;line-height:1;padding:0 2px;font-family:inherit;">&times;</button>'+
       '</div>';
@@ -3243,6 +3259,17 @@ async function _hkRender(){
     return '<div style="padding:9px 11px;border-radius:9px;background:var(--panel-2,rgba(127,127,127,.06));margin-bottom:6px;'+(upcoming?'border-left:3px solid var(--accent,#3d9eff);':'opacity:.62;')+'">'+
       '<div style="font-size:12.5px;font-weight:800;margin-bottom:5px;">'+lbl+(upcoming?'':' <span style="font-weight:500;color:var(--text-dim);">(past)</span>')+'</div>'+headRow+cells+'</div>';
   }).join('');
+}
+
+// Change who actually did the housekeeping for a slot.
+async function setHousekeepingPerson(sel, id){
+  const nm=sel.value;
+  try{
+    await fetch(SUPABASE_URL+'/rest/v1/housekeeping_roster?id=eq.'+encodeURIComponent(id),
+      {method:'PATCH',headers:{..._CD_HJ,'Prefer':'return=minimal'},body:JSON.stringify({staff_name:nm})});
+    showToast(nm.split(' ')[0]+' recorded');
+    _hkRender();
+  }catch(e){ showToast('Save failed'); _hkRender(); }
 }
 
 // Tick/untick who actually did the housekeeping. Only completed duties count
