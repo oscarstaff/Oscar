@@ -1567,7 +1567,10 @@ body.tl-readonly .wk-tools{ display:none !important; }
             </div>
 
             <div style="border-top:1px solid var(--border);margin-top:16px;padding-top:14px;">
-              <div style="font-size:13px;font-weight:700;">Class housekeeping roster</div>
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+                <div style="font-size:13px;font-weight:700;">Class housekeeping roster</div>
+                <button onclick="reshuffleHousekeeping()" id="hkShuffleBtn" class="btn btn-ghost" style="padding:6px 12px;font-size:12px;">Reshuffle</button>
+              </div>
               <div style="font-size:11.5px;color:var(--text-dim);line-height:1.5;margin-top:3px;">Auto-generated for every class day — the housekeeping head plus one person from each team who's available and actually stays past cleanup (~5:30pm).</div>
               <div id="hkRosterList" style="margin-top:12px;"></div>
             </div>
@@ -3088,7 +3091,9 @@ async function _hkAvailableLate(dateStr){
 // habitual early leavers never reach here — so ranking is purely fairness:
 // fewest turns so far, then whoever went longest ago. Without this, the single
 // "always stays late" person in a small team would draw every duty.
-function _hkPick(eligible, hist, habits){
+// When `shuffle` is set, people who are equally owed a turn are ordered
+// randomly, so a reshuffle gives a genuinely different (still fair) roster.
+function _hkPick(eligible, hist, habits, shuffle){
   if(!eligible.length) return null;
   const counts={}, last={};
   eligible.forEach(function(nm){ counts[nm]=0; last[nm]=''; });
@@ -3098,9 +3103,12 @@ function _hkPick(eligible, hist, habits){
     counts[nm]++;
     if(!last[nm] || h.duty_date>last[nm]) last[nm]=h.duty_date;
   });
+  const jitter={};
+  eligible.forEach(function(nm){ jitter[nm]=shuffle?Math.random():0; });
   const sorted=eligible.slice().sort(function(a,b){
     if(counts[a]!==counts[b]) return counts[a]-counts[b];     // fewest turns first
     if(last[a]!==last[b]) return (last[a]||'').localeCompare(last[b]||''); // longest since last
+    if(shuffle) return jitter[a]-jitter[b];                   // tie → random
     return a.localeCompare(b);
   });
   return sorted[0];
@@ -3108,7 +3116,7 @@ function _hkPick(eligible, hist, habits){
 
 // Build the roster for one class day: one person per team. Returns rows to
 // insert. Skips teams already covered.
-function _hkBuildDay(dateStr, teams, excl, onLeave, avail, habits, hist, doneTeams){
+function _hkBuildDay(dateStr, teams, excl, onLeave, avail, habits, hist, doneTeams, shuffle){
   const picks=[];
   // The housekeeping head oversees every session — rostered unless they're on
   // leave or have marked themselves unavailable that day.
@@ -3133,19 +3141,28 @@ function _hkBuildDay(dateStr, teams, excl, onLeave, avail, habits, hist, doneTea
       return _hkTier(habits[key])<=1;            // no availability on file → trust timesheets
     });
     const teamHist=hist.filter(function(h){ return h.team===tm; });
-    const pick=_hkPick(eligible, teamHist, habits);
+    const pick=_hkPick(eligible, teamHist, habits, shuffle);
     if(pick) picks.push({duty_date:dateStr, staff_name:pick, team:tm});
   });
   return picks;
 }
 
-// Generate (and save) the roster for any upcoming class day that doesn't have
-// one yet. Runs automatically — no button.
-async function _hkAutoFill(){
+// Generate (and save) the roster for upcoming class days. Runs automatically on
+// load for any day that isn't rostered yet. With shuffle=true it clears the
+// upcoming days first and rebuilds them in a different (still fair) order.
+async function _hkAutoFill(shuffle){
   const today=_todayIsoSydney();
   let days=[];
   try{ days=(await _cdGet('class_days?select=class_date&class_date=gte.'+today+'&order=class_date.asc&limit=8')).map(function(r){return r.class_date;}); }catch(e){}
   if(!days.length) return;
+
+  if(shuffle){
+    // wipe the upcoming roster so it can be rebuilt from scratch
+    try{
+      await fetch(SUPABASE_URL+'/rest/v1/housekeeping_roster?duty_date=gte.'+today,
+        {method:'DELETE',headers:{..._CD_H,'Prefer':'return=minimal'}});
+    }catch(e){ console.warn('hk clear',e); }
+  }
 
   let hist=[];
   try{ hist=await _cdGet('housekeeping_roster?select=staff_name,duty_date,team&order=duty_date.desc&limit=600'); }catch(e){}
@@ -3160,7 +3177,7 @@ async function _hkAutoFill(){
     if(done.size>=HK_TEAMS.length+1) continue;   // head + 4 teams already rostered
     const onLeave=await _hkOnLeave(d);
     const avail=await _hkAvailableLate(d);
-    const picks=_hkBuildDay(d, teams, excl, onLeave, avail, habits, hist, done);
+    const picks=_hkBuildDay(d, teams, excl, onLeave, avail, habits, hist, done, shuffle);
     picks.forEach(function(p){
       toInsert.push(p);
       hist.push({staff_name:p.staff_name, duty_date:d, team:p.team});  // keep rotation fair across days
@@ -3179,6 +3196,12 @@ async function loadHousekeeping(){
   if(!box) return;
   box.innerHTML='<div style="font-size:12px;color:var(--text-dim);">Building roster…</div>';
   try{ await _hkAutoFill(); }catch(e){ console.warn('hk',e); }
+  await _hkRender();
+}
+
+async function _hkRender(){
+  const box=document.getElementById('hkRosterList');
+  if(!box) return;
   let rows=[];
   try{ rows=await _cdGet('housekeeping_roster?select=id,duty_date,staff_name,team&order=duty_date.desc&limit=80'); }catch(e){}
   if(!rows.length){ box.innerHTML='<div style="font-size:12px;color:var(--text-dim);">No class days coming up — add one above and the roster fills itself.</div>'; return; }
@@ -3213,8 +3236,23 @@ async function loadHousekeeping(){
   }).join('');
 }
 
-async function removeHousekeeping(id){
+// Rebuild the upcoming roster with a different (still fair) arrangement.
+async function reshuffleHousekeeping(){
+  if(!confirm('Reshuffle the upcoming housekeeping roster?\n\nThis replaces who is assigned on all upcoming class days. Past days are untouched.')) return;
+  const btn=document.getElementById('hkShuffleBtn');
+  if(btn){ btn.disabled=true; btn.textContent='Reshuffling…'; }
+  const box=document.getElementById('hkRosterList');
+  if(box) box.innerHTML='<div style="font-size:12px;color:var(--text-dim);">Reshuffling…</div>';
   try{
+    await _hkAutoFill(true);
+    showToast('Roster reshuffled');
+  }catch(e){ console.warn('hk reshuffle',e); showToast('Reshuffle failed'); }
+  if(btn){ btn.disabled=false; btn.textContent='Reshuffle'; }
+  // re-render without re-running autofill
+  await _hkRender();
+}
+
+async function removeHousekeeping(id){  try{
     await fetch(SUPABASE_URL+'/rest/v1/housekeeping_roster?id=eq.'+encodeURIComponent(id),{method:'DELETE',headers:{..._CD_H,'Prefer':'return=minimal'}});
     showToast('Removed'); loadHousekeeping();
   }catch(e){ showToast('Remove failed'); }
