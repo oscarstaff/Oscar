@@ -48,6 +48,11 @@ body{
   font-size:14px;display:flex;flex-direction:column;
   -webkit-text-size-adjust:100%;
 }
+/* body is a flex column and .shell is its item, so the shell's own height
+   isn't the whole story — a flex item can resolve shorter than its
+   declaration and leave the body background showing beneath it. flex:1
+   with min-height:0 makes the shell fill the column exactly. */
+body > .shell{flex:1 1 auto;min-height:0;}
 /* Soft ambient mesh-gradient background — subtle, performance-friendly */
 body::before{
   content:"";position:fixed;inset:0;z-index:-1;
@@ -361,7 +366,17 @@ body::before{
 }
 
 /* ── SHELL ── */
-.shell{display:flex;height:100dvh;height:calc(var(--vh,1vh)*100);overflow:hidden;width:100%;position:relative;}
+/* Height ladder, last supported wins:
+   1. 100vh   — fallback for old browsers
+   2. 100dvh  — handles mobile browser chrome
+   3. --vhFull — exact window.innerHeight in px, set by setVH()
+
+   The shell has overflow:hidden, so if its height resolves even slightly
+   under the viewport a strip of page background shows beneath it. dvh can
+   disagree with innerHeight on some desktop browsers and with fractional
+   device pixel ratios, so the measured pixel value wins where available. */
+.shell{display:flex;height:100vh;height:100dvh;height:var(--vhFull,100dvh);
+  overflow:hidden;width:100%;position:relative;}
 #hubLayer{visibility:hidden;}
 #hubLayer.ready{visibility:visible;}
 
@@ -504,7 +519,7 @@ html[data-sb="collapsed"] .sb-user > div:nth-child(2) {
   .sidebar{display:none!important;}
   
   .mobile-header{display:flex;}
-  .shell{display:flex;flex-direction:column;height:100dvh;height:calc(var(--vh,1vh)*100);overflow:hidden;}
+  .shell{display:flex;flex-direction:column;height:100vh;height:100dvh;height:var(--vhFull,100dvh);overflow:hidden;}
   .main{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding-bottom:calc(60px + env(safe-area-inset-bottom,0px));}
 
   select,textarea{font-size:16px!important;}
@@ -628,6 +643,536 @@ html[data-sb="collapsed"] .sb-user > div:nth-child(2) {
 .f-input:focus{border-color:var(--accent);background:rgba(34,212,160,.04);}
 .f-input::placeholder{color:#cbd5e1;}
 .f-input.error{border-color:#dc2626!important;}
+
+/* ══════════════ CALL LOG · OPERATIONS CONSOLE ══════════════
+   A dual-pane console, not a centred card. Reception logs a call while
+   watching the queue, so both live on screen at once.
+
+   Layout note: .page is capped at 820px and auto-centred by the shell.
+   This page breaks out of that cap and fills .main instead. .shell is
+   already 100dvh with overflow:hidden and .main is the scroll container,
+   so height:100% is enough — no viewport units, no double scrollbars.
+
+   Theming uses the --m-* family, which is declared per theme (light
+   default at :root plus dark/midnight/warm/ocean/forest/rose). Never
+   --card/--border/--text: those are :root-only with dark values and
+   paint dark surfaces in the light themes.
+   ──────────────────────────────────────────────────────────────── */
+
+/* Break out of the 820px centred cap for this page only.
+
+   Height chain: .shell is 100dvh with overflow:hidden and .main is
+   flex:1 — so .main has a resolved height even though it has no
+   explicit one. Percentage heights can't read that, so the console is
+   pinned with absolute positioning instead: it fills .main exactly,
+   and .cl-scroll becomes the only scrolling element.
+
+   Using min-height here instead would let the page grow past the
+   container, and the inner pane would never clip or scroll. */
+#page-calllog{max-width:none;width:100%;padding:0;margin:0;}
+#page-calllog.active{display:block;position:absolute;inset:0;overflow:hidden;}
+.main:has(#page-calllog.active),
+.main.cl-fixed{overflow:hidden;position:relative;}
+
+.cl-console{--cl-ease:cubic-bezier(.2,.8,.2,1);--cl-spring:cubic-bezier(.34,1.56,.64,1);
+  --cl-ribbon:52px;
+  display:flex;flex-direction:column;height:100%;min-height:0;
+  background:var(--m-canvas);}
+
+/* ── STATUS RIBBON ───────────────────────────────────────────── */
+.cl-ribbon{height:var(--cl-ribbon);flex-shrink:0;display:flex;align-items:center;
+  gap:26px;padding:0 22px;background:var(--m-card);
+  border-bottom:1px solid var(--m-border);}
+.cl-rb-brand{display:flex;align-items:center;gap:9px;flex-shrink:0;}
+.cl-rb-title{font-size:14px;font-weight:700;letter-spacing:-.015em;color:var(--m-ink);}
+.cl-dot{width:7px;height:7px;border-radius:50%;background:var(--m-border-hi);
+  flex-shrink:0;transition:all .25s var(--cl-ease);}
+.cl-dot.live{background:var(--accent);box-shadow:0 0 0 3px var(--accent-dim);
+  animation:clPulse 2.4s ease-in-out infinite;}
+@keyframes clPulse{0%,100%{opacity:1;}50%{opacity:.4;}}
+
+.cl-rb-stats{display:flex;align-items:center;gap:22px;flex:1;min-width:0;}
+.cl-stat{display:flex;align-items:baseline;gap:6px;}
+.cl-stat-n{font-size:17px;font-weight:700;color:var(--m-ink);
+  font-variant-numeric:tabular-nums;letter-spacing:-.02em;line-height:1;}
+.cl-stat-l{font-size:11px;font-weight:600;color:var(--m-ink-3);
+  text-transform:uppercase;letter-spacing:.05em;}
+.cl-stat-dim .cl-stat-n{color:var(--m-ink-3);font-weight:600;}
+/* Waiting count goes amber only when there actually is something waiting. */
+.cl-stat-alert.hot .cl-stat-n{color:#d97706;}
+.cl-stat-alert.hot .cl-stat-l{color:#b45309;}
+
+/* Scope switcher — my team vs everyone. */
+.cl-rb-scope{display:flex;gap:3px;padding:3px;border-radius:9px;
+  background:var(--m-card-2);border:1px solid var(--m-border);flex-shrink:0;}
+.cl-sc{border:none;background:transparent;color:var(--m-ink-2);
+  font-family:'Inter',system-ui,sans-serif;font-size:12px;font-weight:600;
+  padding:5px 12px;border-radius:7px;cursor:pointer;white-space:nowrap;
+  transition:all .18s var(--cl-ease);}
+.cl-sc:hover{color:var(--m-ink);}
+.cl-sc-on,.cl-sc-on:hover{background:var(--m-card);color:var(--m-ink);
+  box-shadow:0 1px 2px rgba(0,0,0,.07);}
+.cl-sc:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+
+/* Team badge — only shown when looking across teams. */
+.cl-team{display:inline-block;margin-left:7px;font-size:10px;font-weight:700;
+  text-transform:uppercase;letter-spacing:.04em;color:var(--m-ink-3);
+  background:var(--m-card-2);border:1px solid var(--m-border);
+  padding:1px 5px;border-radius:4px;vertical-align:middle;}
+
+/* Switching scope changes every number on screen, so a brief settle makes
+   the change legible instead of the figures silently swapping. */
+/* ── SKELETON ──
+   Switching scope replaces every row and every number, so the table shows
+   placeholder rows rather than dimming the old data. Dimming reads as
+   "disabled"; skeletons read as "loading". */
+.cl-skel-bar{display:inline-block;border-radius:5px;
+  background:linear-gradient(90deg,
+    var(--m-card-2) 0%, var(--m-border) 40%,
+    var(--m-border) 60%, var(--m-card-2) 100%);
+  background-size:220% 100%;
+  animation:clShimmer 1.15s ease-in-out infinite;}
+@keyframes clShimmer{
+  0%{background-position:130% 0;}
+  100%{background-position:-130% 0;}
+}
+.cl-skel-ava{width:26px;height:26px;border-radius:50%;flex-shrink:0;}
+.cl-skel-pill{height:18px;border-radius:6px;}
+/* Slight stagger so the rows don't pulse in lockstep. */
+.cl-skel-tr:nth-child(2) .cl-skel-bar{animation-delay:.07s;}
+.cl-skel-tr:nth-child(3) .cl-skel-bar{animation-delay:.14s;}
+.cl-skel-tr:nth-child(4) .cl-skel-bar{animation-delay:.21s;}
+.cl-skel-tr:nth-child(5) .cl-skel-bar{animation-delay:.28s;}
+.cl-skel-tr:nth-child(6) .cl-skel-bar{animation-delay:.35s;}
+.cl-skel-tr:nth-child(7) .cl-skel-bar{animation-delay:.42s;}
+.cl-skel-tr:nth-child(8) .cl-skel-bar{animation-delay:.49s;}
+.cl-skel-tr td{padding:11px 12px;}
+.cl-skel-tr:not(.done) td:first-child{box-shadow:none;}
+
+/* The ribbon figures get the same treatment — a blurred number still
+   looks like a number, which is misleading mid-switch. */
+.cl-stat-n .cl-skel-bar{height:15px;width:26px;vertical-align:middle;}
+
+.cl-rb-keys{display:flex;align-items:center;gap:5px;flex-shrink:0;
+  font-size:10.5px;color:var(--m-ink-3);}
+.cl-rb-keys span{margin-right:10px;}
+.cl-rb-keys kbd,.cl-kbd-in{font-family:ui-monospace,'SF Mono',Menlo,monospace;
+  font-size:10px;font-weight:600;padding:2px 5px;border-radius:4px;
+  background:var(--m-card-2);border:1px solid var(--m-border);
+  color:var(--m-ink-2);line-height:1.4;}
+
+/* ── SPLIT BODY ──────────────────────────────────────────────── */
+.cl-body{flex:1;min-height:0;display:grid;grid-template-columns:316px 1fr;}
+
+/* LEFT · input engine. Tinted so it reads as a fixed console panel
+   rather than a card floating on the page. */
+.cl-pane-form{background:var(--m-card);border-right:1px solid var(--m-border);
+  padding:16px 17px 20px;overflow-y:auto;min-height:0;
+  display:flex;flex-direction:column;gap:4px;}
+.cl-pane-form:focus-within{border-right-color:var(--accent-bd);}
+
+.cl-grp{padding-bottom:14px;margin-bottom:14px;
+  border-bottom:1px solid var(--m-border);}
+.cl-grp:last-of-type{border-bottom:none;margin-bottom:6px;}
+.cl-grp-hd{font-size:10px;font-weight:700;text-transform:uppercase;
+  letter-spacing:.09em;color:var(--m-ink-3);margin-bottom:11px;}
+
+.cl-field{margin-bottom:12px;}
+.cl-field:last-child{margin-bottom:0;}
+.cl-label{display:block;font-size:12px;font-weight:600;margin-bottom:5px;
+  color:var(--m-ink-2);letter-spacing:-.003em;}
+.cl-req{color:#dc2626;}
+.cl-hint{font-size:11px;color:var(--m-ink-3);margin-top:5px;min-height:14px;
+  line-height:1.35;transition:color .2s var(--cl-ease);}
+.cl-hint-warn{color:#b45309;font-weight:600;}
+
+.cl-in{width:100%;background:var(--m-card-2);border:1.5px solid var(--m-border);
+  border-radius:9px;color:var(--m-ink);padding:9px 12px;font-size:13.5px;
+  font-weight:500;outline:none;font-family:'Inter',system-ui,sans-serif;
+  -webkit-appearance:none;box-sizing:border-box;
+  transition:border-color .18s var(--cl-ease),background .18s var(--cl-ease),
+             box-shadow .18s var(--cl-ease);}
+.cl-in:hover:not(:focus){border-color:var(--m-border-hi);}
+.cl-in:focus{border-color:var(--accent);background:var(--m-card);
+  box-shadow:0 0 0 3px var(--accent-dim);}
+.cl-in::placeholder{color:var(--m-ink-3);font-weight:400;}
+.cl-in.error{border-color:#dc2626!important;box-shadow:0 0 0 3px rgba(220,38,38,.1);}
+textarea.cl-in{min-height:70px;resize:vertical;line-height:1.5;}
+
+/* Callback checkbox — the one decision that changes what happens next,
+   so it gets its own group and a clear active state. */
+.cl-grp-action{border-bottom:none;}
+.cl-check{display:flex;align-items:flex-start;gap:11px;padding:12px 13px;
+  border:1.5px solid var(--m-border);border-radius:10px;background:var(--m-card-2);
+  cursor:pointer;user-select:none;transition:all .2s var(--cl-ease);}
+.cl-check:hover{border-color:var(--accent-bd);}
+.cl-check input{position:absolute;opacity:0;width:0;height:0;}
+.cl-check-box{width:19px;height:19px;border-radius:6px;
+  border:1.5px solid var(--m-border-hi);background:var(--m-card);
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  margin-top:1px;color:transparent;transition:all .2s var(--cl-spring);}
+.cl-check input:checked ~ .cl-check-box{background:var(--accent);
+  border-color:var(--accent);color:#fff;transform:scale(1.06);}
+.cl-check input:focus-visible ~ .cl-check-box{
+  outline:2px solid var(--accent);outline-offset:2px;}
+.cl-check-text{display:flex;flex-direction:column;gap:1px;}
+.cl-check-main{font-size:13px;font-weight:600;color:var(--m-ink);line-height:1.35;}
+.cl-check-sub{font-size:11.5px;color:var(--m-ink-3);}
+.cl-check.on{border-color:var(--accent);background:var(--accent-dim);}
+.cl-check.on .cl-check-main{color:var(--accent-text);}
+.cl-check.on .cl-check-sub{color:var(--accent-text);opacity:.78;}
+
+.cl-actions{display:flex;gap:8px;margin-top:auto;padding-top:16px;}
+.cl-btn-ghost,.cl-btn-go{min-height:40px;border-radius:9px;cursor:pointer;
+  font-family:'Inter',system-ui,sans-serif;font-size:13.5px;font-weight:600;
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  transition:all .18s var(--cl-ease);}
+.cl-btn-ghost{flex:1;background:var(--m-card-2);color:var(--m-ink-2);
+  border:1px solid var(--m-border);}
+.cl-btn-ghost:hover{background:var(--m-border);color:var(--m-ink);}
+.cl-btn-go{flex:2;background:var(--accent);color:#fff;border:none;
+  box-shadow:0 1px 3px var(--accent-dim);}
+.cl-btn-go:hover{filter:brightness(1.07);box-shadow:0 3px 10px var(--accent-dim);}
+.cl-btn-go:disabled{opacity:.55;cursor:not-allowed;box-shadow:none;filter:none;}
+.cl-kbd-in{background:rgba(255,255,255,.2);border-color:rgba(255,255,255,.25);
+  color:rgba(255,255,255,.9);}
+.cl-btn-ghost:focus-visible,.cl-btn-go:focus-visible{
+  outline:2px solid var(--accent);outline-offset:2px;}
+
+/* RIGHT · context engine */
+.cl-pane-queue{display:flex;flex-direction:column;min-height:0;min-width:0;
+  background:var(--m-canvas);}
+.cl-qbar{flex-shrink:0;display:flex;align-items:center;justify-content:space-between;
+  gap:12px;padding:11px 18px;border-bottom:1px solid var(--m-border);
+  background:var(--m-card);flex-wrap:wrap;}
+.cl-filters{display:flex;gap:5px;}
+.cl-bar-right{display:flex;gap:7px;align-items:center;}
+.cl-chip{border:1px solid var(--m-border);background:var(--m-card-2);
+  color:var(--m-ink-2);font-family:'Inter',system-ui,sans-serif;font-size:12.5px;
+  font-weight:600;padding:6px 13px;border-radius:8px;cursor:pointer;
+  display:inline-flex;align-items:center;gap:7px;min-height:34px;
+  transition:all .18s var(--cl-ease);}
+.cl-chip:hover{border-color:var(--m-border-hi);color:var(--m-ink);}
+.cl-chip-on,.cl-chip-on:hover{background:var(--accent);border-color:var(--accent);
+  color:#fff;box-shadow:0 1px 4px var(--accent-dim);}
+.cl-chip:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+.cl-cnt{font-variant-numeric:tabular-nums;font-size:11px;font-weight:700;opacity:.55;}
+
+.cl-search{border:1px solid var(--m-border);background:var(--m-card-2);
+  border-radius:8px;padding:7px 12px;font-size:12.5px;
+  font-family:'Inter',system-ui,sans-serif;color:var(--m-ink);width:200px;
+  outline:none;min-height:34px;
+  transition:border-color .18s var(--cl-ease),box-shadow .18s var(--cl-ease);}
+.cl-search:hover:not(:focus){border-color:var(--m-border-hi);}
+.cl-search:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-dim);
+  width:240px;background:var(--m-card);}
+.cl-search::placeholder{color:var(--m-ink-3);}
+.cl-refresh{border:1px solid var(--m-border);background:var(--m-card-2);
+  color:var(--m-ink-2);width:34px;height:34px;border-radius:8px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  transition:all .18s var(--cl-ease);}
+.cl-refresh:hover{border-color:var(--m-border-hi);color:var(--m-ink);}
+.cl-refresh:active svg{transform:rotate(180deg);transition:transform .35s var(--cl-ease);}
+.cl-refresh:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+
+/* Only this pane scrolls — the ribbon, form and filter bar stay put. */
+/* Only this pane scrolls. overflow-x is a safety net: if the viewport is
+   narrower than the column budget the table scrolls sideways rather than
+   bleeding out of the pane. */
+.cl-scroll{flex:1;min-height:0;overflow-y:auto;overflow-x:auto;
+  overscroll-behavior:contain;}
+.cl-table{min-width:720px;}
+
+/* ── TABLE ──
+   Never put display:flex on a <td>: it drops the cell out of the table
+   layout, the column collapses and its content disappears. Flex goes on
+   a wrapper div inside the cell. */
+.cl-table{width:100%;border-collapse:collapse;table-layout:fixed;
+  font-family:'Inter',system-ui,sans-serif;font-size:13px;}
+.cl-table thead th{position:sticky;top:0;z-index:5;text-align:left;
+  font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--m-ink-3);padding:10px 12px;background:var(--m-canvas);
+  border-bottom:1.5px solid var(--m-border);white-space:nowrap;}
+/* Fixed widths must total well under the pane, or table-layout:fixed
+   overflows instead of shrinking and the row bleeds past the edge.
+   Budget: ~430px fixed + two proportional columns. */
+.cl-th-caller{width:26%;min-width:150px;}
+.cl-th-num{width:112px;}
+.cl-th-reason{width:auto;min-width:110px;}
+.cl-th-status{width:100px;}
+.cl-th-by{width:13%;min-width:88px;}
+.cl-th-when{width:62px;text-align:right;}
+
+.cl-tr{border-bottom:1px solid var(--m-border);
+  transition:background .14s var(--cl-ease);}
+/* Zebra striping: at a glance you can tell one row from the next when
+   scanning a long log. */
+.cl-tr:nth-child(4n+3){background:var(--m-card-2);}
+.cl-tr:hover{background:var(--accent-dim);}
+.cl-tr td{padding:11px 12px;vertical-align:middle;overflow:hidden;}
+/* Unresolved rows carry a left marker so they read as a worklist. */
+.cl-tr:not(.done) td:first-child{box-shadow:inset 3px 0 0 #f59e0b;}
+
+.cl-caller{display:flex;align-items:center;gap:9px;min-width:0;}
+.cl-ava{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;font-size:10.5px;font-weight:700;flex-shrink:0;}
+.cl-nm{font-weight:600;color:var(--m-ink);letter-spacing:-.005em;min-width:0;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.cl-tr.done .cl-nm{color:var(--m-ink-2);font-weight:500;}
+.cl-att{font-size:10px;font-weight:700;font-variant-numeric:tabular-nums;
+  color:#b45309;background:rgba(245,158,11,.16);padding:2px 6px;
+  border-radius:4px;flex-shrink:0;}
+
+.cl-num{font-family:ui-monospace,'SF Mono','JetBrains Mono',Menlo,Consolas,monospace;
+  font-size:12px;font-weight:500;font-variant-numeric:tabular-nums;
+  color:var(--m-ink-2);background:transparent;border:1px solid transparent;
+  padding:4px 7px;border-radius:6px;cursor:pointer;white-space:nowrap;
+  transition:all .16s var(--cl-ease);}
+.cl-num:hover{background:var(--m-card);border-color:var(--m-border-hi);color:var(--accent);}
+.cl-num.copied{background:var(--accent-dim);border-color:var(--accent);color:var(--accent-text);}
+.cl-num:focus-visible{outline:2px solid var(--accent);outline-offset:1px;}
+.cl-dash{color:var(--m-border-hi);}
+
+.cl-tag{display:inline-block;font-size:11.5px;font-weight:600;color:var(--m-ink-2);
+  background:var(--m-card);border:1px solid var(--m-border);padding:2px 8px;
+  border-radius:5px;max-width:100%;white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis;vertical-align:middle;}
+/* The note preview is the whole point of having a note — showing a
+   truncated line in the row means people read it without clicking. */
+.cl-note-i{display:block;font-size:11.5px;color:var(--m-ink-3);margin-top:4px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;
+  cursor:help;}
+.cl-tr:hover .cl-note-i{color:var(--m-ink-2);}
+
+/* Semantic status colours — functional syntax, scannable in milliseconds. */
+.cl-pill{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;
+  font-weight:700;padding:3px 9px;border-radius:6px;white-space:nowrap;
+  letter-spacing:.005em;}
+.cl-pill.wait{color:#b45309;background:rgba(245,158,11,.15);
+  box-shadow:inset 0 0 0 1px rgba(245,158,11,.22);}
+.cl-pill.ok{color:var(--m-ink-3);background:var(--m-card);
+  box-shadow:inset 0 0 0 1px var(--m-border);}
+.cl-pill.back{color:#047857;background:rgba(16,185,129,.12);
+  box-shadow:inset 0 0 0 1px rgba(16,185,129,.2);}
+.cl-pip{width:5px;height:5px;border-radius:50%;background:currentColor;
+  flex-shrink:0;animation:clPulse 2.4s ease-in-out infinite;}
+
+.cl-td-by{font-size:12.5px;color:var(--m-ink-2);white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis;}
+.cl-td-when{font-size:11.5px;color:var(--m-ink-3);white-space:nowrap;
+  text-align:right;font-variant-numeric:tabular-nums;}
+
+/* ── row actions ── */
+.cl-th-act{width:112px;}
+.cl-td-act{text-align:right;white-space:nowrap;}
+/* Sized for the two icons every row has. Edit and delete only appear for
+   the person who logged it (briefly) or an admin, so the column stretches
+   for them rather than reserving space on every row. */
+.cl-acts{display:flex;gap:4px;justify-content:flex-end;align-items:center;}
+.cl-act{display:inline-flex;align-items:center;justify-content:center;
+  width:28px;height:28px;padding:0;border-radius:8px;cursor:pointer;flex-shrink:0;
+  border:1px solid var(--m-border);background:var(--m-card);color:var(--m-ink-2);
+  transition:all .16s var(--cl-ease);}
+.cl-act:hover{border-color:var(--m-border-hi);color:var(--m-ink);}
+.cl-act svg{opacity:.55;flex-shrink:0;}
+.cl-act:hover svg{opacity:.9;}
+/* Keeps the buttons aligned when a row has no note. */
+.cl-act-sp{display:inline-block;width:28px;flex-shrink:0;}
+.cl-act-off{opacity:.32;cursor:default;}
+.cl-act-off:hover{border-color:var(--m-border);color:var(--m-ink-2);background:var(--m-card);}
+
+/* ── overflow menu ──
+   Fixed position so it isn't clipped by the scroll pane's overflow.
+   Positioned in JS against the button's rect. */
+.cl-more{position:relative;display:inline-flex;}
+.cl-more .cl-act.on{background:var(--m-card-2);border-color:var(--m-border-hi);
+  color:var(--m-ink);}
+.cl-menu{display:none;position:fixed;z-index:60;min-width:172px;padding:5px;
+  background:var(--m-card);border:1px solid var(--m-border-hi);border-radius:10px;
+  box-shadow:var(--m-sh-2);}
+.cl-menu.open{display:block;animation:clMenuIn .13s var(--cl-ease);}
+@keyframes clMenuIn{from{opacity:0;transform:translateY(-3px);}to{opacity:1;transform:none;}}
+.cl-mi{display:flex;align-items:center;gap:9px;width:100%;
+  font-family:'Inter',system-ui,sans-serif;font-size:12.5px;font-weight:600;
+  padding:8px 10px;border-radius:7px;border:none;background:transparent;
+  color:var(--m-ink);cursor:pointer;text-align:left;white-space:nowrap;
+  transition:background .13s var(--cl-ease);}
+.cl-mi:hover{background:var(--m-card-2);}
+.cl-mi svg{opacity:.5;flex-shrink:0;}
+.cl-mi:hover svg{opacity:.85;}
+.cl-mi-hint{margin-left:auto;font-size:10.5px;font-weight:600;color:var(--m-ink-3);
+  font-variant-numeric:tabular-nums;}
+.cl-mi-danger{color:#dc2626;}
+.cl-mi-danger:hover{background:rgba(220,38,38,.08);}
+.cl-mi-danger svg{opacity:.65;}
+.cl-mi:focus-visible{outline:2px solid var(--accent);outline-offset:-2px;}
+/* Destructive action stays quiet until hovered — it shouldn't compete
+   with the actions people actually use all day. */
+.cl-act-del:hover{border-color:#dc2626;color:#dc2626;background:rgba(220,38,38,.07);}
+.cl-act-del:hover svg{opacity:.9;}
+.cl-act-del:focus-visible{outline-color:#dc2626;}
+.cl-act.on{background:var(--accent);border-color:var(--accent);color:#fff;}
+.cl-act.on svg{opacity:.9;}
+.cl-act:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+/* Relog is the primary action on a waiting call, so it carries the accent
+   there and stays quiet on rows that are already closed. */
+.cl-tr:not(.done) .cl-act-relog{border-color:var(--accent-bd);
+  color:var(--accent-text);background:var(--accent-dim);}
+.cl-tr:not(.done) .cl-act-relog svg{opacity:.75;}
+.cl-tr:not(.done) .cl-act-relog:hover{background:var(--accent);
+  border-color:var(--accent);color:#fff;}
+.cl-tr:not(.done) .cl-act-relog:hover svg{opacity:1;}
+
+/* ── expandable detail row ── */
+.cl-tr.clickable{cursor:pointer;}
+.cl-caret{color:var(--m-border-hi);flex-shrink:0;
+  transition:transform .25s var(--cl-spring),color .15s ease;}
+.cl-tr.clickable:hover .cl-caret{color:var(--m-ink-2);}
+.cl-tr.expanded .cl-caret{transform:rotate(90deg);color:var(--accent);}
+.cl-caret-sp{width:10px;flex-shrink:0;}
+.cl-tr.expanded{background:var(--accent-dim);}
+.cl-tr.expanded td{border-bottom:none;}
+.cl-xrow{display:none;}
+.cl-xrow.open{display:table-row;}
+.cl-xrow td{padding:0!important;background:var(--accent-dim);
+  border-bottom:1px solid var(--m-border);}
+.cl-xbody{padding:2px 18px 16px 52px;animation:clSlide .22s var(--cl-ease);}
+@keyframes clSlide{from{opacity:0;transform:translateY(-4px);}to{opacity:1;transform:none;}}
+.cl-xlabel{font-size:10px;font-weight:700;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--m-ink-3);margin-bottom:5px;}
+.cl-xnote{font-size:13px;line-height:1.6;color:var(--m-ink);white-space:pre-wrap;
+  word-break:break-word;max-width:720px;padding:10px 13px;border-radius:8px;
+  background:var(--m-card);border:1px solid var(--m-border);}
+.cl-xmeta{display:flex;flex-wrap:wrap;gap:6px 20px;margin-top:11px;
+  font-size:11.5px;color:var(--m-ink-2);}
+.cl-xmeta b{font-weight:700;color:var(--m-ink);}
+.cl-xwait b{color:#b45309;}
+
+.cl-empty{text-align:center;padding:52px 20px;color:var(--m-ink-3);font-size:13px;}
+.cl-empty svg{opacity:.3;margin-bottom:11px;}
+
+/* ══════════════ RESPONSIVE ══════════════
+
+   Three layouts, each self-contained. Rules from wider breakpoints are
+   explicitly undone rather than left to leak downward — a min-width set
+   at one breakpoint silently forcing overflow at a narrower one was what
+   made the page fall apart on resize.
+
+     >1080px   pinned console, two panes side by side, table scrolls inside
+     680–1080  stacked panes, page scrolls, table scrolls sideways
+     <680px    stacked panes, table becomes cards, no sideways scroll
+   ─────────────────────────────────────────────────────────────────── */
+
+/* Columns drop in order of least value as the pane narrows. Status goes
+   last because the amber left-edge marker already conveys it. Deliberately
+   no min-width here: one set at this level leaks into the card layout and
+   forces horizontal overflow on every phone. */
+@media(max-width:1440px){
+  .cl-th-by,.cl-td-by{display:none;}
+}
+@media(max-width:1240px){
+  .cl-th-status,.cl-td-status{display:none;}
+}
+
+/* ── stacked, page scrolls ── */
+@media(max-width:1080px){
+  /* The form alone can be taller than the viewport once stacked, so the
+     pinned full-height console stops making sense. */
+  #page-calllog.active{position:static;overflow:visible;min-height:100%;}
+  .main:has(#page-calllog.active),
+  .main.cl-fixed{overflow-y:auto;}
+  .cl-console{height:auto;min-height:100%;}
+  .cl-body{grid-template-columns:1fr;grid-template-rows:auto auto;}
+
+  /* No longer a fixed-height flex column, so margin-top:auto on the
+     actions has nothing to push against and would collapse them. */
+  .cl-pane-form{border-right:none;border-bottom:1px solid var(--m-border);
+    overflow:visible;max-height:none;padding-bottom:18px;}
+  .cl-pane-form:focus-within{border-right-color:transparent;
+    border-bottom-color:var(--accent-bd);}
+  .cl-actions{margin-top:0;padding-top:14px;}
+  .cl-grp{padding-bottom:12px;margin-bottom:12px;}
+
+  /* Keep a horizontal scroll on the table so it stays readable instead of
+     stretching the page. Vertical scrolling belongs to the page now. */
+  .cl-scroll{overflow-x:auto;overflow-y:visible;}
+  .cl-table{min-width:560px;}
+  .cl-table thead th{position:static;}
+  .cl-rb-keys{display:none;}
+  .cl-rb-scope{order:2;}
+}
+
+@media(max-width:820px){
+  .cl-ribbon{height:auto;padding:11px 16px;gap:12px;flex-wrap:wrap;}
+  .cl-rb-stats{gap:16px;width:100%;order:3;}
+  .cl-sc{padding:6px 10px;font-size:11.5px;}
+  .cl-qbar{padding:10px 14px;}
+  .cl-bar-right{flex:1;}
+  .cl-search{width:100%;flex:1;}
+  .cl-search:focus{width:100%;}
+  .cl-filters{flex:1;}
+  .cl-chip{flex:1;justify-content:center;min-height:40px;}
+  .cl-in{min-height:42px;}
+}
+
+/* ── cards ──
+   Six columns can't be read on a phone, so each row becomes a block.
+   Everything the table layout established has to be undone here — the
+   min-width and the sideways scroll especially, or the cards overflow. */
+@media(max-width:680px){
+  .cl-scroll{overflow-x:visible;padding:10px 12px;}
+  .cl-table{min-width:0;display:block;}
+  .cl-table tbody,.cl-tr,.cl-tr td{display:block;width:100%;}
+  .cl-table thead{position:absolute;width:1px;height:1px;overflow:hidden;
+    clip:rect(0 0 0 0);white-space:nowrap;}
+
+  .cl-tr{margin-bottom:9px;border:1px solid var(--m-border);border-radius:11px;
+    background:var(--m-card);padding:12px 14px;position:relative;}
+  .cl-tr:nth-child(4n+3){background:var(--m-card);}
+  .cl-tr:hover{background:var(--m-card);}
+  .cl-tr td{padding:0;border:none;overflow:visible;}
+  .cl-tr:not(.done){border-left:3px solid #f59e0b;}
+  .cl-tr:not(.done) td:first-child{box-shadow:none;}
+
+  /* Status and logged-by come back on cards — there's room here, unlike
+     in the squeezed table above. */
+  .cl-th-status,.cl-td-status{display:block;}
+  .cl-td-status{position:absolute;top:12px;right:13px;}
+  .cl-td-by{display:inline-block;}
+
+  .cl-td-caller{margin-bottom:8px;padding-right:92px!important;}
+  .cl-td-num{margin-bottom:7px;margin-left:-7px;}
+  .cl-td-reason{margin-bottom:6px;}
+  .cl-note-i{max-width:100%;white-space:normal;}
+  .cl-td-by,.cl-td-when{font-size:11px;color:var(--m-ink-3);
+    text-align:left;width:auto;display:inline-block;}
+  .cl-td-by::after{content:' \00b7';margin:0 3px;}
+
+  .cl-td-act{display:block;text-align:left;margin-top:10px;
+    padding-top:10px!important;border-top:1px solid var(--m-border)!important;}
+  .cl-acts{justify-content:flex-start;}
+  .cl-act{flex:1;justify-content:center;min-height:38px;}
+  .cl-act-sp{display:none;}
+  .cl-more{flex:1;}
+  .cl-more .cl-act{width:100%;}
+
+  .cl-xrow.open{display:block;margin:-6px 0 9px;}
+  .cl-xrow td{background:transparent;border:none;}
+  .cl-xbody{padding:0 14px 12px;}
+
+  /* Skeletons must become cards too, or loading looks broken. */
+  .cl-skel-tr{display:block;margin-bottom:9px;border:1px solid var(--m-border);
+    border-radius:11px;background:var(--m-card);padding:12px 14px;}
+  .cl-skel-tr td{display:inline-block;padding:0 8px 0 0;}
+}
+
+@media(prefers-reduced-motion:reduce){
+  .cl-dot.live,.cl-pip{animation:none;}
+  .cl-xbody{animation:none;}
+  .cl-caret{transition:color .15s ease;}
+  .cl-search:focus{width:200px;}
+  .cl-skel-bar{animation:none;}
+}
 
 /* ── BUTTONS ── */
 
@@ -5235,6 +5780,12 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
         <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M3 4a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H5a2 2 0 01-2-2V4zm0 8a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H5a2 2 0 01-2-2v-2zm8-8a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V4zm0 8a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
         Nodes
       </div>
+
+      <!-- CALL LOG — access-gated (dialtrac) -->
+      <div class="nav-item" id="nav-calllog" data-tab="calllog" onclick="goTo('calllog')" style="display:none;">
+        <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z"/></svg>
+        Call Log
+      </div>
     </nav>
   </aside>
 
@@ -5873,6 +6424,160 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
 
 
     <!-- HUB PAGE — external apps launcher -->
+    <!-- ══════════ CALL LOG ══════════ -->
+    <div class="page" id="page-calllog">
+      <div class="cl-console">
+
+        <!-- ── STATUS RIBBON ── -->
+        <div class="cl-ribbon">
+          <div class="cl-rb-brand">
+            <span class="cl-dot" id="clDot"></span>
+            <span class="cl-rb-title">Call Log</span>
+          </div>
+          <div class="cl-rb-stats">
+            <div class="cl-stat">
+              <span class="cl-stat-n" id="clStToday">0</span>
+              <span class="cl-stat-l">today</span>
+            </div>
+            <div class="cl-stat cl-stat-alert" id="clStWaitWrap">
+              <span class="cl-stat-n" id="clStWait">0</span>
+              <span class="cl-stat-l">waiting</span>
+            </div>
+            <div class="cl-stat">
+              <span class="cl-stat-n" id="clStMine">0</span>
+              <span class="cl-stat-l">mine</span>
+            </div>
+            <div class="cl-stat cl-stat-dim">
+              <span class="cl-stat-n" id="clStAll">0</span>
+              <span class="cl-stat-l">logged</span>
+            </div>
+          </div>
+          <div class="cl-rb-scope">
+            <button class="cl-sc cl-sc-on" id="clScTeam" onclick="clSetScope('team')">
+              <span id="clScTeamLbl">My team</span>
+            </button>
+            <button class="cl-sc" id="clScAll" onclick="clSetScope('all')">Everyone</button>
+          </div>
+          <div class="cl-rb-keys">
+            <kbd>Alt</kbd><kbd>N</kbd><span>new</span>
+            <kbd>Alt</kbd><kbd>S</kbd><span>log</span>
+            <kbd>/</kbd><span>search</span>
+          </div>
+        </div>
+
+        <!-- ── SPLIT BODY ── -->
+        <div class="cl-body">
+
+          <!-- LEFT · input engine -->
+          <aside class="cl-pane-form" id="clPaneForm">
+            <div class="cl-grp">
+              <div class="cl-grp-hd">Caller</div>
+
+              <div class="cl-field">
+                <label class="cl-label" for="clName">Name <span class="cl-req">*</span></label>
+                <input id="clName" class="cl-in" type="text" placeholder="Who called?" autocomplete="off" />
+              </div>
+
+              <div class="cl-field">
+                <label class="cl-label" for="clPhone">Number <span class="cl-req">*</span></label>
+                <input id="clPhone" class="cl-in" type="tel" placeholder="0412 345 678" autocomplete="off" />
+                <div class="cl-hint" id="clPhoneHint"></div>
+              </div>
+            </div>
+
+            <div class="cl-grp">
+              <div class="cl-grp-hd">About the call</div>
+
+              <div class="cl-field">
+                <label class="cl-label" for="clReason">Reason <span class="cl-req">*</span></label>
+                <input id="clReason" class="cl-in" type="text" placeholder="What was it about?" autocomplete="off" list="clReasonList" />
+                <datalist id="clReasonList">
+                  <option value="New enquiry"></option>
+                  <option value="Checklist / documents"></option>
+                  <option value="Class booking"></option>
+                  <option value="Placement"></option>
+                  <option value="Certificate"></option>
+                  <option value="Payment"></option>
+                  <option value="First Aid / CPR"></option>
+                  <option value="Education / migration"></option>
+                  <option value="Follow-up"></option>
+                  <option value="Other"></option>
+                </datalist>
+              </div>
+
+              <div class="cl-field">
+                <label class="cl-label" for="clNote">Note</label>
+                <textarea id="clNote" class="cl-in" maxlength="600" placeholder="Any extra detail"></textarea>
+              </div>
+            </div>
+
+            <div class="cl-grp cl-grp-action">
+              <div class="cl-grp-hd">Action required</div>
+              <label class="cl-check" id="clCbWrap" for="clCallback">
+                <input type="checkbox" id="clCallback" />
+                <span class="cl-check-box" aria-hidden="true">
+                  <svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                </span>
+                <span class="cl-check-text">
+                  <span class="cl-check-main">Needs a call back</span>
+                  <span class="cl-check-sub">Couldn't reach them / unresolved</span>
+                </span>
+              </label>
+            </div>
+
+            <div class="cl-actions">
+              <button class="cl-btn-ghost" type="button" onclick="clClearForm()">Clear</button>
+              <button class="cl-btn-go" id="clSave" type="button" onclick="clSaveCall()">
+                Log call <kbd class="cl-kbd-in">⌥S</kbd>
+              </button>
+            </div>
+          </aside>
+
+          <!-- RIGHT · context engine -->
+          <section class="cl-pane-queue">
+            <div class="cl-qbar">
+              <div class="cl-filters">
+                <button class="cl-chip cl-chip-on" id="clFiltOpen" onclick="clSetFilter('open')">
+                  Waiting <span class="cl-cnt" id="clCntOpen">0</span>
+                </button>
+                <button class="cl-chip" id="clFiltMine" onclick="clSetFilter('mine')">
+                  Mine <span class="cl-cnt" id="clCntMine">0</span>
+                </button>
+                <button class="cl-chip" id="clFiltDone" onclick="clSetFilter('done')">
+                  All <span class="cl-cnt" id="clCntAll">0</span>
+                </button>
+              </div>
+              <div class="cl-bar-right">
+                <input id="clSearch" class="cl-search" type="search" placeholder="Search  /" autocomplete="off" />
+                <button class="cl-refresh" onclick="clLoadQueue()" title="Refresh">
+                  <svg width="15" height="15" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd"/></svg>
+                </button>
+              </div>
+            </div>
+
+            <div class="cl-scroll">
+              <table class="cl-table">
+                <thead>
+                  <tr>
+                    <th class="cl-th-caller">Caller</th>
+                    <th class="cl-th-num">Number</th>
+                    <th class="cl-th-reason">Reason</th>
+                    <th class="cl-th-status">Status</th>
+                    <th class="cl-th-by">Logged by</th>
+                    <th class="cl-th-when">When</th>
+                    <th class="cl-th-act">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="clQueueBody"></tbody>
+              </table>
+              <div id="clQueueEmpty"></div>
+            </div>
+          </section>
+
+        </div>
+      </div>
+    </div>
+
     <div class="page" id="page-hub">
       <div class="hub-wrap">
         <div class="hub-hdr">
@@ -5900,16 +6605,7 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
             </div>
             <svg class="hub-card-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7"/><polyline points="7 7 17 7 17 17"/></svg>
           </a>
-          <!-- Call Logger — call logging (access-gated) -->
-          <a class="hub-card" id="hubcard-dialtrac" style="display:none;cursor:pointer;" onclick="openGatedApp(event,'dialtrac','https://oscarstaff.github.io/Oscar/dialtrac.html')">
-            <div class="hub-card-icon hub-icon-dialtrac">
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.9.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
-            </div>
-            <div class="hub-card-body">
-              <div class="hub-card-title">Call Logger</div>
-            </div>
-            <svg class="hub-card-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7"/><polyline points="7 7 17 7 17 17"/></svg>
-          </a>
+          <!-- Call Logger moved into Nexus as a native tab (sidebar → Call Log) -->
           <!-- ShiftOps — roster manager (access-gated) -->
           <a class="hub-card" id="hubcard-shiftops" style="display:none;cursor:pointer;" onclick="openGatedApp(event,'shiftops','https://oscarstaff.github.io/Oscar/shiftops.html')">
             <div class="hub-card-icon hub-icon-shiftops">
@@ -7474,6 +8170,8 @@ async function enterHub(){
   if(typeof registerServiceWorker === 'function') registerServiceWorker();
   await loadStaffList();
  // refresh from Supabase in case staff changed
+  // Reveal the Call Log tab straight away — it shouldn't wait for a Nodes visit.
+  try{ gateCallLog(); }catch(e){}
   document.getElementById("authLayer").style.display="none";
   document.getElementById("hubLayer").style.display="flex";
   document.getElementById("hubLayer").classList.add("ready");
@@ -7684,6 +8382,18 @@ function goTo(p){
   // When user opens Discussions page, mark all as seen
   // Nodes — load app access gating
   if(p === 'hub'){ setTimeout(loadHubAccess, 50); }
+  // Call Log is gated — a hand-typed #calllog shouldn't get past the sidebar check
+  if(p === 'calllog'){
+    if(window._canCallLog === false){ p = 'home'; }
+    else { setTimeout(initCallLog, 50); }
+  }
+  // The console is absolutely positioned inside .main, which needs
+  // position:relative. :has() covers most browsers; this class is the
+  // fallback for those without it.
+  try{
+    const _m=document.querySelector('.main');
+    if(_m) _m.classList.toggle('cl-fixed', p==='calllog');
+  }catch(e){}
   if(p === 'kudos'){ setTimeout(loadKudos, 50); }
   // Track page visits (kept for analytics; onboarding card removed)
   const myName = window.me || (typeof me !== 'undefined' && me) || null;
@@ -8367,13 +9077,46 @@ async function loadHubAccess(){
   const sl=document.getElementById('hubcard-slip');
   if(fc) fc.style.display=_accessCache.formcraft.includes(me)?'':'none';
   if(sl) sl.style.display=_accessCache.slip.includes(me)?'':'none';
-  const dt=document.getElementById('hubcard-dialtrac');
-  if(dt) dt.style.display=_accessCache.dialtrac.includes(me)?'':'none';
   const so=document.getElementById('hubcard-shiftops');
   if(so) so.style.display=_accessCache.shiftops.includes(me)?'':'none';
+  // Call Log gate is its own function so it can run at login without
+  // waiting for the user to open Nodes.
+  gateCallLog();
   // Show admin button
   const adminArea=document.getElementById('hubAdminArea');
   if(adminArea) adminArea.style.display=(typeof myIsAdmin!=='undefined'&&myIsAdmin)?'block':'none';
+}
+
+/**
+ * Reveal the Call Log tab. Everyone on the Enrolment team gets it
+ * automatically; anyone outside Enrolment can be granted it individually
+ * through the dialtrac access list. Runs at login, so the tab is there
+ * without anyone having to visit Nodes first.
+ */
+async function gateCallLog(){
+  try{
+    let team = (typeof myTeam !== 'undefined' && myTeam) ? myTeam : '';
+    if(!team){
+      const creds = await sbGet('staff_credentials','?staff_name=eq.'+encodeURIComponent(me)+'&select=team');
+      team = (creds.length && creds[0] && creds[0].team) ? creds[0].team : '';
+      try{ if(team) myTeam = team; }catch(e){}
+    }
+    let granted = false;
+    if(_accessCache && _accessCache.dialtrac && _accessCache.dialtrac.length){
+      granted = _accessCache.dialtrac.includes(me);
+    }else if(team !== 'Enrolment'){
+      // Access lists aren't loaded yet (Nodes not visited) — check directly
+      // so non-Enrolment staff with individual access aren't left waiting.
+      try{
+        const g = await sbGet('app_access','?app=eq.dialtrac&staff_name=eq.'+encodeURIComponent(me)+'&select=staff_name');
+        granted = !!(g && g.length);
+      }catch(e){}
+    }
+    const canCallLog = (team === 'Enrolment') || granted;
+    const clNav=document.getElementById('nav-calllog');
+    if(clNav) clNav.style.display = canCallLog ? '' : 'none';
+    window._canCallLog = canCallLog;
+  }catch(e){ console.warn('gateCallLog',e); }
 }
 function loadMe(){const n=sessionStorage.getItem("ou");if(n){me=n;return true;}return false;}
 function saveMe(n){me=n;sessionStorage.setItem("ou",n);}
@@ -8448,6 +9191,830 @@ async function saveAccessChanges(){
   closeAccessManager();
   loadHubAccess();
 }
+
+/* ══════════════════ CALL LOG ══════════════════
+   Writes to public.call_log. Append-only: every call is a new row,
+   nothing is overwritten, so a caller's full history stays intact.
+   Resolving a row stamps resolved_at/resolved_by rather than deleting.
+   ─────────────────────────────────────────────── */
+/* ── Permissions ──────────────────────────────────────────────────
+   Nobody hard-deletes from the UI. A log whose rows can disappear stops
+   being a record — "no entry means no call" has to stay true, and a
+   deleted row that was still waiting means a caller is silently dropped.
+
+   Instead: you may correct your own row for a short window (typos happen
+   immediately, not three days later), and an admin may soft-delete junk,
+   which hides it everywhere but keeps it recoverable.
+   ───────────────────────────────────────────────────────────────── */
+const CL_EDIT_WINDOW_MS = 15 * 60 * 1000;   // 15 minutes
+
+function clIsAdmin(){
+  return !!(typeof myIsAdmin !== 'undefined' && myIsAdmin);
+}
+function clCanEdit(r){
+  if(!r || r.deleted_at) return false;
+  const mine = r.logged_by === (window.me || me);
+  if(!mine) return false;
+  return (Date.now() - new Date(r.created_at).getTime()) < CL_EDIT_WINDOW_MS;
+}
+function clCanDelete(r){
+  return !!r && !r.deleted_at && clIsAdmin();
+}
+/** Minutes left in the edit window, for the button tooltip. */
+function clEditLeft(r){
+  const ms = CL_EDIT_WINDOW_MS - (Date.now() - new Date(r.created_at).getTime());
+  return Math.max(0, Math.ceil(ms/60000));
+}
+
+let _clSession = [];
+let _clQueue = [];
+let _clFilter = 'open';
+let _clScope = 'team';   // 'team' = my team's calls only, 'all' = everyone
+
+/**
+ * The rows in scope. Everything downstream — table, chips, ribbon — reads
+ * this rather than _clQueue directly, so the two scopes stay consistent.
+ */
+function clScoped(){
+  // Soft-deleted rows are excluded from every view and every count. They
+  // stay in _clQueue so a restore doesn't need a refetch.
+  const live = _clQueue.filter(r => !r.deleted_at);
+  if(_clScope === 'all') return live;
+  const t = (typeof myTeam !== 'undefined' && myTeam) ? myTeam : null;
+  if(!t) return live;               // team unknown — don't hide everything
+  return live.filter(r => r.team === t);
+}
+
+/**
+ * Placeholder rows shown while a scope switch settles. Column widths match
+ * the real table so nothing shifts when the data lands. Bar widths vary a
+ * little so it reads as content rather than a progress bar.
+ */
+function clSkeleton(n){
+  const w = (min,max)=> min + Math.round(((max-min)*0.5) + (max-min)*0.5*Math.sin(n));
+  let out='';
+  for(let i=0;i<n;i++){
+    const nameW = 58 + ((i*23)%46);
+    const reasonW = 52 + ((i*31)%54);
+    const byW = 44 + ((i*17)%38);
+    out += '<tr class="cl-skel-tr">'+
+      '<td><div class="cl-caller">'+
+        '<span class="cl-caret-sp"></span>'+
+        '<span class="cl-skel-bar cl-skel-ava"></span>'+
+        '<span class="cl-skel-bar" style="height:12px;width:'+nameW+'px;"></span>'+
+      '</div></td>'+
+      '<td><span class="cl-skel-bar" style="height:12px;width:92px;"></span></td>'+
+      '<td><span class="cl-skel-bar cl-skel-pill" style="width:'+reasonW+'px;"></span></td>'+
+      '<td><span class="cl-skel-bar cl-skel-pill" style="width:74px;"></span></td>'+
+      '<td><span class="cl-skel-bar" style="height:12px;width:'+byW+'px;"></span></td>'+
+      '<td style="text-align:right;"><span class="cl-skel-bar" style="height:11px;width:38px;"></span></td>'+
+      '<td style="text-align:right;"><span class="cl-skel-bar" style="height:30px;width:30px;border-radius:8px;"></span></td>'+
+    '</tr>';
+  }
+  return out;
+}
+
+/**
+ * Switch scope. The table and the ribbon figures both change wholesale, so
+ * both go to skeletons — dimming the old data would read as "disabled"
+ * rather than "loading", and a blurred number still looks like a number.
+ */
+function clSetScope(s){
+  if(_clScope === s) return;
+  _clScope = s;
+  document.getElementById('clScTeam').classList.toggle('cl-sc-on', s==='team');
+  document.getElementById('clScAll').classList.toggle('cl-sc-on', s==='all');
+
+  const body=document.getElementById('clQueueBody');
+  const empty=document.getElementById('clQueueEmpty');
+  // Roughly as many skeleton rows as the scope is likely to return, capped
+  // so the pane doesn't fill with placeholders on a big switch.
+  const likely = (s==='all' ? _clQueue.length
+                : _clQueue.filter(r=>r.team===myTeam).length) || 3;
+  if(body) body.innerHTML = clSkeleton(Math.max(3, Math.min(8, likely)));
+  if(empty) empty.innerHTML='';
+  ['clStToday','clStWait','clStMine','clStAll'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) el.innerHTML='<span class="cl-skel-bar"></span>';
+  });
+
+  setTimeout(()=>{
+    clRenderQueue();
+    clRefreshOpenCount();
+  }, 620);
+}
+
+// Normalise to E.164 so one caller is one key, not four spellings.
+function clToE164(raw){
+  let d = String(raw||'').replace(/[^\d+]/g,'');
+  if(!d) return null;
+  if(d[0]==='+') return d;
+  if(d[0]==='0') return '+61'+d.slice(1);
+  if(d.slice(0,2)==='61' && d.length>=10) return '+'+d;
+  return d;
+}
+function clFmtPhone(e164){
+  if(!e164) return '';
+  if(/^\+614\d{8}$/.test(e164)) return '0'+e164.slice(3,6)+' '+e164.slice(6,9)+' '+e164.slice(9);
+  if(/^\+612\d{8}$/.test(e164)) return '(0'+e164.slice(3,4)+') '+e164.slice(4,8)+' '+e164.slice(8);
+  return e164;
+}
+function clEsc(s){
+  return String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+}
+function clAgo(iso){
+  const then=new Date(iso), diff=(Date.now()-then.getTime())/1000;
+  if(diff<60) return 'just now';
+  if(diff<3600) return Math.floor(diff/60)+'m ago';
+  if(diff<86400) return Math.floor(diff/3600)+'h ago';
+  const d=Math.floor(diff/86400);
+  if(d===1) return 'yesterday';
+  if(d<7) return d+'d ago';
+  return then.toLocaleDateString('en-AU',{day:'numeric',month:'short'});
+}
+
+function clClearForm(){
+  ['clName','clPhone','clReason','clNote'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el){ el.value=''; el.classList.remove('error'); }
+  });
+  const cb=document.getElementById('clCallback');
+  if(cb) cb.checked=false;
+  const w=document.getElementById('clCbWrap');
+  if(w) w.classList.remove('on');
+  const h=document.getElementById('clPhoneHint');
+  if(h){ h.textContent=''; h.classList.remove('cl-hint-warn'); }
+  const n=document.getElementById('clName');
+  if(n) n.focus();
+}
+
+async function clSaveCall(){
+  const nameEl=document.getElementById('clName');
+  const reasonEl=document.getElementById('clReason');
+  const name=(nameEl.value||'').trim();
+  const reason=(reasonEl.value||'').trim();
+  const phone=clToE164(document.getElementById('clPhone').value);
+  const note=(document.getElementById('clNote').value||'').trim();
+
+  let bad=false;
+  nameEl.classList.toggle('error', !name);   if(!name) bad=true;
+  reasonEl.classList.toggle('error', !reason); if(!reason) bad=true;
+  if(bad){ showToast('Name and reason are required','error'); return; }
+
+  const cbEl = document.getElementById('clCallback');
+  const needsCallback = !!(cbEl && cbEl.checked);
+  const who = (window.me || me || 'Unknown');
+
+  // The number is the key that links repeat attempts to the same caller, so a
+  // call without one can't auto-resolve anything and can't be called back.
+  const phoneEl = document.getElementById('clPhone');
+  phoneEl.classList.toggle('error', !phone);
+  if(!phone){
+    showToast('Phone number is required','error');
+    phoneEl.focus();
+    return;
+  }
+
+  const btn=document.getElementById('clSave');
+  btn.disabled=true; btn.textContent='Logging…';
+
+  try{
+    const now = new Date().toISOString();
+
+    // ── Auto-resolve prior attempts ────────────────────────────────────
+    // Any call to this number is a fresh attempt, so every row still waiting
+    // on it closes and is credited to whoever made this call — including the
+    // logger's own earlier attempts. If this attempt ALSO failed to reach
+    // them, the new row below reopens the number, so there's never more than
+    // one open row per number. Nothing is deleted: each attempt stays as its
+    // own line in the log.
+    let closedCount = 0;
+    try{
+      const open = await sbGet('call_log',
+        '?select=id&phone_e164=eq.'+encodeURIComponent(phone)+
+        '&resolved_at=is.null&deleted_at=is.null');
+      if(open.length){
+        const rc = await fetch(SB+'/rest/v1/call_log?phone_e164=eq.'+encodeURIComponent(phone)+
+                               '&resolved_at=is.null&deleted_at=is.null',{
+          method:'PATCH',
+          headers:{'apikey':KEY,'Authorization':'Bearer '+_sbBearer(),
+                   'Content-Type':'application/json','Prefer':'return=minimal'},
+          body: JSON.stringify({ resolved_at: now, resolved_by: who })
+        });
+        if(rc.ok) closedCount = open.length;
+        else console.warn('auto-resolve failed', rc.status);
+      }
+    }catch(e){ console.warn('auto-resolve',e); }
+
+    // Only calls that actually need ringing back stay open. Everything else is
+    // closed on the spot, so the Callbacks list is a real worklist rather than
+    // a dumping ground that nobody trusts.
+    const r = await sbPost('call_log', {
+      caller_name: name,
+      phone_e164: phone,
+      reason: reason,
+      note: note || null,
+      logged_by: who,
+      team: (typeof myTeam !== 'undefined' && myTeam) ? myTeam : null,
+      resolved_at: needsCallback ? null : now,
+      resolved_by: needsCallback ? null : who
+    });
+    // Real status code — a failed write is visible, unlike the old
+    // no-cors Sheets POST which always looked like it succeeded.
+    if(!r.ok){
+      const t = await r.text().catch(()=> '');
+      console.warn('call_log insert failed', r.status, t);
+      showToast('Could not save — call not logged','error');
+      return;
+    }
+    let msg = needsCallback ? 'Logged — still waiting on a callback' : 'Call logged';
+    if(closedCount) msg += ' · cleared '+closedCount+' earlier callback'+(closedCount>1?'s':'');
+    showToast(msg,'success');
+    clAddRecent({ name, phone, reason, callback: needsCallback, cleared: closedCount });
+    clClearForm();
+    clLoadQueue();
+  }catch(e){
+    console.warn('clSaveCall', e);
+    showToast('Network error — call not logged','error');
+  }finally{
+    btn.disabled=false; btn.textContent='Log call';
+  }
+}
+
+function clAddRecent(entry){
+  _clSession.unshift(Object.assign({}, entry, {
+    time: new Date().toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit'})
+  }));
+  const wrap=document.getElementById('clRecentWrap');
+  const list=document.getElementById('clRecentList');
+  if(!wrap||!list) return;
+  wrap.style.display='block';
+  list.innerHTML=_clSession.slice(0,8).map(e=>{
+    const meta=[clFmtPhone(e.phone), e.reason].filter(Boolean).join(' · ');
+    const flag = e.callback
+      ? '<span class="cl-flag">Callback</span>'
+      : '';
+    return '<div class="cl-row"><div class="cl-tick">'+
+      '<svg width="13" height="13" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg></div>'+
+      '<div class="cl-row-body"><div class="cl-row-top">'+
+      '<span class="cl-row-name">'+clEsc(e.name)+'</span>'+flag+'</div>'+
+      '<div class="cl-row-meta">'+clEsc(meta)+'</div></div>'+
+      '<div class="cl-row-meta">'+e.time+'</div></div>';
+  }).join('');
+}
+
+function clSetFilter(f){
+  _clFilter=f;
+  ['open','mine','done'].forEach(k=>{
+    const b=document.getElementById('clFilt'+k[0].toUpperCase()+k.slice(1));
+    if(b) b.classList.toggle('cl-chip-on', k===f);
+  });
+  clRenderQueue();
+}
+
+async function clLoadQueue(){
+  const empty=document.getElementById('clQueueEmpty');
+  const body=document.getElementById('clQueueBody');
+  // Skeletons on first load; on a refresh the existing rows stay put so the
+  // table doesn't flash for what is usually a sub-second fetch.
+  if(body && !(_clQueue && _clQueue.length)){
+    body.innerHTML = clSkeleton(6);
+    if(empty) empty.innerHTML='';
+  }
+  // The team scope is meaningless without knowing the team, and gateCallLog
+  // may not have run yet if the page was reached directly.
+  try{
+    if(typeof myTeam==='undefined' || !myTeam){
+      const creds=await sbGet('staff_credentials',
+        '?staff_name=eq.'+encodeURIComponent(window.me||me)+'&select=team');
+      if(creds.length && creds[0] && creds[0].team) myTeam=creds[0].team;
+    }
+  }catch(e){ console.warn('clLoadQueue team',e); }
+  try{
+    _clQueue = await sbGet('call_log','?select=*&order=created_at.desc&limit=500');
+  }catch(e){
+    console.warn('clLoadQueue',e);
+    if(body) body.innerHTML='';
+    if(empty) empty.innerHTML='<div class="cl-empty">Could not load calls.</div>';
+    return;
+  }
+  clRenderQueue();
+  clRefreshOpenCount();
+}
+
+function clRefreshOpenCount(){
+  const myName = window.me || me || '';
+  const rows = clScoped();
+  const open = rows.filter(r=>!r.resolved_at).length;
+  const mine = rows.filter(r=>!r.resolved_at && r.logged_by===myName).length;
+  const today = rows.filter(r=>
+    new Date(r.created_at).toDateString()===new Date().toDateString()).length;
+
+  const set=(id,v)=>{const el=document.getElementById(id); if(el) el.textContent=v;};
+  set('clStToday',today); set('clStWait',open);
+  set('clStMine',mine);   set('clStAll',rows.length);
+  set('clCntOpen',open);  set('clCntMine',mine); set('clCntAll',rows.length);
+
+  // Label the scope button with the actual team name once it's known.
+  const lbl=document.getElementById('clScTeamLbl');
+  if(lbl && typeof myTeam!=='undefined' && myTeam) lbl.textContent=myTeam;
+
+  // The ribbon only goes amber when something is actually waiting.
+  const w=document.getElementById('clStWaitWrap');
+  if(w) w.classList.toggle('hot', open>0);
+  const d=document.getElementById('clDot');
+  if(d) d.classList.toggle('live', open>0);
+}
+
+function clInitials(name){
+  const parts=String(name||'?').trim().split(/\s+/).filter(Boolean);
+  if(!parts.length) return '?';
+  return (parts[0][0]+(parts[1]?parts[1][0]:'')).toUpperCase();
+}
+// Stable colour per person so the same caller keeps the same avatar tint.
+function clHue(s){
+  let h=0; s=String(s||'');
+  for(let i=0;i<s.length;i++) h=(h*31+s.charCodeAt(i))|0;
+  return Math.abs(h)%360;
+}
+
+/**
+ * Match a phone search however the person types it. A number stored as
+ * +61455000111 should be found by "+61455000111", "0455000111",
+ * "455000111", "0455 000 111" or a fragment like "5000111".
+ *
+ * Both sides are reduced to their national form — country code and
+ * leading trunk zero stripped — then compared as a substring.
+ */
+function clPhoneMatch(stored, queryDigits){
+  if(!stored || !queryDigits) return false;
+  const strip = d => {
+    d = String(d||'').replace(/\D/g,'');
+    if(d.startsWith('61') && d.length > 9) d = d.slice(2);  // country code
+    if(d.startsWith('0')) d = d.slice(1);                   // trunk zero
+    return d;
+  };
+  const s = strip(stored);
+  const q = strip(queryDigits);
+  if(!s || !q) return false;
+  // Also try the raw query: a fragment from the middle ("5000111") has no
+  // prefix to strip and shouldn't be mangled by the rules above.
+  return s.includes(q) || s.includes(String(queryDigits).replace(/\D/g,''));
+}
+
+/**
+ * Correct your own row within the edit window. Only the fields people
+ * mistype are editable — who logged it, when, and its resolved state are
+ * not, since those are the parts that make the log evidence rather than
+ * a scratchpad.
+ */
+async function clEditRow(id){
+  const r=_clQueue.find(x=>x.id===id);
+  if(!r) return;
+  if(!clCanEdit(r)){
+    showToast('The 15-minute edit window has passed','error');
+    return;
+  }
+  const name=prompt('Caller name', r.caller_name);
+  if(name===null) return;
+  const phoneIn=prompt('Phone number', clFmtPhone(r.phone_e164)||r.phone_e164||'');
+  if(phoneIn===null) return;
+  const reason=prompt('Reason', r.reason);
+  if(reason===null) return;
+  const note=prompt('Note', r.note||'');
+  if(note===null) return;
+
+  const phone=clToE164(phoneIn);
+  if(!name.trim() || !reason.trim() || !phone){
+    showToast('Name, number and reason are all required','error');
+    return;
+  }
+  try{
+    const res=await fetch(SB+'/rest/v1/call_log?id=eq.'+encodeURIComponent(id),{
+      method:'PATCH',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+_sbBearer(),
+               'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({caller_name:name.trim(), phone_e164:phone,
+        reason:reason.trim(), note:note.trim()||null,
+        edited_at:new Date().toISOString()})
+    });
+    if(!res.ok){ showToast('Could not save the edit','error'); return; }
+    Object.assign(r,{caller_name:name.trim(), phone_e164:phone,
+      reason:reason.trim(), note:note.trim()||null,
+      edited_at:new Date().toISOString()});
+    showToast('Call updated','success');
+    clRenderQueue(); clRefreshOpenCount();
+  }catch(e){ console.warn('clEditRow',e); showToast('Network error','error'); }
+}
+
+/**
+ * Soft delete — admin only. Sets deleted_at rather than removing the row,
+ * so a mistake is recoverable and the record stays complete. Warns first
+ * if the row is still waiting, because deleting one drops a caller.
+ */
+async function clDeleteRow(id){
+  const r=_clQueue.find(x=>x.id===id);
+  if(!r) return;
+  if(!clCanDelete(r)){ showToast('Only admins can remove calls','error'); return; }
+  const waiting = !r.resolved_at;
+  const msg = 'Remove this call from the log?\n\n'+
+    r.caller_name+' · '+(clFmtPhone(r.phone_e164)||'no number')+'\n'+
+    (waiting ? '\n⚠ This call is still WAITING on a callback. Removing it '+
+               'means nobody will ring them back.\n' : '')+
+    '\nIt stays in the database and can be restored.';
+  if(!confirm(msg)) return;
+
+  try{
+    const res=await fetch(SB+'/rest/v1/call_log?id=eq.'+encodeURIComponent(id),{
+      method:'PATCH',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+_sbBearer(),
+               'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({deleted_at:new Date().toISOString(),
+                           deleted_by:(window.me||me||'Unknown')})
+    });
+    if(!res.ok){ showToast('Could not remove the call','error'); return; }
+    r.deleted_at=new Date().toISOString();
+    r.deleted_by=(window.me||me||'Unknown');
+    clRenderQueue(); clRefreshOpenCount();
+    showUndoToast
+      ? showUndoToast('Call removed', ()=>clRestoreRow(id))
+      : showToast('Call removed','success');
+  }catch(e){ console.warn('clDeleteRow',e); showToast('Network error','error'); }
+}
+
+/** Undo a soft delete. */
+async function clRestoreRow(id){
+  const r=_clQueue.find(x=>x.id===id);
+  if(!r) return;
+  try{
+    const res=await fetch(SB+'/rest/v1/call_log?id=eq.'+encodeURIComponent(id),{
+      method:'PATCH',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+_sbBearer(),
+               'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({deleted_at:null, deleted_by:null})
+    });
+    if(!res.ok){ showToast('Could not restore','error'); return; }
+    r.deleted_at=null; r.deleted_by=null;
+    clRenderQueue(); clRefreshOpenCount();
+    showToast('Call restored','success');
+  }catch(e){ console.warn('clRestoreRow',e); showToast('Network error','error'); }
+}
+
+/**
+ * Overflow menu. Only one open at a time, closes on outside click or Esc.
+ * Positioned fixed so it escapes the scroll container's overflow clipping
+ * — inside the table it would be cut off at the pane edge.
+ */
+function clToggleMenu(ev, id){
+  ev.stopPropagation();
+  const menu=document.getElementById('clmenu-'+id);
+  if(!menu) return;
+  const wasOpen=menu.classList.contains('open');
+  clCloseMenus();
+  if(wasOpen) return;
+
+  const btn=ev.currentTarget;
+  const r=btn.getBoundingClientRect();
+  menu.style.position='fixed';
+  menu.style.top=(r.bottom+4)+'px';
+  menu.style.right=(window.innerWidth-r.right)+'px';
+  menu.classList.add('open');
+  btn.classList.add('on');
+
+  // Flip above the button if it would run off the bottom of the window.
+  const mh=menu.offsetHeight||90;
+  if(r.bottom+4+mh > window.innerHeight-8){
+    menu.style.top=(r.top-mh-4)+'px';
+  }
+}
+function clCloseMenus(){
+  document.querySelectorAll('.cl-menu.open').forEach(m=>m.classList.remove('open'));
+  document.querySelectorAll('.cl-more .cl-act.on').forEach(b=>b.classList.remove('on'));
+}
+function clMenuAct(ev, what, id){
+  ev.stopPropagation();
+  clCloseMenus();
+  if(what==='edit') clEditRow(id);
+  else if(what==='del') clDeleteRow(id);
+}
+
+function clRenderQueue(){
+  const body=document.getElementById('clQueueBody');
+  const empty=document.getElementById('clQueueEmpty');
+  if(!body) return;
+  const myName = window.me || me || '';
+  const scoped = clScoped();
+
+  let rows;
+  if(_clFilter==='open')      rows=scoped.filter(r=>!r.resolved_at);
+  else if(_clFilter==='mine') rows=scoped.filter(r=>!r.resolved_at && r.logged_by===myName);
+  else                        rows=scoped.slice();
+
+  const q=(document.getElementById('clSearch')||{}).value||'';
+  if(q.trim()){
+    const t=q.trim().toLowerCase();
+    const digits=t.replace(/\D/g,'');
+    rows=rows.filter(r=>
+      (r.caller_name||'').toLowerCase().includes(t) ||
+      (r.reason||'').toLowerCase().includes(t) ||
+      (r.note||'').toLowerCase().includes(t) ||
+      (r.logged_by||'').toLowerCase().includes(t) ||
+      (digits.length>=3 && clPhoneMatch(r.phone_e164, digits))
+    );
+  }
+
+  // Waiting rows read oldest-first so nothing rots at the bottom;
+  // the full log reads newest-first like any normal log.
+  if(_clFilter!=='done') rows=rows.slice().reverse();
+
+  if(!rows.length){
+    body.innerHTML='';
+    const where = _clScope==='team' && typeof myTeam!=='undefined' && myTeam
+      ? ' in '+myTeam : '';
+    const msg = q.trim() ? 'Nothing matches that search.'
+              : _clFilter==='done' ? 'No calls logged'+where+' yet.'
+              : _clFilter==='mine' ? 'None of your calls are waiting.'
+              : 'No callbacks waiting'+where+'. All clear.';
+    empty.innerHTML='<div class="cl-empty">'+
+      '<svg width="30" height="30" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>'+
+      '<div>'+msg+'</div></div>';
+    return;
+  }
+  empty.innerHTML='';
+
+  body.innerHTML=rows.map(r=>{
+    const done=!!r.resolved_at;
+    const pretty=clFmtPhone(r.phone_e164);
+    const attempts = r.phone_e164
+      ? _clQueue.filter(x=>x.phone_e164===r.phone_e164).length : 1;
+    const onCall = done && r.resolved_by===r.logged_by &&
+      Math.abs(new Date(r.resolved_at)-new Date(r.created_at)) < 5000;
+
+    const status = !done
+      ? '<span class="cl-pill wait"><span class="cl-pip"></span>Waiting</span>'
+      : onCall
+        ? '<span class="cl-pill ok">Handled</span>'
+        : '<span class="cl-pill back">Called back</span>';
+
+    const hue=clHue(r.caller_name);
+    const ava='<span class="cl-ava" style="background:hsl('+hue+',62%,92%);color:hsl('+hue+',52%,32%);">'+
+      clEsc(clInitials(r.caller_name))+'</span>';
+
+    const att = (!done && attempts>1)
+      ? '<span class="cl-att" title="'+attempts+' attempts on this number">×'+attempts+'</span>' : '';
+
+    const whenTitle = done && !onCall
+      ? 'Called back by '+clEsc(r.resolved_by||'—')
+      : '';
+
+    const hasMore = !!(r.note && r.note.length);
+    const rid = 'clx-'+r.id;
+    // A waiting row is a job: clicking it loads the caller into the form.
+    // A closed row is history: clicking it opens the note.
+    // Two primary actions stay visible; anything conditional goes behind
+    // an overflow menu so the column width stays constant regardless of
+    // who is looking or how old the row is.
+    const relog = '<button class="cl-act cl-act-relog" aria-label="Relog" '+
+      'title="Log another call to this number" '+
+      'onclick="event.stopPropagation();clPullToForm(\''+r.id+'\')">'+
+      '<svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z"/></svg>'+
+      '</button>';
+    const notes = '<button class="cl-act'+(hasMore?'':' cl-act-off')+'" aria-label="Details" '+
+      (hasMore?'':'disabled ')+
+      'title="'+(hasMore?'Read the note and full history':'No note on this call')+'" '+
+      'onclick="event.stopPropagation();clToggleRow(\''+rid+'\',this.closest(\'tr\'))">'+
+      '<svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 4a1 1 0 011-1h3a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clip-rule="evenodd"/></svg>'+
+      '</button>';
+
+    // Overflow items — only rendered when the person is actually allowed
+    // to use them, so an empty menu never appears.
+    const extra = [];
+    if(clCanEdit(r)){
+      extra.push('<button class="cl-mi" onclick="clMenuAct(event,\'edit\',\''+r.id+'\')">'+
+        '<svg width="13" height="13" viewBox="0 0 20 20" fill="currentColor"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/></svg>'+
+        'Edit <span class="cl-mi-hint">'+clEditLeft(r)+'m left</span></button>');
+    }
+    if(clCanDelete(r)){
+      extra.push('<button class="cl-mi cl-mi-danger" onclick="clMenuAct(event,\'del\',\''+r.id+'\')">'+
+        '<svg width="13" height="13" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>'+
+        'Remove</button>');
+    }
+    const more = extra.length
+      ? '<div class="cl-more">'+
+          '<button class="cl-act" aria-label="More" aria-haspopup="true" title="More actions" '+
+            'onclick="clToggleMenu(event,\''+r.id+'\')">'+
+            '<svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path d="M6 10a2 2 0 11-4 0 2 2 0 014 0zM12 10a2 2 0 11-4 0 2 2 0 014 0zM16 12a2 2 0 100-4 2 2 0 000 4z"/></svg>'+
+          '</button>'+
+          '<div class="cl-menu" id="clmenu-'+r.id+'">'+extra.join('')+'</div>'+
+        '</div>'
+      : '<span class="cl-act-sp"></span>';
+
+    return '<tr class="cl-tr'+(done?' done':'')+'">'+
+      '<td class="cl-td-caller"><div class="cl-caller">'+
+        '<span class="cl-caret-sp"></span>'+
+        ava+
+        '<span class="cl-nm" title="'+clEsc(r.caller_name)+'">'+clEsc(r.caller_name)+'</span>'+att+
+      '</div></td>'+
+      '<td class="cl-td-num">'+
+        (pretty
+          ? '<button class="cl-num" onclick="event.stopPropagation();clCopy(this,\''+clEsc(r.phone_e164)+'\')" title="Click to copy">'+clEsc(pretty)+'</button>'
+          : '<span class="cl-dash">—</span>')+
+      '</td>'+
+      '<td class="cl-td-reason"><span class="cl-tag">'+clEsc(r.reason)+'</span>'+
+        (r.note?'<span class="cl-note-i" title="'+clEsc(r.note)+'">'+clEsc(r.note)+'</span>':'')+'</td>'+
+      '<td class="cl-td-status">'+status+'</td>'+
+      '<td class="cl-td-by" title="'+clEsc(r.logged_by)+'">'+clEsc(r.logged_by)+
+        (_clScope==='all' && r.team
+          ? '<span class="cl-team">'+clEsc(r.team)+'</span>' : '')+
+      '</td>'+
+      '<td class="cl-td-when"'+(whenTitle?' title="'+whenTitle+'"':'')+'>'+
+        clAgo(done && !onCall ? r.resolved_at : r.created_at)+'</td>'+
+      '<td class="cl-td-act"><div class="cl-acts">'+relog+notes+more+'</div></td>'+
+    '</tr>'+
+    (hasMore
+      ? '<tr class="cl-xrow" id="'+rid+'"><td colspan="7">'+
+          '<div class="cl-xbody">'+
+            '<div class="cl-xlabel">Note</div>'+
+            '<div class="cl-xnote">'+clEsc(r.note)+'</div>'+
+            '<div class="cl-xmeta">'+
+              '<span><b>Logged</b> '+clEsc(_clFullDate(r.created_at))+' by '+clEsc(r.logged_by)+'</span>'+
+              (done && !onCall
+                ? '<span><b>Called back</b> '+clEsc(_clFullDate(r.resolved_at))+' by '+clEsc(r.resolved_by||'—')+'</span>'
+                : done
+                  ? '<span><b>Handled</b> on the call</span>'
+                  : '<span class="cl-xwait"><b>Still waiting</b> on a callback</span>')+
+              (attempts>1?'<span><b>'+attempts+' calls</b> to this number</span>':'')+
+              (r.edited_at?'<span><b>Edited</b> '+clEsc(_clFullDate(r.edited_at))+'</span>':'')+
+            '</div>'+
+          '</div>'+
+        '</td></tr>'
+      : '');
+  }).join('');
+}
+
+/** Full timestamp for the expanded detail row. */
+function _clFullDate(iso){
+  if(!iso) return '';
+  return new Date(iso).toLocaleString('en-AU',{
+    day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'
+  });
+}
+
+/** Expand or collapse a row's note. Only one open at a time keeps it tidy. */
+function clToggleRow(id, tr){
+  const row=document.getElementById(id);
+  if(!row) return;
+  const isOpen=row.classList.contains('open');
+  document.querySelectorAll('.cl-xrow.open').forEach(el=>el.classList.remove('open'));
+  document.querySelectorAll('.cl-tr.expanded').forEach(el=>el.classList.remove('expanded'));
+  document.querySelectorAll('.cl-act.on').forEach(el=>el.classList.remove('on'));
+  if(!isOpen){
+    row.classList.add('open');
+    if(tr){
+      tr.classList.add('expanded');
+      const b=tr.querySelector('.cl-act:not(.cl-act-relog)');
+      if(b) b.classList.add('on');
+    }
+  }
+}
+
+/**
+ * Copy a number to the clipboard. Replaces the old tel: link — reception
+ * works from laptops, where a tel: link opens nothing useful.
+ */
+function clCopy(btn, e164){
+  const done = ()=>{
+    btn.classList.add('copied');
+    const orig = btn.innerHTML;
+    btn.innerHTML = 'Copied';
+    setTimeout(()=>{ btn.innerHTML = orig; btn.classList.remove('copied'); }, 1100);
+  };
+  try{
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(e164).then(done).catch(()=>clCopyFallback(e164,done));
+    }else{
+      clCopyFallback(e164, done);
+    }
+  }catch(e){ clCopyFallback(e164, done); }
+}
+function clCopyFallback(text, cb){
+  try{
+    const ta=document.createElement('textarea');
+    ta.value=text; ta.style.position='fixed'; ta.style.opacity='0';
+    document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta);
+    cb();
+  }catch(e){ showToast('Could not copy','error'); }
+}
+
+/**
+ * Clicking a waiting row loads that caller into the form, so logging the
+ * follow-up is one click instead of retyping the number. Saving then
+ * auto-resolves the original via the phone-number match.
+ */
+function clPullToForm(id){
+  const r=_clQueue.find(x=>x.id===id);
+  if(!r) return;
+  const set=(el,v)=>{const e=document.getElementById(el); if(e) e.value=v||'';};
+  set('clName', r.caller_name==='N/A' ? '' : r.caller_name);
+  set('clPhone', clFmtPhone(r.phone_e164) || r.phone_e164);
+  set('clReason', r.reason);
+  set('clNote','');
+  const cb=document.getElementById('clCallback');
+  if(cb){ cb.checked=false; }
+  const w=document.getElementById('clCbWrap');
+  if(w) w.classList.remove('on');
+  const p=document.getElementById('clPhone');
+  if(p) p.dispatchEvent(new Event('input'));
+  const n=document.getElementById('clName');
+  if(n) n.focus();
+  showToast('Loaded '+(r.caller_name==='N/A'?'caller':r.caller_name)+' — log the follow-up','success');
+}
+
+/**
+ * Keyboard-first: operational tools are slowed down by reaching for a
+ * mouse. Alt+N clears and focuses, Alt+S logs, "/" jumps to search.
+ */
+function clBindKeys(){
+  if(window._clKeysBound) return;
+  window._clKeysBound = true;
+  // A fixed-position menu doesn't move with the table, so close it on
+  // scroll rather than letting it float detached from its row.
+  document.addEventListener('click', ()=>clCloseMenus());
+  const sc=document.querySelector('.cl-scroll');
+  if(sc) sc.addEventListener('scroll', ()=>clCloseMenus(), {passive:true});
+  window.addEventListener('resize', ()=>clCloseMenus());
+  document.addEventListener('keydown', ev=>{
+    const page=document.getElementById('page-calllog');
+    if(!page || !page.classList.contains('active')) return;
+    const tag=(ev.target.tagName||'').toLowerCase();
+    const typing = tag==='input' || tag==='textarea' || tag==='select';
+
+    if(ev.altKey && (ev.key==='n' || ev.key==='N')){
+      ev.preventDefault(); clClearForm(); return;
+    }
+    if(ev.altKey && (ev.key==='s' || ev.key==='S')){
+      ev.preventDefault(); clSaveCall(); return;
+    }
+    if(ev.key==='/' && !typing){
+      ev.preventDefault();
+      const s=document.getElementById('clSearch');
+      if(s) s.focus();
+      return;
+    }
+    if(ev.key==='Escape'){ clCloseMenus(); }
+    if(ev.key==='Escape' && ev.target.id==='clSearch'){
+      ev.target.value=''; clRenderQueue(); ev.target.blur();
+    }
+  });
+}
+
+function initCallLog(){
+  const n=document.getElementById('clName');
+  if(n && !n.dataset.clBound){
+    ['clName','clPhone','clReason'].forEach(id=>{
+      const el=document.getElementById(id);
+      if(el) el.addEventListener('keydown',ev=>{
+        if(ev.key==='Enter'){ ev.preventDefault(); clSaveCall(); }
+      });
+    });
+    const p=document.getElementById('clPhone');
+    if(p) p.addEventListener('input',()=>{
+      const h=document.getElementById('clPhoneHint');
+      const e=clToE164(p.value);
+      p.classList.remove('error');
+      if(!h) return;
+      if(!e){ h.textContent=''; h.classList.remove('cl-hint-warn'); return; }
+      // Flag an existing open callback so the person knows this is a repeat
+      // attempt before they save, not after.
+      const waiting=_clQueue.filter(r=>!r.resolved_at && r.phone_e164===e);
+      if(waiting.length){
+        const w=waiting[waiting.length-1];
+        h.textContent='Already waiting on a callback — logged by '+w.logged_by+'. Saving will clear it.';
+        h.classList.add('cl-hint-warn');
+      }else{
+        h.textContent='Saved as '+e;
+        h.classList.remove('cl-hint-warn');
+      }
+    });
+    // Highlight the row when ticked so it's obvious this call will come back
+    const cb=document.getElementById('clCallback');
+    if(cb) cb.addEventListener('change',()=>{
+      const w=document.getElementById('clCbWrap');
+      if(w) w.classList.toggle('on', cb.checked);
+    });
+    const sq=document.getElementById('clSearch');
+    if(sq && !sq.dataset.bound){
+      sq.addEventListener('input', ()=>clRenderQueue());
+      sq.dataset.bound='1';
+    }
+    n.dataset.clBound='1';
+  }
+  clBindKeys();
+  clLoadQueue();
+  if(n) setTimeout(()=>n.focus(),80);
+}
+
 function switchAccessApp(app){
   _accessCurrentApp=app;
   ['formcraft','slip','dialtrac','shiftops'].forEach(a=>{var t=document.getElementById('acctab-'+a);if(t)t.className='acc-app-tab'+(app===a?' acc-tab-active':'');});
@@ -22484,17 +24051,27 @@ function teardownRealtime(){
   _realtimeChannels = [];
 }
 
-// ── Fix 100dvh reflow on iOS/Android ──
+// ── Shell height ──
+// --vhFull is the exact measured window height. .shell uses it in preference
+// to 100dvh because dvh can resolve slightly under innerHeight on some
+// desktop browsers, and .shell has overflow:hidden — so any shortfall shows
+// as a thin strip of page background beneath the app.
 function setVH(){
-  document.documentElement.style.setProperty('--vh', window.innerHeight*0.01+'px');
+  const h = window.innerHeight;
+  document.documentElement.style.setProperty('--vh', (h*0.01)+'px');
+  document.documentElement.style.setProperty('--vhFull', h+'px');
 }
 setVH();
 // Only update on orientation change, not every scroll (prevents reflow)
 window.addEventListener('orientationchange', function(){ setTimeout(setVH, 200); });
 window.addEventListener('resize', function(){
-  // Debounce — only fire if width changed (ignore address bar show/hide)
-  if(window.innerWidth !== (window._lastW||0)){
+  // Height-only resizes matter too: dragging a desktop window shorter never
+  // changes the width, and without this the shell keeps its old height and
+  // leaves a gap at the bottom.
+  if(window.innerWidth !== (window._lastW||0) ||
+     window.innerHeight !== (window._lastH||0)){
     window._lastW = window.innerWidth;
+    window._lastH = window.innerHeight;
     setVH();
   }
 });
