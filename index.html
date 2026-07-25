@@ -17851,7 +17851,7 @@ async function approveExtraBreak(id, staff, date, minutes){
       currentBreak = parseFloat(existing[0].break_hrs) || 0;
     } else {
       // No override yet — compute the auto break from actual clock_log for this day
-      // Mirrors applyAutoRules: weekend = 0, weekday with >5.5h = 0.5, else 0
+      // Mirrors calcDayExtras: weekend = 0, weekday with >5h = 0.5, else 0
       const dayStart = new Date(date + 'T00:00:00');
       const dayEnd = new Date(date + 'T23:59:59');
       const dayLogs = await sbGet('clock_log','?staff_name=eq.'+encodeURIComponent(staff)+'&ts=gte.'+dayStart.toISOString()+'&ts=lte.'+dayEnd.toISOString()+'&order=ts.asc');
@@ -17863,7 +17863,7 @@ async function approveExtraBreak(id, staff, date, minutes){
       }
       const dow = dayStart.getDay(); // 0=Sun, 6=Sat
       const isWeekend = (dow === 0 || dow === 6);
-      currentBreak = isWeekend ? 0 : (rawHours > 5.5 ? 0.5 : 0);
+      currentBreak = isWeekend ? 0 : (rawHours > 5 ? 0.5 : 0);
     }
     const newBreak = currentBreak + (minutes / 60);
     console.log('[approveBreak] staff:', staff, 'date:', date, 'current:', currentBreak, 'add:', minutes/60, 'new:', newBreak);
@@ -18130,7 +18130,7 @@ function calcDayExtras(rawHours, customBreak, customCoffee, dateObj){
   // Returns {hours, breakHrs, coffeeAllowance}
   // Auto-rules (override if customBreak/customCoffee given):
   // - WEEKENDS (Sat/Sun) → paid break, NO auto-deduct
-  // - Weekdays: rawHours > 5.5 → 0.5h break
+  // - Weekdays: rawHours > 5 → 0.5h break
   // - rawHours >= 4 → $5 coffee (any day)
   // - rawHours < 4 → no coffee
   let isWeekend = false;
@@ -18139,7 +18139,7 @@ function calcDayExtras(rawHours, customBreak, customCoffee, dateObj){
     const dow = d.getDay();
     isWeekend = (dow === 0 || dow === 6); // Sun=0, Sat=6
   }
-  const autoBreak = isWeekend ? 0 : (rawHours > 5.5 ? 0.5 : 0);
+  const autoBreak = isWeekend ? 0 : (rawHours > 5 ? 0.5 : 0);
   let breakHrs = (customBreak !== undefined && customBreak !== null && customBreak !== '') ? parseFloat(customBreak) : autoBreak;
   let coffee = (customCoffee !== undefined && customCoffee !== null && customCoffee !== '') ? parseFloat(customCoffee) : (rawHours >= 4 ? 5 : 0);
   if(isNaN(breakHrs)) breakHrs = 0;
@@ -18616,7 +18616,7 @@ async function savePunchEdit(){
       const outH = parseInt(outP[0]) + parseInt(outP[1])/60;
       let raw = outH - inH;
       if(raw < 0) raw += 24;
-      if(breakHrs === '') breakHrs = raw > 5.5 ? '0.5' : '0';
+      if(breakHrs === '') breakHrs = raw > 5 ? '0.5' : '0';
       if(coffee === '') coffee = raw >= 4 ? '5' : '';
     }
   }
