@@ -906,6 +906,25 @@ select.cl-in{appearance:none;-webkit-appearance:none;cursor:pointer;padding-righ
   transform:rotate(90deg);}
 .cl-refresh:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
 
+/* Sub-filters live one level below the main chips, so they read as a
+   refinement of Mine rather than a fourth peer filter. Hidden entirely
+   unless Mine is selected — an empty row of dead controls is worse than
+   no row at all. */
+.cl-subbar{display:none;align-items:center;gap:6px;
+  padding:9px 18px;border-bottom:1px solid var(--m-border);
+  background:var(--m-card-2);}
+.cl-subbar.on{display:flex;}
+.cl-sub-lbl{font-size:10.5px;font-weight:700;letter-spacing:.07em;
+  text-transform:uppercase;color:var(--m-ink-3);margin-right:2px;}
+.cl-sub{border:1px solid transparent;background:transparent;color:var(--m-ink-2);
+  font-family:inherit;font-size:12px;font-weight:600;padding:5px 11px;
+  border-radius:999px;cursor:pointer;display:inline-flex;align-items:center;
+  gap:6px;transition:all var(--cl-t) var(--cl-ease);}
+.cl-sub:hover{background:var(--m-card);color:var(--m-ink);}
+.cl-sub-on,.cl-sub-on:hover{background:var(--m-card);color:var(--m-ink);
+  border-color:var(--m-border);box-shadow:var(--m-sh-1);}
+.cl-sub:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+
 .cl-scroll{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;
   padding:14px 18px 24px;}
 .cl-list{display:flex;flex-direction:column;gap:6px;}
@@ -1094,6 +1113,9 @@ select.cl-in{appearance:none;-webkit-appearance:none;cursor:pointer;padding-righ
   .cl-bar-right{width:100%;}
   .cl-filters{width:100%;}
   .cl-chip{flex:1;justify-content:center;min-height:40px;}
+  .cl-subbar{padding:8px 12px;flex-wrap:wrap;}
+  .cl-sub{flex:1;justify-content:center;min-height:36px;}
+  .cl-sub-lbl{width:100%;margin-bottom:2px;}
   .cl-in{min-height:42px;}
   .cl-stat{padding:4px 6px;}
   .cl-stat-n{font-size:19px;}
@@ -6509,6 +6531,19 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
               </div>
             </div>
 
+            <div class="cl-subbar" id="clSubBar">
+              <span class="cl-sub-lbl">Show</span>
+              <button class="cl-sub cl-sub-on" id="clSubAll" onclick="clSetSub('all')">
+                All <span class="cl-cnt" id="clSubCntAll">0</span>
+              </button>
+              <button class="cl-sub" id="clSubWaiting" onclick="clSetSub('waiting')">
+                Waiting <span class="cl-cnt" id="clSubCntWaiting">0</span>
+              </button>
+              <button class="cl-sub" id="clSubHandled" onclick="clSetSub('handled')">
+                Handled <span class="cl-cnt" id="clSubCntHandled">0</span>
+              </button>
+            </div>
+
             <div class="cl-scroll">
               <div id="clQueueBody" class="cl-list"></div>
               <div id="clQueueEmpty"></div>
@@ -9170,6 +9205,7 @@ function clEditLeft(r){
 let _clSession = [];
 let _clQueue = [];
 let _clFilter = 'open';
+let _clSub    = 'all';   // within Mine: all | waiting | handled
 let _clScope = 'team';   // 'team' = my team's calls only, 'all' = everyone
 
 /**
@@ -9440,7 +9476,27 @@ function clSetFilter(f){
     const b=document.getElementById('clFilt'+k[0].toUpperCase()+k.slice(1));
     if(b) b.classList.toggle('cl-chip-on', k===f);
   });
+  // Sub-filters only make sense inside Mine, and shouldn't persist when
+  // you leave it — coming back to a silently pre-filtered list is worse
+  // than starting from everything.
+  if(f!=='mine') _clSub='all';
+  const sub=document.getElementById('clSubBar');
+  if(sub) sub.classList.toggle('on', f==='mine');
+  clSyncSub();
   clRenderQueue();
+}
+
+/** Narrow the Mine list. */
+function clSetSub(s){
+  _clSub = s;
+  clSyncSub();
+  clRenderQueue();
+}
+function clSyncSub(){
+  ['all','waiting','handled'].forEach(k=>{
+    const b=document.getElementById('clSub'+k[0].toUpperCase()+k.slice(1));
+    if(b) b.classList.toggle('cl-sub-on', k===_clSub);
+  });
 }
 
 async function clLoadQueue(){
@@ -9477,11 +9533,19 @@ function clRefreshOpenCount(){
   const myName = window.me || me || '';
   const rows = clScoped();
   const open = rows.filter(r=>!r.resolved_at).length;
-  const mine = rows.filter(r=>!r.resolved_at && r.logged_by===myName).length;
+  const mine = rows.filter(r=>r.logged_by===myName).length;
   const today = rows.filter(r=>
     new Date(r.created_at).toDateString()===new Date().toDateString()).length;
 
   const set=(id,v)=>{const el=document.getElementById(id); if(el) el.textContent=v;};
+
+  // Sub-filter counts: the split within my own calls, so the numbers are
+  // visible before you click rather than after.
+  const minish  = rows.filter(r=>r.logged_by===myName);
+  const mineOpen= minish.filter(r=>!r.resolved_at).length;
+  set('clSubCntAll', minish.length);
+  set('clSubCntWaiting', mineOpen);
+  set('clSubCntHandled', minish.length - mineOpen);
   set('clStToday',today); set('clStWait',open);
   set('clStMine',mine);   set('clStAll',rows.length);
   set('clCntOpen',open);  set('clCntMine',mine); set('clCntAll',rows.length);
@@ -9676,9 +9740,17 @@ function clRenderQueue(){
   const scoped = clScoped();
 
   let rows;
-  if(_clFilter==='open')      rows=scoped.filter(r=>!r.resolved_at);
-  else if(_clFilter==='mine') rows=scoped.filter(r=>!r.resolved_at && r.logged_by===myName);
-  else                        rows=scoped.slice();
+  if(_clFilter==='open'){
+    rows=scoped.filter(r=>!r.resolved_at);
+  } else if(_clFilter==='mine'){
+    // Everything I logged, not just what's still open — the chip says
+    // "Mine", so it should mean mine. The sub-filter narrows it.
+    rows=scoped.filter(r=>r.logged_by===myName);
+    if(_clSub==='waiting')      rows=rows.filter(r=>!r.resolved_at);
+    else if(_clSub==='handled') rows=rows.filter(r=>!!r.resolved_at);
+  } else {
+    rows=scoped.slice();
+  }
 
   const q=(document.getElementById('clSearch')||{}).value||'';
   if(q.trim()){
@@ -9702,7 +9774,10 @@ function clRenderQueue(){
     const where = _clScope==='team' && typeof myTeam!=='undefined' && myTeam ? ' in '+myTeam : '';
     const msg = q.trim() ? 'Nothing matches that search.'
               : _clFilter==='done' ? 'No calls logged'+where+' yet.'
-              : _clFilter==='mine' ? 'None of your calls are waiting.'
+              : _clFilter==='mine'
+                ? (_clSub==='waiting' ? 'None of your calls are waiting.'
+                 : _clSub==='handled' ? 'None of your calls are closed yet.'
+                 : 'You haven\u2019t logged any calls'+where+' yet.')
               : 'No callbacks waiting'+where+'.';
     empty.innerHTML='<div class="cl-empty">'+
       '<div class="cl-empty-mark"><svg width="26" height="26" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg></div>'+
