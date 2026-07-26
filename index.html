@@ -736,6 +736,9 @@ html[data-sb="collapsed"] .sb-user > div:nth-child(2) {
   letter-spacing:.03em;}
 .cl-stat-alert.hot .cl-stat-n{color:var(--amber);}
 .cl-stat-alert.hot .cl-stat-l{color:var(--amber);}
+/* Something has been waiting 2+ days — a different state from "busy". */
+.cl-stat-alert.overdue .cl-stat-n,
+.cl-stat-alert.overdue .cl-stat-l{color:#dc2626;}
 .cl-stat-sel{background:var(--m-card-2);box-shadow:inset 0 0 0 1px var(--m-border);}
 .cl-rule{width:1px;height:16px;background:var(--m-border);flex-shrink:0;}
 
@@ -994,6 +997,30 @@ select.cl-in{appearance:none;-webkit-appearance:none;cursor:pointer;padding-righ
   display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
   overflow:hidden;transition:all var(--cl-t) var(--cl-ease);}
 .cl-card:hover .cl-note{-webkit-line-clamp:8;border-left-color:var(--accent);}
+
+/* ── AGE TIERS ──
+   A callback waiting three days looked identical to one from an hour ago,
+   which is how a queue gets filled but never worked. The left rail deepens
+   amber → red as it ages, and anything past a day carries an explicit
+   "waiting 2d" badge. Colour alone isn't the signal — the badge text is,
+   so this still reads for colour-blind staff and in greyscale. */
+.cl-card.cl-age-fresh::before{background:var(--amber);opacity:.55;}
+.cl-card.cl-age-today::before{background:var(--amber);}
+.cl-card.cl-age-aging::before{background:#ea580c;}
+.cl-card.cl-age-stale::before{background:#dc2626;}
+.cl-card.cl-age-cold::before{background:#b91c1c;width:4px;}
+
+.cl-card.cl-age-stale{border-color:rgba(220,38,38,.28);}
+.cl-card.cl-age-cold{border-color:rgba(185,28,28,.42);
+  background:linear-gradient(160deg,var(--m-card),rgba(220,38,38,.045));}
+
+.cl-wait-age{font-size:10px;font-weight:700;letter-spacing:.03em;
+  padding:2px 7px;border-radius:5px;white-space:nowrap;text-transform:lowercase;}
+.cl-wait-aging{color:#c2410c;background:rgba(234,88,12,.11);
+  border:1px solid rgba(234,88,12,.24);}
+.cl-wait-stale{color:#dc2626;background:rgba(220,38,38,.1);
+  border:1px solid rgba(220,38,38,.24);}
+.cl-wait-cold{color:#fff;background:#dc2626;border:1px solid #b91c1c;}
 
 .cl-pill{display:inline-flex;align-items:center;gap:5px;font-size:11px;
   font-weight:700;padding:3px 9px;border-radius:999px;white-space:nowrap;
@@ -6469,7 +6496,7 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
               </div>
             </div>
 
-            <div class="cl-field">
+            <div class="cl-field" id="clForField">
               <label class="cl-label" for="clForTeam">Handled by</label>
               <select id="clForTeam" class="cl-in">
                 <option value="">My team</option>
@@ -9317,6 +9344,31 @@ function clFmtPhone(e164){
 function clEsc(s){
   return String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 }
+/**
+ * How stale a waiting callback is. Returns a tier the card styles against —
+ * a three-day-old callback and an hour-old one currently look identical,
+ * which is why the queue gets logged but not worked.
+ *   fresh  <  4h
+ *   today  <  24h
+ *   aging  1–2 days
+ *   stale  2–4 days
+ *   cold   4+ days
+ */
+function clAgeTier(iso){
+  const h = (Date.now() - new Date(iso).getTime()) / 3600000;
+  if(h < 4)  return 'fresh';
+  if(h < 24) return 'today';
+  if(h < 48) return 'aging';
+  if(h < 96) return 'stale';
+  return 'cold';
+}
+/** Plain-language wait, for the badge on stale rows. */
+function clWaitLabel(iso){
+  const h = (Date.now() - new Date(iso).getTime()) / 3600000;
+  if(h < 24) return Math.max(1, Math.floor(h)) + 'h';
+  return Math.floor(h / 24) + 'd';
+}
+
 function clAgo(iso){
   const then=new Date(iso), diff=(Date.now()-then.getTime())/1000;
   if(diff<60) return 'just now';
@@ -9557,9 +9609,18 @@ function clRefreshOpenCount(){
   if(sub) sub.textContent = _clScope==='all' ? 'everyone'
         : ((typeof myTeam!=='undefined' && myTeam) ? myTeam.toLowerCase() : 'my team');
 
-  // The ribbon only goes amber when something is actually waiting.
+  // The ribbon goes amber when anything is waiting, and red once something
+  // has been waiting two days or more — the state worth acting on.
+  const overdue = rows.filter(r=>!r.resolved_at &&
+    (Date.now()-new Date(r.created_at).getTime()) > 48*3600000).length;
   const w=document.getElementById('clStWaitWrap');
-  if(w) w.classList.toggle('hot', open>0);
+  if(w){
+    w.classList.toggle('hot', open>0);
+    w.classList.toggle('overdue', overdue>0);
+    w.title = overdue>0
+      ? overdue+' waiting more than 2 days'
+      : (open>0 ? open+' waiting' : 'Nothing waiting');
+  }
   const d=document.getElementById('clDot');
   if(d) d.classList.toggle('live', open>0);
 }
@@ -9766,8 +9827,12 @@ function clRenderQueue(){
   }
 
   // Waiting reads oldest-first so nothing rots at the bottom; the full log
-  // reads newest-first like any log.
-  if(_clFilter!=='done') rows=rows.slice().reverse();
+  // reads newest-first like any log. Sorting by created_at rather than
+  // reversing the fetch order means an edited or relogged row can't jump
+  // the queue.
+  if(_clFilter!=='done'){
+    rows=rows.slice().sort((a,b)=> new Date(a.created_at) - new Date(b.created_at));
+  }
 
   if(!rows.length){
     body.innerHTML='';
@@ -9834,14 +9899,23 @@ function clRenderQueue(){
         '</button>'
       : '';
 
+    // Waiting rows carry an age tier so a three-day-old callback doesn't
+    // look like an hour-old one.
+    const tier = done ? '' : clAgeTier(r.created_at);
+    const oldish = !done && (tier==='aging' || tier==='stale' || tier==='cold');
+
     return sep+
-    '<article class="cl-card'+(done?' done':'')+'" id="clc-'+r.id+'">'+
+    '<article class="cl-card'+(done?' done':' cl-age-'+tier)+'" id="clc-'+r.id+'">'+
       '<div class="cl-card-main">'+
         ava+
         '<div class="cl-card-body">'+
           '<div class="cl-line1">'+
             '<span class="cl-nm">'+clEsc(r.caller_name)+'</span>'+
             (attempts>1 && !done?'<span class="cl-att" title="'+attempts+' calls to this number">×'+attempts+'</span>':'')+
+            (oldish?'<span class="cl-wait-age cl-wait-'+tier+'" title="Waiting since '+
+              clEsc(new Date(r.created_at).toLocaleString('en-AU',
+                {weekday:'short',day:'numeric',month:'short',hour:'numeric',minute:'2-digit'}))+
+              '">waiting '+clWaitLabel(r.created_at)+'</span>':'')+
             status+
             (helped?'<span class="cl-help" title="Cleared by '+clEsc(r.resolved_by)+' from '+clEsc(helperTeam)+'">'+clEsc(helperTeam)+' helped</span>':'')+
             (handoff?'<span class="cl-team-x">'+clEsc(r.team)+' \u2192 '+clEsc(r.for_team)+'</span>':'')+
@@ -19439,7 +19513,12 @@ async function openFortReport(){
   let idx=0;
   // Animated SVG marks (drawn via stroke-dashoffset) replacing emoji.
   const svgCal='<svg class="fr-svg" viewBox="0 0 48 48" fill="none" stroke="#6b6f86" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><rect class="d1" x="8" y="10" width="32" height="30" rx="4"/><path class="d2" d="M8 18h32"/><path class="d3" d="M16 6v8M32 6v8"/><path class="d4" d="M16 27l4 4 8-8"/></svg>';
-  const svgStar='<svg class="fr-svg" viewBox="0 0 48 48" fill="none" stroke="#3a9e78" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path class="d1" d="M24 7l5.3 10.7 11.8 1.7-8.5 8.3 2 11.8L24 40.9l-10.6 5.6 2-11.8-8.5-8.3 11.8-1.7z"/><path class="d4" d="M18 24l4 4 8-8"/></svg>';
+  // Star: 10 points on alternating radii (outer 17, inner 8) about centre
+  // (24,24), so it mirrors exactly about x=24. The previous path mixed an
+  // absolute "L24 40.9" into a chain of relative linetos, which pulled the
+  // second half of the outline ~7px low and ran the bottom-left tip to
+  // y=46.5 — almost out of the 48 viewBox.
+  const svgStar='<svg class="fr-svg" viewBox="0 0 48 48" fill="none" stroke="#3a9e78" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path class="d1" d="M24 7L28.7 17.5L40.2 18.7L31.6 26.5L34 37.8L24 32L14 37.8L16.4 26.5L7.8 18.7L19.3 17.5z"/><path class="d4" d="M18 24l4 4 8-8"/></svg>';
 
   function slideInner(s){
     if(s.kind==='leaderboard'){
