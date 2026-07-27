@@ -10101,6 +10101,19 @@ function initCallLog(){
       const w=document.getElementById('clCbWrap');
       if(w) w.classList.toggle('on', cb.checked);
     });
+    // If a live update arrived while the form had focus, apply it once the
+    // person moves away rather than leaving them on a stale queue.
+    const pane=document.getElementById('clPaneForm');
+    if(pane && !pane.dataset.blurBound){
+      pane.addEventListener('focusout', function(){
+        setTimeout(function(){
+          if(_clQueueDirty && !pane.contains(document.activeElement)){
+            _clQueueDirty=false; clLoadQueue();
+          }
+        }, 300);
+      });
+      pane.dataset.blurBound='1';
+    }
     const sq=document.getElementById('clSearch');
     if(sq && !sq.dataset.bound){
       sq.addEventListener('input', ()=>clRenderQueue());
@@ -10109,6 +10122,7 @@ function initCallLog(){
     n.dataset.clBound='1';
   }
   clBindKeys();
+  _clQueueDirty = false;   // a full load supersedes anything deferred
   clLoadQueue();
   if(n) setTimeout(()=>n.focus(),80);
 }
@@ -10172,6 +10186,39 @@ let _accessCache={formcraft:[],slip:[],dialtrac:[],shiftops:[]};
 let _accessCurrentApp='formcraft';
 let _accessWorking={formcraft:new Set(),slip:new Set(),dialtrac:new Set(),shiftops:new Set()};
 let _accessAllStaff=[];
+let _clQueueDirty = false;
+let _clRefreshTimer = null;
+
+/**
+ * Debounced live refresh, driven by the realtime subscription.
+ *
+ * Deliberately conservative about WHEN it redraws:
+ *  - Only while the Call Log tab is actually open. A background refresh is
+ *    wasted work and would fight whatever page the person is really using.
+ *  - Not while the form has focus. Someone is mid-call typing a caller's
+ *    details; re-rendering the queue under them is startling and can drop
+ *    an expanded note they were reading.
+ *  - Debounced ~2.5s. Reception logs in bursts — 34 calls in one morning,
+ *    clustered — and a naive subscription refetches all 89 rows per insert.
+ *
+ * The dirty flag survives a skipped tick, so anything deferred is picked up
+ * as soon as the form is released or the tab is reopened.
+ */
+function clScheduleQueueRefresh(){
+  if(_clRefreshTimer) clearTimeout(_clRefreshTimer);
+  _clRefreshTimer = setTimeout(function(){
+    _clRefreshTimer = null;
+    const page = document.getElementById('page-calllog');
+    if(!page || !page.classList.contains('active')) return;   // stays dirty
+
+    const pane = document.getElementById('clPaneForm');
+    if(pane && pane.contains(document.activeElement)) return;  // mid-entry
+
+    _clQueueDirty = false;
+    clLoadQueue();
+  }, 2500);
+}
+
 let _realtimeClient = null;
 const KUDOS_BADGES = {
   star:'⭐', rocket:'🚀', heart:'💜', brain:'🧠', handshake:'🤝', fire:'🔥'
@@ -24099,6 +24146,17 @@ if(typeof refreshTrainingBadge === 'function') setTimeout(refreshTrainingBadge, 
 function setupRealtimeChannels(){
   _realtimeChannels.forEach(function(ch){ try{ _realtimeClient.removeChannel(ch); }catch(e){} });
   _realtimeChannels = [];
+
+  // Call Log — keep the queue live for whoever has the tab open.
+  // Two people now work this queue simultaneously, so a stale view means
+  // ringing someone a colleague already handled.
+  const callCh = _realtimeClient.channel('calllog-live')
+    .on('postgres_changes', {event:'*', schema:'public', table:'call_log'}, function(){
+      _clQueueDirty = true;
+      clScheduleQueueRefresh();
+    })
+    .subscribe();
+  _realtimeChannels.push(callCh);
 
   // Discussions — polls + new post notifications
   const discCh = _realtimeClient.channel('discussions-live')
