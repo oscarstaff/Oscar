@@ -19181,6 +19181,22 @@ function _resolveAvailForDay(snaps, date){
 // `ctx` = { classDays:Set<'YYYY-MM-DD'>, classStart:'HH:MM'|null,
 //           overrides:{ymd:{name:start|null}}, name:staffName } — on a class day,
 // a per-date override (if present) wins over the roster start.
+/**
+ * Snap a clock-in to the same 15-minute block the timesheet records.
+ * Mirrors flexTimeStr() in the Apps Script: ≤7 → :00, ≤22 → :15, ≤37 → :30,
+ * ≤52 → :45, else the next hour. Punctuality has to use this or it will
+ * disagree with payroll about the very same arrival.
+ */
+function _flexRound(dt){
+  const h=dt.getHours(); let m=dt.getMinutes(), hh=h;
+  if(m<=7) m=0;
+  else if(m<=22) m=15;
+  else if(m<=37) m=30;
+  else if(m<=52) m=45;
+  else { m=0; hh=h+1; }
+  return new Date(dt.getFullYear(), dt.getMonth(), dt.getDate(), hh, m, 0, 0);
+}
+
 function _computePunctuality(availSnaps, logs, leaveRows, start, end, ctx){
   ctx = ctx || {};
   const classDays = ctx.classDays || null;
@@ -19191,6 +19207,10 @@ function _computePunctuality(availSnaps, logs, leaveRows, start, end, ctx){
   const cur=new Date(start);
   while(cur<end){
     if(_onLeave(leaveRows, cur)){ leaveDays++; cur.setDate(cur.getDate()+1); continue; }
+    // Saturday and Sunday still count as worked days, but are never marked
+    // late — they run at a relaxed pace and holding them to a weekday start
+    // punished people for coming in at all.
+    const isWeekend = (cur.getDay()===0 || cur.getDay()===6);
     const ymd = cur.getFullYear()+'-'+String(cur.getMonth()+1).padStart(2,'0')+'-'+String(cur.getDate()).padStart(2,'0');
     const isClassDay = classDays && classDays.has(ymd);
 
@@ -19224,12 +19244,16 @@ function _computePunctuality(availSnaps, logs, leaveRows, start, end, ctx){
         measuredDays++;
         const pp=expStart.split(':');
         const expected=new Date(cur.getFullYear(),cur.getMonth(),cur.getDate(),+pp[0],+pp[1],0);
-        const lateMin=Math.round((firstIn-expected)/60000); // negative if early
-        if(lateMin>_PUNCT_GRACE_MIN){
+        // Compare the SAME rounded time the timesheet records, not the raw
+        // clock. flexTimeStr snaps to 15-minute blocks, so an 08:07 arrival is
+        // written to payroll as 08:00 — without this, someone reads "08:00" on
+        // their timesheet and "late" on their report, from one clock-in.
+        const lateMin=Math.round((_flexRound(firstIn)-expected)/60000); // negative if early
+        if(lateMin>_PUNCT_GRACE_MIN && !isWeekend){
           lateDays++; totalLateMin+=lateMin;
           if(lateMin>worstMin){ worstMin=lateMin; worstDay=cur.toLocaleDateString('en-AU',{weekday:'long'}); }
         }else{
-          onTimeDays++; // on time OR early
+          onTimeDays++; // on time, early, or a weekend
         }
       }
     }else{
@@ -19293,10 +19317,16 @@ function _lastFortnight(){
 function _fortReportShowable(fw){
   if(!fw) return false;
   const now=new Date();
-  // fw.end = Monday that starts the new fortnight. Show from Tuesday (+1 day).
-  const tuesday=new Date(fw.end.getTime()+1*_MS_DAY);
-  tuesday.setHours(0,0,0,0);
-  if(now<tuesday) return false;           // still Monday (or earlier) — hold off
+  // fw.end = the Monday that starts the new fortnight, i.e. the first day the
+  // previous fortnight is complete. Show from that Monday.
+  //
+  // This used to hold until Tuesday, to let overnight jobs settle. That buffer
+  // isn't needed here: punctuality reads only clock-INS, and the reconcile /
+  // auto-clock-out crons write clock-OUTS. A first clock-in is recorded when it
+  // happens and doesn't change afterwards unless an admin amends it.
+  const openFrom=new Date(fw.end.getTime());
+  openFrom.setHours(0,0,0,0);
+  if(now<openFrom) return false;          // fortnight not finished yet
   const friday=new Date(fw.end.getTime()+4*_MS_DAY);
   friday.setHours(23,59,59,999);
   if(now>friday) return false;            // past Friday — hide until next cycle
