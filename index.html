@@ -5779,6 +5779,20 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
         <div class="page-sub" id="homeWeekSub" style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.08em;margin-top:2px;"></div>
       </div>
 
+      <!-- Housekeeping duty — only rendered when the person is rostered -->
+      <div id="hkCard" class="card" style="display:none;margin-bottom:12px;padding:16px 18px;">
+        <div style="display:flex;align-items:flex-start;gap:13px;">
+          <div id="hkIcon" style="width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <svg width="19" height="19" viewBox="0 0 20 20" fill="currentColor"><path d="M10 2a1 1 0 011 1v1.323l3.954 1.582 1.599-.8a1 1 0 01.894 1.79l-1.233.616 1.738 5.42a1 1 0 01-.285 1.05A3.989 3.989 0 0115 16a3.989 3.989 0 01-2.667-1.019 1 1 0 01-.285-1.05l1.715-5.349L11 7.323V16h2a1 1 0 110 2H7a1 1 0 110-2h2V7.323L6.237 8.582l1.715 5.349a1 1 0 01-.285 1.05A3.989 3.989 0 015 16a3.989 3.989 0 01-2.667-1.019 1 1 0 01-.285-1.05l1.738-5.42-1.233-.617a1 1 0 01.894-1.788l1.599.799L9 4.323V3a1 1 0 011-1z"/></svg>
+          </div>
+          <div style="flex:1;min-width:0;">
+            <div id="hkTitle" style="font-size:14.5px;font-weight:700;letter-spacing:-.01em;margin-bottom:2px;"></div>
+            <div id="hkSub" style="font-size:12.5px;color:#64748b;line-height:1.45;"></div>
+          </div>
+          <button id="hkDoneBtn" onclick="hkMarkDone()" style="display:none;flex-shrink:0;border:none;border-radius:9px;padding:9px 15px;background:var(--accent);color:#fff;font-family:inherit;font-size:12.5px;font-weight:700;cursor:pointer;">Mark done</button>
+        </div>
+      </div>
+
       <!-- Clock In/Out card -->
       <div id="clockCard" class="card" style="margin-bottom:12px;padding:18px;">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;">
@@ -8175,6 +8189,8 @@ async function enterHub(){
  // refresh from Supabase in case staff changed
   // Reveal the Call Log tab straight away — it shouldn't wait for a Nodes visit.
   try{ gateCallLog(); }catch(e){}
+  // Housekeeping duty card — non-blocking, the home page renders without it.
+  try{ setTimeout(loadHousekeepingDuty, 600); }catch(e){}
   document.getElementById("authLayer").style.display="none";
   document.getElementById("hubLayer").style.display="flex";
   document.getElementById("hubLayer").classList.add("ready");
@@ -10049,6 +10065,110 @@ function clBindKeys(){
       ev.target.value=''; clRenderQueue(); ev.target.blur();
     }
   });
+}
+
+/* ══════════════ HOUSEKEEPING DUTY ══════════════
+   ShiftOps builds the roster; Nexus is where staff actually live, so this
+   surfaces their own duty and lets them tick it off. Read-only apart from
+   the done flag — reassignment stays an admin action in ShiftOps.
+   ────────────────────────────────────────────────────────────────── */
+
+let _hkDuty = null;   // the row for today/next class day, or null
+
+/** Sydney date as yyyy-mm-dd, built from local parts (never toISOString). */
+function _hkToday(){
+  const d=new Date();
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+
+async function loadHousekeepingDuty(){
+  const card=document.getElementById('hkCard');
+  if(!card) return;
+  const who = window.me || me;
+  if(!who){ card.style.display='none'; return; }
+
+  let rows=[];
+  try{
+    // Today and the next few class days. Past duties aren't shown — a card
+    // for something that has already been and gone is just noise.
+    rows = await sbGet('housekeeping_roster',
+      '?select=*&staff_name=eq.'+encodeURIComponent(who)+
+      '&duty_date=gte.'+_hkToday()+'&order=duty_date.asc&limit=3');
+  }catch(e){ console.warn('hk duty', e); card.style.display='none'; return; }
+
+  if(!rows.length){ _hkDuty=null; card.style.display='none'; return; }
+
+  const duty=rows.find(r=>!r.done) || rows[0];
+  _hkDuty=duty;
+
+  const isToday = duty.duty_date === _hkToday();
+  const when = isToday ? 'today'
+             : new Date(duty.duty_date+'T00:00:00')
+                 .toLocaleDateString('en-AU',{weekday:'long', day:'numeric', month:'short'});
+
+  const icon=document.getElementById('hkIcon');
+  const title=document.getElementById('hkTitle');
+  const sub=document.getElementById('hkSub');
+  const btn=document.getElementById('hkDoneBtn');
+
+  if(duty.done){
+    icon.style.background='rgba(16,185,129,.12)';
+    icon.style.color='#047857';
+    title.textContent='Housekeeping done';
+    title.style.color='#047857';
+    sub.textContent='Thanks — your turn is recorded.';
+    btn.style.display='none';
+  }else{
+    icon.style.background = isToday ? 'rgba(217,119,6,.13)' : 'var(--accent-dim)';
+    icon.style.color      = isToday ? '#b45309' : 'var(--accent-text)';
+    title.textContent = isToday ? 'Housekeeping — your turn today'
+                                : 'Housekeeping — '+when;
+    title.style.color='';
+    sub.textContent = 'Cleanup at the end of the class session. '+
+      (isToday ? 'Tick it off once done — that\u2019s what records your turn.'
+               : 'You\u2019ll be reminded on the day.');
+    btn.style.display = isToday ? '' : 'none';
+  }
+  card.style.display='';
+
+  // Notify once per duty, not on every page load.
+  if(!duty.done && isToday && typeof NotifManager !== 'undefined'){
+    const key='hk_notified_'+duty.id;
+    if(!localStorage.getItem(key)){
+      localStorage.setItem(key,'1');
+      NotifManager.push({
+        id:'hk-'+duty.id,
+        type:'housekeeping',
+        title:'Housekeeping duty today',
+        body:'You\u2019re on the class housekeeping roster. Tick it off once done.',
+        ts:Date.now(),
+        link:'home'
+      });
+    }
+  }
+}
+
+/** Tick the duty off. Only a completed duty counts as a turn taken. */
+async function hkMarkDone(){
+  if(!_hkDuty) return;
+  const btn=document.getElementById('hkDoneBtn');
+  if(btn){ btn.disabled=true; btn.textContent='Saving…'; }
+  try{
+    const res=await fetch(SB+'/rest/v1/housekeeping_roster?id=eq.'+encodeURIComponent(_hkDuty.id),{
+      method:'PATCH',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+_sbBearer(),
+               'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({done:true})
+    });
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    _hkDuty.done=true;
+    showToast('Housekeeping marked done','success');
+    loadHousekeepingDuty();
+  }catch(e){
+    console.warn('hkMarkDone',e);
+    showToast('Could not save — try again','error');
+    if(btn){ btn.disabled=false; btn.textContent='Mark done'; }
+  }
 }
 
 function initCallLog(){
@@ -24157,6 +24277,19 @@ function setupRealtimeChannels(){
     })
     .subscribe();
   _realtimeChannels.push(callCh);
+
+  // Housekeeping — an admin reassigning in ShiftOps must reach the person,
+  // otherwise they find out by being told in person, which is the thing this
+  // is meant to replace.
+  const hkCh = _realtimeClient.channel('housekeeping-live')
+    .on('postgres_changes', {event:'*', schema:'public', table:'housekeeping_roster'}, function(payload){
+      const row = payload.new || payload.old;
+      if(!row || !me) return;
+      if(row.staff_name !== me) return;          // only my own duty
+      if(typeof loadHousekeepingDuty === 'function') loadHousekeepingDuty();
+    })
+    .subscribe();
+  _realtimeChannels.push(hkCh);
 
   // Discussions — polls + new post notifications
   const discCh = _realtimeClient.channel('discussions-live')
