@@ -3060,6 +3060,20 @@ function _hkAssignTasks(picks, hist, shuffle){
   const people = picks.filter(function(p){ return p.team !== 'Head'; });
   picks.filter(function(p){ return p.team === 'Head'; })
        .forEach(function(h){ h.task = 'speak'; });
+  if(!people.length) return picks;
+
+  // Autofill often builds only the teams that are MISSING — e.g. one slot was
+  // cleared and needs refilling. Assigning from scratch for that one person
+  // hands them the most-essential slot (water) regardless of what the rest of
+  // the day already holds, which is how a day ends up with three waters and no
+  // chairs. So: find what's already taken today, and only hand out the rest.
+  const dayKey = people[0].duty_date;
+  const taken = [];
+  (hist || []).forEach(function(h){
+    if(h.duty_date !== dayKey || !h.task || h.task === 'speak') return;
+    if(picks.some(function(p){ return p.staff_name === h.staff_name; })) return; // being re-picked
+    taken.push(h.task);
+  });
 
   const mins = {}, last = {}, jitter = {};
   people.forEach(function(p){
@@ -3073,8 +3087,16 @@ function _hkAssignTasks(picks, hist, shuffle){
     if(!cur || h.duty_date > cur) last[h.staff_name][h.task] = h.duty_date;
   });
 
+  // Full slot list for the day, minus what other people already hold.
+  const full = _hkTaskSlots(people.length + taken.length);
+  const remaining = full.slice();
+  taken.forEach(function(t){
+    const i = remaining.indexOf(t);
+    if(i > -1) remaining.splice(i, 1);
+  });
+
   const pool = people.slice();
-  _hkTaskSlots(people.length).forEach(function(task){
+  remaining.forEach(function(task){
     if(!pool.length) return;                 // fewer people than slots
     pool.sort(function(a,b){
       if(mins[a.staff_name] !== mins[b.staff_name])
