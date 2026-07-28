@@ -8530,9 +8530,9 @@ function buildAvailForm(){
       '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #f1f5f9;">'+
         '<div style="font-size:13px;font-weight:600;color:#1e293b;">'+day+'</div>'+
         '<div style="display:flex;gap:6px;">'+
-          '<button class="ao" id="ao-yes-'+i+'" onclick="setDay('+i+',\'all\')"> Available</button>'+
-          '<button class="ao" id="ao-custom-'+i+'" onclick="setDay('+i+',\'custom\')">Custom</button>'+
-          '<button class="ao" id="ao-no-'+i+'" onclick="setDay('+i+',\'no\')"> Unavail</button>'+
+          '<button class="ao" id="ao-yes-'+i+'" onclick="setDay('+i+',\'all\')">Available (9–19)</button>'+
+          '<button class="ao" id="ao-custom-'+i+'" onclick="setDay('+i+',\'custom\')">Custom hours</button>'+
+          '<button class="ao" id="ao-no-'+i+'" onclick="setDay('+i+',\'no\')">Unavailable</button>'+
         '</div>'+
       '</div>'+
       '<div id="ctr-'+i+'" style="display:none;flex-direction:column;gap:8px;padding:8px 0;">'+
@@ -8785,6 +8785,150 @@ function showAvailExpiredNotice(row){
   }
 }
 
+// ─────────────────────────────────────────────────────────────
+// CLOCK-IN REALITY CHECK for availability
+// Compares stated availability vs the staff member's own recent
+// clock-in pattern. First mismatch = gentle nudge. Second time they
+// set availability and STILL mismatch = auto-suggest corrected start
+// with a confirm button. Never resets or blocks. Threshold: their
+// average first clock-in is 30+ min earlier than the start they set,
+// on 3+ recorded days in the last 30.
+// ─────────────────────────────────────────────────────────────
+const AVAIL_EARLY_THRESH_MIN = 30;   // how much earlier counts
+const AVAIL_EARLY_MIN_DAYS   = 3;    // how many days needed to flag
+
+function _availDayIdx(d){ return (d.getDay()+6)%7; }           // Mon=0..Sun=6
+function _availToMin(hhmm){ if(!hhmm) return null; const p=hhmm.split(':'); return (+p[0])*60+(+p[1]); }
+function _availFmt(min){ const h=Math.floor(min/60),m=min%60; return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0'); }
+function _availFloor15(min){ return Math.floor(min/15)*15; }
+
+// Pull last-30-day 'in' punches for the current user and compute the
+// average earliest clock-in per weekday index.
+async function _availClockPattern(){
+  try{
+    const since = new Date(); since.setDate(since.getDate()-30);
+    const rows = await sbGet('clock_log',
+      '?staff_name=eq.'+encodeURIComponent(me)+
+      '&action=eq.in&ts=gte.'+since.toISOString()+
+      '&order=ts.asc&limit=500');
+    if(!rows || !rows.length) return null;
+    // earliest 'in' per calendar date
+    const perDate={};
+    rows.forEach(r=>{
+      const d=new Date(r.ts);
+      const key=d.getFullYear()+'-'+d.getMonth()+'-'+d.getDate();
+      const mins=d.getHours()*60+d.getMinutes();
+      if(perDate[key]===undefined || mins<perDate[key].mins){ perDate[key]={mins,idx:_availDayIdx(d)}; }
+    });
+    const byDay={};
+    Object.values(perDate).forEach(v=>{ (byDay[v.idx]=byDay[v.idx]||[]).push(v.mins); });
+    const avg={};
+    Object.keys(byDay).forEach(idx=>{
+      const arr=byDay[idx];
+      avg[idx]={ avgMin:Math.round(arr.reduce((a,b)=>a+b,0)/arr.length), n:arr.length };
+    });
+    return avg;
+  }catch(e){ console.warn('availClockPattern failed',e); return null; }
+}
+
+// Given the availability object being saved, decide if it mismatches.
+// Returns null (no issue) or {days:[...], totalDays, suggest:'HH:MM', worstIdx}.
+function _availMismatch(avail, pattern){
+  if(!pattern) return null;
+  let totalDays=0; const days=[]; let earliestAvg=null;
+  for(let i=0;i<7;i++){
+    const a=avail[i]; if(!a) continue;
+    // Only 'all' (9–19) and 'custom' have a start to compare against.
+    let startMin;
+    if(a.type==='all') startMin=_availToMin('09:00');
+    else if(a.type==='custom' && a.start) startMin=_availToMin(a.start);
+    else continue;
+    const p=pattern[i]; if(!p) continue;
+    if((startMin - p.avgMin) >= AVAIL_EARLY_THRESH_MIN){
+      totalDays += p.n;
+      days.push(i);
+      if(earliestAvg===null || p.avgMin<earliestAvg) earliestAvg=p.avgMin;
+    }
+  }
+  if(totalDays < AVAIL_EARLY_MIN_DAYS) return null;
+  return {
+    days, totalDays,
+    suggest: _availFmt(_availFloor15(earliestAvg)),
+    worstIdx: days[0]
+  };
+}
+
+// Read/write the "have we nudged this person before" flag.
+// Stored on staff_credentials.avail_nudged_at (nullable timestamptz).
+async function _availNudgedBefore(){
+  try{
+    const rows = await sbGet('staff_credentials',
+      '?staff_name=eq.'+encodeURIComponent(me)+'&select=avail_nudged_at');
+    return !!(rows && rows.length && rows[0].avail_nudged_at);
+  }catch(e){ return false; }
+}
+async function _availMarkNudged(){
+  try{
+    await fetch(SB+'/rest/v1/staff_credentials?staff_name=eq.'+encodeURIComponent(me),{
+      method:'PATCH',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+_sbBearer(),'Content-Type':'application/json','Prefer':'return=minimal'},
+      body: JSON.stringify({avail_nudged_at:new Date().toISOString()})
+    });
+  }catch(e){ /* non-critical */ }
+}
+
+// Render the nudge / auto-suggest banner into the availability form.
+// escalate=false → gentle info nudge. escalate=true → offer corrected start + confirm.
+function _availShowNudge(mismatch, escalate){
+  const host=document.getElementById('availErr');
+  if(!host) return;
+  let el=document.getElementById('availClockNudge');
+  if(!el){
+    el=document.createElement('div');
+    el.id='availClockNudge';
+    el.style.cssText='margin:10px 0;padding:12px 14px;border-radius:10px;font-size:13px;line-height:1.5;background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;';
+    host.parentNode.insertBefore(el, host);
+  }
+  const dayNames=mismatch.days.map(i=>DAYS[i]).join(', ');
+  if(!escalate){
+    el.innerHTML =
+      '<strong>Heads up.</strong> Your recent clock-ins on '+dayNames+
+      ' average earlier than the start you\'ve set. Your saved availability is fine for now — '+
+      'just something to keep in mind next time.';
+  }else{
+    el.innerHTML =
+      '<strong>Your clock-ins don\'t match your hours.</strong> On '+dayNames+
+      ' you usually clock in around <strong>'+mismatch.suggest+'</strong>, earlier than the start you set. '+
+      'Want to set your start to '+mismatch.suggest+'?'+
+      '<div style="margin-top:10px;display:flex;gap:8px;">'+
+        '<button class="btn btn-green" style="padding:6px 14px;font-size:12px;" onclick="_availApplySuggested(\''+mismatch.suggest+'\','+JSON.stringify(mismatch.days)+')">Yes, use '+mismatch.suggest+'</button>'+
+        '<button class="btn btn-outline" style="padding:6px 14px;font-size:12px;" onclick="_availDismissNudge()">Keep my hours</button>'+
+      '</div>';
+  }
+  el.style.display='block';
+}
+function _availDismissNudge(){ const el=document.getElementById('availClockNudge'); if(el)el.style.display='none'; }
+
+// Apply the suggested start to the flagged days: flip them to custom with the
+// suggested start (respecting the early-start floor) and re-save.
+function _availApplySuggested(suggest, dayIdxs){
+  try{
+    (dayIdxs||[]).forEach(i=>{
+      // Only override days that were 'all' or already custom.
+      const cur=dayState[i];
+      if(!cur || cur.type==='no' || cur.type==='unset') return;
+      setDay(i,'custom');
+      const s=document.getElementById('cs-'+i), e=document.getElementById('ce-'+i);
+      if(s){ s.value=suggest; enforceStartFloor(i); }
+      if(e && (!e.value)) e.value='19:00';
+      syncStartPreset(i);
+    });
+  }catch(_e){}
+  _availDismissNudge();
+  submitAvail(); // re-run the save with corrected hours
+}
+
+
 async function submitAvail(){
   const avail={},err=document.getElementById("availErr");err.classList.remove("show");
   await loadEarlyStartApproval();
@@ -8825,6 +8969,18 @@ async function submitAvail(){
       try{
         await sbPost("staff_availability_history",{staff_name:me,availability:avail,is_ongoing:isOngoing,valid_from:validFrom||null,valid_until:validUntil||null,saved_at:payload.updated_at});
       }catch(_e){ /* history is non-critical */ }
+      // Clock-in reality check — nudge if stated hours don't match recent punches.
+      try{
+        const _pattern = await _availClockPattern();
+        const _mis = _availMismatch(avail, _pattern);
+        if(_mis){
+          const _before = await _availNudgedBefore();
+          _availShowNudge(_mis, _before);   // escalate to auto-suggest if nudged before
+          if(!_before) await _availMarkNudged();
+        }else{
+          const _n=document.getElementById('availClockNudge'); if(_n)_n.style.display='none';
+        }
+      }catch(_e){ /* nudge is best-effort, never blocks the save */ }
       // Clear any expired-availability notice now that fresh availability is saved.
       const _strip=document.getElementById("availExpiredStrip");
       if(_strip)_strip.remove();
