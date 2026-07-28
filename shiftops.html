@@ -3016,10 +3016,19 @@ const HK_MIN_END_MIN = 17*60 + 50;   // 17:50
 //               "preferable", so that is what drops first.
 //   mins      — assignment order, heaviest first, so the biggest job goes to
 //               whoever is most owed.
+// The bin (1 min) rides with one of the WATER slots rather than equipment.
+// Water is the lightest job, so it absorbs the extra minute with the least
+// distortion: 10 / 6 / 5.5 / 4.5 instead of 10 / 7 / 4.5 / 4.5.
+//
+// Order here is survival priority — the first `essential` slots of each task
+// are what remain when short-staffed, in this order. The second chairs slot
+// is the only optional one, so it drops first.
 const HK_TASKS = [
-  { key:'water',     label:'Water & lollies',                       slots:2, mins:4.5, essential:2 },
-  { key:'equipment', label:"Bed lifter, trainer's table + the bin", slots:1, mins:7,   essential:1 },
-  { key:'chairs',    label:'Chairs, boards, papers & pens',         slots:2, mins:10,  essential:1 }
+  { key:'chairs',    label:'Chairs, boards, papers & pens',   slots:2, mins:10,  essential:1 },
+  { key:'equipment', label:"Bed lifter & trainer's table",    slots:1, mins:6,   essential:1 },
+  { key:'waterbin',  label:'Water & lollies + bring the bin back from Evershine',
+                                                              slots:1, mins:5.5, essential:1 },
+  { key:'water',     label:'Water & lollies',                 slots:1, mins:4.5, essential:1 }
 ];
 const HK_MINS = {}; HK_TASKS.forEach(function(t){ HK_MINS[t.key] = t.mins; });
 
@@ -3027,8 +3036,11 @@ function _hkTaskLabel(key){
   const t=HK_TASKS.find(function(x){ return x.key===key; });
   return t ? t.label : (key||'');
 }
+// Short chip labels. 'Equipment' alone hid the fact that the bin rides with
+// it — at a glance nobody could tell who was bringing it back.
 function _hkTaskShort(key){
-  return {chairs:'Chairs', equipment:'Equipment', water:'Water', speak:'Speaks'}[key] || key || '';
+  return {chairs:'Chairs', equipment:'Equipment', waterbin:'Water + Bin',
+          water:'Water', speak:'Speaks'}[key] || key || '';
 }
 
 // Slots for `headcount` people: keep the essential ones, spend any spare
