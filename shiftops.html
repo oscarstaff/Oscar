@@ -2998,6 +2998,71 @@ async function _hkOnLeave(dateStr){
 // assigned must still be on site until at least this time.
 const HK_MIN_END_MIN = 17*60 + 50;   // 17:50
 
+// ── Task allocation, balanced by TIME rather than turns ──────────────
+// Chairs (10 min) is over twice the work of water (4-5 min), so equal turns
+// isn't equal effort: someone can draw chairs twice in a fortnight while a
+// colleague draws water twice — an 11-minute gap. Sorting on cumulative
+// minutes holds the spread to ~2 min at any point instead.
+//
+// The bin (1 min) rides with equipment rather than consuming a person, and
+// that is what frees the fifth slot so chairs gets the two it wants.
+// Heaviest task first, so it goes to whoever is most owed.
+const HK_TASKS = [
+  { key:'chairs',    label:'Chairs, boards, papers & pens',         slots:2, mins:10  },
+  { key:'equipment', label:"Bed lifter, trainer's table + the bin", slots:1, mins:7   },
+  { key:'water',     label:'Water & lollies',                       slots:2, mins:4.5 }
+];
+const HK_MINS = {}; HK_TASKS.forEach(function(t){ HK_MINS[t.key] = t.mins; });
+
+function _hkTaskLabel(key){
+  const t=HK_TASKS.find(function(x){ return x.key===key; });
+  return t ? t.label : (key||'');
+}
+function _hkTaskShort(key){
+  return {chairs:'Chairs', equipment:'Equipment', water:'Water', speak:'Speaks'}[key] || key || '';
+}
+
+function _hkTaskSlots(){
+  const out = [];
+  HK_TASKS.forEach(function(t){ for(var i=0;i<t.slots;i++) out.push(t.key); });
+  return out;
+}
+
+// Give each rostered person a specific job. Only COMPLETED duties count
+// toward someone's minutes, so being rostered and not doing it leaves you
+// owed the time — and up first for the heavy job next class day.
+function _hkAssignTasks(picks, hist){
+  const people = picks.filter(function(p){ return p.team !== 'Head'; });
+  picks.filter(function(p){ return p.team === 'Head'; })
+       .forEach(function(h){ h.task = 'speak'; });
+
+  const mins = {}, last = {};
+  people.forEach(function(p){ mins[p.staff_name] = 0; last[p.staff_name] = {}; });
+  (hist || []).forEach(function(h){
+    if(!h.done || !h.task || mins[h.staff_name] === undefined) return;
+    mins[h.staff_name] += (HK_MINS[h.task] || 0);
+    const cur = last[h.staff_name][h.task];
+    if(!cur || h.duty_date > cur) last[h.staff_name][h.task] = h.duty_date;
+  });
+
+  const pool = people.slice();
+  _hkTaskSlots().forEach(function(task){
+    if(!pool.length) return;                 // fewer people than slots
+    pool.sort(function(a,b){
+      if(mins[a.staff_name] !== mins[b.staff_name])
+        return mins[a.staff_name] - mins[b.staff_name];      // least work so far
+      const la = (last[a.staff_name]||{})[task] || '';
+      const lb = (last[b.staff_name]||{})[task] || '';
+      if(la !== lb) return la.localeCompare(lb);             // longest since this job
+      return a.staff_name.localeCompare(b.staff_name);
+    });
+    const pick = pool.shift();
+    pick.task = task;
+    mins[pick.staff_name] += (HK_MINS[task] || 0);           // count it straight away
+  });
+  return picks;
+}
+
 function _hkToMin(t){
   const m=/^(\d{1,2}):(\d{2})/.exec(String(t||''));
   return m ? (parseInt(m[1],10)*60 + parseInt(m[2],10)) : null;
@@ -3147,6 +3212,8 @@ function _hkBuildDay(dateStr, teams, excl, onLeave, avail, habits, hist, doneTea
     const pick=_hkPick(eligible, teamHist, habits, shuffle);
     if(pick) picks.push({duty_date:dateStr, staff_name:pick, team:tm});
   });
+  // Who does what, once we know who is on.
+  _hkAssignTasks(picks, hist);
   return picks;
 }
 
@@ -3169,7 +3236,7 @@ async function _hkAutoFill(shuffle){
   }
 
   let hist=[];
-  try{ hist=await _cdGet('housekeeping_roster?select=staff_name,duty_date,team,done&order=duty_date.desc&limit=600'); }catch(e){}
+  try{ hist=await _cdGet('housekeeping_roster?select=staff_name,duty_date,team,done,task&order=duty_date.desc&limit=600'); }catch(e){}
 
   const teams=await _hkLoadTeams();
   const excl=await _hkExcluded();
@@ -3184,7 +3251,7 @@ async function _hkAutoFill(shuffle){
     const picks=_hkBuildDay(d, teams, excl, onLeave, avail, habits, hist, done, shuffle);
     picks.forEach(function(p){
       toInsert.push(p);
-      hist.push({staff_name:p.staff_name, duty_date:d, team:p.team, done:true});  // provisionally count so one person isn't picked for every upcoming day
+      hist.push({staff_name:p.staff_name, duty_date:d, team:p.team, task:p.task, done:true});  // provisionally count (incl. task) so one person isn't picked for every upcoming day, nor handed the same job twice
     });
   }
   if(!toInsert.length) return;
@@ -3208,7 +3275,7 @@ async function _hkRender(){
   if(!box) return;
   await _hkLoadTeams();   // dropdowns need the team → staff map
   let rows=[];
-  try{ rows=await _cdGet('housekeeping_roster?select=id,duty_date,staff_name,team,done&order=duty_date.desc&limit=80'); }catch(e){}
+  try{ rows=await _cdGet('housekeeping_roster?select=id,duty_date,staff_name,team,done,task&order=duty_date.desc&limit=80'); }catch(e){}
   if(!rows.length){ box.innerHTML='<div style="font-size:12px;color:var(--text-dim);">No class days coming up — add one above and the roster fills itself.</div>'; return; }
   const byDate={};
   rows.forEach(function(r){ (byDate[r.duty_date]=byDate[r.duty_date]||[]).push(r); });
@@ -3241,6 +3308,11 @@ async function _hkRender(){
         tick+
         '<span style="flex-shrink:0;width:74px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:'+(isHead?'var(--accent,#3d9eff)':'var(--text-dim)')+';">'+label+'</span>'+
         picker+
+        // Which job they were given. Without it the roster only says who is
+        // on, and the whole point of the split is knowing who does what.
+        (r.task && r.task!=='speak'
+          ? '<span title="'+_cdEsc(_hkTaskLabel(r.task))+'" style="flex-shrink:0;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;padding:2px 7px;border-radius:5px;background:var(--accent-dim,rgba(61,158,255,.12));color:var(--accent,#3d9eff);">'+_cdEsc(_hkTaskShort(r.task))+'</span>'
+          : '')+
         (r.done?'<span style="flex-shrink:0;font-size:10px;font-weight:700;color:#22a06b;">done</span>':'')+
         '<button onclick="removeHousekeeping(\''+r.id+'\')" title="Remove" style="background:none;border:none;color:#e5484d;cursor:pointer;font-size:14px;line-height:1;padding:0 2px;font-family:inherit;">&times;</button>'+
       '</div>';
