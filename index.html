@@ -5790,7 +5790,6 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
             <div id="hkSub" style="font-size:12.5px;color:#64748b;line-height:1.45;"></div>
             <div id="hkTask" style="display:none;margin-top:9px;padding:8px 11px;border-radius:9px;font-size:12.5px;font-weight:600;line-height:1.4;"></div>
           </div>
-          <button id="hkDoneBtn" onclick="hkMarkDone()" style="display:none;flex-shrink:0;border:none;border-radius:9px;padding:9px 15px;background:var(--accent);color:#fff;font-family:inherit;font-size:12.5px;font-weight:700;cursor:pointer;">Mark done</button>
         </div>
       </div>
 
@@ -10119,7 +10118,6 @@ async function loadHousekeepingDuty(){
   const icon=document.getElementById('hkIcon');
   const title=document.getElementById('hkTitle');
   const sub=document.getElementById('hkSub');
-  const btn=document.getElementById('hkDoneBtn');
 
   const taskBox=document.getElementById('hkTask');
   const isHead = duty.team === 'Head';
@@ -10130,7 +10128,6 @@ async function loadHousekeepingDuty(){
     title.textContent='Housekeeping done';
     title.style.color='#047857';
     sub.textContent='Thanks — your turn is recorded.';
-    btn.style.display='none';
     if(taskBox) taskBox.style.display='none';   // nothing left to read
   }else{
     icon.style.background = isToday ? 'rgba(217,119,6,.13)' : 'var(--accent-dim)';
@@ -10141,10 +10138,9 @@ async function loadHousekeepingDuty(){
     // The head oversees; everyone else gets a specific job below.
     sub.textContent = isHead
       ? ('You\u2019re overseeing this session'+(isToday?'.':' — you\u2019ll be reminded on the day.'))
-      : ('Cleanup at the end of the session. '+
-         (isToday ? 'Tick it off once done — that\u2019s what records your turn.'
+      : ('Be around for the students during the session, then cleanup at the end. '+
+         (isToday ? 'Your turn is recorded once it\u2019s signed off.'
                   : 'You\u2019ll be reminded on the day.'));
-    btn.style.display = isToday ? '' : 'none';
 
     // Show the ONE job they've been given, not the whole list. A roster row
     // created before task assignment existed has no task, so the box stays
@@ -10177,29 +10173,6 @@ async function loadHousekeepingDuty(){
         link:'home'
       });
     }
-  }
-}
-
-/** Tick the duty off. Only a completed duty counts as a turn taken. */
-async function hkMarkDone(){
-  if(!_hkDuty) return;
-  const btn=document.getElementById('hkDoneBtn');
-  if(btn){ btn.disabled=true; btn.textContent='Saving…'; }
-  try{
-    const res=await fetch(SB+'/rest/v1/housekeeping_roster?id=eq.'+encodeURIComponent(_hkDuty.id),{
-      method:'PATCH',
-      headers:{'apikey':KEY,'Authorization':'Bearer '+_sbBearer(),
-               'Content-Type':'application/json','Prefer':'return=minimal'},
-      body:JSON.stringify({done:true})
-    });
-    if(!res.ok) throw new Error('HTTP '+res.status);
-    _hkDuty.done=true;
-    showToast('Housekeeping marked done','success');
-    loadHousekeepingDuty();
-  }catch(e){
-    console.warn('hkMarkDone',e);
-    showToast('Could not save — try again','error');
-    if(btn){ btn.disabled=false; btn.textContent='Mark done'; }
   }
 }
 
