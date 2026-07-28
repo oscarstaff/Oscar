@@ -2951,7 +2951,10 @@ async function setRosterStart(sel, nmEnc){
 // housekeeping head who oversees every session. Picks people who are available
 // that day AND who actually stay past cleanup time (judged from their real
 // clock-outs), rotating fairly so turns are shared.
-const HK_TEAMS = ['Enrolment','Processing','Placement','Evershine','Education'];
+// Placement is deliberately absent: the housekeeping head (HK_HEAD) is a
+// Placement member, so the team already has someone on every session.
+// Adding a second would give Placement two people while others get one.
+const HK_TEAMS = ['Enrolment','Processing','Evershine','Education'];
 // Oversees every class day — always rostered, and kept out of their own team's
 // rotation so that team's other members still take proper turns.
 const HK_HEAD = 'Muhammad Faizan Azim';
@@ -3007,10 +3010,16 @@ const HK_MIN_END_MIN = 17*60 + 50;   // 17:50
 // The bin (1 min) rides with equipment rather than consuming a person, and
 // that is what frees the fifth slot so chairs gets the two it wants.
 // Heaviest task first, so it goes to whoever is most owed.
+// Two orderings that were previously conflated:
+//   essential — how many of a task's slots survive when short-staffed.
+//               Water is "needed x2"; the second chairs slot is only
+//               "preferable", so that is what drops first.
+//   mins      — assignment order, heaviest first, so the biggest job goes to
+//               whoever is most owed.
 const HK_TASKS = [
-  { key:'chairs',    label:'Chairs, boards, papers & pens',         slots:2, mins:10  },
-  { key:'equipment', label:"Bed lifter, trainer's table + the bin", slots:1, mins:7   },
-  { key:'water',     label:'Water & lollies',                       slots:2, mins:4.5 }
+  { key:'water',     label:'Water & lollies',                       slots:2, mins:4.5, essential:2 },
+  { key:'equipment', label:"Bed lifter, trainer's table + the bin", slots:1, mins:7,   essential:1 },
+  { key:'chairs',    label:'Chairs, boards, papers & pens',         slots:2, mins:10,  essential:1 }
 ];
 const HK_MINS = {}; HK_TASKS.forEach(function(t){ HK_MINS[t.key] = t.mins; });
 
@@ -3022,22 +3031,41 @@ function _hkTaskShort(key){
   return {chairs:'Chairs', equipment:'Equipment', water:'Water', speak:'Speaks'}[key] || key || '';
 }
 
-function _hkTaskSlots(){
-  const out = [];
-  HK_TASKS.forEach(function(t){ for(var i=0;i<t.slots;i++) out.push(t.key); });
-  return out;
+// Slots for `headcount` people: keep the essential ones, spend any spare
+// capacity on the optional extras, then order heaviest-first for assignment.
+function _hkTaskSlots(headcount){
+  const must=[], extra=[];
+  HK_TASKS.forEach(function(t){
+    for(var i=0;i<t.slots;i++) (i < t.essential ? must : extra).push(t.key);
+  });
+  var slots;
+  if(headcount==null){
+    slots = must.concat(extra);
+  }else{
+    slots = must.slice(0, headcount);
+    for(var j=0; j<extra.length && slots.length<headcount; j++) slots.push(extra[j]);
+  }
+  return slots.sort(function(a,b){ return HK_MINS[b]-HK_MINS[a]; });
 }
 
 // Give each rostered person a specific job. Only COMPLETED duties count
 // toward someone's minutes, so being rostered and not doing it leaves you
 // owed the time — and up first for the heavy job next class day.
-function _hkAssignTasks(picks, hist){
+// `shuffle` mirrors _hkPick: when people are equally owed — which is always
+// true before any history exists — a deterministic tiebreak hands out the same
+// shape every time, so the same person draws water two days running. Jitter
+// breaks those ties randomly, giving a genuinely different but equally fair
+// split on a reshuffle.
+function _hkAssignTasks(picks, hist, shuffle){
   const people = picks.filter(function(p){ return p.team !== 'Head'; });
   picks.filter(function(p){ return p.team === 'Head'; })
        .forEach(function(h){ h.task = 'speak'; });
 
-  const mins = {}, last = {};
-  people.forEach(function(p){ mins[p.staff_name] = 0; last[p.staff_name] = {}; });
+  const mins = {}, last = {}, jitter = {};
+  people.forEach(function(p){
+    mins[p.staff_name] = 0; last[p.staff_name] = {};
+    jitter[p.staff_name] = shuffle ? Math.random() : 0;
+  });
   (hist || []).forEach(function(h){
     if(!h.done || !h.task || mins[h.staff_name] === undefined) return;
     mins[h.staff_name] += (HK_MINS[h.task] || 0);
@@ -3046,7 +3074,7 @@ function _hkAssignTasks(picks, hist){
   });
 
   const pool = people.slice();
-  _hkTaskSlots().forEach(function(task){
+  _hkTaskSlots(people.length).forEach(function(task){
     if(!pool.length) return;                 // fewer people than slots
     pool.sort(function(a,b){
       if(mins[a.staff_name] !== mins[b.staff_name])
@@ -3054,6 +3082,7 @@ function _hkAssignTasks(picks, hist){
       const la = (last[a.staff_name]||{})[task] || '';
       const lb = (last[b.staff_name]||{})[task] || '';
       if(la !== lb) return la.localeCompare(lb);             // longest since this job
+      if(shuffle) return jitter[a.staff_name] - jitter[b.staff_name];
       return a.staff_name.localeCompare(b.staff_name);
     });
     const pick = pool.shift();
@@ -3213,7 +3242,7 @@ function _hkBuildDay(dateStr, teams, excl, onLeave, avail, habits, hist, doneTea
     if(pick) picks.push({duty_date:dateStr, staff_name:pick, team:tm});
   });
   // Who does what, once we know who is on.
-  _hkAssignTasks(picks, hist);
+  _hkAssignTasks(picks, hist, shuffle);
   return picks;
 }
 

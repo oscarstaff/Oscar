@@ -5788,6 +5788,7 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
           <div style="flex:1;min-width:0;">
             <div id="hkTitle" style="font-size:14.5px;font-weight:700;letter-spacing:-.01em;margin-bottom:2px;"></div>
             <div id="hkSub" style="font-size:12.5px;color:#64748b;line-height:1.45;"></div>
+            <div id="hkTask" style="display:none;margin-top:9px;padding:8px 11px;border-radius:9px;font-size:12.5px;font-weight:600;line-height:1.4;"></div>
           </div>
           <button id="hkDoneBtn" onclick="hkMarkDone()" style="display:none;flex-shrink:0;border:none;border-radius:9px;padding:9px 15px;background:var(--accent);color:#fff;font-family:inherit;font-size:12.5px;font-weight:700;cursor:pointer;">Mark done</button>
         </div>
@@ -10075,6 +10076,15 @@ function clBindKeys(){
 
 let _hkDuty = null;   // the row for today/next class day, or null
 
+// Mirrors HK_TASKS in ShiftOps. Plain labels only — Nexus displays the job,
+// it never assigns one.
+const HK_TASK_LABEL = {
+  chairs:    'Chairs, boards, papers & pens',
+  equipment: "Bed lifter, trainer's table + bring the bin back from Evershine",
+  water:     'Water & lollies',
+  speak:     'Speak to the class'
+};
+
 /** Sydney date as yyyy-mm-dd, built from local parts (never toISOString). */
 function _hkToday(){
   const d=new Date();
@@ -10111,6 +10121,9 @@ async function loadHousekeepingDuty(){
   const sub=document.getElementById('hkSub');
   const btn=document.getElementById('hkDoneBtn');
 
+  const taskBox=document.getElementById('hkTask');
+  const isHead = duty.team === 'Head';
+
   if(duty.done){
     icon.style.background='rgba(16,185,129,.12)';
     icon.style.color='#047857';
@@ -10118,16 +10131,35 @@ async function loadHousekeepingDuty(){
     title.style.color='#047857';
     sub.textContent='Thanks — your turn is recorded.';
     btn.style.display='none';
+    if(taskBox) taskBox.style.display='none';   // nothing left to read
   }else{
     icon.style.background = isToday ? 'rgba(217,119,6,.13)' : 'var(--accent-dim)';
     icon.style.color      = isToday ? '#b45309' : 'var(--accent-text)';
     title.textContent = isToday ? 'Housekeeping — your turn today'
                                 : 'Housekeeping — '+when;
     title.style.color='';
-    sub.textContent = 'Cleanup at the end of the class session. '+
-      (isToday ? 'Tick it off once done — that\u2019s what records your turn.'
-               : 'You\u2019ll be reminded on the day.');
+    // The head oversees; everyone else gets a specific job below.
+    sub.textContent = isHead
+      ? ('You\u2019re overseeing this session'+(isToday?'.':' — you\u2019ll be reminded on the day.'))
+      : ('Cleanup at the end of the session. '+
+         (isToday ? 'Tick it off once done — that\u2019s what records your turn.'
+                  : 'You\u2019ll be reminded on the day.'));
     btn.style.display = isToday ? '' : 'none';
+
+    // Show the ONE job they've been given, not the whole list. A roster row
+    // created before task assignment existed has no task, so the box stays
+    // hidden rather than rendering an empty panel.
+    if(taskBox){
+      const label = HK_TASK_LABEL[duty.task];
+      if(label && !isHead){
+        taskBox.textContent = 'Your job: ' + label;
+        taskBox.style.background = 'var(--accent-dim)';
+        taskBox.style.color = 'var(--accent-text)';
+        taskBox.style.display = '';
+      }else{
+        taskBox.style.display = 'none';
+      }
+    }
   }
   card.style.display='';
 
