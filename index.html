@@ -6186,7 +6186,21 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
           </div>
           <div class="field">
             <label class="field-label">Reason <span class="req">*</span></label>
-            <input class="f-input" type="text" id="leaveReason" placeholder="e.g. Annual leave, Medical appointment">
+            <select class="f-input" id="leaveReason" onchange="onLeaveReasonChange()">
+              <option value="">Select a reason…</option>
+              <option value="Time off / away">Time off / away</option>
+              <option value="Sick leave">Sick leave</option>
+              <option value="Medical appointment">Medical appointment</option>
+              <option value="Family / carer's">Family / carer's</option>
+              <option value="Study / exam">Study / exam</option>
+              <option value="Travel">Travel</option>
+              <option value="Family loss / funeral">Family loss / funeral</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <div class="field" id="leaveOtherWrap" style="display:none;">
+            <label class="field-label">Please specify <span class="req">*</span></label>
+            <input class="f-input" type="text" id="leaveOther" placeholder="Briefly describe your reason" maxlength="200">
           </div>
           <button class="btn btn-green btn-block" id="leaveBtn" onclick="submitLeave()">Submit Leave Request</button>
         </div>
@@ -8593,15 +8607,47 @@ function setDay(i,type){
   if(type==="custom"){renderStartPresets(i);enforceStartFloor(i);syncStartPreset(i);}
 }
 
-// Per-staff early-start approval. Null until loaded; false if column absent.
+// Per-staff early-start approval. staff_credentials is RLS-locked to the
+// authenticated role, so this read MUST run with a real session token — on the
+// anon key it returns zero rows, which is indistinguishable from "not approved".
+// We therefore (a) ensure the auth token is loaded first, and (b) only cache a
+// result that was obtained authenticated. An unauthenticated/failed read returns
+// a safe false for THIS call without latching, so it retries once the session
+// lands.
 let _earlyStartOk=null;
 async function loadEarlyStartApproval(){
   if(_earlyStartOk!==null)return _earlyStartOk;
   try{
+    // Make sure we have a session token before hitting an RLS-locked table.
+    if(!window._sbAuthToken && typeof refreshSbAuthToken==='function'){
+      try{ await refreshSbAuthToken(); }catch(e){}
+    }
+    // Still no token → we'd be reading as anon and RLS would hide the row.
+    // Don't cache a guaranteed-empty result; default false for now and retry.
+    if(!window._sbAuthToken){
+      console.warn('loadEarlyStartApproval: no auth token yet, deferring');
+      return false;
+    }
     const rows=await sbGet("staff_credentials","?staff_name=eq."+encodeURIComponent(me)+"&select=early_start_ok");
     _earlyStartOk=!!(rows&&rows.length&&rows[0].early_start_ok===true);
-  }catch(e){_earlyStartOk=false;}
+    // Approval may have resolved AFTER the form (or a custom day) already
+    // rendered at the 09:00 default. Re-apply presets/floors to every custom
+    // day currently on screen so a just-granted staffer sees 08:00 without
+    // reopening the form.
+    if(_earlyStartOk) _reapplyEarlyStartToOpenDays();
+  }catch(e){
+    console.warn('loadEarlyStartApproval',e);
+    return false;   // transient — leave unresolved so it retries
+  }
   return _earlyStartOk;
+}
+// Refresh presets + floor for any day already switched to Custom.
+function _reapplyEarlyStartToOpenDays(){
+  for(let i=0;i<7;i++){
+    if(document.getElementById("cs-"+i)){
+      try{ renderStartPresets(i); enforceStartFloor(i); syncStartPreset(i); }catch(e){}
+    }
+  }
 }
 
 // Approved staff may start from 08:00; everyone else from 09:00.
@@ -21078,29 +21124,52 @@ async function loadHomeData(){
 async function submitLeave(){
   const from=document.getElementById("leaveFrom").value;
   const to=document.getElementById("leaveTo").value;
-  const reason=document.getElementById("leaveReason").value.trim();
+  const sel=document.getElementById("leaveReason").value;
+  const otherTxt=(document.getElementById("leaveOther").value||"").trim();
   const err=document.getElementById("leaveErr"),ok=document.getElementById("leaveOk");
   err.classList.remove("show");ok.classList.remove("show");
   document.getElementById("leaveReason").classList.remove("error");
+  document.getElementById("leaveOther").classList.remove("error");
   if(!from||!to){err.textContent="Please select your leave dates.";err.classList.add("show");return;}
   if(from>to){err.textContent="End date must be on or after start date.";err.classList.add("show");return;}
-  if(!reason){
-    err.textContent="Please provide a reason for your leave request — this is required.";
+  if(!sel){
+    err.textContent="Please select a reason for your leave request — this is required.";
     err.classList.add("show");
     document.getElementById("leaveReason").classList.add("error");
     document.getElementById("leaveReason").focus();
     return;
   }
+  if(sel==="Other" && !otherTxt){
+    err.textContent="Please specify your reason.";
+    err.classList.add("show");
+    document.getElementById("leaveOther").classList.add("error");
+    document.getElementById("leaveOther").focus();
+    return;
+  }
+  // Store the canonical preset in reason_type so the email can branch on a
+  // fixed set; reason holds what staff/managers read (the Other text, or the
+  // preset label itself for the eight standard ones).
+  const reasonType = sel;
+  const reason = (sel==="Other") ? otherTxt : sel;
   const btn=document.getElementById("leaveBtn");btn.disabled=true;btn.innerHTML='<span class="sp"></span> Submitting...';
   try{
-    const res=await sbPost("leave_submissions",{staff_name:me,from_date:from,to_date:to,reason,status:"pending"});
+    const res=await sbPost("leave_submissions",{staff_name:me,from_date:from,to_date:to,reason,reason_type:reasonType,status:"pending"});
     if(res.ok||res.status===201){
       ok.textContent="Request submitted. Your manager will review it shortly.";ok.classList.add("show");
       document.getElementById("leaveReason").value="";
+      document.getElementById("leaveOther").value="";
+      document.getElementById("leaveOtherWrap").style.display="none";
       loadLeaveHistory();loadHomeData();
     }else throw new Error();
   }catch(e){err.textContent="Failed to submit. Please check your connection.";err.classList.add("show");}
   finally{btn.disabled=false;btn.textContent="Submit Leave Request";}
+}
+// Show the free-text box only when "Other" is chosen.
+function onLeaveReasonChange(){
+  const sel=document.getElementById("leaveReason").value;
+  const wrap=document.getElementById("leaveOtherWrap");
+  if(wrap) wrap.style.display = (sel==="Other") ? "block" : "none";
+  document.getElementById("leaveReason").classList.remove("error");
 }
 async function loadLeaveHistory(){
   const el=document.getElementById("leaveHistory");
