@@ -888,6 +888,24 @@ select.cl-in{appearance:none;-webkit-appearance:none;cursor:pointer;padding-righ
 .cl-cnt{font-variant-numeric:tabular-nums;font-size:11px;font-weight:700;opacity:.6;}
 
 .cl-search-wrap{position:relative;display:flex;align-items:center;}
+.cl-daterange{display:flex;align-items:center;gap:5px;
+  border:1px solid var(--m-border);background:var(--m-card);
+  border-radius:999px;padding:3px 8px;min-height:34px;
+  transition:border-color var(--cl-t) var(--cl-ease);}
+.cl-daterange:hover{border-color:var(--m-border-hi);}
+.cl-daterange.cl-dr-active{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-dim);}
+.cl-date{border:none;background:transparent;font-family:inherit;
+  font-size:12px;color:var(--m-ink);outline:none;padding:2px 3px;
+  color-scheme:light;width:118px;cursor:pointer;}
+:is([data-theme="dark"],[data-theme="midnight"]) .cl-date{color-scheme:dark;}
+.cl-date::-webkit-calendar-picker-indicator{opacity:.5;cursor:pointer;}
+.cl-date::-webkit-calendar-picker-indicator:hover{opacity:.9;}
+.cl-date-dash{color:var(--m-ink-3);font-size:12px;flex-shrink:0;}
+.cl-date-clear{border:none;background:transparent;color:var(--m-ink-3);
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  padding:3px;border-radius:6px;flex-shrink:0;
+  transition:color var(--cl-t),background var(--cl-t);}
+.cl-date-clear:hover{color:var(--warn,#dc2626);background:var(--m-card-2);}
 .cl-search-ico{position:absolute;left:11px;color:var(--m-ink-3);pointer-events:none;}
 .cl-search{border:1px solid var(--m-border);background:var(--m-card);
   border-radius:999px;padding:7px 34px 7px 32px;font-size:12.5px;
@@ -1137,7 +1155,9 @@ select.cl-in{appearance:none;-webkit-appearance:none;cursor:pointer;padding-righ
   .cl-search{width:100%;}
   .cl-search:focus{width:100%;}
   .cl-search-wrap{flex:1;}
-  .cl-bar-right{width:100%;}
+  .cl-bar-right{width:100%;flex-wrap:wrap;}
+  .cl-daterange{width:100%;justify-content:space-between;min-height:40px;}
+  .cl-date{flex:1;width:auto;min-width:0;}
   .cl-filters{width:100%;}
   .cl-chip{flex:1;justify-content:center;min-height:40px;}
   .cl-subbar{padding:8px 12px;flex-wrap:wrap;}
@@ -6561,6 +6581,14 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
                 </button>
               </div>
               <div class="cl-bar-right">
+                <div class="cl-daterange" id="clDateRange" role="group" aria-label="Date range">
+                  <input type="date" id="clFrom" class="cl-date" aria-label="From date" onchange="clSetDateRange()" />
+                  <span class="cl-date-dash">–</span>
+                  <input type="date" id="clTo" class="cl-date" aria-label="To date" onchange="clSetDateRange()" />
+                  <button class="cl-date-clear" id="clDateClear" onclick="clClearDateRange()" title="Clear date range" aria-label="Clear date range" style="display:none;">
+                    <svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor"><path d="M10 8.586 5.05 3.636 3.636 5.05 8.586 10l-4.95 4.95 1.414 1.414L10 11.414l4.95 4.95 1.414-1.414L11.414 10l4.95-4.95L14.95 3.636 10 8.586z"/></svg>
+                  </button>
+                </div>
                 <div class="cl-search-wrap">
                   <svg class="cl-search-ico" width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd"/></svg>
                   <input id="clSearch" class="cl-search" type="search" placeholder="Search" autocomplete="off" />
@@ -9406,6 +9434,8 @@ let _clQueue = [];
 let _clFilter = 'open';
 let _clSub    = 'all';   // within Mine: all | waiting | handled
 let _clScope = 'team';   // 'team' = my team's calls only, 'all' = everyone
+let _clFrom = null;      // date-range filter, inclusive local-day bounds (ms) or null
+let _clTo   = null;
 
 /**
  * The rows in scope. Everything downstream — table, chips, ribbon — reads
@@ -9539,6 +9569,15 @@ function clWaitLabel(iso){
   const h = (Date.now() - new Date(iso).getTime()) / 3600000;
   if(h < 24) return Math.max(1, Math.floor(h)) + 'h';
   return Math.floor(h / 24) + 'd';
+}
+
+/** A gap in ms as a short human duration, for "rung back 3d later". */
+function clDur(ms){
+  const m = Math.round(ms/60000);
+  if(m < 60)   return m+'m';
+  const h = Math.round(m/60);
+  if(h < 24)   return h+'h';
+  return Math.round(h/24)+'d';
 }
 
 function clAgo(iso){
@@ -9689,6 +9728,52 @@ function clAddRecent(entry){
   }).join('');
 }
 
+/**
+ * Date-range filter — applies to every tab (Waiting, Mine, All). Bounds are
+ * inclusive whole local days: From is start-of-day, To is end-of-day, so a
+ * single day picked in both fields captures everything logged that day.
+ */
+function clSetDateRange(){
+  const fromEl=document.getElementById('clFrom');
+  const toEl=document.getElementById('clTo');
+  const fv=(fromEl&&fromEl.value)||'';
+  const tv=(toEl&&toEl.value)||'';
+  // Guard against an inverted range — if From is after To, snap the empty/other
+  // field so the picker can't silently return nothing.
+  if(fv && tv && fv > tv){
+    if(document.activeElement===fromEl){ toEl.value=fv; }
+    else { fromEl.value=tv; }
+  }
+  const f=(document.getElementById('clFrom').value)||'';
+  const t=(document.getElementById('clTo').value)||'';
+  _clFrom = f ? new Date(f+'T00:00:00').getTime() : null;
+  _clTo   = t ? new Date(t+'T23:59:59.999').getTime() : null;
+  const active = !!(_clFrom || _clTo);
+  const wrap=document.getElementById('clDateRange');
+  if(wrap) wrap.classList.toggle('cl-dr-active', active);
+  const clr=document.getElementById('clDateClear');
+  if(clr) clr.style.display = active ? '' : 'none';
+  clRenderQueue();
+  clRefreshOpenCount();
+}
+function clClearDateRange(){
+  _clFrom=_clTo=null;
+  const f=document.getElementById('clFrom'); if(f) f.value='';
+  const t=document.getElementById('clTo');   if(t) t.value='';
+  const wrap=document.getElementById('clDateRange'); if(wrap) wrap.classList.remove('cl-dr-active');
+  const clr=document.getElementById('clDateClear'); if(clr) clr.style.display='none';
+  clRenderQueue();
+  clRefreshOpenCount();
+}
+/** A row is in the active date window (by when the call came in). */
+function clInDateRange(r){
+  if(!_clFrom && !_clTo) return true;
+  const ts=new Date(r.created_at).getTime();
+  if(_clFrom && ts < _clFrom) return false;
+  if(_clTo && ts > _clTo) return false;
+  return true;
+}
+
 function clSetFilter(f){
   _clFilter=f;
   ['clStatToday','clStWaitWrap','clStatMine'].forEach(id=>{
@@ -9755,7 +9840,7 @@ async function clLoadQueue(){
 
 function clRefreshOpenCount(){
   const myName = window.me || me || '';
-  const rows = clScoped();
+  const rows = clScoped().filter(clInDateRange);
   const open = rows.filter(r=>!r.resolved_at).length;
   const mine = rows.filter(r=>r.logged_by===myName).length;
   const today = rows.filter(r=>
@@ -9970,7 +10055,7 @@ function clRenderQueue(){
   const empty=document.getElementById('clQueueEmpty');
   if(!body) return;
   const myName = window.me || me || '';
-  const scoped = clScoped();
+  const scoped = clScoped().filter(clInDateRange);
 
   let rows;
   if(_clFilter==='open'){
@@ -9998,18 +10083,17 @@ function clRenderQueue(){
     );
   }
 
-  // Waiting reads oldest-first so nothing rots at the bottom; the full log
-  // reads newest-first like any log. Sorting by created_at rather than
-  // reversing the fetch order means an edited or relogged row can't jump
-  // the queue.
-  if(_clFilter!=='done'){
-    rows=rows.slice().sort((a,b)=> new Date(a.created_at) - new Date(b.created_at));
-  }
+  // Newest on top everywhere — the waiting queue and the full log both read
+  // most-recent-first. Sorting by created_at rather than reversing the fetch
+  // order means an edited or relogged row can't jump the queue.
+  rows=rows.slice().sort((a,b)=> new Date(b.created_at) - new Date(a.created_at));
 
   if(!rows.length){
     body.innerHTML='';
     const where = _clScope==='team' && typeof myTeam!=='undefined' && myTeam ? ' in '+myTeam : '';
+    const dated = !!(_clFrom || _clTo);
     const msg = q.trim() ? 'Nothing matches that search.'
+              : dated ? 'Nothing in that date range.'
               : _clFilter==='done' ? 'No calls logged'+where+' yet.'
               : _clFilter==='mine'
                 ? (_clSub==='waiting' ? 'None of your calls are waiting.'
@@ -10032,13 +10116,29 @@ function clRenderQueue(){
     const pretty=clFmtPhone(r.phone_e164);
     const attempts = r.phone_e164
       ? _clQueue.filter(x=>x.phone_e164===r.phone_e164 && !x.deleted_at).length : 1;
+    // "Handled on the spot" = closed by the logger at log time. resolved_at is
+    // stamped client-side while created_at is the DB insert default, so the two
+    // can differ by 15-20s (and resolved_at can even precede created_at). A tight
+    // 5s window mislabelled these as "Called back"; 60s absolute covers the skew
+    // while still excluding rows that genuinely sat in the queue and were rung
+    // back later.
     const onCall = done && r.resolved_by===r.logged_by &&
-      Math.abs(new Date(r.resolved_at)-new Date(r.created_at)) < 5000;
+      Math.abs(new Date(r.resolved_at)-new Date(r.created_at)) < 60000;
     const owner = r.for_team || r.team || '';
     const helperTeam = (done && r.resolved_by && !onCall) ? clTeamOf(r.resolved_by) : '';
     const helped = !!(helperTeam && owner && helperTeam !== owner);
     const handoff = !!(r.for_team && r.team && r.for_team !== r.team);
-    const stamp = done && !onCall ? r.resolved_at : r.created_at;
+    // A row's date is ALWAYS when the call came in (created_at). For a callback
+    // that sat waiting and was later rung back, showing resolved_at instead made
+    // a 3-day-old ticket read as "today" and erased how long the caller waited.
+    // The resolution time is shown separately as "· rung back <duration> later".
+    const stamp = r.created_at;
+    // How long a called-back row waited between the call coming in and being
+    // rung back. Only meaningful for genuine callbacks (not handled-on-the-spot),
+    // and only worth showing once it's more than a couple of minutes.
+    const backGapMs = (done && !onCall)
+      ? (new Date(r.resolved_at) - new Date(r.created_at)) : 0;
+    const backLabel = backGapMs > 120000 ? clDur(backGapMs) : '';
 
     let sep='';
     const day=clDayLabel(r.created_at);
@@ -10098,7 +10198,8 @@ function clRenderQueue(){
             '<span class="cl-tag">'+clEsc(r.reason)+'</span>'+
             '<span class="cl-meta">'+clEsc(r.logged_by.split(' ')[0])+
               (_clScope==='all' && r.team && !handoff?' · '+clEsc(r.team):'')+
-              ' · '+clAgo(stamp)+'</span>'+
+              ' · '+clAgo(stamp)+
+              (backLabel?' · rung back '+backLabel+' later':'')+'</span>'+
           '</div>'+
           (r.note?'<p class="cl-note">'+clEsc(r.note)+'</p>':'')+
         '</div>'+
