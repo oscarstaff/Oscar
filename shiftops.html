@@ -1993,6 +1993,13 @@ if(document.readyState !== 'loading') setTimeout(_renderWhoami, 0);
 const GAS_EXEC_URL='https://script.google.com/macros/s/AKfycby0Bq97bCZAsmnruXFuJuCqXQE_kOxhYE2KFuJnVzLXtT5CV0Y12k5176dxZbdaYVGE/exec';
 const GAS_TOKEN='oscars_gas_83235a5f0c1f6ba32b18235e2b2d544ac137167d';
 
+// ── Leave-email relay (SEPARATE Apps Script, personal Gmail sender) ──────
+// Its own deployment + own token — deliberately NOT the main Code.gs relay.
+// After deploying LeaveEmailRelay.gs, paste its /exec URL below. The token
+// must match MAIL_TOKEN inside that script exactly.
+const MAIL_EXEC_URL='PASTE_YOUR_LEAVE_EMAIL_RELAY_EXEC_URL_HERE';
+const MAIL_TOKEN='oscars_mail_921793e91a49d14b120c9053065e94c7065ae583';
+
 const COLORS=['#00e5a0','#0066ff','#ff6b35','#ffd700','#ff69b4','#00bcd4','#9c27b0','#8bc34a','#ff5722','#607d8b'];
 const DAYS=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
 const DAYS_FULL=['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
@@ -2109,6 +2116,7 @@ async function loadData(){
           staff_name:row.staff_name,
           from:row.from_date, to:row.to_date,
           reason:row.reason||'',
+          reason_type:row.reason_type||'',
           status:row.status||'pending',
           declineReason:row.decline_reason||'',
           supabaseId:row.id
@@ -5888,18 +5896,20 @@ function applyLeaveUpdate(id,status,declineReason){
           }).then(r=>r.ok?r.json():[]).then(function(rows){
             const to=(rows&&rows[0]&&rows[0].email||'').trim();
             if(!to || to.indexOf('@')<0) return;   // no/blank/invalid email → skip
-            fetch(GAS_EXEC_URL,{
+            if(!MAIL_EXEC_URL || MAIL_EXEC_URL.indexOf('http')!==0) return;  // relay URL not set yet → skip
+            fetch(MAIL_EXEC_URL,{
               method:'POST',
               headers:{'Content-Type':'text/plain;charset=utf-8'},
               body:JSON.stringify({
                 action:'sendLeaveEmail',
-                token:GAS_TOKEN,
+                token:MAIL_TOKEN,
                 to:to,
                 name:nm,
                 status:status,
                 fromDate:fromStr,
                 toDate:toStr,
                 reason:(r.reason||''),
+                reasonType:(r.reason_type||''),
                 declineReason:(declineReason||''),
                 decidedBy:(typeof currentUser!=='undefined'&&currentUser)?currentUser:''
               })
