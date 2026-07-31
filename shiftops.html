@@ -1369,6 +1369,155 @@ body.tl-readonly .wk-tools{ display:none !important; }
 @media(max-width:760px){ .avail-team-tally{ display:none; } }
 
 </style>
+<style id="polish-2026-07-31">
+/* ═══════════════════════════════════════════════════════════════════════
+   POLISH PASS — layout stability + week spine + shift status
+   Appended last so it wins ties without an !important arms race.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ── STABILITY ─────────────────────────────────────────────────────────
+   "The box changes shapes": three real causes, each pinned down.
+   1) Scrollbars appearing/disappearing reflowed the whole page.
+   2) Buttons and labels whose TEXT changes ("Save"/"Saving…", counts)
+      resized themselves and shoved their neighbours.
+   3) Proportional digits: every number change rewidthed its container. */
+html { scrollbar-gutter: stable; }
+button, .btn { white-space: nowrap; }
+.btn-save { min-width: 74px; }
+.save-status { min-width: 132px; }
+.save-status span { font-variant-numeric: tabular-nums; }
+.week-label, .stat-value, .stat-card, .hours-bar, .mb-t,
+.roster-summary, .grid-col-head { font-variant-numeric: tabular-nums; }
+.week-label {
+  font-size: 13.5px; font-weight: 700; color: var(--text);
+  min-width: 190px; text-align: center; letter-spacing: -.01em;
+}
+.modal { width: min(460px, calc(100vw - 28px)); }
+.shift-cell { min-height: 56px; }
+
+/* One focus language everywhere, keyboard only. */
+:focus-visible { outline: none; box-shadow: var(--ring); border-radius: var(--r6); }
+
+/* ── WEEK SPINE ──────────────────────────────────────────────────────── */
+.week-spine {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; flex-wrap: wrap;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r12);
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  box-shadow: var(--shadow-sm);
+}
+.ws-nav { display: flex; align-items: center; gap: 8px; }
+.ws-state { display: flex; align-items: center; gap: 8px; }
+.ws-today { font-size: 11px; padding: 5px 11px; }
+.ws-clear { font-size: 11px; padding: 5px 11px; color: var(--warn); }
+
+.ws-pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--mono);
+  font-size: 10px; font-weight: 700; letter-spacing: .08em;
+  text-transform: uppercase;
+  border-radius: 999px;
+  padding: 4px 11px;
+  min-width: 86px; justify-content: center;   /* Draft↔Published: no resize */
+  border: 1px solid var(--border2);
+  color: var(--text-dim);
+}
+.ws-pill::before { content:''; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.ws-pill.ws-draft { color: var(--gold); background: var(--gold-dim); border-color: rgba(180,116,10,.35); }
+.ws-pill.ws-pub   { color: var(--success); background: var(--success-dim); border-color: rgba(14,138,95,.35); }
+
+.ws-publish { font-size: 11.5px; padding: 6px 14px; min-width: 108px; }
+.ws-publish-on  { background: var(--accent); color: #fff; border: 1px solid var(--accent-deep); }
+.ws-publish-on:hover  { background: var(--accent-deep); }
+.ws-publish-off { background: var(--surface); color: var(--text-dim); border: 1px solid var(--border2); }
+.ws-publish-off:hover { color: var(--warn); border-color: var(--warn); }
+
+/* ── SHIFT STATUS ON THE GRID ────────────────────────────────────────── */
+.sb-tag {
+  font-family: var(--mono);
+  font-size: 7.5px; font-weight: 700; letter-spacing: .07em;
+}
+.shift-badge.shift-openpick {
+  background: var(--gold-dim) !important;
+  color: var(--gold) !important;
+  border: 1.5px dashed rgba(180,116,10,.55) !important;
+}
+.shift-badge.shift-pendrel {
+  background: var(--gold-dim) !important;
+  color: var(--gold) !important;
+  border: 1px solid rgba(180,116,10,.4) !important;
+}
+
+/* Reduced motion: honour it for everything this pass added. */
+@media (prefers-reduced-motion: reduce){
+  .week-spine, .ws-pill, .ws-publish { transition: none; }
+}
+
+/* ── DEPUTY-STYLE GRID ─────────────────────────────────────────────────
+   Shift cards are tinted with the person's colour and carry a solid
+   colour spine; time is the loudest thing on the card. Day headers show
+   the day's total rostered hours; each person shows their week total. */
+.shift-badge.shift-slot {
+  border-radius: 7px;
+  padding: 5px 7px;
+  color: var(--text);
+  box-shadow: 0 1px 2px rgba(16,24,40,.06);
+}
+.shift-badge.shift-slot:hover { filter: none; box-shadow: 0 2px 6px rgba(16,24,40,.12); transform: translateY(-1px); }
+.sb-time { font-family: var(--mono); font-size: 10px; font-weight: 700; letter-spacing: -.02em; }
+.dh-total {
+  display: block;
+  font-family: var(--mono);
+  font-size: 8.5px; font-weight: 700;
+  color: var(--muted);
+  margin-top: 2px;
+}
+.grid-col-head.today .dh-total { color: var(--accent-text); }
+.hrs-num { font-family: var(--mono); font-weight: 700; color: var(--text-mid); }
+
+/* Draft weeks: every shift is visibly provisional — diagonal stripes that
+   dissolve the moment the week is published. The whole point of a draft
+   state is that you can SEE it's a draft. */
+.grid-draft .shift-badge.shift-slot {
+  background-image: repeating-linear-gradient(135deg,
+    transparent 0 5px, rgba(16,24,40,.055) 5px 9px);
+}
+
+/* Empty cells invite the click, Deputy-style. */
+.shift-cell.empty-clickable { cursor: pointer; }
+.shift-cell.empty-clickable::after {
+  content: '+';
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 15px; font-weight: 600; color: var(--muted);
+  opacity: 0; transition: opacity .12s ease;
+  pointer-events: none;
+}
+.shift-cell.empty-clickable:hover::after { opacity: .9; }
+.shift-cell.empty-clickable:hover { background: var(--surface2); }
+.grid-row:hover { background: rgba(16,24,40,.015); }
+
+/* ── TAB SWITCHING: no jump, no slide, no collapse ─────────────────────
+   1) The app scrolls inside .main, not the page — so the gutter must be
+      reserved THERE. Without it, switching from a tall tab to a short one
+      dropped the scrollbar and shoved the whole centred column sideways.
+   2) The slide-in animation moved every pane on activation; a switch
+      should feel like turning a page, not sliding furniture.
+   3) Panes that load async (Submitted Availability, Class Days) rendered
+      short, then extended when data landed. A stable floor absorbs it. */
+.main { scrollbar-gutter: stable; }
+.tab-content.active { animation: tabFade .13s ease both; }
+@keyframes tabFade { from { opacity: .6; } to { opacity: 1; } }
+.content { min-height: calc(100vh - 140px); }
+#availsec-edit, #availsec-submitted, #availsec-classdays { min-height: 480px; }
+#section-home, #section-roster, #section-availability, #section-staff { min-height: 480px; }
+@media (prefers-reduced-motion: reduce){
+  .tab-content.active { animation: none; }
+}
+</style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.4/dist/jspdf.plugin.autotable.min.js"></script>
@@ -1519,13 +1668,20 @@ body.tl-readonly .wk-tools{ display:none !important; }
       </div>
 
       <div class="tab-content" id="section-roster">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
-          <button class="week-btn" onclick="prevWeek()">◀</button>
-          <div class="week-label" id="weekLabel" style="font-size:13px;font-weight:600;color:var(--text);min-width:180px;text-align:center;"></div>
-          <button class="week-btn" onclick="nextWeek()">▶</button>
-          <button class="btn btn-ghost" onclick="goToday()" style="font-size:11px;padding:4px 10px;">Today</button>
-          <div style="flex:1;"></div>
-          <button class="btn btn-ghost" onclick="clearWeek()" style="font-size:11px;padding:4px 10px;color:var(--warn);">Clear Week</button>
+        <!-- WEEK SPINE — the roster's one strong element: where you are in
+             time, whether staff can see it yet, and the act of releasing it. -->
+        <div class="week-spine">
+          <div class="ws-nav">
+            <button class="week-btn" onclick="prevWeek()" aria-label="Previous week">◀</button>
+            <div class="week-label" id="weekLabel"></div>
+            <button class="week-btn" onclick="nextWeek()" aria-label="Next week">▶</button>
+            <button class="btn btn-ghost ws-today" onclick="goToday()">Today</button>
+          </div>
+          <div class="ws-state">
+            <span class="ws-pill" id="pubPill">…</span>
+            <button class="btn ws-publish" id="pubBtn" onclick="togglePublishWeek()" style="display:none;">Publish week</button>
+            <button class="btn btn-ghost ws-clear" onclick="clearWeek()">Clear week</button>
+          </div>
         </div>
         <div class="roster-grid" id="rosterGrid"></div>
       </div>
@@ -2585,8 +2741,20 @@ function renderRoster(){
   // strip anything that doesn't belong, add every approved leave that does.
   // The grid is ALWAYS a true reflection of leave_submissions.
   try{ _syncWeekLeavesToSubmissions(); }catch(e){}
+  // Deputy-style day totals: each column header carries the day's rostered
+  // hours, so a thin day is visible before anyone reads a single cell.
+  const dayTotals=[0,0,0,0,0,0,0];
+  staff.forEach(function(s){
+    for(let d=0;d<7;d++){
+      ((shifts[s.id]||{})[d]||[]).forEach(function(sh){ dayTotals[d]+=shiftHours(sh); });
+    }
+  });
   let html='<div class="grid-header"><div class="grid-col-head">STAFF</div>';
-  for(let d=0;d<7;d++){const day=addDays(currentWeekStart,d);html+=`<div class="grid-col-head${isToday(day)?' today':''}">${DAYS[d]}<br><span style="font-size:9px;opacity:.6">${fmtDate(day)}</span></div>`;}
+  for(let d=0;d<7;d++){
+    const day=addDays(currentWeekStart,d);
+    const t=dayTotals[d];
+    html+=`<div class="grid-col-head${isToday(day)?' today':''}">${DAYS[d]}<br><span style="font-size:9px;opacity:.6">${fmtDate(day)}</span><span class="dh-total">${t?t.toFixed(1).replace('.0','')+'h':'·'}</span></div>`;
+  }
   html+='</div>';
   const officeManager=staff.filter(s=>s.isOfficeManager||s.isManager==='office');
   if(officeManager.length>0){
@@ -2613,7 +2781,7 @@ function renderRoster(){
     html+=`<div data-team="${(team||'').replace(/"/g,'&quot;')}" style="display:grid;grid-template-columns:155px repeat(7,1fr);background:var(--accent-dim);border-bottom:1px solid var(--border);border-top:1px solid var(--border)"><div style="padding:7px 14px;font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--accent-deep);border-right:1px solid var(--border)">${team}</div>${Array(7).fill(`<div style="border-right:1px solid var(--border)"></div>`).join('')}</div>`;
     ordered.forEach(s=>{
       const hrs=staffHoursWeek(s.id),pct=Math.min(100,(hrs/s.maxHours)*100);
-      html+=`<div class="grid-row" data-team="${(s.team||'').replace(/"/g,'&quot;')}"><div class="staff-cell"><div class="avatar" style="background:${s.color}">${initials(s)}</div><div style="min-width:0;flex:1;overflow:hidden"><div class="staff-name">${s.first} ${s.last}</div><div class="staff-role">${s.team}</div><div class="hours-bar"><div class="hours-bar-bg"><div class="hours-bar-fill${pct>90?' warn':''}" style="width:${pct}%"></div></div></div></div><div class="wk-tools"><button class="wk-btn" title="Copy this week" onclick="event.stopPropagation();copyStaffWeek(${s.id})">⧉</button><button class="wk-btn wk-paste" title="Paste copied week here" onclick="event.stopPropagation();pasteStaffWeek(${s.id})">⤓</button></div></div>`;
+      html+=`<div class="grid-row" data-team="${(s.team||'').replace(/"/g,'&quot;')}"><div class="staff-cell"><div class="avatar" style="background:${s.color}">${initials(s)}</div><div style="min-width:0;flex:1;overflow:hidden"><div class="staff-name">${s.first} ${s.last}</div><div class="staff-role">${s.team} · <b class="hrs-num">${hrs?hrs.toFixed(1).replace('.0',''):0}h</b></div><div class="hours-bar"><div class="hours-bar-bg"><div class="hours-bar-fill${pct>90?' warn':''}" style="width:${pct}%"></div></div></div></div><div class="wk-tools"><button class="wk-btn" title="Copy this week" onclick="event.stopPropagation();copyStaffWeek(${s.id})">⧉</button><button class="wk-btn wk-paste" title="Paste copied week here" onclick="event.stopPropagation();pasteStaffWeek(${s.id})">⤓</button></div></div>`;
       for(let d=0;d<7;d++){
         const av=getAvail(s.id,d),dayShifts=(shifts[s.id]||{})[d]||[];
         const hasNonLeave=dayShifts.some(sh=>sh.type!=='leave');
@@ -2640,7 +2808,10 @@ function renderRoster(){
               });
             });
           }
-          html+=`<div class="shift-badge ${il?'shift-leave':'shift-slot'}" ${il?'':`draggable="true" ondragstart="shiftDragStart(event,${s.id},${d},${i})" ondragend="shiftDragEnd(event)"`} onclick="event.stopPropagation();editShift(${s.id},${d},${i})">${il?'LEAVE':`${sh.start}–${sh.end}`}${dev?`<br><span style="font-size:8px;opacity:.85;color:${devConflict?'#ff6432':'inherit'}"> ${dev.name}${sh.deviceStart?` ${sh.deviceStart}–${sh.deviceEnd}`:''}${devConflict?' ':''}</span>`:`${staffRoleLabel(s)?`<br><span style="font-size:8px;opacity:.7">${staffRoleLabel(s)}</span>`:''}`}</div>`;
+          const stCls = sh._status==='open' ? ' shift-openpick' : (sh._status==='pending_release' ? ' shift-pendrel' : '');
+          const stTag = sh._status==='open' ? '<br><span class="sb-tag">OPEN FOR PICKUP</span>'
+                      : (sh._status==='pending_release' ? '<br><span class="sb-tag">RELEASE ASKED</span>' : '');
+          html+=`<div class="shift-badge ${il?'shift-leave':'shift-slot'}${stCls}" ${il?'':`style="background:${s.color}1a;border-left:3px solid ${s.color};" draggable="true" ondragstart="shiftDragStart(event,${s.id},${d},${i})" ondragend="shiftDragEnd(event)"`} onclick="event.stopPropagation();editShift(${s.id},${d},${i})">${il?'LEAVE':`<b class="sb-time">${sh.start}–${sh.end}</b>`}${stTag}${dev?`<br><span style="font-size:8px;opacity:.85;color:${devConflict?'#ff6432':'inherit'}"> ${dev.name}${sh.deviceStart?` ${sh.deviceStart}–${sh.deviceEnd}`:''}${devConflict?' ':''}</span>`:`${staffRoleLabel(s)?`<br><span style="font-size:8px;opacity:.7">${staffRoleLabel(s)}</span>`:''}`}</div>`;
         });
         html+='</div>';
       }
@@ -2830,6 +3001,30 @@ function _staffIdByName(){
 }
 
 let _dbShiftsLoading=false;
+/**
+ * Keep the grid honest against changes made elsewhere.
+ *
+ * Shifts can change without ShiftOps doing anything: staff claim an open
+ * shift in Nexus, or a leave approval releases one. Without this the grid
+ * kept showing whatever it fetched on load — a claimed shift appeared to
+ * vanish, or stayed under the old person's name until you switched weeks.
+ * Refreshing on focus covers the realistic case (you tab away, something
+ * happens, you come back) without polling.
+ */
+function startShiftAutoRefresh(){
+  if(window._shiftRefreshBound) return;
+  window._shiftRefreshBound=true;
+  const refresh=function(){
+    if(document.hidden) return;
+    if(typeof currentWeekStart==='undefined') return;
+    loadWeekShiftsFromDB(currentWeekStart);
+  };
+  window.addEventListener('focus', refresh);
+  document.addEventListener('visibilitychange', refresh);
+  // Slow safety net for a window left open all day on the roster.
+  setInterval(refresh, 120000);
+}
+
 async function loadWeekShiftsFromDB(weekStart){
   if(_dbShiftsLoading) return;
   _dbShiftsLoading=true;
@@ -2873,6 +3068,7 @@ async function loadWeekShiftsFromDB(weekStart){
 
     if(typeof renderRoster==='function') renderRoster();
     if(typeof updateStats==='function') updateStats();
+    if(typeof renderPublishState==='function') renderPublishState();
   }catch(e){
     console.warn('loadWeekShiftsFromDB failed', e);
     try{ showToast('Couldn\'t load shifts — check connection'); }catch(_){}
@@ -2889,6 +3085,83 @@ function loadWeek(key){
   staff.forEach(s=>{if(!shifts[s.id])shifts[s.id]={};if(!availability[s.id])availability[s.id]={};});
 }
 
+/* ── ROSTER PUBLISHING ────────────────────────────────────────────────────
+   A week is invisible to staff until it's published. That gives the manager
+   a real draft state: build, shuffle, delete freely — nobody sees the churn.
+   Publishing is one deliberate act, and the week spine shows plainly which
+   state the visible week is in. Unpublishing is allowed (mistakes happen).
+   ──────────────────────────────────────────────────────────────────────── */
+let _pubWeeks=null;   // Set of published week_start ISO dates; null = not loaded
+
+async function loadPublishedWeeks(){
+  try{
+    const r=await fetch(SUPABASE_URL+'/rest/v1/roster_published?select=week_start',
+      {headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY}});
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const rows=await r.json();
+    _pubWeeks=new Set((rows||[]).map(function(x){return x.week_start;}));
+  }catch(e){
+    console.warn('loadPublishedWeeks',e);
+    _pubWeeks=_pubWeeks||new Set();   // keep whatever we had
+  }
+  renderPublishState();
+}
+
+function _curWeekISO(){ return _isoDate(currentWeekStart); }
+
+function renderPublishState(){
+  const pill=document.getElementById('pubPill');
+  const btn=document.getElementById('pubBtn');
+  if(!pill||!btn) return;
+  if(_pubWeeks===null){ pill.textContent='…'; pill.className='ws-pill'; btn.style.display='none'; return; }
+  const wk=_curWeekISO();
+  const pub=_pubWeeks.has(wk);
+  pill.textContent=pub?'Published':'Draft';
+  pill.className='ws-pill '+(pub?'ws-pub':'ws-draft');
+  btn.style.display='';
+  // Deputy behaviour: the publish button tells you how much you're about to
+  // release, and draft shifts render striped until you do.
+  let n=0;
+  try{ Object.values(shifts||{}).forEach(function(byDay){ Object.values(byDay||{}).forEach(function(arr){ (arr||[]).forEach(function(sh){ if(sh.type!=='leave') n++; }); }); }); }catch(e){}
+  btn.textContent=pub?'Unpublish':(n?('Publish · '+n+' shift'+(n===1?'':'s')):'Publish week');
+  btn.className='btn ws-publish '+(pub?'ws-publish-off':'ws-publish-on');
+  const grid=document.getElementById('rosterGrid');
+  if(grid) grid.classList.toggle('grid-draft', !pub);
+}
+
+async function togglePublishWeek(){
+  if(_pubWeeks===null) return;
+  const wk=_curWeekISO();
+  const pub=_pubWeeks.has(wk);
+  const btn=document.getElementById('pubBtn');
+  if(btn) btn.disabled=true;
+  try{
+    if(pub){
+      if(!confirm('Unpublish this week? Staff will stop seeing these shifts in Nexus.')){ if(btn) btn.disabled=false; return; }
+      const r=await fetch(SUPABASE_URL+'/rest/v1/roster_published?week_start=eq.'+wk,
+        {method:'DELETE',headers:_DB_H});
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      _pubWeeks.delete(wk);
+      showToast('Week unpublished — hidden from staff');
+    }else{
+      const r=await fetch(SUPABASE_URL+'/rest/v1/roster_published',{
+        method:'POST',
+        headers:Object.assign({Prefer:'resolution=merge-duplicates,return=minimal'},_DB_H),
+        body:JSON.stringify({week_start:wk,
+          published_by:(typeof currentUser!=='undefined'&&currentUser)?currentUser:null})
+      });
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      _pubWeeks.add(wk);
+      showToast('Published — staff can now see this week');
+    }
+  }catch(e){
+    console.warn('togglePublishWeek',e);
+    showToast('Could not update — check connection');
+  }
+  if(btn) btn.disabled=false;
+  renderPublishState();
+}
+
 function switchWeek(newStart){
   console.log('[WEEK-DEBUG] switchWeek → from currentWeekStart="'+weekKey(currentWeekStart)+'" (availWeekKey="'+availWeekKey+'") to newStart="'+weekKey(newStart)+'"');
   saveCurrentWeek();
@@ -2898,6 +3171,7 @@ function switchWeek(newStart){
   loadWeek(availWeekKey);
   // Shifts come from roster_shifts, not the blob — pull the new week.
   loadWeekShiftsFromDB(currentWeekStart);
+  renderPublishState();
 }
 
 function prevWeek(){switchWeek(addDays(currentWeekStart,-7));renderRoster();updateStats();}
@@ -7146,7 +7420,7 @@ async function aaSave(){
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────
-const SHIFTOPS_BUILD='2026-07-31-v16-roster-shifts';
+const SHIFTOPS_BUILD='2026-07-31-v19-stable-tabs';
 console.log('%c[ShiftOps build '+SHIFTOPS_BUILD+' loaded]','background:#16a34a;color:#fff;padding:2px 8px;border-radius:4px;font-weight:700;');
 (async()=>{
   await loadData();
@@ -7166,6 +7440,8 @@ console.log('%c[ShiftOps build '+SHIFTOPS_BUILD+' loaded]','background:#16a34a;c
   renderAll();
   // Real shifts live in roster_shifts, not the blob — pull this week's.
   loadWeekShiftsFromDB(currentWeekStart);
+  try{ startShiftAutoRefresh(); }catch(e){ console.warn('shift auto-refresh', e); }
+  loadPublishedWeeks();
   try{ applyTeamLeadLock(); }catch(e){}
   // Open the section named in the URL hash, defaulting to Home (which starts
   // the Morning Board). Replaces the old unconditional board start.
