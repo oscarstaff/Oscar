@@ -4252,6 +4252,10 @@ async function notifyTeamShiftOpen(team, fromStaff, info){
       console.log('[PILOT] shift-open email → '+to[0].email+' only');
     }
     if(!to.length) return;
+    // Read the relay's reply rather than discarding it. Without this a
+    // rejected send ("unknown action" from an un-redeployed relay, "bad
+    // token", "quota") is indistinguishable from success — which is exactly
+    // how a missing email turns into a guessing game.
     fetch(MAIL_EXEC_URL,{
       method:'POST',
       headers:{'Content-Type':'text/plain;charset=utf-8'},
@@ -4265,7 +4269,25 @@ async function notifyTeamShiftOpen(team, fromStaff, info){
         endTime:String(info.end_time||'').slice(0,5),
         fromStaff:fromStaff
       })
-    }).catch(function(){});
+    }).then(function(resp){
+      return resp.text().then(function(txt){
+        console.log('[PILOT] relay replied ('+resp.status+'):', txt);
+        let j=null; try{ j=JSON.parse(txt); }catch(e){}
+        if(j && j.ok===true){
+          showToast('Notified '+(j.sent||to.length)+' teammate'+((j.sent||to.length)===1?'':'s'));
+        }else if(j && j.error==='unknown action'){
+          showToast('Relay is out of date — redeploy it as a NEW version');
+        }else if(j && j.error==='quota'){
+          showToast('Email quota reached ('+j.remaining+' left, needed '+j.needed+')');
+        }else if(j && j.error){
+          showToast('Email not sent: '+j.error);
+        }
+      });
+    }).catch(function(err){
+      // A blocked cross-origin read still means the POST was delivered, so
+      // this is informational, not a failure.
+      console.log('[PILOT] relay response unreadable (send may still have worked):', err);
+    });
   }catch(e){ console.warn('notifyTeamShiftOpen',e); }
 }
 
