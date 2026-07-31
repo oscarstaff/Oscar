@@ -19346,12 +19346,19 @@ async function askReleaseShift(shiftId, btn){
   if(reason===null) return;                 // cancelled
   if(btn){ btn.disabled=true; btn.textContent='Sending…'; }
   try{
-    const res=await fetch(SUPABASE_URL+'/rest/v1/rpc/request_shift_release',{
+    const res=await fetch(SB+'/rest/v1/rpc/request_shift_release',{
       method:'POST',
-      headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+(window._sbAuthToken||SUPABASE_KEY),'Content-Type':'application/json'},
+      headers:{apikey:KEY,Authorization:'Bearer '+(window._sbAuthToken||KEY),'Content-Type':'application/json'},
       body:JSON.stringify({p_shift_id:shiftId,p_staff_name:me,p_reason:reason||null})
     });
-    if(!res.ok) throw new Error('HTTP '+res.status);
+    if(!res.ok){
+      const detail=await res.text().catch(function(){return '';});
+      console.warn('[RELEASE] HTTP '+res.status, detail);
+      if(res.status===404) showToast('Not available yet — try again in a moment');
+      else                 showToast('Request failed ('+res.status+')');
+      if(btn){ btn.disabled=false; btn.textContent='Can\'t make it'; }
+      return;
+    }
     const out=await res.json();
     if(out&&out.ok===true){
       showToast('Sent — your manager will review it');
@@ -19452,12 +19459,23 @@ async function claimShift(shiftId, btn){
   if(!me){ showToast('Not signed in'); return; }
   if(btn){ btn.disabled=true; btn.textContent='Claiming…'; }
   try{
-    const res=await fetch(SUPABASE_URL+'/rest/v1/rpc/claim_shift',{
+    const res=await fetch(SB+'/rest/v1/rpc/claim_shift',{
       method:'POST',
-      headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+(window._sbAuthToken||SUPABASE_KEY),'Content-Type':'application/json'},
+      headers:{apikey:KEY,Authorization:'Bearer '+(window._sbAuthToken||KEY),'Content-Type':'application/json'},
       body:JSON.stringify({p_shift_id:shiftId,p_staff_name:me})
     });
-    if(!res.ok) throw new Error('HTTP '+res.status);
+    if(!res.ok){
+      // Report what actually went wrong. A blanket "check your connection" hid
+      // real causes — most often a 404 because PostgREST hadn't picked up the
+      // new function yet, which looks nothing like a network problem.
+      const detail=await res.text().catch(function(){return '';});
+      console.warn('[CLAIM] HTTP '+res.status, detail);
+      if(res.status===404)      showToast('Claim unavailable — server not ready yet, try again in a moment');
+      else if(res.status===401||res.status===403) showToast('Not allowed to claim — try signing out and back in');
+      else                      showToast('Claim failed ('+res.status+')');
+      if(btn){ btn.disabled=false; btn.textContent='Claim'; }
+      return;
+    }
     const out=await res.json();
     if(out&&out.ok===true){
       showToast('Shift is yours');
