@@ -6903,11 +6903,33 @@ async function refreshMorningBoard(){
   }catch(e){ /* fall back to in-memory availability below */ }
 
   const dayIdx = _todayDayIndex();
+
+  // The board describes TODAY, so it must read the week that actually contains
+  // today — not whatever week the roster happens to be parked on. Viewing next
+  // week used to make the board index that week by today's day-of-week, so a
+  // future leave landing on the same weekday showed as "on leave" right now
+  // (e.g. leave on Fri 7 Aug displayed on Fri 31 Jul).
+  // When the viewed week IS this week, keep using the live `shifts` object so
+  // unsaved edits are reflected; otherwise read this week from the store.
+  let _todayShifts = shifts;
+  try{
+    const _todayWk = _canonicalWeekKey(weekKey(new Date()));
+    const _viewWk  = _canonicalWeekKey(availWeekKey || weekKey(currentWeekStart));
+    if(_todayWk !== _viewWk){
+      // Resolve through _resolveStoreKey, not a raw lookup: duplicate key
+      // formats ("27 Jul" + "27 July") can coexist and the canonical one is
+      // sometimes the emptier shell. The resolver picks whichever variant
+      // actually holds data, which is what stops the roster "vanishing".
+      const _k = (typeof _resolveStoreKey==='function') ? _resolveStoreKey(_todayWk) : _todayWk;
+      _todayShifts = (shiftsStore && (shiftsStore[_k] || shiftsStore[_todayWk])) || {};
+    }
+  }catch(e){ /* fall back to the loaded week */ }
+
   const inNow=[], lateList=[], leaveList=[], notInList=[], doneList=[];
 
   staff.forEach(s=>{
     const key = _normName(s.first+' '+s.last);
-    const dayShifts = (shifts[s.id]||{})[dayIdx] || [];
+    const dayShifts = (_todayShifts[s.id]||{})[dayIdx] || [];
     const onLeave = dayShifts.some(x=>x.type==='leave');
     const rostered = dayShifts.filter(x=>x.type!=='leave');
     const p = last[key];
