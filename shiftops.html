@@ -2795,6 +2795,78 @@ function _resolveStoreKey(key){
   });
   return best;
 }
+/* ── roster_shifts: the real shift source ─────────────────────────────────
+   Shifts now live in the roster_shifts table (keyed by staff_name + a real
+   date), not in the shiftsStore blob. The blob held no real shifts — only
+   stale leave fossils — so this overlay is additive, not a migration.
+
+   The grid renderer is unchanged: we just populate the same
+   shifts[staffId][dayIndex] = [{start,end,type,role}] shape it already
+   expects, tagging each block with its DB id so release/claim can act on it.
+   ──────────────────────────────────────────────────────────────────────── */
+function _isoDate(d){
+  const p=new Date(d);
+  return p.getFullYear()+'-'+String(p.getMonth()+1).padStart(2,'0')+'-'+String(p.getDate()).padStart(2,'0');
+}
+function _staffIdByName(){
+  const m={};
+  (staff||[]).forEach(function(s){
+    const full=((s.first||'').trim()+' '+(s.last||'').trim()).trim();
+    if(full) m[_normName(full)]=s.id;
+  });
+  return m;
+}
+
+let _dbShiftsLoading=false;
+async function loadWeekShiftsFromDB(weekStart){
+  if(_dbShiftsLoading) return;
+  _dbShiftsLoading=true;
+  try{
+    const from=_isoDate(weekStart), to=_isoDate(addDays(new Date(weekStart),6));
+    const r=await fetch(SUPABASE_URL+'/rest/v1/roster_shifts'+
+      '?select=id,staff_name,shift_date,start_time,end_time,role,status,open_to_team,release_requested_by'+
+      '&shift_date=gte.'+from+'&shift_date=lte.'+to+'&order=shift_date.asc,start_time.asc',
+      {headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY}});
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const rows=await r.json();
+
+    const byName=_staffIdByName();
+    // Clear only non-leave blocks; leave is painted separately from
+    // leave_submissions and must not be disturbed here.
+    Object.keys(shifts||{}).forEach(function(sid){
+      Object.keys(shifts[sid]||{}).forEach(function(di){
+        const kept=(shifts[sid][di]||[]).filter(function(sh){return sh.type==='leave';});
+        if(kept.length) shifts[sid][di]=kept; else delete shifts[sid][di];
+      });
+    });
+
+    (rows||[]).forEach(function(row){
+      const sid=byName[_normName(row.staff_name)];
+      if(sid===undefined) return;                     // not on this roster
+      const d=new Date(row.shift_date+'T00:00:00');
+      const dow=d.getDay(); const di=(dow===0?6:dow-1);   // Mon=0 … Sun=6
+      if(!shifts[sid]) shifts[sid]={};
+      if(!shifts[sid][di]) shifts[sid][di]=[];
+      shifts[sid][di].push({
+        start:String(row.start_time||'').slice(0,5),
+        end:String(row.end_time||'').slice(0,5),
+        type:'shift',
+        role:row.role||'',
+        _dbId:row.id,
+        _status:row.status||'assigned',
+        _openTeam:row.open_to_team||null,
+        _releaseBy:row.release_requested_by||null
+      });
+    });
+
+    if(typeof renderRoster==='function') renderRoster();
+    if(typeof updateStats==='function') updateStats();
+  }catch(e){
+    console.warn('loadWeekShiftsFromDB failed', e);
+    try{ showToast('Couldn\'t load shifts — check connection'); }catch(_){}
+  }finally{ _dbShiftsLoading=false; }
+}
+
 function loadWeek(key){
   const resolved=_resolveStoreKey(key);
   const _has = !!resolved;
@@ -2812,6 +2884,8 @@ function switchWeek(newStart){
   availWeekKey=weekKey(currentWeekStart);
   console.log('[WEEK-DEBUG] switchWeek: after save, now availWeekKey="'+availWeekKey+'"');
   loadWeek(availWeekKey);
+  // Shifts come from roster_shifts, not the blob — pull the new week.
+  loadWeekShiftsFromDB(currentWeekStart);
 }
 
 function prevWeek(){switchWeek(addDays(currentWeekStart,-7));renderRoster();updateStats();}
@@ -4859,6 +4933,24 @@ function showSection(id){
   // keep the URL hash in sync so each view is bookmarkable / refresh-safe
   try{ if(('#'+id)!==location.hash) history.replaceState(null,'','#'+id); }catch(e){}
 }let _navSwitchPending=false;
+/**
+ * Hide the "NEW" pip on the Availability nav item.
+ *
+ * The nav item has always called this, but the function was never defined —
+ * so every click on Availability threw "clearAvailBadge is not defined" and
+ * aborted the rest of that onclick handler. Defensive: the badge element is
+ * optional, so this is safe even if the markup is later removed.
+ *
+ * Note: nothing currently SHOWS this badge (no showAvailBadge counterpart and
+ * the span is inline display:none), so the feature is dormant rather than
+ * broken. Wiring it up would mean flipping it on when new availability is
+ * submitted.
+ */
+function clearAvailBadge(){
+  const b=document.getElementById('availNavBadge');
+  if(b) b.style.display='none';
+}
+
 function switchNav(id,el){
   if(_navSwitchPending)return;
   _navSwitchPending=true;
@@ -6670,13 +6762,26 @@ async function aaSave(){
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────
-const SHIFTOPS_BUILD='2026-07-13-v15-health-nudge';
+const SHIFTOPS_BUILD='2026-07-31-v16-roster-shifts';
 console.log('%c[ShiftOps build '+SHIFTOPS_BUILD+' loaded]','background:#16a34a;color:#fff;padding:2px 8px;border-radius:4px;font-weight:700;');
 (async()=>{
   await loadData();
-  if(!availWeekKey)availWeekKey=weekKey(currentWeekStart);
+  // Always open on the week that contains TODAY, and keep availWeekKey and
+  // currentWeekStart in lockstep.
+  //
+  // Previously availWeekKey was restored from the saved blob while
+  // currentWeekStart was initialised to today, so they could disagree: the
+  // grid drew today's dates while loadWeek() filled it with a different
+  // week's shifts, and saveCurrentWeek() then wrote back under the OTHER
+  // week's key. That desync is the root of the "wrong week" family of bugs
+  // (it's why the Morning Board showed a leave a week early), and it becomes
+  // far more dangerous now that real shifts live in roster_shifts.
+  currentWeekStart=getMonday(new Date());
+  availWeekKey=weekKey(currentWeekStart);
   loadWeek(availWeekKey);
   renderAll();
+  // Real shifts live in roster_shifts, not the blob — pull this week's.
+  loadWeekShiftsFromDB(currentWeekStart);
   try{ applyTeamLeadLock(); }catch(e){}
   // Open the section named in the URL hash, defaulting to Home (which starts
   // the Morning Board). Replaces the old unconditional board start.
