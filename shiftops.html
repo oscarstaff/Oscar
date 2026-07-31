@@ -4148,6 +4148,10 @@ function deleteCurrentShift(){
     }
   }
 
+  // Remove from the DB before dropping it from memory — once it's spliced out
+  // we've lost the _dbId and the row would be orphaned in roster_shifts.
+  if(block && block.type!=='leave' && block._dbId) dbDeleteShift(block);
+
   shifts[staffId][dayIdx].splice(shiftIdx,1);
   closeModal('shiftModal');markDirty();renderAll();
   showToast(block&&block.type==='leave'?'Leave removed':'Shift deleted');
@@ -4155,6 +4159,85 @@ function deleteCurrentShift(){
 function populateStaffSelect(elId,selectedId){
   document.getElementById(elId).innerHTML=staff.map(s=>`<option value="${s.id}"${s.id==selectedId?' selected':''}>${s.first} ${s.last}</option>`).join('');
 }
+/* ── roster_shifts writes ─────────────────────────────────────────────────
+   Deliberately per-mutation rather than a whole-week reconciler. A reconciler
+   would also have to decide what to DELETE, and if the in-memory grid were
+   ever empty (failed load, race during init) it would happily delete a real
+   roster — the same failure mode that wiped ShiftOps before. These fail the
+   other way: if something isn't wired up yet, the edit simply doesn't persist.
+   Leave blocks are never written here; leave lives in leave_submissions.
+   ──────────────────────────────────────────────────────────────────────── */
+function _shiftDateFor(dayIdx){
+  return _isoDate(addDays(new Date(currentWeekStart), dayIdx));
+}
+function _nameForStaffId(id){
+  const s=(staff||[]).find(function(x){return x.id===id;});
+  return s ? ((s.first||'').trim()+' '+(s.last||'').trim()).trim() : '';
+}
+const _DB_H={apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY,'Content-Type':'application/json'};
+
+async function dbCreateShift(staffId, dayIdx, sh){
+  const name=_nameForStaffId(staffId);
+  if(!name) return null;
+  try{
+    const r=await fetch(SUPABASE_URL+'/rest/v1/roster_shifts',{
+      method:'POST',
+      headers:Object.assign({Prefer:'return=representation'},_DB_H),
+      body:JSON.stringify({
+        staff_name:name, shift_date:_shiftDateFor(dayIdx),
+        start_time:sh.start, end_time:sh.end,
+        role:sh.role||null,
+        created_by:(typeof currentUser!=='undefined'&&currentUser)?currentUser:null,
+        updated_by:(typeof currentUser!=='undefined'&&currentUser)?currentUser:null
+      })
+    });
+    if(!r.ok){
+      // 409 = the uniqueness constraint caught an exact duplicate.
+      if(r.status===409){ showToast('That exact shift already exists'); return null; }
+      throw new Error('HTTP '+r.status);
+    }
+    const rows=await r.json();
+    if(rows&&rows[0]){ sh._dbId=rows[0].id; sh._status=rows[0].status; return rows[0].id; }
+  }catch(e){
+    console.warn('dbCreateShift',e);
+    showToast('Shift not saved to server — check connection');
+  }
+  return null;
+}
+
+async function dbUpdateShift(sh, staffId, dayIdx){
+  if(!sh||!sh._dbId) return false;
+  const name=_nameForStaffId(staffId);
+  try{
+    const body={start_time:sh.start,end_time:sh.end,role:sh.role||null,
+                updated_by:(typeof currentUser!=='undefined'&&currentUser)?currentUser:null};
+    if(name) body.staff_name=name;
+    if(dayIdx!==undefined && dayIdx!==null) body.shift_date=_shiftDateFor(dayIdx);
+    const r=await fetch(SUPABASE_URL+'/rest/v1/roster_shifts?id=eq.'+encodeURIComponent(sh._dbId),
+      {method:'PATCH',headers:_DB_H,body:JSON.stringify(body)});
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    return true;
+  }catch(e){
+    console.warn('dbUpdateShift',e);
+    showToast('Change not saved to server — check connection');
+    return false;
+  }
+}
+
+async function dbDeleteShift(sh){
+  if(!sh||!sh._dbId) return false;
+  try{
+    const r=await fetch(SUPABASE_URL+'/rest/v1/roster_shifts?id=eq.'+encodeURIComponent(sh._dbId),
+      {method:'DELETE',headers:_DB_H});
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    return true;
+  }catch(e){
+    console.warn('dbDeleteShift',e);
+    showToast('Delete not saved to server — check connection');
+    return false;
+  }
+}
+
 function saveShift(){
   const staffId=parseInt(document.getElementById('shiftStaff').value);
   const day=parseInt(document.getElementById('shiftDay').value);
@@ -4170,9 +4253,21 @@ function saveShift(){
   if(!shifts[staffId][day])shifts[staffId][day]=[];
   const sh={start,end,type,role:isLeave?'Leave':role};
   if(deviceId)sh.deviceId=deviceId;
-  if(editingShift&&editingShift.staffId===staffId&&editingShift.dayIdx===day)
+  let _wasEdit=false, _prev=null;
+  if(editingShift&&editingShift.staffId===staffId&&editingShift.dayIdx===day){
+    _prev=shifts[staffId][day][editingShift.shiftIdx];
+    // Carry the DB identity across an edit, or the update would orphan the row.
+    if(_prev&&_prev._dbId){ sh._dbId=_prev._dbId; sh._status=_prev._status; _wasEdit=true; }
     shifts[staffId][day][editingShift.shiftIdx]=sh;
+  }
   else shifts[staffId][day].push(sh);
+
+  // Persist to roster_shifts. Leave is never stored here — it stays in
+  // leave_submissions and is painted live.
+  if(!isLeave){
+    if(_wasEdit) dbUpdateShift(sh, staffId, day);
+    else         dbCreateShift(staffId, day, sh);
+  }
 
   // Check device conflicts on this day
   if(deviceId){
@@ -6897,11 +6992,21 @@ function cellDrop(e, sid, day){
   const isCopy = _drag.copy || e.altKey || e.ctrlKey || e.metaKey;
   if(!shifts[sid]) shifts[sid]={};
   if(!shifts[sid][day]) shifts[sid][day]=[];
-  shifts[sid][day].push(JSON.parse(JSON.stringify(_drag.shift)));
+  const _moved=JSON.parse(JSON.stringify(_drag.shift));
+  if(isCopy){ delete _moved._dbId; delete _moved._status; }   // a copy is a NEW row
+  shifts[sid][day].push(_moved);
 
   if(!isCopy){
     const src = (shifts[_drag.sid]||{})[_drag.day];
     if(src){ src.splice(_drag.idx,1); if(!src.length) delete shifts[_drag.sid][_drag.day]; }
+  }
+
+  // Persist: a move re-points the existing row at the new person/day, a copy
+  // creates a new one. Leave blocks are never stored in roster_shifts.
+  if(_moved.type!=='leave'){
+    if(isCopy)            dbCreateShift(sid, day, _moved);
+    else if(_moved._dbId) dbUpdateShift(_moved, sid, day);
+    else                  dbCreateShift(sid, day, _moved);
   }
   const who = staff.find(x=>x.id===sid);
   showToast(`${isCopy?'Copied':'Moved'} shift → ${who?who.first:''} ${DAYS_SHORT[day]||''}${r.level==='warn'?` (${r.why})`:''}`);
