@@ -2677,12 +2677,16 @@ function saveCurrentWeek(){
       if(!merged[s.id][d].length) delete merged[s.id][d];
     }
   });
-  // Also scrub any leave blocks that were already sitting in the store.
+  // Also scrub any leave blocks that were already sitting in the store, and
+  // drop staff entries that ended up with no days at all. Leaving empty {}
+  // shells behind is what inflated a blank week's "staff count" to 33 and let
+  // it beat the real roster in _resolveStoreKey.
   Object.keys(merged).forEach(function(sid){
     Object.keys(merged[sid]||{}).forEach(function(d){
       merged[sid][d]=noLeave(merged[sid][d]);
       if(!merged[sid][d].length) delete merged[sid][d];
     });
+    if(!Object.keys(merged[sid]||{}).length) delete merged[sid];
   });
   shiftsStore[key]=merged;
   availStore[key]=JSON.parse(JSON.stringify(availability));
@@ -2764,10 +2768,29 @@ function _resolveStoreKey(key){
   });
   if(!variants.length) return null;
   if(variants.length===1) return variants[0];
-  // Multiple variants — return the one with the most staff entries.
+  // Multiple variants — return the one with the most ACTUAL SHIFT DATA.
+  //
+  // This used to count staff-ID keys, which is not the same thing and picked
+  // exactly the wrong variant: saveCurrentWeek() writes an empty {} shell for
+  // every staff member, so a week with no shifts still carries 33 keys, while
+  // the legacy long-form key holding the real roster might carry only 6. The
+  // count said 33 > 6 and the blank week won — the roster "vanished".
+  // Count populated day arrays instead, and break ties toward the variant that
+  // has any data at all.
+  const dataCount=function(k){
+    let n=0;
+    const wkObj=shiftsStore[k]||{};
+    Object.keys(wkObj).forEach(function(sid){
+      const byDay=wkObj[sid]||{};
+      Object.keys(byDay).forEach(function(d){
+        if(Array.isArray(byDay[d]) && byDay[d].length) n++;
+      });
+    });
+    return n;
+  };
   let best=variants[0], bestCnt=-1;
   variants.forEach(function(k){
-    const cnt=Object.keys(shiftsStore[k]||{}).length;
+    const cnt=dataCount(k);
     if(cnt>bestCnt){ bestCnt=cnt; best=k; }
   });
   return best;
