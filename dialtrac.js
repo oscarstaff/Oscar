@@ -365,6 +365,26 @@ select.cl-in{appearance:none;-webkit-appearance:none;cursor:pointer;padding-righ
 .cl-att{font-size:10px;font-weight:700;font-variant-numeric:tabular-nums;
   color:var(--amber);background:var(--amber-bg);border:1px solid var(--amber-bd);
   padding:1px 6px;border-radius:5px;}
+/* When the badge doubles as the day-group expander it's a real button. */
+.cl-att-btn{font-family:inherit;cursor:pointer;display:inline-flex;
+  align-items:center;gap:3px;line-height:1.5;
+  transition:background var(--cl-t),transform var(--cl-t);}
+.cl-att-btn:hover{transform:translateY(-1px);filter:brightness(.97);}
+.cl-att-ch{transition:transform var(--cl-t) var(--cl-ease);opacity:.75;}
+.cl-att-btn.on .cl-att-ch{transform:rotate(180deg);}
+/* Earlier same-day attempts, hidden until the ×N badge is clicked. */
+.cl-stack{display:none;flex-direction:column;gap:5px;margin-top:9px;
+  padding-top:9px;border-top:1px dashed var(--m-border);}
+.cl-stack.on{display:flex;}
+.cl-stack-row{display:flex;align-items:center;gap:8px;font-size:12px;
+  flex-wrap:wrap;min-width:0;}
+.cl-stack-t{font-variant-numeric:tabular-nums;font-weight:700;
+  color:var(--m-ink-2);flex-shrink:0;}
+.cl-stack-by{color:var(--m-ink-2);font-weight:600;flex-shrink:0;}
+.cl-stack-rs{color:var(--m-ink-3);}
+.cl-stack-note{color:var(--m-ink-3);flex:1;min-width:0;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap;}
+.cl-stack-row .cl-hist-pill{margin-left:auto;}
 
 .cl-line2{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
 .cl-num{font-family:ui-monospace,'SF Mono','JetBrains Mono',Menlo,monospace;
@@ -1542,6 +1562,32 @@ function clRenderQueue(){
   // order means an edited or relogged row can't jump the queue.
   rows=rows.slice().sort((a,b)=> new Date(b.created_at) - new Date(a.created_at));
 
+  // ── Same number + same Sydney day = ONE card ──────────────────────────
+  // Grouped in the RENDER only; the DB stays append-only and every call is
+  // still its own row. The newest row of each number+day is the card face;
+  // that day's earlier calls stack inside it, expandable from the ×N badge.
+  // The stack is built from the full queue (not the filtered rows), so in
+  // the Waiting tab the face is the one open row and the stack shows the
+  // day's earlier — by then resolved — attempts. Rows without a number
+  // never group.
+  const _gSeen=new Set();
+  window._clStacks={};
+  const faces=[];
+  rows.forEach(r=>{
+    const key=r.phone_e164 ? (r.phone_e164+'|'+clSydDate(r.created_at)) : ('solo|'+r.id);
+    if(_gSeen.has(key)) return;          // stacked under an earlier (newer) face
+    _gSeen.add(key);
+    if(r.phone_e164){
+      const day=clSydDate(r.created_at);
+      window._clStacks[r.id]=_clQueue.filter(x=>
+        x.id!==r.id && !x.deleted_at && x.phone_e164===r.phone_e164 &&
+        clSydDate(x.created_at)===day
+      ).sort((a,b)=> new Date(b.created_at)-new Date(a.created_at));
+    }else window._clStacks[r.id]=[];
+    faces.push(r);
+  });
+  rows=faces;
+
   if(!rows.length){
     body.innerHTML='';
     const where = _clScope==='team' && typeof myTeam!=='undefined' && myTeam ? ' in '+myTeam : '';
@@ -1568,12 +1614,10 @@ function clRenderQueue(){
   body.innerHTML=rows.map(r=>{
     const done=!!r.resolved_at;
     const pretty=clFmtPhone(r.phone_e164);
-    // Attempts reset daily: the counter is calls to this number on the SAME
-    // Sydney calendar day. A caller rung three times last week and once today
-    // shows ×1 today, not ×4 — each new day is a fresh ticket.
-    const attempts = r.phone_e164
-      ? _clQueue.filter(x=>x.phone_e164===r.phone_e164 && !x.deleted_at
-          && clSydDate(x.created_at)===clSydDate(r.created_at)).length : 1;
+    // Attempts reset daily: the day-group IS the ticket, so the count is
+    // simply this card's stack + its face. New Sydney day = fresh ticket.
+    const stack=(window._clStacks&&window._clStacks[r.id])||[];
+    const attempts=1+stack.length;
     // "Handled on the spot" = closed by the logger at log time. resolved_at is
     // stamped client-side while created_at is the DB insert default, so the two
     // can differ by 15-20s (and resolved_at can even precede created_at). A tight
@@ -1649,7 +1693,11 @@ function clRenderQueue(){
         '<div class="cl-card-body">'+
           '<div class="cl-line1">'+
             '<span class="cl-nm">'+clEsc(r.caller_name)+'</span>'+
-            (attempts>1 && !done?'<span class="cl-att" title="'+attempts+' calls to this number">×'+attempts+'</span>':'')+
+            (attempts>1?'<button class="cl-att cl-att-btn" id="clatt-'+r.id+'" '+
+              'title="'+attempts+' calls to this number today — click for earlier attempts" '+
+              'onclick="event.stopPropagation();clToggleStack(\''+r.id+'\')">\u00d7'+attempts+
+              '<svg class="cl-att-ch" width="9" height="9" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>'+
+              '</button>':'')+
             (oldish?'<span class="cl-wait-age cl-wait-'+tier+'" title="Waiting since '+
               clEsc(new Date(r.created_at).toLocaleString('en-AU',
                 {weekday:'short',day:'numeric',month:'short',hour:'numeric',minute:'2-digit'}))+
@@ -1668,6 +1716,25 @@ function clRenderQueue(){
               (backLabel?' · rung back '+backLabel+' later':'')+'</span>'+
           '</div>'+
           (r.note?'<p class="cl-note">'+clEsc(r.note)+'</p>':'')+
+          (stack.length?'<div class="cl-stack" id="clstk-'+r.id+'">'+
+            stack.map(function(s){
+              const sd=!!s.resolved_at;
+              const sOn=sd && s.resolved_by===s.logged_by &&
+                Math.abs(new Date(s.resolved_at)-new Date(s.created_at))<60000;
+              const sPill=!sd?'<span class="cl-hist-pill wait">Waiting</span>'
+                : sOn?'<span class="cl-hist-pill done">Handled</span>'
+                     :'<span class="cl-hist-pill done">Called back</span>';
+              const t=new Date(s.created_at).toLocaleTimeString('en-AU',
+                {hour:'numeric',minute:'2-digit',timeZone:'Australia/Sydney'});
+              const naRe=/^n\/?a$/i;
+              return '<div class="cl-stack-row">'+
+                '<span class="cl-stack-t">'+t+'</span>'+
+                '<span class="cl-stack-by">'+clEsc((s.logged_by||'').split(' ')[0])+'</span>'+
+                (s.reason && !naRe.test(String(s.reason).trim())
+                  ?'<span class="cl-stack-rs">'+clEsc(s.reason)+'</span>':'')+
+                (s.note?'<span class="cl-stack-note">'+clEsc(s.note)+'</span>':'')+
+                sPill+'</div>';
+            }).join('')+'</div>':'')+
         '</div>'+
       '</div>'+
       '<div class="cl-card-act">'+
@@ -2073,6 +2140,15 @@ function clScheduleQueueRefresh(){
   }, 2500);
 }
 
+
+/** Expand/collapse a day-group's earlier attempts. */
+function clToggleStack(id){
+  const el=document.getElementById('clstk-'+id);
+  const b=document.getElementById('clatt-'+id);
+  if(!el) return;
+  const on=el.classList.toggle('on');
+  if(b) b.classList.toggle('on',on);
+}
 
 /* ── Caller history card ──────────────────────────────────────────
    When a valid number is typed, show that number's last 14 days,
