@@ -2015,6 +2015,13 @@ const GAS_TOKEN='oscars_gas_83235a5f0c1f6ba32b18235e2b2d544ac137167d';
 const MAIL_EXEC_URL='https://script.google.com/macros/s/AKfycbyfr16rfoX-kj30XxJu53wkJrFz6ZixQOylpIqcfbtjVhZBJUFYpBQ_5i9lZSi8PjI-Zw/exec';
 const MAIL_TOKEN='oscars_mail_921793e91a49d14b120c9053065e94c7065ae583';
 
+// ── PILOT SWITCH ────────────────────────────────────────────────────────
+// While testing shift pickup, only this person receives the "shift available"
+// email — the shift still opens to the whole team and anyone can claim it in
+// Nexus, this only limits who gets notified.
+// Set to '' to notify the real team.
+const SHIFT_MAIL_TEST_ONLY='Sanskar Pokharel';
+
 const COLORS=['#00e5a0','#0066ff','#ff6b35','#ffd700','#ff69b4','#00bcd4','#9c27b0','#8bc34a','#ff5722','#607d8b'];
 const DAYS=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
 const DAYS_FULL=['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
@@ -4231,9 +4238,19 @@ async function notifyTeamShiftOpen(team, fromStaff, info){
       {headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY}});
     if(!r.ok) return;
     const rows=await r.json();
-    const to=(rows||[])
+    let to=(rows||[])
       .filter(function(x){ return x.email && x.email.indexOf('@')>0 && x.staff_name!==fromStaff; })
       .map(function(x){ return {name:x.staff_name, email:x.email}; });
+    // Pilot: narrow the audience to the tester, without changing who can claim.
+    if(SHIFT_MAIL_TEST_ONLY){
+      to=to.filter(function(x){ return x.name===SHIFT_MAIL_TEST_ONLY; });
+      if(!to.length){
+        console.warn('[PILOT] '+SHIFT_MAIL_TEST_ONLY+' not in team '+team+
+                     ' (or has no email) — no shift-open email sent');
+        return;
+      }
+      console.log('[PILOT] shift-open email → '+to[0].email+' only');
+    }
     if(!to.length) return;
     fetch(MAIL_EXEC_URL,{
       method:'POST',
