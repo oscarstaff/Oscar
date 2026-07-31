@@ -3140,17 +3140,42 @@ async function togglePublishWeek(){
       if(!confirm('Unpublish this week? Staff will stop seeing these shifts in Nexus.')){ if(btn) btn.disabled=false; return; }
       const r=await fetch(SUPABASE_URL+'/rest/v1/roster_published?week_start=eq.'+wk,
         {method:'DELETE',headers:_DB_H});
-      if(!r.ok) throw new Error('HTTP '+r.status);
+      if(!r.ok){
+        const d=await r.text().catch(function(){return '';});
+        console.error('[PUBLISH] unpublish HTTP '+r.status, d);
+        showToast('Could not unpublish ('+r.status+')');
+        if(btn) btn.disabled=false;
+        return;
+      }
       _pubWeeks.delete(wk);
       showToast('Week unpublished — hidden from staff');
     }else{
       const r=await fetch(SUPABASE_URL+'/rest/v1/roster_published',{
         method:'POST',
-        headers:Object.assign({Prefer:'resolution=merge-duplicates,return=minimal'},_DB_H),
+        headers:Object.assign({Prefer:'resolution=merge-duplicates,return=representation'},_DB_H),
         body:JSON.stringify({week_start:wk,
           published_by:(typeof currentUser!=='undefined'&&currentUser)?currentUser:null})
       });
-      if(!r.ok) throw new Error('HTTP '+r.status);
+      // Verify the row actually landed. Previously any failure fell through to
+      // a "Published" toast, so the UI claimed success while the table stayed
+      // empty — the worst possible outcome for a publish button.
+      if(!r.ok){
+        const d=await r.text().catch(function(){return '';});
+        console.error('[PUBLISH] HTTP '+r.status, d);
+        if(r.status===404)      showToast('Publish unavailable — server not ready, try again shortly');
+        else if(r.status===401||r.status===403) showToast('Not allowed to publish');
+        else                    showToast('Publish failed ('+r.status+')');
+        if(btn) btn.disabled=false;
+        return;
+      }
+      const rows=await r.json().catch(function(){return null;});
+      if(!rows || !rows.length){
+        console.error('[PUBLISH] no row returned', rows);
+        showToast('Publish did not save — nothing was written');
+        if(btn) btn.disabled=false;
+        return;
+      }
+      console.log('[PUBLISH] week '+wk+' published', rows[0]);
       _pubWeeks.add(wk);
       showToast('Published — staff can now see this week');
     }
@@ -7420,7 +7445,7 @@ async function aaSave(){
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────
-const SHIFTOPS_BUILD='2026-07-31-v19-stable-tabs';
+const SHIFTOPS_BUILD='2026-07-31-v20-fixes';
 console.log('%c[ShiftOps build '+SHIFTOPS_BUILD+' loaded]','background:#16a34a;color:#fff;padding:2px 8px;border-radius:4px;font-weight:700;');
 (async()=>{
   await loadData();
@@ -7587,6 +7612,10 @@ function copyStaffWeek(sid){
   // never copy leave blocks — they belong to the person, not the pattern
   Object.keys(_copiedWeek).forEach(d=>{
     _copiedWeek[d] = (_copiedWeek[d]||[]).filter(x=>x.type!=='leave');
+    // CRITICAL: strip the database identity. A copy must become NEW rows.
+    // Carrying _dbId through meant a paste re-pointed the ORIGINAL row at the
+    // new person — a copy that behaved like a cut.
+    _copiedWeek[d].forEach(function(x){ delete x._dbId; delete x._status; delete x._openTeam; delete x._releaseBy; });
     if(!_copiedWeek[d].length) delete _copiedWeek[d];
   });
   const s = staff.find(x=>x.id===sid);
@@ -7605,7 +7634,10 @@ function pasteStaffWeek(sid){
       if(r.level==='block'){ skipped.push(`${DAYS_SHORT[d]} (${r.why})`); return; }
       if(!shifts[sid]) shifts[sid]={};
       if(!shifts[sid][d]) shifts[sid][d]=[];
-      shifts[sid][d].push(JSON.parse(JSON.stringify(sh)));
+      const copy=JSON.parse(JSON.stringify(sh));
+      delete copy._dbId; delete copy._status;      // belt and braces
+      shifts[sid][d].push(copy);
+      dbCreateShift(sid, d, copy);                  // persist — paste was memory-only
       added++;
     });
   });
