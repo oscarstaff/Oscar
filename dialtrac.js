@@ -262,7 +262,13 @@ select.cl-in{appearance:none;-webkit-appearance:none;cursor:pointer;padding-righ
 .cl-cnt{font-variant-numeric:tabular-nums;font-size:11px;font-weight:700;opacity:.6;}
 
 .cl-search-wrap{position:relative;display:flex;align-items:center;flex-shrink:0;}
-.cl-daterange{display:flex;align-items:center;gap:5px;flex-shrink:0;
+/* The two date inputs are the widest thing in the bar and rarely used, so
+   they stay tucked away until the calendar chip opens them (or a range is
+   actually active). This is what un-crowds the toolbar. */
+.cl-daterange{display:none;align-items:center;gap:5px;flex-shrink:0;}
+.cl-daterange.show,.cl-daterange.cl-dr-active{display:flex;}
+.cl-chip-ico{padding:7px 10px;}
+.cl-daterange{
   border:1px solid var(--m-border);background:var(--m-card);
   border-radius:999px;padding:3px 8px;min-height:34px;
   transition:border-color var(--cl-t) var(--cl-ease);}
@@ -736,6 +742,9 @@ select.cl-in{appearance:none;-webkit-appearance:none;cursor:pointer;padding-righ
               </div>
               <div class="cl-bar-right">
                 <button class="cl-chip" id="clChipToday" onclick="clToggleToday()" title="Show only today's calls">Today</button>
+                <button class="cl-chip cl-chip-ico" id="clDateBtn" onclick="clToggleDatePicker()" title="Filter by date range" aria-label="Toggle date range filter">
+                  <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd"/></svg>
+                </button>
                 <div class="cl-daterange" id="clDateRange" role="group" aria-label="Date range">
                   <input type="date" id="clFrom" class="cl-date" aria-label="From date" onchange="clSetDateRange()" />
                   <span class="cl-date-dash">–</span>
@@ -1147,13 +1156,26 @@ function clToggleToday(){
     const f=document.getElementById('clFrom'), t=document.getElementById('clTo');
     if(f) f.value=''; if(t) t.value='';
     const dr=document.getElementById('clDateRange');
-    if(dr) dr.classList.remove('cl-daterange-on');
+    if(dr){ dr.classList.remove('cl-dr-active'); dr.classList.remove('show'); }
     const x=document.getElementById('clDateClear');
     if(x) x.style.display='none';
+    const db=document.getElementById('clDateBtn');
+    if(db) db.classList.remove('cl-chip-on');
   }
   const b=document.getElementById('clChipToday');
   if(b) b.classList.toggle('cl-chip-on', _clToday);
   clRenderQueue(); clRefreshOpenCount();
+}
+
+/** Show/hide the date-range inputs. The calendar chip stays lit while a
+ *  range is active even when the inputs are tucked away again. */
+function clToggleDatePicker(){
+  const dr=document.getElementById('clDateRange');
+  if(!dr) return;
+  const on=dr.classList.toggle('show');
+  const b=document.getElementById('clDateBtn');
+  if(b) b.classList.toggle('cl-chip-on', on || !!(_clFrom||_clTo));
+  if(on){ const f=document.getElementById('clFrom'); if(f) f.focus(); }
 }
 
 function clSetDateRange(){
@@ -1182,6 +1204,8 @@ function clSetDateRange(){
   if(wrap) wrap.classList.toggle('cl-dr-active', active);
   const clr=document.getElementById('clDateClear');
   if(clr) clr.style.display = active ? '' : 'none';
+  const db=document.getElementById('clDateBtn');
+  if(db) db.classList.toggle('cl-chip-on', active || (wrap&&wrap.classList.contains('show')));
   clRenderQueue();
   clRefreshOpenCount();
 }
@@ -1189,8 +1213,10 @@ function clClearDateRange(){
   _clFrom=_clTo=null;
   const f=document.getElementById('clFrom'); if(f) f.value='';
   const t=document.getElementById('clTo');   if(t) t.value='';
-  const wrap=document.getElementById('clDateRange'); if(wrap) wrap.classList.remove('cl-dr-active');
+  const wrap=document.getElementById('clDateRange');
+  if(wrap){ wrap.classList.remove('cl-dr-active'); wrap.classList.remove('show'); }
   const clr=document.getElementById('clDateClear'); if(clr) clr.style.display='none';
+  const db=document.getElementById('clDateBtn'); if(db) db.classList.remove('cl-chip-on');
   clRenderQueue();
   clRefreshOpenCount();
 }
