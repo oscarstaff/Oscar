@@ -1646,6 +1646,17 @@ body.tl-readonly .wk-tools{ display:none !important; }
         <option value="">— No device —</option>
       </select>
     </div>
+    <!-- Shift-pickup status: only shown for shifts that exist in roster_shifts -->
+    <div class="form-group" id="shiftPickupBox" style="display:none;border:1px solid var(--border);border-radius:8px;padding:10px 12px;background:var(--bg);">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <span id="shiftPickupState" style="font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;"></span>
+        <span id="shiftPickupNote" style="font-size:12px;color:var(--text-dim);"></span>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:9px;flex-wrap:wrap;">
+        <button class="btn btn-primary" id="shiftOpenBtn" style="display:none" onclick="openShiftToTeam()">Open to team</button>
+        <button class="btn btn-ghost" id="shiftUnopenBtn" style="display:none" onclick="cancelShiftOpening()">Cancel opening</button>
+      </div>
+    </div>
     <div class="modal-actions">
       <button class="btn btn-warn" id="shiftDeleteBtn" style="display:none" onclick="deleteCurrentShift()">Delete</button>
       <button class="btn btn-ghost" onclick="closeModal('shiftModal')">Cancel</button>
@@ -2635,6 +2646,7 @@ function clickCell(staffId,day){
   document.getElementById('shiftWeek').value='w1';
   populateShiftDeviceSelect(null);
   onShiftTypeChange(document.getElementById('shiftType'));
+  renderShiftPickupBox(null);   // new shift: nothing to open for pickup yet
   openModal('shiftModal');
 }
 
@@ -2652,6 +2664,7 @@ function editShift(staffId,dayIdx,shiftIdx){
   document.getElementById('shiftWeek').value='w1';
   populateShiftDeviceSelect(sh.deviceId||null);
   onShiftTypeChange(document.getElementById('shiftType'));
+  renderShiftPickupBox(sh);
   openModal('shiftModal');
 }
 
@@ -4097,8 +4110,148 @@ function openAddShift(staffId,dayIdx){
   document.getElementById('shiftType').value='shift';
   document.getElementById('shiftRole').value='';
   onShiftTypeChange(document.getElementById('shiftType'));
+  renderShiftPickupBox(null);   // new shift: nothing to open for pickup yet
   openModal('shiftModal');
 }
+/* ── Shift pickup: manager controls ───────────────────────────────────────
+   Opening a shift makes it claimable by the owner's team. The claim itself
+   is atomic server-side (claim_shift), so two people tapping at once can't
+   both win — this side only decides what becomes available.
+   ──────────────────────────────────────────────────────────────────────── */
+function renderShiftPickupBox(sh){
+  const box=document.getElementById('shiftPickupBox');
+  if(!box) return;
+  const openBtn=document.getElementById('shiftOpenBtn');
+  const unopenBtn=document.getElementById('shiftUnopenBtn');
+  const state=document.getElementById('shiftPickupState');
+  const note=document.getElementById('shiftPickupNote');
+
+  // Only DB-backed, non-leave shifts can be opened for pickup.
+  if(!sh || !sh._dbId || sh.type==='leave'){
+    box.style.display='none';
+    return;
+  }
+  box.style.display='';
+  const st=sh._status||'assigned';
+  if(st==='open'){
+    state.textContent='Open for pickup';
+    state.style.color='var(--warn)';
+    note.textContent=sh._openTeam?('Visible to '+sh._openTeam):'Visible to the team';
+    openBtn.style.display='none';
+    unopenBtn.style.display='';
+  }else if(st==='pending_release'){
+    state.textContent='Release requested';
+    state.style.color='var(--warn)';
+    note.textContent=(sh._releaseBy||'Staff')+' asked to give this up';
+    openBtn.style.display='';
+    openBtn.textContent='Approve & open to team';
+    unopenBtn.style.display='';
+    unopenBtn.textContent='Decline request';
+  }else{
+    state.textContent='Assigned';
+    state.style.color='var(--text-dim)';
+    note.textContent='';
+    openBtn.style.display='';
+    openBtn.textContent='Open to team';
+    unopenBtn.style.display='none';
+  }
+}
+
+function _editingShiftBlock(){
+  if(!editingShift) return null;
+  const{staffId,dayIdx,shiftIdx}=editingShift;
+  return (shifts[staffId]&&shifts[staffId][dayIdx])?shifts[staffId][dayIdx][shiftIdx]:null;
+}
+
+async function openShiftToTeam(){
+  const sh=_editingShiftBlock();
+  if(!sh||!sh._dbId){ showToast('Save the shift first'); return; }
+  const who=_nameForStaffId(editingShift.staffId);
+  const s=(staff||[]).find(function(x){return x.id===editingShift.staffId;});
+  const team=(s&&s.team)?s.team:null;
+  try{
+    const r=await fetch(SUPABASE_URL+'/rest/v1/rpc/approve_shift_release',{
+      method:'POST',headers:_DB_H,
+      body:JSON.stringify({p_shift_id:sh._dbId,
+        p_manager:(typeof currentUser!=='undefined'&&currentUser)?currentUser:'Manager',
+        p_team:team})
+    });
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const res=await r.json();
+    if(!res||res.ok!==true){
+      showToast('Could not open shift'+(res&&res.reason?(' — '+res.reason):''));
+      return;
+    }
+    sh._status='open'; sh._openTeam=res.open_to_team||team;
+    renderShiftPickupBox(sh);
+    closeModal('shiftModal');
+    renderAll();
+    showToast('Shift opened to '+(res.open_to_team||'team'));
+    notifyTeamShiftOpen(res.open_to_team||team, who, res);
+  }catch(e){
+    console.warn('openShiftToTeam',e);
+    showToast('Could not open shift — check connection');
+  }
+}
+
+async function cancelShiftOpening(){
+  const sh=_editingShiftBlock();
+  if(!sh||!sh._dbId) return;
+  try{
+    const r=await fetch(SUPABASE_URL+'/rest/v1/rpc/cancel_shift_open',{
+      method:'POST',headers:_DB_H,
+      body:JSON.stringify({p_shift_id:sh._dbId,
+        p_actor:(typeof currentUser!=='undefined'&&currentUser)?currentUser:'Manager',
+        p_note:null})
+    });
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const res=await r.json();
+    if(!res||res.ok!==true){ showToast('Could not cancel'+(res&&res.reason?(' — '+res.reason):'')); return; }
+    sh._status='assigned'; sh._openTeam=null; sh._releaseBy=null;
+    renderShiftPickupBox(sh);
+    closeModal('shiftModal');
+    renderAll();
+    showToast('Shift is assigned again');
+  }catch(e){
+    console.warn('cancelShiftOpening',e);
+    showToast('Could not cancel — check connection');
+  }
+}
+
+/**
+ * Tell the team a shift is up for grabs. Best-effort and silent on failure —
+ * a mail problem must never make the shift look un-opened when it IS open.
+ * Skips anyone with no email on file.
+ */
+async function notifyTeamShiftOpen(team, fromStaff, info){
+  if(!team) return;
+  if(!MAIL_EXEC_URL || MAIL_EXEC_URL.indexOf('http')!==0) return;
+  try{
+    const r=await fetch(SUPABASE_URL+'/rest/v1/staff_credentials?team=eq.'+encodeURIComponent(team)+'&select=staff_name,email',
+      {headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY}});
+    if(!r.ok) return;
+    const rows=await r.json();
+    const to=(rows||[])
+      .filter(function(x){ return x.email && x.email.indexOf('@')>0 && x.staff_name!==fromStaff; })
+      .map(function(x){ return {name:x.staff_name, email:x.email}; });
+    if(!to.length) return;
+    fetch(MAIL_EXEC_URL,{
+      method:'POST',
+      headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body:JSON.stringify({
+        action:'sendShiftOpen',
+        token:MAIL_TOKEN,
+        recipients:to,
+        team:team,
+        shiftDate:info.shift_date,
+        startTime:String(info.start_time||'').slice(0,5),
+        endTime:String(info.end_time||'').slice(0,5),
+        fromStaff:fromStaff
+      })
+    }).catch(function(){});
+  }catch(e){ console.warn('notifyTeamShiftOpen',e); }
+}
+
 function onShiftTypeChange(sel){
   const isLeave=sel.value==='leave';
   const timeRow=document.getElementById('shiftTimeRow');
