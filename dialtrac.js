@@ -239,8 +239,14 @@ select.cl-in{appearance:none;-webkit-appearance:none;cursor:pointer;padding-righ
 .cl-qbar{flex-shrink:0;display:flex;align-items:center;justify-content:space-between;
   gap:12px;padding:12px 18px;border-bottom:1px solid var(--m-border);
   background:var(--m-canvas);flex-wrap:wrap;}
-.cl-filters{display:flex;gap:5px;}
-.cl-bar-right{display:flex;gap:7px;align-items:center;}
+.cl-filters{display:flex;gap:5px;flex-wrap:wrap;}
+/* The right cluster must WRAP when tight, never crush. Without wrap, adding
+   the Today chip (or the search growing on focus) squeezed the date inputs
+   and search into an overlapped mess at mid widths. Each control keeps its
+   size (shrink:0 below) and drops to the next line as a unit instead. */
+.cl-bar-right{display:flex;gap:7px;align-items:center;flex-wrap:wrap;
+  justify-content:flex-end;min-width:0;}
+#clChipToday{flex-shrink:0;}
 .cl-chip{border:1px solid var(--m-border);background:var(--m-card);
   color:var(--m-ink-2);font-family:inherit;font-size:12.5px;font-weight:600;
   padding:7px 14px;border-radius:999px;cursor:pointer;
@@ -255,8 +261,8 @@ select.cl-in{appearance:none;-webkit-appearance:none;cursor:pointer;padding-righ
 .cl-chip:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
 .cl-cnt{font-variant-numeric:tabular-nums;font-size:11px;font-weight:700;opacity:.6;}
 
-.cl-search-wrap{position:relative;display:flex;align-items:center;}
-.cl-daterange{display:flex;align-items:center;gap:5px;
+.cl-search-wrap{position:relative;display:flex;align-items:center;flex-shrink:0;}
+.cl-daterange{display:flex;align-items:center;gap:5px;flex-shrink:0;
   border:1px solid var(--m-border);background:var(--m-card);
   border-radius:999px;padding:3px 8px;min-height:34px;
   transition:border-color var(--cl-t) var(--cl-ease);}
@@ -280,7 +286,7 @@ select.cl-in{appearance:none;-webkit-appearance:none;cursor:pointer;padding-righ
   font-family:inherit;color:var(--m-ink);width:180px;outline:none;min-height:34px;
   transition:all var(--cl-t) var(--cl-ease);}
 .cl-search:hover:not(:focus){border-color:var(--m-border-hi);}
-.cl-search:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-dim);width:236px;}
+.cl-search:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-dim);width:min(236px,36vw);}
 .cl-search::placeholder{color:var(--m-ink-3);}
 .cl-search-kbd{position:absolute;right:10px;font-family:ui-monospace,Menlo,monospace;
   font-size:10px;font-weight:600;color:var(--m-ink-3);pointer-events:none;
