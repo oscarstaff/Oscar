@@ -2001,7 +2001,7 @@ const GAS_TOKEN='oscars_gas_83235a5f0c1f6ba32b18235e2b2d544ac137167d';
 // Its own deployment + own token — deliberately NOT the main Code.gs relay.
 // After deploying LeaveEmailRelay.gs, paste its /exec URL below. The token
 // must match MAIL_TOKEN inside that script exactly.
-const MAIL_EXEC_URL='https://script.google.com/macros/s/AKfycbyfr16rfoX-kj30XxJu53wkJrFz6ZixQOylpIqcfbtjVhZBJUFYpBQ_5i9lZSi8PjI-Zw/exec';
+const MAIL_EXEC_URL='PASTE_YOUR_LEAVE_EMAIL_RELAY_EXEC_URL_HERE';
 const MAIL_TOKEN='oscars_mail_921793e91a49d14b120c9053065e94c7065ae583';
 
 const COLORS=['#00e5a0','#0066ff','#ff6b35','#ffd700','#ff69b4','#00bcd4','#9c27b0','#8bc34a','#ff5722','#607d8b'];
@@ -2104,33 +2104,40 @@ async function loadData(){
   }
 
   // Now that staff is loaded, rebuild leaveRequests from the DATABASE (the
-  // authoritative source) rather than trusting the blob, which can carry
-  // phantom leaves from old sessions. Then repaint approved leaves on the grid.
-  try{
-    const lr=await fetch(`${SUPABASE_URL}/rest/v1/leave_submissions?order=submitted_at.desc`,
-      {headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`}});
-    if(lr.ok){
-      const rows=await lr.json();
-      leaveRequests=(rows||[]).map(function(row){
-        const m=staff.find(function(x){return _normName(x.first+' '+x.last)===_normName(row.staff_name);});
-        return {
-          id:nextLeaveId++,
-          staffId:m?m.id:null,
-          staffName:row.staff_name,
-          staff_name:row.staff_name,
-          from:row.from_date, to:row.to_date,
-          reason:row.reason||'',
-          reason_type:row.reason_type||'',
-          status:row.status||'pending',
-          declineReason:row.decline_reason||'',
-          supabaseId:row.id
-        };
-      });
-    }
-    if(typeof repaintAllApprovedLeaves==='function') repaintAllApprovedLeaves();
-  }catch(e){ console.warn('leave load/repaint failed', e);
-    // fallback: at least self-heal whatever is in memory
-    try{ (leaveRequests||[]).forEach(function(r){ const m=_staffForLeave(r); if(m) r.staffId=m.id; }); if(typeof repaintAllApprovedLeaves==='function') repaintAllApprovedLeaves(); }catch(_){}
+  // authoritative source). Since Phase 0 the blob no longer carries a copy,
+  // so this fetch is the ONLY source — a silent failure would leave approved
+  // leaves unpainted with no explanation. Retry, then say so out loud.
+  let _leaveOk=false;
+  for(let attempt=1; attempt<=3 && !_leaveOk; attempt++){
+    try{
+      const lr=await fetch(`${SUPABASE_URL}/rest/v1/leave_submissions?order=submitted_at.desc`,
+        {headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`}});
+      if(lr.ok){
+        const rows=await lr.json();
+        leaveRequests=(rows||[]).map(function(row){
+          const m=staff.find(function(x){return _normName(x.first+' '+x.last)===_normName(row.staff_name);});
+          return {
+            id:nextLeaveId++,
+            staffId:m?m.id:null,
+            staffName:row.staff_name,
+            staff_name:row.staff_name,
+            from:row.from_date, to:row.to_date,
+            reason:row.reason||'',
+            reason_type:row.reason_type||'',
+            status:row.status||'pending',
+            declineReason:row.decline_reason||'',
+            supabaseId:row.id
+          };
+        });
+        _leaveOk=true;
+      }
+    }catch(e){ console.warn('leave load failed (attempt '+attempt+')', e); }
+    if(!_leaveOk && attempt<3) await new Promise(function(r){ setTimeout(r, attempt*700); });
+  }
+  try{ if(typeof repaintAllApprovedLeaves==='function') repaintAllApprovedLeaves(); }catch(_){}
+  if(!_leaveOk){
+    console.error('[INIT] leave_submissions never loaded — approved leave will not show on the grid until reload');
+    try{ showToast('Couldn\'t load leave — approved leave may not show'); }catch(e){}
   }
 }
 
@@ -2277,7 +2284,7 @@ async function saveData(){
   }
   try{
     saveCurrentWeek(); // flush current week into the store
-    const res=await window.shiftops.saveData({staff,shiftsStore,availStore,nextStaffId,teams,devices,nextDeviceId,availWeekKey,leaveRequests,nextLeaveId});
+    const res=await window.shiftops.saveData(_buildSavePayload());
     if(res.ok){isDirty=false;updateSaveStatus();showToast('Saved');syncStaffToNexus();}
     else showToast('Save failed: '+res.error);
   }catch(e){showToast(''+e.message);}
@@ -2410,13 +2417,40 @@ function _safeToSave(){
   return true;
 }
 
+/**
+ * The ONE place the persisted payload is defined. Three code paths save
+ * (saveData, forceSave, beforeunload) and they must never drift apart —
+ * a stale copy in one of them silently re-introduces whatever the others
+ * dropped.
+ *
+ * Phase 0: we deliberately do NOT persist data Supabase already owns —
+ *   • leaveRequests → rebuilt wholesale from leave_submissions on load,
+ *     so storing it wrote ~39% of every payload (and every history
+ *     snapshot) for data that is thrown away on read.
+ *   • role flags    → deleted on load and re-derived from staff_settings
+ *     / app_access.
+ * Everything else on `staff` stays: `id` keys both shiftsStore and
+ * availStore, and type/maxHours/color exist in no other table.
+ */
+function _buildSavePayload(){
+  const staffSlim=(staff||[]).map(function(s){
+    return {
+      id:s.id, first:s.first, last:s.last, team:s.team,
+      type:s.type, maxHours:s.maxHours, color:s.color,
+      isManager:s.isManager, isOfficeManager:s.isOfficeManager
+    };
+  });
+  return {staff:staffSlim,shiftsStore,availStore,nextStaffId,teams,
+          devices,nextDeviceId,availWeekKey,nextLeaveId};
+}
+
 function markDirty(){isDirty=true;updateSaveStatus();debouncedAutoSave();}
 // Final safeguard: flush any pending changes before window closes
 window.addEventListener('beforeunload', function(e){
   if(isDirty && window.shiftops && _safeToSave()){
     try{
       saveCurrentWeek();
-      window.shiftops.saveData({staff,shiftsStore,availStore,nextStaffId,teams,devices,nextDeviceId,availWeekKey,leaveRequests,nextLeaveId});
+      window.shiftops.saveData(_buildSavePayload());
     }catch(err){}
   }
 });
@@ -2431,7 +2465,7 @@ async function forceSave(){
     if(!_safeToSave()){ try{ showToast('Save skipped — staff not loaded'); }catch(e){} return; }
     try{
       saveCurrentWeek();
-      const res=await window.shiftops.saveData({staff,shiftsStore,availStore,nextStaffId,teams,devices,nextDeviceId,availWeekKey,leaveRequests,nextLeaveId});
+      const res=await window.shiftops.saveData(_buildSavePayload());
       if(res && res.ok){isDirty=false;updateSaveStatus();syncStaffToNexus();}
     }catch(e){console.warn('[forceSave] failed:', e);}
   }
