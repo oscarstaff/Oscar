@@ -19269,6 +19269,31 @@ function onLeaveReasonChange(){
    pending_release; a manager approves, which opens it to everyone in Shift
    Pickup. Staff never release a shift unilaterally — there'd be no cover.
    ──────────────────────────────────────────────────────────────────────── */
+/* ── Published-week gate ──────────────────────────────────────────────────
+   A roster week is a DRAFT until the manager publishes it in ShiftOps.
+   Staff-facing views (My Roster, Shift Pickup) only show shifts from
+   published weeks, so nobody sees a half-built roster being shuffled.
+   Fails OPEN on a fetch error: on a flaky connection it's better to show a
+   possibly-draft roster than to make everyone's shifts vanish. */
+async function _publishedWeeks(){
+  try{
+    const rows=await sbGet('roster_published','?select=week_start');
+    return new Set((rows||[]).map(function(x){return x.week_start;}));
+  }catch(e){
+    console.warn('[PUBLISH-GATE] fetch failed — failing open', e);
+    return null;   // null = gate unavailable, show everything
+  }
+}
+function _weekMonISO(dateStr){
+  const d=new Date(dateStr+'T00:00:00');
+  d.setDate(d.getDate()-((d.getDay()+6)%7));
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+function _filterPublished(rows, pub){
+  if(pub===null) return rows;                       // gate down → fail open
+  return (rows||[]).filter(function(r){ return pub.has(_weekMonISO(r.shift_date)); });
+}
+
 async function loadMyRoster(){
   const host=document.getElementById('myRosterList');
   if(!host) return;
@@ -19281,7 +19306,15 @@ async function loadMyRoster(){
       '&shift_date=gte.'+iso+
       '&select=id,shift_date,start_time,end_time,role,status'+
       '&order=shift_date.asc,start_time.asc');
-    renderMyRoster(rows||[]);
+    const pub=await _publishedWeeks();
+    const visible=_filterPublished(rows||[], pub);
+    if(!visible.length && (rows||[]).length){
+      // Shifts exist but none are in a published week yet.
+      const host2=document.getElementById('myRosterList');
+      if(host2) host2.innerHTML='<div style="padding:30px 0;text-align:center;color:#94a3b8;font-size:13px;">Your roster for the coming weeks hasn\'t been published yet.</div>';
+      return;
+    }
+    renderMyRoster(visible);
   }catch(e){
     console.warn('loadMyRoster',e);
     host.innerHTML='<div style="padding:26px 0;text-align:center;color:#94a3b8;font-size:13px;">Couldn\'t load your roster. Pull to refresh.</div>';
@@ -19409,8 +19442,10 @@ async function loadShiftPickup(){
       '&shift_date=gte.'+iso+
       '&select=id,staff_name,shift_date,start_time,end_time,role,open_to_team'+
       '&order=shift_date.asc,start_time.asc');
-    console.log('[PICKUP] team="'+team+'" rows='+((rows||[]).length));
-    renderShiftPickup(rows||[]);
+    const pub=await _publishedWeeks();
+    const visible=_filterPublished(rows||[], pub);
+    console.log('[PICKUP] team="'+team+'" rows='+((rows||[]).length)+' published='+visible.length);
+    renderShiftPickup(visible);
   }catch(e){
     console.warn('loadShiftPickup',e);
     host.innerHTML='<div style="padding:26px 0;text-align:center;color:#94a3b8;font-size:13px;">Couldn\'t load available shifts. Pull to refresh.</div>';
