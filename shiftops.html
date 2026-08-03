@@ -1585,9 +1585,13 @@ button, .btn { white-space: nowrap; }
       var payload=JSON.parse(decodeURIComponent(escape(atob(b64))));
       if(payload.app!==APP){fail('Token is for a different app.');return;}
       if(Date.now()>payload.exp){fail('Token expired — relaunch from Nexus.');return;}
-      // verify the person is still on the access list (server-side truth)
+      // verify the person is still on the access list (server-side truth).
+      // Use the session token Nexus passed in the payload, not the anon key:
+      // app_access is RLS-locked to authenticated, and this gate script runs
+      // before the fetch interceptor exists, so nothing would swap it for us.
       var name=payload.name||'';
-      var r=await fetch(SB+'/rest/v1/app_access?app=eq.'+APP+'&staff_name=eq.'+encodeURIComponent(name)+'&select=staff_name',{headers:{apikey:KEY,Authorization:'Bearer '+KEY}});
+      var _gh={apikey:KEY,Authorization:'Bearer '+(payload.sb_at||KEY)};
+      var r=await fetch(SB+'/rest/v1/app_access?app=eq.'+APP+'&staff_name=eq.'+encodeURIComponent(name)+'&select=staff_name',{headers:_gh});
       var rows=r.ok?await r.json():[];
       if(!rows.length){fail('You no longer have access to this app.');return;}
       try{ sessionStorage.setItem('so_me', name); }catch(e){}
