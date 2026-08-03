@@ -8798,7 +8798,7 @@ async function saveAccessChanges(){
       await sbPost('app_access',{app:app,staff_name:n});
     }
     for(const n of toDel){
-      await fetch(SB+'/rest/v1/app_access?app=eq.'+encodeURIComponent(app)+'&staff_name=eq.'+encodeURIComponent(n),{method:'DELETE',headers:{"apikey":KEY,"Authorization":"Bearer "+KEY}});
+      await fetch(SB+'/rest/v1/app_access?app=eq.'+encodeURIComponent(app)+'&staff_name=eq.'+encodeURIComponent(n),{method:'DELETE',headers:{"apikey":KEY,"Authorization":"Bearer "+_sbBearer()}});
     }
   }
   showToast('Access updated');
@@ -10024,9 +10024,12 @@ async function _legacy_loadOnboardingChecklist(){
   const el=document.getElementById('onboardChecklist');
   if(!el)return;
   try{
-    const creds=await sbGet('staff_credentials','?staff_name=eq.'+encodeURIComponent(me)+'&select=password_hash,sq1_question,birthday');
+    const creds=await sbGet('staff_credentials','?staff_name=eq.'+encodeURIComponent(me)+'&select=auth_uid,must_reset,sq1_question,birthday');
     const avail=await sbGet('staff_availability','?staff_name=eq.'+encodeURIComponent(me)+'&limit=1');
-    const hasPass=creds.length&&!!creds[0].password_hash;
+    // "Password set" now means a real Supabase Auth account that isn't still
+    // on a temporary password — not the presence of a legacy password_hash,
+    // which is being retired and would read as incomplete for everyone.
+    const hasPass=creds.length&&!!creds[0].auth_uid&&creds[0].must_reset!==true;
     const hasSQ=creds.length&&!!creds[0].sq1_question;
     const hasDOB=creds.length&&!!creds[0].birthday;
     const hasAvail=avail.length>0;
@@ -10878,6 +10881,57 @@ async function changePassword(){
   if(!newp||newp.length<8){err.textContent="New password must be at least 8 characters.";err.classList.add("show");return;}
   if(newp!==conf){err.textContent="Passwords do not match.";err.classList.add("show");return;}
   const btn=document.getElementById("profPassBtn");btn.disabled=true;btn.innerHTML='<span class="sp"></span> Saving...';
+  try{
+    // Change the password where it actually lives: Supabase Auth.
+    //
+    // This used to verify `curr` against the legacy password_hash column and
+    // write the new one back there — which meant changing your password had
+    // no effect on your real login (AUTH_ONLY_MODE routes sign-in through
+    // Supabase Auth), and it kept the weak single-round SHA-256 hashes alive.
+    // Re-authenticating with the current password also proves the person at
+    // the keyboard knows it, which updateUser alone wouldn't.
+    const auth=getAuthClient();
+    if(!auth){ err.textContent="Can't reach the sign-in service. Please try again."; err.classList.add("show"); return; }
+
+    const { error: reauthErr } = await auth.signInWithPassword({
+      email: synthEmailFromName(me),
+      password: curr
+    });
+    if(reauthErr){
+      err.textContent="Current password is incorrect.";
+      err.classList.add("show");
+      return;
+    }
+
+    const { error: updErr } = await auth.updateUser({ password: newp });
+    if(updErr){
+      err.textContent=updErr.message||"Couldn't update your password. Please try again.";
+      err.classList.add("show");
+      return;
+    }
+    await refreshSbAuthToken();
+
+    // Clear the forced-reset flag and drop any legacy hash for this account.
+    try{
+      await fetch(SB+"/rest/v1/staff_credentials?staff_name=eq."+encodeURIComponent(me),{
+        method:"PATCH",
+        headers:{"apikey":KEY,"Authorization":"Bearer "+_sbBearer(),"Content-Type":"application/json","Prefer":"return=minimal"},
+        body:JSON.stringify({must_reset:false, password_hash:null})
+      });
+    }catch(e){ /* password already changed; flag cleanup is best-effort */ }
+
+    ok.textContent="Password updated successfully!";ok.classList.add("show");
+    document.getElementById("profPassCurrent").value="";
+    document.getElementById("profPassNew").value="";
+    document.getElementById("profPassConfirm").value="";
+  }catch(e){
+    console.warn('changePassword',e);
+    err.textContent="Something went wrong. Please try again.";err.classList.add("show");
+  }
+  finally{btn.disabled=false;btn.textContent="Update";}
+}
+
+async function _changePasswordLegacyDisabled(){
   try{
     const rows=await sbGet("staff_credentials","?staff_name=eq."+encodeURIComponent(me));
     if(!rows.length){err.textContent="Account not found.";err.classList.add("show");return;}
