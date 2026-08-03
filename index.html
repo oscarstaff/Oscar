@@ -8664,13 +8664,30 @@ async function makeAppToken(app,name){
   const payload={app:app,name:name||'',exp:Date.now()+1000*60*5}; // valid 5 min to launch
   // Hand the launched app our live Supabase session so it can write to
   // RLS-locked tables as an authenticated user (no anon-key writes).
+  //
+  // refreshSession() first, NOT just getSession(): getSession returns whatever
+  // is cached, and a tab that's been idle has had its background refresh timer
+  // throttled by the browser — so the cached access token can already be
+  // expired. Embedding a dead token made the gate fall back to the anon key,
+  // which app_access now rejects, and the person was told "you no longer have
+  // access" when the real problem was an expired session.
   try{
     const ac = getAuthClient();
-    if(ac && ac.getSession){
-      const { data } = await ac.getSession();
-      if(data && data.session){
-        payload.sb_at = data.session.access_token || null;
-        payload.sb_rt = data.session.refresh_token || null;
+    if(ac){
+      let session=null;
+      try{
+        if(ac.refreshSession){
+          const { data, error } = await ac.refreshSession();
+          if(!error && data && data.session) session=data.session;
+        }
+      }catch(e){ /* fall through to the cached session */ }
+      if(!session && ac.getSession){
+        const { data } = await ac.getSession();
+        session = (data && data.session) ? data.session : null;
+      }
+      if(session){
+        payload.sb_at = session.access_token || null;
+        payload.sb_rt = session.refresh_token || null;
       }
     }
   }catch(e){}

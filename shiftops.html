@@ -1590,8 +1590,37 @@ button, .btn { white-space: nowrap; }
       // app_access is RLS-locked to authenticated, and this gate script runs
       // before the fetch interceptor exists, so nothing would swap it for us.
       var name=payload.name||'';
-      var _gh={apikey:KEY,Authorization:'Bearer '+(payload.sb_at||KEY)};
-      var r=await fetch(SB+'/rest/v1/app_access?app=eq.'+APP+'&staff_name=eq.'+encodeURIComponent(name)+'&select=staff_name',{headers:_gh});
+      var _at=payload.sb_at||'';
+      async function _checkAccess(tok){
+        return fetch(SB+'/rest/v1/app_access?app=eq.'+APP+'&staff_name=eq.'+encodeURIComponent(name)+'&select=staff_name',
+          {headers:{apikey:KEY,Authorization:'Bearer '+(tok||KEY)}});
+      }
+      var r=await _checkAccess(_at);
+      // A stale access token looks exactly like "no access" from here, which is
+      // how idle staff got locked out. Spend the refresh token and retry before
+      // telling anyone they've lost access.
+      if((r.status===401||r.status===403) && payload.sb_rt){
+        try{
+          var rf=await fetch(SB+'/auth/v1/token?grant_type=refresh_token',{
+            method:'POST',
+            headers:{apikey:KEY,'Content-Type':'application/json'},
+            body:JSON.stringify({refresh_token:payload.sb_rt})
+          });
+          if(rf.ok){
+            var s=await rf.json();
+            if(s && s.access_token){
+              _at=s.access_token;
+              payload.sb_at=s.access_token;
+              if(s.refresh_token) payload.sb_rt=s.refresh_token;
+              r=await _checkAccess(_at);
+            }
+          }
+        }catch(e){ console.warn('[gate] refresh failed', e); }
+      }
+      if(r.status===401||r.status===403){
+        fail('Your session expired. Go back to Nexus, refresh, and launch again.');
+        return;
+      }
       var rows=r.ok?await r.json():[];
       if(!rows.length){fail('You no longer have access to this app.');return;}
       try{ sessionStorage.setItem('so_me', name); }catch(e){}
@@ -7534,7 +7563,7 @@ async function aaSave(){
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────
-const SHIFTOPS_BUILD='2026-07-31-v21-fill-week';
+const SHIFTOPS_BUILD='2026-08-04-v22-session-refresh';
 console.log('%c[ShiftOps build '+SHIFTOPS_BUILD+' loaded]','background:#16a34a;color:#fff;padding:2px 8px;border-radius:4px;font-weight:700;');
 (async()=>{
   await loadData();
