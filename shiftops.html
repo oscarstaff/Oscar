@@ -343,7 +343,7 @@ h1,h2,h3,.section-title,.modal-title{ font-family: var(--display); letter-spacin
 }
 .grid-header {
   display: grid;
-  grid-template-columns: 175px repeat(7,1fr);
+  grid-template-columns: var(--staffcol) repeat(7,1fr);
   background: linear-gradient(180deg, var(--surface3), var(--surface2));
   border-bottom: 1.5px solid var(--border2);
 }
@@ -361,7 +361,7 @@ h1,h2,h3,.section-title,.modal-title{ font-family: var(--display); letter-spacin
 .grid-col-head.today { color: var(--accent-deep); background: var(--accent-dim); box-shadow: inset 0 -2px 0 var(--accent); }
 .grid-row {
   display: grid;
-  grid-template-columns: 175px repeat(7,1fr);
+  grid-template-columns: var(--staffcol) repeat(7,1fr);
   border-bottom: 1px solid var(--border);
   transition: background .1s;
 }
@@ -1426,6 +1426,32 @@ button, .btn { white-space: nowrap; }
   font-variant-numeric: tabular-nums;
 }
 .ws-total.ws-total-empty { color: var(--muted); }
+
+/* ── STAFF COLUMN: hours must never be the thing that gets clipped ──────
+   .staff-role was a single nowrap/ellipsis line, so on a long name like
+   "Santosh Singh Basnet" the team name consumed the width and the hours were
+   silently truncated away — the figure was in the DOM but invisible.
+   Now the TEAM truncates and the hours are pinned, never shrinking. The
+   column is also wider (155/175px was inconsistent between the team header
+   rows and the staff rows, so they didn't even align). */
+:root { --staffcol: 205px; }
+.staff-role {
+  display: flex; align-items: baseline; gap: 6px;
+  justify-content: space-between;
+  overflow: visible;
+}
+.sr-team {
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.hrs-num {
+  flex: 0 0 auto;
+  font-family: var(--mono);
+  font-size: 10.5px; font-weight: 800;
+  color: var(--text-mid);
+  font-variant-numeric: tabular-nums;
+}
+.grid-row:hover .hrs-num { color: var(--accent-text); }
+@media (max-width: 1100px){ :root { --staffcol: 180px; } }
 .ws-fill:hover { color: var(--accent-text); border-color: var(--accent-border); }
 
 .ws-pill {
@@ -2807,7 +2833,7 @@ function renderRoster(){
   html+='</div>';
   const officeManager=staff.filter(s=>s.isOfficeManager||s.isManager==='office');
   if(officeManager.length>0){
-    html+=`<div style="display:grid;grid-template-columns:155px repeat(7,1fr);background:rgba(255,215,0,.08);border-bottom:1px solid var(--border);"><div style="padding:6px 12px;font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#ffd700;border-right:1px solid var(--border)">&#9733; Office</div>${Array(7).fill(`<div style="border-right:1px solid var(--border)"></div>`).join('')}</div>`;
+    html+=`<div style="display:grid;grid-template-columns:var(--staffcol) repeat(7,1fr);background:rgba(255,215,0,.08);border-bottom:1px solid var(--border);"><div style="padding:6px 12px;font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#ffd700;border-right:1px solid var(--border)">&#9733; Office</div>${Array(7).fill(`<div style="border-right:1px solid var(--border)"></div>`).join('')}</div>`;
     officeManager.forEach(s=>{
       const hrs=staffHoursWeek(s.id),pct=Math.min(100,(hrs/s.maxHours)*100);
       html+=`<div class="grid-row" style="background:rgba(255,215,0,.04)"><div class="staff-cell"><div class="avatar" style="background:#ffd700;color:#3a2a00">${initials(s)}</div><div style="min-width:0;flex:1;overflow:hidden"><div class="staff-name" style="color:#ffd700">${s.first} ${s.last} &#9733;</div><div class="staff-role" style="color:#c9a800">Office Manager</div><div class="hours-bar"><div class="hours-bar-bg"><div class="hours-bar-fill${pct>90?' warn':''}" style="width:${pct}%;background:#ffd700"></div></div></div></div></div>`;
@@ -2834,10 +2860,10 @@ function renderRoster(){
     const teamDay=[0,0,0,0,0,0,0];
     ordered.forEach(s=>{ for(let d=0;d<7;d++) teamDay[d]+=staffHoursDay(s.id,d); });
     const _h=n=>n?(Math.round(n*10)/10).toString().replace(/\.0$/,'')+'h':'·';
-    html+=`<div data-team="${(team||'').replace(/"/g,'&quot;')}" style="display:grid;grid-template-columns:155px repeat(7,1fr);background:var(--accent-dim);border-bottom:1px solid var(--border);border-top:1px solid var(--border)"><div style="padding:7px 14px;font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--accent-deep);border-right:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:6px"><span>${team}</span><span style="opacity:.75;letter-spacing:.5px">${ordered.length}&middot;${_h(teamWeek)}</span></div>${teamDay.map(t=>`<div style="border-right:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:9px;font-weight:700;color:var(--accent-deep);opacity:.8">${_h(t)}</div>`).join('')}</div>`;
+    html+=`<div data-team="${(team||'').replace(/"/g,'&quot;')}" style="display:grid;grid-template-columns:var(--staffcol) repeat(7,1fr);background:var(--accent-dim);border-bottom:1px solid var(--border);border-top:1px solid var(--border)"><div style="padding:7px 14px;font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--accent-deep);border-right:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:6px"><span>${team}</span><span style="opacity:.75;letter-spacing:.5px">${ordered.length}&middot;${_h(teamWeek)}</span></div>${teamDay.map(t=>`<div style="border-right:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:9px;font-weight:700;color:var(--accent-deep);opacity:.8">${_h(t)}</div>`).join('')}</div>`;
     ordered.forEach(s=>{
       const hrs=staffHoursWeek(s.id),pct=Math.min(100,(hrs/s.maxHours)*100);
-      html+=`<div class="grid-row" data-team="${(s.team||'').replace(/"/g,'&quot;')}"><div class="staff-cell"><div class="avatar" style="background:${s.color}">${initials(s)}</div><div style="min-width:0;flex:1;overflow:hidden"><div class="staff-name">${s.first} ${s.last}</div><div class="staff-role">${s.team} · <b class="hrs-num">${hrs?hrs.toFixed(1).replace('.0',''):0}h</b></div><div class="hours-bar"><div class="hours-bar-bg"><div class="hours-bar-fill${pct>90?' warn':''}" style="width:${pct}%"></div></div></div></div><div class="wk-tools"><button class="wk-btn" title="Copy this week" onclick="event.stopPropagation();copyStaffWeek(${s.id})">⧉</button><button class="wk-btn wk-paste" title="Paste copied week here" onclick="event.stopPropagation();pasteStaffWeek(${s.id})">⤓</button></div></div>`;
+      html+=`<div class="grid-row" data-team="${(s.team||'').replace(/"/g,'&quot;')}"><div class="staff-cell"><div class="avatar" style="background:${s.color}">${initials(s)}</div><div style="min-width:0;flex:1;overflow:hidden"><div class="staff-name">${s.first} ${s.last}</div><div class="staff-role"><span class="sr-team">${s.team}</span><b class="hrs-num">${hrs?hrs.toFixed(1).replace('.0',''):0}h</b></div><div class="hours-bar"><div class="hours-bar-bg"><div class="hours-bar-fill${pct>90?' warn':''}" style="width:${pct}%"></div></div></div></div><div class="wk-tools"><button class="wk-btn" title="Copy this week" onclick="event.stopPropagation();copyStaffWeek(${s.id})">⧉</button><button class="wk-btn wk-paste" title="Paste copied week here" onclick="event.stopPropagation();pasteStaffWeek(${s.id})">⤓</button></div></div>`;
       for(let d=0;d<7;d++){
         const av=getAvail(s.id,d),dayShifts=(shifts[s.id]||{})[d]||[];
         const hasNonLeave=dayShifts.some(sh=>sh.type!=='leave');
@@ -7607,7 +7633,7 @@ async function aaSave(){
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────
-const SHIFTOPS_BUILD='2026-08-04-v23-week-totals';
+const SHIFTOPS_BUILD='2026-08-04-v24-hours-visible';
 console.log('%c[ShiftOps build '+SHIFTOPS_BUILD+' loaded]','background:#16a34a;color:#fff;padding:2px 8px;border-radius:4px;font-weight:700;');
 (async()=>{
   await loadData();
