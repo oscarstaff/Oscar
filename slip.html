@@ -71,7 +71,6 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 
 .inv-doctype{font-size:25px;font-weight:800;letter-spacing:3px;color:var(--ink);text-transform:uppercase;margin-bottom:10px;}
 .inv-co{font-size:12.5px;line-height:1.65;color:var(--ink);}
 .inv-co b{font-weight:700;font-size:14px;display:block;margin-bottom:2px;}
-.inv-co .abn{color:var(--ink-dim);margin-top:3px;}
 /* bill-to + meta box row */
 .inv-info{display:flex;justify-content:space-between;gap:30px;margin-bottom:30px;}
 .inv-billto{font-size:13px;line-height:1.7;max-width:300px;}
@@ -239,7 +238,6 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 
                   <b id="r-co">Oscars Training Centre</b>
                   <span id="r-addr">6/5 King St, Rockdale NSW 2216, Australia</span><br>
                   <span id="r-cophone">+61 451 995 201</span>
-                  <div class="abn" id="r-abn">ABN 00 000 000 000</div>
                 </div>
               </div>
             </div>
@@ -312,7 +310,6 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 
       <div class="field"><label>Business Name</label><input id="s-co" value="Oscars Training Centre" oninput="saveSettings()"></div>
       <div class="field"><label>Address</label><input id="s-addr" value="6/5 King St, Rockdale NSW 2216, Australia" oninput="saveSettings()"></div>
       <div class="field"><label>Phone</label><input id="s-phone" value="+61 451 995 201" oninput="saveSettings()"></div>
-      <div class="field"><label>ABN</label><input id="s-abn" value="ABN 00 000 000 000" oninput="saveSettings()"></div>
       <div class="field"><label>Default Payment Terms (days)</label><input id="s-terms" type="number" value="7" oninput="saveSettings()"></div>
       <div class="field"><label>Next Invoice Number</label><input id="s-nextnum" type="number" oninput="saveSettings()"></div>
       <div class="actions"><button class="btn btn-primary" onclick="saveSettings();toast('Settings saved')">Save settings</button></div>
@@ -335,7 +332,6 @@ function loadSettings(){
   if(s.co)document.getElementById('s-co').value=s.co;
   if(s.addr)document.getElementById('s-addr').value=s.addr;
   if(s.phone)document.getElementById('s-phone').value=s.phone;
-  if(s.abn)document.getElementById('s-abn').value=s.abn;
 
   if(s.terms)document.getElementById('s-terms').value=s.terms;
   // Next invoice number now lives in the shared DB counter (read-only preview)
@@ -348,18 +344,17 @@ function loadSettings(){
 }
 function saveSettings(){
   const s={co:document.getElementById('s-co').value,addr:document.getElementById('s-addr').value,
-    phone:document.getElementById('s-phone').value,abn:document.getElementById('s-abn').value,
+    phone:document.getElementById('s-phone').value,
     terms:document.getElementById('s-terms').value};
   localStorage.setItem(LS.settings,JSON.stringify(s));
   applySettingsToReceipt();renderReceipt();
 }
 function applySettingsToReceipt(){
   const co=document.getElementById('s-co').value,addr=document.getElementById('s-addr').value,
-    ph=document.getElementById('s-phone').value,abn=document.getElementById('s-abn').value;
+    ph=document.getElementById('s-phone').value;
   document.getElementById('r-co').textContent=co;
   document.getElementById('r-addr').textContent=addr;
   document.getElementById('r-cophone').textContent=ph;
-  document.getElementById('r-abn').textContent=abn;
 }
 // Peek the shared counter (preview only — does NOT consume a number).
 async function getNextNum(){
