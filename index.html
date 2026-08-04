@@ -699,7 +699,6 @@ html[data-sb="collapsed"] .sb-user > div:nth-child(2) {
 .ao:hover{border-color:#475569;color:#475569;}
 .ao.yes{background:var(--accent-dim);border-color:var(--accent-bd);color:var(--accent-text);font-weight:700;}
 .ao.custom{background:#f0f9ff;border-color:#bae6fd;color:#0284c7;font-weight:700;}
-.ao.avail-preset{flex:0 0 auto !important;min-width:64px;padding:6px 12px;font-size:12px;}
 .ao.no{background:#fef2f2;border-color:rgba(255,107,71,.3);color:#dc2626;}
 .custom-time-row{
   display:none;align-items:center;gap:10px;
@@ -5737,23 +5736,6 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
         </div>
 
         <div id="availFormArea">
-          <div class="card roster-card" style="margin-bottom:12px">
-            <div class="roster-card-hd"><div class="roster-card-title">Period</div></div>
-            <div style="display:flex;gap:8px;margin-bottom:4px;">
-              <button id="period-ongoing" onclick="setPeriod('ongoing')" class="ao yes" style="flex:1;padding:11px;font-size:13px;">Ongoing</button>
-              <button id="period-range" onclick="setPeriod('range')" class="ao" style="flex:1;padding:11px;font-size:13px;">Date range</button>
-            </div>
-            <div id="dateRangeFields" style="display:none;gap:10px;grid-template-columns:1fr 1fr;margin-top:10px;">
-              <div>
-                <div style="font-size:11px;font-weight:600;color:#94a3b8;margin-bottom:5px;text-transform:uppercase;">From</div>
-                <input type="date" id="availFrom" class="f-input">
-              </div>
-              <div>
-                <div style="font-size:11px;font-weight:600;color:#94a3b8;margin-bottom:5px;text-transform:uppercase;">Until</div>
-                <input type="date" id="availUntil" class="f-input">
-              </div>
-            </div>
-          </div>
           <div class="card roster-card">
             <div class="roster-card-hd"><div class="roster-card-title">Weekly schedule</div></div>
             <div id="availForm"></div>
@@ -7977,15 +7959,15 @@ async function loadAdminAvailGrid(){
 
 // AVAILABILITY — Persistent standing availability
 const dayState={};let fBuilt=false;
+// Availability is always ongoing now. The Ongoing/Date-range choice was
+// removed: with submissions locked to the fortnight cycle, a standing weekly
+// pattern is the only thing the roster reads, and date-ranged entries just
+// created availability that silently expired mid-fortnight. Short-term
+// changes belong in Leave, which is designed for them.
 let availPeriod="ongoing";
 
-function setPeriod(type){
-  availPeriod=type;
-  document.getElementById("period-ongoing").className="ao"+(type==="ongoing"?" yes":"");
-  document.getElementById("period-range").className="ao"+(type==="range"?" yes":"");
-  const rf=document.getElementById("dateRangeFields");
-  if(rf)rf.style.display=type==="range"?"grid":"none";
-}
+// Kept as a no-op so any remaining call site is harmless.
+function setPeriod(){ availPeriod="ongoing"; }
 
 function buildAvailForm(){
   if(fBuilt)return;
@@ -8005,12 +7987,8 @@ function buildAvailForm(){
         '</div>'+
       '</div>'+
       '<div id="ctr-'+i+'" style="display:none;flex-direction:column;gap:8px;padding:8px 0;">'+
-        '<div id="apwrap-'+i+'" style="display:none;flex-direction:column;gap:6px;">'+
-          '<div style="font-size:11px;font-weight:600;color:#94a3b8;">Approved early start</div>'+
-          '<div id="aprow-'+i+'" style="display:flex;flex-wrap:wrap;gap:6px;"></div>'+
-        '</div>'+
         '<div style="display:flex;align-items:center;gap:8px;">'+
-          '<input type="time" class="f-input" id="cs-'+i+'" value="09:00" onchange="syncStartPreset('+i+')" style="width:130px;padding:6px 10px;font-size:13px;">'+
+          '<input type="time" class="f-input" id="cs-'+i+'" value="09:00" style="width:130px;padding:6px 10px;font-size:13px;">'+
           '<span style="color:#94a3b8;font-size:13px;">to</span>'+
           '<input type="time" class="f-input" id="ce-'+i+'" value="19:00" style="width:130px;padding:6px 10px;font-size:13px;">'+
         '</div>'+
@@ -8059,58 +8037,28 @@ function _reapplyEarlyStartToOpenDays(){
 // so there's no reason to police what hours someone says they can work. The
 // old 08:00/09:00 floor (and the early_start_ok approval behind it) is gone —
 // staff can state any start time and the roster decides what actually happens.
+// Start-time presets and the early-start floor are both gone: staff type the
+// hours they can work, with no suggested times and nothing to be approved for.
+// These stay as no-ops because they're called from ~8 places across the
+// availability UI, and sweeping every call site would risk more than it saves.
 function earliestStart(){return "";}
-function presetTimes(){return ['07:00','08:00','08:30','09:00','09:30','10:00'];}
-
-// Preset chips, shown to everyone.
-function renderStartPresets(i){
-  const wrap=document.getElementById("apwrap-"+i),row=document.getElementById("aprow-"+i);
-  if(!wrap||!row)return;
-  wrap.style.display="flex";
-  row.innerHTML=presetTimes().map(function(t){
-    return '<button type="button" class="ao avail-preset" id="ap-'+i+'-'+t.replace(':','')+'" onclick="setStartPreset('+i+',\''+t+'\')">'+t+'</button>';
-  }).join('');
-}
-
-// No floor any more — kept as a no-op so the many existing call sites keep
-// working without a risky sweep through the availability UI.
+function presetTimes(){return [];}
+function renderStartPresets(){}
 function enforceStartFloor(i){
-  const s=document.getElementById("cs-"+i);if(!s)return;
-  s.removeAttribute('min');
+  const s=document.getElementById("cs-"+i);
+  if(s)s.removeAttribute('min');
 }
-
-// Set the start time from a preset chip. Highlights the active chip.
 function setStartPreset(i,t){
   const s=document.getElementById("cs-"+i);
   if(s)s.value=t;
-  enforceStartFloor(i);
-  syncStartPreset(i);
 }
-
-// Highlight whichever preset chip matches the current start time (if any).
-function syncStartPreset(i){
-  enforceStartFloor(i);
-  const s=document.getElementById("cs-"+i);
-  const cur=s?s.value:"";
-  presetTimes().forEach(function(t){
-    const b=document.getElementById("ap-"+i+"-"+t.replace(':',''));
-    if(b)b.className="ao avail-preset"+(cur===t?" yes":"");
-  });
-}
+function syncStartPreset(){}
 
 async function loadExistingAvail(){
   try{
     const rows=await sbGet("staff_availability","?staff_name=eq."+encodeURIComponent(me)+"&limit=1");
     if(!rows.length)return;
     const r=rows[0];
-    // Restore period type
-    if(!r.is_ongoing&&r.valid_from){
-      setPeriod("range");
-      if(document.getElementById("availFrom"))document.getElementById("availFrom").value=r.valid_from;
-      if(document.getElementById("availUntil")&&r.valid_until)document.getElementById("availUntil").value=r.valid_until;
-    }else{
-      setPeriod("ongoing");
-    }
     // Restore day states
     await loadEarlyStartApproval();
     const av=r.availability;
@@ -8433,10 +8381,8 @@ async function submitAvail(){
       avail[i]={type:"custom",start:st,end:en};
     }else avail[i]={type:s.type};
   }
-  const isOngoing=availPeriod==="ongoing";
-  const validFrom=isOngoing?null:(document.getElementById("availFrom")?document.getElementById("availFrom").value:null);
-  const validUntil=isOngoing?null:(document.getElementById("availUntil")?document.getElementById("availUntil").value:null);
-  if(!isOngoing&&!validFrom){err.textContent="Please select a start date for the date range.";err.classList.add("show");return;}
+  // Always ongoing — the date-range option was removed.
+  const isOngoing=true, validFrom=null, validUntil=null;
 
   const btn=document.getElementById("availBtn");btn.disabled=true;btn.innerHTML='<span class="sp"></span> Saving...';
   try{
