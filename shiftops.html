@@ -3990,14 +3990,36 @@ async function _hkRender(){
     const lbl=dd.toLocaleDateString('en-AU',{weekday:'long',day:'numeric',month:'short'});
     const upcoming=d>=today;
     const list=byDate[d];
+    // Every slot can be filled by ANYONE, not just that team.
+    //
+    // The dropdown used to list only the slot's own team, so when someone was
+    // off sick there was no way to cover their duty from another team — the
+    // slot just sat empty or you edited the database. Reality doesn't respect
+    // team boundaries at 5:30pm.
+    //
+    // The slot's own team is still listed FIRST and stays the default, so
+    // normal use is unchanged; other teams follow in their own groups, which
+    // keeps 33 names scannable.
     const teamOptions=function(tm,current){
-      const members=Object.keys(_hkTeamMap||{}).filter(function(nm){ return _hkTeamMap[nm]===tm; }).sort();
-      // make sure whoever is currently set is always in the list, even if their
-      // team changed since the duty was recorded
-      if(current && members.indexOf(current)===-1) members.unshift(current);
-      return members.map(function(nm){
+      const all=Object.keys(_hkTeamMap||{});
+      const own=all.filter(function(nm){ return _hkTeamMap[nm]===tm; }).sort();
+      // whoever is currently set must always appear, even if they've since
+      // changed team or left the pool
+      if(current && all.indexOf(current)===-1) own.unshift(current);
+      const opt=function(nm){
         return '<option value="'+_cdEsc(nm)+'"'+(nm===current?' selected':'')+'>'+_cdEsc(nm)+'</option>';
-      }).join('');
+      };
+      let html='<optgroup label="'+_cdEsc(tm)+'">'+own.map(opt).join('')+'</optgroup>';
+      const others={};
+      all.forEach(function(nm){
+        const t=_hkTeamMap[nm];
+        if(t===tm) return;
+        (others[t||'Other']=others[t||'Other']||[]).push(nm);
+      });
+      Object.keys(others).sort().forEach(function(t){
+        html+='<optgroup label="'+_cdEsc(t)+'">'+others[t].sort().map(opt).join('')+'</optgroup>';
+      });
+      return html;
     };
     const rowFor=function(r,label,isHead){
       const tick='<input type="checkbox" '+(r.done?'checked':'')+
@@ -4017,6 +4039,12 @@ async function _hkRender(){
         // on, and the whole point of the split is knowing who does what.
         (r.task && r.task!=='speak'
           ? '<span title="'+_cdEsc(_hkTaskLabel(r.task))+'" style="flex-shrink:0;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;padding:2px 7px;border-radius:5px;background:var(--accent-dim,rgba(61,158,255,.12));color:var(--accent,#3d9eff);">'+_cdEsc(_hkTaskShort(r.task))+'</span>'
+          : '')+
+        // Flag a cover from another team. Without this the roster silently
+        // reads "Processing — Santosh" and looks like a mistake, when it's a
+        // deliberate substitution.
+        (!isHead && r.staff_name && _hkTeamMap[r.staff_name] && _hkTeamMap[r.staff_name]!==r.team
+          ? '<span title="Covering for '+_cdEsc(r.team)+' — normally '+_cdEsc(_hkTeamMap[r.staff_name])+'" style="flex-shrink:0;font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;padding:2px 6px;border-radius:5px;background:rgba(180,116,10,.14);color:#b4740a;">cover</span>'
           : '')+
         (r.done?'<span style="flex-shrink:0;font-size:10px;font-weight:700;color:#22a06b;">done</span>':'')+
         '<button onclick="removeHousekeeping(\''+r.id+'\')" title="Remove from the roster (does NOT pick a replacement — use Reshuffle for that)" style="background:none;border:none;color:#e5484d;cursor:pointer;font-size:14px;line-height:1;padding:0 2px;font-family:inherit;">&times;</button>'+
@@ -7633,7 +7661,7 @@ async function aaSave(){
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────
-const SHIFTOPS_BUILD='2026-08-04-v24-hours-visible';
+const SHIFTOPS_BUILD='2026-08-04-v25-hk-cover';
 console.log('%c[ShiftOps build '+SHIFTOPS_BUILD+' loaded]','background:#16a34a;color:#fff;padding:2px 8px;border-radius:4px;font-weight:700;');
 (async()=>{
   await loadData();
