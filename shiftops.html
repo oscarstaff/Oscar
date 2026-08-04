@@ -1414,6 +1414,18 @@ button, .btn { white-space: nowrap; }
 .ws-today { font-size: 11px; padding: 5px 11px; }
 .ws-clear { font-size: 11px; padding: 5px 11px; color: var(--warn); }
 .ws-fill { font-size: 11px; padding: 5px 11px; }
+.ws-total {
+  font-family: var(--mono);
+  font-size: 10.5px; font-weight: 700;
+  color: var(--text-mid);
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: 999px;
+  padding: 4px 11px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.ws-total.ws-total-empty { color: var(--muted); }
 .ws-fill:hover { color: var(--accent-text); border-color: var(--accent-border); }
 
 .ws-pill {
@@ -1713,6 +1725,7 @@ button, .btn { white-space: nowrap; }
             <button class="btn btn-ghost ws-today" onclick="goToday()">Today</button>
           </div>
           <div class="ws-state">
+            <span class="ws-total" id="wsTotal" title="Total rostered hours this week">—</span>
             <button class="btn btn-ghost ws-fill" onclick="fillFromPreviousWeek()">Fill from last week</button>
             <span class="ws-pill" id="pubPill">…</span>
             <button class="btn ws-publish" id="pubBtn" onclick="togglePublishWeek()" style="display:none;">Publish week</button>
@@ -2814,7 +2827,14 @@ function renderRoster(){
     const teamStaff=staff.filter(s=>s.team===team&&!s.isOfficeManager&&s.isManager!=='office');
     const ordered=teamStaff.sort((a,b)=>a.first.localeCompare(b.first)||a.last.localeCompare(b.last));
     if(!ordered.length)return;
-    html+=`<div data-team="${(team||'').replace(/"/g,'&quot;')}" style="display:grid;grid-template-columns:155px repeat(7,1fr);background:var(--accent-dim);border-bottom:1px solid var(--border);border-top:1px solid var(--border)"><div style="padding:7px 14px;font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--accent-deep);border-right:1px solid var(--border)">${team}</div>${Array(7).fill(`<div style="border-right:1px solid var(--border)"></div>`).join('')}</div>`;
+    // Team roll-up: the week total for the team, and its hours per day. Reading
+    // 33 individual rows to work out whether a team is over- or under-covered
+    // was the missing piece — the numbers were all there, just never added up.
+    const teamWeek=ordered.reduce((t,s)=>t+staffHoursWeek(s.id),0);
+    const teamDay=[0,0,0,0,0,0,0];
+    ordered.forEach(s=>{ for(let d=0;d<7;d++) teamDay[d]+=staffHoursDay(s.id,d); });
+    const _h=n=>n?(Math.round(n*10)/10).toString().replace(/\.0$/,'')+'h':'·';
+    html+=`<div data-team="${(team||'').replace(/"/g,'&quot;')}" style="display:grid;grid-template-columns:155px repeat(7,1fr);background:var(--accent-dim);border-bottom:1px solid var(--border);border-top:1px solid var(--border)"><div style="padding:7px 14px;font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--accent-deep);border-right:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:6px"><span>${team}</span><span style="opacity:.75;letter-spacing:.5px">${ordered.length}&middot;${_h(teamWeek)}</span></div>${teamDay.map(t=>`<div style="border-right:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:9px;font-weight:700;color:var(--accent-deep);opacity:.8">${_h(t)}</div>`).join('')}</div>`;
     ordered.forEach(s=>{
       const hrs=staffHoursWeek(s.id),pct=Math.min(100,(hrs/s.maxHours)*100);
       html+=`<div class="grid-row" data-team="${(s.team||'').replace(/"/g,'&quot;')}"><div class="staff-cell"><div class="avatar" style="background:${s.color}">${initials(s)}</div><div style="min-width:0;flex:1;overflow:hidden"><div class="staff-name">${s.first} ${s.last}</div><div class="staff-role">${s.team} · <b class="hrs-num">${hrs?hrs.toFixed(1).replace('.0',''):0}h</b></div><div class="hours-bar"><div class="hours-bar-bg"><div class="hours-bar-fill${pct>90?' warn':''}" style="width:${pct}%"></div></div></div></div><div class="wk-tools"><button class="wk-btn" title="Copy this week" onclick="event.stopPropagation();copyStaffWeek(${s.id})">⧉</button><button class="wk-btn wk-paste" title="Paste copied week here" onclick="event.stopPropagation();pasteStaffWeek(${s.id})">⤓</button></div></div>`;
@@ -2855,6 +2875,8 @@ function renderRoster(){
     });
   });
   grid.innerHTML=html;
+  // Totals must track every render — editing a shift changes them too.
+  try{ if(typeof renderWeekTotal==='function') renderWeekTotal(); }catch(e){}
   const wl=`${fmtDate(currentWeekStart)} – ${fmtDate(addDays(currentWeekStart,6))}`;
   document.getElementById('weekLabel').textContent=wl;
   const tb=document.getElementById('topbarWeek');
@@ -3163,6 +3185,28 @@ function renderPublishState(){
   btn.className='btn ws-publish '+(pub?'ws-publish-off':'ws-publish-on');
   const grid=document.getElementById('rosterGrid');
   if(grid) grid.classList.toggle('grid-draft', !pub);
+  renderWeekTotal();
+}
+
+/**
+ * Total rostered hours for the visible week, shown in the spine so it's
+ * readable without scrolling past 33 rows. Excludes leave, same as every
+ * other hours figure on this screen.
+ */
+function renderWeekTotal(){
+  const el=document.getElementById('wsTotal');
+  if(!el) return;
+  let total=0, people=0;
+  try{
+    (staff||[]).forEach(function(s){
+      const h=staffHoursWeek(s.id);
+      if(h>0){ total+=h; people++; }
+    });
+  }catch(e){ el.textContent='—'; return; }
+  el.textContent = total
+    ? ((Math.round(total*10)/10).toString().replace(/\.0$/,'')+'h · '+people+' rostered')
+    : 'Nothing rostered';
+  el.classList.toggle('ws-total-empty', !total);
 }
 
 async function togglePublishWeek(){
@@ -7563,7 +7607,7 @@ async function aaSave(){
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────
-const SHIFTOPS_BUILD='2026-08-04-v22-session-refresh';
+const SHIFTOPS_BUILD='2026-08-04-v23-week-totals';
 console.log('%c[ShiftOps build '+SHIFTOPS_BUILD+' loaded]','background:#16a34a;color:#fff;padding:2px 8px;border-radius:4px;font-weight:700;');
 (async()=>{
   await loadData();
