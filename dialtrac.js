@@ -1924,6 +1924,22 @@ async function loadHousekeepingDuty(){
 
   if(!rows.length){ _hkDuty=null; card.style.display='none'; return; }
 
+  // Only show days the manager has PUBLISHED in ShiftOps. Housekeeping is
+  // auto-generated and then corrected by hand, so an unpublished day is still
+  // being shuffled — showing it means someone is told they're on chairs, then
+  // told they aren't. Fails OPEN: if the publish table can't be read we show
+  // the duty rather than silently hiding a real one.
+  try{
+    const dates = rows.map(r => r.duty_date);
+    const pub = await sbGet('housekeeping_published',
+      '?select=duty_date&duty_date=in.('+dates.join(',')+')');
+    if(pub){
+      const ok = new Set(pub.map(p => p.duty_date));
+      rows = rows.filter(r => ok.has(r.duty_date));
+      if(!rows.length){ _hkDuty=null; card.style.display='none'; return; }
+    }
+  }catch(e){ console.warn('hk publish gate — showing anyway', e); }
+
   const duty=rows.find(r=>!r.done) || rows[0];
   _hkDuty=duty;
 
