@@ -19332,6 +19332,9 @@ async function loadHomeCalendar(){
 }
 
 async function loadHomeData(){
+  // Class-day housekeeping duty (separate from the work roster) — guarded so
+  // a module failure can never stop the clock card loading.
+  try{ if(typeof loadMyHousekeeping==='function') loadMyHousekeeping(); }catch(e){}
   const statsEl=document.getElementById("homeStats"),sumEl=document.getElementById("homeAvailSummary");if(!statsEl)return;
   try{
     const [ar,lr]=await Promise.all([
@@ -24265,5 +24268,6 @@ input:focus{
 <script src="payroll.js?v=1"></script>
 <script src="teamhours.js?v=1"></script>
 <script src="availlock.js?v=2"></script>
+<script src="housekeeping.js?v=1"></script>
 </body>
 </html>
