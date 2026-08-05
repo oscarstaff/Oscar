@@ -3979,8 +3979,10 @@ async function _hkRender(){
   const box=document.getElementById('hkRosterList');
   if(!box) return;
   await _hkLoadTeams();   // dropdowns need the team → staff map
+  await loadHousekeepingPublished();
   let rows=[];
   try{ rows=await _cdGet('housekeeping_roster?select=id,duty_date,staff_name,team,done,task&order=duty_date.desc&limit=80'); }catch(e){}
+  _hkRows=rows;   // copy-to-clipboard reads this rather than refetching
   if(!rows.length){ box.innerHTML='<div style="font-size:12px;color:var(--text-dim);">No class days coming up — add one above and the roster fills itself.</div>'; return; }
   const byDate={};
   rows.forEach(function(r){ (byDate[r.duty_date]=byDate[r.duty_date]||[]).push(r); });
@@ -4037,9 +4039,17 @@ async function _hkRender(){
         picker+
         // Which job they were given. Without it the roster only says who is
         // on, and the whole point of the split is knowing who does what.
-        (r.task && r.task!=='speak'
-          ? '<span title="'+_cdEsc(_hkTaskLabel(r.task))+'" style="flex-shrink:0;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;padding:2px 7px;border-radius:5px;background:var(--accent-dim,rgba(61,158,255,.12));color:var(--accent,#3d9eff);">'+_cdEsc(_hkTaskShort(r.task))+'</span>'
-          : '')+
+        // The job is now editable too — auto-allocation gets the split roughly
+        // right, but who carries the bed lifter on a given day is a judgement
+        // call the roster can't make.
+        (isHead ? '' :
+          '<select onchange="setHousekeepingTask(this,\''+r.id+'\')" title="'+_cdEsc(_hkTaskLabel(r.task))+'"'+
+          ' style="flex-shrink:0;border:1px solid var(--border);border-radius:5px;padding:2px 5px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;font-family:inherit;background:var(--accent-dim,rgba(61,158,255,.12));color:var(--accent,#3d9eff);cursor:pointer;">'+
+          HK_TASKS.map(function(t){
+            return '<option value="'+t.key+'"'+(t.key===r.task?' selected':'')+'>'+_cdEsc(_hkTaskShort(t.key))+'</option>';
+          }).join('')+
+          '<option value=""'+(r.task?'':' selected')+'>&mdash;</option>'+
+          '</select>')+
         // Flag a cover from another team. Without this the roster silently
         // reads "Processing — Santosh" and looks like a mistake, when it's a
         // deliberate substitution.
@@ -4064,9 +4074,111 @@ async function _hkRender(){
         '<span style="flex:1;font-size:12px;color:var(--text-dim);font-style:italic;">not rostered — press Reshuffle to fill</span>'+
       '</div>';
     }).join('');
-    return '<div style="padding:9px 11px;border-radius:9px;background:var(--panel-2,rgba(127,127,127,.06));margin-bottom:6px;'+(upcoming?'border-left:3px solid var(--accent,#3d9eff);':'opacity:.62;')+'">'+
-      '<div style="font-size:12.5px;font-weight:800;margin-bottom:5px;">'+lbl+(upcoming?'':' <span style="font-weight:500;color:var(--text-dim);">(past)</span>')+'</div>'+headRow+cells+'</div>';
+    const isPub=_hkPubDays.has(d);
+    return '<div id="hkday-'+d+'" style="padding:9px 11px;border-radius:9px;background:var(--panel-2,rgba(127,127,127,.06));margin-bottom:6px;'+(upcoming?'border-left:3px solid '+(isPub?'#22a06b':'var(--accent,#3d9eff)')+';':'opacity:.62;')+'">'+
+      '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:5px;">'+
+        '<div style="font-size:12.5px;font-weight:800;">'+lbl+(upcoming?'':' <span style="font-weight:500;color:var(--text-dim);">(past)</span>')+'</div>'+
+        '<span style="font-size:9px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;padding:2px 7px;border-radius:999px;'+
+          (isPub?'background:rgba(34,160,107,.14);color:#22a06b;':'background:rgba(180,116,10,.14);color:#b4740a;')+'">'+(isPub?'published':'draft')+'</span>'+
+        '<div style="flex:1;"></div>'+
+        '<button onclick="copyHousekeepingDay(\''+d+'\')" title="Copy this day\'s roster to the clipboard" style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--text-dim);cursor:pointer;font-size:10px;font-weight:700;padding:3px 9px;font-family:inherit;">Copy</button>'+
+        (upcoming
+          ? '<button onclick="toggleHousekeepingPublish(\''+d+'\')" style="border:1px solid '+(isPub?'var(--border)':'transparent')+';border-radius:6px;cursor:pointer;font-size:10px;font-weight:700;padding:3px 9px;font-family:inherit;'+
+            (isPub?'background:none;color:var(--text-dim);':'background:var(--accent,#3d9eff);color:#fff;')+'">'+(isPub?'Unpublish':'Publish')+'</button>'
+          : '')+
+      '</div>'+headRow+cells+'</div>';
   }).join('');
+}
+
+/* ── Task, copy and publish ───────────────────────────────────────────── */
+
+// Which days staff can see. Absence of a row = draft.
+let _hkPubDays = new Set();
+let _hkRows = [];
+
+async function loadHousekeepingPublished(){
+  try{
+    const rows=await _cdGet('housekeeping_published?select=duty_date');
+    _hkPubDays=new Set((rows||[]).map(function(r){ return r.duty_date; }));
+  }catch(e){ console.warn('loadHousekeepingPublished', e); }
+}
+
+async function toggleHousekeepingPublish(d){
+  const pub=_hkPubDays.has(d);
+  try{
+    if(pub){
+      const r=await fetch(SUPABASE_URL+'/rest/v1/housekeeping_published?duty_date=eq.'+encodeURIComponent(d),
+        {method:'DELETE',headers:{..._CD_HJ,'Prefer':'return=minimal'}});
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      _hkPubDays.delete(d);
+      showToast('Hidden from staff again');
+    }else{
+      const r=await fetch(SUPABASE_URL+'/rest/v1/housekeeping_published',{
+        method:'POST',
+        headers:{..._CD_HJ,'Prefer':'resolution=merge-duplicates,return=representation'},
+        body:JSON.stringify({duty_date:d,
+          published_by:(typeof currentUser!=='undefined'&&currentUser)?currentUser:null})
+      });
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      const rows=await r.json().catch(function(){return null;});
+      if(!rows||!rows.length) throw new Error('nothing written');
+      _hkPubDays.add(d);
+      showToast('Published — staff can see this day');
+    }
+  }catch(e){
+    console.warn('toggleHousekeepingPublish', e);
+    showToast('Could not update — check connection');
+  }
+  _hkRender();
+}
+
+// Change the job assigned to a slot.
+async function setHousekeepingTask(sel, id){
+  const task=sel.value||null;
+  try{
+    await fetch(SUPABASE_URL+'/rest/v1/housekeeping_roster?id=eq.'+encodeURIComponent(id),
+      {method:'PATCH',headers:{..._CD_HJ,'Prefer':'return=minimal'},body:JSON.stringify({task:task})});
+    showToast(task?(_hkTaskShort(task)+' assigned'):'Job cleared');
+    _hkRender();
+  }catch(e){ showToast('Save failed'); _hkRender(); }
+}
+
+/**
+ * Copy a day's roster as plain text for pasting into a group chat.
+ *
+ * Deliberately WITHOUT team names — staff need to know who is doing what,
+ * and prefixing every line with "Enrolment"/"Processing" just makes the
+ * message longer and invites "why am I under Processing?" when someone is
+ * covering for another team.
+ */
+function copyHousekeepingDay(d){
+  const list=(_hkRows||[]).filter(function(r){ return r.duty_date===d; });
+  if(!list.length){ showToast('Nothing to copy'); return; }
+  const dt=new Date(d+'T00:00:00');
+  const lines=[dt.toLocaleDateString('en-AU',{weekday:'long',day:'numeric',month:'long'})];
+  const head=list.find(function(x){ return x.team==='Head'; });
+  if(head && head.staff_name) lines.push(head.staff_name+' — Head');
+  HK_TEAMS.forEach(function(tm){
+    const r=list.find(function(x){ return x.team===tm; });
+    if(!r || !r.staff_name) return;
+    lines.push(r.staff_name + (r.task && r.task!=='speak' ? ' — '+_hkTaskLabel(r.task) : ''));
+  });
+  const text=lines.join('\n');
+  const done=function(){ showToast('Copied'); };
+  const fallback=function(){
+    // Clipboard API needs a secure context and permission; a hidden textarea
+    // works everywhere and is worth keeping as a fallback.
+    try{
+      const ta=document.createElement('textarea');
+      ta.value=text; ta.style.position='fixed'; ta.style.opacity='0';
+      document.body.appendChild(ta); ta.select();
+      document.execCommand('copy'); document.body.removeChild(ta);
+      done();
+    }catch(e){ showToast('Copy failed'); }
+  };
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(done).catch(fallback);
+  }else fallback();
 }
 
 // Change who actually did the housekeeping for a slot.
@@ -7661,7 +7773,7 @@ async function aaSave(){
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────
-const SHIFTOPS_BUILD='2026-08-04-v25-hk-cover';
+const SHIFTOPS_BUILD='2026-08-05-v26-hk-tasks-publish';
 console.log('%c[ShiftOps build '+SHIFTOPS_BUILD+' loaded]','background:#16a34a;color:#fff;padding:2px 8px;border-radius:4px;font-weight:700;');
 (async()=>{
   await loadData();
