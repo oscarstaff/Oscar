@@ -6103,7 +6103,10 @@ async function loadHealthChecks(){
 }
 
 function showSection(id){
-  ['home','roster','availability','staff'].forEach(s=>{
+  // Payroll must be in this list — it's the list that adds .active, and
+  // .tab-content is display:none without it. Omitting it meant the nav item
+  // appeared and clicking it showed an empty page.
+  ['home','roster','availability','staff','payroll'].forEach(s=>{
     const el=document.getElementById(`section-${s}`);
     if(el)el.classList.toggle('active',s===id);
     // tab elements may no longer exist — guard
@@ -6160,7 +6163,8 @@ function switchNav(id,el){
 // Open the section named in the URL hash (#home/#roster/#availability/#staff).
 // Called on load; defaults to Home. Also highlights the matching nav item.
 function applyHashNav(){
-  var valid={home:1,roster:1,availability:1,staff:1};
+  // #payroll must be valid too, or a deep link or refresh lands on Home.
+  var valid={home:1,roster:1,availability:1,staff:1,payroll:1};
   var h=(location.hash||'').replace(/^#/,'').toLowerCase();
   var id=valid[h]?h:'home';
   var nav=document.querySelector('.nav-item[onclick*="switchNav(\''+id+'\'"]');
@@ -8044,7 +8048,7 @@ async function aaSave(){
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────
-const SHIFTOPS_BUILD='2026-08-07-v35-payroll-nav';
+const SHIFTOPS_BUILD='2026-08-07-v36-payroll-section';
 console.log('%c[ShiftOps build '+SHIFTOPS_BUILD+' loaded]','background:#16a34a;color:#fff;padding:2px 8px;border-radius:4px;font-weight:700;');
 (async()=>{
   await loadData();
