@@ -848,6 +848,9 @@ let _clToday  = false;   // "Today" quick filter — Sydney calendar day
 let _clWaitView = 'week'; // Waiting tab grouping: 'week' (default) | 'day'
 let _clSub    = 'all';   // within Mine: all | waiting | handled
 let _clScope = 'team';   // 'team' = my team's calls only, 'all' = everyone
+// How far back the queue loads when no date range is chosen. Raise if you
+// routinely look further back without setting a range.
+const CL_RECENT_DAYS = 60;
 let _clFrom = null;      // date-range filter, inclusive local-day bounds (ms) or null
 let _clTo   = null;
 
@@ -1206,8 +1209,8 @@ function clSetDateRange(){
   if(clr) clr.style.display = active ? '' : 'none';
   const db=document.getElementById('clDateBtn');
   if(db) db.classList.toggle('cl-chip-on', active || (wrap&&wrap.classList.contains('show')));
-  clRenderQueue();
-  clRefreshOpenCount();
+  // Refetch — the chosen range may be older than what's currently loaded.
+  clLoadQueue();
 }
 function clClearDateRange(){
   _clFrom=_clTo=null;
@@ -1217,7 +1220,7 @@ function clClearDateRange(){
   if(wrap){ wrap.classList.remove('cl-dr-active'); wrap.classList.remove('show'); }
   const clr=document.getElementById('clDateClear'); if(clr) clr.style.display='none';
   const db=document.getElementById('clDateBtn'); if(db) db.classList.remove('cl-chip-on');
-  clRenderQueue();
+  clLoadQueue();
   clRefreshOpenCount();
 }
 /** A row is in the active date window (by when the call came in). */
@@ -1296,7 +1299,23 @@ async function clLoadQueue(){
     }
   }catch(e){ console.warn('clLoadQueue team',e); }
   try{
-    _clQueue = await sbGet('call_log','?select=*&order=created_at.desc&limit=500');
+    // The fetch now follows the DATE FILTER rather than always grabbing the
+    // newest 500. With ~400 calls a week, a flat top-500 meant anything older
+    // than about ten days was never loaded — so filtering to an earlier range
+    // searched rows the browser didn't have and returned nothing.
+    //
+    // No range set → a recent window (fast, covers normal use).
+    // Range set     → exactly that range from the server, however far back.
+    let _q = '?select=*&order=created_at.desc';
+    if(_clFrom || _clTo){
+      if(_clFrom) _q += '&created_at=gte.'+new Date(_clFrom).toISOString();
+      if(_clTo)   _q += '&created_at=lte.'+new Date(_clTo).toISOString();
+      _q += '&limit=5000';
+    }else{
+      const _since = new Date(Date.now() - CL_RECENT_DAYS*86400000);
+      _q += '&created_at=gte.'+_since.toISOString()+'&limit=5000';
+    }
+    _clQueue = await sbGet('call_log', _q);
   }catch(e){
     console.warn('clLoadQueue',e);
     if(body) body.innerHTML='';
