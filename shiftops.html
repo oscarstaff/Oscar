@@ -1154,7 +1154,11 @@ body.tl-readonly #tlPill{ display:inline-flex; }
    ═══════════════════════════════════════════════════════════════ */
 .shell{ flex-direction:column!important; height:100vh; }
 .main{ flex:1; overflow-y:auto; width:100%; }
-.content{ max-width:1560px; margin:0 auto; padding:18px 28px 60px; }
+/* Every tab uses the full screen. This is an operations console — a roster
+   grid, a leave table and a staff list all want width, and capping the page
+   at 1560px left dead margins on any decent monitor while squeezing the
+   7-day grid. */
+.content{ max-width:none; margin:0; padding:18px 28px 60px; }
 
 .appbar{
   display:flex; align-items:center; gap:18px; height:52px; padding:0 20px;
@@ -1415,6 +1419,53 @@ body.tl-readonly .wk-tools{ display:none !important; }
 .lv-actions{ display:inline-flex; gap:5px; }
 @media(max-width:900px){ .lv-reason{ display:none; } }
 
+/* ── DASHBOARD: FIND A PERSON ──────────────────────────────────────────
+   Top of the page and bound to "/" because looking someone up is the most
+   frequent HR action — more frequent than reading any of the counts below. */
+.dash-find{
+  display:flex; align-items:center; gap:9px;
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:12px; padding:0 14px; margin-bottom:12px;
+  box-shadow:var(--shadow-sm); transition:border-color .13s, box-shadow .13s;
+}
+.dash-find:focus-within{ border-color:var(--accent); box-shadow:var(--ring); }
+.df-ico{ color:var(--muted); flex-shrink:0; }
+#dashFind{
+  flex:1; border:none; outline:none; background:none;
+  font-family:inherit; font-size:14px; color:var(--text);
+  padding:13px 0;
+}
+#dashFind::placeholder{ color:var(--muted); }
+.df-kbd{
+  font-family:var(--mono); font-size:10px; font-weight:700; color:var(--text-dim);
+  background:var(--surface3); border:1px solid var(--border);
+  border-radius:5px; padding:2px 7px; flex-shrink:0;
+}
+.dash-find-results{ display:none; margin:-4px 0 12px; }
+.dash-find-results.show{ display:block; }
+.df-row{
+  display:flex; align-items:center; gap:11px;
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:10px; padding:9px 13px; margin-bottom:6px;
+}
+.df-first{ border-color:var(--accent-border, var(--border2)); }
+.df-ava{ width:28px; height:28px; font-size:10px; flex-shrink:0; }
+.df-txt{ display:flex; flex-direction:column; gap:1px; flex:1; min-width:0; }
+.df-name{ font-size:13.5px; font-weight:650; color:var(--text); }
+.df-meta{ font-size:11.5px; color:var(--text-dim); }
+.df-away{ color:var(--gold); font-weight:700; }
+.df-acts{ display:flex; gap:5px; flex-shrink:0; }
+.df-btn{
+  border:1px solid var(--border); background:var(--surface2); color:var(--text-mid);
+  border-radius:7px; padding:5px 11px; font-size:11px; font-weight:700;
+  font-family:inherit; cursor:pointer; transition:all .12s;
+}
+.df-btn:hover{ background:var(--accent); border-color:var(--accent-deep); color:#fff; }
+.df-empty{ font-size:12.5px; color:var(--text-dim); padding:11px 13px; }
+/* Brief highlight so the row you jumped to is obvious on arrival. */
+@keyframes rowFlash{ 0%{ background:var(--accent-dim); } 100%{ background:transparent; } }
+.row-flash{ animation:rowFlash 1.6s ease-out; }
+
 /* ── DASHBOARD STRIP ───────────────────────────────────────────────────
    Six numbers, each a question asked before 9am, each clicking through to
    the screen that answers it. No sparklines, no deltas: with 33 staff a
@@ -1454,9 +1505,7 @@ body.tl-readonly .wk-tools{ display:none !important; }
 
 /* The dashboard is a wall display, not a document — let it use the screen.
    Everything else keeps the reading-width cap. */
-/* Set explicitly by switchNav rather than :has(), so the layout doesn't
-   depend on selector support. */
-.content.wide{ max-width:none; }
+
 .lv-count{ font-family:var(--mono); font-size:10px; opacity:.75; margin-left:4px; }
 
 
@@ -1853,7 +1902,7 @@ button, .btn { white-space: nowrap; }
 
   <main class="main">
 
-    <div class="content wide">
+    <div class="content">
       <div class="stats-strip">
         <div class="stat"><span class="stat-value green" id="statShifts">0</span><span class="stat-label">shifts this week</span></div>
         <div class="stat-sep"></div>
@@ -1867,8 +1916,20 @@ button, .btn { white-space: nowrap; }
       <div class="conflict-banner" id="conflictBanner" style="display:none"> <strong>Conflicts detected.</strong>&nbsp; Some staff are rostered on unavailable days.</div>
 
       <div class="tab-content active" id="section-home">
-        <!-- At-a-glance strip. Each tile is a question a manager asks before
-             9am, and each one clicks through to the screen that answers it. -->
+        <!-- Find a person. The most common HR action isn't reading a number,
+             it's "pull up Nabina" — so it gets the top of the page and the
+             keyboard. Enter jumps straight to the top match. -->
+        <div class="dash-find">
+          <svg class="df-ico" viewBox="0 0 20 20" fill="currentColor" width="15" height="15"><path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd"/></svg>
+          <input id="dashFind" type="text" autocomplete="off" spellcheck="false"
+                 placeholder="Find someone — name, team, or a leave date"
+                 oninput="dashFindRun(this.value)" onkeydown="dashFindKey(event)">
+          <kbd class="df-kbd">/</kbd>
+        </div>
+        <div class="dash-find-results" id="dashFindResults"></div>
+
+        <!-- At-a-glance strip. Each tile is a question asked before 9am, and
+             each one clicks through to the screen that answers it. -->
         <div class="dash-strip" id="dashStrip"></div>
         <div class="morning-board" id="morningBoard"></div>
       </div>
@@ -6055,12 +6116,6 @@ function clearAvailBadge(){
 function switchNav(id,el){
   if(_navSwitchPending)return;
   _navSwitchPending=true;
-  // The Dashboard is a wall display — it uses the full screen. Every other
-  // section keeps the reading-width cap so tables don't stretch to 2000px.
-  try{
-    const _c=document.querySelector('.content');
-    if(_c) _c.classList.toggle('wide', id==='home');
-  }catch(e){}
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   if(el)el.classList.add('active');
   const crumbs={home:'Home',roster:'Roster',availability:'Availability',staff:'Staff'};
@@ -7949,7 +8004,7 @@ async function aaSave(){
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────
-const SHIFTOPS_BUILD='2026-08-07-v29-leave-table';
+const SHIFTOPS_BUILD='2026-08-07-v30-dash-find';
 console.log('%c[ShiftOps build '+SHIFTOPS_BUILD+' loaded]','background:#16a34a;color:#fff;padding:2px 8px;border-radius:4px;font-weight:700;');
 (async()=>{
   await loadData();
@@ -8211,6 +8266,107 @@ function renderDashStrip(c){
     tile(c.open,'Open shifts','ds-gold',goRoster)+
     tile(c.pending,'Leave to action','ds-gold',goLeave);
 }
+
+/* ── DASHBOARD: FIND A PERSON ─────────────────────────────────────────────
+   The most common HR action isn't reading a stat, it's "pull up Nabina" —
+   what are they on this week, are they on leave, what's their number. This
+   searches the staff you already have in memory (no round trip) and offers
+   the three things you'd actually want next for that person.
+   ──────────────────────────────────────────────────────────────────────── */
+let _dfMatches = [];
+
+function dashFindRun(q){
+  const box=document.getElementById('dashFindResults');
+  if(!box) return;
+  q=(q||'').trim().toLowerCase();
+  if(q.length<2){ box.innerHTML=''; box.classList.remove('show'); _dfMatches=[]; return; }
+
+  const onLeaveNames=new Set((leaveRequests||[])
+    .filter(function(r){
+      if(r.status!=='approved') return false;
+      const t=new Date(); t.setHours(0,0,0,0);
+      const f=new Date((r.from||r.from_date||'')+'T00:00:00');
+      const to=new Date((r.to||r.to_date||'')+'T00:00:00');
+      return !isNaN(f)&&!isNaN(to)&&t>=f&&t<=to;
+    })
+    .map(function(r){ return _normName(r.staff_name||r.staffName||''); }));
+
+  _dfMatches=(staff||[]).filter(function(s){
+    const full=(s.first+' '+s.last).toLowerCase();
+    return full.indexOf(q)>-1 || (s.team||'').toLowerCase().indexOf(q)>-1;
+  }).slice(0,6);
+
+  if(!_dfMatches.length){
+    box.innerHTML='<div class="df-empty">No one matches “'+_cdEsc(q)+'”.</div>';
+    box.classList.add('show');
+    return;
+  }
+
+  box.innerHTML=_dfMatches.map(function(s,i){
+    const full=(s.first+' '+s.last).trim();
+    const hrs=staffHoursWeek(s.id);
+    const away=onLeaveNames.has(_normName(full));
+    return '<div class="df-row'+(i===0?' df-first':'')+'">'+
+      '<span class="avatar df-ava" style="background:'+(s.color||'#94a3b8')+'">'+initials(s)+'</span>'+
+      '<span class="df-txt"><span class="df-name">'+_cdEsc(full)+'</span>'+
+        '<span class="df-meta">'+_cdEsc(s.team||'No team')+' · '+
+          (hrs?((Math.round(hrs*10)/10)+'h this week'):'nothing rostered')+
+          (away?' · <b class="df-away">on leave today</b>':'')+'</span></span>'+
+      '<span class="df-acts">'+
+        '<button class="df-btn" onclick="dashFindGo(\'roster\',\''+_cdEsc(full)+'\')">Roster</button>'+
+        '<button class="df-btn" onclick="dashFindGo(\'leave\',\''+_cdEsc(full)+'\')">Leave</button>'+
+        '<button class="df-btn" onclick="dashFindGo(\'staff\',\''+_cdEsc(full)+'\')">Profile</button>'+
+      '</span>'+
+    '</div>';
+  }).join('');
+  box.classList.add('show');
+}
+
+/** Enter opens the top match's roster; Escape clears. */
+function dashFindKey(e){
+  if(e.key==='Escape'){ e.target.value=''; dashFindRun(''); e.target.blur(); return; }
+  if(e.key==='Enter' && _dfMatches.length){
+    const s=_dfMatches[0];
+    dashFindGo('roster',(s.first+' '+s.last).trim());
+  }
+}
+
+/** Jump to the screen, already filtered to that person. */
+function dashFindGo(where, name){
+  const nav=document.querySelectorAll('.nav-item');
+  if(where==='roster'){
+    switchNav('roster',nav[1]);
+    setTimeout(function(){
+      const row=document.querySelector('#rosterGrid [data-staff-name="'+name+'"]')
+             || Array.from(document.querySelectorAll('#rosterGrid .staff-name'))
+                     .find(function(n){ return n.textContent.trim()===name; });
+      if(row){ row.scrollIntoView({block:'center',behavior:'smooth'});
+               const r=row.closest('.grid-row'); if(r){ r.classList.add('row-flash');
+                 setTimeout(function(){ r.classList.remove('row-flash'); },1600); } }
+    },260);
+  }else if(where==='leave'){
+    switchNav('staff',nav[3]);
+    setTimeout(function(){ showSubTab('leave'); setTimeout(function(){ renderLeave(name); },80); },90);
+  }else{
+    switchNav('staff',nav[3]);
+    setTimeout(function(){ showSubTab('list'); },90);
+  }
+  const inp=document.getElementById('dashFind');
+  if(inp) inp.value='';
+  const box=document.getElementById('dashFindResults');
+  if(box){ box.innerHTML=''; box.classList.remove('show'); }
+}
+
+// "/" focuses the finder from anywhere on the Dashboard.
+document.addEventListener('keydown',function(e){
+  if(e.key!=='/'||e.metaKey||e.ctrlKey) return;
+  const t=e.target.tagName;
+  if(t==='INPUT'||t==='TEXTAREA'||t==='SELECT') return;
+  const home=document.getElementById('section-home');
+  if(!home||!home.classList.contains('active')) return;
+  const inp=document.getElementById('dashFind');
+  if(inp){ e.preventDefault(); inp.focus(); }
+});
 
 // Open shifts aren't in any list the board builds, so fetch the count itself.
 // Cheap (HEAD + count header) and cached on window for the strip to read.
