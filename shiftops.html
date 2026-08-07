@@ -8044,7 +8044,7 @@ async function aaSave(){
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────
-const SHIFTOPS_BUILD='2026-08-07-v34-payroll-moved';
+const SHIFTOPS_BUILD='2026-08-07-v35-payroll-nav';
 console.log('%c[ShiftOps build '+SHIFTOPS_BUILD+' loaded]','background:#16a34a;color:#fff;padding:2px 8px;border-radius:4px;font-weight:700;');
 (async()=>{
   await loadData();
@@ -8069,10 +8069,20 @@ console.log('%c[ShiftOps build '+SHIFTOPS_BUILD+' loaded]','background:#16a34a;c
   // Payroll is Accounts-only. The nav entry stays hidden otherwise; the real
   // boundary is the RLS policy on payroll_rates, which returns nothing to
   // anyone whose auth_uid isn't on the Accounts team.
-  try{
-    const pb=document.getElementById('navPayroll');
-    if(pb && typeof _canPayroll==='function' && _canPayroll()) pb.style.display='';
-  }catch(e){}
+  // Runs once here AND again shortly after, because _canPayroll() resolves the
+  // team from the `staff` array — if the roles/staff fetch hasn't settled yet
+  // the first check fails and the tab stays hidden for someone entitled to it.
+  window.refreshPayrollNav = function(){
+    try{
+      const pb=document.getElementById('navPayroll');
+      if(!pb) return;
+      const ok = (typeof _canPayroll==='function') && _canPayroll();
+      pb.style.display = ok ? '' : 'none';
+      if(ok) console.log('[PAYROLL] tab available');
+    }catch(e){}
+  };
+  refreshPayrollNav();
+  setTimeout(function(){ try{ refreshPayrollNav(); }catch(e){} }, 1500);
   try{ applyTeamLeadLock(); }catch(e){}
   // Open the section named in the URL hash, defaulting to Home (which starts
   // the Morning Board). Replaces the old unconditional board start.
