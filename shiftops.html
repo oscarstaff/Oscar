@@ -1368,6 +1368,95 @@ body.tl-readonly .wk-tools{ display:none !important; }
 }
 .lv-src-nexus{ background:rgba(99,102,241,.12); color:var(--accent2); border:1px solid rgba(99,102,241,.25); }
 .lv-src-added{ background:var(--surface2); color:var(--muted); border:1px solid var(--border); }
+
+/* ── LEAVE TABLE ───────────────────────────────────────────────────────
+   Was a stack of cards: avatar, name, dates, reason and status all laid out
+   vertically, so nothing lined up between rows and comparing two requests
+   meant re-reading both. A table puts every value in a column. */
+.lv-table-wrap{ overflow-x:auto; margin-bottom:18px; border:1px solid var(--border);
+  border-radius:12px; background:var(--surface); box-shadow:var(--shadow-sm); }
+.lv-table{ width:100%; border-collapse:collapse; font-size:12.5px; }
+.lv-th{
+  text-align:left; padding:9px 12px; white-space:nowrap;
+  font-family:var(--mono); font-size:9px; font-weight:700;
+  letter-spacing:.08em; text-transform:uppercase; color:var(--text-dim);
+  background:var(--surface2); border-bottom:1px solid var(--border);
+}
+.lv-tr{ border-bottom:1px solid var(--border); transition:background .1s; }
+.lv-tr:last-child{ border-bottom:none; }
+.lv-tr:hover{ background:var(--surface2); }
+.lv-td{ padding:9px 12px; vertical-align:middle; color:var(--text); }
+.lv-td-sm{ white-space:nowrap; font-variant-numeric:tabular-nums; color:var(--text-mid); }
+.lv-td-num{ text-align:right; font-family:var(--mono); font-weight:700; font-variant-numeric:tabular-nums; }
+.lv-td-act{ text-align:right; white-space:nowrap; }
+.lv-td-who{ min-width:230px; }
+.lv-td-who{ display:flex; align-items:center; gap:9px; }
+.lv-ava{ width:26px; height:26px; font-size:9.5px; flex-shrink:0; }
+.lv-who-txt{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; min-width:0; }
+.lv-name{ font-weight:650; }
+/* The reason is context, not a headline — it shouldn't push the row taller. */
+.lv-reason{
+  color:var(--text-dim); font-style:italic; font-size:11.5px;
+  max-width:190px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.lv-dash{ color:var(--muted); }
+/* Leave type — captured by the Nexus preset picker and, until now, never shown. */
+.lv-type{
+  font-size:10px; font-weight:700; letter-spacing:.02em;
+  border-radius:6px; padding:2px 8px; white-space:nowrap;
+}
+.lt-sick  { background:rgba(236,72,153,.12); color:#be1e6d; }
+.lt-med   { background:rgba(14,165,233,.12); color:#0369a1; }
+.lt-fam   { background:rgba(249,115,22,.12); color:#c2410c; }
+.lt-study { background:rgba(139,92,246,.12); color:#6d28d9; }
+.lt-travel{ background:rgba(20,184,166,.12); color:#0f766e; }
+.lt-berv  { background:rgba(100,116,139,.14); color:#475569; }
+.lt-other { background:var(--surface3); color:var(--text-dim); }
+.lv-actions{ display:inline-flex; gap:5px; }
+@media(max-width:900px){ .lv-reason{ display:none; } }
+
+/* ── DASHBOARD STRIP ───────────────────────────────────────────────────
+   Six numbers, each a question asked before 9am, each clicking through to
+   the screen that answers it. No sparklines, no deltas: with 33 staff a
+   one-person change is 3%, so a percentage would be decoration. */
+.dash-strip{
+  display:grid;
+  grid-template-columns:repeat(6,1fr);
+  gap:10px;
+  margin-bottom:14px;
+}
+.ds-tile{
+  display:flex; flex-direction:column; align-items:flex-start; gap:2px;
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:12px; padding:13px 15px;
+  font-family:inherit; text-align:left;
+  cursor:pointer; transition:border-color .13s, box-shadow .13s, transform .13s;
+  box-shadow:var(--shadow-sm);
+}
+.ds-tile:hover{ border-color:var(--border2); box-shadow:var(--shadow-md); transform:translateY(-1px); }
+.ds-tile:not([onclick]){ cursor:default; }
+.ds-tile:not([onclick]):hover{ transform:none; box-shadow:var(--shadow-sm); border-color:var(--border); }
+.ds-num{
+  font-family:var(--mono); font-size:26px; font-weight:800;
+  letter-spacing:-.02em; color:var(--text); line-height:1.05;
+  font-variant-numeric:tabular-nums;
+}
+.ds-lbl{
+  font-size:10.5px; font-weight:700; letter-spacing:.04em;
+  text-transform:uppercase; color:var(--text-dim); white-space:nowrap;
+}
+.ds-warn .ds-num{ color:var(--warn); }
+.ds-gold .ds-num{ color:var(--gold); }
+/* A zero is good news on this board — state it quietly rather than in alarm colours. */
+.ds-zero .ds-num{ color:var(--muted); font-weight:700; }
+@media(max-width:1100px){ .dash-strip{ grid-template-columns:repeat(3,1fr); } }
+@media(max-width:640px){  .dash-strip{ grid-template-columns:repeat(2,1fr); } }
+
+/* The dashboard is a wall display, not a document — let it use the screen.
+   Everything else keeps the reading-width cap. */
+/* Set explicitly by switchNav rather than :has(), so the layout doesn't
+   depend on selector support. */
+.content.wide{ max-width:none; }
 .lv-count{ font-family:var(--mono); font-size:10px; opacity:.75; margin-left:4px; }
 
 
@@ -1731,7 +1820,7 @@ button, .btn { white-space: nowrap; }
       <span class="brand-name">Oscars</span><span class="brand-prod">ShiftOps</span>
     </div>
     <nav class="appbar-nav">
-      <div class="nav-item active" onclick="switchNav('home',this)">Home</div>
+      <div class="nav-item active" onclick="switchNav('home',this)">Dashboard</div>
       <div class="nav-item" onclick="switchNav('roster',this)">Roster</div>
       <div class="nav-item" onclick="switchNav('availability',this);clearAvailBadge()">Availability<span id="availNavBadge" style="display:none;margin-left:6px;background:var(--warn);color:#fff;border-radius:8px;padding:1px 6px;font-size:8px;font-weight:800;font-family:var(--mono);">NEW</span></div>
       <div class="nav-item" onclick="switchNav('staff',this)">Staff</div>
@@ -1764,7 +1853,7 @@ button, .btn { white-space: nowrap; }
 
   <main class="main">
 
-    <div class="content">
+    <div class="content wide">
       <div class="stats-strip">
         <div class="stat"><span class="stat-value green" id="statShifts">0</span><span class="stat-label">shifts this week</span></div>
         <div class="stat-sep"></div>
@@ -1778,6 +1867,9 @@ button, .btn { white-space: nowrap; }
       <div class="conflict-banner" id="conflictBanner" style="display:none"> <strong>Conflicts detected.</strong>&nbsp; Some staff are rostered on unavailable days.</div>
 
       <div class="tab-content active" id="section-home">
+        <!-- At-a-glance strip. Each tile is a question a manager asks before
+             9am, and each one clicks through to the screen that answers it. -->
+        <div class="dash-strip" id="dashStrip"></div>
         <div class="morning-board" id="morningBoard"></div>
       </div>
 
@@ -2423,6 +2515,11 @@ async function loadData(){
             reason_type:row.reason_type||'',
             status:row.status||'pending',
             declineReason:row.decline_reason||'',
+            // Carried so the list can show WHERE a request came from and WHEN
+            // it was raised. Without resolved_by the origin badge silently
+            // reported everything as "From Nexus".
+            resolved_by:row.resolved_by||'',
+            submitted_at:row.submitted_at||null,
             supabaseId:row.id
           };
         });
@@ -5958,6 +6055,12 @@ function clearAvailBadge(){
 function switchNav(id,el){
   if(_navSwitchPending)return;
   _navSwitchPending=true;
+  // The Dashboard is a wall display — it uses the full screen. Every other
+  // section keeps the reading-width cap so tables don't stretch to 2000px.
+  try{
+    const _c=document.querySelector('.content');
+    if(_c) _c.classList.toggle('wide', id==='home');
+  }catch(e){}
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   if(el)el.classList.add('active');
   const crumbs={home:'Home',roster:'Roster',availability:'Availability',staff:'Staff'};
@@ -6566,6 +6669,16 @@ function renderLeave(filterName){
 
   const fmtLeaveDate=d=>new Date(d).toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'});
 
+  const _typeShort = t => ({
+    'Time off / away':'Time off','Sick leave':'Sick','Medical appointment':'Medical',
+    "Family / carer's":'Family','Study / exam':'Study','Travel':'Travel',
+    'Family loss / funeral':'Bereavement','Other':'Other'
+  })[t] || t || '';
+  const _typeCls = t => ({
+    'Sick leave':'lt-sick','Medical appointment':'lt-med',"Family / carer's":'lt-fam',
+    'Study / exam':'lt-study','Travel':'lt-travel','Family loss / funeral':'lt-berv'
+  })[t] || 'lt-other';
+
   const renderRow=(r,showActions)=>{
     // Resolve the staffer by NAME first — leave rows from the web form carry the
     // authoritative staff_name (snake_case) from Supabase, while staffId can be
@@ -6590,23 +6703,34 @@ function renderLeave(filterName){
     const addedHere = (r.resolved_by||'') === 'Admin (ShiftOps)';
     const _du = (function(){ const f=new Date((r.from||r.from_date||'')+'T00:00:00'); const t=new Date(); t.setHours(0,0,0,0); return isNaN(f)?999:Math.round((f-t)/86400000); })();
     const soonCls = (r.status==='approved' && _du>=0 && _du<=7) ? ' lv-soon' : '';
-    return `<div class="lv-card lv-row lv-${r.status}${soonCls}">
-      <div class="avatar lv-ava" style="background:${color}">${s?initials(s):name.slice(0,2).toUpperCase()}</div>
-      <div class="lv-body">
-        <div class="lv-name">${name}<span class="lv-src ${addedHere?'lv-src-added':'lv-src-nexus'}">${addedHere?'Added':'From Nexus'}</span></div>
-        <div class="lv-dates">${fmtLeaveDate(r.from||r.from_date)} <span class="lv-arrow">&rarr;</span> ${fmtLeaveDate(r.to||r.to_date)} <span class="lv-days">${days} day${days!==1?'s':''}</span></div>
-        ${r.reason?`<div class="lv-reason">"${r.reason}"</div>`:''}
-      </div>
-      <div class="lv-right">
-        ${statusFilter==='all'?`<div class="lv-status lv-status-${r.status}">${r.status}</div>`:''}
+    // A TABLE, not stacked cards: with every value in a column the eye can
+    // compare rows down a line instead of re-reading each card's layout.
+    const applied = r.submitted_at ? new Date(r.submitted_at).toLocaleDateString('en-AU',{day:'numeric',month:'short'}) : '—';
+    const ty = r.reason_type||'';
+    return `<tr class="lv-tr lv-${r.status}${soonCls}">
+      <td class="lv-td lv-td-who">
+        <span class="avatar lv-ava" style="background:${color}">${s?initials(s):name.slice(0,2).toUpperCase()}</span>
+        <span class="lv-who-txt">
+          <span class="lv-name">${name}</span>
+          <span class="lv-src ${addedHere?'lv-src-added':'lv-src-nexus'}">${addedHere?'Added':'From Nexus'}</span>
+          ${r.reason?`<span class="lv-reason" title="${String(r.reason).replace(/"/g,'&quot;')}">${r.reason}</span>`:''}
+        </span>
+      </td>
+      <td class="lv-td lv-td-sm">${applied}</td>
+      <td class="lv-td">${ty?`<span class="lv-type ${_typeCls(ty)}">${_typeShort(ty)}</span>`:'<span class="lv-dash">—</span>'}</td>
+      <td class="lv-td lv-td-sm">${fmtLeaveDate(r.from||r.from_date)}</td>
+      <td class="lv-td lv-td-sm">${fmtLeaveDate(r.to||r.to_date)}</td>
+      <td class="lv-td lv-td-num">${days}</td>
+      <td class="lv-td"><span class="lv-status lv-status-${r.status}">${r.status}</span></td>
+      <td class="lv-td lv-td-act">
         ${showActions?`<div class="lv-actions">
           <button class="lv-btn lv-edit" onclick="openLeaveEdit(${r.id})">Edit</button>
           ${r.status!=='approved'?`<button class="lv-btn lv-approve" onclick="updateLeave(${r.id},'approved')">Approve</button>`:''}
           ${r.status!=='declined'?`<button class="lv-btn lv-decline" onclick="updateLeave(${r.id},'declined')">Decline</button>`:''}
           <button class="lv-btn lv-del" onclick="deleteLeave(${r.id})" title="Delete this request">Delete</button>
         </div>`:''}
-      </div>
-    </div>`;
+      </td>
+    </tr>`;
   };
 
   // Header: the count line is dropped — the status chips below carry the same
@@ -6627,20 +6751,25 @@ function renderLeave(filterName){
 
   const showS = st => statusFilter==='all' || statusFilter===st;
 
-  if(pending.length && showS('pending')){
-    html+=`<div class="lv-section-hd" style="color:var(--gold)">Pending (${pending.length})</div>`;
-    pending.forEach(r=>html+=renderRow(r,true));
-    html+=`<div style="height:16px"></div>`;
-  }
-  if(approved.length && showS('approved')){
-    html+=`<div class="lv-section-hd" style="color:var(--success)">Approved (${approved.length})</div>`;
-    approved.forEach(r=>html+=renderRow(r,true));
-    html+=`<div style="height:16px"></div>`;
-  }
-  if(declined.length && showS('declined')){
-    html+=`<div class="lv-section-hd" style="color:var(--warn)">Declined (${declined.length})</div>`;
-    declined.forEach(r=>html+=renderRow(r,true));
-  }
+  const THEAD = `<thead><tr>
+      <th class="lv-th">Staff</th>
+      <th class="lv-th">Applied</th>
+      <th class="lv-th">Type</th>
+      <th class="lv-th">From</th>
+      <th class="lv-th">To</th>
+      <th class="lv-th lv-td-num">Days</th>
+      <th class="lv-th">Status</th>
+      <th class="lv-th"></th>
+    </tr></thead>`;
+  const section=(label,colour,rows)=>
+    `<div class="lv-section-hd" style="color:${colour}">${label} (${rows.length})</div>`+
+    `<div class="lv-table-wrap"><table class="lv-table">${THEAD}<tbody>`+
+    rows.map(r=>renderRow(r,true)).join('')+
+    `</tbody></table></div>`;
+
+  if(pending.length && showS('pending'))  html+=section('Pending','var(--gold)',pending);
+  if(approved.length && showS('approved'))html+=section('Approved','var(--success)',approved);
+  if(declined.length && showS('declined'))html+=section('Declined','var(--warn)',declined);
   // filtered to a status with no rows
   if(statusFilter!=='all' && leaveRequests.length &&
      ((statusFilter==='pending'&&!pending.length)||(statusFilter==='approved'&&!approved.length)||(statusFilter==='declined'&&!declined.length))){
@@ -7820,7 +7949,7 @@ async function aaSave(){
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────
-const SHIFTOPS_BUILD='2026-08-07-v27-leave-uniform';
+const SHIFTOPS_BUILD='2026-08-07-v29-leave-table';
 console.log('%c[ShiftOps build '+SHIFTOPS_BUILD+' loaded]','background:#16a34a;color:#fff;padding:2px 8px;border-radius:4px;font-weight:700;');
 (async()=>{
   await loadData();
@@ -8055,7 +8184,48 @@ function _hhmmFlexSydney(iso){
   return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0');
 }
 
+/**
+ * Dashboard strip — six numbers a manager wants before 9am.
+ *
+ * Deliberately NO percentage deltas. At 33 staff one person is 3%, so
+ * "Present 23 ▲12.9%" would be noise dressed as insight; the reference design
+ * leans on deltas because it's built for a 3,934-person company.
+ *
+ * Fed from the same lists the Morning Board builds, so the two can never
+ * disagree with each other.
+ */
+function renderDashStrip(c){
+  const el=document.getElementById('dashStrip');
+  if(!el) return;
+  const goRoster = "switchNav('roster',document.querySelectorAll('.nav-item')[1])";
+  const goLeave  = "switchNav('staff',document.querySelectorAll('.nav-item')[3]);setTimeout(function(){showSubTab('leave');},80)";
+  const tile=function(n,label,cls,go){
+    return '<button class="ds-tile'+(n?(cls?' '+cls:''):' ds-zero')+'"'+(go?' onclick="'+go+'"':'')+'>'+
+             '<div class="ds-num">'+n+'</div><div class="ds-lbl">'+label+'</div></button>';
+  };
+  el.innerHTML =
+    tile(c.present,'On shift','',goRoster)+
+    tile(c.late,'Late','ds-warn',goRoster)+
+    tile(c.notIn,'Not clocked in','ds-warn','')+
+    tile(c.leave,'On leave','',goLeave)+
+    tile(c.open,'Open shifts','ds-gold',goRoster)+
+    tile(c.pending,'Leave to action','ds-gold',goLeave);
+}
+
+// Open shifts aren't in any list the board builds, so fetch the count itself.
+// Cheap (HEAD + count header) and cached on window for the strip to read.
+async function _refreshOpenShiftCount(){
+  try{
+    const r=await fetch(SUPABASE_URL+'/rest/v1/roster_shifts?status=eq.open&select=id',
+      {headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY,Prefer:'count=exact',Range:'0-0'}});
+    const cr=r.headers.get('content-range')||'';
+    const n=parseInt((cr.split('/')[1]||'0'),10);
+    window._dashOpenShifts = isNaN(n)?0:n;
+  }catch(e){ window._dashOpenShifts = window._dashOpenShifts||0; }
+}
+
 async function refreshMorningBoard(){
+  try{ await _refreshOpenShiftCount(); }catch(e){}
   const host = document.getElementById('morningBoard');
   if(!host) return;
   const today = _todayIsoSydney();
@@ -8193,6 +8363,18 @@ async function refreshMorningBoard(){
   const chip = (cls,label,n) => `<span class="mb-chip ${cls}${n===0?' zero':''}"><b>${n}</b>${label}</span>`;
   const person = (o,meta='') => `<div class="mb-person"><i class="mb-dot" style="background:${o.s.color||'#94a3b8'}"></i><span>${o.s.first} ${o.s.last.charAt(0)}.</span>${meta?`<s class="mb-meta">${meta}</s>`:''}</div>`;
   const dateLbl = new Intl.DateTimeFormat('en-AU',{timeZone:'Australia/Sydney',weekday:'short',day:'numeric',month:'short'}).format(new Date());
+
+  // Strip first — same source lists, so the numbers always agree with the board.
+  try{
+    renderDashStrip({
+      present: inNow.length,
+      late:    lateList.length,
+      notIn:   notInList.length,
+      leave:   leaveList.length,
+      open:    (window._dashOpenShifts||0),
+      pending: (leaveRequests||[]).filter(function(r){return r.status==='pending';}).length
+    });
+  }catch(e){ console.warn('dash strip', e); }
 
   const anyone = lateList.length||notInList.length||inNow.length||leaveList.length||doneList.length;
   host.innerHTML = `
