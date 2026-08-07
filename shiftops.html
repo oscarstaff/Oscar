@@ -3687,14 +3687,25 @@ function pushAvailToSource(staffId){
         const v=(availability[staffId]||{})[d];
         if(v) week[String(d)]=v;
       }
-      const r=await fetch(SUPABASE_URL+'/rest/v1/staff_availability',{
+      // on_conflict=staff_name is REQUIRED: the primary key here is `id`, and
+      // PostgREST resolves merge-duplicates against the PK unless told
+      // otherwise. Without it the upsert tried to INSERT, hit the UNIQUE
+      // constraint on staff_name, and came back 409 — which surfaced as
+      // "not saved" with nothing written.
+      const r=await fetch(SUPABASE_URL+'/rest/v1/staff_availability?on_conflict=staff_name',{
         method:'POST',
-        headers:Object.assign({Prefer:'resolution=merge-duplicates,return=minimal'},_DB_H),
+        headers:Object.assign({Prefer:'resolution=merge-duplicates,return=representation'},_DB_H),
         body:JSON.stringify({staff_name:name, availability:week,
                              is_ongoing:true, valid_from:null, valid_until:null,
                              updated_at:new Date().toISOString()})
       });
-      if(!r.ok) throw new Error('HTTP '+r.status);
+      if(!r.ok){
+        const detail=await r.text().catch(function(){return '';});
+        console.error('[AVAIL] save failed HTTP '+r.status, detail);
+        throw new Error('HTTP '+r.status);
+      }
+      const saved=await r.json().catch(function(){return null;});
+      if(!saved || !saved.length) throw new Error('nothing written');
       // Keep the sync signature fresh so our own write doesn't look like a
       // remote change and trigger a pointless re-apply.
       _lastAvailSig='';
@@ -8139,7 +8150,7 @@ async function aaSave(){
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────
-const SHIFTOPS_BUILD='2026-08-07-v40-avail-admin';
+const SHIFTOPS_BUILD='2026-08-07-v41-avail-upsert';
 console.log('%c[ShiftOps build '+SHIFTOPS_BUILD+' loaded]','background:#16a34a;color:#fff;padding:2px 8px;border-radius:4px;font-weight:700;');
 (async()=>{
   await loadData();
