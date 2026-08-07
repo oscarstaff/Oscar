@@ -6401,14 +6401,15 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
   display: inline-block;
   margin-left: 5px;
   font-size: 10.5px;
-  font-weight: 600;
-  color: #7c3aed;
-  background: rgba(139,92,246,.08);
+  font-weight: 700;
+  color: #6d28d9;
+  background: rgba(139,92,246,.16);
+  border: 1px solid rgba(139,92,246,.22);
   padding: 0 4px;
-  border-radius: 3px;
+  border-radius: 4px;
   vertical-align: top;
   line-height: 14px;
-  font-family: 'Noto Sans Devanagari', 'Mangal', system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
 }
 :is([data-theme="dark"],[data-theme="midnight"]) .cal-bs-day {
   color: #c4b5fd;
@@ -9911,11 +9912,14 @@ function renderBdayCalendar(){
     // Combined AD + BS date display
     const _adDateObj_$ = new Date(yr, mo, d);
     const _bsDate_$ = (typeof adToBs === 'function') ? adToBs(_adDateObj_$) : null;
-    const _bsDayNep_$ = (_bsDate_$ && typeof NEPALI_DIGITS !== 'undefined')
-      ? String(_bsDate_$.day).split('').map(function(c){return NEPALI_DIGITS[parseInt(c,10)]||c;}).join('')
-      : '';
+    // LATIN digits, not Devanagari. Devanagari needs a font the device may not
+    // have (Noto Sans Devanagari / Mangal) — without it the numerals render as
+    // blank boxes, which reads as "the Nepali dates aren't showing" even though
+    // they are. The full Nepali-script date is still in the tooltip and the
+    // month header, where a missing glyph is less damaging.
+    const _bsDayNep_$ = _bsDate_$ ? String(_bsDate_$.day) : '';
     html+='<div class="cal-date">'+(isToday?'<span class="cal-date-today">'+d+'</span>':d);
-    if(_bsDayNep_$) html += '<span class="cal-bs-day" title="'+(NEPALI_BS_MONTH_NAMES[_bsDate_$.month]+' '+_bsDate_$.day)+'">'+_bsDayNep_$+'</span>';
+    if(_bsDayNep_$) html += '<span class="cal-bs-day" title="'+(_bsDate_$.day+' '+NEPALI_BS_MONTH_NAMES[_bsDate_$.month]+' '+_bsDate_$.year+' BS')+'">'+_bsDayNep_$+'</span>';
     html += '</div>';
     html+='<div class="cal-pills">';
 
@@ -13292,7 +13296,7 @@ const NEPALI_BS_MONTHS = {
   2080:[31,32,31,32,31,30,30,30,29,29,30,30],
   2081:[31,32,31,32,31,30,30,30,29,30,29,31],
   2082:[31,31,32,31,31,31,30,29,30,29,30,30],
-  2083:[31,31,32,31,31,30,30,30,29,30,30,30],
+  2083:[31,31,32,31,31,31,30,29,30,29,30,30], // corrected — Asoj/Mangsir/Poush/Magh were wrong
   2084:[31,31,32,31,31,30,30,30,29,30,30,30],
   2085:[31,32,31,32,30,31,30,30,29,30,30,30],
   2086:[30,32,31,32,31,30,30,30,29,30,30,30],
@@ -24225,7 +24229,7 @@ input:focus{
 </style>
 
 <!-- DialTRAC (Call Log tab) — extracted module. Bump ?v= on each deploy. -->
-<script src="dialtrac.js?v=3"></script>
+<script src="dialtrac.js?v=4"></script>
 <script src="quizreview.js?v=1"></script>
 <script src="teamhours.js?v=2"></script>
 <script src="availlock.js?v=2"></script>
