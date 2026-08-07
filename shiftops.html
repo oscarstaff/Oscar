@@ -2480,6 +2480,34 @@ const MAIL_TOKEN='oscars_mail_921793e91a49d14b120c9053065e94c7065ae583';
 // gets told.
 const MIN_TEAM_FOR_EMAIL=6;      // teams of this size or smaller are not emailed
 
+// Minimum notice before a shift starts for a pickup email to be worth sending.
+// Below this the shift still opens and stays claimable — we just don't email,
+// because nobody can realistically rearrange their day at that range and the
+// noise devalues every future notification.
+const SHIFT_NOTICE_HOURS = 10;
+
+/**
+ * Hours from now until a shift starts, in Sydney time.
+ *
+ * Resolves the offset for that specific date rather than assuming +10:00 —
+ * Sydney is +11 under daylight saving (Oct–Apr), and a one-hour error either
+ * side of a 10-hour threshold is exactly the case that would email the whole
+ * team about a shift starting imminently.
+ */
+function _hoursUntilShift(dateStr, startTime){
+  try{
+    const hhmm=String(startTime||'09:00').slice(0,5);
+    let start=new Date(dateStr+'T'+hhmm+':00+10:00');
+    if(isNaN(start)) return 999;
+    // How far is Sydney from UTC on that date? 600 (AEST) or 660 (AEDT).
+    const asUtc=new Date(start.toLocaleString('en-US',{timeZone:'UTC'}));
+    const asSyd=new Date(start.toLocaleString('en-US',{timeZone:'Australia/Sydney'}));
+    const offMin=Math.round((asSyd-asUtc)/60000);
+    if(offMin===660) start=new Date(dateStr+'T'+hhmm+':00+11:00');
+    return (start.getTime()-Date.now())/3600000;
+  }catch(e){ return 999; }   // unknown → treat as plenty of notice
+}
+
 // Set to a staff name to send shift-available emails to ONLY that person
 // (useful when testing). Empty = normal rules apply.
 const SHIFT_MAIL_TEST_ONLY='';
@@ -7255,7 +7283,7 @@ async function releaseShiftsForLeave(s, fromStr, toStr){
       {headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY}})).json();
     if(!rows || !rows.length) return;
 
-    let opened=0;
+    let opened=0, tooSoon=0;
     for(const row of rows){
       try{
         const r=await fetch(SUPABASE_URL+'/rest/v1/rpc/approve_shift_release',{
@@ -7268,12 +7296,27 @@ async function releaseShiftsForLeave(s, fromStr, toStr){
         const res=await r.json();
         if(res && res.ok===true){
           opened++;
-          notifyShiftOpen(name, res);
+          // Only email if there's real time to respond. Blasting the team about
+          // a shift starting in two hours doesn't get it covered — people are
+          // mid-shift or asleep — it just trains everyone to ignore the emails.
+          // The shift still OPENS either way, so it's on the pickup list and
+          // recorded properly; what changes is whether we shout about it.
+          if(_hoursUntilShift(row.shift_date, row.start_time) >= SHIFT_NOTICE_HOURS){
+            notifyShiftOpen(name, res);
+          }else{
+            tooSoon++;
+            console.log('[SHIFT] '+row.shift_date+' '+row.start_time+
+              ' opens in under '+SHIFT_NOTICE_HOURS+'h — no email, arrange cover directly');
+          }
         }
       }catch(e){ console.warn('releaseShiftsForLeave row',e); }
     }
     if(opened){
-      showToast(opened+' shift'+(opened===1?'':'s')+' opened for pickup (on leave)');
+      showToast(opened+' shift'+(opened===1?'':'s')+' opened for pickup (on leave)'+
+        (tooSoon?(' — '+tooSoon+' within '+SHIFT_NOTICE_HOURS+'h, not emailed'):''));
+      if(tooSoon){
+        showToast(tooSoon+' shift'+(tooSoon===1?' starts':'s start')+' too soon to email — arrange cover directly');
+      }
       loadWeekShiftsFromDB(currentWeekStart);
     }
   }catch(e){ console.warn('releaseShiftsForLeave',e); }
@@ -8048,7 +8091,7 @@ async function aaSave(){
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────
-const SHIFTOPS_BUILD='2026-08-07-v36-payroll-section';
+const SHIFTOPS_BUILD='2026-08-07-v37-shift-notice';
 console.log('%c[ShiftOps build '+SHIFTOPS_BUILD+' loaded]','background:#16a34a;color:#fff;padding:2px 8px;border-radius:4px;font-weight:700;');
 (async()=>{
   await loadData();
