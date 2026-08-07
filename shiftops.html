@@ -1071,7 +1071,6 @@ select.form-input { cursor: pointer; }
 .lv-ava{ width:38px!important; height:38px!important; font-size:11px!important; flex-shrink:0; border-radius:12px!important; box-shadow:inset 0 -6px 12px rgba(0,0,0,.14),0 2px 5px rgba(30,27,75,.16); }
 .lv-body{ flex:1; min-width:0; }
 .lv-name{ font-size:13.5px; font-weight:750; color:var(--text); display:flex; align-items:center; gap:7px; }
-.lv-web{ font-family:var(--mono); font-size:8px; font-weight:700; background:rgba(99,102,241,.12); color:var(--accent2); border:1px solid rgba(99,102,241,.25); border-radius:5px; padding:1px 6px; }
 .lv-dates{ font-size:12px; color:var(--text-dim); margin-top:3px; display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
 .lv-arrow{ color:var(--muted); }
 .lv-days{ font-family:var(--mono); font-size:10px; font-weight:700; background:var(--accent-dim); color:var(--accent-text); border-radius:20px; padding:2px 9px; }
@@ -1327,6 +1326,48 @@ body.tl-readonly .wk-tools{ display:none !important; }
 }
 .lv-fchip:hover{ border-color:var(--border2); color:var(--text); }
 .lv-fchip.active{ background:var(--accent); border-color:var(--accent-deep); color:#fff; }
+
+/* ── Leave page: one toolbar, one filter language ─────────────────────
+   The header block, staff select and clear link were all inline-styled while
+   the cards used .lv-* classes — so a token change updated half the page.
+   These pull the last inline styles into the same system. */
+.lv-toolbar{
+  display:flex; justify-content:space-between; align-items:center;
+  gap:10px; flex-wrap:wrap; margin-bottom:14px;
+}
+.lv-toolbar-actions{ display:flex; gap:8px; align-items:center; }
+.lv-sync{ font-size:11.5px; padding:6px 13px; }
+
+/* Staff filter matches the status chips instead of being a bare native select. */
+.lv-fselect{
+  border:1px solid var(--border); background:var(--surface2);
+  color:var(--text-mid); border-radius:999px;
+  padding:5px 11px; font-size:11.5px; font-weight:650;
+  font-family:inherit; cursor:pointer; max-width:190px;
+}
+.lv-fselect.active{ background:var(--accent); border-color:var(--accent-deep); color:#fff; }
+.lv-fdiv{ width:1px; height:18px; background:var(--border); margin:0 2px; }
+/* Neutral — clearing a filter isn't destructive, and --warn already means
+   "declined" on this page. */
+.lv-fclear{
+  background:none; border:none; cursor:pointer; font-family:inherit;
+  font-size:11px; font-weight:650; color:var(--text-dim); padding:5px 4px;
+}
+.lv-fclear:hover{ color:var(--text); text-decoration:underline; }
+.lv-soon-note{
+  margin-left:auto; font-family:var(--mono); font-size:10px; font-weight:700;
+  color:var(--gold); white-space:nowrap;
+}
+
+/* Origin of the request. Replaces the "WEB" badge, which named the transport
+   rather than telling a manager whether a person asked or someone entered it. */
+.lv-src{
+  font-family:var(--mono); font-size:8px; font-weight:700;
+  letter-spacing:.04em; text-transform:uppercase;
+  border-radius:5px; padding:1px 6px; margin-left:7px; white-space:nowrap;
+}
+.lv-src-nexus{ background:rgba(99,102,241,.12); color:var(--accent2); border:1px solid rgba(99,102,241,.25); }
+.lv-src-added{ background:var(--surface2); color:var(--muted); border:1px solid var(--border); }
 .lv-count{ font-family:var(--mono); font-size:10px; opacity:.75; margin-left:4px; }
 
 
@@ -6503,13 +6544,24 @@ function renderLeave(filterName){
   };
   // upcoming approved leave starting within 7 days (what a manager needs to see)
   const upcomingSoon = approved.filter(r=>{ const d=daysUntil(r); return d>=0 && d<=7; });
+  const _staffNamesForFilter=[...new Set(leaveRequests.map(r=>{
+    const s=staff.find(x=>x.id===r.staffId);
+    return (r.staff_name||r.staffName||(s?`${s.first} ${s.last}`:'')).trim();
+  }).filter(Boolean))].sort();
+
   const filterChips = `
     <div class="lv-filter-bar">
       <button class="lv-fchip ${statusFilter==='all'?'active':''}" onclick="setLeaveStatusFilter('all')">All<span class="lv-count">${pending.length+approved.length+declined.length}</span></button>
       <button class="lv-fchip ${statusFilter==='pending'?'active':''}" onclick="setLeaveStatusFilter('pending')">Pending<span class="lv-count">${pending.length}</span></button>
       <button class="lv-fchip ${statusFilter==='approved'?'active':''}" onclick="setLeaveStatusFilter('approved')">Approved<span class="lv-count">${approved.length}</span></button>
       <button class="lv-fchip ${statusFilter==='declined'?'active':''}" onclick="setLeaveStatusFilter('declined')">Declined<span class="lv-count">${declined.length}</span></button>
-      ${upcomingSoon.length?`<span style="margin-left:auto;font-size:11px;color:var(--gold);font-weight:600;">⚑ ${upcomingSoon.length} starting within 7 days</span>`:''}
+      <span class="lv-fdiv"></span>
+      <select class="lv-fselect${activeFilter?' active':''}" onchange="renderLeave(this.value)">
+        <option value="">Everyone</option>
+        ${_staffNamesForFilter.map(n=>`<option value="${n}"${n===activeFilter?' selected':''}>${n}</option>`).join('')}
+      </select>
+      ${activeFilter?`<button class="lv-fclear" onclick="renderLeave('')">Clear</button>`:''}
+      ${upcomingSoon.length?`<span class="lv-soon-note">${upcomingSoon.length} starting within 7 days</span>`:''}
     </div>`;
 
   const fmtLeaveDate=d=>new Date(d).toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'});
@@ -6530,53 +6582,48 @@ function renderLeave(filterName){
     const name=rName||(s?`${s.first} ${s.last}`:'Unknown');
     const color=s?s.color:'#666';
     const days=countLeaveDays(r.from||r.from_date||'',(r.to||r.to_date||''),(r.staffId||null));
-    const isWeb=!!r.supabaseId; // came from web form
+    // Where the request came from. Admin-added rows are stamped
+    // resolved_by='Admin (ShiftOps)' by the relay; anything else came from a
+    // staff member submitting in Nexus. "WEB" told you the transport; this
+    // tells you whether a person asked for it or someone entered it for them,
+    // which is the thing a manager actually needs to know.
+    const addedHere = (r.resolved_by||'') === 'Admin (ShiftOps)';
     const _du = (function(){ const f=new Date((r.from||r.from_date||'')+'T00:00:00'); const t=new Date(); t.setHours(0,0,0,0); return isNaN(f)?999:Math.round((f-t)/86400000); })();
     const soonCls = (r.status==='approved' && _du>=0 && _du<=7) ? ' lv-soon' : '';
     return `<div class="lv-card lv-row lv-${r.status}${soonCls}">
       <div class="avatar lv-ava" style="background:${color}">${s?initials(s):name.slice(0,2).toUpperCase()}</div>
       <div class="lv-body">
-        <div class="lv-name">${name}${isWeb?`<span class="lv-web">WEB</span>`:''}</div>
-        <div class="lv-dates">${fmtLeaveDate(r.from||r.from_date)} <span class="lv-arrow">-></span> ${fmtLeaveDate(r.to||r.to_date)} <span class="lv-days">${days} day${days!==1?'s':''}</span></div>
+        <div class="lv-name">${name}<span class="lv-src ${addedHere?'lv-src-added':'lv-src-nexus'}">${addedHere?'Added':'From Nexus'}</span></div>
+        <div class="lv-dates">${fmtLeaveDate(r.from||r.from_date)} <span class="lv-arrow">&rarr;</span> ${fmtLeaveDate(r.to||r.to_date)} <span class="lv-days">${days} day${days!==1?'s':''}</span></div>
         ${r.reason?`<div class="lv-reason">"${r.reason}"</div>`:''}
       </div>
       <div class="lv-right">
-        <div class="lv-status lv-status-${r.status}">${r.status}</div>
+        ${statusFilter==='all'?`<div class="lv-status lv-status-${r.status}">${r.status}</div>`:''}
         ${showActions?`<div class="lv-actions">
           <button class="lv-btn lv-edit" onclick="openLeaveEdit(${r.id})">Edit</button>
           ${r.status!=='approved'?`<button class="lv-btn lv-approve" onclick="updateLeave(${r.id},'approved')">Approve</button>`:''}
           ${r.status!=='declined'?`<button class="lv-btn lv-decline" onclick="updateLeave(${r.id},'declined')">Decline</button>`:''}
-          <button class="lv-btn lv-del" onclick="deleteLeave(${r.id})"></button>
+          <button class="lv-btn lv-del" onclick="deleteLeave(${r.id})" title="Delete this request">Delete</button>
         </div>`:''}
       </div>
     </div>`;
   };
 
-  // Build staff filter options
-  const staffNames=[...new Set(leaveRequests.map(r=>{
-    const s=staff.find(x=>x.id===r.staffId);
-    return s?`${s.first} ${s.last}`:(r.staffName||'');
-  }).filter(Boolean))].sort();
-
-  let html=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px">
-    <div>
-      <div class="section-title">Leave Requests</div>
-      <div style="font-family:var(--mono);font-size:9px;color:var(--text-dim);margin-top:3px">${leaveRequests.length} total · ${pending.length} pending</div>
-    </div>
-    <div style="display:flex;gap:8px;align-items:center;">
-      <button class="btn btn-save" onclick="syncLeaveRequests()" style="font-size:11.5px">Sync from Staff</button>
+  // Header: the count line is dropped — the status chips below carry the same
+  // numbers, and stating them twice made neither authoritative. Only one
+  // toolbar action is primary; syncing is maintenance, adding is the job.
+  let html=`<div class="lv-toolbar">
+    <div class="section-title">Leave Requests</div>
+    <div class="lv-toolbar-actions">
+      <button class="btn btn-ghost lv-sync" onclick="syncLeaveRequests()">Sync from Staff</button>
       <button class="btn btn-primary" onclick="openLeaveModal()">+ Add Leave</button>
     </div>
-  </div>
-  <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;">
-    <select onchange="renderLeave(this.value)" style="padding:6px 10px;border:1px solid var(--border);border-radius:var(--r6);font-size:12px;font-family:var(--sans);color:var(--text);background:var(--surface);cursor:pointer;min-width:160px;">
-      <option value="">All Staff</option>
-      ${staffNames.map(n=>`<option value="${n}"${n===activeFilter?' selected':''}>${n}</option>`).join('')}
-    </select>
-    ${activeFilter?`<button onclick="renderLeave('')" style="font-size:11px;color:var(--warn);background:none;border:none;cursor:pointer;font-family:var(--sans);">Clear filter</button>`:''}
   </div>`;
 
-  html += filterChips;   // ← leave reform: status filter row
+  // Staff and status filters now share ONE row and ONE visual language. They
+  // were two separate mechanisms — a native select with a red text link, and a
+  // chip bar — doing the same job while looking unrelated.
+  html += filterChips;
 
   const showS = st => statusFilter==='all' || statusFilter===st;
 
@@ -7773,7 +7820,7 @@ async function aaSave(){
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────
-const SHIFTOPS_BUILD='2026-08-05-v26-hk-tasks-publish';
+const SHIFTOPS_BUILD='2026-08-07-v27-leave-uniform';
 console.log('%c[ShiftOps build '+SHIFTOPS_BUILD+' loaded]','background:#16a34a;color:#fff;padding:2px 8px;border-radius:4px;font-weight:700;');
 (async()=>{
   await loadData();
