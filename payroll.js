@@ -190,6 +190,27 @@ function _pTeam(){
   }catch(e){}
   return '';
 }
+/**
+ * Canonical staff-name list.
+ *
+ * Nexus keeps a flat `STAFF` array of names; ShiftOps keeps `staff` as objects
+ * with first/last. Referencing STAFF directly threw a ReferenceError in
+ * ShiftOps, which rejected the promise chain and left the rates editor stuck
+ * on "Loading…" with no visible error.
+ */
+function _pStaffNames(){
+  try{
+    if(typeof STAFF !== 'undefined' && Array.isArray(STAFF) && STAFF.length) return STAFF.slice();
+  }catch(e){}
+  try{
+    if(typeof staff !== 'undefined' && Array.isArray(staff) && staff.length){
+      return staff.map(function(s){ return ((s.first||'')+' '+(s.last||'')).trim(); })
+                  .filter(Boolean);
+    }
+  }catch(e){}
+  return [];
+}
+
 function _canPayroll(){
   try{
     if(PAYROLL_ALLOW.indexOf(_pMe()) >= 0) return true;
@@ -220,7 +241,13 @@ function initPayrollTab(){
   const s = document.getElementById('payStart'), e = document.getElementById('payEnd');
   if(s && !s.value) s.value = _payFmt(start);
   if(e && !e.value) e.value = _payFmt(end);
-  loadPayRates().then(renderRatesEditor);
+  // Surface a failure instead of leaving "Loading…" on screen forever — a
+  // silent rejection here is exactly what hid the missing STAFF global.
+  loadPayRates().then(renderRatesEditor).catch(function(err){
+    console.error('[PAYROLL] rates editor failed', err);
+    const el=document.getElementById('payRatesEditor');
+    if(el) el.innerHTML='<div style="color:#b91c1c;font-size:13px;">Couldn\'t load rates — see console.</div>';
+  });
 }
 
 async function loadPayRates(){
@@ -311,7 +338,7 @@ async function runPayroll(){
   // Roster = everyone with a rate OR any punches in this range (canonical STAFF).
   const roster = Array.from(new Set([].concat(
     Object.keys(_payRates),
-    (STAFF||[]).filter(Boolean)
+    _pStaffNames().filter(Boolean)
   ))).sort(function(a,b){ return a.localeCompare(b); });
 
   el.innerHTML = '<div style="color:#94a3b8;text-align:center;padding:20px;">Running payrun for '+roster.length+' staff…</div>';
@@ -426,7 +453,7 @@ function renderRatesEditor(){
   if(!el) return;
   const roster = Array.from(new Set([].concat(
     Object.keys(_payRates),
-    (STAFF||[]).filter(Boolean)
+    _pStaffNames().filter(Boolean)
   ))).sort(function(a,b){ return a.localeCompare(b); });
   let html = '<div style="overflow-x:auto;"><table class="pp-rates">'+
     '<thead><tr>'+
@@ -466,7 +493,7 @@ async function savePayRates(){
       prem_rate: parseFloat(tr.querySelector('.pr-prem').value) || 0,
       pay_cap: parseFloat(tr.querySelector('.pr-cap').value) || 48,
       updated_at: new Date().toISOString(),
-      updated_by: (window.me || me || '')
+      updated_by: _pMe()
     });
   });
   try{
