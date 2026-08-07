@@ -2172,7 +2172,6 @@ button, .btn { white-space: nowrap; }
       <div class="form-group"><label class="form-label">Team</label>
         <select class="form-input" id="staffTeam">
           <option value="Enrolment">Enrolment</option>
-          <option value="Follow-up">Follow-up</option>
           <option value="Processing">Processing</option>
           <option value="Placement">Placement</option>
           <option value="Evershine">Evershine</option>
@@ -2527,7 +2526,7 @@ let leaveRequests=[]; // [{id, staffId, from, to, reason, status:'pending'|'appr
 let nextLeaveId=1;
 let shifts={};
 let nextStaffId=1; // was 6 to clear the 5 seed staff; no seed data now
-let teams=['Enrolment','Follow-up','Processing','Placement','Evershine','Accounts','Education'];
+let teams=['Enrolment','Processing','Placement','Evershine','Accounts','Education'];
 let devices=[]; // [{id, name, assignedTo: staffId|null}]
 let nextDeviceId=1;
 let currentWeekStart=getMonday(new Date());
@@ -3659,6 +3658,52 @@ function setAvail(staffId,day,val){
   if(!availability[staffId])availability[staffId]={};
   availability[staffId][day]=val;
   markDirty();
+  // Write THROUGH to staff_availability, the source of truth.
+  //
+  // Previously this only touched the in-memory grid (and the blob), while
+  // _syncAvailabilityCore() pulls FROM staff_availability every few minutes —
+  // so an admin edit here was silently reverted on the next pull. Now that
+  // staff can't edit their own availability in Nexus, this is the only way it
+  // changes, and it has to land in the real table.
+  pushAvailToSource(staffId);
+}
+
+let _pushAvailTimers={};
+/**
+ * Debounced per-person write of the whole weekly pattern. Debounced because
+ * setting Mon–Sun is seven rapid calls, and seven PATCHes for one person's
+ * week is needless.
+ */
+function pushAvailToSource(staffId){
+  clearTimeout(_pushAvailTimers[staffId]);
+  _pushAvailTimers[staffId]=setTimeout(async function(){
+    try{
+      const s=(staff||[]).find(function(x){ return x.id===staffId; });
+      if(!s) return;
+      const name=((s.first||'')+' '+(s.last||'')).trim();
+      if(!name) return;
+      const week={};
+      for(let d=0; d<7; d++){
+        const v=(availability[staffId]||{})[d];
+        if(v) week[String(d)]=v;
+      }
+      const r=await fetch(SUPABASE_URL+'/rest/v1/staff_availability',{
+        method:'POST',
+        headers:Object.assign({Prefer:'resolution=merge-duplicates,return=minimal'},_DB_H),
+        body:JSON.stringify({staff_name:name, availability:week,
+                             is_ongoing:true, valid_from:null, valid_until:null,
+                             updated_at:new Date().toISOString()})
+      });
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      // Keep the sync signature fresh so our own write doesn't look like a
+      // remote change and trigger a pointless re-apply.
+      _lastAvailSig='';
+      showToast('Availability saved for '+s.first);
+    }catch(e){
+      console.warn('pushAvailToSource',e);
+      showToast('Availability not saved — check connection');
+    }
+  }, 700);
 }
 
 let editingAvail={staffId:null,day:null};
@@ -5001,6 +5046,9 @@ function openAddShift(staffId,dayIdx){
    is atomic server-side (claim_shift), so two people tapping at once can't
    both win — this side only decides what becomes available.
    ──────────────────────────────────────────────────────────────────────── */
+
+
+
 function renderShiftPickupBox(sh){
   const box=document.getElementById('shiftPickupBox');
   if(!box) return;
@@ -8091,7 +8139,7 @@ async function aaSave(){
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────
-const SHIFTOPS_BUILD='2026-08-07-v37-shift-notice';
+const SHIFTOPS_BUILD='2026-08-07-v40-avail-admin';
 console.log('%c[ShiftOps build '+SHIFTOPS_BUILD+' loaded]','background:#16a34a;color:#fff;padding:2px 8px;border-radius:4px;font-weight:700;');
 (async()=>{
   await loadData();

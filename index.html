@@ -6882,7 +6882,11 @@ function showSchedTab(tab){
     if(t)t.classList.toggle('active',s===tab);
   });
   if(tab==='leave'){loadLeaveHistory();}
-  if(tab==='availability' && typeof applyAvailLock === 'function'){ setTimeout(applyAvailLock, 60); }
+  if(tab==='availability'){
+    // Check for a manager-granted exception before deciding what to show.
+    if(typeof refreshAvailUnlock === 'function') refreshAvailUnlock();
+    if(typeof applyAvailLock === 'function') setTimeout(applyAvailLock, 60);
+  }
   if(tab==='availability'){
     checkLock();
     if(myIsAdmin){
@@ -24232,6 +24236,6 @@ input:focus{
 <script src="dialtrac.js?v=4"></script>
 <script src="quizreview.js?v=1"></script>
 <script src="teamhours.js?v=2"></script>
-<script src="availlock.js?v=2"></script>
+<script src="availlock.js?v=4"></script>
 </body>
 </html>

@@ -1,97 +1,35 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   availlock.js — availability submission cut-off
-   Loaded by index.html:  <script src="availlock.js?v=2"></script>
+   availlock.js — availability is read-only for staff
+   Loaded by index.html:  <script src="availlock.js?v=4"></script>
 
    Separate module by convention — see ARCHITECTURE.md.
 
    WHY
    Staff were changing availability AFTER the roster had been built from it,
-   which silently invalidated shifts already assigned: someone rostered on
-   Thursday could mark themselves unavailable on Thursday and the grid would
-   never know.
+   which silently invalidated shifts already assigned. The fortnightly cut-off
+   helped but still left a window where a change could land unnoticed.
 
-   THE RULE
-   Availability closes 2 DAYS BEFORE each new fortnight starts, giving the
-   roster a stable picture to be built from. It reopens when the fortnight
-   begins, and whatever you submit then applies to the NEXT fortnight.
+   Availability is now set by a manager in ShiftOps (Availability → Weekly
+   Grid), which writes straight to staff_availability. Staff can SEE theirs but
+   not change it — they ask, and it's updated for them. One place to change it,
+   one person accountable for it, and the roster is always built from what's
+   actually recorded.
 
-   Fortnights are Monday-to-Sunday pairs anchored on Mon 4 May 2026 — the same
-   FORTNIGHT_ANCHOR the payroll script uses, so availability, rostering and pay
-   all agree on where a fortnight begins.
-
-       fortnight starts:  27 Jul · 10 Aug · 24 Aug · 7 Sep · …
-       locked on:         Sat + Sun immediately before each start
-
-   Evaluated in Sydney time, so an 11pm submission isn't judged against
-   tomorrow's date.
-
-   TUNING — two constants:
-     FORT_ANCHOR    any Monday a fortnight has started on
-     CUTOFF_DAYS    how many days before the next fortnight it closes
+   The screen stays visible on purpose: knowing what the office thinks your
+   availability is matters, and it's how someone notices it's wrong.
    ═══════════════════════════════════════════════════════════════════════ */
 (function(){
   'use strict';
 
-  var FORT_ANCHOR = '2026-05-04';   // Mon — matches FORTNIGHT_ANCHOR in Apps Script
-  var CUTOFF_DAYS = 2;              // closes this many days before a fortnight starts
-
-  function _sydneyToday(){
-    var s = new Date().toLocaleString('en-US', { timeZone: 'Australia/Sydney' });
-    var d = new Date(s);
-    d.setHours(0,0,0,0);
-    return d;
-  }
-  function _parse(iso){ var d = new Date(iso + 'T00:00:00'); d.setHours(0,0,0,0); return d; }
-  function _addDays(d,n){ var x = new Date(d); x.setDate(x.getDate()+n); return x; }
-  function _days(a,b){ return Math.round((a-b)/86400000); }
-  function _fmt(d){ return d.toLocaleDateString('en-AU',{weekday:'long',day:'numeric',month:'long'}); }
-  function _fmtShort(d){ return d.toLocaleDateString('en-AU',{day:'numeric',month:'short'}); }
-
-  /**
-   * Where are we in the fortnight?
-   * Returns { locked, fortStart, nextFort, cutoff, daysUntilOpen, appliesFrom }.
-   */
-  function availWindow(){
-    var today  = _sydneyToday();
-    var anchor = _parse(FORT_ANCHOR);
-
-    // Floor-divide so dates before the anchor still land on a real boundary.
-    var elapsed = _days(today, anchor);
-    var n = Math.floor(elapsed / 14);
-    var fortStart = _addDays(anchor, n * 14);      // fortnight containing today
-    var nextFort  = _addDays(fortStart, 14);
-    var cutoff    = _addDays(nextFort, -CUTOFF_DAYS);  // last day you can submit
-
-    var locked = today >= cutoff;
-
-    return {
-      locked: locked,
-      fortStart: fortStart,
-      nextFort: nextFort,
-      cutoff: cutoff,
-      // When locked, submissions reopen at the next fortnight start.
-      daysUntilOpen: locked ? _days(nextFort, today) : 0,
-      // What a submission made right now would apply to.
-      appliesFrom: locked ? _addDays(nextFort, 14) : nextFort
-    };
-  }
-
-  /** Admins can always change availability — they're the ones fixing mistakes. */
+  /** Admins keep the ability to edit from either side. */
   function availLocked(){
     try{ if(typeof myIsAdmin !== 'undefined' && myIsAdmin) return false; }catch(e){}
-    return availWindow().locked;
+    return true;
   }
 
   function availLockMessage(){
-    var w = availWindow();
-    if(w.locked){
-      var d = w.daysUntilOpen;
-      return 'The roster for the fortnight starting ' + _fmt(w.nextFort) +
-             ' is being built, so availability is closed. It reopens ' + _fmt(w.nextFort) +
-             (d > 0 ? ' (' + d + ' day' + (d === 1 ? '' : 's') + ')' : '') + '.';
-    }
-    return 'Open until ' + _fmt(w.cutoff) + ' — changes apply from the fortnight starting ' +
-           _fmtShort(w.appliesFrom) + '.';
+    return 'Your availability is managed by the office. If it needs changing, '+
+           'speak to your manager and it will be updated for you.';
   }
 
   /**
@@ -113,35 +51,38 @@
       host.insertBefore(bar, host.firstChild);
     }
     if(locked){
-      bar.style.background = '#fffbeb';
-      bar.style.border     = '1px solid #fde68a';
-      bar.style.color      = '#92400e';
-      bar.innerHTML = '<strong>Closed for this fortnight</strong> — ' + availLockMessage() +
-        '<br><span style="opacity:.85;">Need a change sooner? Speak to your manager.</span>';
+      bar.style.background = '#f8fafc';
+      bar.style.border     = '1px solid #e2e8f0';
+      bar.style.color      = '#475569';
+      bar.innerHTML = '<strong>Set by the office</strong> — ' + availLockMessage();
     }else{
       bar.style.background = '#f0fdf4';
       bar.style.border     = '1px solid #bbf7d0';
       bar.style.color      = '#065f46';
-      bar.innerHTML = '<strong>Open</strong> — ' + availLockMessage();
+      bar.innerHTML = '<strong>Admin</strong> — you can edit availability here or in ShiftOps.';
     }
 
     var btn = document.getElementById('availBtn');
     if(btn){
       btn.disabled = locked;
-      btn.style.opacity = locked ? '.5' : '';
-      btn.style.cursor  = locked ? 'not-allowed' : '';
-      btn.title = locked ? availLockMessage() : '';
+      btn.style.display = locked ? 'none' : '';   // nothing to submit
     }
     host.querySelectorAll('input,select,button').forEach(function(el){
       if(el.id === 'availBtn') return;
       if(el.closest('#availLockBar')) return;
       el.disabled = locked;
       el.style.opacity = locked ? '.6' : '';
+      el.style.pointerEvents = locked ? 'none' : '';
     });
   }
 
-  window.availWindow      = availWindow;
-  window.availLocked      = availLocked;
-  window.availLockMessage = availLockMessage;
-  window.applyAvailLock   = applyAvailLock;
+  // Kept so existing call sites don't throw; there is no unlock any more.
+  function refreshAvailUnlock(){}
+  function availWindow(){ return { locked: availLocked() }; }
+
+  window.availWindow        = availWindow;
+  window.availLocked        = availLocked;
+  window.availLockMessage   = availLockMessage;
+  window.applyAvailLock     = applyAvailLock;
+  window.refreshAvailUnlock = refreshAvailUnlock;
 })();
