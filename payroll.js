@@ -12,6 +12,67 @@
    auth_uid maps to a staff_credentials row with team = 'Accounts'. The UI
    guard is convenience; the RLS policy is the real boundary.
    ═══════════════════════════════════════════════════════════════════════ */
+/* ── HOST SHIM ────────────────────────────────────────────────────────────
+   This module now runs in ShiftOps as well as Nexus, and the two hosts name
+   their Supabase globals differently (SB/KEY vs SUPABASE_URL/SUPABASE_KEY)
+   and expose different helpers. Resolving them here keeps the payroll logic
+   identical in both rather than maintaining two copies that can drift.
+   ──────────────────────────────────────────────────────────────────────── */
+function _pUrl(){
+  if(typeof SUPABASE_URL !== 'undefined' && SUPABASE_URL) return SUPABASE_URL;
+  if(typeof SB !== 'undefined' && SB) return SB;
+  return '';
+}
+function _pKey(){
+  if(typeof SUPABASE_KEY !== 'undefined' && SUPABASE_KEY) return SUPABASE_KEY;
+  if(typeof KEY !== 'undefined' && KEY) return KEY;
+  return '';
+}
+/** Bearer: Nexus tracks the session itself; ShiftOps' fetch interceptor
+ *  swaps it in, so the anon key here is replaced before the request leaves. */
+function _pBearer(){
+  if(typeof _sbBearer === 'function') return _sbBearer();
+  try{ const t=sessionStorage.getItem('so_sb_at'); if(t) return t; }catch(e){}
+  return _pKey();
+}
+async function _pGet(table, qs){
+  if(typeof sbGet === 'function') return _pGet(table, qs);
+  const r = await fetch(_pUrl()+'/rest/v1/'+table+(qs||''),
+    {headers:{apikey:_pKey(), Authorization:'Bearer '+_pBearer()}});
+  if(!r.ok){ console.warn('payroll _pGet', table, r.status); return []; }
+  return r.json();
+}
+function _pEsc(s){
+  if(typeof esc === 'function') return esc(s);
+  return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+/** 7-minute flex rounding. Uses the host's version where there is one so the
+ *  payrun can't drift from the timesheet; the fallback below is the same rule. */
+function _pFlex(date){
+  if(typeof flexClockTime === 'function') return _pFlex(date);
+  const d=new Date(date), m=d.getMinutes();
+  let nm, nh=d.getHours();
+  if(m<=7) nm=0; else if(m<=22) nm=15; else if(m<=37) nm=30;
+  else if(m<=52) nm=45; else { nm=0; nh=(nh+1)%24; }
+  d.setHours(nh,nm,0,0); return d;
+}
+/** Break + coffee rules. MUST match _pExtras() in Nexus — if these two
+ *  disagree, payroll and the timesheet report different hours for the same
+ *  day, which is the worst possible failure for this feature. */
+function _pExtras(rawHours, customBreak, customCoffee, dateObj){
+  if(typeof calcDayExtras === 'function') return _pExtras(rawHours, customBreak, customCoffee, dateObj);
+  let isWeekend=false;
+  if(dateObj){ const d=(dateObj instanceof Date)?dateObj:new Date(dateObj);
+    const dow=d.getDay(); isWeekend=(dow===0||dow===6); }
+  const autoBreak = isWeekend ? 0 : (rawHours>5 ? 0.5 : 0);
+  let breakHrs = (customBreak!==undefined&&customBreak!==null&&customBreak!=='')?parseFloat(customBreak):autoBreak;
+  let coffee   = (customCoffee!==undefined&&customCoffee!==null&&customCoffee!=='')?parseFloat(customCoffee):(rawHours>=4?5:0);
+  if(isNaN(breakHrs)) breakHrs=0;
+  if(isNaN(coffee)) coffee=0;
+  return { netHours: Math.max(0, rawHours-breakHrs), breakHrs:breakHrs, coffee:coffee };
+}
+
 (function(){
   'use strict';
 
@@ -109,10 +170,30 @@
 // (e.g. add 'Sanskar Pokharel' here temporarily to test as a non-Accounts admin.)
 const PAYROLL_ALLOW = [];
 
+/** Who am I? Nexus keeps `me`; ShiftOps stashes the name at the gate. */
+function _pMe(){
+  try{ if(typeof window.me === 'string' && window.me) return window.me; }catch(e){}
+  try{ if(typeof me === 'string' && me) return me; }catch(e){}
+  try{ const s=sessionStorage.getItem('so_me'); if(s) return s; }catch(e){}
+  return '';
+}
+/** My team. Nexus has `myTeam`; in ShiftOps, look it up in the staff array. */
+function _pTeam(){
+  try{ if(typeof myTeam === 'string' && myTeam) return myTeam; }catch(e){}
+  try{
+    const n=_pMe().trim().toLowerCase();
+    if(n && typeof staff !== 'undefined' && staff && staff.length){
+      const s=staff.find(function(x){
+        return ((x.first||'')+' '+(x.last||'')).trim().toLowerCase()===n; });
+      if(s && s.team) return s.team;
+    }
+  }catch(e){}
+  return '';
+}
 function _canPayroll(){
   try{
-    if(PAYROLL_ALLOW.indexOf(window.me || me) >= 0) return true;
-    return (typeof myTeam !== 'undefined' && myTeam === 'Accounts');
+    if(PAYROLL_ALLOW.indexOf(_pMe()) >= 0) return true;
+    return _pTeam() === 'Accounts';
   }catch(e){ return false; }
 }
 
@@ -145,7 +226,7 @@ function initPayrollTab(){
 async function loadPayRates(){
   _payRates = {};
   try{
-    const rows = await sbGet('payroll_rates','?select=*');
+    const rows = await _pGet('payroll_rates','?select=*');
     (rows||[]).forEach(function(r){ _payRates[r.staff_name] = r; });
   }catch(e){ console.warn('loadPayRates', e); }
 }
@@ -155,7 +236,7 @@ async function _payHoursFor(staff, startStr, endStr){
   const start = new Date(startStr+'T00:00:00');
   const end   = new Date(endStr+'T23:59:59');
   let logs = [];
-  try{ logs = await sbGet('clock_log','?staff_name=eq.'+encodeURIComponent(staff)+'&order=ts.asc&limit=2000'); }catch(e){}
+  try{ logs = await _pGet('clock_log','?staff_name=eq.'+encodeURIComponent(staff)+'&order=ts.asc&limit=2000'); }catch(e){}
   logs = (logs||[]).filter(function(r){ const t = new Date(r.ts); return t >= start && t <= end; });
   if(!logs.length) return {net:0, coffee:0, raw:0, open:0, days:0};
   logs.sort(function(a,b){ return new Date(a.ts) - new Date(b.ts); });
@@ -171,7 +252,7 @@ async function _payHoursFor(staff, startStr, endStr){
   const byDay = {}; let openIn = null; let openCount = 0;
   logs.forEach(function(r){
     const t = new Date(r.ts);
-    const ft = flexClockTime(t);
+    const ft = _pFlex(t);
     const dayKey = t.toLocaleDateString('en-AU',{day:'2-digit',month:'2-digit',year:'numeric'});
     if(!byDay[dayKey]) byDay[dayKey] = {date:t, hours:0};
     if(r.action === 'in'){
@@ -189,7 +270,7 @@ async function _payHoursFor(staff, startStr, endStr){
   // overrides (custom break/coffee per date)
   let overrides = {};
   try{
-    const ov = await sbGet('clock_overrides','?staff_name=eq.'+encodeURIComponent(staff)+'&date=gte.'+startStr+'&date=lte.'+endStr);
+    const ov = await _pGet('clock_overrides','?staff_name=eq.'+encodeURIComponent(staff)+'&date=gte.'+startStr+'&date=lte.'+endStr);
     (ov||[]).forEach(function(r){ overrides[r.date] = r; });
   }catch(e){}
   let net = 0, coffee = 0, raw = 0;
@@ -197,7 +278,7 @@ async function _payHoursFor(staff, startStr, endStr){
     const d = byDay[k]; raw += d.hours;
     const iso = d.date.getFullYear()+'-'+String(d.date.getMonth()+1).padStart(2,'0')+'-'+String(d.date.getDate()).padStart(2,'0');
     const ov = overrides[iso] || {};
-    const ex = calcDayExtras(d.hours, ov.break_hrs, ov.coffee, d.date);
+    const ex = _pExtras(d.hours, ov.break_hrs, ov.coffee, d.date);
     net += ex.netHours; coffee += ex.coffee;
   });
   return {net:net, coffee:coffee, raw:raw, open:openCount, days:Object.keys(byDay).length};
@@ -389,9 +470,9 @@ async function savePayRates(){
     });
   });
   try{
-    const res = await fetch(SB+'/rest/v1/payroll_rates',{
+    const res = await fetch(_pUrl()+'/rest/v1/payroll_rates',{
       method:'POST',
-      headers:{'apikey':KEY,'Authorization':'Bearer '+_sbBearer(),'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},
+      headers:{'apikey':_pKey(),'Authorization':'Bearer '+_pBearer(),'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},
       body: JSON.stringify(payload)
     });
     if(res.ok){ if(typeof showToast==='function') showToast('Rates saved'); await loadPayRates(); renderRatesEditor(); }
