@@ -3611,7 +3611,12 @@ async function fillFromPreviousWeek(){
 
     // merge-duplicates lets the unique constraint absorb exact repeats
     // instead of failing the whole batch.
-    const r=await fetch(SUPABASE_URL+'/rest/v1/roster_shifts',{
+    // on_conflict is REQUIRED: the primary key is `id`, and PostgREST resolves
+    // merge-duplicates against the PK unless told otherwise. Without it the
+    // upsert tried a plain INSERT, hit roster_shifts_no_exact_dupe, and came
+    // back 409 — so nothing copied.
+    const r=await fetch(SUPABASE_URL+'/rest/v1/roster_shifts'+
+      '?on_conflict=staff_name,shift_date,start_time,end_time',{
       method:'POST',
       headers:Object.assign({Prefer:'resolution=merge-duplicates,return=representation'},_DB_H),
       body:JSON.stringify(payload)
@@ -5340,6 +5345,58 @@ function _nameForStaffId(id){
 }
 const _DB_H={apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY,'Content-Type':'application/json'};
 
+/* Bulk create. Auto-allocate can produce ~200 shifts in one press; firing
+   that many individual POSTs is slow and, on failure, buries the screen in
+   toasts. Collect them and write once. */
+let _shiftQueue=[];
+function queueShift(staffId, dayIdx, sh){
+  const name=_nameForStaffId(staffId);
+  if(!name || !sh || sh.type==='leave') return;
+  _shiftQueue.push({ _sid:staffId, _day:dayIdx, _blk:sh,
+    staff_name:name, shift_date:_shiftDateFor(dayIdx),
+    start_time:sh.start, end_time:sh.end, role:sh.role||null, status:'assigned',
+    created_by:(typeof currentUser!=='undefined'&&currentUser)?currentUser:null,
+    updated_by:(typeof currentUser!=='undefined'&&currentUser)?currentUser:null });
+}
+async function flushShiftQueue(){
+  if(!_shiftQueue.length) return 0;
+  const batch=_shiftQueue.slice();
+  _shiftQueue=[];
+  const payload=batch.map(function(r){
+    const o=Object.assign({},r); delete o._sid; delete o._day; delete o._blk; return o;
+  });
+  try{
+    const r=await fetch(SUPABASE_URL+'/rest/v1/roster_shifts'+
+      '?on_conflict=staff_name,shift_date,start_time,end_time',{
+      method:'POST',
+      headers:Object.assign({Prefer:'resolution=merge-duplicates,return=representation'},_DB_H),
+      body:JSON.stringify(payload)
+    });
+    if(!r.ok){
+      const t=await r.text().catch(function(){return '';});
+      console.error('[ALLOC] bulk insert HTTP '+r.status, t);
+      showToast('Shifts not saved ('+r.status+')');
+      return 0;
+    }
+    const saved=await r.json().catch(function(){return [];});
+    // Tag the in-memory blocks with their new ids so edit/delete work without
+    // a reload.
+    (saved||[]).forEach(function(row){
+      const m=batch.find(function(b){
+        return b.staff_name===row.staff_name && b.shift_date===row.shift_date &&
+               String(b.start_time).slice(0,5)===String(row.start_time).slice(0,5);
+      });
+      if(m && m._blk){ m._blk._dbId=row.id; m._blk._status=row.status; }
+    });
+    showToast(saved.length+' shift'+(saved.length===1?'':'s')+' saved');
+    return saved.length;
+  }catch(e){
+    console.warn('flushShiftQueue',e);
+    showToast('Shifts not saved — check connection');
+    return 0;
+  }
+}
+
 async function dbCreateShift(staffId, dayIdx, sh){
   const name=_nameForStaffId(staffId);
   if(!name) return null;
@@ -5852,7 +5909,12 @@ function runAutoAllocate(){
         const shStart=av.type==='custom'?av.start:startTime;
         const shEnd=av.type==='custom'?av.end:endTime;
         const shType=parseInt(shStart.split(':')[0])<12?'morning':parseInt(shStart.split(':')[0])<17?'afternoon':'evening';
-        shifts[s.id][d]=[{start:shStart,end:shEnd,type:shType,role:staffRoleLabel(s)}];
+        const _blk={start:shStart,end:shEnd,type:shType,role:staffRoleLabel(s)};
+        shifts[s.id][d]=[_blk];
+        // Persist. Auto-allocate only ever filled the in-memory grid, so the
+        // roster looked complete and then came back empty on reload — the
+        // shifts were never in roster_shifts at all.
+        if(shType!=='leave') queueShift(s.id, d, _blk);
         allocated++;
       }
     });
@@ -5860,6 +5922,8 @@ function runAutoAllocate(){
 
   closeModal('allocModal');
   markDirty();renderAll();
+  // One bulk write for everything the allocator just placed.
+  flushShiftQueue().then(function(n){ if(n) loadWeekShiftsFromDB(currentWeekStart); });
   const msg=skipped>0?` ${allocated} shifts allocated · ${skipped} skipped (unavailable)`:` Allocated ${allocated} shifts`;
   showToast(msg);
 }
@@ -5895,7 +5959,12 @@ function rosterByAvailability(){
         const shStart=av.type==='custom'?av.start:startTime;
         const shEnd=av.type==='custom'?av.end:endTime;
         const shType=parseInt(shStart.split(':')[0])<12?'morning':parseInt(shStart.split(':')[0])<17?'afternoon':'evening';
-        shifts[s.id][d]=[{start:shStart,end:shEnd,type:shType,role:staffRoleLabel(s)}];
+        const _blk={start:shStart,end:shEnd,type:shType,role:staffRoleLabel(s)};
+        shifts[s.id][d]=[_blk];
+        // Persist. Auto-allocate only ever filled the in-memory grid, so the
+        // roster looked complete and then came back empty on reload — the
+        // shifts were never in roster_shifts at all.
+        if(shType!=='leave') queueShift(s.id, d, _blk);
         allocated++;
       }
     }
@@ -5903,6 +5972,8 @@ function rosterByAvailability(){
 
   closeModal('allocModal');
   markDirty();renderAll();
+  // One bulk write for everything the allocator just placed.
+  flushShiftQueue().then(function(n){ if(n) loadWeekShiftsFromDB(currentWeekStart); });
 
   if(allocated===0&&skipped===0){
     showToast('No availability found — ask staff to submit via the web form');
@@ -8150,7 +8221,7 @@ async function aaSave(){
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────
-const SHIFTOPS_BUILD='2026-08-07-v41-avail-upsert';
+const SHIFTOPS_BUILD='2026-08-08-v42-alloc-persist';
 console.log('%c[ShiftOps build '+SHIFTOPS_BUILD+' loaded]','background:#16a34a;color:#fff;padding:2px 8px;border-radius:4px;font-weight:700;');
 (async()=>{
   await loadData();
