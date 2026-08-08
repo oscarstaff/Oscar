@@ -1419,6 +1419,55 @@ body.tl-readonly .wk-tools{ display:none !important; }
 .lv-actions{ display:inline-flex; gap:5px; }
 @media(max-width:900px){ .lv-reason{ display:none; } }
 
+/* ── CLEAR WEEK CONFIRMATION ───────────────────────────────────────────
+   Was an inline-styled bar with a hard-coded dark shadow that fought the
+   light theme, appearing and vanishing with no transition. This slides up
+   from the bottom, uses the theme tokens, and leaves the way it came in. */
+.cw-confirm{
+  position: fixed; bottom: 24px; left: 50%;
+  transform: translate(-50%, 16px) scale(.97);
+  opacity: 0;
+  display: flex; align-items: center; gap: 13px;
+  background: var(--surface);
+  border: 1px solid var(--border2);
+  border-left: 3px solid var(--warn);
+  border-radius: 13px;
+  padding: 13px 16px;
+  z-index: 300;
+  box-shadow: var(--shadow-lg);
+  font-family: var(--sans);
+  max-width: min(560px, calc(100vw - 32px));
+  transition: opacity .19s ease, transform .19s cubic-bezier(.2,.9,.3,1.2);
+}
+.cw-confirm.cw-in{ opacity: 1; transform: translate(-50%, 0) scale(1); }
+.cw-confirm.cw-out{ opacity: 0; transform: translate(-50%, 10px) scale(.98); }
+.cw-ico{
+  width: 30px; height: 30px; flex-shrink: 0; border-radius: 9px;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(220,38,38,.10); color: var(--warn);
+}
+.cw-txt{ flex: 1; min-width: 0; }
+.cw-title{ font-size: 13.5px; font-weight: 750; color: var(--text); }
+.cw-sub{ font-size: 11.5px; color: var(--text-dim); margin-top: 1px; line-height: 1.4; }
+.cw-btn{
+  border-radius: 8px; padding: 7px 15px; font-size: 12.5px; font-weight: 700;
+  font-family: inherit; cursor: pointer; white-space: nowrap;
+  transition: filter .12s, transform .08s;
+}
+.cw-btn:active{ transform: scale(.97); }
+.cw-btn:disabled{ opacity: .6; cursor: default; }
+.cw-go{ background: var(--warn); color: #fff; border: none; }
+.cw-go:hover:not(:disabled){ filter: brightness(1.08); }
+.cw-no{ background: transparent; border: 1px solid var(--border2); color: var(--text-dim); }
+.cw-no:hover{ color: var(--text); border-color: var(--text-dim); }
+/* The grid dissolves as it empties, so a week disappearing reads as an action
+   rather than a glitch. */
+.grid-clearing{ opacity: .25; transition: opacity .18s ease; }
+@media (prefers-reduced-motion: reduce){
+  .cw-confirm, .grid-clearing{ transition: none; }
+  .cw-confirm{ transform: translate(-50%, 0); }
+}
+
 /* ── DASHBOARD: FIND A PERSON ──────────────────────────────────────────
    Top of the page and bound to "/" because looking someone up is the most
    frequent HR action — more frequent than reading any of the counts below. */
@@ -5985,26 +6034,93 @@ function rosterByAvailability(){
   }
 }
 
-function clearWeek(){
-  // Show in-app confirmation panel
+async function clearWeek(){
   const existing=document.getElementById('clearWeekConfirm');
-  if(existing){existing.remove();return;}
+  if(existing){ dismissClearWeek(); return; }
+
+  // Say what's actually at stake. "Clear all shifts" gives no sense of scale;
+  // "47 shifts" is the difference between a considered click and a reflex one.
+  let n=0;
+  try{
+    Object.keys(shifts||{}).forEach(function(sid){
+      Object.keys(shifts[sid]||{}).forEach(function(d){
+        (shifts[sid][d]||[]).forEach(function(sh){ if(sh.type!=='leave') n++; });
+      });
+    });
+  }catch(e){}
+  if(!n){ showToast('Nothing rostered this week'); return; }
+
+  const wk=new Date(currentWeekStart);
+  const end=addDays(new Date(currentWeekStart),6);
+  const fmt=function(d){ return d.toLocaleDateString('en-AU',{day:'numeric',month:'short'}); };
+
   const el=document.createElement('div');
   el.id='clearWeekConfirm';
-  el.style.cssText='position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid rgba(255,107,53,.5);border-radius:12px;padding:16px 22px;z-index:300;display:flex;align-items:center;gap:14px;box-shadow:0 8px 32px rgba(0,0,0,.5);font-family:var(--sans);';
-  el.innerHTML=`
-    <span style="font-size:13px;font-weight:600;color:var(--text)">Clear all shifts for this week?</span>
-    <button onclick="doClearWeek()" style="background:var(--warn);color:#fff;border:none;border-radius:6px;padding:7px 16px;font-size:12.5px;font-weight:700;cursor:pointer;">Yes, Clear</button>
-    <button onclick="document.getElementById('clearWeekConfirm').remove()" style="background:transparent;border:1px solid var(--border);color:var(--text-dim);border-radius:6px;padding:7px 14px;font-size:12.5px;cursor:pointer;">Cancel</button>
-  `;
+  el.className='cw-confirm';
+  el.innerHTML=
+    '<div class="cw-ico"><svg viewBox="0 0 20 20" fill="currentColor" width="17" height="17">'+
+      '<path fill-rule="evenodd" d="M8.257 3.1c.765-1.36 2.72-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg></div>'+
+    '<div class="cw-txt">'+
+      '<div class="cw-title">Delete '+n+' shift'+(n===1?'':'s')+'?</div>'+
+      '<div class="cw-sub">Week of '+fmt(wk)+' – '+fmt(end)+' · this removes them from the roster for everyone</div>'+
+    '</div>'+
+    '<button class="cw-btn cw-go" onclick="doClearWeek(this)">Delete</button>'+
+    '<button class="cw-btn cw-no" onclick="dismissClearWeek()">Cancel</button>';
   document.body.appendChild(el);
-  setTimeout(()=>{if(document.getElementById('clearWeekConfirm'))el.remove();},8000);
+  requestAnimationFrame(function(){ el.classList.add('cw-in'); });
+  el._t=setTimeout(dismissClearWeek, 12000);
 }
-function doClearWeek(){
-  staff.forEach(s=>{shifts[s.id]={};});
+
+function dismissClearWeek(){
   const el=document.getElementById('clearWeekConfirm');
-  if(el)el.remove();
-  markDirty();renderAll();showToast('Week cleared');
+  if(!el) return;
+  clearTimeout(el._t);
+  el.classList.remove('cw-in');
+  el.classList.add('cw-out');
+  setTimeout(function(){ if(el.parentNode) el.remove(); }, 200);
+}
+
+/**
+ * Actually clear the week — from roster_shifts, not just the grid.
+ *
+ * This only emptied the in-memory `shifts` object, so the week looked cleared
+ * and every shift returned on the next load. The roster lives in the database
+ * now; clearing has to happen there.
+ */
+async function doClearWeek(btn){
+  if(btn){ btn.disabled=true; btn.textContent='Deleting…'; }
+  const from=_isoDate(currentWeekStart);
+  const to=_isoDate(addDays(new Date(currentWeekStart),6));
+  try{
+    const r=await fetch(SUPABASE_URL+'/rest/v1/roster_shifts'+
+      '?shift_date=gte.'+from+'&shift_date=lte.'+to,
+      {method:'DELETE',headers:Object.assign({Prefer:'return=representation'},_DB_H)});
+    if(!r.ok){
+      const t=await r.text().catch(function(){return '';});
+      console.error('[CLEAR-WEEK] HTTP '+r.status, t);
+      showToast('Could not clear ('+r.status+')');
+      if(btn){ btn.disabled=false; btn.textContent='Delete'; }
+      return;
+    }
+    const gone=await r.json().catch(function(){return [];});
+
+    // Fade the grid out as it empties, so the change is seen rather than just
+    // appearing — a week vanishing instantly reads like a glitch.
+    const grid=document.getElementById('rosterGrid');
+    if(grid){ grid.classList.add('grid-clearing'); }
+    staff.forEach(function(s){ shifts[s.id]={}; });
+    dismissClearWeek();
+    setTimeout(function(){
+      markDirty(); renderAll();
+      if(grid) grid.classList.remove('grid-clearing');
+      showToast((gone.length||0)+' shift'+((gone.length||0)===1?'':'s')+' deleted');
+      loadWeekShiftsFromDB(currentWeekStart);
+    }, 190);
+  }catch(e){
+    console.warn('doClearWeek',e);
+    showToast('Could not clear — check connection');
+    if(btn){ btn.disabled=false; btn.textContent='Delete'; }
+  }
 }
 
 // ── EXPORT PDF ────────────────────────────────────────────────────────────
@@ -8221,7 +8337,7 @@ async function aaSave(){
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────
-const SHIFTOPS_BUILD='2026-08-08-v42-alloc-persist';
+const SHIFTOPS_BUILD='2026-08-08-v43-clear-week';
 console.log('%c[ShiftOps build '+SHIFTOPS_BUILD+' loaded]','background:#16a34a;color:#fff;padding:2px 8px;border-radius:4px;font-weight:700;');
 (async()=>{
   await loadData();
