@@ -8677,6 +8677,13 @@ async function makeAppToken(app,name){
   const sig=await hmacHex(APP_GATE_SECRET, b64);
   return b64+'.'+sig;
 }
+// Declared up front, not created on first assignment inside loadHubAccess().
+// gateCallLog() runs at startup and reads _accessCache — as an undeclared
+// implicit global it threw ReferenceError before Nodes had ever been opened,
+// so the Call Log nav stayed hidden until a Nodes visit ran the check again.
+let _accessCache = null;
+let _accessWorking = null;
+
 async function loadHubAccess(){
   // Load access lists from Supabase
   try{
@@ -19944,7 +19951,7 @@ async function loadNotifications(){
 async function markAllNotificationsRead(silent){
   try{
     const postSeen = async (key)=>{
-      try{ await fetch(SB+'/rest/v1/notification_seen',{
+      try{ await fetch(SB+'/rest/v1/notification_seen?on_conflict=staff_name,notif_key',{
         method:'POST',
         headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates'},
         body:JSON.stringify({staff_name:me, notif_key:key})
@@ -22191,7 +22198,7 @@ async function markNotifReadEverywhere(notifKey){
   if(!me || !notifKey) return;
   try{
     // 1. Upsert read state (triggers Realtime on OPEN tabs)
-    await fetch(SB + '/rest/v1/notification_seen', {
+    await fetch(SB + '/rest/v1/notification_seen?on_conflict=staff_name,notif_key', {
       method: 'POST',
       headers: {
         'apikey': KEY,
@@ -22730,7 +22737,7 @@ async function markNotifRead(id){
   if(!read.includes(id)){read.push(id);localStorage.setItem('oR_'+me,JSON.stringify(read));}
   // Persist to supabase
   try{
-    await fetch(SB+'/rest/v1/notification_seen',{
+    await fetch(SB+'/rest/v1/notification_seen?on_conflict=staff_name,notif_key',{
       method:'POST',
       headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates'},
       body:JSON.stringify({staff_name:me, notif_key:'leave_'+id})
@@ -22744,7 +22751,7 @@ async function markTaskNotifSeen(id){
   const seen=JSON.parse(localStorage.getItem('seen_task_notifs_'+me)||'[]');
   if(!seen.includes(id)){seen.push(id);localStorage.setItem('seen_task_notifs_'+me,JSON.stringify(seen));}
   try{
-    await fetch(SB+'/rest/v1/notification_seen',{
+    await fetch(SB+'/rest/v1/notification_seen?on_conflict=staff_name,notif_key',{
       method:'POST',
       headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates'},
       body:JSON.stringify({staff_name:me, notif_key:'task_'+id})
@@ -22865,7 +22872,7 @@ async function markNotifSeen(key){
   _seenCache[key] = true;
   localStorage.setItem('seen_'+me+'_'+key, '1'); // local fallback
   try{
-    await fetch(SB+'/rest/v1/notification_seen',{
+    await fetch(SB+'/rest/v1/notification_seen?on_conflict=staff_name,notif_key',{
       method:'POST',
       headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates'},
       body:JSON.stringify({staff_name:me, notif_key:key})
