@@ -7831,7 +7831,11 @@ function goTo(p){
       }catch(e){}
     }, 50);
   }
-  // Call Log is gated — a hand-typed #calllog shouldn't get past the sidebar check
+  // Call Log is gated twice: by access list, and by location.
+  //
+  // It's a desk tool — logging and resolving student calls — so it should only
+  // open on site, the same rule clock-in already uses. Checking here rather
+  // than inside dialtrac.js means a hand-typed #calllog can't slip past.
   if(p === 'calllog'){
     if(window._canCallLog === false){ p = 'home'; }
     else { setTimeout(function(){ if(typeof initCallLog==='function') initCallLog(); }, 50); }
@@ -15051,9 +15055,11 @@ const OFFICE_LNG = 151.13856;
 // within the radius of ANY office below. Add new offices here.
 //   Sydney  — Rockdale NSW (head office)
 //   Nepal   — Bagbazar, Kathmandu
+// Sydney only. The Nepal entry was removed — clock-in should not pass from
+// there, and having two offices made "near an office" mean something looser
+// than intended.
 const OFFICES = [
-  { name: 'Sydney', lat: -33.95245,            lng: 151.13856,            radiusM: 30 },
-  { name: 'Nepal',  lat: 27.705566882043552,   lng: 85.32147759609747,    radiusM: 30 }
+  { name: 'Sydney', lat: -33.95245, lng: 151.13856, radiusM: 30 }
 ];
 const OFFICE_RADIUS_DEFAULT = 30;
 // ── TESTING FLAG ──────────────────────────────────────────────
