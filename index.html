@@ -8677,11 +8677,17 @@ async function makeAppToken(app,name){
   const sig=await hmacHex(APP_GATE_SECRET, b64);
   return b64+'.'+sig;
 }
-// Declared up front, not created on first assignment inside loadHubAccess().
-// gateCallLog() runs at startup and reads _accessCache — as an undeclared
-// implicit global it threw ReferenceError before Nodes had ever been opened,
-// so the Call Log nav stayed hidden until a Nodes visit ran the check again.
-let _accessCache = null;
+// Declared up front rather than created on first assignment inside
+// loadHubAccess(): gateCallLog() runs at login and reads _accessCache, and as
+// an undeclared implicit global that threw ReferenceError before Nodes had
+// ever been opened — which is why the Call Log tab only appeared after a
+// Nodes visit.
+//
+// Initialised to a valid EMPTY SHAPE, not null. The reads below
+// (_accessCache.formcraft.includes(...)) have no guard, so a null default
+// turns a failed app_access fetch — which is caught and swallowed — into a
+// TypeError that kills the whole Nodes page.
+let _accessCache = { formcraft:[], slip:[], dialtrac:[], shiftops:[] };
 let _accessWorking = null;
 
 async function loadHubAccess(){
@@ -8692,12 +8698,13 @@ async function loadHubAccess(){
     (rows||[]).forEach(r=>{ if(_accessCache[r.app]) _accessCache[r.app].push(r.staff_name); });
   }catch(e){ console.warn('loadHubAccess',e); }
   // Show/hide cards for current user
+  const _ac = _accessCache || { formcraft:[], slip:[], dialtrac:[], shiftops:[] };
   const fc=document.getElementById('hubcard-formcraft');
   const sl=document.getElementById('hubcard-slip');
-  if(fc) fc.style.display=_accessCache.formcraft.includes(me)?'':'none';
-  if(sl) sl.style.display=_accessCache.slip.includes(me)?'':'none';
+  if(fc) fc.style.display=(_ac.formcraft||[]).includes(me)?'':'none';
+  if(sl) sl.style.display=(_ac.slip||[]).includes(me)?'':'none';
   const so=document.getElementById('hubcard-shiftops');
-  if(so) so.style.display=_accessCache.shiftops.includes(me)?'':'none';
+  if(so) so.style.display=(_ac.shiftops||[]).includes(me)?'':'none';
   // Call Log gate is its own function so it can run at login without
   // waiting for the user to open Nodes.
   gateCallLog();
