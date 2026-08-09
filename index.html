@@ -8594,12 +8594,6 @@ setTimeout(function(){
 
 
 
-// Shared secret for the node-app launch token. ShiftOps, FormCraft, Slip and
-// the Call Log all verify against this same value — see `var SECRET` in each
-// gate script. makeAppToken() referenced it but it was never declared here, so
-// every launch threw ReferenceError and showed "Could not open app".
-const APP_GATE_SECRET = 'oscars_nexus_gate_v1_8f3a2c91';
-
 async function openGatedApp(ev,app,url){
   if(ev)ev.preventDefault();
   try{
@@ -8683,19 +8677,6 @@ async function makeAppToken(app,name){
   const sig=await hmacHex(APP_GATE_SECRET, b64);
   return b64+'.'+sig;
 }
-// Declared up front rather than created on first assignment inside
-// loadHubAccess(): gateCallLog() runs at login and reads _accessCache, and as
-// an undeclared implicit global that threw ReferenceError before Nodes had
-// ever been opened — which is why the Call Log tab only appeared after a
-// Nodes visit.
-//
-// Initialised to a valid EMPTY SHAPE, not null. The reads below
-// (_accessCache.formcraft.includes(...)) have no guard, so a null default
-// turns a failed app_access fetch — which is caught and swallowed — into a
-// TypeError that kills the whole Nodes page.
-let _accessCache = { formcraft:[], slip:[], dialtrac:[], shiftops:[] };
-let _accessWorking = null;
-
 async function loadHubAccess(){
   // Load access lists from Supabase
   try{
