@@ -58,11 +58,45 @@
       stroke: var(--border-color, #d8dee9);
       stroke-width: 2.5;
       stroke-linecap: round;
-      transition: stroke .22s ease;
+      transition: stroke .22s ease, stroke-width .22s ease;
     }
-    .hub-spoke.lit{ stroke: var(--accent, #6366f1); }
+    .hub-spoke.lit{ stroke: var(--accent, #6366f1); stroke-width: 3.5; }
+    /* Spokes draw outward from the core when the page opens, so the diagram
+       assembles itself instead of just being there. */
+    .hub-radial .hub-spoke{
+      stroke-dasharray: var(--len);
+      stroke-dashoffset: var(--len);
+      animation: hubDraw .5s cubic-bezier(.3,.9,.3,1) forwards;
+      animation-delay: var(--d);
+    }
+    @keyframes hubDraw{ to{ stroke-dashoffset: 0; } }
+    /* A dot where each spoke meets its node — the reference diagram's
+       terminals, and it stops the line ending in mid-air. */
+    .hub-node-dot{
+      fill: var(--surface, #fff);
+      stroke: var(--border-color, #d8dee9);
+      stroke-width: 2.5;
+      transition: stroke .22s ease, fill .22s ease;
+    }
+    .hub-node-dot.lit{ stroke: var(--accent, #6366f1); fill: var(--accent, #6366f1); }
+    /* Everything except the hovered node steps back. */
+    .hub-radial.dimmed .hub-card:not(:hover){ opacity: .45; }
+    .hub-radial .hub-card{ opacity: 1; transition: opacity .2s ease, transform .22s cubic-bezier(.2,.9,.3,1.15), box-shadow .22s ease; }
 
     /* The centre — the thing all the spokes come from. */
+    /* A slow halo so the centre reads as live rather than a static blob. */
+    .hub-core::before{
+      content:'';
+      position: absolute; inset: -14px;
+      border-radius: 50%;
+      border: 2px solid var(--accent, #6366f1);
+      opacity: .18;
+      animation: hubHalo 3.4s ease-in-out infinite;
+    }
+    @keyframes hubHalo{
+      0%,100%{ transform: scale(1);    opacity: .18; }
+      50%    { transform: scale(1.07); opacity: .05; }
+    }
     .hub-core{
       position: absolute;
       left: 50%; top: 50%;
@@ -98,6 +132,8 @@
   @media (prefers-reduced-motion: reduce){
     .hub-radial .hub-card{ transition: none; }
     .hub-radial .hub-card:hover{ transform: translate(-50%, -50%); }
+    .hub-radial .hub-spoke{ animation: none; stroke-dashoffset: 0; }
+    .hub-core::before{ animation: none; }
   }`;
 
   function injectCss(){
@@ -181,25 +217,49 @@
 
       // Stop the spoke short of the core and the card so it reads as a
       // connector rather than a line running underneath them.
+      var x1 = cx + 74 * Math.cos(a), y1 = cy + 74 * Math.sin(a);
+      var x2 = x  - 52 * Math.cos(a), y2 = y  - 52 * Math.sin(a);
+
       var line = document.createElementNS('http://www.w3.org/2000/svg','line');
       line.setAttribute('class','hub-spoke');
-      line.setAttribute('x1', cx + 66 * Math.cos(a));
-      line.setAttribute('y1', cy + 66 * Math.sin(a));
-      line.setAttribute('x2', x - 46 * Math.cos(a));
-      line.setAttribute('y2', y - 46 * Math.sin(a));
+      line.setAttribute('x1', x1); line.setAttribute('y1', y1);
+      line.setAttribute('x2', x2); line.setAttribute('y2', y2);
+      // Dash length must match the real line length or the draw-in either
+      // finishes early or never completes.
+      var len = Math.hypot(x2-x1, y2-y1);
+      line.style.setProperty('--len', len);
+      line.style.setProperty('--d', (i * 70) + 'ms');
       svg.appendChild(line);
 
-      // Light the matching spoke on hover, so the connection is legible.
+      // Terminal dot at the node end — the reference diagram's circles.
+      var dot = document.createElementNS('http://www.w3.org/2000/svg','circle');
+      dot.setAttribute('class','hub-node-dot');
+      dot.setAttribute('cx', x2); dot.setAttribute('cy', y2);
+      dot.setAttribute('r', 5);
+      svg.appendChild(dot);
+
+      // Light the matching spoke + dot on hover and step the others back.
       if(!card.dataset.spokeBound){
         card.dataset.spokeBound = '1';
         card.addEventListener('mouseenter', function(){
-          var l = svg.querySelectorAll('.hub-spoke')[i];
+          var svgNow = grid.querySelector('.hub-spokes');
+          if(!svgNow) return;
+          var idx = Array.prototype.indexOf.call(
+            grid.querySelectorAll('.hub-card:not([style*="display: none"])'), card);
+          var l = svgNow.querySelectorAll('.hub-spoke')[idx];
+          var d = svgNow.querySelectorAll('.hub-node-dot')[idx];
           if(l) l.classList.add('lit');
+          if(d) d.classList.add('lit');
+          grid.classList.add('dimmed');
         });
         card.addEventListener('mouseleave', function(){
-          Array.prototype.forEach.call(svg.querySelectorAll('.hub-spoke'), function(l){
-            l.classList.remove('lit');
-          });
+          var svgNow = grid.querySelector('.hub-spokes');
+          if(svgNow){
+            Array.prototype.forEach.call(
+              svgNow.querySelectorAll('.hub-spoke,.hub-node-dot'),
+              function(el){ el.classList.remove('lit'); });
+          }
+          grid.classList.remove('dimmed');
         });
       }
     });

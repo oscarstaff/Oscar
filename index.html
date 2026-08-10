@@ -8698,6 +8698,10 @@ async function loadHubAccess(){
   // Call Log gate is its own function so it can run at login without
   // waiting for the user to open Nodes.
   gateCallLog();
+  // Access decides which cards are visible, so the ring must be recomputed
+  // whenever access is reloaded — otherwise granting or revoking an app
+  // leaves a gap or two cards stacked on one angle.
+  try{ if(typeof hubRadialLayout==='function') hubRadialLayout(); }catch(e){}
   // Show admin button
   const adminArea=document.getElementById('hubAdminArea');
   if(adminArea) adminArea.style.display=(typeof myIsAdmin!=='undefined'&&myIsAdmin)?'block':'none';
