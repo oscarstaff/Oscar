@@ -7817,8 +7817,11 @@ function goTo(p){
   // Notifications are mobile-only — redirect to home on desktop
   if(p === 'notifs' && window.innerWidth > 900) p = 'home';
   // When user opens Discussions page, mark all as seen
-  // Nodes — load app access gating
-  if(p === 'hub'){ setTimeout(loadHubAccess, 50); }
+  // Nodes — load app access gating, then lay the cards out as a node diagram.
+  if(p === 'hub'){
+    setTimeout(loadHubAccess, 50);
+    setTimeout(function(){ if(typeof hubRadialLayout==='function') hubRadialLayout(); }, 60);
+  }
   // Roster & Shifts: both panes start hidden, so a direct hit on #shifts
   // (deep link, refresh, back button) would show an empty page. Default to
   // My Roster unless a pane is already open.
@@ -24244,5 +24247,6 @@ input:focus{
 <script src="quizreview.js?v=1"></script>
 <script src="teamhours.js?v=2"></script>
 <script src="availlock.js?v=4"></script>
+<script src="hubradial.js?v=1"></script>
 </body>
 </html>
