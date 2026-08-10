@@ -5731,7 +5731,7 @@ async function saveStaff(){
     try{
       const resp=await fetch(GAS_EXEC_URL,{
         method:'POST',headers:{'Content-Type':'text/plain'},
-        body:JSON.stringify({action:'adminSetPw',staff:fullName,newPassword:'Oscars2026!',token:GAS_TOKEN})
+        body:JSON.stringify({action:'adminSetPw',staff:fullName,newPassword:'Oscars2026!',token:GAS_TOKEN,sbAccessToken:_soTok()})
       });
       const j=await resp.json().catch(()=>({}));
       if(j&&j.ok){ showToast(` ${fullName} added — temp password: Oscars2026!`); }
@@ -5812,7 +5812,7 @@ async function offboardStaffAccess(fullName){
     const r = await fetch(GAS_EXEC_URL,{
       method:'POST',
       headers:{'Content-Type':'text/plain;charset=utf-8'},
-      body: JSON.stringify({action:'offboardStaff', staff: fullName, token: GAS_TOKEN})
+      body: JSON.stringify({action:'offboardStaff', staff: fullName, token: GAS_TOKEN, sbAccessToken:_soTok()})
     });
     let ok=false;
     try{ const j=await r.json(); ok = j && j.ok; }catch(e){}
@@ -7937,7 +7937,7 @@ async function doResetPassword(){
     // (The legacy password_hash is no longer used for login under auth-only mode.)
     const resp=await fetch(GAS_EXEC_URL,{
       method:'POST',headers:{'Content-Type':'text/plain'},
-      body:JSON.stringify({action:'adminSetPw',staff:name,newPassword:pass,token:GAS_TOKEN})
+      body:JSON.stringify({action:'adminSetPw',staff:name,newPassword:pass,token:GAS_TOKEN,sbAccessToken:_soTok()})
     });
     const j=await resp.json().catch(()=>({}));
     if(j&&j.ok){
@@ -7970,6 +7970,35 @@ function _soTok(){
   if(_soAuthToken) return _soAuthToken;
   try{ _soAuthToken = sessionStorage.getItem('so_sb_at') || null; }catch(e){}
   return _soAuthToken;
+}
+
+/**
+ * Is the inherited session token still valid?
+ *
+ * The token is a JWT with roughly an hour's life, stashed once at the gate.
+ * Refresh only starts if a refresh token came through too — so a tab opened
+ * without one, or left open past a failed refresh, ends up holding a dead
+ * token. Every admin action then returns a bare "forbidden", which reads as
+ * "you don't have permission" when it actually means "your session aged out".
+ */
+function _soTokAlive(){
+  var t = _soTok();
+  if(!t) return false;
+  try{
+    var p = t.split('.');
+    if(p.length !== 3) return false;
+    var b = p[1].replace(/-/g,'+').replace(/_/g,'/');
+    while(b.length % 4) b += '=';
+    var c = JSON.parse(atob(b));
+    return !!(c.exp && (c.exp * 1000) > Date.now() + 30000);   // 30s margin
+  }catch(e){ return false; }
+}
+
+/** Guard admin actions with a message that says what to actually do. */
+function _soAdminReady(){
+  if(_soTokAlive()) return true;
+  showToast('Session expired — close this tab and reopen ShiftOps from Nexus');
+  return false;
 }
 (function(){
   const _origFetch = window.fetch.bind(window);
@@ -8058,7 +8087,7 @@ async function renameStaffEverywhere(oldName, newName){
     try{
       const resp=await fetch(GAS_EXEC_URL,{
         method:'POST',headers:{'Content-Type':'text/plain'},
-        body:JSON.stringify({action:'adminRenameAuth',oldName:oldName,newName:newName,token:GAS_TOKEN})
+        body:JSON.stringify({action:'adminRenameAuth',oldName:oldName,newName:newName,token:GAS_TOKEN,sbAccessToken:_soTok()})
       });
       const j=await resp.json().catch(()=>({}));
       if(!(j&&j.ok)){
@@ -8337,7 +8366,7 @@ async function aaSave(){
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────
-const SHIFTOPS_BUILD='2026-08-08-v43-clear-week';
+const SHIFTOPS_BUILD='2026-08-10-v44-admin-token';
 console.log('%c[ShiftOps build '+SHIFTOPS_BUILD+' loaded]','background:#16a34a;color:#fff;padding:2px 8px;border-radius:4px;font-weight:700;');
 (async()=>{
   await loadData();
