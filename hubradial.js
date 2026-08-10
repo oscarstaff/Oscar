@@ -31,17 +31,54 @@
     .hub-grid.hub-radial{
       position: relative;
       display: block;
-      height: 560px;
+      height: 600px;
       margin: 8px auto 0;
-      max-width: 760px;
+      max-width: 820px;
     }
+    /* NODES, not cards.
+       A 168px rectangle sitting on a ring still reads as a card — which is
+       why the ring version looked like the grid version. The node is now a
+       circle holding just the icon, with the label sitting outside it. That
+       is what makes this read as a diagram at a glance. */
     .hub-radial .hub-card{
       position: absolute;
-      width: 168px;
+      width: 84px; height: 84px;
+      padding: 0;
       margin: 0;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       transform: translate(-50%, -50%);
-      transition: transform .22s cubic-bezier(.2,.9,.3,1.15), box-shadow .22s ease;
+      transition: transform .22s cubic-bezier(.2,.9,.3,1.15),
+                  box-shadow .22s ease, border-color .22s ease, opacity .2s ease;
       z-index: 2;
+      overflow: visible;
+    }
+    .hub-radial .hub-card:hover{
+      border-color: var(--accent, #6366f1);
+    }
+    .hub-radial .hub-card-icon{
+      margin: 0;
+      width: 40px; height: 40px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .hub-radial .hub-card-icon svg{ width: 26px; height: 26px; }
+    /* Label hangs below the circle, outside it — so the circle stays a
+       circle and long names don't squeeze the icon. */
+    .hub-radial .hub-card-body{
+      position: absolute;
+      top: calc(100% + 9px);
+      left: 50%;
+      transform: translateX(-50%);
+      width: 130px;
+      text-align: center;
+      pointer-events: none;
+    }
+    .hub-radial .hub-card-title{
+      font-size: 13px;
+      font-weight: 600;
+      white-space: nowrap;
     }
     .hub-radial .hub-card:hover{
       transform: translate(-50%, -50%) scale(1.045);
@@ -126,8 +163,7 @@
     }
     /* Hide the arrow glyph — on a ring it points nowhere meaningful. */
     .hub-radial .hub-card-arrow{ display: none; }
-    .hub-radial .hub-card{ flex-direction: column; text-align: center; gap: 8px; padding: 16px 12px; }
-    .hub-radial .hub-card-body{ text-align: center; }
+
   }
   @media (prefers-reduced-motion: reduce){
     .hub-radial .hub-card{ transition: none; }
@@ -198,8 +234,11 @@
     var cx = W / 2, cy = H / 2;
     // Ring radius: big enough to clear the core, small enough that a card
     // at the edge stays inside the box.
-    var rx = Math.max(180, Math.min(W/2 - 96, 300));
-    var ry = Math.max(150, Math.min(H/2 - 62, 220));
+    // Nodes are 84px circles now, so the ring can push much closer to the
+    // edges than it could with 168px cards — which is what gives the spokes
+    // enough length to actually look like spokes.
+    var rx = Math.max(200, Math.min(W/2 - 70, 330));
+    var ry = Math.max(150, Math.min(H/2 - 76, 210));
 
     svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
     svg.innerHTML = '';
@@ -218,7 +257,7 @@
       // Stop the spoke short of the core and the card so it reads as a
       // connector rather than a line running underneath them.
       var x1 = cx + 74 * Math.cos(a), y1 = cy + 74 * Math.sin(a);
-      var x2 = x  - 52 * Math.cos(a), y2 = y  - 52 * Math.sin(a);
+      var x2 = x  - 46 * Math.cos(a), y2 = y  - 46 * Math.sin(a);
 
       var line = document.createElementNS('http://www.w3.org/2000/svg','line');
       line.setAttribute('class','hub-spoke');
