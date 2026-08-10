@@ -7513,6 +7513,7 @@ function startSessionExpiryWatch(){
 }
 
 async function doLogout(){
+  try{ if(typeof sessionLimitClear==='function') sessionLimitClear(); }catch(e){}
   try{ teardownRealtime(); }catch(e){}
   // Stop any running timers
   if(typeof _clockTickTimer !== 'undefined' && _clockTickTimer){ clearInterval(_clockTickTimer); _clockTickTimer=null; }
@@ -7538,6 +7539,9 @@ async function doLogout(){
 }
 
 async function enterHub(){
+  // Start the 8-hour session clock. Stamped on entry, not on every load, so
+  // the limit measures time since sign-in rather than time since page open.
+  try{ if(typeof sessionLimitMark==='function') sessionLimitMark(); }catch(e){}
   // Clear any old 'anon' NotifManager bucket so legacy notifs don't surface
   try{ localStorage.removeItem('notif_local_anon'); }catch(e){}
   // Start the session-expiry watchdog (idempotent).
@@ -24252,5 +24256,6 @@ input:focus{
 <script src="teamhours.js?v=2"></script>
 <script src="availlock.js?v=4"></script>
 <script src="hubradial.js?v=3"></script>
+<script src="sessionlimit.js?v=1"></script>
 </body>
 </html>
