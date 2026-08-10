@@ -253,11 +253,25 @@
 
       card.style.left = x + 'px';
       card.style.top  = y + 'px';
+      // Stamp the spoke index at layout time. Re-querying on hover meant
+      // matching hidden cards with an attribute selector, and the markup
+      // writes `display:none` while the selector looked for `display: none`
+      // — so hidden cards were counted and every index after them shifted.
+      // With all 5 apps visible nothing was hidden and it happened to line
+      // up; with 4, hovering lit a spoke belonging to a different app.
+      card.dataset.spokeIdx = i;
 
       // Stop the spoke short of the core and the card so it reads as a
       // connector rather than a line running underneath them.
-      var x1 = cx + 74 * Math.cos(a), y1 = cy + 74 * Math.sin(a);
-      var x2 = x  - 46 * Math.cos(a), y2 = y  - 46 * Math.sin(a);
+      // Offset along the REAL direction from centre to node, not along the
+      // angle. On an ellipse (rx !== ry) those differ everywhere except the
+      // four quarter points, so using the angle pulled spoke ends sideways
+      // and made them appear to aim at a neighbouring node.
+      var dx = x - cx, dy = y - cy;
+      var d  = Math.hypot(dx, dy) || 1;
+      var ux = dx / d, uy = dy / d;
+      var x1 = cx + 74 * ux, y1 = cy + 74 * uy;
+      var x2 = x  - 46 * ux, y2 = y  - 46 * uy;
 
       var line = document.createElementNS('http://www.w3.org/2000/svg','line');
       line.setAttribute('class','hub-spoke');
@@ -283,8 +297,8 @@
         card.addEventListener('mouseenter', function(){
           var svgNow = grid.querySelector('.hub-spokes');
           if(!svgNow) return;
-          var idx = Array.prototype.indexOf.call(
-            grid.querySelectorAll('.hub-card:not([style*="display: none"])'), card);
+          var idx = parseInt(card.dataset.spokeIdx, 10);
+          if(isNaN(idx)) return;
           var l = svgNow.querySelectorAll('.hub-spoke')[idx];
           var d = svgNow.querySelectorAll('.hub-node-dot')[idx];
           if(l) l.classList.add('lit');
