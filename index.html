@@ -7246,6 +7246,7 @@ async function doLogin(){
     // ── Phase 1B: try REAL Supabase Auth first ──
     const auth = getAuthClient();
     let authedViaSupabase = false;
+    let _authErrMsg = '';   // what Supabase actually said, for the error text
     if(!auth){ console.warn('[auth] getAuthClient() returned null — supabase-js not loaded; using legacy login'); }
     if(auth){
       const synthEmail = synthEmailFromName(m);
@@ -7254,7 +7255,10 @@ async function doLogin(){
         const { data, error } = await auth.signInWithPassword({
           email: synthEmail, password: pass
         });
-        if(error){ console.warn('[auth] sign-in failed:', error.message, '→ falling back to legacy'); }
+        if(error){
+          console.warn('[auth] sign-in failed:', error.message);
+          _authErrMsg = error.message || '';
+        }
         if(!error && data && data.session){
           console.log('[auth] Supabase sign-in OK for', synthEmail);
           authedViaSupabase = true;
@@ -7282,22 +7286,32 @@ async function doLogin(){
     // ── 1C-4: auth-only mode. When AUTH_ONLY_MODE is true, the legacy hash login
     // is disabled — everyone must use real Supabase Auth. Flip the flag to false
     // (top of script) to instantly revert to allowing legacy login as a fallback.
-    const credRows = await sbGet("staff_credentials","?staff_name=eq."+encodeURIComponent(m)+"&select=password_hash,auth_uid");
-    const isMigrated = credRows.length && credRows[0].auth_uid;
-    if(isMigrated){
-      // migrated — auth already tried + failed above; do NOT accept the old hash.
-      err.textContent="Please use your temporary password (or the new one you set). Old passwords no longer work.";
-      err.classList.add("show");
-      btn.disabled=false;btn.textContent="Sign In";
-      return;
-    }
+    // The message is based on WHAT AUTH SAID, not on a database lookup.
+    //
+    // This used to query staff_credentials to decide whether the account was
+    // migrated — but staff_credentials is RLS-locked to authenticated users,
+    // and a failed sign-in means we're not authenticated. The query returned
+    // an empty array every time, so isMigrated was always false and EVERY
+    // wrong password produced "your account isn't set up for the new login
+    // yet — ask an admin to migrate your account". Alarming, and wrong.
     if(AUTH_ONLY_MODE){
-      // Not migrated + auth-only → cannot log in with the old system. Tell them clearly.
-      err.textContent="Your account isn't set up for the new login yet. Please ask an admin to migrate your account.";
+      const e = (_authErrMsg || '').toLowerCase();
+      if(e.indexOf('invalid login') !== -1 || e.indexOf('invalid credentials') !== -1){
+        err.textContent = "Wrong password. Check for caps lock, or use 'Forgot password' below.";
+      }else if(e.indexOf('email not confirmed') !== -1){
+        err.textContent = "Your account isn't activated yet. Ask an admin to set your password.";
+      }else if(e.indexOf('rate') !== -1 || e.indexOf('too many') !== -1){
+        err.textContent = "Too many attempts. Wait a few minutes and try again.";
+      }else if(e.indexOf('network') !== -1 || e.indexOf('fetch') !== -1 || !e){
+        err.textContent = "Couldn't reach the sign-in service. Check your connection and try again.";
+      }else{
+        err.textContent = "Couldn't sign you in. If this keeps happening, ask an admin.";
+      }
       err.classList.add("show");
       btn.disabled=false;btn.textContent="Sign In";
       return;
     }
+    const credRows = await sbGet("staff_credentials","?staff_name=eq."+encodeURIComponent(m)+"&select=password_hash,auth_uid");
     // (Legacy mode only — AUTH_ONLY_MODE=false) old client-side hash login.
     const h=await hash(pass);
     const rows=credRows;
