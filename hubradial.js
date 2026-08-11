@@ -176,19 +176,26 @@
        assembles itself instead of just being there. */
     .hub-radial .hub-spoke{
       stroke-dasharray: var(--len);
-      stroke-dashoffset: var(--len);
-      animation: hubDraw .5s cubic-bezier(.05,.7,.1,1) forwards;
+      /* Land at 0 and STAY at 0 (forwards). The hover energize below must
+         not touch dashoffset, or when its one-shot animation ends the offset
+         snaps back to this declared value and the whole line vanishes. */
+      stroke-dashoffset: 0;
+      animation: hubDraw .5s cubic-bezier(.05,.7,.1,1) both;
       animation-delay: var(--d);
     }
-    @keyframes hubDraw{ to{ stroke-dashoffset: 0; } }
-    /* HOVER energize (secondary): the lit spoke gets a one-shot pulse that
-       travels core→node, reinforcing the direction of the connection. */
-    .hub-radial .hub-spoke.lit{
-      animation: hubPulse .55s cubic-bezier(.2,0,0,1);
+    @keyframes hubDraw{
+      from{ stroke-dashoffset: var(--len); }
+      to  { stroke-dashoffset: 0; }
     }
-    @keyframes hubPulse{
-      0%  { stroke-dashoffset: var(--len); }
-      100%{ stroke-dashoffset: 0; }
+    /* HOVER energize (secondary): colour + weight only, no dash animation —
+       the line stays fully drawn. A subtle glow gives the directional read
+       the pulse was reaching for, without ever hiding the stroke. */
+    .hub-radial .hub-spoke.lit{
+      animation: hubLit .3s cubic-bezier(.2,0,0,1) both;
+    }
+    @keyframes hubLit{
+      from{ stroke-width: 2.5; }
+      to  { stroke-width: 3.5; }
     }
     /* A dot where each spoke meets its node — the reference diagram's
        terminals, and it stops the line ending in mid-air. */
@@ -283,7 +290,7 @@
     .hub-radial .hub-card:active .hub-card-icon{ transform: none; }
     .hub-radial .hub-card:hover .hub-card-body{ transform: translateX(-50%); }
     .hub-radial .hub-spoke{ animation: none; stroke-dashoffset: 0; }
-    .hub-radial .hub-spoke.lit{ animation: none; }
+    .hub-radial .hub-spoke.lit{ animation: none; stroke-width: 3.5; }
     .hub-radial .hub-node-dot{ animation: none; opacity: 1; transform: none; }
     .hub-radial .hub-node-dot.lit{ animation: none; }
     .hub-core{ animation: none; }
@@ -425,12 +432,7 @@
           if(isNaN(idx)) return;
           var l = svgNow.querySelectorAll('.hub-spoke')[idx];
           var dd = svgNow.querySelectorAll('.hub-node-dot')[idx];
-          if(l){
-            // restart the pulse each hover — remove, reflow, re-add
-            l.classList.remove('lit');
-            void l.getBBox;
-            l.classList.add('lit');
-          }
+          if(l) l.classList.add('lit');
           if(dd) dd.classList.add('lit');
           grid.classList.add('dimmed');
         });
