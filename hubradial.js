@@ -114,9 +114,8 @@
       box-shadow: 0 22px 44px -18px rgba(30,27,75,.6);
       transition: box-shadow .16s cubic-bezier(.2,0,0,1);
     }
-    .hub-radial .hub-card.hub-dragging .hub-card-icon{
-      animation-play-state: paused;
-      transform: scale(1.1);
+    .hub-radial .hub-card.hub-dragging .hub-card-icon svg{
+      transform: scale(1.12);
     }
     .hub-radial.hub-is-dragging .hub-card:not(.hub-dragging){ opacity: .5; }
 
@@ -126,21 +125,30 @@
       z-index: 5;
       box-shadow: 0 14px 30px -14px rgba(30,27,75,.5);
     }
-    /* PRESS: quick, firm. */
-    .hub-radial .hub-card:active .hub-card-icon{
-      transform: translateY(0) scale(.92);
+    /* PRESS: quick, firm. Scale lives on the SVG, never on .hub-card-icon —
+       see the float note below. */
+    .hub-radial .hub-card:active .hub-card-icon svg{
+      transform: scale(.9);
       transition: transform .12s cubic-bezier(.3,0,.3,1);
     }
+    /* .hub-card-icon carries the ambient float and NOTHING ELSE.
+       It must never receive a transform declaration, because a running
+       animation's computed value overrides plain declarations — the transform
+       would silently do nothing. And it must never be paused, because pausing
+       freezes it at whatever phase of the 5.2s cycle it happened to reach,
+       snapping the icon up to 3px in a random direction. That was the click
+       jump. Hover/press/drag scale goes on the child <svg> instead: the parent
+       translates, the child scales, and the two compose without fighting. */
     .hub-radial .hub-card-icon{
       margin: 0;
       width: 48%; height: 48%;
       display: flex; align-items: center; justify-content: center;
-      transition: transform .2s cubic-bezier(.2,0,0,1);
       pointer-events: none;
     }
     .hub-radial .hub-card-icon svg{
       width: calc(var(--hub-node-size) * .31);
       height: calc(var(--hub-node-size) * .31);
+      transition: transform .2s cubic-bezier(.2,0,0,1);
     }
     /* Label hangs below the circle, outside it. */
     .hub-radial .hub-card-body{
@@ -183,13 +191,8 @@
       0%,100%{ transform: translateY(0)   scale(1); }
       50%    { transform: translateY(-3px) scale(1); }
     }
-    .hub-radial .hub-card:hover .hub-card-icon{
-      animation-play-state: paused;
-      transform: translateY(-3px) scale(1.06);
-    }
-    .hub-radial .hub-card:active .hub-card-icon{
-      animation-play-state: paused;
-      transform: translateY(0) scale(.92);
+    .hub-radial .hub-card:hover .hub-card-icon svg{
+      transform: scale(1.1);
     }
 
     /* ── spokes ─────────────────────────────────────────────────────── */
@@ -314,7 +317,6 @@
 
     /* Everything except the hovered node steps back. */
     .hub-radial.dimmed .hub-card:not(:hover){ opacity: .4; }
-    .hub-radial.dimmed .hub-card:not(:hover) .hub-card-icon{ animation-play-state: paused; }
 
     /* ── the centre ─────────────────────────────────────────────────── */
     .hub-core::before{
@@ -418,9 +420,11 @@
 
   @media (prefers-reduced-motion: reduce){
     .hub-radial .hub-card{ animation: none; }
-    .hub-radial .hub-card .hub-card-icon{ animation: none; transition: none; }
-    .hub-radial .hub-card:hover .hub-card-icon,
-    .hub-radial .hub-card:active .hub-card-icon{ transform: none; }
+    .hub-radial .hub-card .hub-card-icon{ animation: none; }
+    .hub-radial .hub-card-icon svg{ transition: none; }
+    .hub-radial .hub-card:hover .hub-card-icon svg,
+    .hub-radial .hub-card:active .hub-card-icon svg,
+    .hub-radial .hub-card.hub-dragging .hub-card-icon svg{ transform: none; }
     .hub-radial .hub-card:hover .hub-card-body{ transform: translateX(-50%); }
     .hub-radial .hub-spoke{ animation: none; stroke-dashoffset: 0; }
     .hub-radial .hub-spoke.lit{ animation: none; stroke-width: 3.5; }
