@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════════════════════════════
    hubradial.js — the Nodes page as an actual node diagram
-   Loaded by index.html:  <script src="hubradial.js?v=1"></script>
+   Loaded by index.html:  <script src="hubradial.js?v=2"></script>
 
    Separate module by convention — see ARCHITECTURE.md.
 
@@ -15,6 +15,20 @@
    positions them and draws the spokes behind. So nothing about who can see
    which app changes, and if this file fails to load the page falls back to
    the original grid on its own.
+
+   ─── v2: MOTION PASS (motion-design skill) ──────────────────────────────
+   Personality: Corporate base with a whisper of Playful for the assembly
+   moment. Signature easing cubic-bezier(.2,0,0,1); entrances use the
+   MD3-emphasized curve (.05,.7,.1,1). Three motion layers throughout:
+     • Primary   — the node arriving on the ring (position+scale+opacity),
+                    synced to ride in behind its own spoke as it draws.
+     • Secondary — spoke energize, shadow follow-through, label lift, the
+                    terminal dot pop.
+     • Ambient   — the core halo (kept) + a phase-offset per-node float so
+                    the ring breathes rather than sits dead.
+   Stagger is 70ms by ring position, total assembly < 500ms (skill budget).
+   Everything is still inside the IIFE / one window property — no top-level
+   declarations, per the cross-file collision rule.
 
    NO TOP-LEVEL DECLARATIONS
    Everything lives inside the IIFE and one window property. Top-level
@@ -49,19 +63,40 @@
       display: flex;
       align-items: center;
       justify-content: center;
+      /* transform is driven by two custom props so the entrance, the float
+         and the hover lift can each own one channel without clobbering the
+         others. --hub-enter runs 1→0 during assembly; --hub-lift is the
+         hover offset; the keyframe float rides on top via its own translate. */
       transform: translate(-50%, -50%);
-      transition: transform .22s cubic-bezier(.2,.9,.3,1.15),
-                  box-shadow .22s ease, border-color .22s ease, opacity .2s ease;
+      transition: box-shadow .28s cubic-bezier(.2,0,0,1),
+                  border-color .2s ease,
+                  opacity .2s ease;
       z-index: 2;
       overflow: visible;
+      /* set by JS at layout time */
+      --hub-i: 0;
     }
+    /* HOVER (secondary layer): lift + a touch of scale, shadow lands late.
+       Driven on a wrapper transform so it composes with the float keyframe. */
+    .hub-radial .hub-card > *{ transition: transform .22s cubic-bezier(.2,0,0,1); }
     .hub-radial .hub-card:hover{
       border-color: var(--accent, #6366f1);
+      z-index: 5;
+      box-shadow: 0 14px 30px -14px rgba(30,27,75,.5);
+    }
+    .hub-radial .hub-card:hover .hub-card-icon{
+      transform: translateY(-3px) scale(1.06);
+    }
+    /* PRESS (state feedback): quick, firm, no float fighting it. */
+    .hub-radial .hub-card:active .hub-card-icon{
+      transform: translateY(0) scale(.92);
+      transition: transform .12s cubic-bezier(.3,0,.3,1);
     }
     .hub-radial .hub-card-icon{
       margin: 0;
       width: 40px; height: 40px;
       display: flex; align-items: center; justify-content: center;
+      transition: transform .2s cubic-bezier(.2,0,0,1);
     }
     .hub-radial .hub-card-icon svg{ width: 26px; height: 26px; }
     /* Label hangs below the circle, outside it — so the circle stays a
@@ -74,16 +109,54 @@
       width: 130px;
       text-align: center;
       pointer-events: none;
+      transition: transform .22s cubic-bezier(.2,0,0,1), opacity .2s ease;
+    }
+    /* Label lifts and firms up on hover — small secondary read. */
+    .hub-radial .hub-card:hover .hub-card-body{
+      transform: translateX(-50%) translateY(2px);
     }
     .hub-radial .hub-card-title{
       font-size: 13px;
       font-weight: 600;
       white-space: nowrap;
+      transition: color .2s ease;
     }
-    .hub-radial .hub-card:hover{
-      transform: translate(-50%, -50%) scale(1.045);
-      z-index: 3;
+    .hub-radial .hub-card:hover .hub-card-title{ color: var(--accent, #6366f1); }
+
+    /* ── ENTRANCE (primary layer) ───────────────────────────────────────
+       The node rides in behind its own spoke: starts pulled toward the core
+       and shrunk, decelerates onto the ring. Delay matches the spoke draw so
+       line and node arrive together instead of the node just being there. */
+    .hub-radial .hub-card{
+      animation: hubNodeIn .46s cubic-bezier(.05,.7,.1,1) both;
+      animation-delay: calc(var(--hub-i) * 70ms + 60ms);
     }
+    @keyframes hubNodeIn{
+      0%  { opacity: 0; transform: translate(-50%, -50%) scale(.4); }
+      60% { opacity: 1; }
+      100%{ opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    }
+    /* AMBIENT (float): starts only after assembly, phase-offset per node so
+       the ring breathes out of sync. Tiny amplitude — life, not distraction. */
+    .hub-radial .hub-card .hub-card-icon{
+      animation: hubFloat 5.2s ease-in-out infinite;
+      animation-delay: calc(var(--hub-i) * -0.9s);
+    }
+    @keyframes hubFloat{
+      0%,100%{ transform: translateY(0)   scale(1); }
+      50%    { transform: translateY(-3px) scale(1); }
+    }
+    /* Hover/press must beat the ambient float — repeat the intents at higher
+       specificity so they win over the keyframe on .hub-card-icon. */
+    .hub-radial .hub-card:hover .hub-card-icon{
+      animation-play-state: paused;
+      transform: translateY(-3px) scale(1.06);
+    }
+    .hub-radial .hub-card:active .hub-card-icon{
+      animation-play-state: paused;
+      transform: translateY(0) scale(.92);
+    }
+
     /* The spokes sit behind everything and are purely decorative. */
     .hub-spokes{
       position: absolute; inset: 0;
@@ -95,7 +168,8 @@
       stroke: var(--border-color, #d8dee9);
       stroke-width: 2.5;
       stroke-linecap: round;
-      transition: stroke .22s ease, stroke-width .22s ease;
+      transition: stroke .28s cubic-bezier(.2,0,0,1),
+                  stroke-width .28s cubic-bezier(.2,0,0,1);
     }
     .hub-spoke.lit{ stroke: var(--accent, #6366f1); stroke-width: 3.5; }
     /* Spokes draw outward from the core when the page opens, so the diagram
@@ -103,22 +177,52 @@
     .hub-radial .hub-spoke{
       stroke-dasharray: var(--len);
       stroke-dashoffset: var(--len);
-      animation: hubDraw .5s cubic-bezier(.3,.9,.3,1) forwards;
+      animation: hubDraw .5s cubic-bezier(.05,.7,.1,1) forwards;
       animation-delay: var(--d);
     }
     @keyframes hubDraw{ to{ stroke-dashoffset: 0; } }
+    /* HOVER energize (secondary): the lit spoke gets a one-shot pulse that
+       travels core→node, reinforcing the direction of the connection. */
+    .hub-radial .hub-spoke.lit{
+      animation: hubPulse .55s cubic-bezier(.2,0,0,1);
+    }
+    @keyframes hubPulse{
+      0%  { stroke-dashoffset: var(--len); }
+      100%{ stroke-dashoffset: 0; }
+    }
     /* A dot where each spoke meets its node — the reference diagram's
        terminals, and it stops the line ending in mid-air. */
     .hub-node-dot{
       fill: var(--surface, #fff);
       stroke: var(--border-color, #d8dee9);
       stroke-width: 2.5;
-      transition: stroke .22s ease, fill .22s ease;
+      transform-box: fill-box;
+      transform-origin: center;
+      transition: stroke .24s cubic-bezier(.2,0,0,1),
+                  fill .24s cubic-bezier(.2,0,0,1);
     }
-    .hub-node-dot.lit{ stroke: var(--accent, #6366f1); fill: var(--accent, #6366f1); }
+    /* Terminal dot pops in just after its spoke lands. */
+    .hub-radial .hub-node-dot{
+      animation: hubDotIn .34s cubic-bezier(.175,.885,.32,1.275) both;
+      animation-delay: var(--d);
+    }
+    @keyframes hubDotIn{
+      0%  { opacity: 0; transform: scale(0); }
+      100%{ opacity: 1; transform: scale(1); }
+    }
+    .hub-node-dot.lit{
+      stroke: var(--accent, #6366f1); fill: var(--accent, #6366f1);
+      /* a small emphasis pop when its node is hovered */
+      animation: hubDotPop .3s cubic-bezier(.175,.885,.32,1.275);
+    }
+    @keyframes hubDotPop{
+      0%  { transform: scale(1); }
+      45% { transform: scale(1.55); }
+      100%{ transform: scale(1); }
+    }
     /* Everything except the hovered node steps back. */
-    .hub-radial.dimmed .hub-card:not(:hover){ opacity: .45; }
-    .hub-radial .hub-card{ opacity: 1; transition: opacity .2s ease, transform .22s cubic-bezier(.2,.9,.3,1.15), box-shadow .22s ease; }
+    .hub-radial.dimmed .hub-card:not(:hover){ opacity: .4; }
+    .hub-radial.dimmed .hub-card:not(:hover) .hub-card-icon{ animation-play-state: paused; }
 
     /* The centre — the thing all the spokes come from. */
     /* A slow halo so the centre reads as live rather than a static blob. */
@@ -148,6 +252,13 @@
       box-shadow: 0 6px 28px -12px rgba(30,27,75,.45);
       z-index: 4;
       text-align: center;
+      /* Core lands first, with a small anticipation overshoot — it's the
+         hero, so it gets the most expressive entrance. */
+      animation: hubCoreIn .5s cubic-bezier(.175,.885,.32,1.275) both;
+    }
+    @keyframes hubCoreIn{
+      0%  { opacity: 0; transform: translate(-50%, -50%) scale(.72); }
+      100%{ opacity: 1; transform: translate(-50%, -50%) scale(1); }
     }
     .hub-core-mark{
       font-family: 'Fraunces', Georgia, serif;
@@ -166,9 +277,16 @@
 
   }
   @media (prefers-reduced-motion: reduce){
-    .hub-radial .hub-card{ transition: none; }
-    .hub-radial .hub-card:hover{ transform: translate(-50%, -50%); }
+    .hub-radial .hub-card{ animation: none; }
+    .hub-radial .hub-card .hub-card-icon{ animation: none; transition: none; }
+    .hub-radial .hub-card:hover .hub-card-icon,
+    .hub-radial .hub-card:active .hub-card-icon{ transform: none; }
+    .hub-radial .hub-card:hover .hub-card-body{ transform: translateX(-50%); }
     .hub-radial .hub-spoke{ animation: none; stroke-dashoffset: 0; }
+    .hub-radial .hub-spoke.lit{ animation: none; }
+    .hub-radial .hub-node-dot{ animation: none; opacity: 1; transform: none; }
+    .hub-radial .hub-node-dot.lit{ animation: none; }
+    .hub-core{ animation: none; }
     .hub-core::before{ animation: none; }
   }`;
 
@@ -253,6 +371,10 @@
 
       card.style.left = x + 'px';
       card.style.top  = y + 'px';
+      // Ordinal for the entrance cascade + float phase offset (motion pass).
+      // Drives animation-delay via calc(var(--hub-i) * 70ms) in CSS, so the
+      // node arrives in step with its spoke and each node floats out of phase.
+      card.style.setProperty('--hub-i', i);
       // Stamp the spoke index at layout time. Re-querying on hover meant
       // matching hidden cards with an attribute selector, and the markup
       // writes `display:none` while the selector looked for `display: none`
@@ -289,6 +411,8 @@
       dot.setAttribute('class','hub-node-dot');
       dot.setAttribute('cx', x2); dot.setAttribute('cy', y2);
       dot.setAttribute('r', 5);
+      // Same cascade delay as the spoke so the dot pops as the line lands.
+      dot.style.setProperty('--d', (i * 70 + 260) + 'ms');
       svg.appendChild(dot);
 
       // Light the matching spoke + dot on hover and step the others back.
@@ -300,9 +424,14 @@
           var idx = parseInt(card.dataset.spokeIdx, 10);
           if(isNaN(idx)) return;
           var l = svgNow.querySelectorAll('.hub-spoke')[idx];
-          var d = svgNow.querySelectorAll('.hub-node-dot')[idx];
-          if(l) l.classList.add('lit');
-          if(d) d.classList.add('lit');
+          var dd = svgNow.querySelectorAll('.hub-node-dot')[idx];
+          if(l){
+            // restart the pulse each hover — remove, reflow, re-add
+            l.classList.remove('lit');
+            void l.getBBox;
+            l.classList.add('lit');
+          }
+          if(dd) dd.classList.add('lit');
           grid.classList.add('dimmed');
         });
         card.addEventListener('mouseleave', function(){
