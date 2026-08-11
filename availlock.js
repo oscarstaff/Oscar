@@ -1,46 +1,63 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   availlock.js — availability is read-only for staff
-   Loaded by index.html:  <script src="availlock.js?v=4"></script>
+   availlock.js — availability edits apply from NEXT week
+   Loaded by index.html:  <script src="availlock.js?v=5"></script>
 
    Separate module by convention — see ARCHITECTURE.md.
 
-   WHY
-   Staff were changing availability AFTER the roster had been built from it,
-   which silently invalidated shifts already assigned. The fortnightly cut-off
-   helped but still left a window where a change could land unnoticed.
+   THE RULE
+   What someone submits becomes their standing availability and holds until
+   they submit again. The only constraint is WHEN it starts: next Monday, not
+   mid-week, because the running week's roster was built from the current
+   pattern and changing it underneath invalidates assigned shifts.
 
-   Availability is now set by a manager in ShiftOps (Availability → Weekly
-   Grid), which writes straight to staff_availability. Staff can SEE theirs but
-   not change it — they ask, and it's updated for them. One place to change it,
-   one person accountable for it, and the roster is always built from what's
-   actually recorded.
+   WHY THIS SHAPE
+   The roster for the running week is already built from the current pattern.
+   Letting a mid-week edit land immediately is how someone rostered on
+   Thursday quietly becomes unavailable on Thursday, with nothing telling the
+   roster. Deferring to next Monday keeps the current week stable while still
+   letting people manage their own availability.
 
-   The screen stays visible on purpose: knowing what the office thinks your
-   availability is matters, and it's how someone notices it's wrong.
+   Mechanically the new pattern is parked in
+   staff_availability.pending_availability with its effective-from date, and a
+   daily job promotes it. So this file's job is only to SAY when it starts —
+   the form stays open.
    ═══════════════════════════════════════════════════════════════════════ */
 (function(){
   'use strict';
 
-  /** Admins keep the ability to edit from either side. */
-  function availLocked(){
-    try{ if(typeof myIsAdmin !== 'undefined' && myIsAdmin) return false; }catch(e){}
-    return true;
+  /** Monday of next week, Sydney. */
+  function nextMonday(){
+    var s = new Date().toLocaleString('en-US', { timeZone: 'Australia/Sydney' });
+    var d = new Date(s);
+    d.setHours(0,0,0,0);
+    var dow = (d.getDay() + 6) % 7;          // Mon=0 … Sun=6
+    d.setDate(d.getDate() + (7 - dow));
+    return d;
   }
 
+  function fmt(d){
+    return d.toLocaleDateString('en-AU', { weekday:'long', day:'numeric', month:'long' });
+  }
+
+  /** Nothing is locked any more — the deferral does the work. */
+  function availLocked(){ return false; }
+
   function availLockMessage(){
-    return 'Your availability is managed by the office. If it needs changing, '+
-           'speak to your manager and it will be updated for you.';
+    return 'Your new availability starts ' + fmt(nextMonday()) +
+           ' and stays that way until you change it again. This week isn\'t ' +
+           'affected — the roster is already set.';
   }
 
   /**
-   * Banner + input disabling, applied whenever the Availability tab renders.
-   * Disabling the controls matters as much as blocking the save: letting
-   * someone fill in a form that will be rejected is its own small cruelty.
+   * Banner explaining when the change lands.
+   *
+   * Stating the date matters more than it looks: without it, someone updates
+   * their availability on Wednesday, sees no change to Thursday's shift, and
+   * assumes it didn't save.
    */
   function applyAvailLock(){
     var host = document.getElementById('ssec-availability');
     if(!host) return;
-    var locked = availLocked();
 
     var bar = document.getElementById('availLockBar');
     if(!bar){
@@ -50,39 +67,30 @@
                           'font-size:12.5px;line-height:1.5;';
       host.insertBefore(bar, host.firstChild);
     }
-    if(locked){
-      bar.style.background = '#f8fafc';
-      bar.style.border     = '1px solid #e2e8f0';
-      bar.style.color      = '#475569';
-      bar.innerHTML = '<strong>Set by the office</strong> — ' + availLockMessage();
-    }else{
-      bar.style.background = '#f0fdf4';
-      bar.style.border     = '1px solid #bbf7d0';
-      bar.style.color      = '#065f46';
-      bar.innerHTML = '<strong>Admin</strong> — you can edit availability here or in ShiftOps.';
-    }
+    bar.style.background = '#eef2ff';
+    bar.style.border     = '1px solid #c7d2fe';
+    bar.style.color      = '#3730a3';
+    bar.innerHTML = '<strong>Starts next Monday</strong> — ' + availLockMessage();
 
+    // Everything stays editable.
     var btn = document.getElementById('availBtn');
-    if(btn){
-      btn.disabled = locked;
-      btn.style.display = locked ? 'none' : '';   // nothing to submit
-    }
+    if(btn){ btn.disabled = false; btn.style.display = ''; btn.style.opacity = ''; }
     host.querySelectorAll('input,select,button').forEach(function(el){
-      if(el.id === 'availBtn') return;
       if(el.closest('#availLockBar')) return;
-      el.disabled = locked;
-      el.style.opacity = locked ? '.6' : '';
-      el.style.pointerEvents = locked ? 'none' : '';
+      el.disabled = false;
+      el.style.opacity = '';
+      el.style.pointerEvents = '';
     });
   }
 
-  // Kept so existing call sites don't throw; there is no unlock any more.
+  // Kept so existing call sites don't throw.
   function refreshAvailUnlock(){}
-  function availWindow(){ return { locked: availLocked() }; }
+  function availWindow(){ return { locked:false, appliesFrom: nextMonday() }; }
 
   window.availWindow        = availWindow;
   window.availLocked        = availLocked;
   window.availLockMessage   = availLockMessage;
   window.applyAvailLock     = applyAvailLock;
   window.refreshAvailUnlock = refreshAvailUnlock;
+  window.availNextMonday    = nextMonday;
 })();

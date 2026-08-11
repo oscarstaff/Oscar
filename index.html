@@ -8065,7 +8065,11 @@ async function loadExistingAvail(){
     const r=rows[0];
     // Restore day states
     await loadEarlyStartApproval();
-    const av=r.availability;
+    // Show the PENDING pattern if one is waiting, not the live one — otherwise
+    // someone submits on Wednesday, reopens the page, sees their old hours and
+    // reasonably concludes it didn't save.
+    const av = (r.pending_availability && r.pending_from)
+      ? r.pending_availability : r.availability;
     Object.keys(av).forEach(k=>{
       const a=av[k];
       setDay(parseInt(k),a.type);
@@ -8361,6 +8365,17 @@ function _availApplySuggested(suggest, dayIdxs){
 }
 
 
+/** Monday of NEXT week, Sydney, as yyyy-mm-dd. */
+function nextMondaySydney(){
+  const s = new Date().toLocaleString('en-US', { timeZone: 'Australia/Sydney' });
+  const d = new Date(s);
+  d.setHours(0,0,0,0);
+  // Mon=0 … Sun=6, then jump to the following Monday.
+  const dow = (d.getDay() + 6) % 7;
+  d.setDate(d.getDate() + (7 - dow));
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+
 async function submitAvail(){
   const avail={},err=document.getElementById("availErr");err.classList.remove("show");
   // Availability is locked between windows because the roster is built from
@@ -8392,12 +8407,27 @@ async function submitAvail(){
   try{
     // Check if row already exists
     const existing=await sbGet("staff_availability","?staff_name=eq."+encodeURIComponent(me)+"&limit=1");
-    const payload={staff_name:me,availability:avail,is_ongoing:isOngoing,valid_from:validFrom||null,valid_until:validUntil||null,updated_at:new Date().toISOString()};
+    // What's submitted becomes the person's STANDING availability — it holds
+    // until they submit again. The one rule is that it starts NEXT Monday,
+    // not mid-week: the running week's roster was built from the current
+    // pattern, and changing it underneath would invalidate assigned shifts.
+    //
+    // So the new pattern is parked with an effective-from date and promoted
+    // on that date by a daily job. Both apps keep reading `availability` as
+    // the single live pattern.
+    const _mon = nextMondaySydney();
+    const payload = existing.length
+      ? { pending_availability: avail,
+          pending_from: _mon,
+          pending_set_at: new Date().toISOString() }
+      : { staff_name: me, availability: avail, is_ongoing: isOngoing,
+          valid_from: null, valid_until: null,
+          updated_at: new Date().toISOString() };   // first ever save applies now
     let res;
     if(existing.length){
       res=await fetch(SB+"/rest/v1/staff_availability?staff_name=eq."+encodeURIComponent(me),{
         method:"PATCH",
-        headers:{"apikey":KEY,"Authorization":"Bearer "+KEY,"Content-Type":"application/json","Prefer":"return=minimal"},
+        headers:{"apikey":KEY,"Authorization":"Bearer "+_sbBearer(),"Content-Type":"application/json","Prefer":"return=minimal"},
         body:JSON.stringify(payload)
       });
     }else{
@@ -24268,7 +24298,7 @@ input:focus{
 <script src="dialtrac.js?v=4"></script>
 <script src="quizreview.js?v=1"></script>
 <script src="teamhours.js?v=2"></script>
-<script src="availlock.js?v=4"></script>
+<script src="availlock.js?v=7"></script>
 <script src="hubradial.js?v=3"></script>
 <script src="sessionlimit.js?v=1"></script>
 </body>
