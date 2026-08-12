@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light">
+<title>Docket</title>
+<meta name="description" content="A private task list. Everything stays on this device.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Public+Sans:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%234B4FA6'/><path d='M9 11h14M9 16h14M9 21h9' stroke='white' stroke-width='2.4' stroke-linecap='round'/></svg>">
+<style>
+/* ═══════════════════════════════════════════════════════════════════
+   DOCKET — a device-only task list.
+
+   DESIGN NOTE
+   Styled after the carbon-copy duplicate book: the pink-and-white NCR
+   slips that RTO and care paperwork actually runs on. Ruled form lines,
+   Public Sans (a typeface drawn for government forms), mono for anything
+   numeric, and one bold move — a real highlighter sweep under the active
+   filter instead of the usual solid pill. Everything else stays quiet.
+   ═══════════════════════════════════════════════════════════════════ */
+:root{
+  --paper:#FAFAF8;
+  --slip:#FFFFFF;
+  --ink:#16181D;
+  --graphite:#5A6270;
+  --rule:#E4E5E0;
+  --carbon:#4B4FA6;      /* the duplicate-copy blue */
+  --marker:#FFE066;      /* highlighter */
+  --stamp:#C2402E;       /* overdue, like a rubber stamp */
+  --done:#8A9099;
+
+  --r:10px;
+  --pad:clamp(16px,4vw,28px);
+  --ease:cubic-bezier(.2,0,0,1);
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:var(--paper);
+  color:var(--ink);
+  font-family:'Public Sans',system-ui,-apple-system,sans-serif;
+  font-size:15px;
+  line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+  padding-bottom:env(safe-area-inset-bottom);
+}
+button,input,textarea,select{font:inherit;color:inherit;}
+:focus-visible{outline:2.5px solid var(--carbon);outline-offset:2px;border-radius:3px;}
+
+.sheet{max-width:760px;margin:0 auto;padding:0 var(--pad) 96px;}
+
+/* ── masthead ─────────────────────────────────────────────────── */
+.top{padding:clamp(24px,5vw,44px) 0 18px;}
+.brand{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;}
+h1{
+  font-family:'Bricolage Grotesque',system-ui,sans-serif;
+  font-weight:800;font-size:clamp(30px,7vw,44px);
+  letter-spacing:-.03em;margin:0;line-height:1;
+}
+.tagline{
+  font-size:12px;color:var(--graphite);
+  font-variant-numeric:tabular-nums;
+}
+.today-line{
+  margin-top:6px;font-family:ui-monospace,'SF Mono',Menlo,monospace;
+  font-size:12px;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--graphite);
+}
+.privacy{
+  margin-top:14px;display:inline-flex;align-items:center;gap:8px;
+  font-size:12.5px;color:var(--graphite);
+  border:1px solid var(--rule);border-radius:999px;
+  padding:5px 12px 5px 10px;background:var(--slip);
+}
+.privacy svg{flex:none;}
+
+/* ── compose ──────────────────────────────────────────────────── */
+.compose{
+  margin-top:22px;background:var(--slip);
+  border:1px solid var(--rule);border-radius:var(--r);
+  padding:6px 6px 6px 14px;
+  display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+  transition:border-color .18s var(--ease),box-shadow .18s var(--ease);
+}
+.compose:focus-within{border-color:var(--carbon);box-shadow:0 0 0 3px rgba(75,79,166,.1);}
+#newTask{
+  flex:1 1 220px;min-width:0;border:0;background:none;padding:9px 0;font-size:15.5px;
+}
+#newTask:focus{outline:none;}
+#newTask::placeholder{color:#A8ADB5;}
+#newDue{
+  border:1px solid var(--rule);border-radius:7px;background:var(--paper);
+  padding:7px 9px;font-size:13px;color:var(--graphite);
+  font-family:ui-monospace,Menlo,monospace;
+}
+.add{
+  border:0;background:var(--carbon);color:#fff;font-weight:700;font-size:14px;
+  padding:9px 18px;border-radius:7px;cursor:pointer;
+  transition:transform .12s var(--ease),background .18s var(--ease);
+}
+.add:hover{background:#3E42911;background:#3E4291;}
+.add:active{transform:scale(.96);}
+
+/* ── filters: the signature highlighter sweep ─────────────────── */
+.bar{
+  display:flex;align-items:center;gap:4px;margin:26px 0 6px;
+  flex-wrap:wrap;
+}
+.tab{
+  position:relative;border:0;background:none;cursor:pointer;
+  padding:7px 12px 9px;font-weight:600;font-size:14px;color:var(--graphite);
+  transition:color .18s var(--ease);
+}
+.tab:hover{color:var(--ink);}
+.tab[aria-selected="true"]{color:var(--ink);}
+/* The sweep. Irregular corners + a slight tilt + multiply blend so it
+   behaves like a marker over paper rather than a UI pill. */
+.tab::after{
+  content:'';position:absolute;left:6px;right:6px;bottom:5px;height:11px;
+  background:var(--marker);mix-blend-mode:multiply;
+  border-radius:60% 40% 55% 45% / 100% 100% 60% 70%;
+  transform:rotate(-.6deg) scaleX(0);transform-origin:left center;
+  transition:transform .34s var(--ease);
+}
+.tab[aria-selected="true"]::after{transform:rotate(-.6deg) scaleX(1);}
+.tab .n{
+  font-family:ui-monospace,Menlo,monospace;font-size:11.5px;
+  color:var(--graphite);margin-left:5px;position:relative;z-index:1;
+}
+.bar-sp{flex:1;}
+.search{
+  border:1px solid var(--rule);border-radius:7px;background:var(--slip);
+  padding:7px 10px;font-size:13.5px;width:150px;
+}
+.search:focus{outline:none;border-color:var(--carbon);}
+
+/* ── list ─────────────────────────────────────────────────────── */
+.list{list-style:none;margin:0;padding:0;border-top:1px solid var(--rule);}
+.row{
+  border-bottom:1px solid var(--rule);
+  padding:13px 2px 13px 0;
+  display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:start;
+  background:var(--slip);
+}
+.row.overdue{background:linear-gradient(90deg,rgba(194,64,46,.045),transparent 62%);}
+.row.done{background:var(--paper);}
+
+/* Checkbox drawn as a form box, not a native control. */
+.box{
+  appearance:none;-webkit-appearance:none;
+  width:19px;height:19px;margin:2px 0 0 12px;flex:none;
+  border:1.8px solid #B9BDC4;border-radius:4px;background:var(--slip);
+  cursor:pointer;position:relative;
+  transition:border-color .15s var(--ease),background .15s var(--ease);
+}
+.box:hover{border-color:var(--carbon);}
+.box:checked{background:var(--carbon);border-color:var(--carbon);}
+.box:checked::after{
+  content:'';position:absolute;left:5.4px;top:2px;width:5px;height:9.5px;
+  border:solid #fff;border-width:0 2.1px 2.1px 0;transform:rotate(43deg);
+}
+.box.sub{width:16px;height:16px;margin-left:0;border-radius:3px;}
+.box.sub:checked::after{left:4.4px;top:1.6px;width:4px;height:8px;border-width:0 1.9px 1.9px 0;}
+
+.main{min-width:0;}
+.title{
+  border:0;background:none;padding:0;width:100%;font-size:15.5px;
+  line-height:1.45;color:var(--ink);
+}
+.title:focus{outline:none;}
+.row.done .title{color:var(--done);text-decoration:line-through;text-decoration-thickness:1.5px;}
+
+.meta{
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  margin-top:5px;font-family:ui-monospace,Menlo,monospace;font-size:11.5px;
+  color:var(--graphite);letter-spacing:.02em;
+}
+.due{display:inline-flex;align-items:center;gap:5px;}
+.due.is-overdue{color:var(--stamp);font-weight:700;}
+.due.is-today{color:var(--carbon);font-weight:700;}
+.count{color:var(--graphite);}
+
+.acts{display:flex;gap:2px;align-items:center;padding-right:10px;opacity:0;transition:opacity .16s var(--ease);}
+.row:hover .acts,.row:focus-within .acts{opacity:1;}
+@media (hover:none){.acts{opacity:1;}}
+.ico{
+  border:0;background:none;cursor:pointer;padding:6px;border-radius:6px;
+  color:var(--graphite);line-height:0;
+  transition:background .15s var(--ease),color .15s var(--ease);
+}
+.ico:hover{background:var(--paper);color:var(--ink);}
+.ico.danger:hover{color:var(--stamp);}
+
+/* ── subtasks ─────────────────────────────────────────────────── */
+.subs{list-style:none;margin:9px 0 0;padding:0 0 0 3px;border-left:2px solid var(--rule);}
+.sub-row{display:flex;align-items:center;gap:9px;padding:4px 0 4px 11px;}
+.sub-title{
+  border:0;background:none;padding:0;flex:1;min-width:0;
+  font-size:14px;color:var(--ink);
+}
+.sub-title:focus{outline:none;}
+.sub-row.done .sub-title{color:var(--done);text-decoration:line-through;}
+.sub-add{
+  display:flex;align-items:center;gap:9px;padding:4px 0 2px 11px;
+}
+.sub-input{
+  border:0;background:none;padding:2px 0;flex:1;min-width:0;font-size:13.5px;
+  color:var(--ink);border-bottom:1px dashed var(--rule);
+}
+.sub-input:focus{outline:none;border-bottom-color:var(--carbon);}
+.sub-input::placeholder{color:#B0B5BC;}
+.sub-del{
+  border:0;background:none;cursor:pointer;color:#C3C7CD;padding:3px;line-height:0;
+  border-radius:4px;
+}
+.sub-del:hover{color:var(--stamp);}
+
+/* ── empty + footer ───────────────────────────────────────────── */
+.empty{
+  border:1px dashed var(--rule);border-radius:var(--r);
+  padding:38px 22px;text-align:center;color:var(--graphite);
+  background:var(--slip);margin-top:-1px;
+}
+.empty b{display:block;color:var(--ink);font-size:16px;margin-bottom:5px;font-weight:700;}
+.foot{
+  margin-top:28px;display:flex;gap:14px;align-items:center;flex-wrap:wrap;
+  font-size:12px;color:var(--graphite);
+}
+.linky{
+  border:0;background:none;cursor:pointer;color:var(--carbon);
+  font-size:12px;font-weight:600;padding:2px;text-decoration:underline;
+  text-underline-offset:2px;
+}
+.kbd{
+  font-family:ui-monospace,Menlo,monospace;font-size:11px;
+  border:1px solid var(--rule);border-bottom-width:2px;border-radius:4px;
+  padding:1px 5px;background:var(--slip);color:var(--graphite);
+}
+
+/* ── reminder banner ──────────────────────────────────────────── */
+.nudge{
+  margin-top:18px;display:none;align-items:center;gap:11px;
+  background:var(--slip);border:1px solid var(--rule);
+  border-left:3px solid var(--marker);
+  border-radius:var(--r);padding:11px 14px;font-size:13.5px;
+}
+.nudge.show{display:flex;}
+.nudge .linky{margin-left:auto;}
+
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;}
+
+@media (max-width:520px){
+  .search{width:100%;order:9;}
+  .bar-sp{display:none;}
+  .row{grid-template-columns:auto 1fr;gap:10px;}
+  .acts{grid-column:2;justify-content:flex-start;padding:4px 0 0;opacity:1;}
+}
+@media (prefers-reduced-motion:reduce){
+  *{transition:none!important;animation:none!important;}
+  .tab[aria-selected="true"]::after{transform:rotate(-.6deg) scaleX(1);}
+}
+</style>
+</head>
+<body>
+<main class="sheet">
+
+  <header class="top">
+    <div class="brand">
+      <h1>Docket</h1>
+      <span class="tagline" id="stamp"></span>
+    </div>
+    <div class="today-line" id="todayLine"></div>
+    <div class="privacy">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+        <rect x="4" y="10.5" width="16" height="10" rx="2"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/>
+      </svg>
+      Stays on this device. Nothing is uploaded.
+    </div>
+  </header>
+
+  <div class="compose">
+    <input id="newTask" type="text" placeholder="What needs doing?" autocomplete="off" aria-label="New task">
+    <input id="newDue" type="date" aria-label="Due date">
+    <button class="add" id="addBtn">Add</button>
+  </div>
+
+  <div class="nudge" id="nudge" role="status">
+    <span id="nudgeText"></span>
+    <button class="linky" id="nudgeAllow">Turn on reminders</button>
+  </div>
+
+  <nav class="bar" role="tablist" aria-label="Filter tasks">
+    <button class="tab" role="tab" data-f="today"    aria-selected="true">Today <span class="n" id="n-today">0</span></button>
+    <button class="tab" role="tab" data-f="upcoming" aria-selected="false">Next 7 days <span class="n" id="n-upcoming">0</span></button>
+    <button class="tab" role="tab" data-f="all"      aria-selected="false">All <span class="n" id="n-all">0</span></button>
+    <button class="tab" role="tab" data-f="done"     aria-selected="false">Done <span class="n" id="n-done">0</span></button>
+    <span class="bar-sp"></span>
+    <input class="search" id="search" type="search" placeholder="Search" aria-label="Search tasks">
+  </nav>
+
+  <ul class="list" id="list"></ul>
+  <div class="empty" id="empty" hidden></div>
+
+  <footer class="foot">
+    <span><span class="kbd">/</span> search</span>
+    <span><span class="kbd">Enter</span> add</span>
+    <span id="countLine"></span>
+    <button class="linky" id="clearDone" hidden>Clear finished</button>
+  </footer>
+</main>
+
+<script>
+(function(){
+'use strict';
+
+/* ═══════════════════════════════════════════════════════════════════
+   STORAGE — localStorage, this device only.
+   Versioned key so a future schema change can migrate rather than
+   silently discard someone's list.
+   ═══════════════════════════════════════════════════════════════════ */
+var KEY = 'docket_v1';
+var state = { tasks: [], filter: 'today', q: '' };
+
+function load(){
+  try{
+    var raw = localStorage.getItem(KEY);
+    if(!raw) return [];
+    var d = JSON.parse(raw);
+    if(!d || !Array.isArray(d.tasks)) return [];
+    return d.tasks.filter(function(t){ return t && typeof t.title === 'string'; })
+                  .map(function(t){
+      return {
+        id: t.id || uid(),
+        title: t.title,
+        done: !!t.done,
+        due: typeof t.due === 'string' && t.due ? t.due : null,
+        time: typeof t.time === 'string' && t.time ? t.time : null,
+        notified: !!t.notified,
+        created: t.created || Date.now(),
+        subs: Array.isArray(t.subs) ? t.subs.filter(function(s){
+          return s && typeof s.title === 'string';
+        }).map(function(s){
+          return { id:s.id||uid(), title:s.title, done:!!s.done };
+        }) : []
+      };
+    });
+  }catch(e){ return []; }
+}
+function save(){
+  try{ localStorage.setItem(KEY, JSON.stringify({ v:1, tasks:state.tasks })); }
+  catch(e){
+    // Quota is the realistic failure here, not a crash.
+    banner('Could not save — this browser is out of storage space.');
+  }
+}
+function uid(){
+  return 't' + Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   DATES — all comparisons are LOCAL, never UTC.
+
+   new Date('2026-08-11') parses as UTC midnight, which in Sydney is
+   already 10am on the 11th — so a task due today can read as yesterday,
+   or tomorrow's can read as today. Everything below builds dates from
+   parts so the day boundary is the one the person is actually living in.
+   ═══════════════════════════════════════════════════════════════════ */
+function todayKey(d){
+  d = d || new Date();
+  return d.getFullYear() + '-' +
+         String(d.getMonth()+1).padStart(2,'0') + '-' +
+         String(d.getDate()).padStart(2,'0');
+}
+function parseKey(k){                      // 'YYYY-MM-DD' -> local Date
+  var p = String(k).split('-');
+  return new Date(+p[0], +p[1]-1, +p[2]);
+}
+/** Whole days from today. Negative = overdue. */
+function daysAway(key){
+  if(!key) return null;
+  var t = new Date(); t.setHours(0,0,0,0);
+  return Math.round((parseKey(key) - t) / 86400000);
+}
+function dueLabel(key, time){
+  var n = daysAway(key);
+  if(n === null) return '';
+  var s = n === 0 ? 'Today'
+        : n === 1 ? 'Tomorrow'
+        : n === -1 ? 'Yesterday'
+        : n < 0 ? Math.abs(n) + ' days ago'
+        : n < 7 ? parseKey(key).toLocaleDateString('en-AU',{weekday:'long'})
+        : parseKey(key).toLocaleDateString('en-AU',{day:'numeric',month:'short'});
+  return time ? s + ' ' + time : s;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   BUCKETS
+   ═══════════════════════════════════════════════════════════════════ */
+function isOverdue(t){
+  if(t.done || !t.due) return false;
+  return daysAway(t.due) < 0;
+}
+function inFilter(t, f){
+  if(f === 'done') return t.done;
+  if(t.done) return false;
+  if(f === 'all') return true;
+  var n = daysAway(t.due);
+  if(f === 'today')    return n !== null && n <= 0;       // overdue counts as today
+  if(f === 'upcoming') return n !== null && n > 0 && n <= 7;
+  return true;
+}
+function matches(t, q){
+  if(!q) return true;
+  q = q.toLowerCase();
+  if(t.title.toLowerCase().indexOf(q) > -1) return true;
+  return t.subs.some(function(s){ return s.title.toLowerCase().indexOf(q) > -1; });
+}
+function visible(){
+  return state.tasks
+    .filter(function(t){ return inFilter(t, state.filter) && matches(t, state.q); })
+    .sort(function(a,b){
+      // Overdue first, then by due date, then undated, then newest.
+      var ad = a.due ? daysAway(a.due) : 9e9;
+      var bd = b.due ? daysAway(b.due) : 9e9;
+      if(ad !== bd) return ad - bd;
+      return b.created - a.created;
+    });
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   RENDER
+   ═══════════════════════════════════════════════════════════════════ */
+var $ = function(id){ return document.getElementById(id); };
+function esc(s){
+  return String(s).replace(/[&<>"']/g, function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+  });
+}
+
+function render(){
+  var rows = visible();
+  var list = $('list');
+
+  list.innerHTML = rows.map(function(t){
+    var doneSubs = t.subs.filter(function(s){ return s.done; }).length;
+    var over = isOverdue(t);
+    var n = daysAway(t.due);
+    var dueCls = over ? ' is-overdue' : (n === 0 ? ' is-today' : '');
+    return '<li class="row'+(t.done?' done':'')+(over?' overdue':'')+'" data-id="'+t.id+'">'+
+      '<input class="box" type="checkbox" '+(t.done?'checked':'')+
+        ' aria-label="Mark '+esc(t.title)+' as done">'+
+      '<div class="main">'+
+        '<input class="title" value="'+esc(t.title)+'" aria-label="Task name">'+
+        '<div class="meta">'+
+          (t.due ? '<span class="due'+dueCls+'">'+
+                     (over?'<b>OVERDUE</b> · ':'')+esc(dueLabel(t.due,t.time))+
+                   '</span>' : '')+
+          (t.subs.length ? '<span class="count">'+doneSubs+'/'+t.subs.length+' steps</span>' : '')+
+        '</div>'+
+        (t.subs.length ? '<ul class="subs">'+t.subs.map(function(s){
+          return '<li class="sub-row'+(s.done?' done':'')+'" data-sid="'+s.id+'">'+
+            '<input class="box sub" type="checkbox" '+(s.done?'checked':'')+
+              ' aria-label="Mark step '+esc(s.title)+' as done">'+
+            '<input class="sub-title" value="'+esc(s.title)+'" aria-label="Step name">'+
+            '<button class="sub-del" data-act="delsub" aria-label="Delete step">'+
+              '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>'+
+            '</button></li>';
+        }).join('')+'</ul>' : '')+
+        '<div class="sub-add">'+
+          '<input class="sub-input" placeholder="Add a step" aria-label="Add a step to '+esc(t.title)+'" autocomplete="off">'+
+        '</div>'+
+      '</div>'+
+      '<div class="acts">'+
+        '<button class="ico" data-act="due" aria-label="Set due date">'+
+          '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>'+
+        '</button>'+
+        '<button class="ico danger" data-act="del" aria-label="Delete task">'+
+          '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13"/></svg>'+
+        '</button>'+
+      '</div></li>';
+  }).join('');
+
+  // counts
+  ['today','upcoming','all','done'].forEach(function(f){
+    $('n-'+f).textContent = state.tasks.filter(function(t){ return inFilter(t,f); }).length;
+  });
+
+  var open = state.tasks.filter(function(t){ return !t.done; }).length;
+  var over = state.tasks.filter(isOverdue).length;
+  $('countLine').textContent = open + (open===1?' open task':' open tasks') +
+                               (over ? ' · ' + over + ' overdue' : '');
+  document.title = (over ? '(' + over + ') ' : open ? '(' + open + ') ' : '') + 'Docket';
+  $('clearDone').hidden = !state.tasks.some(function(t){ return t.done; });
+
+  // empty states are directions, not decoration
+  var e = $('empty');
+  if(rows.length){ e.hidden = true; }
+  else{
+    e.hidden = false;
+    var msg = state.q
+      ? '<b>Nothing matches “'+esc(state.q)+'”</b>Try a shorter word, or clear the search.'
+      : state.filter === 'today'
+        ? '<b>Nothing due today</b>Add something above, or check Next 7 days.'
+      : state.filter === 'upcoming'
+        ? '<b>The week ahead is clear</b>Tasks with a due date in the next 7 days land here.'
+      : state.filter === 'done'
+        ? '<b>Nothing finished yet</b>Ticked-off tasks collect here.'
+        : '<b>Your docket is empty</b>Write the first thing in the box above.';
+    e.innerHTML = msg;
+  }
+}
+
+function stampHeader(){
+  var d = new Date();
+  $('todayLine').textContent = d.toLocaleDateString('en-AU',
+    {weekday:'long', day:'numeric', month:'long', year:'numeric'});
+  $('stamp').textContent = 'no. ' + todayKey(d).replace(/-/g,'');
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   ACTIONS
+   ═══════════════════════════════════════════════════════════════════ */
+function find(id){
+  for(var i=0;i<state.tasks.length;i++) if(state.tasks[i].id === id) return state.tasks[i];
+  return null;
+}
+function addTask(){
+  var input = $('newTask');
+  var title = input.value.trim();
+  if(!title) { input.focus(); return; }
+  var due = $('newDue').value || null;
+  state.tasks.unshift({
+    id:uid(), title:title, done:false, due:due, time:null,
+    notified:false, created:Date.now(), subs:[]
+  });
+  input.value = ''; $('newDue').value = '';
+  // A new task can land outside the current filter — an undated one is not
+  // in Today, a next-week one is not in Today either. Silently adding a task
+  // the person then cannot see is the worst possible outcome, so follow it.
+  if(!inFilter(state.tasks[0], state.filter)) setFilter('all');
+  save(); render(); input.focus();
+}
+function setFilter(f){
+  state.filter = f;
+  Array.prototype.forEach.call(document.querySelectorAll('.tab'), function(b){
+    b.setAttribute('aria-selected', String(b.dataset.f === f));
+  });
+  render();
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   REMINDERS
+
+   HONEST LIMIT: with no server and no push subscription, a browser can
+   only notify while this page is open. There is no way to make a purely
+   local page alert someone who has closed the tab. So: a notification if
+   the tab is open and permission was granted, and the overdue count in
+   the tab title and in the list either way.
+   ═══════════════════════════════════════════════════════════════════ */
+function banner(text, showAllow){
+  $('nudgeText').textContent = text;
+  $('nudgeAllow').hidden = !showAllow;
+  $('nudge').classList.add('show');
+}
+function dueNow(t){
+  if(t.done || !t.due || t.notified) return false;
+  var n = daysAway(t.due);
+  if(n > 0) return false;
+  if(n < 0) return true;                       // overdue
+  if(!t.time) return true;                     // date-only, due today
+  var p = t.time.split(':');
+  var when = new Date(); when.setHours(+p[0], +p[1] || 0, 0, 0);
+  return Date.now() >= when.getTime();
+}
+function checkReminders(){
+  var hits = state.tasks.filter(dueNow);
+  if(!hits.length) return;
+  hits.forEach(function(t){ t.notified = true; });
+  save();
+  var msg = hits.length === 1
+    ? hits[0].title
+    : hits.length + ' tasks are due';
+  if(window.Notification && Notification.permission === 'granted'){
+    try{ new Notification('Docket', { body: msg, tag: 'docket' }); }catch(e){}
+  }else if(window.Notification && Notification.permission === 'default'){
+    banner('Due now: ' + msg, true);
+  }
+  render();
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   WIRING — delegated, because rows are rebuilt on every render.
+   ═══════════════════════════════════════════════════════════════════ */
+function init(){
+  state.tasks = load();
+  stampHeader();
+  setFilter('today');
+
+  $('addBtn').addEventListener('click', addTask);
+  $('newTask').addEventListener('keydown', function(e){
+    if(e.key === 'Enter'){ e.preventDefault(); addTask(); }
+  });
+  $('newDue').addEventListener('keydown', function(e){
+    if(e.key === 'Enter'){ e.preventDefault(); addTask(); }
+  });
+
+  $('search').addEventListener('input', function(){
+    state.q = this.value.trim(); render();
+  });
+  $('search').addEventListener('keydown', function(e){
+    if(e.key === 'Escape'){ this.value=''; state.q=''; render(); this.blur(); }
+  });
+  document.addEventListener('keydown', function(e){
+    if(e.key === '/' && document.activeElement === document.body){
+      e.preventDefault(); $('search').focus();
+    }
+  });
+
+  Array.prototype.forEach.call(document.querySelectorAll('.tab'), function(b){
+    b.addEventListener('click', function(){ setFilter(b.dataset.f); });
+  });
+
+  $('clearDone').addEventListener('click', function(){
+    var n = state.tasks.filter(function(t){ return t.done; }).length;
+    if(!n) return;
+    if(!confirm('Delete ' + n + ' finished task' + (n===1?'':'s') + '? This cannot be undone.')) return;
+    state.tasks = state.tasks.filter(function(t){ return !t.done; });
+    save(); render();
+  });
+
+  $('nudgeAllow').addEventListener('click', function(){
+    if(!window.Notification) return;
+    Notification.requestPermission().then(function(){
+      $('nudge').classList.remove('show');
+    });
+  });
+
+  var list = $('list');
+
+  list.addEventListener('change', function(e){
+    var row = e.target.closest('.row'); if(!row) return;
+    var t = find(row.dataset.id); if(!t) return;
+    if(e.target.classList.contains('sub')){
+      var sid = e.target.closest('.sub-row').dataset.sid;
+      t.subs.forEach(function(s){ if(s.id === sid) s.done = e.target.checked; });
+      // Finishing the last step is a strong signal the task itself is done.
+      if(t.subs.length && t.subs.every(function(s){ return s.done; })) t.done = true;
+      else if(t.done && !e.target.checked) t.done = false;
+    }else{
+      t.done = e.target.checked;
+      if(t.done) t.subs.forEach(function(s){ s.done = true; });
+      if(!t.done) t.notified = false;
+    }
+    save(); render();
+  });
+
+  list.addEventListener('click', function(e){
+    var btn = e.target.closest('[data-act]'); if(!btn) return;
+    var row = e.target.closest('.row'); if(!row) return;
+    var t = find(row.dataset.id); if(!t) return;
+    var act = btn.dataset.act;
+
+    if(act === 'del'){
+      if(!confirm('Delete “' + t.title + '”?')) return;
+      state.tasks = state.tasks.filter(function(x){ return x.id !== t.id; });
+      save(); render();
+    }
+    if(act === 'delsub'){
+      var sid = btn.closest('.sub-row').dataset.sid;
+      t.subs = t.subs.filter(function(s){ return s.id !== sid; });
+      save(); render();
+    }
+    if(act === 'due'){
+      var cur = t.due || '';
+      var v = prompt('Due date for “' + t.title + '” (YYYY-MM-DD). Leave blank to clear.', cur);
+      if(v === null) return;
+      v = v.trim();
+      if(!v){ t.due = null; t.time = null; }
+      else if(/^\d{4}-\d{2}-\d{2}$/.test(v)){ t.due = v; t.notified = false; }
+      else { alert('Use the format YYYY-MM-DD, for example ' + todayKey() + '.'); return; }
+      save(); render();
+    }
+  });
+
+  // Inline rename, committed on blur or Enter.
+  list.addEventListener('keydown', function(e){
+    if(e.key !== 'Enter') return;
+    if(e.target.classList.contains('title') || e.target.classList.contains('sub-title')){
+      e.preventDefault(); e.target.blur();
+    }
+    if(e.target.classList.contains('sub-input')){
+      e.preventDefault();
+      var row = e.target.closest('.row'); var t = find(row.dataset.id);
+      var v = e.target.value.trim();
+      if(t && v){ t.subs.push({ id:uid(), title:v, done:false }); t.done = false; save(); render(); }
+      // Put the cursor back in the same task's step box.
+      var again = list.querySelector('.row[data-id="'+row.dataset.id+'"] .sub-input');
+      if(again) again.focus();
+    }
+  });
+  list.addEventListener('focusout', function(e){
+    var row = e.target.closest('.row'); if(!row) return;
+    var t = find(row.dataset.id); if(!t) return;
+    if(e.target.classList.contains('title')){
+      var v = e.target.value.trim();
+      if(!v){ e.target.value = t.title; return; }   // refuse to blank a task
+      if(v !== t.title){ t.title = v; save(); render(); }
+    }
+    if(e.target.classList.contains('sub-title')){
+      var sid = e.target.closest('.sub-row').dataset.sid;
+      var s = null;
+      t.subs.forEach(function(x){ if(x.id === sid) s = x; });
+      if(!s) return;
+      var sv = e.target.value.trim();
+      if(!sv){ e.target.value = s.title; return; }
+      if(sv !== s.title){ s.title = sv; save(); render(); }
+    }
+  });
+
+  render();
+  checkReminders();
+  setInterval(checkReminders, 60000);
+  // Crossing midnight with the tab open must re-bucket everything.
+  setInterval(function(){
+    var k = todayKey();
+    if(k !== init._day){ init._day = k; stampHeader(); render(); }
+  }, 60000);
+  init._day = todayKey();
+
+  // Another tab on the same device edited the list.
+  window.addEventListener('storage', function(e){
+    if(e.key !== KEY) return;
+    state.tasks = load(); render();
+  });
+}
+
+if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+else init();
+
+// exposed for tests only
+window.__docket = { load:load, daysAway:daysAway, dueLabel:dueLabel, todayKey:todayKey,
+                    inFilter:inFilter, isOverdue:isOverdue, state:state, render:render,
+                    parseKey:parseKey, dueNow:dueNow };
+})();
+</script>
+</body>
+</html>
