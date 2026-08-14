@@ -122,6 +122,30 @@ body::before{
 [data-theme="rose"]{
   --accent:#db2777;--accent-dim:rgba(219,39,119,.12);--accent-bd:rgba(219,39,119,.28);--accent-text:#be185d;
 }
+/* SAND — warm greige/paper, muted terracotta */
+[data-theme="sand"] body{ background:#f5f1ea; color:#3a322a; }
+[data-theme="sand"] body::before{
+  background:
+    radial-gradient(at 12% 8%, rgba(180,101,47,.09) 0px, transparent 52%),
+    radial-gradient(at 88% 12%, rgba(150,120,90,.08) 0px, transparent 55%),
+    radial-gradient(at 50% 100%, rgba(200,160,110,.08) 0px, transparent 60%),
+    #f5f1ea;
+}
+[data-theme="sand"]{
+  --accent:#b4652f;--accent-dim:rgba(180,101,47,.12);--accent-bd:rgba(180,101,47,.28);--accent-text:#8a4b1e;
+}
+/* LILAC — soft cool lavender, violet accent */
+[data-theme="lilac"] body{ background:#f4f2fb; color:#2e2a3d; }
+[data-theme="lilac"] body::before{
+  background:
+    radial-gradient(at 12% 8%, rgba(139,92,246,.10) 0px, transparent 52%),
+    radial-gradient(at 88% 12%, rgba(124,110,230,.08) 0px, transparent 55%),
+    radial-gradient(at 50% 100%, rgba(167,139,250,.09) 0px, transparent 60%),
+    #f4f2fb;
+}
+[data-theme="lilac"]{
+  --accent:#7c5cd6;--accent-dim:rgba(124,92,214,.12);--accent-bd:rgba(124,92,214,.28);--accent-text:#5f3fb8;
+}
 /* MIDNIGHT — deep dark, reuses dark overrides + violet accent */
 [data-theme="midnight"] body{ background:#070b14; color:#d4d8e0; }
 [data-theme="midnight"] body::before{
@@ -168,6 +192,16 @@ body::before{
 [data-theme="rose"] .page-title,[data-theme="rose"] .card-title{color:#3a2230 !important;}
 [data-theme="rose"] .roster-segment{background:#f7dde8 !important;}
 [data-theme="rose"] .roster-stat,[data-theme="rose"] .roster-avail-banner{background:#fff6fa !important;border-color:#f3d4e2 !important;}
+[data-theme="sand"] .main{background:#efe9df !important;}
+[data-theme="sand"] .card{background:#fdfbf7 !important;border-color:#e6ddcf !important;}
+[data-theme="sand"] .page-title,[data-theme="sand"] .card-title{color:#3a322a !important;}
+[data-theme="sand"] .roster-segment{background:#e8e0d3 !important;}
+[data-theme="sand"] .roster-stat,[data-theme="sand"] .roster-avail-banner{background:#fdfbf7 !important;border-color:#e6ddcf !important;}
+[data-theme="lilac"] .main{background:#ece9f7 !important;}
+[data-theme="lilac"] .card{background:#fbfaff !important;border-color:#ddd6f2 !important;}
+[data-theme="lilac"] .page-title,[data-theme="lilac"] .card-title{color:#2e2a3d !important;}
+[data-theme="lilac"] .roster-segment{background:#e4def4 !important;}
+[data-theme="lilac"] .roster-stat,[data-theme="lilac"] .roster-avail-banner{background:#fbfaff !important;border-color:#ddd6f2 !important;}
 /* MIDNIGHT — deep dark */
 [data-theme="midnight"] .main{background:#0a0f1c !important;}
 [data-theme="midnight"] .card{background:#121a2b !important;border-color:#22304a !important;}
@@ -6144,13 +6178,6 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
             </div>
           </div>
 
-          <!-- Clock control (device-only, via clockswitch.js) -->
-          <div style="padding:14px 0;border-bottom:1px solid #f1f5f9;">
-            <div style="font-size:13px;font-weight:600;margin-bottom:2px;">Clock control</div>
-            <div style="font-size:11px;color:#94a3b8;margin-bottom:10px;">How you clock in and out. Saves on this device.</div>
-            <div id="clockControlPicker"></div>
-          </div>
-
           <!-- TEXT COLOR PICKER -->
           <div id="textColorPicker" style="padding:14px 0;border-top:1px solid #f1f5f9;margin-top:8px;">
             <div style="font-size:13px;font-weight:700;margin-bottom:4px;color:var(--text,#0f172a);">Text colour</div>
@@ -8490,6 +8517,8 @@ const NEXUS_THEMES = [
   {id:'ocean',    name:'Ocean',    sub:'Calm blues',     swatch:'linear-gradient(135deg,#eef6fb,#38b6de)'},
   {id:'forest',   name:'Forest',   sub:'Earthy greens',  swatch:'linear-gradient(135deg,#f0f6ef,#16a34a)'},
   {id:'rose',     name:'Rose',     sub:'Soft pink',      swatch:'linear-gradient(135deg,#fdf2f6,#db2777)'},
+  {id:'sand',     name:'Sand',     sub:'Warm greige',    swatch:'linear-gradient(135deg,#f5f1ea,#b4652f)'},
+  {id:'lilac',    name:'Lilac',    sub:'Soft lavender',  swatch:'linear-gradient(135deg,#f4f2fb,#7c5cd6)'},
   {id:'midnight', name:'Midnight', sub:'Deep & dark',    swatch:'linear-gradient(135deg,#070b14,#8b5cf6)'}
 ];
 const THEME_IDS = NEXUS_THEMES.map(t=>t.id);
@@ -8512,9 +8541,6 @@ function setTheme(theme){
 }
 
 function renderAppearancePicker(){
-  // Clock-control chooser (lives in clockswitch.js). Guarded so a missing
-  // module never breaks the settings page.
-  try{ if(window.ClockSwitch) window.ClockSwitch.renderPickerInto('clockControlPicker'); }catch(e){}
   const wrap = document.getElementById('appearanceGrid');
   if(!wrap) return;
   const cur = document.documentElement.getAttribute('data-theme') || 'light';
@@ -13621,8 +13647,7 @@ const CC_WORLDS = [];
 // ── Clock-card "worlds" removed ──────────────────────────────────────
 // The 15 illustrated per-day scenes were retired; the clock card is now a
 // plain themed Nexus card. These stubs stay so existing calls in
-// renderClockCard() and the clock-in path don't throw. clockswitch.js owns
-// the in/out control now.
+// renderClockCard() and the clock-in path don't throw.
 function applyClockCardTheme(){ /* worlds removed — card uses --m-* like every card */ }
 function ccBurst(){ /* celebratory burst removed */ }
 function ccWorldForToday(){ return 0; }
@@ -15215,8 +15240,58 @@ function openExtraBreakRequest(){
       '<button onclick="document.getElementById(\'extraBreakBack\').style.display=\'none\'" class="btn btn-outline" style="padding:8px 16px;font-size:13px;">Cancel</button>'+
       '<button onclick="submitExtraBreakRequest()" class="btn btn-green" style="padding:8px 18px;font-size:13px;" id="ebrSubmitBtn">Submit request</button>'+
     '</div>'+
+    // Your own recent requests — so a decision is visible instead of looking
+    // like the request vanished. Loads after the modal renders.
+    '<div id="ebrHistory" style="border-top:1px solid #f1f5f9;padding:14px 18px;max-height:210px;overflow-y:auto;">'+
+      '<div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.04em;margin-bottom:10px;">Your recent requests</div>'+
+      '<div id="ebrHistoryBody" style="font-size:12.5px;color:#94a3b8;">Loading…</div>'+
+    '</div>'+
   '</div>';
   bd.style.display = 'flex';
+  loadMyBreakHistory();
+}
+
+// Staff-side: show THIS person's recent requests with their outcome. Read-only.
+// Uses `me` (the signed-in staff name) to scope to their own rows.
+async function loadMyBreakHistory(){
+  const box = document.getElementById('ebrHistoryBody');
+  if(!box) return;
+  try{
+    const rows = await sbGet('extra_break_requests',
+      '?staff_name=eq.'+encodeURIComponent(me)+'&order=created_at.desc&limit=10');
+    if(!rows || !rows.length){
+      box.innerHTML = '<div style="color:#94a3b8;">No requests yet. Your first one will show here with its outcome.</div>';
+      return;
+    }
+    box.innerHTML = rows.map(function(r){
+      var st = (r.status||'pending').toLowerCase();
+      var pill = st==='approved'
+        ? '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:999px;background:rgba(22,163,74,.12);color:#16a34a;">Approved</span>'
+        : st==='declined'
+        ? '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:999px;background:rgba(220,38,38,.1);color:#dc2626;">Declined</span>'
+        : '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:999px;background:rgba(217,119,6,.12);color:#d97706;">Pending</span>';
+      // request_date -> local, human. Build from parts to avoid the UTC shift.
+      var dLabel = '';
+      try{
+        var p = String(r.request_date).split('-');
+        var d = new Date(+p[0], +p[1]-1, +p[2]);
+        dLabel = d.toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short'});
+      }catch(e){ dLabel = r.request_date || ''; }
+      var who = (st==='approved'||st==='declined') && r.resolved_by
+        ? '<div style="font-size:11px;color:#94a3b8;margin-top:2px;">by '+esc(r.resolved_by)+'</div>' : '';
+      var reason = r.reason
+        ? '<div style="font-size:11px;color:#94a3b8;margin-top:1px;">“'+esc(r.reason)+'”</div>' : '';
+      return '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;padding:9px 0;border-bottom:1px solid #f4f6f9;">'+
+        '<div style="min-width:0;">'+
+          '<div style="font-size:13px;font-weight:600;color:#0f172a;">+'+(r.minutes||0)+' min · '+dLabel+'</div>'+
+          reason + who +
+        '</div>'+
+        '<div style="flex:none;">'+pill+'</div>'+
+      '</div>';
+    }).join('');
+  }catch(e){
+    box.innerHTML = '<div style="color:#dc2626;">Couldn\'t load your history right now.</div>';
+  }
 }
 
 function updateExtraBreakLabel(val){
@@ -21937,8 +22012,7 @@ window.addEventListener('resize', function(){
        One random world per day, per person. Respects reduced-motion. */
     /* ── Clock card: a plain Nexus card. The illustrated per-day "worlds"
        were removed; the card now uses the same surface/line/ink tokens as
-       every other card and recolours with the active theme. clockswitch.js
-       supplies the physical in/out control that sits where the button was. ── */
+       every other card and recolours with the active theme. ── */
     #clockCard{
       background:var(--m-surface,#fff);
       border:1px solid var(--m-line,#e7e9ed);
@@ -22484,6 +22558,16 @@ input:focus{
   --m-border:#f3dde8; --m-border-hi:#ecc9da;
   --m-ink:#3a2230; --m-ink-2:#8a607a; --m-ink-3:#b78ca6;
 }
+[data-theme="sand"]{
+  --m-canvas:#f5f1ea; --m-card:#fdfbf7; --m-card-2:#efe9df;
+  --m-border:#e6ddcf; --m-border-hi:#d8ccb8;
+  --m-ink:#3a322a; --m-ink-2:#7d6d5a; --m-ink-3:#a89681;
+}
+[data-theme="lilac"]{
+  --m-canvas:#f4f2fb; --m-card:#fbfaff; --m-card-2:#ece9f7;
+  --m-border:#ddd6f2; --m-border-hi:#cabce8;
+  --m-ink:#2e2a3d; --m-ink-2:#6b6284; --m-ink-3:#9b93b5;
+}
 /* midnight: deep violet-charcoal distinct from the warm-charcoal dark */
 [data-theme="midnight"]{
   --m-canvas:#0a0a14; --m-card:#15131f; --m-card-2:#1d1a2b;
@@ -22727,6 +22811,5 @@ input:focus{
 <script src="availlock.js?v=7"></script>
 <script src="hubradial.js?v=3"></script>
 <script src="sessionlimit.js?v=1"></script>
-<script src="clockswitch.js?v=1"></script>
 </body>
 </html>
