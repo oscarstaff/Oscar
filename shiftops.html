@@ -3842,7 +3842,7 @@ function renderAvailability(){
       if(av.type==='no'){
         chip=`<div class="avail-chip avail-no" onclick="cycleAvail(${s.id},${d})">Unavail</div>`;
       } else if(av.type==='custom'){
-        chip=`<div class="avail-chip avail-pref" onclick="openCustomAvail(${s.id},${d})" style="font-size:7.5px">${av.start}–${av.end}</div>`;
+        chip=`<div class="avail-chip avail-pref" onclick="cycleAvail(${s.id},${d})" title="Click to cycle · use Custom below to edit hours" style="font-size:7.5px">${av.start}–${av.end}</div>`;
       } else if(av.type==='all'){
         chip=`<div class="avail-chip avail-yes" onclick="cycleAvail(${s.id},${d})">9-7</div>`;
       } else {
@@ -4855,10 +4855,14 @@ function downloadSubmittedAvailability(){
 
 function cycleAvail(staffId,day){
   const av=getAvail(staffId,day);
-  // Cycle: unset ->all ->no ->unset
+  // Cycle: unset -> all -> no -> unset.
+  // Custom is not part of the forward cycle (it's set via the Custom button),
+  // but a day that IS custom must be able to leave it — otherwise clicking a
+  // custom chip had no exit and the day was stuck on custom forever. Treating
+  // custom like 'no' here sends the next click to unset, rejoining the loop.
   if(av.type==='unset')setAvail(staffId,day,{type:'all'});
   else if(av.type==='all')setAvail(staffId,day,{type:'no'});
-  else setAvail(staffId,day,{type:'unset'});
+  else setAvail(staffId,day,{type:'unset'});   // covers 'no' AND 'custom'
   renderAvailability();renderRoster();
 }
 
