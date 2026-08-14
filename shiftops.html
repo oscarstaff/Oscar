@@ -1920,7 +1920,7 @@ button, .btn { white-space: nowrap; }
     <nav class="appbar-nav">
       <div class="nav-item active" onclick="switchNav('home',this)">Dashboard</div>
       <div class="nav-item" onclick="switchNav('roster',this)">Roster</div>
-      <div class="nav-item" onclick="switchNav('availability',this);clearAvailBadge()">Availability<span id="availNavBadge" style="display:none;margin-left:6px;background:var(--warn);color:#fff;border-radius:8px;padding:1px 6px;font-size:8px;font-weight:800;font-family:var(--mono);">NEW</span></div>
+      <div class="nav-item" onclick="switchNav('availability',this);clearAvailBadge()">Availability<span id="availNavBadge" style="display:none;margin-left:6px;background:var(--warn);color:#fff;border-radius:8px;padding:1px 6px;font-size:8px;font-weight:800;font-family:var(--mono);"></span></div>
       <div class="nav-item" onclick="switchNav('staff',this)">Staff</div>
       <div class="nav-item" id="navPayroll" style="display:none" onclick="switchNav('payroll',this)">Payroll</div>
     </nav>
@@ -4670,7 +4670,7 @@ async function loadSubmittedAvailability(){
   el.innerHTML='<div style="text-align:center;padding:32px;color:var(--text-dim);font-size:13px;">Loading...</div>';
   try{
     const rows=await fetch(
-      `${SUPABASE_URL}/rest/v1/staff_availability?select=*&order=updated_at.desc.nullslast`,
+      `${SUPABASE_URL}/rest/v1/staff_availability?select=*,availability_reviewed_at&order=updated_at.desc.nullslast`,
       {headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`}}
     ).then(r=>r.ok?r.json():[]);
 
@@ -4685,8 +4685,15 @@ async function loadSubmittedAvailability(){
 
     let html='<div style="display:flex;flex-direction:column;gap:12px;">';
 
+    let _needsReviewCount=0;
     rows.forEach(row=>{
       const av=row.availability||{};
+      // Needs review = staff changed availability after we last marked it reviewed.
+      const _upd=row.updated_at?new Date(row.updated_at).getTime():0;
+      const _rev=row.availability_reviewed_at?new Date(row.availability_reviewed_at).getTime():0;
+      const needsReview=_upd>_rev;
+      if(needsReview)_needsReviewCount++;
+      const _nameEsc=String(row.staff_name).replace(/'/g,"\\'").replace(/"/g,'&quot;');
       // Period label
       let period='Ongoing';
       let periodColor='var(--accent)';
@@ -4705,17 +4712,25 @@ async function loadSubmittedAvailability(){
 
       const s=staff.find(x=>`${x.first} ${x.last}`.toLowerCase()===row.staff_name.toLowerCase());
       const _cardTeam=(s&&s.team)?String(s.team).replace(/"/g,'&quot;'):'';
-      html+='<div data-team="'+_cardTeam+'" style="background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:12px;overflow:hidden;">';
+      html+='<div data-team="'+_cardTeam+'" data-availcard="'+_nameEsc+'" style="background:rgba(255,255,255,.03);border:1px solid '+(needsReview?'var(--warn)':'var(--border)')+';border-radius:12px;overflow:hidden;">';
       // Header
       html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:rgba(255,255,255,.03);border-bottom:1px solid var(--border);">';
       html+='<div style="display:flex;align-items:center;gap:10px;">';
       const color=s?s.color:'#667';
       const ava=row.staff_name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
-      html+='<div class="avatar" style="background:'+color+';width:28px;height:28px;font-size:9px;flex-shrink:0;">'+ava+'</div>';
+      html+='<div class="avatar" style="background:'+color+';width:28px;height:28px;font-size:9px;flex-shrink:0;position:relative;">'+ava;
+      html+='<span data-availdot style="display:'+(needsReview?'block':'none')+';position:absolute;top:-3px;right:-3px;width:9px;height:9px;border-radius:50%;background:var(--warn);border:2px solid var(--bg,#0e1116);"></span>';
+      html+='</div>';
       html+='<div><div style="font-size:13px;font-weight:700;">'+row.staff_name+'</div>';
       html+='<div style="font-size:10px;color:'+periodColor+';font-weight:600;margin-top:1px;">'+period+'</div></div>';
       html+='</div>';
+      html+='<div style="display:flex;align-items:center;gap:10px;">';
+      html+='<div data-availreview style="display:'+(needsReview?'flex':'none')+';align-items:center;gap:8px;">';
+      html+='<span style="font-family:var(--mono);font-size:8px;font-weight:800;color:var(--warn);letter-spacing:.5px;">CHANGED</span>';
+      html+='<button onclick="markAvailReviewed(\''+_nameEsc+'\',this)" style="cursor:pointer;background:var(--warn);color:#fff;border:none;border-radius:7px;padding:5px 10px;font-size:9px;font-weight:800;font-family:var(--mono);letter-spacing:.3px;">MARK REVIEWED</button>';
+      html+='</div>';
       if(updated)html+='<div style="font-family:var(--mono);font-size:8px;color:var(--muted);">Updated '+updated+'</div>';
+      html+='</div>';
       html+='</div>';
 
       // Days grid
@@ -4740,9 +4755,50 @@ async function loadSubmittedAvailability(){
 
     html+='</div>';
     el.innerHTML=html;
+    setAvailBadge(_needsReviewCount);
   }catch(e){
     console.warn(e);
     el.innerHTML='<div style="color:var(--warn);text-align:center;padding:32px;">Could not load submitted availability.</div>';
+  }
+}
+
+// Show the count of staff whose availability changed since last reviewed.
+function setAvailBadge(n){
+  const b=document.getElementById('availNavBadge');
+  if(!b)return;
+  if(n>0){ b.textContent=n; b.style.display='inline-block'; }
+  else { b.style.display='none'; }
+}
+
+// Mark one staff's availability as reviewed: stamp reviewed_at=now, clear their dot.
+async function markAvailReviewed(name,btn){
+  if(btn)btn.disabled=true;
+  try{
+    const r=await fetch(
+      `${SUPABASE_URL}/rest/v1/staff_availability?staff_name=eq.`+encodeURIComponent(name),
+      {method:'PATCH',
+       headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`,'Content-Type':'application/json','Prefer':'return=minimal'},
+       body:JSON.stringify({availability_reviewed_at:new Date().toISOString()})}
+    );
+    if(!r.ok)throw new Error('patch '+r.status);
+    // Clear this card's UI
+    const card=document.querySelector('[data-availcard="'+String(name).replace(/"/g,'&quot;')+'"]');
+    if(card){
+      card.style.borderColor='var(--border)';
+      const dot=card.querySelector('[data-availdot]'); if(dot)dot.style.display='none';
+      const rev=card.querySelector('[data-availreview]'); if(rev)rev.style.display='none';
+    }
+    // Decrement badge
+    const b=document.getElementById('availNavBadge');
+    if(b&&b.style.display!=='none'){
+      const n=Math.max(0,(parseInt(b.textContent,10)||1)-1);
+      setAvailBadge(n);
+    }
+    if(typeof showToast==='function')showToast('Marked reviewed');
+  }catch(e){
+    console.warn(e);
+    if(btn)btn.disabled=false;
+    if(typeof showToast==='function')showToast('Could not mark reviewed');
   }
 }
 
@@ -6421,8 +6477,9 @@ function showSection(id){
  * submitted.
  */
 function clearAvailBadge(){
-  const b=document.getElementById('availNavBadge');
-  if(b) b.style.display='none';
+  // No-op now: the badge reflects the live "changed since reviewed" count,
+  // managed by setAvailBadge()/markAvailReviewed(). Clicking the nav must not
+  // wipe a real count. Kept as a named function so the inline onclick is safe.
 }
 
 function switchNav(id,el){
@@ -8175,8 +8232,18 @@ async function _syncAvailabilityCore(silent){
     );
     if(!res.ok) return -1;
     const rows=await res.json();
-    if(!rows.length) return 0;
+    if(!rows.length){ if(typeof setAvailBadge==='function')setAvailBadge(0); return 0; }
 
+    // Update the "changed since reviewed" nav badge from this pull.
+    try{
+      let _nr=0;
+      rows.forEach(function(r){
+        const u=r.updated_at?new Date(r.updated_at).getTime():0;
+        const v=r.availability_reviewed_at?new Date(r.availability_reviewed_at).getTime():0;
+        if(u>v)_nr++;
+      });
+      if(typeof setAvailBadge==='function')setAvailBadge(_nr);
+    }catch(e){}
 
     // Skip re-applying if nothing changed since last pull (avoids needless saves
     // on the auto-timer). Signature = staff_name+updated_at pairs.
