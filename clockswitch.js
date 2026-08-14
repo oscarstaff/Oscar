@@ -371,6 +371,25 @@
   }
 
   // ── boot ──
+  // Self-healing reconcile. Wrapping renderClockCard is the primary sync path,
+  // but it is fragile: the inline clock code calls renderClockCard from inside
+  // an async toggleClock (after the clock-out confirm popup resolves), and load
+  // ordering can mean an early render runs before the wrap is installed. Rather
+  // than depend on the wrap catching every path, this cheaply checks a few times
+  // a second whether the control's shown state matches the real _clockState, and
+  // repaints if they drifted. So even if a render call is ever missed — popup,
+  // race, future refactor — the control corrects itself within ~250ms and can
+  // never sit stuck showing the wrong state.
+  function reconcile(){
+    if(!_control || !_control._paint) return;
+    var shouldBeIn = isIn();
+    var showsIn = _control.getAttribute('data-in') === '1';
+    if(shouldBeIn !== showsIn) paint();
+    // keep the disabled cue honest even if no render fired
+    var dis = _control.getAttribute('aria-disabled') === 'true';
+    if(locked() !== dis) _control.setAttribute('aria-disabled', locked() ? 'true' : 'false');
+  }
+
   function boot(){
     mount();
     // hook render; if the inline code isn't defined yet, poll briefly
@@ -382,6 +401,9 @@
       }, 100);
     }
     paint();
+    // Safety net regardless of hook timing (see reconcile). 250ms is invisible
+    // to a person but instant enough that the control never looks stuck.
+    setInterval(reconcile, 250);
   }
 
   if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
