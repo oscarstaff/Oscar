@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   sessionlimit.js — sessions expire after 8 hours
-   Loaded by index.html:  <script src="sessionlimit.js?v=1"></script>
+   sessionlimit.js — sessions expire after 16 hours
+   Loaded by index.html:  <script src="sessionlimit.js?v=2"></script>
 
    Separate module by convention — see ARCHITECTURE.md.
 
@@ -8,15 +8,22 @@
    A staff member was absent and someone else opened his Nexus account and
    clocked in and out. That account also carries ShiftOps and DialTRAC, so
    the roster, everyone's leave, and the full call log were reachable too.
-
    MFA at login would not have stopped it: if a session is already signed in
    on a shared or unlocked device, there is no login to challenge. What DOES
    stop it is the session not surviving overnight — a session from a previous
    day is exactly what was used.
 
+   WHY 16 HOURS (not 8)
+   Staff work 10+ hour shifts. An 8-hour cap logged people out mid-shift every
+   day — the limit was firing on normal work, not on the overnight-reuse it
+   exists to stop. 16 hours clears the longest realistic shift (plus arriving
+   early / running over) while still expiring the SAME day, so a session never
+   carries into the next day. That next-day carry is the actual incident this
+   guards against, and 16h still prevents it.
+
    HOW
    Login time is recorded once. Every load, every 5 minutes, and whenever the
-   tab becomes visible, the age is checked. Past 8 hours the person is signed
+   tab becomes visible, the age is checked. Past 16 hours the person is signed
    out through the normal doLogout() path.
 
    HONEST LIMITS
@@ -30,7 +37,7 @@
 (function(){
   'use strict';
 
-  var MAX_HOURS = 8;
+  var MAX_HOURS = 16;
   var KEY = 'oscars_session_start';
   var CHECK_MS = 5 * 60 * 1000;
 
@@ -91,11 +98,14 @@
   window.sessionLimitClear = clear;
   window.sessionLimitCheck = check;
   window.sessionLimitAge   = hoursOld;
+  window.sessionLimitMax   = function(){ return MAX_HOURS; };
 
   setInterval(check, CHECK_MS);
+
   document.addEventListener('visibilitychange', function(){
     if(!document.hidden) check();
   });
+
   // A tab left open overnight is the case this exists for, so check on load.
   if(document.readyState === 'loading'){
     document.addEventListener('DOMContentLoaded', function(){ setTimeout(check, 1500); });
