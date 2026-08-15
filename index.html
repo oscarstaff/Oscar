@@ -8182,10 +8182,8 @@ function showAvailSuccess(row){
     const until=new Date(row.valid_until+'T00:00:00');
     const today=new Date(); today.setHours(0,0,0,0);
     expired=until<today;
-  } else if(row && row.is_ongoing && row.updated_at){
-    const cutoff=new Date(); cutoff.setMonth(cutoff.getMonth()-1);
-    expired=new Date(row.updated_at)<cutoff;
   }
+  // Ongoing rows no longer expire on a timer — nothing to mark here.
   // Period label
   let period="Ongoing availability";
   if(!row.is_ongoing&&row.valid_from){
@@ -8194,6 +8192,31 @@ function showAvailSuccess(row){
   if(expired) period="Expired — "+period.toLowerCase();
   const periodEl=document.getElementById("availSavedPeriod");
   if(periodEl)periodEl.textContent=period;
+  // Effective-from line: tell the person plainly when this takes effect, so a
+  // deferred change doesn't look like it failed to save.
+  (function(){
+    var el=document.getElementById("availEffectiveNote");
+    if(!el){
+      var anchor=document.getElementById("availSavedPeriod");
+      if(anchor&&anchor.parentNode){
+        el=document.createElement("div");
+        el.id="availEffectiveNote";
+        el.style.cssText="font-size:12.5px;line-height:1.5;margin-top:8px;padding:9px 12px;border-radius:9px;";
+        anchor.parentNode.insertBefore(el, anchor.nextSibling);
+      }
+    }
+    if(el){
+      if(row._appliedNow){
+        el.style.background="#ecfdf5"; el.style.border="1px solid #a7f3d0"; el.style.color="#065f46";
+        el.innerHTML="<strong>Active now.</strong> Your availability is live immediately \u2014 you're all set.";
+      }else if(row._startsFrom){
+        var dt=new Date(row._startsFrom+"T00:00:00");
+        var nice=dt.toLocaleDateString('en-AU',{weekday:'long',day:'numeric',month:'long'});
+        el.style.background="#eef2ff"; el.style.border="1px solid #c7d2fe"; el.style.color="#3730a3";
+        el.innerHTML="<strong>Saved \u2014 starts "+nice+".</strong> Your current availability stays until then, so this fortnight's roster isn't affected.";
+      }else{ el.style.display="none"; }
+    }
+  })();
   // Status banner
   const banner=document.getElementById("availStatusBanner");
   if(banner){
@@ -8422,6 +8445,8 @@ function nextMondaySydney(){
 
 async function submitAvail(){
   const avail={},err=document.getElementById("availErr");err.classList.remove("show");
+  // Local YYYY-MM-DD formatter (Sydney date object in, ISO date string out).
+  const _dfmt=function(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
   // Availability is locked between windows because the roster is built from
   // it — changing it after publication silently invalidates shifts already
   // assigned. Blocked here as well as in the UI: disabled inputs are a
@@ -8452,32 +8477,49 @@ async function submitAvail(){
     // Check if row already exists
     const existing=await sbGet("staff_availability","?staff_name=eq."+encodeURIComponent(me)+"&limit=1");
     // What's submitted becomes the person's STANDING availability — it holds
-    // until they submit again. The one rule is that it starts NEXT Monday,
-    // not mid-week: the running week's roster was built from the current
-    // pattern, and changing it underneath would invalidate assigned shifts.
+    // until they submit again. Normally it starts NEXT FORTNIGHT, not mid-cycle:
+    // the running fortnight's roster was built from the current pattern, and
+    // changing it underneath would invalidate assigned shifts. So the new
+    // pattern is parked with an effective-from date and promoted on that date
+    // by a daily job.
     //
-    // So the new pattern is parked with an effective-from date and promoted
-    // on that date by a daily job. Both apps keep reading `availability` as
-    // the single live pattern.
-    const _mon = nextMondaySydney();
-    const payload = existing.length
-      ? { pending_availability: avail,
-          pending_from: _mon,
-          pending_set_at: new Date().toISOString() }
-      : { staff_name: me, availability: avail, is_ongoing: isOngoing,
+    // EXCEPTION — no valid live availability right now (expired, or ongoing but
+    // not re-confirmed in the gate's window). Deferring would leave them locked
+    // out of the portal until the fortnight boundary, even though they just
+    // submitted. In that case the submission applies IMMEDIATELY so they're
+    // unblocked, and there's no roster to protect because they weren't covered.
+    const _fortnight = (typeof window.availNextFortnight === 'function')
+      ? _dfmt(window.availNextFortnight())
+      : nextMondaySydney();  // fallback if availlock.js not loaded
+    const _liveValid = (typeof _hasValidAvailability === 'function')
+      ? _hasValidAvailability(existing) : false;
+    const _applyNow = !existing.length || !_liveValid;
+
+    const payload = _applyNow
+      ? { staff_name: me, availability: avail, is_ongoing: isOngoing,
           valid_from: null, valid_until: null,
-          updated_at: new Date().toISOString() };   // first ever save applies now
-    let res;
+          pending_availability: null, pending_from: null, pending_set_at: null,
+          updated_at: new Date().toISOString() }   // apply immediately (unblocks)
+      : { pending_availability: avail,
+          pending_from: _fortnight,
+          pending_set_at: new Date().toISOString() };
+    let res, _wroteRows=null;
     if(existing.length){
       res=await fetch(SB+"/rest/v1/staff_availability?staff_name=eq."+encodeURIComponent(me),{
         method:"PATCH",
-        headers:{"apikey":KEY,"Authorization":"Bearer "+_sbBearer(),"Content-Type":"application/json","Prefer":"return=minimal"},
+        headers:{"apikey":KEY,"Authorization":"Bearer "+_sbBearer(),"Content-Type":"application/json","Prefer":"return=representation"},
         body:JSON.stringify(payload)
       });
+      // return=representation: a successful write echoes the row(s). Empty array
+      // means the write was silently rejected (e.g. RLS) despite a 2xx — treat
+      // as failure so the user isn't told it saved when it didn't.
+      try{ _wroteRows = await res.clone().json(); }catch(_e){ _wroteRows = null; }
     }else{
       res=await sbPost("staff_availability",payload);
     }
-    if(res.ok||res.status===201||res.status===204){
+    const _okStatus = res.ok||res.status===201||res.status===204;
+    const _wroteOk = existing.length ? (Array.isArray(_wroteRows) && _wroteRows.length>0) : true;
+    if(_okStatus && _wroteOk){
       // Append an immutable snapshot to history so past fortnights can still be
       // scored against the availability that applied at the time. Best-effort:
       // never blocks the main save.
@@ -8501,7 +8543,8 @@ async function submitAvail(){
       if(_strip)_strip.remove();
       const _bn=document.getElementById("availStatusBanner");
       if(_bn)_bn.classList.remove("avail-expired");
-      showAvailSuccess({availability:avail,is_ongoing:isOngoing,valid_from:validFrom,valid_until:validUntil});
+      showAvailSuccess({availability:avail,is_ongoing:isOngoing,valid_from:validFrom,valid_until:validUntil,
+                        _appliedNow:_applyNow, _startsFrom:_applyNow?null:_fortnight});
       loadHomeData();
       if(typeof recheckOnboarding==='function') recheckOnboarding();
     }else throw new Error("Server error "+res.status);
@@ -11144,12 +11187,11 @@ async function ensureStaffSettingsRow(){
 function _hasValidAvailability(rows){
   if(!Array.isArray(rows)||!rows.length) return false;
   const today=new Date(); today.setHours(0,0,0,0);
-  const cutoff=new Date(); cutoff.setMonth(cutoff.getMonth()-1);  // 1 month ago
   return rows.some(function(r){
-    if(r.is_ongoing){
-      if(!r.updated_at) return true;            // legacy row with no timestamp → don't lock
-      return new Date(r.updated_at) >= cutoff;  // re-confirmed within last 1 month
-    }
+    // Ongoing availability holds until the person changes it — it never
+    // expires on its own. (Previously required re-saving within 1 month, which
+    // silently locked staff out of the portal; removed by request.)
+    if(r.is_ongoing) return true;
     if(!r.valid_until) return true;             // dated start, no end → valid
     const until=new Date(r.valid_until+'T00:00:00');
     return until>=today;                         // not yet expired
@@ -14066,6 +14108,17 @@ function openShiftBlockedDialog(sinceTs){
   });
 }
 
+// Brief visual "got it, but not yet" flash for taps a safety guard ignores,
+// so the button never feels dead. Retriggers cleanly on repeated taps.
+function _ccNudge(btn){
+  if(!btn) return;
+  btn.classList.remove('cc-btn--nudge');
+  // force reflow so the animation restarts even on back-to-back taps
+  void btn.offsetWidth;
+  btn.classList.add('cc-btn--nudge');
+  setTimeout(function(){ btn.classList.remove('cc-btn--nudge'); }, 340);
+}
+
 async function toggleClock(){
   const btn = document.getElementById('clockBtn');
   if(!btn) return;
@@ -14073,6 +14126,7 @@ async function toggleClock(){
   // check) has settled — otherwise a tap in that ~5s window races the auto-out
   // and creates a confusing in/out tangle.
   if(window._clockSyncing){
+    _ccNudge(btn);
     showToast('One sec — checking your clock status…');
     return;
   }
@@ -14088,6 +14142,7 @@ async function toggleClock(){
   // never blocks a legitimate punch.
   if(window._lastClockAnyToggle && (_now - window._lastClockAnyToggle) < 8000){
     console.warn('[clock] hard lockout — punch ignored (', _now - window._lastClockAnyToggle, 'ms since last)');
+    _ccNudge(btn);
     return;
   }
   if(window._lastClockToggle && window._lastClockAction === _nextAction
@@ -14149,6 +14204,7 @@ async function toggleClock(){
     }
   }
   btn.disabled = true;
+  btn.classList.add('cc-btn--working');
   const prevText = btn.textContent;
   btn.textContent = _bgPosition ? 'Verifying...' : 'Locating GPS...';
 
@@ -14189,6 +14245,7 @@ async function toggleClock(){
         const accFmt = Math.round(acc)+'m';
         showToast('Too far ('+distFmt+', ±'+accFmt+' accuracy). Move closer or wait for better GPS.', 'warning');
         btn.disabled = false;
+        btn.classList.remove('cc-btn--working');
         btn.textContent = prevText;
         return;
       }
@@ -14196,6 +14253,7 @@ async function toggleClock(){
       console.warn('GPS error:', e);
       showToast('Location required: enable GPS in browser settings');
       btn.disabled = false;
+      btn.classList.remove('cc-btn--working');
       btn.textContent = prevText;
       return;
     }
@@ -14229,6 +14287,7 @@ async function toggleClock(){
     btn.textContent = (next === 'in') ? 'Clock Out' : 'Clock In';
     btn.style.background = (next === 'in') ? '#dc2626' : 'var(--accent)';
     btn.disabled = false;
+    btn.classList.remove('cc-btn--working');
     renderClockCard();
     if(next === 'in'){ try{ ccBurst(); }catch(e){} }   // the world reacts
     showToast(next==='in' ? 'Clocked in' : 'Clocked out');
@@ -14305,6 +14364,7 @@ async function toggleClock(){
     showToast('Failed to record');
     btn.textContent = prevText;
     btn.disabled = false;
+    btn.classList.remove('cc-btn--working');
   }
 }
 
@@ -22031,10 +22091,24 @@ window.addEventListener('resize', function(){
     #clockCard .cc-btn{ padding:12px 22px; min-width:126px; border-radius:12px; border:0;
       background:var(--accent); color:#fff; font-size:14px; font-weight:800;
       letter-spacing:-.01em; cursor:pointer; font-family:inherit;
-      transition:transform .12s, filter .15s; }
+      touch-action:manipulation; -webkit-tap-highlight-color:transparent;
+      box-shadow:0 2px 8px rgba(0,0,0,.12);
+      transition:transform .09s cubic-bezier(.34,1.56,.64,1), filter .15s, box-shadow .12s; }
     #clockCard .cc-btn:hover{ filter:brightness(1.06); }
-    #clockCard .cc-btn:active{ transform:scale(.97); }
+    #clockCard .cc-btn:active{ transform:scale(.94); box-shadow:0 1px 3px rgba(0,0,0,.16); filter:brightness(.97); }
     #clockCard .cc-btn:focus-visible{ outline:2px solid var(--accent); outline-offset:3px; }
+    #clockCard .cc-btn:disabled{ cursor:default; }
+    /* "Working" state — a calm pulse while GPS/verify/write is in flight, so a
+       tap that hits a safety guard or a network moment still visibly reacts. */
+    #clockCard .cc-btn--working{ animation:ccBtnPulse 1s ease-in-out infinite; }
+    @keyframes ccBtnPulse{ 0%,100%{ filter:brightness(1); } 50%{ filter:brightness(1.14); } }
+    /* Quick flash when a tap is intentionally ignored by a guard (lockout/sync),
+       so it reads as "got it, wait" rather than "dead button". */
+    #clockCard .cc-btn--nudge{ animation:ccBtnNudge .32s ease; }
+    @keyframes ccBtnNudge{ 0%{ transform:scale(1); } 40%{ transform:scale(.94); } 100%{ transform:scale(1); } }
+    @media (prefers-reduced-motion: reduce){
+      #clockCard .cc-btn--working, #clockCard .cc-btn--nudge{ animation:none; }
+    }
     #clockCard .cc-btn2{ padding:12px 16px; border-radius:10px; border:1px solid var(--m-line,#e2e8f0);
       background:var(--m-surface,#fff); color:var(--m-ink,#0f172a); font-size:13px; font-weight:700;
       cursor:pointer; font-family:inherit; }
@@ -22808,7 +22882,7 @@ input:focus{
 <script src="dialtrac.js?v=4"></script>
 <script src="quizreview.js?v=1"></script>
 <script src="teamhours.js?v=2"></script>
-<script src="availlock.js?v=7"></script>
+<script src="availlock.js?v=8"></script>
 <script src="hubradial.js?v=3"></script>
 <script src="sessionlimit.js?v=1"></script>
 </body>

@@ -25,15 +25,30 @@
 (function(){
   'use strict';
 
-  /** Monday of next week, Sydney. */
+  /* Fortnight anchor: 10 Aug 2026 is a fortnight START (Monday). All fortnight
+     starts are this date + a multiple of 14 days: 10 Aug, 24 Aug, 7 Sep, …
+     Changes never touch the running fortnight (its roster is built), so we
+     always defer to the NEXT fortnight start — including when submitted on a
+     boundary day itself. */
+  var FORTNIGHT_ANCHOR = new Date(2026, 7, 10); // month 7 = August
+  FORTNIGHT_ANCHOR.setHours(0,0,0,0);
+
+  /** Start of the next fortnight, Sydney. (Name kept for call sites.) */
   function nextMonday(){
     var s = new Date().toLocaleString('en-US', { timeZone: 'Australia/Sydney' });
     var d = new Date(s);
     d.setHours(0,0,0,0);
-    var dow = (d.getDay() + 6) % 7;          // Mon=0 … Sun=6
-    d.setDate(d.getDate() + (7 - dow));
-    return d;
+    var DAY = 86400000;
+    var diff = Math.floor((d - FORTNIGHT_ANCHOR) / DAY);
+    var rem = ((diff % 14) + 14) % 14;        // 0 on a boundary day
+    var add = (rem === 0) ? 14 : (14 - rem);  // boundary day -> next fortnight
+    var res = new Date(d.getTime() + add * DAY);
+    res.setHours(0,0,0,0);
+    return res;
   }
+
+  /** Explicit alias so future code reads clearly. */
+  function nextFortnightStart(){ return nextMonday(); }
 
   function fmt(d){
     return d.toLocaleDateString('en-AU', { weekday:'long', day:'numeric', month:'long' });
@@ -44,8 +59,8 @@
 
   function availLockMessage(){
     return 'Your new availability starts ' + fmt(nextMonday()) +
-           ' and stays that way until you change it again. This week isn\'t ' +
-           'affected — the roster is already set.';
+           ' (the next fortnight) and stays that way until you change it ' +
+           'again. This fortnight isn\'t affected — the roster is already set.';
   }
 
   /**
@@ -70,7 +85,8 @@
     bar.style.background = '#eef2ff';
     bar.style.border     = '1px solid #c7d2fe';
     bar.style.color      = '#3730a3';
-    bar.innerHTML = '<strong>Starts next Monday</strong> — ' + availLockMessage();
+    bar.innerHTML = '<strong>Starts next fortnight (' + fmt(nextMonday()) +
+                    ')</strong> — ' + availLockMessage();
 
     // Everything stays editable.
     var btn = document.getElementById('availBtn');
@@ -92,5 +108,6 @@
   window.availLockMessage   = availLockMessage;
   window.applyAvailLock     = applyAvailLock;
   window.refreshAvailUnlock = refreshAvailUnlock;
-  window.availNextMonday    = nextMonday;
+  window.availNextMonday      = nextMonday;
+  window.availNextFortnight   = nextFortnightStart;
 })();
