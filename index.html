@@ -5673,17 +5673,20 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
       <!-- Stats -->
       <div class="stats-row" id="homeStats"></div>
 
-      <!-- Weather strip (shift planning) -->
-      <div id="homeWeatherCard" style="display:none;margin-bottom:12px;background:linear-gradient(120deg,#eff6ff,#f0f9ff);border:1px solid #e0f2fe;border-radius:12px;padding:12px 16px;align-items:center;gap:14px;">
-        <div id="homeWeatherIcon" style="font-size:30px;line-height:1;flex-shrink:0;">⛅</div>
-        <div style="flex:1;min-width:0;">
-          <div style="display:flex;align-items:baseline;gap:8px;">
-            <span id="homeWeatherTemp" style="font-size:22px;font-weight:800;color:#0f172a;letter-spacing:-.02em;">—°</span>
-            <span id="homeWeatherDesc" style="font-size:12.5px;font-weight:600;color:#475569;text-transform:capitalize;"></span>
+      <!-- What's New in Nexus (product changelog) -->
+      <div class="card" id="homeWhatsNew" style="margin-bottom:12px;padding:0;overflow:hidden;">
+        <div onclick="toggleWhatsNew()" style="display:flex;align-items:center;gap:10px;padding:12px 16px;cursor:pointer;user-select:none;">
+          <div style="font-size:20px;line-height:1;flex-shrink:0;">✨</div>
+          <div style="flex:1;min-width:0;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span class="card-title" style="font-size:14px;">What's New in Nexus</span>
+              <span id="whatsNewBadge" style="display:none;background:var(--accent,#3b82f6);color:#fff;border-radius:10px;padding:1px 7px;font-size:9px;font-weight:800;letter-spacing:.3px;">NEW</span>
+            </div>
+            <div id="whatsNewSub" style="font-size:11px;color:#64748b;margin-top:1px;"></div>
           </div>
-          <div id="homeWeatherMeta" style="font-size:11px;color:#64748b;margin-top:1px;"></div>
+          <div id="whatsNewChevron" style="font-size:13px;color:#94a3b8;flex-shrink:0;transition:transform .18s;">▾</div>
         </div>
-        <div id="homeWeatherHi" style="font-size:11px;font-weight:700;color:#94a3b8;text-align:right;flex-shrink:0;"></div>
+        <div id="whatsNewBody" style="display:none;border-top:1px solid #f1f5f9;padding:6px 16px 14px;"></div>
       </div>
 
       <!-- My tasks due -->
@@ -7967,7 +7970,7 @@ async function enterHub(){
   document.getElementById("leaveTo").value=today;
   buildAvailForm();
   showSchedTab('leave'); // default schedule sub-tab
-  startBackgroundLocation();ensureStaffSettingsRow();loadStaffTheme();Promise.all([loadHomeData(),loadNotifications(),loadLeaveHistory(),refreshAnnBadge(),loadHomeWeather(),loadHomeCalendar(),loadHomeAttention(),renderTodayChip(),maybeShowOnboarding(),checkFeedbackInvites(),checkNewNotifications(),loadAnnReads(),loadClockState(),loadAllClockLogs()]).then(function(){
+  startBackgroundLocation();ensureStaffSettingsRow();loadStaffTheme();Promise.all([loadHomeData(),loadNotifications(),loadLeaveHistory(),refreshAnnBadge(),loadWhatsNew(),loadHomeCalendar(),loadHomeAttention(),renderTodayChip(),maybeShowOnboarding(),checkFeedbackInvites(),checkNewNotifications(),loadAnnReads(),loadClockState(),loadAllClockLogs()]).then(function(){
     setTimeout(function(){
       maybeShowTour();
     }, 300);
@@ -8255,7 +8258,7 @@ function goTo(p){
   }
   if(p==="schedule"){showSchedTab("leave");}
   if(p==="profile")loadProfilePage();
-  if(p==="home"){loadHomeData();loadClockState();loadHomeWeather();loadHomeCalendar();loadHomeAttention();renderTodayChip();}
+  if(p==="home"){loadHomeData();loadClockState();loadWhatsNew();loadHomeCalendar();loadHomeAttention();renderTodayChip();}
   if(p==="notifs"){renderNotifsPage();}
   
   if(p==="training"){renderMyTraining();}
@@ -18279,38 +18282,96 @@ async function loadHomeAttention(){
   wrap.style.display = 'block';
 }
 
-async function loadHomeWeather(){
-  const card = document.getElementById('homeWeatherCard');
+// ── WHAT'S NEW IN NEXUS ──
+// Product changelog shown on the home screen (where the weather used to be).
+// APPEND new entries to the TOP of this array each week. Keep them short and
+// staff-friendly — what changed and why it helps, not internal detail.
+// date: 'YYYY-MM-DD' (used to sort + flag unseen). tag: 'New' | 'Fixed' | 'Improved'.
+const NEXUS_WHATS_NEW = [
+  { date:'2026-08-15', tag:'New',      title:'What\'s New board',
+    body:'This board — a quick note of what changed in Nexus each week.' },
+  { date:'2026-08-15', tag:'Improved', title:'Retro themes',
+    body:'Two new looks in Settings → Appearance: Retro 95 and Renaissance.' },
+  { date:'2026-08-15', tag:'Fixed',    title:'Fewer sign-outs',
+    body:'Sessions now last through a full shift instead of timing out early.' },
+  { date:'2026-08-15', tag:'Fixed',    title:'Availability saves reliably',
+    body:'Setting a new availability now records properly and won\'t lock you out.' }
+];
+
+function _whatsNewSeenKey(){
+  try{ return 'nexus_whatsnew_seen_' + ((typeof me!=='undefined'&&me)?me:'anon'); }
+  catch(e){ return 'nexus_whatsnew_seen_anon'; }
+}
+function _whatsNewLatestDate(){
+  return NEXUS_WHATS_NEW.reduce(function(mx,e){ return e.date>mx?e.date:mx; }, '');
+}
+function _whatsNewUnseenCount(){
+  let seen='';
+  try{ seen = localStorage.getItem(_whatsNewSeenKey()) || ''; }catch(e){}
+  return NEXUS_WHATS_NEW.filter(function(e){ return e.date > seen; }).length;
+}
+
+function loadWhatsNew(){
+  const card = document.getElementById('homeWhatsNew');
   if(!card) return;
+  if(!NEXUS_WHATS_NEW.length){ card.style.display='none'; return; }
+  card.style.display = 'block';
+  const unseen = _whatsNewUnseenCount();
+  const badge = document.getElementById('whatsNewBadge');
+  const sub   = document.getElementById('whatsNewSub');
+  if(badge) badge.style.display = unseen>0 ? 'inline-block' : 'none';
+  if(sub){
+    const latest = NEXUS_WHATS_NEW.slice().sort(function(a,b){return b.date<a.date?-1:1;})[0];
+    sub.textContent = unseen>0
+      ? (unseen + ' new update' + (unseen>1?'s':''))
+      : ('Latest: ' + (latest?latest.title:''));
+  }
+}
+
+function _fmtWhatsNewDate(d){
   try{
-    const lat = -33.8688, lon = 151.2093; // Sydney
-    const url = 'https://api.open-meteo.com/v1/forecast?latitude='+lat+'&longitude='+lon+
-                '&current=temperature_2m,weather_code,is_day&daily=temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=1';
-    const r = await fetch(url);
-    if(!r.ok) return;
-    const d = await r.json();
-    const cur = d.current || {};
-    const day = d.daily || {};
-    const code = cur.weather_code;
-    const isDay = cur.is_day !== 0; // 1/undefined = day, 0 = night
-    // Day icons
-    const map = {0:['☀️','Clear'],1:['🌤️','Mainly clear'],2:['⛅','Partly cloudy'],3:['☁️','Overcast'],
-      45:['🌫️','Fog'],48:['🌫️','Fog'],51:['🌦️','Light drizzle'],53:['🌦️','Drizzle'],55:['🌦️','Drizzle'],
-      61:['🌧️','Light rain'],63:['🌧️','Rain'],65:['🌧️','Heavy rain'],71:['🌨️','Snow'],73:['🌨️','Snow'],75:['🌨️','Snow'],
-      80:['🌦️','Showers'],81:['🌦️','Showers'],82:['⛈️','Heavy showers'],95:['⛈️','Thunderstorm'],96:['⛈️','Thunderstorm'],99:['⛈️','Thunderstorm']};
-    // Night overrides for clear/partly-cloudy codes (moon instead of sun)
-    const nightMap = {0:['🌙','Clear'],1:['🌙','Mainly clear'],2:['☁️','Partly cloudy'],3:['☁️','Overcast']};
-    const m = (!isDay && nightMap[code]) ? nightMap[code] : (map[code] || ['⛅','']);
-    const temp = Math.round(cur.temperature_2m);
-    const hi = day.temperature_2m_max ? Math.round(day.temperature_2m_max[0]) : null;
-    const lo = day.temperature_2m_min ? Math.round(day.temperature_2m_min[0]) : null;
-    document.getElementById('homeWeatherIcon').textContent = m[0];
-    document.getElementById('homeWeatherTemp').textContent = temp+'°';
-    document.getElementById('homeWeatherDesc').textContent = m[1];
-    document.getElementById('homeWeatherMeta').textContent = 'Sydney · now';
-    document.getElementById('homeWeatherHi').innerHTML = (hi!=null?('H '+hi+'°'):'')+(lo!=null?('<br>L '+lo+'°'):'');
-    card.style.display = 'flex';
-  }catch(e){ /* silent — weather is non-critical */ }
+    const dt = new Date(d+'T00:00:00');
+    return dt.toLocaleDateString('en-AU',{day:'numeric',month:'short'});
+  }catch(e){ return d; }
+}
+
+function renderWhatsNewBody(){
+  const body = document.getElementById('whatsNewBody');
+  if(!body) return;
+  const tagColor = { 'New':'#16a34a', 'Fixed':'#3b82f6', 'Improved':'#7c3aed' };
+  const rows = NEXUS_WHATS_NEW.slice().sort(function(a,b){ return b.date<a.date?-1:1; });
+  body.innerHTML = rows.map(function(e){
+    const c = tagColor[e.tag] || 'var(--accent,#3b82f6)';
+    return '<div style="display:flex;gap:10px;padding:9px 0;border-bottom:1px solid #f1f5f9;">'+
+      '<div style="flex-shrink:0;width:52px;font-size:10px;color:#94a3b8;font-weight:600;padding-top:2px;">'+_fmtWhatsNewDate(e.date)+'</div>'+
+      '<div style="flex:1;min-width:0;">'+
+        '<div style="display:flex;align-items:center;gap:7px;margin-bottom:2px;">'+
+          '<span style="font-size:8.5px;font-weight:800;letter-spacing:.4px;color:#fff;background:'+c+';border-radius:5px;padding:1px 6px;text-transform:uppercase;">'+e.tag+'</span>'+
+          '<span style="font-size:12.5px;font-weight:700;color:inherit;">'+e.title+'</span>'+
+        '</div>'+
+        '<div style="font-size:11.5px;color:#64748b;line-height:1.45;">'+e.body+'</div>'+
+      '</div>'+
+    '</div>';
+  }).join('');
+  // Mark all current entries as seen for this user.
+  try{ localStorage.setItem(_whatsNewSeenKey(), _whatsNewLatestDate()); }catch(e){}
+}
+
+function toggleWhatsNew(){
+  const body = document.getElementById('whatsNewBody');
+  const chev = document.getElementById('whatsNewChevron');
+  if(!body) return;
+  const open = body.style.display !== 'none';
+  if(open){
+    body.style.display = 'none';
+    if(chev) chev.style.transform = 'rotate(0deg)';
+  }else{
+    renderWhatsNewBody();
+    body.style.display = 'block';
+    if(chev) chev.style.transform = 'rotate(180deg)';
+    // Clear the NEW badge + refresh subtitle now that they've opened it.
+    loadWhatsNew();
+  }
 }
 
 // My tasks due — next 3 incomplete tasks, soonest first. Tick to complete.
