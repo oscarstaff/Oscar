@@ -1569,6 +1569,54 @@ async function clRestoreRow(id){
   }catch(e){ console.warn('clRestoreRow',e); showToast('Network error','error'); }
 }
 
+// ── All-time search ───────────────────────────────────────────────
+// The queue only loads a recent window (CL_RECENT_DAYS) so normal use stays
+// fast. But a caller from months ago should still be findable by name or
+// number. When a search doesn't match anything in the loaded rows, this
+// quietly queries the server across ALL time and merges the hits in, so old
+// callers surface without the person needing a date range or History view.
+let _clAllTimeTimer=null, _clAllTimeLast='';
+function clSearchAllTime(){
+  const el=document.getElementById('clSearch');
+  const q=((el&&el.value)||'').trim();
+  if(_clAllTimeTimer){ clearTimeout(_clAllTimeTimer); _clAllTimeTimer=null; }
+  if(q.length<2){ _clAllTimeLast=''; return; }        // too short to be useful
+  if(q===_clAllTimeLast) return;                       // already fetched this
+  _clAllTimeTimer=setTimeout(async ()=>{
+    _clAllTimeTimer=null;
+    _clAllTimeLast=q;
+    try{
+      const t=q.toLowerCase();
+      const digits=q.replace(/\D/g,'');
+      // Build an OR filter: name / reason / note / logged_by ILIKE, plus a
+      // phone match when the query looks numeric. PostgREST 'or=(...)'.
+      const like='*'+encodeURIComponent(t)+'*';
+      const ors=[
+        'caller_name.ilike.'+like,
+        'reason.ilike.'+like,
+        'note.ilike.'+like,
+        'logged_by.ilike.'+like
+      ];
+      if(digits.length>=3){
+        // National-form fragment: strip trunk zero so 0455… and 455… both hit.
+        const nat=digits.replace(/^0/,'');
+        ors.push('phone_e164.ilike.*'+encodeURIComponent(nat)+'*');
+      }
+      const _q='?select=*&deleted_at=is.null&or=('+ors.join(',')+')'+
+               '&order=created_at.desc&limit=200';
+      const hits=await sbGet('call_log', _q);
+      if(!hits || !hits.length) return;
+      // Merge any rows we don't already have, then re-render if the search
+      // box still holds the same query.
+      const have=new Set(_clQueue.map(r=>r.id));
+      let added=0;
+      hits.forEach(h=>{ if(!have.has(h.id)){ _clQueue.push(h); added++; } });
+      const cur=((document.getElementById('clSearch')||{}).value||'').trim();
+      if(added && cur===q){ clRenderQueue(); }
+    }catch(e){ console.warn('clSearchAllTime',e); }
+  }, 400);
+}
+
 function clRenderQueue(){
   const body=document.getElementById('clQueueBody');
   const empty=document.getElementById('clQueueEmpty');
@@ -2095,7 +2143,7 @@ function initCallLog(){
     }
     const sq=document.getElementById('clSearch');
     if(sq && !sq.dataset.bound){
-      sq.addEventListener('input', ()=>clRenderQueue());
+      sq.addEventListener('input', ()=>{ clRenderQueue(); clSearchAllTime(); });
       sq.dataset.bound='1';
     }
     n.dataset.clBound='1';
