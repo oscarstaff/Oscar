@@ -267,15 +267,21 @@ select.cl-in{appearance:none;-webkit-appearance:none;cursor:pointer;padding-righ
 /* The two date inputs are the widest thing in the bar and rarely used, so
    they stay tucked away until the calendar chip opens them (or a range is
    actually active). This is what un-crowds the toolbar. */
-.cl-daterange{display:none;align-items:center;gap:5px;flex-shrink:0;}
+/* The date-range floats in a popover below its chip, so opening it never
+   reflows the toolbar (that reflow was the "jump"). The chip stays in the
+   flow; the panel is lifted out of it. */
+.cl-date-pop{position:relative;flex-shrink:0;}
+.cl-daterange{display:none;align-items:center;gap:5px;
+  position:absolute;top:calc(100% + 8px);right:0;z-index:40;}
 .cl-daterange.show,.cl-daterange.cl-dr-active{display:flex;}
 .cl-chip-ico{padding:7px 10px;}
 .cl-daterange{
   border:1px solid var(--m-border);background:var(--m-card);
-  border-radius:10px;padding:3px 8px;min-height:34px;
+  border-radius:10px;padding:6px 9px;min-height:34px;
+  box-shadow:var(--m-sh-2,0 8px 30px rgba(0,0,0,.12));
   transition:border-color var(--cl-t) var(--cl-ease);}
 .cl-daterange:hover{border-color:var(--m-border-hi);}
-.cl-daterange.cl-dr-active{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-dim);}
+.cl-daterange.cl-dr-active{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-dim),var(--m-sh-2,0 8px 30px rgba(0,0,0,.12));}
 .cl-date{border:none;background:transparent;font-family:inherit;
   font-size:12px;color:var(--m-ink);outline:none;padding:2px 3px;
   color-scheme:light;width:118px;cursor:pointer;}
@@ -560,7 +566,7 @@ select.cl-in{appearance:none;-webkit-appearance:none;cursor:pointer;padding-righ
   .cl-search:focus{width:100%;}
   .cl-search-wrap{flex:1;}
   .cl-bar-right{width:100%;flex-wrap:wrap;}
-  .cl-daterange{width:100%;justify-content:space-between;min-height:40px;}
+  .cl-daterange{min-width:260px;max-width:calc(100vw - 32px);justify-content:space-between;min-height:40px;right:0;}
   .cl-date{flex:1;width:auto;min-width:0;}
   .cl-filters{width:100%;}
   .cl-chip{flex:1;justify-content:center;min-height:40px;}
@@ -746,16 +752,18 @@ select.cl-in{appearance:none;-webkit-appearance:none;cursor:pointer;padding-righ
               </div>
               <div class="cl-bar-right">
                 <button class="cl-chip" id="clChipToday" onclick="clToggleToday()" title="Show only today's calls">Today</button>
-                <button class="cl-chip cl-chip-ico" id="clDateBtn" onclick="clToggleDatePicker()" title="Filter by date range" aria-label="Toggle date range filter">
-                  <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd"/></svg>
-                </button>
-                <div class="cl-daterange" id="clDateRange" role="group" aria-label="Date range">
-                  <input type="date" id="clFrom" class="cl-date" aria-label="From date" onchange="clSetDateRange()" />
-                  <span class="cl-date-dash">–</span>
-                  <input type="date" id="clTo" class="cl-date" aria-label="To date" onchange="clSetDateRange()" />
-                  <button class="cl-date-clear" id="clDateClear" onclick="clClearDateRange()" title="Clear date range" aria-label="Clear date range" style="display:none;">
-                    <svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor"><path d="M10 8.586 5.05 3.636 3.636 5.05 8.586 10l-4.95 4.95 1.414 1.414L10 11.414l4.95 4.95 1.414-1.414L11.414 10l4.95-4.95L14.95 3.636 10 8.586z"/></svg>
+                <div class="cl-date-pop" id="clDatePop">
+                  <button class="cl-chip cl-chip-ico" id="clDateBtn" onclick="clToggleDatePicker()" title="Filter by date range" aria-label="Toggle date range filter">
+                    <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd"/></svg>
                   </button>
+                  <div class="cl-daterange" id="clDateRange" role="group" aria-label="Date range">
+                    <input type="date" id="clFrom" class="cl-date" aria-label="From date" onchange="clSetDateRange()" />
+                    <span class="cl-date-dash">–</span>
+                    <input type="date" id="clTo" class="cl-date" aria-label="To date" onchange="clSetDateRange()" />
+                    <button class="cl-date-clear" id="clDateClear" onclick="clClearDateRange()" title="Clear date range" aria-label="Clear date range" style="display:none;">
+                      <svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor"><path d="M10 8.586 5.05 3.636 3.636 5.05 8.586 10l-4.95 4.95 1.414 1.414L10 11.414l4.95 4.95 1.414-1.414L11.414 10l4.95-4.95L14.95 3.636 10 8.586z"/></svg>
+                    </button>
+                  </div>
                 </div>
                 <div class="cl-search-wrap">
                   <svg class="cl-search-ico" width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd"/></svg>
@@ -1182,7 +1190,23 @@ function clToggleDatePicker(){
   const on=dr.classList.toggle('show');
   const b=document.getElementById('clDateBtn');
   if(b) b.classList.toggle('cl-chip-on', on || !!(_clFrom||_clTo));
-  if(on){ const f=document.getElementById('clFrom'); if(f) f.focus(); }
+  if(on){
+    const f=document.getElementById('clFrom'); if(f) f.focus();
+    // Close when clicking anywhere outside the popover.
+    setTimeout(function(){ document.addEventListener('mousedown', clDateOutside); }, 0);
+  }else{
+    document.removeEventListener('mousedown', clDateOutside);
+  }
+}
+function clDateOutside(e){
+  const pop=document.getElementById('clDatePop');
+  if(pop && !pop.contains(e.target)){
+    const dr=document.getElementById('clDateRange');
+    if(dr) dr.classList.remove('show');
+    const b=document.getElementById('clDateBtn');
+    if(b) b.classList.toggle('cl-chip-on', !!(_clFrom||_clTo));
+    document.removeEventListener('mousedown', clDateOutside);
+  }
 }
 
 function clSetDateRange(){
