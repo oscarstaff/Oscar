@@ -13723,16 +13723,27 @@ async function flushClockSyncQueue(){
     if(sbQ.length){
       console.log('[clock] retrying '+sbQ.length+' queued supabase writes');
       const remSb = [];
+      let _anyFlushed = false;
       for(const item of sbQ){
         if(Date.now() - item.queuedAt > 3*24*3600*1000) continue;
         try{
-          await sbPost('clock_log', item.payload);
+          const res = await sbPost('clock_log', item.payload);
+          // A rejected save comes back ok:false without throwing — treat it as
+          // a failure so it stays queued instead of being silently dropped.
+          if(res && res.ok === false){ throw new Error('HTTP '+res.status); }
+          _anyFlushed = true;
           console.log('[clock] queued supabase write flushed OK');
         }catch(e){
           remSb.push(item);
         }
       }
       localStorage.setItem('clock_supabase_queue', JSON.stringify(remSb));
+      // A retry that finally landed may have changed the real clock state, so
+      // re-read from the DB and redraw — otherwise the button can disagree with
+      // what's now saved.
+      if(_anyFlushed && typeof loadClockState === 'function'){
+        try{ loadClockState(); }catch(_){}
+      }
     }
   }catch(e){ console.warn('flush supabase queue:', e); }
   
@@ -13783,6 +13794,14 @@ async function loadClockState(){
   }catch(e){}
   // Then fetch fresh data from supabase
   try{
+    // Remember what the cached state claimed, so we can spot a punch that
+    // looked saved locally but never actually reached the database.
+    let _cachedSaidIn = false;
+    try{
+      const _c = JSON.parse(localStorage.getItem('clock_state_'+me) || 'null');
+      _cachedSaidIn = !!(_c && _c.state === 'in');
+    }catch(_){}
+
     const rows = await sbGet('clock_log','?staff_name=eq.'+encodeURIComponent(me)+'&order=ts.desc&limit=1');
     if(rows && rows.length){
       _clockState = rows[0].action;
@@ -13791,6 +13810,26 @@ async function loadClockState(){
       _clockState = 'out';
       _clockSinceTs = null;
     }
+
+    // Safety net: the phone thought this person was clocked in, but the
+    // database has no matching clock-in. That means their last clock-in never
+    // saved. Tell them once so it isn't silent — but only when there's a real
+    // mismatch, and only once per lost punch.
+    if(_cachedSaidIn && _clockState === 'out'){
+      const _warnKey = 'clock_lostwarn_'+me;
+      let _alreadyWarned = false;
+      try{ _alreadyWarned = localStorage.getItem(_warnKey) === '1'; }catch(_){}
+      if(!_alreadyWarned){
+        try{ localStorage.setItem(_warnKey, '1'); }catch(_){}
+        setTimeout(function(){
+          try{ showToast('Your last clock-in didn\u2019t save. If you\u2019re on shift, please tap Clock In again.','warning'); }catch(_){}
+        }, 1200);
+      }
+    } else {
+      // States agree (or they're genuinely clocked in) — clear any old warning.
+      try{ localStorage.removeItem('clock_lostwarn_'+me); }catch(_){}
+    }
+
     // Save to cache for next page-load instant render
     try{
       localStorage.setItem('clock_state_'+me, JSON.stringify({
@@ -14809,18 +14848,36 @@ async function toggleClock(){
     btn.classList.remove('cc-btn--working');
     renderClockCard();
     if(next === 'in'){ try{ ccBurst(); }catch(e){} }   // the world reacts
-    showToast(next==='in' ? 'Clocked in' : 'Clocked out');
+    // Neutral "in progress" message — the real confirmation comes once the
+    // save actually lands, so we never tell someone they're clocked in before
+    // it's saved.
+    showToast(next==='in' ? 'Clocking in…' : 'Clocking out…');
     applyGpsLock();
-    
-    // ── BACKGROUND: fire Supabase write (no await) ──
+
+    // ── BACKGROUND: fire Supabase write ──
+    // A fetch only "fails" on a dropped connection; a rejected save (login
+    // timed out, permission error, server error) still comes back "ok:false".
+    // We must check that, or a rejected punch looks like success and is lost.
     sbPost('clock_log', {staff_name: me, action: next, ts: realTs})
-      .then(function(){
-        // Refresh logs cache in background — non-blocking
+      .then(function(res){
+        if(res && res.ok === false){ throw new Error('HTTP '+res.status); }
+        // Confirmed saved — NOW show success.
+        showToast(next==='in' ? 'Clocked in ✓' : 'Clocked out ✓','success');
+        try{ localStorage.removeItem('clock_pending_'+me); }catch(_){}
         if(typeof loadAllClockLogs === 'function') loadAllClockLogs();
       })
       .catch(function(err){
-        console.warn('[clock] supabase write failed, queuing:', err.message);
-        // Queue for retry
+        console.warn('[clock] write failed:', err && err.message);
+        // Tell the person plainly — do NOT leave a false "clocked in" on screen.
+        showToast(next==='in'
+          ? 'Clock-in didn\u2019t save — check your connection and tap Clock In again'
+          : 'Clock-out didn\u2019t save — tap Clock Out again','error');
+        // Put the button/card back to what it really is, so it matches the DB.
+        _clockState = (next==='in') ? 'out' : 'in';
+        _clockSinceTs = null;
+        try{ localStorage.setItem('clock_state_'+me, JSON.stringify({state:_clockState, ts:new Date().toISOString()})); }catch(_){}
+        renderClockCard();
+        // Still keep a backup retry, in case it was a brief network blip.
         try{
           const q = JSON.parse(localStorage.getItem('clock_supabase_queue') || '[]');
           q.push({payload: {staff_name: me, action: next, ts: realTs}, queuedAt: Date.now()});
