@@ -7118,18 +7118,60 @@ const GAS_TOKEN = "oscars_gas_83235a5f0c1f6ba32b18235e2b2d544ac137167d";
 // Auto-inject the token into every POST to the Apps Script /exec endpoint.
 // This covers all clock/punch/updatePunch/uploadDoc/template calls + queue replays
 // in one place, so no call can forget the token.
-// ═══════ AUTO-UPDATE — detect new deploys, refresh cache QUIETLY ═══════
+// ═══════ AUTO-UPDATE — detect new deploys, reload only when INACTIVE ═══════
 // Stale cached app versions caused real clock bugs (old logic punching wrong
 // times). This fingerprints the DEPLOYED index.html (no-store fetch) and, on a
-// change, clears CacheStorage so the NEXT natural load is fresh — but it does
-// NOT force a reload. Forcing a reload yanked the page out from under staff
-// mid-task (mid clock-in, mid availability edit), which was worse than the
-// problem. The update simply lands the next time they reload, navigate, or
-// reopen the app on their own.
+// change, clears CacheStorage. It then reloads to the new version — but ONLY
+// during a natural pause: the person has been idle a while and the tab isn't
+// in the foreground, or they've been idle a long time. It never yanks the page
+// out mid clock-in or mid form entry. If they're active, it simply waits.
 (function(){
   if(location.protocol === 'file:') return; // skip local testing
   function sig(s){ let h=5381; for(let i=0;i<s.length;i+=7){ h=((h<<5)+h+s.charCodeAt(i))>>>0; } return h.toString(36)+'-'+s.length; }
   let _lastFgCheck = 0;
+  let _updatePending = false;
+  let _lastActivity = Date.now();
+
+  // Track activity so we know when it's safe to slip a reload in.
+  ['pointerdown','keydown','touchstart','scroll'].forEach(function(ev){
+    window.addEventListener(ev, function(){ _lastActivity = Date.now(); }, {passive:true});
+  });
+
+  // True only when a reload would NOT disturb anyone: nothing is being typed,
+  // no clock punch is in flight, and no obvious modal/edit is open.
+  function _safeToReload(){
+    try{
+      // Don't reload while a field is focused (mid clock-in note, availability,
+      // call log, etc.) — losing keystrokes is exactly the disruption we avoid.
+      const a = document.activeElement;
+      if(a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) return false;
+      // Don't reload during the clock sync/punch window.
+      if(window._clockSyncing) return false;
+      // Don't reload while a clock punch is actively in flight (GPS → write):
+      // the clock button carries this class for the few seconds it takes.
+      if(document.querySelector('.cc-btn--working')) return false;
+      // Don't reload if an availability edit is open in ShiftOps-style flows.
+      if(window._availEditMode) return false;
+      // Don't reload while any dialog/modal is on screen.
+      if(document.querySelector('.modal-open, [data-modal-open], dialog[open]')) return false;
+    }catch(e){}
+    return true;
+  }
+
+  function _maybeInactiveReload(){
+    if(!_updatePending) return;
+    // Hard-refresh policy: apply the update AS SOON AS it's safe — don't wait
+    // for a long idle window. "Safe" still means we never interrupt a real
+    // action: not mid clock-in, not while typing, not with a dialog open (see
+    // _safeToReload). A tiny 3s settle avoids reloading on the exact keystroke
+    // someone just finished with.
+    const idleMs = Date.now() - _lastActivity;
+    if(idleMs >= 3000 && _safeToReload()){
+      try{ localStorage.removeItem('app_update_pending'); }catch(_){}
+      location.reload();
+    }
+  }
+
   async function checkAppVersion(){
     try{
       const url = location.href.split('#')[0].split('?')[0] + '?_vchk=' + Date.now();
@@ -7139,20 +7181,33 @@ const GAS_TOKEN = "oscars_gas_83235a5f0c1f6ba32b18235e2b2d544ac137167d";
       const stored = localStorage.getItem('app_deploy_sig');
       if(!stored){ localStorage.setItem('app_deploy_sig', remote); return; }
       if(stored === remote) return;
-      // New deploy detected — update the fingerprint and clear stale caches so
-      // the next natural load picks up the fresh version. No toast, no reload.
+      // New deploy detected — record it, clear stale caches, and mark an update
+      // pending. The reload itself waits for an inactive moment.
       localStorage.setItem('app_deploy_sig', remote);
       localStorage.setItem('app_update_pending', '1');
+      _updatePending = true;
       try{ if(window.caches && caches.keys){ const ks = await caches.keys(); await Promise.all(ks.map(function(k){ return caches.delete(k); })); } }catch(e){}
-      // Intentionally NO location.reload() — the person keeps working; the new
-      // version loads whenever they next refresh or reopen the app.
+      // Try to apply it right away — _maybeInactiveReload only reloads if it's
+      // safe (not mid clock-in / typing / modal), otherwise it keeps trying.
+      setTimeout(_maybeInactiveReload, 300);
     }catch(e){ /* offline etc — try again next cycle */ }
   }
+
+  // If a previous session already flagged an update but never got a quiet
+  // moment to apply it, honour that now too.
+  try{ if(localStorage.getItem('app_update_pending') === '1') _updatePending = true; }catch(_){}
+
   setTimeout(checkAppVersion, 8000);                 // shortly after open
-  setInterval(checkAppVersion, 15*60*1000);          // every 15 min
+  setInterval(checkAppVersion, 5*60*1000);           // every 5 min
+  setInterval(_maybeInactiveReload, 3000);           // apply as soon as it's safe
   document.addEventListener('visibilitychange', function(){
-    if(document.visibilityState !== 'visible') return;
+    if(document.visibilityState === 'hidden'){
+      // Tab just went to the background — a natural chance to update.
+      setTimeout(_maybeInactiveReload, 500);
+      return;
+    }
     const now = Date.now();
+    _lastActivity = now;                              // returning counts as activity
     if(now - _lastFgCheck < 5*60*1000) return;       // throttle foreground checks
     _lastFgCheck = now;
     checkAppVersion();                                // app brought back to front

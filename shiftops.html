@@ -7516,26 +7516,63 @@ function syncLeaveToPortal(staffId,from,to,reason){
     if(!s){return;}
     const fullName=((s.first||'').trim()+' '+(s.last||'').trim()).trim();
     if(!fullName){return;}
-    fetch(GAS_EXEC_URL,{
-      method:'POST',
-      headers:{'Content-Type':'text/plain;charset=utf-8'},
-      body:JSON.stringify({
-        action:'addLeave',
-        staff:fullName,
-        from:from,        // yyyy-MM-dd from the date inputs
-        to:to,
-        reason:reason||'',
-        token:GAS_TOKEN
-      })
-    }).then(function(r){ return r.json().catch(function(){return {};}); })
-      .then(function(res){
-        if(!res || res.ok!==true){
-          showToast('Leave saved locally, portal sync failed'+(res&&res.error?(' ('+res.error+')'):''));
-        }
-      }).catch(function(){
-        showToast('Leave saved locally, portal sync failed (offline)');
+
+    // The relay's addLeave is admin-gated: it needs a LIVE Supabase session
+    // token to verify the caller is an admin. Tokens age out after ~1h. Every
+    // other admin action checks this first; this path used to skip it, so a
+    // stale token produced a bare "forbidden" that surfaced as the misleading
+    // "portal sync failed" — when the real cause was an expired session. Now we
+    // make sure the token is fresh (refreshing if we can) before sending.
+    const _send = function(){
+      fetch(GAS_EXEC_URL,{
+        method:'POST',
+        headers:{'Content-Type':'text/plain;charset=utf-8'},
+        body:JSON.stringify({
+          action:'addLeave',
+          staff:fullName,
+          from:from,        // yyyy-MM-dd from the date inputs
+          to:to,
+          reason:reason||'',
+          token:GAS_TOKEN
+        })
+      }).then(function(r){ return r.json().catch(function(){return {};}); })
+        .then(function(res){
+          if(!res || res.ok!==true){
+            showToast('Leave saved locally, portal sync failed'+(res&&res.error?(' ('+res.error+')'):''));
+          }
+        }).catch(function(){
+          showToast('Leave saved locally, portal sync failed (offline)');
+        });
+    };
+
+    if(typeof _soTokAlive==='function' && _soTokAlive()){
+      _send();                      // token good — send now
+    } else {
+      // Token stale/expired — try to refresh it, then send. If we can't get a
+      // fresh one, tell the admin plainly instead of a vague sync failure.
+      _soRefreshToken(function(ok){
+        if(ok){ _send(); }
+        else { showToast('Session expired — reopen ShiftOps from Nexus, then re-add this leave','error'); }
       });
+    }
   }catch(e){ /* never block the local save */ }
+}
+
+// Refresh the inherited Supabase session token via supabase-js, then continue.
+function _soRefreshToken(cb){
+  try{
+    const _c = window._soSbClient || null;
+    if(_c && _c.auth && _c.auth.refreshSession){
+      _c.auth.refreshSession().then(function(r){
+        const sess = r && r.data && r.data.session;
+        if(sess && sess.access_token){
+          _soAuthToken = sess.access_token;
+          try{ sessionStorage.setItem('so_sb_at', _soAuthToken); }catch(_){}
+          cb(true);
+        } else { cb(false); }
+      }).catch(function(){ cb(false); });
+    } else { cb(false); }
+  }catch(e){ cb(false); }
 }
 
 function updateLeave(id,status){
@@ -8199,6 +8236,7 @@ function _soAdminReady(){
     const rt = sessionStorage.getItem('so_sb_rt');
     if(window.supabase && _soAuthToken && rt){
       const _c = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+      window._soSbClient = _c;   // expose so on-demand refresh (leave sync) can reuse it
       await _c.auth.setSession({ access_token: _soAuthToken, refresh_token: rt });
       _c.auth.onAuthStateChange(function(evt, sess){
         if(sess && sess.access_token){
