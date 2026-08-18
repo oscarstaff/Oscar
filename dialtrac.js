@@ -759,7 +759,6 @@ textarea.cl-edit-in{min-height:52px;resize:vertical;line-height:1.45;}
               </span>
               <span class="cl-check-text">
                 <span class="cl-check-main">Needs a call back</span>
-                <span class="cl-check-sub">Couldn't reach them</span>
               </span>
             </label>
 
