@@ -458,6 +458,14 @@ textarea.cl-edit-in{min-height:52px;resize:vertical;line-height:1.45;}
   display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
   overflow:hidden;transition:all var(--cl-t) var(--cl-ease);}
 .cl-card:hover .cl-note{-webkit-line-clamp:8;border-left-color:var(--accent);}
+/* Placement-offered line (Placement team only) */
+.cl-plc{margin:7px 0 0;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;}
+.cl-plc-badge{font-size:10.5px;font-weight:700;letter-spacing:.02em;
+  text-transform:uppercase;color:#166534;background:#dcfce7;
+  border:1px solid #bbf7d0;border-radius:999px;padding:2px 9px;flex-shrink:0;}
+.cl-plc-rem{font-size:12.5px;line-height:1.45;color:var(--m-ink-2);
+  background:var(--m-card-2);border-radius:8px;padding:5px 9px;
+  white-space:pre-wrap;word-break:break-word;}
 
 /* ── AGE TIERS ──
    A callback waiting three days looked identical to one from an hour ago,
@@ -762,6 +770,21 @@ textarea.cl-edit-in{min-height:52px;resize:vertical;line-height:1.45;}
               </span>
             </label>
 
+            <!-- Placement-only: shown when For team = Placement (see clForTeam handler) -->
+            <label class="cl-check" id="clPlcWrap" for="clPlcOffered" style="display:none;">
+              <input type="checkbox" id="clPlcOffered" />
+              <span class="cl-check-box" aria-hidden="true">
+                <svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+              </span>
+              <span class="cl-check-text">
+                <span class="cl-check-main">Placement offered</span>
+              </span>
+            </label>
+            <div class="cl-field" id="clPlcRemarksWrap" style="display:none;">
+              <label class="cl-label" for="clPlcRemarks">Post-offer remarks</label>
+              <textarea id="clPlcRemarks" class="cl-in" maxlength="600" placeholder="e.g. offered Aubrey Downer — SAKS; denied, wants after 3 weeks"></textarea>
+            </div>
+
             <div class="cl-actions">
               <button class="cl-btn-ghost" type="button" onclick="clClearForm()">Clear</button>
               <button class="cl-btn-go" id="clSave" type="button" onclick="clSaveCall()">Log call</button>
@@ -1052,6 +1075,25 @@ function clAgo(iso){
   return then.toLocaleDateString('en-AU',{day:'numeric',month:'short'});
 }
 
+// Placement team logs whether a placement was offered + post-offer remarks.
+// These fields only make sense for Placement, so they appear only when the
+// call's "For team" is Placement, and the remarks box only once offered is ticked.
+function clUpdatePlcFields(){
+  const ft=document.getElementById('clForTeam');
+  const _mine=(typeof myTeam!=='undefined' && myTeam)?myTeam:'';
+  // Effective team = explicit "For team" if set, else the logger's own team.
+  const team=((ft&&ft.value)||_mine||'').trim();
+  const isPlacement=/^placement$/i.test(team);
+  const wrap=document.getElementById('clPlcWrap');
+  const remWrap=document.getElementById('clPlcRemarksWrap');
+  const offered=document.getElementById('clPlcOffered');
+  if(wrap) wrap.style.display=isPlacement?'':'none';
+  // Remarks show only when Placement AND offered is ticked.
+  const showRem=isPlacement && offered && offered.checked;
+  if(remWrap) remWrap.style.display=showRem?'':'none';
+  if(!isPlacement && offered) offered.checked=false;   // tidy if team changed away
+}
+
 function clClearForm(){
   ['clName','clPhone','clReason','clNote'].forEach(id=>{
     const el=document.getElementById(id);
@@ -1066,6 +1108,12 @@ function clClearForm(){
   if(cb) cb.checked=false;
   const w=document.getElementById('clCbWrap');
   if(w) w.classList.remove('on');
+  // Reset Placement-only fields
+  const po=document.getElementById('clPlcOffered');
+  if(po) po.checked=false;
+  const pr=document.getElementById('clPlcRemarks');
+  if(pr) pr.value='';
+  clUpdatePlcFields();   // re-evaluate visibility for the (now cleared) team
   const h=document.getElementById('clPhoneHint');
   if(h){ h.textContent=''; h.classList.remove('cl-hint-warn'); }
   clHistLookup(null);
@@ -1134,6 +1182,16 @@ async function clSaveCall(){
     // Only calls that actually need ringing back stay open. Everything else is
     // closed on the spot, so the Callbacks list is a real worklist rather than
     // a dumping ground that nobody trusts.
+    // Placement-only fields (only meaningful when For team = Placement).
+    const _forTeamVal=(document.getElementById('clForTeam')||{}).value ||
+                      ((typeof myTeam !== 'undefined' && myTeam) ? myTeam : '');
+    const _isPlacement=/^placement$/i.test((_forTeamVal||'').trim());
+    const _plcOfferedEl=document.getElementById('clPlcOffered');
+    const _plcOffered=_isPlacement && !!(_plcOfferedEl && _plcOfferedEl.checked);
+    const _plcRemarks=_plcOffered
+      ? ((document.getElementById('clPlcRemarks')||{}).value||'').trim()
+      : '';
+
     const r = await sbPost('call_log', {
       caller_name: name,
       phone_e164: phone,
@@ -1143,6 +1201,8 @@ async function clSaveCall(){
       team: (typeof myTeam !== 'undefined' && myTeam) ? myTeam : null,
       for_team: (document.getElementById('clForTeam')||{}).value ||
                 ((typeof myTeam !== 'undefined' && myTeam) ? myTeam : null),
+      plc_offered: _plcOffered,
+      plc_remarks: _plcRemarks || null,
       resolved_at: needsCallback ? null : now,
       resolved_by: needsCallback ? null : who
     });
@@ -1560,6 +1620,12 @@ function clEditRow(id){
         '<input class="cl-edit-in" id="ced-reason-'+id+'" type="text" value="'+clEsc(r.reason||'')+'" /></div>'+
       '<div class="cl-edit-f full"><span class="cl-edit-lbl">Note</span>'+
         '<textarea class="cl-edit-in" id="ced-note-'+id+'">'+clEsc(r.note||'')+'</textarea></div>'+
+      (/^placement$/i.test(((r.for_team||r.team||'')).trim())
+        ? '<div class="cl-edit-f full"><label class="cl-edit-lbl" style="display:flex;align-items:center;gap:7px;cursor:pointer;">'+
+            '<input type="checkbox" id="ced-plc-'+id+'"'+(r.plc_offered?' checked':'')+' /> Placement offered</label></div>'+
+          '<div class="cl-edit-f full"><span class="cl-edit-lbl">Post-offer remarks</span>'+
+            '<textarea class="cl-edit-in" id="ced-plcrem-'+id+'">'+clEsc(r.plc_remarks||'')+'</textarea></div>'
+        : '')+
     '</div>'+
     '<div class="cl-edit-act">'+
       '<button class="cl-edit-btn" onclick="event.stopPropagation();clEditCancel(\''+id+'\')">Cancel</button>'+
@@ -1600,21 +1666,29 @@ async function clEditSave(id){
 
   const saveBtn=document.getElementById('ced-save-'+id);
   if(saveBtn){ saveBtn.disabled=true; saveBtn.textContent='Saving…'; }
+
+  // Placement fields, if this editor showed them.
+  const plcEl=document.getElementById('ced-plc-'+id);
+  const plcRemEl=document.getElementById('ced-plcrem-'+id);
+  const _patch={caller_name:name, phone_e164:phone, reason:reason,
+    note:note||null, edited_at:new Date().toISOString()};
+  if(plcEl){
+    _patch.plc_offered=!!plcEl.checked;
+    _patch.plc_remarks=plcEl.checked ? ((plcRemEl&&plcRemEl.value||'').trim()||null) : null;
+  }
   try{
     const res=await fetch(SB+'/rest/v1/call_log?id=eq.'+encodeURIComponent(id),{
       method:'PATCH',
       headers:{'apikey':KEY,'Authorization':'Bearer '+_sbBearer(),
                'Content-Type':'application/json','Prefer':'return=minimal'},
-      body:JSON.stringify({caller_name:name, phone_e164:phone,
-        reason:reason, note:note||null, edited_at:new Date().toISOString()})
+      body:JSON.stringify(_patch)
     });
     if(!res.ok){
       showToast('Could not save the edit','error');
       if(saveBtn){ saveBtn.disabled=false; saveBtn.textContent='Save'; }
       return;
     }
-    Object.assign(r,{caller_name:name, phone_e164:phone, reason:reason,
-      note:note||null, edited_at:new Date().toISOString()});
+    Object.assign(r,_patch);
     clEditCancel(id);
     showToast('Call updated','success');
     clRenderQueue(); clRefreshOpenCount();
@@ -1918,6 +1992,10 @@ function clRenderQueue(){
               (backLabel?' · rung back '+backLabel+' later':'')+'</span>'+
           '</div>'+
           (r.note?'<p class="cl-note">'+clEsc(r.note)+'</p>':'')+
+          (r.plc_offered
+            ? '<p class="cl-plc"><span class="cl-plc-badge">Placement offered</span>'+
+              (r.plc_remarks?'<span class="cl-plc-rem">'+clEsc(r.plc_remarks)+'</span>':'')+'</p>'
+            : '')+
           (stack.length?'<div class="cl-stack" id="clstk-'+r.id+'">'+
             stack.map(function(s){
               const sd=!!s.resolved_at;
@@ -2231,11 +2309,13 @@ function initCallLog(){
     const ft=document.getElementById('clForTeam');
     if(ft) ft.addEventListener('change',()=>{
       const fh=document.getElementById('clForHint');
-      if(!fh) return;
-      if(ft.value && ft.value!==myTeam){
-        fh.textContent='This call will appear in '+ft.value+"'s list, not yours.";
-        fh.classList.add('cl-hint-warn');
-      }else{ fh.textContent=''; fh.classList.remove('cl-hint-warn'); }
+      if(fh){
+        if(ft.value && ft.value!==myTeam){
+          fh.textContent='This call will appear in '+ft.value+"'s list, not yours.";
+          fh.classList.add('cl-hint-warn');
+        }else{ fh.textContent=''; fh.classList.remove('cl-hint-warn'); }
+      }
+      clUpdatePlcFields();   // show/hide Placement fields for the new team
     });
     // Highlight the row when ticked so it's obvious this call will come back
     const cb=document.getElementById('clCallback');
@@ -2243,6 +2323,14 @@ function initCallLog(){
       const w=document.getElementById('clCbWrap');
       if(w) w.classList.toggle('on', cb.checked);
     });
+    // Placement: reveal remarks box only once "offered" is ticked
+    const plc=document.getElementById('clPlcOffered');
+    if(plc) plc.addEventListener('change',()=>{
+      const w=document.getElementById('clPlcWrap');
+      if(w) w.classList.toggle('on', plc.checked);
+      clUpdatePlcFields();
+    });
+    clUpdatePlcFields();   // set initial visibility based on the logger's team
     // If a live update arrived while the form had focus, apply it once the
     // person moves away rather than leaving them on a stale queue.
     const pane=document.getElementById('clPaneForm');
