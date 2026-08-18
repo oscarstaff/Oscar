@@ -388,19 +388,52 @@ select.cl-in{appearance:none;-webkit-appearance:none;cursor:pointer;padding-righ
 .cl-att-btn:hover{transform:translateY(-1px);filter:brightness(.97);}
 .cl-att-ch{transition:transform var(--cl-t) var(--cl-ease);opacity:.75;}
 .cl-att-btn.on .cl-att-ch{transform:rotate(180deg);}
+/* ── Inline edit panel (replaces the prompt() popups) ── */
+.cl-edit{display:none;margin-top:10px;padding:12px;border-radius:11px;
+  background:var(--m-card-2);border:1px solid var(--accent-bd,var(--m-border));}
+.cl-edit.on{display:block;}
+.cl-edit-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;}
+.cl-edit-f{display:flex;flex-direction:column;gap:4px;}
+.cl-edit-f.full{grid-column:1 / -1;}
+.cl-edit-lbl{font-size:10.5px;font-weight:700;letter-spacing:.04em;
+  text-transform:uppercase;color:var(--m-ink-3);}
+.cl-edit-in{width:100%;box-sizing:border-box;background:var(--m-card);
+  border:1.5px solid var(--m-border);border-radius:8px;color:var(--m-ink);
+  padding:8px 10px;font-size:13px;font-family:inherit;outline:none;
+  transition:border-color .15s,box-shadow .15s;}
+.cl-edit-in:focus{border-color:var(--accent);
+  box-shadow:0 0 0 3px var(--accent-dim,rgba(0,0,0,.06));}
+.cl-edit-in.err{border-color:#dc2626;box-shadow:0 0 0 3px rgba(220,38,38,.1);}
+textarea.cl-edit-in{min-height:52px;resize:vertical;line-height:1.45;}
+.cl-edit-act{display:flex;gap:8px;justify-content:flex-end;margin-top:11px;}
+.cl-edit-btn{min-height:34px;padding:0 15px;border-radius:9px;cursor:pointer;
+  font-family:inherit;font-size:12.5px;font-weight:600;
+  border:1px solid var(--m-border);background:var(--m-card);color:var(--m-ink-2);
+  transition:border-color .15s,color .15s,background .15s;}
+.cl-edit-btn:hover{border-color:var(--m-border-hi);color:var(--m-ink);}
+.cl-edit-save{border-color:transparent;color:#fff;background:var(--accent);}
+.cl-edit-save:hover{border-color:transparent;color:#fff;filter:brightness(.95);}
+.cl-edit-save:disabled{opacity:.5;cursor:not-allowed;}
+@media(max-width:680px){ .cl-edit-grid{grid-template-columns:1fr;} }
 /* Earlier same-day attempts, hidden until the ×N badge is clicked. */
-.cl-stack{display:none;flex-direction:column;gap:5px;margin-top:9px;
+.cl-stack{display:none;flex-direction:column;gap:0;margin-top:9px;
   padding-top:9px;border-top:1px dashed var(--m-border);}
 .cl-stack.on{display:flex;}
-.cl-stack-row{display:flex;align-items:center;gap:8px;font-size:12px;
-  flex-wrap:wrap;min-width:0;}
+.cl-stack-row{display:flex;flex-direction:column;gap:4px;
+  padding:8px 0;border-bottom:1px dashed var(--m-border);}
+.cl-stack-row:last-child{border-bottom:none;}
+.cl-stack-head{display:flex;align-items:center;gap:8px;font-size:12px;flex-wrap:wrap;}
 .cl-stack-t{font-variant-numeric:tabular-nums;font-weight:700;
   color:var(--m-ink-2);flex-shrink:0;}
 .cl-stack-by{color:var(--m-ink-2);font-weight:600;flex-shrink:0;}
 .cl-stack-rs{color:var(--m-ink-3);}
-.cl-stack-note{color:var(--m-ink-3);flex:1;min-width:0;overflow:hidden;
-  text-overflow:ellipsis;white-space:nowrap;}
-.cl-stack-row .cl-hist-pill{margin-left:auto;}
+.cl-stack-head .cl-hist-pill{margin-left:auto;}
+/* Note gets its own full-width line and wraps — the whole point is being able
+   to read earlier notes, so never truncate them. */
+.cl-stack-note{color:var(--m-ink-2);font-size:12px;line-height:1.5;
+  white-space:pre-wrap;word-break:break-word;
+  background:var(--m-card-2);border-radius:7px;padding:6px 9px;}
+.cl-stack-note-empty{color:var(--m-ink-3);font-size:11.5px;font-style:italic;}
 
 .cl-line2{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
 .cl-num{font-family:ui-monospace,'SF Mono','JetBrains Mono',Menlo,monospace;
@@ -1505,43 +1538,92 @@ function clPhoneMatch(stored, queryDigits){
  * not, since those are the parts that make the log evidence rather than
  * a scratchpad.
  */
-async function clEditRow(id){
+// Open an inline editor on this card — no popups. Only ever touches this row.
+function clEditRow(id){
   const r=_clQueue.find(x=>x.id===id);
   if(!r) return;
-  if(!clCanEdit(r)){
-    showToast('The 15-minute edit window has passed','error');
-    return;
-  }
-  const name=prompt('Caller name', r.caller_name);
-  if(name===null) return;
-  const phoneIn=prompt('Phone number', clFmtPhone(r.phone_e164)||r.phone_e164||'');
-  if(phoneIn===null) return;
-  const reason=prompt('Reason', r.reason);
-  if(reason===null) return;
-  const note=prompt('Note', r.note||'');
-  if(note===null) return;
+  if(!clCanEdit(r)){ showToast('The 15-minute edit window has passed','error'); return; }
+  // Close any other open editor so only one card edits at a time.
+  document.querySelectorAll('.cl-edit.on').forEach(function(el){
+    if(el.id!=='cledit-'+id) el.classList.remove('on');
+  });
+  const box=document.getElementById('cledit-'+id);
+  if(!box) return;
+  if(box.classList.contains('on')){ clEditCancel(id); return; }  // toggle off
+  const phonePretty=clFmtPhone(r.phone_e164)||r.phone_e164||'';
+  box.innerHTML=
+    '<div class="cl-edit-grid">'+
+      '<div class="cl-edit-f"><span class="cl-edit-lbl">Caller</span>'+
+        '<input class="cl-edit-in" id="ced-name-'+id+'" type="text" value="'+clEsc(r.caller_name||'')+'" /></div>'+
+      '<div class="cl-edit-f"><span class="cl-edit-lbl">Number</span>'+
+        '<input class="cl-edit-in" id="ced-phone-'+id+'" type="tel" value="'+clEsc(phonePretty)+'" /></div>'+
+      '<div class="cl-edit-f full"><span class="cl-edit-lbl">Reason</span>'+
+        '<input class="cl-edit-in" id="ced-reason-'+id+'" type="text" value="'+clEsc(r.reason||'')+'" /></div>'+
+      '<div class="cl-edit-f full"><span class="cl-edit-lbl">Note</span>'+
+        '<textarea class="cl-edit-in" id="ced-note-'+id+'">'+clEsc(r.note||'')+'</textarea></div>'+
+    '</div>'+
+    '<div class="cl-edit-act">'+
+      '<button class="cl-edit-btn" onclick="event.stopPropagation();clEditCancel(\''+id+'\')">Cancel</button>'+
+      '<button class="cl-edit-btn cl-edit-save" id="ced-save-'+id+'" onclick="event.stopPropagation();clEditSave(\''+id+'\')">Save</button>'+
+    '</div>';
+  box.classList.add('on');
+  const nm=document.getElementById('ced-name-'+id);
+  if(nm){ nm.focus(); nm.select(); }
+}
 
-  const phone=clToE164(phoneIn);
-  if(!name.trim() || !reason.trim() || !phone){
+function clEditCancel(id){
+  const box=document.getElementById('cledit-'+id);
+  if(box){ box.classList.remove('on'); box.innerHTML=''; }
+}
+
+async function clEditSave(id){
+  const r=_clQueue.find(x=>x.id===id);
+  if(!r) return;
+  if(!clCanEdit(r)){ showToast('The 15-minute edit window has passed','error'); clEditCancel(id); return; }
+  const nmEl=document.getElementById('ced-name-'+id);
+  const phEl=document.getElementById('ced-phone-'+id);
+  const rsEl=document.getElementById('ced-reason-'+id);
+  const ntEl=document.getElementById('ced-note-'+id);
+  if(!nmEl||!phEl||!rsEl||!ntEl) return;
+
+  const name=(nmEl.value||'').trim();
+  const reason=(rsEl.value||'').trim();
+  const note=(ntEl.value||'').trim();
+  const phone=clToE164(phEl.value);
+
+  nmEl.classList.toggle('err', !name);
+  rsEl.classList.toggle('err', !reason);
+  phEl.classList.toggle('err', !phone);
+  if(!name || !reason || !phone){
     showToast('Name, number and reason are all required','error');
     return;
   }
+
+  const saveBtn=document.getElementById('ced-save-'+id);
+  if(saveBtn){ saveBtn.disabled=true; saveBtn.textContent='Saving…'; }
   try{
     const res=await fetch(SB+'/rest/v1/call_log?id=eq.'+encodeURIComponent(id),{
       method:'PATCH',
       headers:{'apikey':KEY,'Authorization':'Bearer '+_sbBearer(),
                'Content-Type':'application/json','Prefer':'return=minimal'},
-      body:JSON.stringify({caller_name:name.trim(), phone_e164:phone,
-        reason:reason.trim(), note:note.trim()||null,
-        edited_at:new Date().toISOString()})
+      body:JSON.stringify({caller_name:name, phone_e164:phone,
+        reason:reason, note:note||null, edited_at:new Date().toISOString()})
     });
-    if(!res.ok){ showToast('Could not save the edit','error'); return; }
-    Object.assign(r,{caller_name:name.trim(), phone_e164:phone,
-      reason:reason.trim(), note:note.trim()||null,
-      edited_at:new Date().toISOString()});
+    if(!res.ok){
+      showToast('Could not save the edit','error');
+      if(saveBtn){ saveBtn.disabled=false; saveBtn.textContent='Save'; }
+      return;
+    }
+    Object.assign(r,{caller_name:name, phone_e164:phone, reason:reason,
+      note:note||null, edited_at:new Date().toISOString()});
+    clEditCancel(id);
     showToast('Call updated','success');
     clRenderQueue(); clRefreshOpenCount();
-  }catch(e){ console.warn('clEditRow',e); showToast('Network error','error'); }
+  }catch(e){
+    console.warn('clEditSave',e);
+    showToast('Network error','error');
+    if(saveBtn){ saveBtn.disabled=false; saveBtn.textContent='Save'; }
+  }
 }
 
 /**
@@ -1849,12 +1931,17 @@ function clRenderQueue(){
                 {hour:'numeric',minute:'2-digit',timeZone:'Australia/Sydney'});
               const naRe=/^n\/?a$/i;
               return '<div class="cl-stack-row">'+
-                '<span class="cl-stack-t">'+t+'</span>'+
-                '<span class="cl-stack-by">'+clEsc((s.logged_by||'').split(' ')[0])+'</span>'+
-                (s.reason && !naRe.test(String(s.reason).trim())
-                  ?'<span class="cl-stack-rs">'+clEsc(s.reason)+'</span>':'')+
-                (s.note?'<span class="cl-stack-note">'+clEsc(s.note)+'</span>':'')+
-                sPill+'</div>';
+                '<div class="cl-stack-head">'+
+                  '<span class="cl-stack-t">'+t+'</span>'+
+                  '<span class="cl-stack-by">'+clEsc((s.logged_by||'').split(' ')[0])+'</span>'+
+                  (s.reason && !naRe.test(String(s.reason).trim())
+                    ?'<span class="cl-stack-rs">'+clEsc(s.reason)+'</span>':'')+
+                  sPill+
+                '</div>'+
+                (s.note
+                  ?'<div class="cl-stack-note">'+clEsc(s.note)+'</div>'
+                  :'<div class="cl-stack-note-empty">No note</div>')+
+              '</div>';
             }).join('')+'</div>':'')+
         '</div>'+
       '</div>'+
@@ -1865,6 +1952,7 @@ function clRenderQueue(){
           '<span>Relog</span></button>'+
         edit+del+
       '</div>'+
+      '<div class="cl-edit" id="cledit-'+r.id+'"></div>'+
     '</article>';
   }).join('');
 }
