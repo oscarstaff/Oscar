@@ -414,6 +414,12 @@ textarea.cl-edit-in{min-height:52px;resize:vertical;line-height:1.45;}
 .cl-edit-save{border-color:transparent;color:#fff;background:var(--accent);}
 .cl-edit-save:hover{border-color:transparent;color:#fff;filter:brightness(.95);}
 .cl-edit-save:disabled{opacity:.5;cursor:not-allowed;}
+.cl-edit-plc-chk{display:flex;align-items:center;gap:8px;cursor:pointer;
+  font-size:12.5px;font-weight:600;color:var(--m-ink);
+  padding:9px 11px;border-radius:8px;background:var(--m-card);
+  border:1px solid var(--m-border);transition:border-color .15s;}
+.cl-edit-plc-chk:hover{border-color:var(--m-border-hi);}
+.cl-edit-plc-chk input{width:16px;height:16px;accent-color:#16a34a;cursor:pointer;}
 @media(max-width:680px){ .cl-edit-grid{grid-template-columns:1fr;} }
 /* Earlier same-day attempts, hidden until the ×N badge is clicked. */
 .cl-stack{display:none;flex-direction:column;gap:0;margin-top:9px;
@@ -459,13 +465,19 @@ textarea.cl-edit-in{min-height:52px;resize:vertical;line-height:1.45;}
   overflow:hidden;transition:all var(--cl-t) var(--cl-ease);}
 .cl-card:hover .cl-note{-webkit-line-clamp:8;border-left-color:var(--accent);}
 /* Placement-offered line (Placement team only) */
-.cl-plc{margin:7px 0 0;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;}
-.cl-plc-badge{font-size:10.5px;font-weight:700;letter-spacing:.02em;
-  text-transform:uppercase;color:#166534;background:#dcfce7;
-  border:1px solid #bbf7d0;border-radius:999px;padding:2px 9px;flex-shrink:0;}
-.cl-plc-rem{font-size:12.5px;line-height:1.45;color:var(--m-ink-2);
-  background:var(--m-card-2);border-radius:8px;padding:5px 9px;
+.cl-plc{margin:8px 0 0;display:flex;flex-direction:column;gap:5px;}
+.cl-plc-badge{align-self:flex-start;display:inline-flex;align-items:center;gap:5px;
+  font-size:10px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;
+  color:#166534;background:#dcfce7;border:1px solid #bbf7d0;
+  border-radius:999px;padding:3px 10px;}
+.cl-plc-badge::before{content:"";width:5px;height:5px;border-radius:50%;
+  background:#16a34a;flex-shrink:0;}
+.cl-plc-rem{font-size:12.5px;line-height:1.5;color:var(--m-ink-2);
+  background:var(--m-card-2);border-radius:9px;padding:7px 11px;
+  border-left:2px solid #86efac;
   white-space:pre-wrap;word-break:break-word;}
+.cl-plc-rem-lbl{display:block;font-size:9.5px;font-weight:700;letter-spacing:.04em;
+  text-transform:uppercase;color:var(--m-ink-3);margin-bottom:3px;}
 
 /* ── AGE TIERS ──
    A callback waiting three days looked identical to one from an hour ago,
@@ -782,7 +794,7 @@ textarea.cl-edit-in{min-height:52px;resize:vertical;line-height:1.45;}
             </label>
             <div class="cl-field" id="clPlcRemarksWrap" style="display:none;">
               <label class="cl-label" for="clPlcRemarks">Post-offer remarks</label>
-              <textarea id="clPlcRemarks" class="cl-in" maxlength="600" placeholder="e.g. offered Aubrey Downer — SAKS; denied, wants after 3 weeks"></textarea>
+              <textarea id="clPlcRemarks" class="cl-in" maxlength="600" rows="2" placeholder="What happened after the offer? e.g. offered Aubrey Downer — SAKS; denied, wants after 3 weeks"></textarea>
             </div>
 
             <div class="cl-actions">
@@ -1621,10 +1633,16 @@ function clEditRow(id){
       '<div class="cl-edit-f full"><span class="cl-edit-lbl">Note</span>'+
         '<textarea class="cl-edit-in" id="ced-note-'+id+'">'+clEsc(r.note||'')+'</textarea></div>'+
       (/^placement$/i.test(((r.for_team||r.team||'')).trim())
-        ? '<div class="cl-edit-f full"><label class="cl-edit-lbl" style="display:flex;align-items:center;gap:7px;cursor:pointer;">'+
-            '<input type="checkbox" id="ced-plc-'+id+'"'+(r.plc_offered?' checked':'')+' /> Placement offered</label></div>'+
-          '<div class="cl-edit-f full"><span class="cl-edit-lbl">Post-offer remarks</span>'+
-            '<textarea class="cl-edit-in" id="ced-plcrem-'+id+'">'+clEsc(r.plc_remarks||'')+'</textarea></div>'
+        ? '<div class="cl-edit-f full"><label class="cl-edit-plc-chk">'+
+            '<input type="checkbox" id="ced-plc-'+id+'"'+(r.plc_offered?' checked':'')+
+            ' onchange="clEditPlcToggle(\''+id+'\')" />'+
+            '<span>Placement offered</span></label></div>'+
+          '<div class="cl-edit-f full" id="ced-plcrem-wrap-'+id+'"'+
+            (r.plc_offered?'':' style="display:none;"')+'>'+
+            '<span class="cl-edit-lbl">Post-offer remarks</span>'+
+            '<textarea class="cl-edit-in" id="ced-plcrem-'+id+'" '+
+              'placeholder="e.g. offered Aubrey Downer — SAKS; denied, wants after 3 weeks">'+
+              clEsc(r.plc_remarks||'')+'</textarea></div>'
         : '')+
     '</div>'+
     '<div class="cl-edit-act">'+
@@ -1639,6 +1657,13 @@ function clEditRow(id){
 function clEditCancel(id){
   const box=document.getElementById('cledit-'+id);
   if(box){ box.classList.remove('on'); box.innerHTML=''; }
+}
+
+// Show/hide the remarks box in the editor when "Placement offered" is toggled.
+function clEditPlcToggle(id){
+  const chk=document.getElementById('ced-plc-'+id);
+  const wrap=document.getElementById('ced-plcrem-wrap-'+id);
+  if(wrap) wrap.style.display=(chk&&chk.checked)?'':'none';
 }
 
 async function clEditSave(id){
@@ -1993,8 +2018,8 @@ function clRenderQueue(){
           '</div>'+
           (r.note?'<p class="cl-note">'+clEsc(r.note)+'</p>':'')+
           (r.plc_offered
-            ? '<p class="cl-plc"><span class="cl-plc-badge">Placement offered</span>'+
-              (r.plc_remarks?'<span class="cl-plc-rem">'+clEsc(r.plc_remarks)+'</span>':'')+'</p>'
+            ? '<div class="cl-plc"><span class="cl-plc-badge">Placement offered</span>'+
+              (r.plc_remarks?'<div class="cl-plc-rem"><span class="cl-plc-rem-lbl">Post-offer remarks</span>'+clEsc(r.plc_remarks)+'</div>':'')+'</div>'
             : '')+
           (stack.length?'<div class="cl-stack" id="clstk-'+r.id+'">'+
             stack.map(function(s){
