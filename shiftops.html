@@ -2037,20 +2037,12 @@ button, .btn { white-space: nowrap; }
         <div id="availsec-classdays" style="display:none;">
           <div class="card" style="padding:18px;max-width:640px;">
             <div style="font-size:15px;font-weight:700;margin-bottom:3px;">Class days</div>
-            <div style="font-size:12.5px;color:var(--text-dim);line-height:1.5;margin-bottom:12px;">Mark class days. On these dates, punctuality is measured against each person's rostered class start (8:00 / 9:00 / 9:30) instead of their availability.</div>
+            <div style="font-size:12.5px;color:var(--text-dim);line-height:1.5;margin-bottom:12px;">Mark class days. These are used to auto-generate the class housekeeping roster below. Punctuality is always measured against each person's rostered shift start.</div>
             <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;">
               <div style="flex:1;min-width:150px;"><label style="font-size:11px;font-weight:600;color:var(--text-dim);">Add a class day</label><input type="date" id="classDayInput" style="width:100%;border:1.5px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;font-family:inherit;outline:none;margin-top:3px;background:var(--input-bg,#fff);color:inherit;"></div>
               <button onclick="addClassDay()" class="btn btn-primary" style="padding:9px 16px;font-size:12px;">Add</button>
             </div>
             <div id="classDayList" style="margin-top:14px;"></div>
-            <div style="border-top:1px solid var(--border);margin-top:16px;padding-top:14px;">
-              <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
-                <div style="font-size:13px;font-weight:700;">Class start roster</div>
-                <button onclick="toggleRosterEditor()" id="rosterToggleBtn" class="btn btn-ghost" style="padding:6px 12px;font-size:12px;">Edit</button>
-              </div>
-              <div style="font-size:11.5px;color:var(--text-dim);line-height:1.5;margin-top:3px;">Each person's start time on a class day. Set to <b>none</b> to remove them (they'll use availability instead).</div>
-              <div id="rosterEditor" style="display:none;margin-top:12px;"></div>
-            </div>
 
             <div style="border-top:1px solid var(--border);margin-top:16px;padding-top:14px;">
               <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
@@ -3927,11 +3919,9 @@ async function loadClassDays(){
       '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">'+
         '<span style="font-size:13px;font-weight:600;">'+lbl+'</span>'+
         '<div style="display:flex;gap:12px;align-items:center;flex-shrink:0;">'+
-          '<button onclick="toggleDayException(\''+r.class_date+'\')" style="background:none;border:none;color:var(--accent,#3d9eff);cursor:pointer;font-size:12px;font-weight:700;font-family:inherit;">Exceptions</button>'+
           '<button onclick="removeClassDay(\''+r.class_date+'\')" style="background:none;border:none;color:#e5484d;cursor:pointer;font-size:12px;font-weight:600;font-family:inherit;">Remove</button>'+
         '</div>'+
       '</div>'+
-      '<div id="dayExc-'+r.class_date+'" style="display:none;margin-top:8px;"></div>'+
     '</div>';
   }).join('');
 }
@@ -3948,50 +3938,6 @@ async function removeClassDay(dateStr){
     await fetch(SUPABASE_URL+'/rest/v1/class_days?class_date=eq.'+encodeURIComponent(dateStr),{method:'DELETE',headers:{..._CD_H,'Prefer':'return=minimal'}});
     showToast('Removed'); loadClassDays();
   }catch(e){ showToast('Remove failed'); }
-}
-
-// ── CLASS START ROSTER EDITOR ──────────────────────
-let _rosterEditorOpen=false;
-async function toggleRosterEditor(){
-  _rosterEditorOpen=!_rosterEditorOpen;
-  const ed=document.getElementById('rosterEditor');
-  const btn=document.getElementById('rosterToggleBtn');
-  if(!ed) return;
-  ed.style.display=_rosterEditorOpen?'block':'none';
-  if(btn) btn.textContent=_rosterEditorOpen?'Close':'Edit';
-  if(_rosterEditorOpen) renderRosterEditor();
-}
-async function renderRosterEditor(){
-  const ed=document.getElementById('rosterEditor');
-  if(!ed) return;
-  ed.innerHTML='<div style="font-size:12px;color:var(--text-dim);">Loading…</div>';
-  let map={};
-  (await _cdGet('class_roster?select=staff_name,start_time')).forEach(function(r){ map[r.staff_name]=r.start_time; });
-  const names=_cdStaffNames();
-  const opts=['','08:00','08:15','08:30','09:00','09:30'];
-  ed.innerHTML='<div style="max-height:360px;overflow-y:auto;border:1px solid var(--border);border-radius:10px;">'+
-    names.map(function(nm){
-      const cur=map[nm]||'';
-      return '<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-bottom:1px solid var(--border);">'+
-        '<span style="flex:1;min-width:0;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+_cdEsc(nm)+'</span>'+
-        '<select onchange="setRosterStart(this,\''+encodeURIComponent(nm)+'\')" style="border:1.5px solid var(--border);border-radius:7px;padding:5px 8px;font-size:12px;font-family:inherit;background:var(--input-bg,#fff);color:inherit;">'+
-          opts.map(function(o){return '<option value="'+o+'"'+(o===cur?' selected':'')+'>'+(o===''?'none':o)+'</option>';}).join('')+
-        '</select>'+
-      '</div>';
-    }).join('')+
-  '</div>'+
-  '<div style="font-size:10.5px;color:var(--text-dim);margin-top:8px;">Changes save instantly.</div>';
-}
-async function setRosterStart(sel, nmEnc){
-  const nm=decodeURIComponent(nmEnc), val=sel.value;
-  try{
-    if(val===''){
-      await fetch(SUPABASE_URL+'/rest/v1/class_roster?staff_name=eq.'+encodeURIComponent(nm),{method:'DELETE',headers:{..._CD_H,'Prefer':'return=minimal'}});
-    }else{
-      await fetch(SUPABASE_URL+'/rest/v1/class_roster',{method:'POST',headers:{..._CD_HJ,'Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({staff_name:nm,start_time:val,updated_at:new Date().toISOString()})});
-    }
-    showToast(val===''?(nm.split(' ')[0]+' removed'):(nm.split(' ')[0]+' → '+val));
-  }catch(e){ showToast('Save failed'); }
 }
 
 // ── CLASS HOUSEKEEPING ROSTER ──────────────────────
@@ -4633,63 +4579,6 @@ async function removeHousekeeping(id){  try{
 }
 
 // ── PER-DATE CLASS EXCEPTIONS ──────────────────────
-async function toggleDayException(dateStr){
-  const box=document.getElementById('dayExc-'+dateStr);
-  if(!box) return;
-  if(box.style.display==='none'){ box.style.display='block'; renderDayException(dateStr); }
-  else box.style.display='none';
-}
-async function renderDayException(dateStr){
-  const box=document.getElementById('dayExc-'+dateStr);
-  if(!box) return;
-  box.innerHTML='<div style="font-size:11.5px;color:var(--text-dim);">Loading…</div>';
-  const ov=await _cdGet('class_day_overrides?class_date=eq.'+encodeURIComponent(dateStr)+'&select=staff_name,start_time');
-  const names=_cdStaffNames();
-  const opts=['excluded','08:00','08:15','08:30','09:00','09:30'];
-  const rowsHtml = ov.length ? ov.map(function(o){
-    const cur=(o.start_time===null||o.start_time===undefined)?'excluded':o.start_time;
-    return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;">'+
-      '<span style="flex:1;min-width:0;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+_cdEsc(o.staff_name)+'</span>'+
-      '<select onchange="setDayException(\''+dateStr+'\',\''+encodeURIComponent(o.staff_name)+'\',this.value)" style="border:1.5px solid var(--border);border-radius:7px;padding:4px 7px;font-size:12px;font-family:inherit;background:var(--input-bg,#fff);color:inherit;">'+
-        opts.map(function(x){return '<option value="'+x+'"'+(x===cur?' selected':'')+'>'+x+'</option>';}).join('')+
-      '</select>'+
-      '<button onclick="clearDayException(\''+dateStr+'\',\''+encodeURIComponent(o.staff_name)+'\')" style="background:none;border:none;color:#e5484d;cursor:pointer;font-size:11px;font-weight:600;font-family:inherit;">×</button>'+
-    '</div>';
-  }).join('') : '<div style="font-size:11.5px;color:var(--text-dim);">No exceptions — everyone uses the roster this day.</div>';
-  box.innerHTML=
-    '<div style="font-size:11px;color:var(--text-dim);margin-bottom:6px;">Only add people whose start differs from the roster on this date.</div>'+
-    rowsHtml+
-    '<div style="display:flex;gap:6px;margin-top:8px;">'+
-      '<select id="excAdd-'+dateStr+'" style="flex:1;border:1.5px solid var(--border);border-radius:7px;padding:6px 8px;font-size:12px;font-family:inherit;background:var(--input-bg,#fff);color:inherit;">'+
-        '<option value="">Add person…</option>'+
-        names.map(function(n){return '<option value="'+encodeURIComponent(n)+'">'+_cdEsc(n)+'</option>';}).join('')+
-      '</select>'+
-      '<button onclick="addDayException(\''+dateStr+'\')" class="btn btn-primary" style="padding:6px 12px;font-size:12px;">Add</button>'+
-    '</div>';
-}
-async function addDayException(dateStr){
-  const sel=document.getElementById('excAdd-'+dateStr);
-  if(!sel||!sel.value){ showToast('Pick a person'); return; }
-  const nm=decodeURIComponent(sel.value);
-  await setDayException(dateStr, encodeURIComponent(nm), 'excluded');
-  renderDayException(dateStr);
-}
-async function setDayException(dateStr, nmEnc, val){
-  const nm=decodeURIComponent(nmEnc);
-  const start_time=(val==='excluded')?null:val;
-  try{
-    await fetch(SUPABASE_URL+'/rest/v1/class_day_overrides',{method:'POST',headers:{..._CD_HJ,'Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({class_date:dateStr,staff_name:nm,start_time:start_time,updated_at:new Date().toISOString()})});
-    showToast(nm.split(' ')[0]+': '+(start_time===null?'excluded':start_time));
-  }catch(e){ showToast('Save failed'); }
-}
-async function clearDayException(dateStr, nmEnc){
-  const nm=decodeURIComponent(nmEnc);
-  try{
-    await fetch(SUPABASE_URL+'/rest/v1/class_day_overrides?class_date=eq.'+encodeURIComponent(dateStr)+'&staff_name=eq.'+encodeURIComponent(nm),{method:'DELETE',headers:{..._CD_H,'Prefer':'return=minimal'}});
-    showToast('Exception removed'); renderDayException(dateStr);
-  }catch(e){ showToast('Remove failed'); }
-}
-
 function showAvailTab(tab){
   ['edit','submitted','classdays'].forEach(s=>{
     const sec=document.getElementById('availsec-'+s);
@@ -8993,19 +8882,11 @@ async function refreshMorningBoard(){
   const last = {};
   punches.forEach(p=>{ last[_normName(p.staff_name)] = p; });
 
-  // Class-day context for TODAY: if today is a class day, punctuality is judged
-  // against each person's class-roster start (with any per-date exception), not
-  // their shift/availability. Fetch once; empty when today isn't a class day.
+  // Class days still exist (the housekeeping roster uses them), but they no
+  // longer affect punctuality — lateness is measured against the rostered shift
+  // start for everyone, every day. So the board no longer needs to fetch the
+  // class roster or per-date overrides here.
   const todayIso = today; // YYYY-MM-DD (Sydney)
-  let classToday=false, classRoster={}, classOverrides={};
-  try{
-    const cd = await _cdGet('class_days?class_date=eq.'+todayIso+'&select=class_date');
-    classToday = !!(cd && cd.length);
-    if(classToday){
-      (await _cdGet('class_roster?select=staff_name,start_time')).forEach(r=>{ classRoster[_normName(r.staff_name)]=r.start_time; });
-      (await _cdGet('class_day_overrides?class_date=eq.'+todayIso+'&select=staff_name,start_time')).forEach(o=>{ classOverrides[_normName(o.staff_name)]={has:true,start:o.start_time}; });
-    }
-  }catch(e){ /* board still works without class context */ }
 
   // Fresh availability per staff for TODAY, keyed by normalised name → day slot.
   // Fetched directly so the board never depends on the in-memory availability
@@ -9064,19 +8945,9 @@ async function refreshMorningBoard(){
     const avToday = avObj ? (avObj[dayIdx] || avObj[String(dayIdx)]) : null;
     const isUnavailable = avToday && avToday.type === 'no';
 
-    // On a class day, the rostered class start wins (per-date exception first,
-    // then the class roster) — BUT only if the person is actually expected in.
-    // Someone who marked themselves unavailable today must NOT get a class "due"
-    // time, or they'd wrongly show as absent.
-    if(classToday && !isUnavailable){
-      const ov = classOverrides[key];
-      if(ov && ov.has){
-        if(ov.start) startTime = ov.start;   // explicit override time
-        // ov.start null → excluded, keep shift-based startTime
-      }else if(classRoster[key]){
-        startTime = classRoster[key];         // class roster start
-      }
-    }
+    // Lateness is always measured against the ROSTERED shift start (startTime
+    // above), never a class-day start. Class days still exist for the
+    // housekeeping roster, but they no longer change the punctuality "due" time.
     // If unavailable today, they're not expected — no due time, and they should
     // not be surfaced as "not clocked in".
     if(isUnavailable) startTime = null;
