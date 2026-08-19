@@ -136,6 +136,80 @@
   var RSEG = 200, RLEN = 1600, RDRAW = 300, RW = 2000;   // road units
   var rs = null, rRAF = null, rKeys = {};
 
+  /* ── Sound (Web Audio) ─────────────────────────────────────────────
+     A looping engine tone whose pitch tracks speed, plus one-shot thwacks
+     for punches, kicks, hits and crashes. Created lazily on first use so it
+     only spins up when someone actually plays, and survives browsers that
+     block audio until a gesture (the first key press is the gesture). */
+  var rAC = null, rEngine = null, rEngGain = null;
+  function rAudio(){
+    if(rAC) return rAC;
+    try{
+      rAC = new (window.AudioContext || window.webkitAudioContext)();
+    }catch(e){ rAC = null; }
+    return rAC;
+  }
+  function rEngineStart(){
+    var ac = rAudio(); if(!ac || rEngine) return;
+    try{
+      rEngine = ac.createOscillator();
+      rEngine.type = 'sawtooth';
+      var lp = ac.createBiquadFilter();
+      lp.type = 'lowpass'; lp.frequency.value = 620;
+      rEngGain = ac.createGain(); rEngGain.gain.value = 0.0;
+      rEngine.connect(lp); lp.connect(rEngGain); rEngGain.connect(ac.destination);
+      rEngine.frequency.value = 60;
+      rEngine.start();
+    }catch(e){ rEngine = null; }
+  }
+  function rEngineStop(){
+    try{ if(rEngine){ rEngine.stop(); rEngine.disconnect(); } }catch(e){}
+    rEngine = null; rEngGain = null;
+  }
+  function rEngineUpdate(speed, maxSpeed){
+    if(!rEngine || !rEngGain || !rAC) return;
+    var f = speed / maxSpeed;                    // 0..1
+    // Idle rumble even at rest, rising with speed; a little wobble for life.
+    var hz = 55 + f*135 + Math.sin(rAC.currentTime*22)*3;
+    try{
+      rEngine.frequency.setTargetAtTime(hz, rAC.currentTime, 0.05);
+      rEngGain.gain.setTargetAtTime(0.03 + f*0.06, rAC.currentTime, 0.1);
+    }catch(e){}
+  }
+  // One-shot: a short noise/tone burst. kind: 'punch'|'kick'|'hit'|'crash'|'ko'
+  function rSfx(kind){
+    var ac = rAudio(); if(!ac) return;
+    var t = ac.currentTime;
+    try{
+      if(kind === 'crash' || kind === 'hit' || kind === 'ko'){
+        // Noise burst through a bandpass — a thud/smash.
+        var len = kind==='crash' ? 0.45 : 0.16;
+        var buf = ac.createBuffer(1, ac.sampleRate*len, ac.sampleRate);
+        var d = buf.getChannelData(0);
+        for(var i=0;i<d.length;i++) d[i] = (Math.random()*2-1) * (1 - i/d.length);
+        var src = ac.createBufferSource(); src.buffer = buf;
+        var bp = ac.createBiquadFilter(); bp.type='bandpass';
+        bp.frequency.value = kind==='crash' ? 220 : (kind==='ko'?140:380);
+        var gn = ac.createGain(); gn.gain.value = kind==='crash'?0.5:0.35;
+        gn.gain.setTargetAtTime(0.0001, t+0.02, len*0.4);
+        src.connect(bp); bp.connect(gn); gn.connect(ac.destination);
+        src.start(t);
+      }else{
+        // punch/kick — quick pitched blip.
+        var o = ac.createOscillator();
+        o.type = 'square';
+        var g = ac.createGain();
+        var f0 = kind==='kick' ? 300 : 440;
+        o.frequency.setValueAtTime(f0, t);
+        o.frequency.exponentialRampToValueAtTime(f0*0.4, t+0.12);
+        g.gain.setValueAtTime(0.22, t);
+        g.gain.exponentialRampToValueAtTime(0.0001, t+0.13);
+        o.connect(g); g.connect(ac.destination);
+        o.start(t); o.stop(t+0.14);
+      }
+    }catch(e){}
+  }
+
   function rBuildRoad(){
     var segs = [], i;
     for(i=0;i<RLEN;i++){
@@ -152,7 +226,17 @@
       if(i > 300 && i < 420) hill = Math.sin((i-300)/120*Math.PI) * 900;
       if(i > 700 && i < 860) hill = Math.sin((i-700)/160*Math.PI) * -1200;
       if(i > 1100 && i < 1260) hill = Math.sin((i-1100)/160*Math.PI) * 1500;
-      segs.push({ i:i, curve:curve, y:hill });
+      // Roadside scenery — a sprite every few segments, alternating sides,
+      // whipping past to sell the speed. Type varies so it's not one object
+      // repeated. side: -1 left, +1 right; off: how far off the tarmac.
+      var scenery = null;
+      if(i % 7 === 0){
+        var side = (i % 14 === 0) ? -1 : 1;
+        var types = ['tree','tree','pole','sign','tree','rock'];
+        scenery = { type: types[(i/7|0) % types.length], side: side,
+                    off: 1.35 + (i % 3)*0.28 };
+      }
+      segs.push({ i:i, curve:curve, y:hill, scenery:scenery });
     }
     return segs;
   }
@@ -165,6 +249,7 @@
       pos: 0, playerX: 0, speed: 0, maxSpeed: 340,
       hp: 100, score: 0, dist: 0, lap: 1, over: false,
       punchCd: 0, hitFlash: 0, shake: 0, last: 0,
+      kickCd: 0, lean: 0,
       rivals: []
     };
     // Rivals spread down the road; each has a lane, a cruise speed and hp.
@@ -180,13 +265,14 @@
       });
     }
     var st = el('rashStatus');
-    if(st) st.textContent = 'Arrows to ride \u00b7 Z punch';
+    if(st) st.textContent = 'Arrows to ride \u00b7 Z punch \u00b7 X kick';
+    rEngineStart();
     rHud();
     if(rRAF) cancelAnimationFrame(rRAF);
     rs.last = 0;
     rRAF = requestAnimationFrame(rLoop);
   };
-  AG3.rashStop = function(){ if(rRAF) cancelAnimationFrame(rRAF); rRAF = null; };
+  AG3.rashStop = function(){ if(rRAF) cancelAnimationFrame(rRAF); rRAF = null; rEngineStop(); };
   AG3.rashRestart = function(){ AG3.rashInit(); };
   AG3.rashKey = function(k,down){ rKeys[k] = !!down; };
 
@@ -212,6 +298,7 @@
   AG3.rashPunch = function(){
     if(!rs || rs.over || rs.punchCd > 0) return;
     rs.punchCd = 0.32;
+    rSfx('punch');
     var hit = false;
     for(var i=0;i<rs.rivals.length;i++){
       var r = rs.rivals[i];
@@ -223,15 +310,50 @@
         r.swing = 0.25;
         rs.score += 60;
         hit = true;
+        rSfx('hit');
         if(r.hp <= 0){
           r.down = 2.4;
           rs.score += 350;
+          rSfx('ko');
           var st = el('rashStatus');
           if(st) st.textContent = r.name + ' is down! +350';
         }
       }
     }
     if(!hit) rs.score = Math.max(0, rs.score - 5);   // whiffing costs a little
+    rHud();
+  };
+
+  // Kick — heavier and longer-reach than a punch, but a longer cooldown, so
+  // it's the finisher and the punch is the jab. Also nudges YOU sideways a
+  // touch (recoil), which reads on screen as a lean.
+  AG3.rashKick = function(){
+    if(!rs || rs.over || rs.kickCd > 0) return;
+    rs.kickCd = 0.7;
+    rs.lean = (rs.playerX >= 0 ? -1 : 1) * 0.4;   // recoil lean
+    rSfx('kick');
+    var hit = false;
+    for(var i=0;i<rs.rivals.length;i++){
+      var r = rs.rivals[i];
+      if(r.down > 0) continue;
+      var dz = r.z - rs.pos;
+      if(dz > -320 && dz < 520 && Math.abs(r.x - rs.playerX) < 0.78){
+        r.hp -= 60;
+        r.swing = 0.3;
+        r.x += Math.sign(r.x - rs.playerX) * 0.35;   // knock them wide
+        rs.score += 90;
+        hit = true;
+        rSfx('hit');
+        if(r.hp <= 0){
+          r.down = 2.6;
+          rs.score += 350;
+          rSfx('ko');
+          var st = el('rashStatus');
+          if(st) st.textContent = r.name + ' floored! +350';
+        }
+      }
+    }
+    if(!hit) rs.score = Math.max(0, rs.score - 8);
     rHud();
   };
 
@@ -265,6 +387,9 @@
       rs.speed = Math.min(rs.speed, rs.maxSpeed*0.55);
       rs.shake = 3;
       rs.hp -= 4*dt;
+      // Occasional gravel crunch, not every frame.
+      rs._offSfx = (rs._offSfx||0) - dt;
+      if(rs._offSfx <= 0){ rSfx('crash'); rs._offSfx = 0.5; }
     }
 
     else if(rs.hp < 100){
@@ -277,8 +402,15 @@
     rs.pos += rs.speed * dt * 12;
     rs.dist += rs.speed * dt * 12;
     if(rs.punchCd > 0) rs.punchCd -= dt;
+    if(rs.kickCd > 0) rs.kickCd -= dt;
     if(rs.hitFlash > 0) rs.hitFlash -= dt;
     if(rs.shake > 0) rs.shake -= dt*8;
+    // Lean recovers to match steering; recoil lean decays.
+    var targetLean = steer * 0.5 + (rs.lean||0);
+    rs.leanShown = (rs.leanShown||0) + (targetLean - (rs.leanShown||0)) * Math.min(1, dt*10);
+    if(rs.lean) rs.lean *= Math.max(0, 1 - dt*4);
+    // Engine note tracks speed.
+    rEngineUpdate(rs.speed, rs.maxSpeed);
 
     // --- rivals ---
     for(var i=0;i<rs.rivals.length;i++){
@@ -307,6 +439,7 @@
           rs.hp -= 6;
           rs.hitFlash = 0.22; rs.shake = 5;
           rs.speed *= 0.9;
+          rSfx('hit');
           var st = el('rashStatus');
           if(st) st.textContent = r.name + ' lands one on you';
         }
@@ -326,6 +459,7 @@
 
     if(rs.hp <= 0){
       rs.hp = 0; rs.over = true;
+      rSfx('crash'); rEngineStop();
       var rec = setBest('rash', rs.score);
       var st2 = el('rashStatus');
       if(st2) st2.textContent = rec ? 'New best: '+rs.score+'!' : 'Wiped out \u00b7 '+rs.score;
@@ -395,6 +529,15 @@
       // Store the projection so riders can be placed on the same road.
       s._x = sx; s._y = sy; s._w = sw; s._sc = scale; s._world = world;
 
+      // Roadside scenery — placed off the tarmac edge, scaled by distance.
+      // Drawn here (far to near naturally, since we walk forward) so nearer
+      // objects paint over farther ones.
+      if(s.scenery && sy > 0 && sy < H && scale > 0.02){
+        var scn = s.scenery;
+        var edge = sx + scn.side * (sw/2 + scn.off * sw * 0.5);
+        rScenery(g, scn.type, edge, sy, sw);
+      }
+
       x += dx; dx += s.curve;
       if(sy < 0) break;
     }
@@ -413,15 +556,36 @@
       bx = seg2._x + (r.x - rs.playerX) * RW * 0.5 * scl * 0.9;
       var by = seg2._y;
       var bw = Math.max(6, 300*scl);
-      rBike(g, bx, by, bw, r.down > 0, r.swing > 0, '#c9952e');
+      rBike(g, bx, by, bw, r.down > 0, r.swing > 0, '#c9952e', 0, false);
     }
 
     // --- player ---
     var pw = 118;
     var px = W/2, py = H - 62;
-    rBike(g, px, py, pw, false, rs.punchCd > 0.2, '#5a7ec9');
+    var braking = rKeys.down && rs.speed > 20;
+    rBike(g, px, py, pw, false, rs.punchCd > 0.2 || rs.kickCd > 0.5,
+          '#5a7ec9', rs.leanShown || 0, braking);
 
     g.restore();
+
+    // Speed streaks — faint lines rushing outward from the vanishing point,
+    // stronger the faster you go. Cheap, but sells velocity hugely.
+    var spd01 = rs.speed / rs.maxSpeed;
+    if(spd01 > 0.45){
+      g.save();
+      g.strokeStyle = 'rgba(255,255,255,'+((spd01-0.45)*0.5)+')';
+      g.lineWidth = 2;
+      var cx = W/2, cy = H*0.46;
+      for(var q=0;q<7;q++){
+        var ang = (q/7)*Math.PI*2 + (rs.pos*0.01);
+        var r1 = 40 + (q%3)*14, r2 = r1 + 34 + spd01*40;
+        g.beginPath();
+        g.moveTo(cx + Math.cos(ang)*r1, cy + Math.sin(ang)*r1*0.6);
+        g.lineTo(cx + Math.cos(ang)*r2, cy + Math.sin(ang)*r2*0.6);
+        g.stroke();
+      }
+      g.restore();
+    }
 
     if(rs.hitFlash > 0){
       g.fillStyle = 'rgba(224,90,63,'+(rs.hitFlash*0.9)+')';
@@ -440,12 +604,50 @@
     }
   }
 
+  /** One roadside object, scaled to the road width at that distance. */
+  function rScenery(g, type, x, groundY, roadW){
+    var s = roadW * 0.5;                 // size scales with the road at that depth
+    if(s < 3) return;
+    g.save();
+    g.translate(x, groundY);
+    if(type === 'tree'){
+      var th = s*1.7, tw = s*0.5;
+      g.fillStyle = '#3a2a1c';           // trunk
+      g.fillRect(-tw*0.14, -th*0.34, tw*0.28, th*0.34);
+      g.fillStyle = '#2f6b34';           // canopy
+      g.beginPath(); g.ellipse(0, -th*0.55, tw*0.7, th*0.4, 0, 0, 7); g.fill();
+      g.fillStyle = '#3a7c40';
+      g.beginPath(); g.ellipse(-tw*0.25, -th*0.68, tw*0.42, th*0.3, 0, 0, 7); g.fill();
+    }else if(type === 'pole'){
+      var ph = s*2.0;
+      g.fillStyle = '#8a8f98';
+      g.fillRect(-s*0.06, -ph, s*0.12, ph);
+      g.fillStyle = '#c7ccd4';
+      g.fillRect(-s*0.34, -ph, s*0.68, s*0.14);   // cross-arm
+    }else if(type === 'sign'){
+      var sh = s*1.1;
+      g.fillStyle = '#6b7079';
+      g.fillRect(-s*0.05, -sh, s*0.10, sh);
+      g.fillStyle = '#e8b530';
+      g.beginPath();
+      g.moveTo(0,-sh-s*0.55); g.lineTo(s*0.5,-sh); g.lineTo(0,-sh+s*0.05);
+      g.lineTo(-s*0.5,-sh); g.closePath(); g.fill();
+    }else{ // rock
+      g.fillStyle = '#7d7469';
+      g.beginPath(); g.ellipse(0, -s*0.28, s*0.5, s*0.3, 0, 0, 7); g.fill();
+      g.fillStyle = '#8f877b';
+      g.beginPath(); g.ellipse(-s*0.12, -s*0.4, s*0.28, s*0.2, 0, 0, 7); g.fill();
+    }
+    g.restore();
+  }
+
   /** One rider. Simple shapes — at speed you read the silhouette, not detail. */
-  function rBike(g,x,y,w,down,swinging,col){
+  function rBike(g,x,y,w,down,swinging,col,lean,braking){
     var h = w*0.78;
     g.save();
     g.translate(x,y);
     if(down){ g.rotate(1.35); g.globalAlpha = .75; }
+    else if(lean){ g.rotate(lean * 0.32); }     // lean into the turn
     // shadow
     g.fillStyle = 'rgba(0,0,0,.22)';
     g.beginPath(); g.ellipse(0, h*0.06, w*0.42, h*0.09, 0, 0, 7); g.fill();
@@ -457,6 +659,13 @@
     g.beginPath();
     g.roundRect(-w*0.20, -h*0.52, w*0.40, h*0.44, w*0.07);
     g.fill();
+    // brake light — a red glow low and rear when braking
+    if(braking){
+      g.fillStyle = 'rgba(255,60,40,.95)';
+      g.beginPath(); g.ellipse(0, -h*0.10, w*0.10, h*0.06, 0, 0, 7); g.fill();
+      g.fillStyle = 'rgba(255,120,90,.5)';
+      g.beginPath(); g.ellipse(0, -h*0.10, w*0.18, h*0.11, 0, 0, 7); g.fill();
+    }
     // rider
     g.fillStyle = '#2b3038';
     g.beginPath(); g.arc(0, -h*0.62, w*0.13, 0, 7); g.fill();
@@ -899,6 +1108,7 @@
             '<button class="ag3-pad" data-rk="down">\u25BC</button>'+
             '<button class="ag3-pad" data-rk="right">\u25B6</button>'+
             '<button class="ag3-pad" data-rk="punch">\u{1F44A}</button>'+
+            '<button class="ag3-pad" data-rk="kick">\u{1F9B5}</button>'+
           '</div>'+
           '<div class="ag-row">'+
             '<button class="ag-btn primary" onclick="AG3.rashRestart()">Restart</button>'+
@@ -979,6 +1189,7 @@
       else if(k==='ArrowUp')    set('up',true);
       else if(k==='ArrowDown')  set('down',true);
       else if(g==='rash' && (k==='z'||k==='Z'||k===' ')) AG3.rashPunch();
+      else if(g==='rash' && (k==='x'||k==='X')) AG3.rashKick();
       else if(g==='belter' && k===' ') set('fire',true);
       else hit = false;
       if(hit) e.preventDefault();
@@ -1001,6 +1212,7 @@
       e.preventDefault();
       if(pad.dataset.rk){
         if(pad.dataset.rk === 'punch') AG3.rashPunch();
+        else if(pad.dataset.rk === 'kick') AG3.rashKick();
         else AG3.rashKey(pad.dataset.rk, true);
       }
       if(pad.dataset.bk) AG3.belterKey(pad.dataset.bk, true);
@@ -1008,7 +1220,7 @@
     function padUp(e){
       var pad = e.target.closest ? e.target.closest('.ag3-pad') : null;
       if(!pad) return;
-      if(pad.dataset.rk && pad.dataset.rk !== 'punch') AG3.rashKey(pad.dataset.rk, false);
+      if(pad.dataset.rk && pad.dataset.rk !== 'punch' && pad.dataset.rk !== 'kick') AG3.rashKey(pad.dataset.rk, false);
       if(pad.dataset.bk) AG3.belterKey(pad.dataset.bk, false);
     }
     document.addEventListener('pointerup', padUp);
