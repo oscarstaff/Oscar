@@ -3949,9 +3949,20 @@ async function removeClassDay(dateStr){
 // Placement member, so the team already has someone on every session.
 // Adding a second would give Placement two people while others get one.
 const HK_TEAMS = ['Enrolment','Processing','Evershine','Education'];
-// Oversees every class day — always rostered, and kept out of their own team's
-// rotation so that team's other members still take proper turns.
-const HK_HEAD = 'Muhammad Faizan Azim';
+// The Speaker oversees every class day — always rostered, and kept out of their
+// own team's rotation so that team's other members still take proper turns.
+// Stored in app_settings (key hk_speaker) so an admin can change who it is;
+// falls back to this default if the setting is missing.
+const HK_SPEAKER_DEFAULT = 'Muhammad Faizan Azim';
+let _hkSpeaker = null;
+async function _hkGetSpeaker(){
+  if(_hkSpeaker) return _hkSpeaker;
+  try{
+    const rows = await _cdGet("app_settings?key=eq.hk_speaker&select=value");
+    _hkSpeaker = (rows && rows.length && rows[0].value) ? rows[0].value : HK_SPEAKER_DEFAULT;
+  }catch(e){ _hkSpeaker = HK_SPEAKER_DEFAULT; }
+  return _hkSpeaker;
+}
 let _hkTeamMap=null;
 
 async function _hkLoadTeams(){
@@ -4018,7 +4029,7 @@ const HK_MIN_END_MIN = 17*60 + 50;   // 17:50
 // are what remain when short-staffed, in this order. The second chairs slot
 // is the only optional one, so it drops first.
 const HK_TASKS = [
-  { key:'chairs',    label:'Chairs, boards, papers & pens',   slots:2, mins:10,  essential:1 },
+  { key:'chairs',    label:'Chairs, boards, papers & pens',   slots:1, mins:10,  essential:1 },
   { key:'equipment', label:"Bed lifter & trainer's table",    slots:1, mins:6,   essential:1 },
   { key:'waterbin',  label:'Water & lollies + bring the bin back from Evershine',
                                                               slots:1, mins:5.5, essential:1 },
@@ -4034,7 +4045,7 @@ function _hkTaskLabel(key){
 // it — at a glance nobody could tell who was bringing it back.
 function _hkTaskShort(key){
   return {chairs:'Chairs', equipment:'Equipment', waterbin:'Water + Bin',
-          water:'Water', speak:'Speaks'}[key] || key || '';
+          water:'Water'}[key] || key || '';
 }
 
 // Slots for `headcount` people: keep the essential ones, spend any spare
@@ -4063,9 +4074,10 @@ function _hkTaskSlots(headcount){
 // breaks those ties randomly, giving a genuinely different but equally fair
 // split on a reshuffle.
 function _hkAssignTasks(picks, hist, shuffle){
-  const people = picks.filter(function(p){ return p.team !== 'Head'; });
-  picks.filter(function(p){ return p.team === 'Head'; })
-       .forEach(function(h){ h.task = 'speak'; });
+  const people = picks.filter(function(p){ return p.team !== 'Speaker'; });
+  // The Speaker always does chairs (their fixed job), regardless of rotation.
+  picks.filter(function(p){ return p.team === 'Speaker'; })
+       .forEach(function(h){ h.task = 'chairs'; });
   if(!people.length) return picks;
 
   // Autofill often builds only the teams that are MISSING — e.g. one slot was
@@ -4076,7 +4088,8 @@ function _hkAssignTasks(picks, hist, shuffle){
   const dayKey = people[0].duty_date;
   const taken = [];
   (hist || []).forEach(function(h){
-    if(h.duty_date !== dayKey || !h.task || h.task === 'speak') return;
+    if(h.duty_date !== dayKey || !h.task) return;
+    if(h.team === 'Speaker' || h.task === 'speak') return; // Speaker's chairs is fixed, not a team slot
     if(picks.some(function(p){ return p.staff_name === h.staff_name; })) return; // being re-picked
     taken.push(h.task);
   });
@@ -4241,14 +4254,15 @@ function _hkPick(eligible, hist, habits, shuffle){
 
 // Build the roster for one class day: one person per team. Returns rows to
 // insert. Skips teams already covered.
-function _hkBuildDay(dateStr, teams, excl, onLeave, avail, habits, hist, doneTeams, shuffle){
+function _hkBuildDay(dateStr, teams, excl, onLeave, avail, habits, hist, doneTeams, shuffle, speaker){
   const picks=[];
-  // The housekeeping head oversees every session — rostered unless they're on
-  // leave or have marked themselves unavailable that day.
-  if(!doneTeams || !doneTeams.has('Head')){
-    const hk=_normName(HK_HEAD);
+  const SPEAKER = speaker || HK_SPEAKER_DEFAULT;
+  // The Speaker oversees every session — rostered unless they're on leave or
+  // have marked themselves unavailable that day.
+  if(!doneTeams || !doneTeams.has('Speaker')){
+    const hk=_normName(SPEAKER);
     if(!onLeave.has(hk) && !avail.unavail.has(hk)){
-      picks.push({duty_date:dateStr, staff_name:HK_HEAD, team:'Head'});
+      picks.push({duty_date:dateStr, staff_name:SPEAKER, team:'Speaker'});
     }
   }
   HK_TEAMS.forEach(function(tm){
@@ -4256,7 +4270,7 @@ function _hkBuildDay(dateStr, teams, excl, onLeave, avail, habits, hist, doneTea
     const members=Object.keys(teams).filter(function(nm){ return teams[nm]===tm; });
     const eligible=members.filter(function(nm){
       const key=_normName(nm);
-      if(key===_normName(HK_HEAD)) return false; // head has their own slot
+      if(key===_normName(SPEAKER)) return false; // speaker has their own slot
       if(excl.has(key)) return false;            // manually excluded
       if(onLeave.has(key)) return false;         // on approved leave
       if(avail.unavail.has(key)) return false;   // marked unavailable that day
@@ -4298,14 +4312,15 @@ async function _hkAutoFill(shuffle){
   const teams=await _hkLoadTeams();
   const excl=await _hkExcluded();
   const habits=await _hkLeavingHabits();
+  const speaker=await _hkGetSpeaker();
 
   const toInsert=[];
   for(const d of days){
     const done=new Set(hist.filter(function(h){ return h.duty_date===d; }).map(function(h){ return h.team; }));
-    if(done.size>=HK_TEAMS.length+1) continue;   // head + 4 teams already rostered
+    if(done.size>=HK_TEAMS.length+1) continue;   // speaker + 4 teams already rostered
     const onLeave=await _hkOnLeave(d);
     const avail=await _hkAvailableLate(d);
-    const picks=_hkBuildDay(d, teams, excl, onLeave, avail, habits, hist, done, shuffle);
+    const picks=_hkBuildDay(d, teams, excl, onLeave, avail, habits, hist, done, shuffle, speaker);
     picks.forEach(function(p){
       toInsert.push(p);
       hist.push({staff_name:p.staff_name, duty_date:d, team:p.team, task:p.task, done:true});  // provisionally count (incl. task) so one person isn't picked for every upcoming day, nor handed the same job twice
@@ -4380,7 +4395,10 @@ async function _hkRender(){
         ' onchange="setHousekeepingDone(this,\''+r.id+'\')" title="Tick when they\'ve done it"'+
         ' style="width:15px;height:15px;cursor:pointer;flex-shrink:0;">';
       const picker=isHead
-        ? '<span style="flex:1;font-size:12.5px;font-weight:700;">'+_cdEsc(r.staff_name)+'</span>'
+        ? '<select onchange="setHousekeepingSpeaker(this,\''+r.id+'\')" title="Change the Speaker"'+
+          ' style="flex:1;min-width:0;border:1px solid var(--border);border-radius:7px;padding:4px 7px;font-size:12.5px;font-weight:700;font-family:inherit;background:var(--input-bg,#fff);color:inherit;cursor:pointer;">'+
+          _hkAllStaffOptions(r.staff_name)+
+          '</select>'
         : '<select onchange="setHousekeepingPerson(this,\''+r.id+'\')" title="Who actually did it"'+
           ' style="flex:1;min-width:0;border:1px solid var(--border);border-radius:7px;padding:4px 7px;font-size:12.5px;font-weight:600;font-family:inherit;background:var(--input-bg,#fff);color:inherit;cursor:pointer;'+(r.done?'':'opacity:.8;')+'">'+
           teamOptions(r.team, r.staff_name)+
@@ -4389,12 +4407,10 @@ async function _hkRender(){
         tick+
         '<span style="flex-shrink:0;width:74px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:'+(isHead?'var(--accent,#3d9eff)':'var(--text-dim)')+';">'+label+'</span>'+
         picker+
-        // Which job they were given. Without it the roster only says who is
-        // on, and the whole point of the split is knowing who does what.
-        // The job is now editable too — auto-allocation gets the split roughly
-        // right, but who carries the bed lifter on a given day is a judgement
-        // call the roster can't make.
-        (isHead ? '' :
+        // The Speaker's fixed job is Chairs — shown (not editable) so it's clear.
+        (isHead ?
+          '<span style="flex-shrink:0;border:1px solid var(--border);border-radius:5px;padding:2px 6px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;background:var(--accent-dim,rgba(61,158,255,.12));color:var(--accent,#3d9eff);">Chairs</span>'
+          :
           '<select onchange="setHousekeepingTask(this,\''+r.id+'\')" title="'+_cdEsc(_hkTaskLabel(r.task))+'"'+
           ' style="flex-shrink:0;border:1px solid var(--border);border-radius:5px;padding:2px 5px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;font-family:inherit;background:var(--accent-dim,rgba(61,158,255,.12));color:var(--accent,#3d9eff);cursor:pointer;">'+
           HK_TASKS.map(function(t){
@@ -4412,8 +4428,8 @@ async function _hkRender(){
         '<button onclick="removeHousekeeping(\''+r.id+'\')" title="Remove from the roster (does NOT pick a replacement — use Reshuffle for that)" style="background:none;border:none;color:#e5484d;cursor:pointer;font-size:14px;line-height:1;padding:0 2px;font-family:inherit;">&times;</button>'+
       '</div>';
     };
-    const head=list.find(function(x){ return x.team==='Head'; });
-    const headRow=head?rowFor(head,'Head',true):'';
+    const head=list.find(function(x){ return x.team==='Speaker'; });
+    const headRow=head?rowFor(head,'Speaker',true):'';
     const cells=HK_TEAMS.map(function(tm){
       const r=list.find(function(x){ return x.team===tm; });
       if(r) return rowFor(r,tm,false);
@@ -4508,8 +4524,8 @@ function copyHousekeepingDay(d){
   if(!list.length){ showToast('Nothing to copy'); return; }
   const dt=new Date(d+'T00:00:00');
   const lines=[dt.toLocaleDateString('en-AU',{weekday:'long',day:'numeric',month:'long'})];
-  const head=list.find(function(x){ return x.team==='Head'; });
-  if(head && head.staff_name) lines.push(head.staff_name+' — Head');
+  const head=list.find(function(x){ return x.team==='Speaker'; });
+  if(head && head.staff_name) lines.push(head.staff_name+' — Speaker (Chairs)');
   HK_TEAMS.forEach(function(tm){
     const r=list.find(function(x){ return x.team===tm; });
     if(!r || !r.staff_name) return;
@@ -4540,6 +4556,34 @@ async function setHousekeepingPerson(sel, id){
     await fetch(SUPABASE_URL+'/rest/v1/housekeeping_roster?id=eq.'+encodeURIComponent(id),
       {method:'PATCH',headers:{..._CD_HJ,'Prefer':'return=minimal'},body:JSON.stringify({staff_name:nm})});
     showToast(nm.split(' ')[0]+' recorded');
+    _hkRender();
+  }catch(e){ showToast('Save failed'); _hkRender(); }
+}
+
+// All staff, as <option>s, for the Speaker picker (selected = current speaker).
+function _hkAllStaffOptions(current){
+  const names=_cdStaffNames();
+  if(current && names.indexOf(current)<0) names.unshift(current);
+  return names.map(function(nm){
+    return '<option value="'+_cdEsc(nm)+'"'+(nm===current?' selected':'')+'>'+_cdEsc(nm)+'</option>';
+  }).join('');
+}
+
+// Change the Speaker. Updates this day's row AND saves the new default to
+// app_settings so future class days use the new Speaker too.
+async function setHousekeepingSpeaker(sel, id){
+  const nm=sel.value;
+  if(!nm) return;
+  try{
+    // 1. This day's Speaker row.
+    await fetch(SUPABASE_URL+'/rest/v1/housekeeping_roster?id=eq.'+encodeURIComponent(id),
+      {method:'PATCH',headers:{..._CD_HJ,'Prefer':'return=minimal'},body:JSON.stringify({staff_name:nm})});
+    // 2. Persist as the default Speaker for future days.
+    await fetch(SUPABASE_URL+'/rest/v1/app_settings',
+      {method:'POST',headers:{..._CD_HJ,'Prefer':'resolution=merge-duplicates,return=minimal'},
+       body:JSON.stringify({key:'hk_speaker', value:nm, updated_at:new Date().toISOString()})});
+    _hkSpeaker=nm;   // refresh cache so autofill uses the new Speaker
+    showToast('Speaker set to '+nm.split(' ')[0]);
     _hkRender();
   }catch(e){ showToast('Save failed'); _hkRender(); }
 }
