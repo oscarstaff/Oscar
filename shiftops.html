@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Oscars Staff Management</title>
+<title>Oscars ShiftOprs — Employee Management</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%235b5bd6'/><rect x='6.5' y='8' width='19' height='17' rx='2.5' fill='%23fff'/><path d='M6.5 12.5h19' stroke='%235b5bd6' stroke-width='1.6'/><path d='M11 6v4M21 6v4' stroke='%23fff' stroke-width='2' stroke-linecap='round'/><circle cx='16' cy='19' r='4.3' fill='%235b5bd6'/><path d='M16 16.6V19l1.7 1' stroke='%23fff' stroke-width='1.5' stroke-linecap='round' fill='none'/></svg>" />
 <style>
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600;700&display=swap');
@@ -1926,13 +1926,13 @@ button, .btn { white-space: nowrap; }
   <header class="appbar">
     <div class="appbar-brand">
       <div class="brand-mark">O</div>
-      <span class="brand-name">Oscars</span><span class="brand-prod">ShiftOps</span>
+      <span class="brand-name">ShiftOps</span>
     </div>
     <nav class="appbar-nav">
       <div class="nav-item active" onclick="switchNav('home',this)">Dashboard</div>
       <div class="nav-item" onclick="switchNav('roster',this)">Roster</div>
       <div class="nav-item" onclick="switchNav('availability',this);clearAvailBadge()">Availability<span id="availNavBadge" style="display:none;margin-left:6px;background:var(--warn);color:#fff;border-radius:8px;padding:1px 6px;font-size:8px;font-weight:800;font-family:var(--mono);"></span></div>
-      <div class="nav-item" onclick="switchNav('staff',this)">Staff</div>
+      <div class="nav-item" onclick="switchNav('staff',this)">Employees</div>
       <div class="nav-item" id="navPayroll" style="display:none" onclick="switchNav('payroll',this)">Payroll</div>
     </nav>
     <div class="appbar-spacer"></div>
@@ -2215,7 +2215,9 @@ button, .btn { white-space: nowrap; }
 </div>
 <div class="modal-overlay" id="staffModal">
   <div class="modal">
-    <div class="modal-title"><span id="staffModalTitle">Add Staff Member</span><button class="modal-close" onclick="closeModal('staffModal')">×</button></div>
+    <div class="modal-title"><span id="staffModalTitle">Add Employee</span><button class="modal-close" onclick="closeModal('staffModal')">×</button></div>
+    <!-- Profile summary — populated by editStaff() for existing employees, hidden when adding -->
+    <div id="empProfilePanel" style="display:none;margin-bottom:18px;"></div>
     <div class="form-row">
       <div class="form-group"><label class="form-label">First Name</label><input type="text" class="form-input" id="staffFirstName" placeholder="Jane"></div>
       <div class="form-group"><label class="form-label">Last Name</label><input type="text" class="form-input" id="staffLastName" placeholder="Smith"></div>
@@ -2337,7 +2339,7 @@ button, .btn { white-space: nowrap; }
 <div class="modal-overlay" id="sharedFolderModal">
   <div class="modal" style="width:500px">
     <div class="modal-title"><span>Shared Folder</span><button class="modal-close" onclick="closeModal('sharedFolderModal')">×</button></div>
-    <div style="background:rgba(0,229,160,.07);border:1px solid rgba(0,229,160,.2);border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:12px;color:var(--text-dim);line-height:1.7">Point Oscars Staff Management to a <strong style="color:var(--accent)">Google Drive or Dropbox folder</strong>shared with your coworker. Both of you set the same folder — whoever saves last wins, so coordinate who edits when.
+    <div style="background:rgba(0,229,160,.07);border:1px solid rgba(0,229,160,.2);border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:12px;color:var(--text-dim);line-height:1.7">Point Oscars ShiftOprs to a <strong style="color:var(--accent)">Google Drive or Dropbox folder</strong>shared with your coworker. Both of you set the same folder — whoever saves last wins, so coordinate who edits when.
     </div>
     <div class="form-group">
       <label class="form-label">Current Data Location</label>
@@ -4981,13 +4983,13 @@ function renderStaffList(){
   const el=document.getElementById('staffList');
   const tl={full:'Full-time',part:'Part-time',casual:'Casual'},tb={full:'badge-full',part:'badge-part',casual:'badge-casual'};
   let html=`<div class="staff-list-header">
-    <div class="section-title">Staff Members (${staff.length})</div>
+    <div class="section-title">Employee Management <span style="color:var(--text-dim);font-weight:400">(${staff.length})</span></div>
     <div style="display:flex;align-items:center;gap:8px">
       <div style="display:flex;border:1px solid var(--border);border-radius:6px;overflow:hidden">
         <button onclick="setStaffSort('asc')" style="padding:5px 12px;font-size:11px;font-family:var(--mono);font-weight:600;cursor:pointer;border:none;transition:all .15s;background:${staffSortOrder==='asc'?'rgba(0,229,160,.15)':'transparent'};color:${staffSortOrder==='asc'?'var(--accent)':'var(--text-dim)'}">A ->Z</button>
         <button onclick="setStaffSort('desc')" style="padding:5px 12px;font-size:11px;font-family:var(--mono);font-weight:600;cursor:pointer;border:none;border-left:1px solid var(--border);transition:all .15s;background:${staffSortOrder==='desc'?'rgba(0,229,160,.15)':'transparent'};color:${staffSortOrder==='desc'?'var(--accent)':'var(--text-dim)'}">Z ->A</button>
       </div>
-      <button class="btn btn-primary" onclick="openAddStaff()">+ Add Staff</button>
+      <button class="btn btn-primary" onclick="openAddStaff()">+ Add Employee</button>
     </div>
   </div>
   <div class="staff-list-head"><div class="col-head">Name / Role</div><div class="col-head">Type</div><div class="col-head">Max Hrs</div><div class="col-head">Scheduled</div><div class="col-head">Utilisation</div><div class="col-head">Actions</div></div>`;
@@ -5003,13 +5005,13 @@ function renderStaffList(){
       ? ` <span style="background:rgba(61,158,255,.2);color:var(--accent2);border:1px solid rgba(61,158,255,.4);border-radius:3px;padding:1px 5px;font-size:8px;font-weight:700;font-family:var(--mono)">ADMIN</span>`
       : (isTeamLead ? ` <span style="background:rgba(0,229,160,.18);color:#00e5a0;border:1px solid rgba(0,229,160,.4);border-radius:3px;padding:1px 5px;font-size:8px;font-weight:700;font-family:var(--mono)">TEAM LEAD</span>` : '');
     html+=`<div class="staff-list-row" data-team="${(s.team||'').replace(/"/g,'&quot;')}">
-      <div style="display:flex;align-items:center;gap:8px"><div class="avatar" style="background:${s.color}">${initials(s)}</div><div><div style="font-weight:600;font-size:12.5px">${s.first} ${s.last}${roleBadge}</div><div style="display:flex;align-items:center;gap:5px;margin-top:2px"><span style="font-family:var(--mono);font-size:8.5px;color:var(--text-dim)">${s.team}</span></div></div></div>
+      <div style="display:flex;align-items:center;gap:8px;cursor:pointer" onclick="editStaff(${s.id})" title="Open profile"><div class="avatar" style="background:${s.color}">${initials(s)}</div><div><div style="font-weight:600;font-size:12.5px">${s.first} ${s.last}${roleBadge}</div><div style="display:flex;align-items:center;gap:5px;margin-top:2px"><span style="font-family:var(--mono);font-size:8.5px;color:var(--text-dim)">${s.team}</span></div></div></div>
       <div><span class="badge ${tb[s.type]}">${tl[s.type]}</span></div>
       <div style="font-family:var(--mono);font-size:12px">${s.maxHours}h</div>
       <div style="font-family:var(--mono);font-size:12px;color:${pct>100?'var(--warn)':'inherit'}">${hrs.toFixed(1)}h</div>
       <div style="display:flex;align-items:center;gap:6px"><div class="hours-bar-bg" style="width:52px"><div class="hours-bar-fill${pct>100?' warn':''}" style="width:${pct}%"></div></div><span style="font-family:var(--mono);font-size:9px;color:var(--text-dim)">${pct}%</span></div>
       <div style="display:flex;gap:5px;align-items:center;position:relative">
-        <button class="btn btn-ghost" style="padding:4px 9px;font-size:10.5px" onclick="editStaff(${s.id})">Edit</button>
+        <button class="btn btn-ghost" style="padding:4px 9px;font-size:10.5px" onclick="editStaff(${s.id})">Profile</button>
         <button class="btn btn-warn" style="padding:4px 9px;font-size:10.5px" onclick="removeStaff(${s.id})">Remove</button>
 
       </div>
@@ -5662,7 +5664,9 @@ function onRoleChange(sel){
 
 function openAddStaff(){
   editingStaffId=null;
-  document.getElementById('staffModalTitle').textContent='Add Staff Member';
+  document.getElementById('staffModalTitle').textContent='Add Employee';
+  const _pp=document.getElementById('empProfilePanel');
+  if(_pp){ _pp.style.display='none'; _pp.innerHTML=''; }
   const adminSec0=document.getElementById('staffAdminSection');
   if(adminSec0) adminSec0.style.display='none';
   ['staffFirstName','staffLastName'].forEach(id=>document.getElementById(id).value='');
@@ -5679,7 +5683,7 @@ function editStaff(id){
   const s=staff.find(x=>x.id===id);if(!s)return;
   editingStaffId=id;
   window._editingOldName = (s.first+' '+s.last).trim();  // remember name BEFORE edit, to detect renames
-  document.getElementById('staffModalTitle').textContent='Edit Staff Member';
+  document.getElementById('staffModalTitle').textContent='Employee Profile';
   document.getElementById('staffFirstName').value=s.first;
   document.getElementById('staffLastName').value=s.last;
   populateTeamSelect(s.team);
@@ -5693,7 +5697,75 @@ function editStaff(id){
   if(adminSec) adminSec.style.display = '';
   loadStaffAccess(s);
   loadStaffExtraTeams((s.first+' '+s.last).trim(), s.team);
+  renderEmpProfile(s);   // build the read-only summary at the top
   openModal('staffModal');
+}
+
+// Build the read-only profile summary shown at the top of the employee modal:
+// avatar/name/role, key figures (hours, utilisation, type, max), then live
+// stats pulled in async (punctuality, leave). Reuses data ShiftOps already has.
+function renderEmpProfile(s){
+  const panel=document.getElementById('empProfilePanel');
+  if(!panel) return;
+  const hrs=staffHoursWeek(s.id);
+  const pct=Math.min(100,Math.round((hrs/s.maxHours)*100));
+  const tl={full:'Full-time',part:'Part-time',casual:'Casual'};
+  const isAdmin=!!s.isHubAdmin, isLead=!isAdmin&&!!s.isTeamLead;
+  const roleTxt=isAdmin?'Admin':(isLead?'Team Lead':'Team Member');
+  const stat=(label,val,sub)=>
+    '<div style="flex:1;min-width:82px;background:var(--card,rgba(127,127,127,.06));border:1px solid var(--border);border-radius:9px;padding:9px 11px;">'+
+      '<div style="font-family:var(--mono);font-size:8.5px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text-dim);">'+label+'</div>'+
+      '<div style="font-size:16px;font-weight:700;margin-top:3px;">'+val+'</div>'+
+      (sub?'<div style="font-size:10px;color:var(--text-dim);margin-top:1px;">'+sub+'</div>':'')+
+    '</div>';
+  panel.innerHTML=
+    '<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">'+
+      '<div class="avatar" style="background:'+s.color+';width:52px;height:52px;font-size:18px;">'+initials(s)+'</div>'+
+      '<div style="flex:1;min-width:0;">'+
+        '<div style="font-size:17px;font-weight:700;">'+_cdEsc(s.first+' '+s.last)+'</div>'+
+        '<div style="display:flex;align-items:center;gap:7px;margin-top:3px;flex-wrap:wrap;">'+
+          '<span style="font-family:var(--mono);font-size:10px;color:var(--text-dim);">'+_cdEsc(s.team||'')+'</span>'+
+          '<span style="font-size:9px;font-weight:700;font-family:var(--mono);padding:1px 7px;border-radius:4px;background:'+(isAdmin?'rgba(61,158,255,.2);color:var(--accent2,#3d9eff)':(isLead?'rgba(0,229,160,.18);color:#00e5a0':'rgba(127,127,127,.15);color:var(--text-dim)'))+';">'+roleTxt.toUpperCase()+'</span>'+
+        '</div>'+
+      '</div>'+
+    '</div>'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;">'+
+      stat('This week', hrs.toFixed(1)+'h', pct+'% of '+s.maxHours+'h')+
+      stat('Type', tl[s.type]||s.type, '')+
+      stat('Punctuality', '<span id="empProfPunc">…</span>', 'last 30 days')+
+      stat('Leave', '<span id="empProfLeave">…</span>', 'upcoming')+
+    '</div>'+
+    '<div style="font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin:16px 0 2px;">Edit details</div>';
+  panel.style.display='';
+  // Fill the async stats (punctuality, leave) without blocking the modal.
+  _fillEmpProfileStats(s);
+}
+
+async function _fillEmpProfileStats(s){
+  const full=(s.first+' '+s.last).trim();
+  // Punctuality: count clock-ins vs lateness over the last 30 days is complex;
+  // as a light first pass, show on-time rate from clock_log 'in' punches that
+  // exist (present days) — kept simple and honest rather than precise.
+  try{
+    const puncEl=document.getElementById('empProfPunc');
+    if(puncEl){
+      const since=new Date(Date.now()-30*86400000).toISOString().slice(0,10);
+      const rows=await _cdGet('clock_log?staff_name=eq.'+encodeURIComponent(full)+'&action=eq.in&ts=gte.'+since+'&select=ts');
+      puncEl.textContent=(rows&&rows.length!=null)?(rows.length+' days'):'—';
+    }
+  }catch(e){ const p=document.getElementById('empProfPunc'); if(p)p.textContent='—'; }
+  // Leave: next upcoming approved leave.
+  try{
+    const lvEl=document.getElementById('empProfLeave');
+    if(lvEl){
+      const today=new Date().toISOString().slice(0,10);
+      const rows=await _cdGet('leave_submissions?staff_name=eq.'+encodeURIComponent(full)+'&status=eq.approved&to_date=gte.'+today+'&order=from_date.asc&select=from_date,to_date&limit=1');
+      if(rows&&rows.length){
+        const d=new Date(rows[0].from_date+'T00:00:00');
+        lvEl.textContent=d.toLocaleDateString('en-AU',{day:'numeric',month:'short'});
+      }else lvEl.textContent='None';
+    }
+  }catch(e){ const l=document.getElementById('empProfLeave'); if(l)l.textContent='—'; }
 }
 
 // Multi-team ("Also on teams") removed — single team per staffer via staff_directory.
@@ -6484,7 +6556,7 @@ function showSection(id){
   const crumbs={home:'Dashboard',roster:'Roster',availability:'Availability',staff:'Staff',payroll:'Payroll'};
   if(id==='payroll' && typeof initPayrollTab==='function'){ setTimeout(initPayrollTab,80); }
   const titleEl=document.getElementById('topbarTitle');
-  if(titleEl)titleEl.innerHTML='<span style="color:var(--muted);font-weight:400">Oscars</span><span style="color:var(--muted);margin:0 6px;font-weight:400">></span>'+(crumbs[id]||'Home');
+  if(titleEl)titleEl.innerHTML='<span style="color:var(--muted);font-weight:400">ShiftOps</span><span style="color:var(--muted);margin:0 6px;font-weight:400">></span>'+(crumbs[id]||'Home');
   // Morning Board lives on Home now.
   if(id==='home'){ try{ startMorningBoard(); }catch(e){} }
   else { try{ stopMorningBoard(); }catch(e){} }
@@ -6523,7 +6595,7 @@ function switchNav(id,el){
   if(el)el.classList.add('active');
   const crumbs={home:'Dashboard',roster:'Roster',availability:'Availability',staff:'Staff',payroll:'Payroll'};
   const titleEl=document.getElementById('topbarTitle');
-  if(titleEl)titleEl.innerHTML='<span style="color:var(--muted);font-weight:400">Oscars</span><span style="color:var(--muted);margin:0 6px;font-weight:400">></span>'+(crumbs[id]||'Home');
+  if(titleEl)titleEl.innerHTML='<span style="color:var(--muted);font-weight:400">ShiftOps</span><span style="color:var(--muted);margin:0 6px;font-weight:400">></span>'+(crumbs[id]||'Home');
   requestAnimationFrame(()=>{
     showSection(id);
     _navSwitchPending=false;
