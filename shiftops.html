@@ -2243,11 +2243,12 @@ button, .btn { white-space: nowrap; }
     </div>
   </div>
 </div>
-<div class="modal-overlay" id="staffModal">
+<div class="modal-overlay" id="staffModal" style="z-index:1000;">
   <div class="modal">
     <div class="modal-title"><span id="staffModalTitle">Add Employee</span><button class="modal-close" onclick="closeModal('staffModal')">×</button></div>
     <!-- Profile summary — populated by editStaff() for existing employees, hidden when adding -->
     <div id="empProfilePanel" style="display:none;margin-bottom:18px;"></div>
+    <div id="staffFormMovable">
     <div class="form-row">
       <div class="form-group"><label class="form-label">First Name</label><input type="text" class="form-input" id="staffFirstName" placeholder="Jane"></div>
       <div class="form-group"><label class="form-label">Last Name</label><input type="text" class="form-input" id="staffLastName" placeholder="Smith"></div>
@@ -2294,7 +2295,8 @@ button, .btn { white-space: nowrap; }
 
       <button type="button" id="modalSetPasswordBtn" onclick="modalSetPassword()" class="btn btn-ghost" style="padding:8px 14px;font-size:12.5px;font-weight:600;background:rgba(61,158,255,.12);color:#3d9eff;border:1px solid rgba(61,158,255,.35);">Set Password</button>
     </div>
-    <div class="modal-actions">
+    </div><!-- /staffFormMovable -->
+    <div class="modal-actions" id="staffModalActions">
       <button class="btn btn-ghost" onclick="closeModal('staffModal')">Cancel</button>
       <button class="btn btn-primary" onclick="saveStaff()">Save</button>
     </div>
@@ -5695,6 +5697,7 @@ function onRoleChange(sel){
 }
 
 function openAddStaff(){
+  try{ if(typeof _epReturnForm==='function') _epReturnForm(); }catch(e){}  // form may be mounted in a profile
   editingStaffId=null;
   document.getElementById('staffModalTitle').textContent='Add Employee';
   const _pp=document.getElementById('empProfilePanel');
@@ -5725,12 +5728,13 @@ function openEmpProfile(id){
   _epStaff=s; _epTab='overview';
   _epPage={clockins:0, calls:0, leave:0, punctuality:0};
   const btn=document.getElementById('empProfEditBtn');
-  if(btn) btn.onclick=function(){ editStaff(id); };
+  if(btn) btn.onclick=function(){ _epSwitch('details'); };
   _epRenderHeader(); _epRenderStats(); _epRenderTabs(); _epRenderBody();
   const pg=document.getElementById('empProfilePage');
   if(pg){ pg.style.display='block'; pg.scrollTop=0; }
 }
 function closeEmpProfile(){
+  try{ _epReturnForm(); }catch(e){}   // ensure the shared form is back in the modal
   const pg=document.getElementById('empProfilePage');
   if(pg) pg.style.display='none';
   _epStaff=null;
@@ -5787,13 +5791,68 @@ function _epRenderTabs(){
   const tabs=[['overview','Overview'],['clockins','Clock-ins'],['punctuality','Punctuality'],['calls','Call Logs'],['leave','Leave'],['details','Details']];
   document.getElementById('empProfTabs').innerHTML=tabs.map(function(t){
     const on=_epTab===t[0];
-    return '<button onclick="_epSwitch(\''+t[0]+'\')" style="padding:9px 16px;font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer;background:none;border:none;white-space:nowrap;color:'+(on?'var(--accent,#3d9eff)':'var(--text-dim)')+';border-bottom:2px solid '+(on?'var(--accent,#3d9eff)':'transparent')+';">'+t[1]+'</button>';
+    return '<button data-eptab="'+t[0]+'" onclick="_epSwitch(\''+t[0]+'\')" style="padding:9px 16px;font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer;background:none;border:none;white-space:nowrap;color:'+(on?'var(--accent,#3d9eff)':'var(--text-dim)')+';border-bottom:2px solid '+(on?'var(--accent,#3d9eff)':'transparent')+';">'+t[1]+'</button>';
   }).join('');
 }
 function _epSwitch(tab){
+  const prev=_epTab;
+  // Leaving the Details tab → put the edit form back in the modal shell.
+  if(prev==='details' && tab!=='details') _epReturnForm();
   _epTab=tab;
-  if(tab==='details'){ editStaff(_epStaff.id); return; }  // details opens the edit modal
-  _epRenderTabs(); _epRenderBody();
+  const strip=document.getElementById('empProfTabs');
+  if(strip){
+    Array.prototype.forEach.call(strip.children, function(btn){
+      const on=(btn.getAttribute('data-eptab')===tab);
+      btn.style.color = on ? 'var(--accent,#3d9eff)' : 'var(--text-dim)';
+      btn.style.borderBottom = '2px solid '+(on ? 'var(--accent,#3d9eff)' : 'transparent');
+    });
+  }
+  _epRenderBody();
+}
+
+// Move the shared edit form OUT of the modal and INTO the profile body, so
+// Details edits inline (no popup). Reuses the exact same fields + saveStaff()
+// logic — nothing is duplicated. _epReturnForm() puts it back.
+function _epMountForm(){
+  const form=document.getElementById('staffFormMovable');
+  const host=document.getElementById('epDetailsHost');
+  if(form && host && form.parentNode!==host){ host.appendChild(form); }
+  // Populate the form for this employee (same calls editStaff used).
+  const s=_epStaff; if(!s) return;
+  editingStaffId=s.id;
+  window._editingOldName=(s.first+' '+s.last).trim();
+  document.getElementById('staffFirstName').value=s.first;
+  document.getElementById('staffLastName').value=s.last;
+  populateTeamSelect(s.team);
+  document.getElementById('staffIsManager').value=(s.isOfficeManager||s.isManager==='office')?'office':'false';
+  document.getElementById('staffType').value=s.type;
+  document.getElementById('staffMaxHours').value=s.maxHours;
+  onRoleChange(document.getElementById('staffIsManager'));
+  const adminSec=document.getElementById('staffAdminSection');
+  if(adminSec) adminSec.style.display='';
+  const _pp=document.getElementById('empProfilePanel'); if(_pp){ _pp.style.display='none'; }
+  loadStaffAccess(s);
+  loadStaffExtraTeams((s.first+' '+s.last).trim(), s.team);
+}
+function _epReturnForm(){
+  const form=document.getElementById('staffFormMovable');
+  const modal=document.querySelector('#staffModal .modal');
+  const actions=document.getElementById('staffModalActions');
+  if(form && modal && actions && form.parentNode!==modal){
+    modal.insertBefore(form, actions);   // back to its original slot (before the modal actions)
+  }
+}
+
+// Save the inline Details edits — reuses the exact saveStaff() the modal used,
+// then refreshes the profile header/stats and returns to Overview.
+async function _epSaveDetails(){
+  const id=_epStaff?_epStaff.id:null;
+  try{ await saveStaff(); }catch(e){ console.warn('inline save',e); }
+  _epReturnForm();                       // move the form back to the modal shell
+  // Re-sync _epStaff to the updated record and re-render the page chrome.
+  if(id!=null){ const s=staff.find(x=>x.id===id); if(s) _epStaff=s; }
+  _epRenderHeader(); _epRenderStats();
+  _epTab='overview'; _epRenderTabs(); _epRenderBody();
 }
 
 function _epRenderBody(){
@@ -5803,6 +5862,15 @@ function _epRenderBody(){
   if(_epTab==='punctuality'){ b.innerHTML=_epLoading(); _epLoadPunctuality(true); return; }
   if(_epTab==='calls'){ b.innerHTML=_epLoading(); _epLoadCalls(true); return; }
   if(_epTab==='leave'){ b.innerHTML=_epLoading(); _epLoadLeave(true); return; }
+  if(_epTab==='details'){
+    b.innerHTML='<div id="epDetailsHost" style="max-width:640px;"></div>'+
+      '<div style="display:flex;gap:10px;margin-top:20px;max-width:640px;">'+
+        '<button class="btn btn-primary" style="padding:9px 20px;" onclick="_epSaveDetails()">Save changes</button>'+
+        '<button class="btn btn-ghost" style="padding:9px 16px;" onclick="_epSwitch(\'overview\')">Cancel</button>'+
+      '</div>';
+    _epMountForm();
+    return;
+  }
 }
 function _epLoading(){ return '<div style="padding:40px;text-align:center;color:var(--text-dim);font-size:13px;">Loading…</div>'; }
 function _epEmpty(msg){ return '<div style="padding:40px;text-align:center;color:var(--text-dim);font-size:13px;">'+msg+'</div>'; }
@@ -5981,7 +6049,6 @@ function editStaff(id){
   const s=staff.find(x=>x.id===id);if(!s)return;
   editingStaffId=id;
   window._editingOldName = (s.first+' '+s.last).trim();  // remember name BEFORE edit, to detect renames
-  document.getElementById('staffModalTitle').textContent='Employee Profile';
   document.getElementById('staffFirstName').value=s.first;
   document.getElementById('staffLastName').value=s.last;
   populateTeamSelect(s.team);
@@ -5995,7 +6062,11 @@ function editStaff(id){
   if(adminSec) adminSec.style.display = '';
   loadStaffAccess(s);
   loadStaffExtraTeams((s.first+' '+s.last).trim(), s.team);
-  renderEmpProfile(s);   // build the read-only summary at the top
+  // The full profile page now carries the summary — keep the modal as a pure
+  // edit form. Hide the old in-modal profile panel if it exists.
+  const _oldPanel=document.getElementById('empProfilePanel');
+  if(_oldPanel){ _oldPanel.style.display='none'; _oldPanel.innerHTML=''; }
+  document.getElementById('staffModalTitle').textContent='Edit Employee';
   openModal('staffModal');
 }
 
