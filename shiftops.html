@@ -1963,6 +1963,12 @@ button, .btn { white-space: nowrap; }
 
   <main class="main">
 
+    <div id="soBootLoading" style="position:absolute;inset:0;z-index:500;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:var(--bg,#0f1117);">
+      <div style="width:34px;height:34px;border:3px solid var(--border,#2e3344);border-top-color:var(--accent,#3d9eff);border-radius:50%;animation:soSpin .8s linear infinite;"></div>
+      <div style="font-family:var(--mono,monospace);font-size:12px;color:var(--text-dim,#8b94a8);letter-spacing:.5px;">Loading ShiftOps…</div>
+    </div>
+    <style>@keyframes soSpin{to{transform:rotate(360deg)}}</style>
+
     <div class="content">
       <div class="stats-strip">
         <div class="stat"><span class="stat-value green" id="statShifts">0</span><span class="stat-label">shifts this week</span></div>
@@ -5735,6 +5741,7 @@ function renderEmpProfile(s){
       stat('Punctuality', '<span id="empProfPunc">…</span>', 'last 30 days')+
       stat('Leave', '<span id="empProfLeave">…</span>', 'upcoming')+
     '</div>'+
+    '<div id="empProfPayroll" style="display:none;"></div>'+
     '<div style="font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin:16px 0 2px;">Edit details</div>';
   panel.style.display='';
   // Fill the async stats (punctuality, leave) without blocking the modal.
@@ -5766,6 +5773,50 @@ async function _fillEmpProfileStats(s){
       }else lvEl.textContent='None';
     }
   }catch(e){ const l=document.getElementById('empProfLeave'); if(l)l.textContent='—'; }
+
+  // Payroll breakdown — Accounts-only. Gated by _canPayroll() AND by RLS on
+  // payroll_rates (returns nothing to non-Accounts), so this is safe even if
+  // the UI check were bypassed. Renders rate, hours, premium and total.
+  try{
+    const payWrap=document.getElementById('empProfPayroll');
+    if(payWrap && typeof _canPayroll==='function' && _canPayroll()){
+      const rows=await _cdGet('payroll_rates?staff_name=eq.'+encodeURIComponent(full)+'&select=structure,std_rate,prem_rate,pay_cap&limit=1');
+      if(rows && rows.length){
+        const r=rows[0];
+        const hrs=staffHoursWeek(s.id);
+        const cap=(r.pay_cap!=null)?Number(r.pay_cap):0;
+        const std=Number(r.std_rate||0), prem=Number(r.prem_rate||0);
+        let stdHrs, premHrs, stdPay, premPay;
+        if(r.structure==='flat'){
+          stdHrs=hrs; premHrs=0; stdPay=hrs*std; premPay=0;
+        }else{
+          stdHrs=Math.min(hrs,cap); premHrs=Math.max(0,hrs-cap);
+          stdPay=stdHrs*std; premPay=premHrs*prem;
+        }
+        const total=stdPay+premPay;
+        const money=v=>'$'+v.toFixed(2);
+        const line=(l,v,accent)=>
+          '<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:12.5px;'+(accent?'color:var(--pp-prem,#b45309);font-weight:700;':'')+'">'+
+            '<span style="color:'+(accent?'inherit':'var(--text-dim)')+'">'+l+'</span><span style="font-family:var(--mono);font-weight:600;">'+v+'</span></div>';
+        payWrap.innerHTML=
+          '<div style="font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin:16px 0 6px;">Payroll (this week)</div>'+
+          '<div style="border:1px solid var(--border);border-radius:9px;padding:10px 13px;background:var(--card,rgba(127,127,127,.05));">'+
+            line((r.structure==='flat'?'Flat rate':'Standard rate')+' ('+money(std)+'/h)', stdHrs.toFixed(1)+'h · '+money(stdPay))+
+            (r.structure!=='flat'
+              ? line('Premium rate ('+money(prem)+'/h, over '+cap+'h)', premHrs>0?(premHrs.toFixed(1)+'h · '+money(premPay)):'—', true)
+              : '')+
+            '<div style="border-top:1px solid var(--border);margin-top:6px;padding-top:6px;">'+
+              line('<b>Total</b>', '<b>'+money(total)+'</b>')+
+            '</div>'+
+          '</div>';
+        payWrap.style.display='';
+      }else{
+        payWrap.innerHTML='<div style="font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin:16px 0 6px;">Payroll</div>'+
+          '<div style="font-size:12px;color:var(--text-dim);padding:8px 0;">No pay rate set for this employee.</div>';
+        payWrap.style.display='';
+      }
+    }
+  }catch(e){ /* payroll stays hidden on error — never leak a partial state */ }
 }
 
 // Multi-team ("Also on teams") removed — single team per staffer via staff_directory.
@@ -6732,8 +6783,14 @@ function computeTeamLeadState(){
 }
 function applyTeamLeadLock(){
   computeTeamLeadState();
-  document.body.classList.toggle('tl-readonly', AM_TEAM_LEAD);
-  if(!AM_TEAM_LEAD) return;
+  // Only ever show the read-only team-lead view once the role is POSITIVELY
+  // resolved AND confirmed team-lead. Until then (data still loading, or an
+  // admin whose flags haven't arrived), default to the full admin view rather
+  // than flashing the locked view — which is the "first login shows Team Lead"
+  // bug. An admin should never briefly see the restricted UI.
+  const confirmedLead = _tlResolved && AM_TEAM_LEAD === true;
+  document.body.classList.toggle('tl-readonly', confirmedLead);
+  if(!confirmedLead) return;
 
   // Hide any staff-list / roster / team-view / availability row that isn't the
   // team lead's own team. We tag rows by scanning their visible team label.
@@ -8584,8 +8641,13 @@ async function aaSave(){
 // ── INIT ──────────────────────────────────────────────────────────────────
 const SHIFTOPS_BUILD='2026-08-10-v46-avail-standing';
 console.log('%c[ShiftOps build '+SHIFTOPS_BUILD+' loaded]','background:#16a34a;color:#fff;padding:2px 8px;border-radius:4px;font-weight:700;');
+// Failsafe: never let the loading overlay trap the UI, even if boot throws.
+setTimeout(function(){ try{ var b=document.getElementById('soBootLoading'); if(b) b.style.display='none'; }catch(e){} }, 12000);
 (async()=>{
   await loadData();
+  // Data's in — drop the loading screen so the dashboard shows its real state
+  // instead of a blank/half-built view during the multi-second fetch+retry.
+  try{ var _bl=document.getElementById('soBootLoading'); if(_bl) _bl.style.display='none'; }catch(e){}
   // Always open on the week that contains TODAY, and keep availWeekKey and
   // currentWeekStart in lockstep.
   //
