@@ -6403,13 +6403,18 @@ async function saveStaff(){
     await saveStaffAccess(newName);   // persist app access + admin flag for this person
     await addStaffToSupabase(newName, team); // persist team → staff_directory + staff_credentials (staff_teams retired)
     await saveRosterConfig(newName, type, maxHours);   // employment type → who gets shift-open emails
-    // Personal details (DOB / pronouns / email) → staff_directory + staff_credentials.
+    // Personal details (DOB / pronouns / email) → staff_credentials only.
+    // staff_directory is a VIEW over it, so writing there fails — the view
+    // reflects the credentials automatically. Needs the AUTHENTICATED token
+    // (admins can update any row via the sc_admin_write policy); the anon key
+    // is rejected by RLS.
     try{
+      const _ptok=(typeof _soTok==='function' && _soTok())?_soTok():SUPABASE_KEY;
+      const _pH={apikey:SUPABASE_KEY, Authorization:'Bearer '+_ptok, 'Content-Type':'application/json'};
       const body=JSON.stringify({pronouns:pronouns||null, birthday:birthday||null, email:email||null});
-      await fetch(SUPABASE_URL+'/rest/v1/staff_credentials?staff_name=eq.'+encodeURIComponent(newName),
-        {method:'PATCH',headers:{..._CD_HJ,'Prefer':'return=minimal'},body:body});
-      await fetch(SUPABASE_URL+'/rest/v1/staff_directory?staff_name=eq.'+encodeURIComponent(newName),
-        {method:'PATCH',headers:{..._CD_HJ,'Prefer':'return=minimal'},body:body});
+      const _pr=await fetch(SUPABASE_URL+'/rest/v1/staff_credentials?staff_name=eq.'+encodeURIComponent(newName),
+        {method:'PATCH',headers:{..._pH,'Prefer':'return=minimal'},body:body});
+      if(!_pr.ok){ console.warn('personal details save HTTP', _pr.status, await _pr.text().catch(()=> '')); showToast('Personal details not saved'); }
     }catch(e){ console.warn('save personal details',e); }
     // keep local admin flag in sync so the row badge updates without a reload
     if(s){ const isAdmin=!!(document.getElementById('saAccess_admin')||{}).checked; s.isHubAdmin=isAdmin; s.isShiftAdmin=isAdmin; s.isTeamLead=(!!(document.getElementById('saAccess_shiftops')||{}).checked) && !isAdmin; }
