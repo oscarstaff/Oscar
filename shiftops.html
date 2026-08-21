@@ -535,33 +535,37 @@ h1,h2,h3,.section-title,.modal-title{ font-family: var(--display); letter-spacin
   box-shadow: var(--shadow-sm);
 }
 .staff-list-header {
-  padding: 12px 18px;
+  padding: 16px 22px;
   border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: var(--surface2);
+  background: transparent;
 }
 .staff-list-head {
   display: grid;
-  grid-template-columns: 1fr 90px 70px 80px 110px 160px;
-  padding: 8px 18px;
+  grid-template-columns: 44px 1fr 100px 76px 88px 120px 150px;
+  padding: 11px 22px;
   border-bottom: 1px solid var(--border);
   background: var(--surface2);
-  gap: 12px;
+  gap: 14px;
   align-items: center;
 }
 .staff-list-row {
   display: grid;
-  grid-template-columns: 1fr 90px 70px 80px 110px 160px;
+  grid-template-columns: 44px 1fr 100px 76px 88px 120px 150px;
   align-items: center;
-  padding: 10px 18px;
+  padding: 13px 22px;
   border-bottom: 1px solid var(--border);
-  gap: 12px;
-  transition: background .1s;
+  gap: 14px;
+  transition: background .12s;
 }
 .staff-list-row:last-child { border-bottom: none; }
 .staff-list-row:hover { background: var(--surface2); }
+.staff-list-row .avatar { width: 40px; height: 40px; font-size: 14px; }
+.emp-id { font-family: var(--mono); font-size: 13px; font-weight: 600; color: var(--text-dim); }
+.emp-name { font-weight: 600; font-size: 13.5px; letter-spacing: -.01em; }
+.emp-team { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
 .col-head { font-size: 10px; font-weight: 700; letter-spacing: 0.5px; color: var(--muted); text-transform: uppercase; }
 .badge { display: inline-flex; align-items: center; padding: 3px 8px; border-radius: 20px; font-size: 10px; font-weight: 600; }
 .badge-full { background: var(--success-dim); color: var(--success); }
@@ -2130,6 +2134,26 @@ button, .btn { white-space: nowrap; }
 
     </div>
   </main>
+
+<!-- ══ FULL-SCREEN EMPLOYEE PROFILE ══ -->
+<div id="empProfilePage" style="display:none;position:fixed;inset:0;z-index:900;background:var(--bg,#0f1117);overflow-y:auto;">
+  <div style="max-width:1080px;margin:0 auto;padding:20px 24px 60px;">
+    <!-- top bar -->
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
+      <button onclick="closeEmpProfile()" class="btn btn-ghost" style="padding:7px 14px;font-size:13px;">← Back to Employees</button>
+      <div style="flex:1;"></div>
+      <button id="empProfEditBtn" class="btn btn-primary" style="padding:7px 14px;font-size:12.5px;">Edit details</button>
+    </div>
+    <!-- header -->
+    <div id="empProfHeader" style="display:flex;align-items:center;gap:16px;margin-bottom:18px;"></div>
+    <!-- stat cards -->
+    <div id="empProfStats" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:22px;"></div>
+    <!-- sub-tabs -->
+    <div id="empProfTabs" style="display:flex;gap:2px;border-bottom:1px solid var(--border);margin-bottom:20px;overflow-x:auto;"></div>
+    <!-- tab content -->
+    <div id="empProfBody" style="min-height:240px;"></div>
+  </div>
+</div>
 </div>
 
 <!-- SHIFT MODAL -->
@@ -4998,12 +5022,14 @@ function renderStaffList(){
       <button class="btn btn-primary" onclick="openAddStaff()">+ Add Employee</button>
     </div>
   </div>
-  <div class="staff-list-head"><div class="col-head">Name / Role</div><div class="col-head">Type</div><div class="col-head">Max Hrs</div><div class="col-head">Scheduled</div><div class="col-head">Utilisation</div><div class="col-head">Actions</div></div>`;
+  <div class="staff-list-head"><div class="col-head">ID</div><div class="col-head">Employee</div><div class="col-head">Type</div><div class="col-head">Max Hrs</div><div class="col-head">Scheduled</div><div class="col-head">Utilisation</div><div class="col-head">Actions</div></div>`;
   const sortedStaff=[...staff].sort((a,b)=>{
     const cmp=a.first.localeCompare(b.first)||a.last.localeCompare(b.last);
     return staffSortOrder==='asc'?cmp:-cmp;
   });
+  let _rowNo=0;
   sortedStaff.forEach(s=>{
+    _rowNo++;
     const hrs=staffHoursWeek(s.id),pct=Math.min(100,Math.round((hrs/s.maxHours)*100));
     const isAdmin=!!s.isHubAdmin;
     const isTeamLead=!isAdmin && !!s.isTeamLead;  // admin always wins; never both
@@ -5011,15 +5037,15 @@ function renderStaffList(){
       ? ` <span style="background:rgba(61,158,255,.2);color:var(--accent2);border:1px solid rgba(61,158,255,.4);border-radius:3px;padding:1px 5px;font-size:8px;font-weight:700;font-family:var(--mono)">ADMIN</span>`
       : (isTeamLead ? ` <span style="background:rgba(0,229,160,.18);color:#00e5a0;border:1px solid rgba(0,229,160,.4);border-radius:3px;padding:1px 5px;font-size:8px;font-weight:700;font-family:var(--mono)">TEAM LEAD</span>` : '');
     html+=`<div class="staff-list-row" data-team="${(s.team||'').replace(/"/g,'&quot;')}">
-      <div style="display:flex;align-items:center;gap:8px;cursor:pointer" onclick="editStaff(${s.id})" title="Open profile"><div class="avatar" style="background:${s.color}">${initials(s)}</div><div><div style="font-weight:600;font-size:12.5px">${s.first} ${s.last}${roleBadge}</div><div style="display:flex;align-items:center;gap:5px;margin-top:2px"><span style="font-family:var(--mono);font-size:8.5px;color:var(--text-dim)">${s.team}</span></div></div></div>
+      <div class="emp-id">${_rowNo}</div>
+      <div style="display:flex;align-items:center;gap:11px;cursor:pointer" onclick="openEmpProfile(${s.id})" title="Open profile"><div class="avatar" style="background:${s.color}">${initials(s)}</div><div><div class="emp-name">${s.first} ${s.last}${roleBadge}</div><div class="emp-team">${s.team}</div></div></div>
       <div><span class="badge ${tb[s.type]}">${tl[s.type]}</span></div>
-      <div style="font-family:var(--mono);font-size:12px">${s.maxHours}h</div>
-      <div style="font-family:var(--mono);font-size:12px;color:${pct>100?'var(--warn)':'inherit'}">${hrs.toFixed(1)}h</div>
-      <div style="display:flex;align-items:center;gap:6px"><div class="hours-bar-bg" style="width:52px"><div class="hours-bar-fill${pct>100?' warn':''}" style="width:${pct}%"></div></div><span style="font-family:var(--mono);font-size:9px;color:var(--text-dim)">${pct}%</span></div>
-      <div style="display:flex;gap:5px;align-items:center;position:relative">
-        <button class="btn btn-ghost" style="padding:4px 9px;font-size:10.5px" onclick="editStaff(${s.id})">Profile</button>
-        <button class="btn btn-warn" style="padding:4px 9px;font-size:10.5px" onclick="removeStaff(${s.id})">Remove</button>
-
+      <div style="font-family:var(--mono);font-size:12.5px">${s.maxHours}h</div>
+      <div style="font-family:var(--mono);font-size:12.5px;color:${pct>100?'var(--warn)':'inherit'}">${hrs.toFixed(1)}h</div>
+      <div style="display:flex;align-items:center;gap:7px"><div class="hours-bar-bg" style="width:58px"><div class="hours-bar-fill${pct>100?' warn':''}" style="width:${pct}%"></div></div><span style="font-family:var(--mono);font-size:9.5px;color:var(--text-dim)">${pct}%</span></div>
+      <div style="display:flex;gap:6px;align-items:center;position:relative">
+        <button class="btn btn-ghost" style="padding:5px 11px;font-size:10.5px" onclick="openEmpProfile(${s.id})">Profile</button>
+        <button class="btn btn-warn" style="padding:5px 11px;font-size:10.5px" onclick="removeStaff(${s.id})">Remove</button>
       </div>
     </div>`;
   });
@@ -5685,6 +5711,272 @@ function openAddStaff(){
   if(opt)opt.textContent='Office Manager';
   openModal('staffModal');
 }
+// ══════════════════════════════════════════════════════════════════════
+// FULL-SCREEN EMPLOYEE PROFILE — Overview / Clock-ins / Punctuality /
+// Call Logs / Leave / Details. Everything ShiftOps knows about a person,
+// each list paged with "Load more".
+// ══════════════════════════════════════════════════════════════════════
+let _epStaff=null, _epTab='overview';
+const _EP_PAGE=20;
+let _epPage={clockins:0, calls:0, leave:0, punctuality:0};
+
+function openEmpProfile(id){
+  const s=staff.find(x=>x.id===id); if(!s) return;
+  _epStaff=s; _epTab='overview';
+  _epPage={clockins:0, calls:0, leave:0, punctuality:0};
+  const btn=document.getElementById('empProfEditBtn');
+  if(btn) btn.onclick=function(){ editStaff(id); };
+  _epRenderHeader(); _epRenderStats(); _epRenderTabs(); _epRenderBody();
+  const pg=document.getElementById('empProfilePage');
+  if(pg){ pg.style.display='block'; pg.scrollTop=0; }
+}
+function closeEmpProfile(){
+  const pg=document.getElementById('empProfilePage');
+  if(pg) pg.style.display='none';
+  _epStaff=null;
+}
+
+function _epRenderHeader(){
+  const s=_epStaff; if(!s) return;
+  const isAdmin=!!s.isHubAdmin, isLead=!isAdmin&&!!s.isTeamLead;
+  const roleTxt=isAdmin?'Admin':(isLead?'Team Lead':'Team Member');
+  const roleCol=isAdmin?'rgba(61,158,255,.2);color:var(--accent2,#3d9eff)':(isLead?'rgba(0,229,160,.18);color:#00e5a0':'rgba(127,127,127,.15);color:var(--text-dim)');
+  document.getElementById('empProfHeader').innerHTML=
+    '<div class="avatar" style="background:'+s.color+';width:64px;height:64px;font-size:22px;">'+initials(s)+'</div>'+
+    '<div><div style="font-size:22px;font-weight:700;letter-spacing:-.01em;">'+_cdEsc(s.first+' '+s.last)+'</div>'+
+    '<div style="display:flex;align-items:center;gap:8px;margin-top:4px;flex-wrap:wrap;">'+
+      '<span style="font-family:var(--mono);font-size:12px;color:var(--text-dim);">'+_cdEsc(s.team||'')+'</span>'+
+      '<span style="font-size:9px;font-weight:700;font-family:var(--mono);padding:2px 8px;border-radius:4px;background:'+roleCol+';">'+roleTxt.toUpperCase()+'</span>'+
+    '</div></div>';
+}
+
+function _epRenderStats(){
+  const s=_epStaff; if(!s) return;
+  const hrs=staffHoursWeek(s.id);
+  const pct=Math.min(100,Math.round((hrs/s.maxHours)*100));
+  const tl={full:'Full-time',part:'Part-time',casual:'Casual'};
+  const stat=(label,val,sub)=>
+    '<div style="flex:1;min-width:120px;background:var(--card,rgba(127,127,127,.06));border:1px solid var(--border);border-radius:11px;padding:12px 15px;">'+
+      '<div style="font-family:var(--mono);font-size:8.5px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text-dim);">'+label+'</div>'+
+      '<div style="font-size:19px;font-weight:700;margin-top:4px;">'+val+'</div>'+
+      (sub?'<div style="font-size:10.5px;color:var(--text-dim);margin-top:1px;">'+sub+'</div>':'')+'</div>';
+  document.getElementById('empProfStats').innerHTML=
+    stat('This week', hrs.toFixed(1)+'h', pct+'% of '+s.maxHours+'h')+
+    stat('Type', tl[s.type]||s.type, 'max '+s.maxHours+'h')+
+    stat('Punctuality', '<span id="epStatPunc">…</span>', 'clock-ins, 30d')+
+    stat('Next leave', '<span id="epStatLeave">…</span>', 'upcoming');
+  _epFillHeaderStats();
+}
+
+async function _epFillHeaderStats(){
+  const s=_epStaff, full=(s.first+' '+s.last).trim();
+  try{
+    const since=new Date(Date.now()-30*86400000).toISOString().slice(0,10);
+    const rows=await _cdGet('clock_log?staff_name=eq.'+encodeURIComponent(full)+'&action=eq.in&ts=gte.'+since+'&select=ts');
+    const el=document.getElementById('epStatPunc'); if(el) el.textContent=(rows?rows.length:0)+' days';
+  }catch(e){}
+  try{
+    const today=new Date().toISOString().slice(0,10);
+    const rows=await _cdGet('leave_submissions?staff_name=eq.'+encodeURIComponent(full)+'&status=eq.approved&to_date=gte.'+today+'&order=from_date.asc&select=from_date&limit=1');
+    const el=document.getElementById('epStatLeave');
+    if(el) el.textContent=(rows&&rows.length)?new Date(rows[0].from_date+'T00:00:00').toLocaleDateString('en-AU',{day:'numeric',month:'short'}):'None';
+  }catch(e){}
+}
+
+function _epRenderTabs(){
+  const tabs=[['overview','Overview'],['clockins','Clock-ins'],['punctuality','Punctuality'],['calls','Call Logs'],['leave','Leave'],['details','Details']];
+  document.getElementById('empProfTabs').innerHTML=tabs.map(function(t){
+    const on=_epTab===t[0];
+    return '<button onclick="_epSwitch(\''+t[0]+'\')" style="padding:9px 16px;font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer;background:none;border:none;white-space:nowrap;color:'+(on?'var(--accent,#3d9eff)':'var(--text-dim)')+';border-bottom:2px solid '+(on?'var(--accent,#3d9eff)':'transparent')+';">'+t[1]+'</button>';
+  }).join('');
+}
+function _epSwitch(tab){
+  _epTab=tab;
+  if(tab==='details'){ editStaff(_epStaff.id); return; }  // details opens the edit modal
+  _epRenderTabs(); _epRenderBody();
+}
+
+function _epRenderBody(){
+  const b=document.getElementById('empProfBody'); if(!b) return;
+  if(_epTab==='overview'){ _epOverview(b); return; }
+  if(_epTab==='clockins'){ b.innerHTML=_epLoading(); _epLoadClockins(true); return; }
+  if(_epTab==='punctuality'){ b.innerHTML=_epLoading(); _epLoadPunctuality(true); return; }
+  if(_epTab==='calls'){ b.innerHTML=_epLoading(); _epLoadCalls(true); return; }
+  if(_epTab==='leave'){ b.innerHTML=_epLoading(); _epLoadLeave(true); return; }
+}
+function _epLoading(){ return '<div style="padding:40px;text-align:center;color:var(--text-dim);font-size:13px;">Loading…</div>'; }
+function _epEmpty(msg){ return '<div style="padding:40px;text-align:center;color:var(--text-dim);font-size:13px;">'+msg+'</div>'; }
+function _epMoreBtn(kind){
+  return '<div style="text-align:center;margin-top:14px;"><button onclick="_epMore(\''+kind+'\')" class="btn btn-ghost" style="padding:7px 18px;font-size:12px;">Load more</button></div>';
+}
+function _epMore(kind){
+  _epPage[kind]++;
+  if(kind==='clockins') _epLoadClockins(false);
+  else if(kind==='calls') _epLoadCalls(false);
+  else if(kind==='leave') _epLoadLeave(false);
+  else if(kind==='punctuality') _epLoadPunctuality(false);
+}
+
+// Small helpers for formatting.
+function _epDate(iso){ if(!iso) return ''; try{ return new Date(iso).toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short',year:'numeric'}); }catch(e){ return iso; } }
+function _epTime(iso){ if(!iso) return ''; try{ return new Date(iso).toLocaleTimeString('en-AU',{hour:'numeric',minute:'2-digit'}); }catch(e){ return ''; } }
+function _epRow(cells){
+  return '<div style="display:grid;grid-template-columns:'+cells.map(c=>c.w||'1fr').join(' ')+';gap:12px;align-items:center;padding:11px 14px;border-bottom:1px solid var(--border);font-size:12.5px;">'+
+    cells.map(c=>'<div style="'+(c.style||'')+'">'+c.v+'</div>').join('')+'</div>';
+}
+
+function _epOverview(b){
+  const s=_epStaff;
+  b.innerHTML=
+    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;">'+
+      '<div style="border:1px solid var(--border);border-radius:11px;padding:16px;">'+
+        '<div style="font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;">Employment</div>'+
+        _epKV('Team', s.team||'—')+_epKV('Type', ({full:'Full-time',part:'Part-time',casual:'Casual'})[s.type]||s.type)+_epKV('Max hours', s.maxHours+'h/week')+
+        _epKV('Role', s.isHubAdmin?'Admin':(s.isTeamLead?'Team Lead':'Team Member'))+
+      '</div>'+
+      '<div id="epOvPay" style="border:1px solid var(--border);border-radius:11px;padding:16px;">'+
+        '<div style="font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;">Payroll (this week)</div>'+
+        '<div style="color:var(--text-dim);font-size:12.5px;">Loading…</div>'+
+      '</div>'+
+    '</div>'+
+    '<div style="margin-top:16px;color:var(--text-dim);font-size:12px;">Use the tabs above to see full clock-in history, punctuality, call logs and leave.</div>';
+  _epOverviewPay();
+}
+function _epKV(k,v){ return '<div style="display:flex;justify-content:space-between;padding:5px 0;font-size:12.5px;"><span style="color:var(--text-dim);">'+k+'</span><span style="font-weight:600;">'+_cdEsc(String(v))+'</span></div>'; }
+
+async function _epOverviewPay(){
+  const box=document.getElementById('epOvPay'); if(!box) return;
+  const s=_epStaff, full=(s.first+' '+s.last).trim();
+  if(!(typeof _canPayroll==='function' && _canPayroll())){
+    box.innerHTML='<div style="font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;">Payroll</div><div style="color:var(--text-dim);font-size:12px;">Visible to the Accounts team only.</div>';
+    return;
+  }
+  try{
+    const rows=await _cdGet('payroll_rates?staff_name=eq.'+encodeURIComponent(full)+'&select=structure,std_rate,prem_rate,pay_cap&limit=1');
+    if(!rows||!rows.length){ box.innerHTML='<div style="font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;">Payroll</div><div style="color:var(--text-dim);font-size:12px;">No pay rate set.</div>'; return; }
+    const r=rows[0], hrs=staffHoursWeek(s.id), cap=Number(r.pay_cap||0), std=Number(r.std_rate||0), prem=Number(r.prem_rate||0);
+    let stdHrs,premHrs,stdPay,premPay;
+    if(r.structure==='flat'){ stdHrs=hrs;premHrs=0;stdPay=hrs*std;premPay=0; }
+    else { stdHrs=Math.min(hrs,cap);premHrs=Math.max(0,hrs-cap);stdPay=stdHrs*std;premPay=premHrs*prem; }
+    const m=v=>'$'+v.toFixed(2);
+    box.innerHTML='<div style="font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;">Payroll (this week)</div>'+
+      _epKV((r.structure==='flat'?'Flat':'Standard')+' '+m(std)+'/h', stdHrs.toFixed(1)+'h · '+m(stdPay))+
+      (r.structure!=='flat'?_epKV('Premium '+m(prem)+'/h (>'+cap+'h)', premHrs>0?premHrs.toFixed(1)+'h · '+m(premPay):'—'):'')+
+      '<div style="border-top:1px solid var(--border);margin-top:6px;padding-top:6px;">'+_epKV('Total', m(stdPay+premPay))+'</div>';
+  }catch(e){ box.innerHTML='<div style="color:var(--text-dim);font-size:12px;">Couldn\'t load payroll.</div>'; }
+}
+
+async function _epLoadClockins(reset){
+  const s=_epStaff, full=(s.first+' '+s.last).trim();
+  const off=_epPage.clockins*_EP_PAGE;
+  try{
+    const rows=await _cdGet('clock_log?staff_name=eq.'+encodeURIComponent(full)+'&order=ts.desc&limit='+_EP_PAGE+'&offset='+off+'&select=action,ts,origin,edited_by');
+    const b=document.getElementById('empProfBody');
+    let html = (reset ? '<div style="border:1px solid var(--border);border-radius:11px;overflow:hidden;">'+_epRow([{v:'Date',w:'1.4fr',style:'font-weight:700;color:var(--text-dim);font-size:10px;text-transform:uppercase;letter-spacing:.5px;'},{v:'Action',style:'font-weight:700;color:var(--text-dim);font-size:10px;text-transform:uppercase;letter-spacing:.5px;'},{v:'Time',style:'font-weight:700;color:var(--text-dim);font-size:10px;text-transform:uppercase;letter-spacing:.5px;'},{v:'Source',style:'font-weight:700;color:var(--text-dim);font-size:10px;text-transform:uppercase;letter-spacing:.5px;'}])
+                        : (document.getElementById('_epClkRows')? '' : '')) ;
+    if(reset && (!rows||!rows.length)){ b.innerHTML=_epEmpty('No clock-ins recorded.'); return; }
+    const rowsHtml=(rows||[]).map(function(r){
+      const inOut = r.action==='in'
+        ? '<span style="color:#10b981;font-weight:700;">● In</span>'
+        : '<span style="color:#f59e0b;font-weight:700;">● Out</span>';
+      const src = r.edited_by ? ('manual · '+_cdEsc(r.edited_by)) : (r.origin||'app');
+      return _epRow([{v:_epDate(r.ts),w:'1.4fr'},{v:inOut},{v:_epTime(r.ts)},{v:'<span style="color:var(--text-dim);font-size:11px;">'+_cdEsc(src)+'</span>'}]);
+    }).join('');
+    if(reset){
+      b.innerHTML='<div id="_epClkWrap" style="border:1px solid var(--border);border-radius:11px;overflow:hidden;"><div id="_epClkRows">'+
+        _epRow([{v:'Date',w:'1.4fr',style:'font-weight:700;color:var(--text-dim);font-size:10px;text-transform:uppercase;letter-spacing:.5px;'},{v:'Status',style:'font-weight:700;color:var(--text-dim);font-size:10px;text-transform:uppercase;letter-spacing:.5px;'},{v:'Time',style:'font-weight:700;color:var(--text-dim);font-size:10px;text-transform:uppercase;letter-spacing:.5px;'},{v:'Source',style:'font-weight:700;color:var(--text-dim);font-size:10px;text-transform:uppercase;letter-spacing:.5px;'}])+
+        rowsHtml+'</div></div>'+
+        ((rows&&rows.length===_EP_PAGE)?_epMoreBtn('clockins'):'');
+    }else{
+      const cont=document.getElementById('_epClkRows'); if(cont) cont.insertAdjacentHTML('beforeend', rowsHtml);
+      const oldBtn=document.querySelector('#empProfBody .btn'); // remove old load-more
+      if(!rows||rows.length<_EP_PAGE){ if(oldBtn&&oldBtn.parentNode) oldBtn.parentNode.remove(); }
+    }
+  }catch(e){ const b=document.getElementById('empProfBody'); if(reset&&b) b.innerHTML=_epEmpty('Couldn\'t load clock-ins.'); }
+}
+
+async function _epLoadCalls(reset){
+  const s=_epStaff, full=(s.first+' '+s.last).trim();
+  const off=_epPage.calls*_EP_PAGE;
+  try{
+    const rows=await _cdGet('call_log?logged_by=eq.'+encodeURIComponent(full)+'&deleted_at=is.null&order=created_at.desc&limit='+_EP_PAGE+'&offset='+off+'&select=caller_name,phone_e164,reason,note,created_at,resolved_at,for_team');
+    const b=document.getElementById('empProfBody');
+    if(reset && (!rows||!rows.length)){ b.innerHTML=_epEmpty('No calls logged by this employee.'); return; }
+    const rowsHtml=(rows||[]).map(function(r){
+      const status=r.resolved_at?'<span style="color:#10b981;">Handled</span>':'<span style="color:#f59e0b;">Waiting</span>';
+      return _epRow([
+        {v:_epDate(r.created_at),w:'1.1fr'},
+        {v:'<span style="font-weight:600;">'+_cdEsc(r.caller_name||'—')+'</span><div style="font-size:11px;color:var(--text-dim);">'+_cdEsc(r.reason||'')+'</div>',w:'1.4fr'},
+        {v:'<span style="font-size:11px;color:var(--text-dim);">'+_cdEsc(r.for_team||r.team||'')+'</span>'},
+        {v:status}
+      ]);
+    }).join('');
+    if(reset){
+      b.innerHTML='<div style="border:1px solid var(--border);border-radius:11px;overflow:hidden;"><div id="_epCallRows">'+
+        _epRow([{v:'Date',w:'1.1fr',style:'font-weight:700;color:var(--text-dim);font-size:10px;text-transform:uppercase;letter-spacing:.5px;'},{v:'Caller / Reason',w:'1.4fr',style:'font-weight:700;color:var(--text-dim);font-size:10px;text-transform:uppercase;letter-spacing:.5px;'},{v:'Team',style:'font-weight:700;color:var(--text-dim);font-size:10px;text-transform:uppercase;letter-spacing:.5px;'},{v:'Status',style:'font-weight:700;color:var(--text-dim);font-size:10px;text-transform:uppercase;letter-spacing:.5px;'}])+
+        rowsHtml+'</div></div>'+((rows&&rows.length===_EP_PAGE)?_epMoreBtn('calls'):'');
+    }else{
+      const cont=document.getElementById('_epCallRows'); if(cont) cont.insertAdjacentHTML('beforeend', rowsHtml);
+      if(!rows||rows.length<_EP_PAGE){ const btn=document.querySelector('#empProfBody .btn'); if(btn&&btn.parentNode) btn.parentNode.remove(); }
+    }
+  }catch(e){ const b=document.getElementById('empProfBody'); if(reset&&b) b.innerHTML=_epEmpty('Couldn\'t load call logs.'); }
+}
+
+async function _epLoadLeave(reset){
+  const s=_epStaff, full=(s.first+' '+s.last).trim();
+  const off=_epPage.leave*_EP_PAGE;
+  try{
+    const rows=await _cdGet('leave_submissions?staff_name=eq.'+encodeURIComponent(full)+'&order=from_date.desc&limit='+_EP_PAGE+'&offset='+off+'&select=from_date,to_date,reason,status,reason_type');
+    const b=document.getElementById('empProfBody');
+    if(reset && (!rows||!rows.length)){ b.innerHTML=_epEmpty('No leave records.'); return; }
+    const badge=st=>{ const c={approved:'#10b981',pending:'#f59e0b',declined:'#ef4444'}[st]||'var(--text-dim)'; return '<span style="color:'+c+';font-weight:700;text-transform:capitalize;">'+(st||'—')+'</span>'; };
+    const rowsHtml=(rows||[]).map(function(r){
+      const range=r.from_date===r.to_date?_epDate(r.from_date):(_epDate(r.from_date)+' → '+_epDate(r.to_date));
+      return _epRow([{v:range,w:'1.6fr'},{v:'<span style="color:var(--text-dim);">'+_cdEsc(r.reason||r.reason_type||'')+'</span>'},{v:badge(r.status)}]);
+    }).join('');
+    if(reset){
+      b.innerHTML='<div style="border:1px solid var(--border);border-radius:11px;overflow:hidden;"><div id="_epLvRows">'+
+        _epRow([{v:'Dates',w:'1.6fr',style:'font-weight:700;color:var(--text-dim);font-size:10px;text-transform:uppercase;letter-spacing:.5px;'},{v:'Reason',style:'font-weight:700;color:var(--text-dim);font-size:10px;text-transform:uppercase;letter-spacing:.5px;'},{v:'Status',style:'font-weight:700;color:var(--text-dim);font-size:10px;text-transform:uppercase;letter-spacing:.5px;'}])+
+        rowsHtml+'</div></div>'+((rows&&rows.length===_EP_PAGE)?_epMoreBtn('leave'):'');
+    }else{
+      const cont=document.getElementById('_epLvRows'); if(cont) cont.insertAdjacentHTML('beforeend', rowsHtml);
+      if(!rows||rows.length<_EP_PAGE){ const btn=document.querySelector('#empProfBody .btn'); if(btn&&btn.parentNode) btn.parentNode.remove(); }
+    }
+  }catch(e){ const b=document.getElementById('empProfBody'); if(reset&&b) b.innerHTML=_epEmpty('Couldn\'t load leave.'); }
+}
+
+// Punctuality: pair each day's first clock-in against the rostered start isn't
+// trivially available here, so we show each clock-in day with its first punch
+// time and flag notably late mornings (after 9:30) as a light heuristic.
+async function _epLoadPunctuality(reset){
+  const s=_epStaff, full=(s.first+' '+s.last).trim();
+  const off=_epPage.punctuality*_EP_PAGE;
+  try{
+    // Pull 'in' punches, newest first; group by day, take earliest per day.
+    const rows=await _cdGet('clock_log?staff_name=eq.'+encodeURIComponent(full)+'&action=eq.in&order=ts.desc&limit='+_EP_PAGE+'&offset='+off+'&select=ts');
+    const b=document.getElementById('empProfBody');
+    if(reset && (!rows||!rows.length)){ b.innerHTML=_epEmpty('No clock-ins to assess.'); return; }
+    const rowsHtml=(rows||[]).map(function(r){
+      const d=new Date(r.ts);
+      const mins=d.getHours()*60+d.getMinutes();
+      let tag;
+      if(mins<=9*60+5) tag='<span style="color:#10b981;font-weight:700;">On time</span>';
+      else if(mins<=9*60+30) tag='<span style="color:#f59e0b;font-weight:700;">A little late</span>';
+      else tag='<span style="color:#ef4444;font-weight:700;">Late</span>';
+      return _epRow([{v:_epDate(r.ts),w:'1.4fr'},{v:_epTime(r.ts)},{v:tag}]);
+    }).join('');
+    if(reset){
+      b.innerHTML='<div style="font-size:11.5px;color:var(--text-dim);margin-bottom:12px;">First clock-in each day. Flags mornings after 9:05 / 9:30 as a rough guide — check the roster for the exact rostered start.</div>'+
+        '<div style="border:1px solid var(--border);border-radius:11px;overflow:hidden;"><div id="_epPunRows">'+
+        _epRow([{v:'Date',w:'1.4fr',style:'font-weight:700;color:var(--text-dim);font-size:10px;text-transform:uppercase;letter-spacing:.5px;'},{v:'Clock-in',style:'font-weight:700;color:var(--text-dim);font-size:10px;text-transform:uppercase;letter-spacing:.5px;'},{v:'Assessment',style:'font-weight:700;color:var(--text-dim);font-size:10px;text-transform:uppercase;letter-spacing:.5px;'}])+
+        rowsHtml+'</div></div>'+((rows&&rows.length===_EP_PAGE)?_epMoreBtn('punctuality'):'');
+    }else{
+      const cont=document.getElementById('_epPunRows'); if(cont) cont.insertAdjacentHTML('beforeend', rowsHtml);
+      if(!rows||rows.length<_EP_PAGE){ const btn=document.querySelector('#empProfBody .btn'); if(btn&&btn.parentNode) btn.parentNode.remove(); }
+    }
+  }catch(e){ const b=document.getElementById('empProfBody'); if(reset&&b) b.innerHTML=_epEmpty('Couldn\'t load punctuality.'); }
+}
+
 function editStaff(id){
   const s=staff.find(x=>x.id===id);if(!s)return;
   editingStaffId=id;
