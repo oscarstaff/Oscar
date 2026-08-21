@@ -2142,7 +2142,7 @@ button, .btn { white-space: nowrap; }
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
       <button onclick="closeEmpProfile()" class="btn btn-ghost" style="padding:7px 14px;font-size:13px;">← Back to Employees</button>
       <div style="flex:1;"></div>
-      <button id="empProfEditBtn" class="btn btn-primary" style="padding:7px 14px;font-size:12.5px;">Edit details</button>
+      <button id="empProfEditBtn" onclick="_epSwitch('details')" class="btn btn-primary" style="padding:7px 14px;font-size:12.5px;">Edit details</button>
     </div>
     <!-- header -->
     <div id="empProfHeader" style="display:flex;align-items:center;gap:16px;margin-bottom:18px;"></div>
@@ -5727,8 +5727,6 @@ function openEmpProfile(id){
   const s=staff.find(x=>x.id===id); if(!s) return;
   _epStaff=s; _epTab='overview';
   _epPage={clockins:0, calls:0, leave:0, punctuality:0};
-  const btn=document.getElementById('empProfEditBtn');
-  if(btn) btn.onclick=function(){ _epSwitch('details'); };
   _epRenderHeader(); _epRenderStats(); _epRenderTabs(); _epRenderBody();
   const pg=document.getElementById('empProfilePage');
   if(pg){ pg.style.display='block'; pg.scrollTop=0; }
@@ -5817,22 +5815,22 @@ function _epMountForm(){
   const form=document.getElementById('staffFormMovable');
   const host=document.getElementById('epDetailsHost');
   if(form && host && form.parentNode!==host){ host.appendChild(form); }
-  // Populate the form for this employee (same calls editStaff used).
   const s=_epStaff; if(!s) return;
-  editingStaffId=s.id;
-  window._editingOldName=(s.first+' '+s.last).trim();
-  document.getElementById('staffFirstName').value=s.first;
-  document.getElementById('staffLastName').value=s.last;
-  populateTeamSelect(s.team);
-  document.getElementById('staffIsManager').value=(s.isOfficeManager||s.isManager==='office')?'office':'false';
-  document.getElementById('staffType').value=s.type;
-  document.getElementById('staffMaxHours').value=s.maxHours;
-  onRoleChange(document.getElementById('staffIsManager'));
-  const adminSec=document.getElementById('staffAdminSection');
-  if(adminSec) adminSec.style.display='';
-  const _pp=document.getElementById('empProfilePanel'); if(_pp){ _pp.style.display='none'; }
-  loadStaffAccess(s);
-  loadStaffExtraTeams((s.first+' '+s.last).trim(), s.team);
+  // Populate the form for this employee. Each step is guarded so that if any
+  // one helper throws on real data, the form still shows (just missing that
+  // one field) instead of the whole tab collapsing.
+  try{ editingStaffId=s.id; window._editingOldName=(s.first+' '+s.last).trim(); }catch(e){}
+  try{ document.getElementById('staffFirstName').value=s.first; }catch(e){}
+  try{ document.getElementById('staffLastName').value=s.last; }catch(e){}
+  try{ populateTeamSelect(s.team); }catch(e){ console.warn('populateTeamSelect',e); }
+  try{ document.getElementById('staffIsManager').value=(s.isOfficeManager||s.isManager==='office')?'office':'false'; }catch(e){}
+  try{ document.getElementById('staffType').value=s.type; }catch(e){}
+  try{ document.getElementById('staffMaxHours').value=s.maxHours; }catch(e){}
+  try{ onRoleChange(document.getElementById('staffIsManager')); }catch(e){ console.warn('onRoleChange',e); }
+  try{ const adminSec=document.getElementById('staffAdminSection'); if(adminSec) adminSec.style.display=''; }catch(e){}
+  try{ const _pp=document.getElementById('empProfilePanel'); if(_pp){ _pp.style.display='none'; } }catch(e){}
+  try{ loadStaffAccess(s); }catch(e){ console.warn('loadStaffAccess',e); }
+  try{ loadStaffExtraTeams((s.first+' '+s.last).trim(), s.team); }catch(e){ console.warn('loadStaffExtraTeams',e); }
 }
 function _epReturnForm(){
   const form=document.getElementById('staffFormMovable');
