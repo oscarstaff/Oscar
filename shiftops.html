@@ -5846,6 +5846,7 @@ function _epRenderTabs(){
 }
 function _epSwitch(tab){
   const prev=_epTab;
+  if(prev===tab) return;   // already on this tab — no rebuild, no jump
   // Leaving the Details tab → put the edit form back in the modal shell.
   if(prev==='details' && tab!=='details') _epReturnForm();
   _epTab=tab;
@@ -5858,12 +5859,11 @@ function _epSwitch(tab){
     });
   }
   _epRenderBody();
-  // Keep the view anchored: after switching, scroll the tab strip to the top of
-  // the viewport so every tab opens at a consistent position instead of leaving
-  // you stranded mid-page (the "jump").
+  // Anchor the view at the top of the profile so switching tabs never strands
+  // you mid-page or throws you to the bottom.
   try{
-    const tabs=document.getElementById('empProfTabs');
-    if(tabs && tabs.scrollIntoView) tabs.scrollIntoView({block:'start'});
+    const pg=document.getElementById('empProfilePage');
+    if(pg) pg.scrollTop=0;
   }catch(e){}
 }
 // Details edits inline (no popup). Reuses the exact same fields + saveStaff()
@@ -5951,6 +5951,10 @@ async function _epSaveDetails(){
 
 function _epRenderBody(){
   const b=document.getElementById('empProfBody'); if(!b) return;
+  // Before wiping the body, always rescue the shared edit form back into the
+  // modal shell — otherwise setting innerHTML destroys it (that's the "click
+  // Employee information twice and it collapses to just Save/Cancel" bug).
+  try{ _epReturnForm(); }catch(e){}
   if(_epTab==='overview'){ _epOverview(b); return; }
   if(_epTab==='clockins'){ b.innerHTML=_epLoading(); _epLoadClockins(true); return; }
   if(_epTab==='punctuality'){ b.innerHTML=_epLoading(); _epLoadPunctuality(true); return; }
