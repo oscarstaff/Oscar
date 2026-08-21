@@ -2431,7 +2431,7 @@ button, .btn { white-space: nowrap; }
 </div>
 
 <!-- RESET PASSWORD MODAL -->
-<div class="modal-overlay" id="resetPassModal">
+<div class="modal-overlay" id="resetPassModal" style="z-index:1001;">
   <div class="modal" style="width:420px">
     <div class="modal-title"><span>Password Management</span><button class="modal-close" onclick="closeModal('resetPassModal')">×</button></div>
     <div id="resetPassName" style="font-size:13.5px;font-weight:700;color:var(--text-mid);margin-bottom:16px"></div>
@@ -6276,7 +6276,12 @@ function onStaffAdminToggle(box){
 // Persist the edit panel's access choices for one staff member
 async function saveStaffAccess(fullName){
   if(!fullName) return;
-  const H={apikey:AA_KEY,Authorization:'Bearer '+AA_KEY};
+  // RLS on app_access / staff_settings requires the AUTHENTICATED role. The
+  // anon key alone is rejected, so admin/team-lead changes silently failed.
+  // Use the signed-in user's token for Authorization (apikey stays the anon
+  // public key, which is correct). Fall back to anon only if no token.
+  const _tok = (typeof _soTok==='function' && _soTok()) ? _soTok() : AA_KEY;
+  const H={apikey:AA_KEY,Authorization:'Bearer '+_tok};
   const HJ={...H,'Content-Type':'application/json'};
   const jobs=[];
   const isAdmin = !!(document.getElementById('saAccess_admin')||{}).checked;
@@ -6362,7 +6367,10 @@ async function saveStaff(){
         {method:'PATCH',headers:{..._CD_HJ,'Prefer':'return=minimal'},body:body});
     }catch(e){ console.warn('save personal details',e); }
     // keep local admin flag in sync so the row badge updates without a reload
-    if(s){ const isAdmin=!!(document.getElementById('saAccess_admin')||{}).checked; s.isHubAdmin=isAdmin; s.isShiftAdmin=isAdmin; }
+    if(s){ const isAdmin=!!(document.getElementById('saAccess_admin')||{}).checked; s.isHubAdmin=isAdmin; s.isShiftAdmin=isAdmin; s.isTeamLead=(!!(document.getElementById('saAccess_shiftops')||{}).checked) && !isAdmin; }
+    // Role may have changed (admin ↔ team lead). Clear the latch and re-resolve
+    // so the read-only lock updates this session instead of only after reload.
+    try{ _tlResolved=false; if(typeof applyTeamLeadLock==='function') applyTeamLeadLock(); }catch(e){}
     closeModal('staffModal');forceSave();renderAll();showToast('Staff updated');pushStaffNames();
   }else{
     const s={id:nextStaffId++,first,last,team,isManager:isOfficeManager?'office':isManager,isOfficeManager,type,maxHours,color:COLORS[(nextStaffId-2)%COLORS.length]};
