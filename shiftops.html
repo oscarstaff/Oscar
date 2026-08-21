@@ -2147,10 +2147,10 @@ button, .btn { white-space: nowrap; }
     <div id="empProfHeader" style="display:flex;align-items:center;gap:16px;margin-bottom:18px;"></div>
     <!-- stat cards -->
     <div id="empProfStats" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:22px;"></div>
-    <!-- sub-tabs -->
-    <div id="empProfTabs" style="display:flex;gap:2px;border-bottom:1px solid var(--border);margin-bottom:20px;overflow-x:auto;"></div>
+    <!-- sub-tabs (sticky so switching never shifts them) -->
+    <div id="empProfTabs" style="display:flex;gap:2px;border-bottom:1px solid var(--border);margin-bottom:20px;overflow-x:auto;position:sticky;top:0;background:var(--bg,#0f1117);z-index:5;padding-top:4px;"></div>
     <!-- tab content -->
-    <div id="empProfBody" style="min-height:240px;"></div>
+    <div id="empProfBody" style="min-height:60vh;"></div>
   </div>
 </div>
 </div>
@@ -5817,9 +5817,14 @@ function _epSwitch(tab){
     });
   }
   _epRenderBody();
+  // Keep the view anchored: after switching, scroll the tab strip to the top of
+  // the viewport so every tab opens at a consistent position instead of leaving
+  // you stranded mid-page (the "jump").
+  try{
+    const tabs=document.getElementById('empProfTabs');
+    if(tabs && tabs.scrollIntoView) tabs.scrollIntoView({block:'start'});
+  }catch(e){}
 }
-
-// Move the shared edit form OUT of the modal and INTO the profile body, so
 // Details edits inline (no popup). Reuses the exact same fields + saveStaff()
 // logic — nothing is duplicated. _epReturnForm() puts it back.
 function _epMountForm(){
