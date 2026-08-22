@@ -4722,6 +4722,42 @@ function showAvailTab(tab){
 
 let submittedAvailData=[];
 
+// Render one 7-day availability grid. When `compareTo` is supplied, any day
+// that differs from it is outlined so admins can see exactly what changed.
+function _availDayLabel(a){
+  if(!a) a={type:'unset'};
+  if(a.type==='all')    return {label:'9-7',bg:'rgba(0,200,150,.08)',col:'var(--accent)',fw:'600'};
+  if(a.type==='custom') return {label:(a.start||'?')+'–'+(a.end||'?'),bg:'rgba(79,142,247,.08)',col:'var(--accent)',fw:'600'};
+  if(a.type==='no')     return {label:'Off',bg:'rgba(220,38,38,.06)',col:'var(--warn)',fw:'600'};
+  return {label:'—',bg:'transparent',col:'var(--muted)',fw:'400'};
+}
+function _availDaysDiffer(a,b){
+  a=a||{type:'unset'}; b=b||{type:'unset'};
+  if(a.type!==b.type) return true;
+  if(a.type==='custom') return (a.start!==b.start)||(a.end!==b.end);
+  return false;
+}
+function _renderAvailGrid(avObj,compareTo){
+  const DAYS_SHORT=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  let h='<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:0;">';
+  DAYS_SHORT.forEach(function(day,i){
+    const a=avObj[i]||avObj[String(i)]||{type:'unset'};
+    const st=_availDayLabel(a);
+    let changed=false;
+    if(compareTo){
+      const b=compareTo[i]||compareTo[String(i)]||{type:'unset'};
+      changed=_availDaysDiffer(a,b);
+    }
+    const ring=changed?'box-shadow:inset 0 0 0 2px var(--warn);':'';
+    h+='<div style="padding:10px 4px;text-align:center;background:'+st.bg+';border-right:1px solid var(--border);position:relative;'+ring+'">';
+    h+='<div style="font-family:var(--mono);font-size:8px;font-weight:700;color:var(--muted);margin-bottom:4px;">'+day+'</div>';
+    h+='<div style="font-size:9.5px;font-weight:'+st.fw+';color:'+st.col+';line-height:1.3;">'+st.label+'</div>';
+    h+='</div>';
+  });
+  h+='</div>';
+  return h;
+}
+
 async function loadSubmittedAvailability(){
   const el=document.getElementById('submittedAvailContent');
   if(!el)return;
@@ -4746,10 +4782,16 @@ async function loadSubmittedAvailability(){
     let _needsReviewCount=0;
     rows.forEach(row=>{
       const av=row.availability||{};
-      // Needs review = staff changed availability after we last marked it reviewed.
-      const _upd=row.updated_at?new Date(row.updated_at).getTime():0;
+      const pend=row.pending_availability||null;
+      const hasPending=!!(pend&&row.pending_from);
+      // Needs review = staff changed availability after we last marked it
+      // reviewed. A future-dated pending submission counts too: its updated_at
+      // may be old (only pending_set_at moved), so check that as well —
+      // otherwise pending changes stay invisible until they promote.
       const _rev=row.availability_reviewed_at?new Date(row.availability_reviewed_at).getTime():0;
-      const needsReview=_upd>_rev;
+      const _upd=row.updated_at?new Date(row.updated_at).getTime():0;
+      const _pset=row.pending_set_at?new Date(row.pending_set_at).getTime():0;
+      const needsReview=(_upd>_rev)||(hasPending&&_pset>_rev);
       if(needsReview)_needsReviewCount++;
       const _nameEsc=String(row.staff_name).replace(/'/g,"\\'").replace(/"/g,'&quot;');
       // Period label
@@ -4791,23 +4833,23 @@ async function loadSubmittedAvailability(){
       html+='</div>';
       html+='</div>';
 
-      // Days grid
-      html+='<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:0;">';
-      DAYS_SHORT.forEach(function(day,i){
-        const a=av[i]||av[String(i)]||{type:'unset'};
-        let label='—';
-        let bg='transparent';
-        let textCol='var(--muted)';
-        let fw='400';
-        if(a.type==='all'){label='9-7';bg='rgba(0,200,150,.08)';textCol='var(--accent)';fw='600';}
-        else if(a.type==='custom'){label=(a.start||'?')+'–'+(a.end||'?');bg='rgba(79,142,247,.08)';textCol='var(--accent)';fw='600';}
-        else if(a.type==='no'){label='Off';bg='rgba(220,38,38,.06)';textCol='var(--warn)';fw='600';}
-        html+='<div style="padding:10px 4px;text-align:center;background:'+bg+';border-right:1px solid var(--border);">';
-        html+='<div style="font-family:var(--mono);font-size:8px;font-weight:700;color:var(--muted);margin-bottom:4px;">'+day+'</div>';
-        html+='<div style="font-size:9.5px;font-weight:'+fw+';color:'+textCol+';line-height:1.3;">'+label+'</div>';
+      // Current (live) grid. If there's a pending change, label this as current.
+      if(hasPending){
+        html+='<div style="font-family:var(--mono);font-size:8px;font-weight:800;letter-spacing:.5px;color:var(--muted);padding:8px 16px 4px;">CURRENT</div>';
+      }
+      html+=_renderAvailGrid(av,null);
+
+      // Pending (future-dated) grid — the change that hasn't taken effect yet.
+      if(hasPending){
+        const _pf=row.pending_from;
+        let _pfLabel=_pf;
+        try{ _pfLabel=new Date(_pf+'T00:00:00').toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short'}); }catch(e){}
+        html+='<div style="display:flex;align-items:center;gap:8px;padding:10px 16px 4px;border-top:1px dashed var(--border);margin-top:2px;">';
+        html+='<span style="font-family:var(--mono);font-size:8px;font-weight:800;letter-spacing:.5px;color:var(--warn);">NEW — EFFECTIVE '+_pfLabel+'</span>';
+        html+='<span style="font-size:9px;color:var(--muted);">outlined days changed</span>';
         html+='</div>';
-      });
-      html+='</div>';
+        html+=_renderAvailGrid(pend,av);
+      }
       html+='</div>';
     });
 
@@ -5756,7 +5798,7 @@ function openAddStaff(){
   if(_pp){ _pp.style.display='none'; _pp.innerHTML=''; }
   const adminSec0=document.getElementById('staffAdminSection');
   if(adminSec0) adminSec0.style.display='none';
-  ['staffFirstName','staffLastName'].forEach(id=>document.getElementById(id).value='');
+  ['staffFirstName','staffLastName','staffBirthday','staffPronouns','staffEmail'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   populateTeamSelect(null);
   document.getElementById('staffIsManager').value='false';
   document.getElementById('staffType').value='full';
