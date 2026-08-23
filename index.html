@@ -599,105 +599,132 @@ body::before{
 }
 .auth-link:hover{text-decoration:underline;}
 
-/* ── SPLIT-SCREEN LOGIN (login page only) ───────────────────
-   Desktop: brand panel left (colored), form right.
-   Phone: stacks to a single centered column, no card. */
+/* ── SPLIT LOGIN — CONNECTED FIELD (concept A, login page only) ──
+   Left brand panel (soft green wash + drifting node network, Nexus's own
+   "nodes connect to form N" motif) with the wordmark and tagline; right panel
+   holds a small greeting and the form as a flex column. No fragile grid-cell
+   transforms — the right side is one flex container, so returning from the
+   security-questions / set-password pages re-lays-out cleanly. */
 #authLayer.login-edge{
   justify-content:stretch;
   align-items:stretch;
   padding:0;
+  position:fixed;inset:0;
 }
 #authLayer.login-edge .auth-box{
   max-width:none;width:100%;
   display:block;min-height:100dvh;
 }
-/* the page becomes the split grid */
+/* full page becomes a 2-col split */
 #authLayer.login-edge #pg-login{
   display:grid;
-  grid-template-columns:1.05fr 1fr;
-  grid-template-rows:100dvh;
+  grid-template-columns:1.1fr 1fr;
   min-height:100dvh;width:100%;
 }
-/* LEFT brand panel — wordmark + tagline, accent wash */
+/* faint node canvas — sits over the LEFT panel only */
+#authLayer #loginNet{ display:none; }
+#authLayer.login-edge #loginNet{
+  display:block;
+  position:absolute;top:0;left:0;height:100%;
+  width:52.4%;                 /* matches the 1.1fr share of the grid */
+  opacity:.9;pointer-events:none;z-index:1;
+}
+/* LEFT brand panel: painted via a pseudo so markup stays put */
+#authLayer.login-edge #pg-login::before{
+  content:"";grid-column:1;grid-row:1;
+  background:
+    radial-gradient(120% 100% at 12% 18%, rgba(5,150,105,.16) 0%, transparent 55%),
+    linear-gradient(155deg,#e8f2ed 0%,#dceee6 45%,#cfe8dc 100%);
+  background-color:#dceee6;
+  border-right:1px solid var(--accent-bd);
+}
+/* wordmark + tagline: left panel, vertically centered, above the canvas */
 #authLayer.login-edge .auth-logo{
   grid-column:1;grid-row:1;
   align-self:center;justify-self:end;
-  width:100%;max-width:420px;
-  box-sizing:border-box;
-  padding:0 clamp(32px,5vw,72px);
-  font-size:clamp(44px,4vw,60px);
-  animation:none;margin:0 0 12px;letter-spacing:-1.2px;
-  text-align:left;z-index:1;
+  width:100%;max-width:440px;box-sizing:border-box;
+  padding:0 clamp(40px,5vw,76px);
+  font-size:clamp(46px,4.4vw,64px);
+  animation:none;margin:0 0 14px;letter-spacing:-.04em;
+  text-align:left;z-index:2;line-height:1;
 }
 #authLayer.login-edge .auth-tagline{
   grid-column:1;grid-row:1;
   align-self:center;justify-self:end;
-  width:100%;max-width:420px;
-  box-sizing:border-box;
-  padding:0 clamp(32px,5vw,72px);
-  transform:translateY(46px);            /* sit just under the wordmark */
+  width:100%;max-width:440px;box-sizing:border-box;
+  padding:0 clamp(40px,5vw,76px);
+  transform:translateY(52px);        /* sit just under the wordmark */
   text-transform:none;letter-spacing:.1px;
-  font-size:16px;color:var(--accent-text);opacity:.85;
-  text-align:left;margin:0;z-index:1;
+  font-size:16px;color:var(--accent-text);opacity:.9;
+  text-align:left;margin:0;line-height:1.5;z-index:2;
 }
-/* the colored panel itself (painted via a pseudo so markup stays put) */
-#authLayer.login-edge #pg-login::before{
-  content:"";grid-column:1;grid-row:1;
-  background:linear-gradient(160deg,var(--accent-dim),transparent 70%),
-             var(--accent-dim);
-  border-right:1px solid var(--accent-bd);
+/* small footer anchor bottom-left of the brand panel */
+#authLayer.login-edge #loginFoot{
+  grid-column:1;grid-row:1;
+  align-self:end;justify-self:start;
+  padding:0 0 30px clamp(40px,5vw,76px);
+  font-size:12px;color:var(--accent-text);opacity:.6;letter-spacing:.02em;
+  z-index:2;
 }
-/* RIGHT form panel — card + both links share one cell, stacked */
-#authLayer.login-edge .auth-card,
-#authLayer.login-edge #pg-login .auth-link{
+/* RIGHT form panel — greeting + card + links as one flex column */
+#authLayer.login-edge .auth-right{
   grid-column:2;grid-row:1;
-}
-#authLayer.login-edge .auth-card{
   align-self:center;justify-self:start;
-  width:100%;max-width:380px;
-  margin:0;padding:0 clamp(32px,5vw,72px) !important;
-  background:transparent !important;border:none !important;border-radius:0 !important;
-  box-shadow:none !important;animation:none !important;
+  display:flex;flex-direction:column;
+  width:100%;max-width:360px;box-sizing:border-box;
+  padding:0 clamp(40px,5vw,72px);
 }
-/* links flow right under the card via a translate from the card's center line */
-#authLayer.login-edge #pg-login .auth-link{
-  align-self:center;justify-self:start;
-  width:100%;max-width:380px;box-sizing:border-box;
-  padding-left:clamp(32px,5vw,72px);
-  padding-right:clamp(32px,5vw,72px);
-  text-align:left;
+#authLayer.login-edge .auth-greet{
+  order:-1;margin:0 0 24px;
 }
-#authLayer.login-edge #pg-login .auth-link:nth-of-type(1){ transform:translateY(150px); }
-#authLayer.login-edge #pg-login .auth-link:nth-of-type(2){ transform:translateY(188px); }
-#authLayer.login-edge #pg-login .f-input{
+#authLayer.login-edge .auth-greet h2{
+  font-size:22px;font-weight:800;letter-spacing:-.02em;margin:0 0 4px;color:#0f172a;
+}
+#authLayer.login-edge .auth-greet p{
+  font-size:13px;color:#64748b;margin:0;
+}
+#authLayer.login-edge .auth-right .auth-card{
+  width:100%;margin:0;padding:0 !important;
+  background:transparent !important;border:none !important;
+  border-radius:0 !important;box-shadow:none !important;animation:none !important;
+}
+#authLayer.login-edge .auth-right .auth-link{
+  text-align:left;transform:none;margin-top:14px;padding:2px 0;
+}
+#authLayer.login-edge .auth-right .auth-link:first-of-type{ margin-top:20px; }
+#authLayer.login-edge .f-input{
   background:#fff;border-color:#e2e8f0;
 }
+/* the brand-panel wordmark/tagline show only in the split; hide the greeting's
+   duplicate role — greeting stays on the right */
 
-/* ── Phone / narrow: stack to single column, no panel ── */
+/* respect reduced-motion: canvas script also checks this */
+@media (prefers-reduced-motion:reduce){
+  #authLayer.login-edge #loginNet{ opacity:.6; }
+}
+
+/* ── Phone / narrow: stack to one centered column, drop the panel ── */
 @media (max-width:760px){
+  #authLayer.login-edge{ padding:max(48px,8vh) 24px 40px; overflow-y:auto; }
+  #authLayer.login-edge .auth-box{ min-height:auto;max-width:420px;margin:0 auto; }
   #authLayer.login-edge #pg-login{
-    display:block;min-height:100dvh;
-    max-width:440px;margin:0 auto;
-    padding:max(56px,10vh) 24px 40px;
+    display:block;min-height:auto;width:100%;
   }
   #authLayer.login-edge #pg-login::before{ display:none; }
+  #authLayer.login-edge #loginNet{ display:none; }
   #authLayer.login-edge .auth-logo{
     max-width:none;padding:0;font-size:clamp(40px,9vw,52px);
-    margin-bottom:10px;justify-self:auto;
+    margin:0 0 8px;justify-self:auto;text-align:left;
   }
   #authLayer.login-edge .auth-tagline{
     max-width:none;padding:0;transform:none;
-    color:#64748b;opacity:1;margin-bottom:36px;justify-self:auto;
+    color:#64748b;opacity:1;margin:0 0 30px;justify-self:auto;text-align:left;
   }
-  #authLayer.login-edge .auth-card{
-    max-width:none;padding:0 !important;justify-self:auto;
+  #authLayer.login-edge #loginFoot{ display:none; }
+  #authLayer.login-edge .auth-right{
+    max-width:none;padding:0;justify-self:auto;align-self:auto;
   }
-  #authLayer.login-edge #pg-login .auth-link{
-    max-width:none;padding-left:0;padding-right:0;
-    transform:none;align-self:auto;
-  }
-  #authLayer.login-edge #pg-login .auth-link:nth-of-type(1){ transform:none;margin-top:14px; }
-  #authLayer.login-edge #pg-login .auth-link:nth-of-type(2){ transform:none; }
+  #authLayer.login-edge .auth-greet{ margin-bottom:20px; }
 }
 
 /* ── SHELL ── */
@@ -5424,11 +5451,17 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
 <!-- ── AUTH ── -->
 
 <div id="authLayer" class="login-edge" style="display:none">
+  <canvas id="loginNet"></canvas>
   <div class="auth-box">
 
     <div id="pg-login">
       <div class="auth-logo">Nexus</div>
       <div class="auth-tagline">Time, training, and team</div>
+      <div class="auth-right">
+      <div class="auth-greet">
+        <h2>Welcome back</h2>
+        <p>Sign in with your full name and password.</p>
+      </div>
       <div class="auth-card">
         <div class="alert alert-err" id="loginErr"></div>
         <div class="field">
@@ -5443,6 +5476,7 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
       </div>
       <button class="auth-link" onclick="showAuth('setpass')">First time? Set your password</button>
       <button class="auth-link" onclick="showAuth('resetkey')">Forgot password? Answer security questions</button>
+      </div>
     </div>
 
     <div id="pg-setpass" style="display:none">
@@ -5519,6 +5553,51 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
 
   </div>
 </div>
+
+<script id="nexus-login-net-v1">
+/* Faint drifting node network behind the login card — Nexus's own motif
+   ("nodes connect to form N"). Only runs while the login page is visible;
+   pauses when hidden and honours prefers-reduced-motion. */
+(function(){
+  var c=document.getElementById('loginNet'); if(!c) return;
+  var ctx=c.getContext('2d'), W=0,H=0,DPR=Math.min(window.devicePixelRatio||1,2);
+  var reduce=window.matchMedia&&window.matchMedia('(prefers-reduced-motion:reduce)').matches;
+  var N=26, LINK=140, pts=[], raf=null;
+  function accent(){
+    try{ var v=getComputedStyle(document.documentElement).getPropertyValue('--accent').trim(); return v||'#059669'; }
+    catch(e){ return '#059669'; }
+  }
+  function size(){ W=c.clientWidth;H=c.clientHeight; c.width=W*DPR;c.height=H*DPR; ctx.setTransform(DPR,0,0,DPR,0,0); }
+  function init(){ pts=[]; for(var i=0;i<N;i++) pts.push({x:Math.random()*W,y:Math.random()*H,vx:(Math.random()-.5)*.22,vy:(Math.random()-.5)*.22}); }
+  function frame(){
+    var col=accent();
+    ctx.clearRect(0,0,W,H);
+    var i,j;
+    if(!reduce){ for(i=0;i<pts.length;i++){var p=pts[i];p.x+=p.vx;p.y+=p.vy;if(p.x<0||p.x>W)p.vx*=-1;if(p.y<0||p.y>H)p.vy*=-1;} }
+    for(i=0;i<pts.length;i++){
+      for(j=i+1;j<pts.length;j++){
+        var a=pts[i],b=pts[j],dx=a.x-b.x,dy=a.y-b.y,d=Math.sqrt(dx*dx+dy*dy);
+        if(d<LINK){ ctx.globalAlpha=(1-d/LINK)*.18; ctx.strokeStyle=col; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke(); }
+      }
+    }
+    ctx.globalAlpha=.4; ctx.fillStyle=col;
+    for(i=0;i<pts.length;i++){ ctx.beginPath(); ctx.arc(pts[i].x,pts[i].y,1.8,0,6.283); ctx.fill(); }
+    ctx.globalAlpha=1;
+    if(!reduce) raf=requestAnimationFrame(frame);
+  }
+  function start(){ if(raf) return; if(!c.clientWidth) size(); if(!pts.length) init(); frame(); }
+  function stop(){ if(raf){ cancelAnimationFrame(raf); raf=null; } }
+  function visible(){ var a=document.getElementById('authLayer'); return a && a.style.display!=='none' && a.classList.contains('login-edge'); }
+  function tick(){ if(visible()){ size(); init(); start(); } else { stop(); } }
+  window.addEventListener('resize', function(){ if(visible()){ size(); init(); } });
+  // React to the login screen being shown/hidden (display + class toggles)
+  try{
+    var a=document.getElementById('authLayer');
+    new MutationObserver(tick).observe(a,{attributes:true,attributeFilter:['style','class']});
+  }catch(e){}
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',tick); else tick();
+})();
+</script>
 
 <!-- ── HUB ── -->
 <div id="hubLayer" class="shell" style="display:none">
@@ -9338,7 +9417,12 @@ async function openGatedApp(ev,app,url){
 }
 function showAuth(s){
   ["login","setpass","resetkey"].forEach(p=>document.getElementById("pg-"+p).style.display="none");
-  document.getElementById("pg-"+s).style.display="block";
+  // Clear inline display for the login page so the stylesheet's grid layout
+  // wins (.login-edge #pg-login{display:grid}). Forcing "block" here was what
+  // collapsed / dissociated the split layout when returning from the
+  // security-questions page.
+  const pg=document.getElementById("pg-"+s);
+  pg.style.display = (s==="login") ? "" : "block";
   try{ document.getElementById("authLayer").classList.toggle("login-edge", s==="login"); }catch(e){}
 }
 
@@ -23595,6 +23679,72 @@ input:focus{
 .pw-eye:hover{ color:var(--accent-text); background:var(--accent-dim); }
 :is([data-theme="dark"],[data-theme="midnight"],[data-theme="renaissance"]) .pw-eye{ color:var(--m-ink-3); }
 :is([data-theme="dark"],[data-theme="midnight"],[data-theme="renaissance"]) .pw-eye:hover{ color:var(--accent-text); background:var(--accent-dim); }
+
+/* ── LOGIN PAGE = PLAIN NEXUS (theme-independent) ─────────────
+   The login screen must always render as the plain/default Nexus look,
+   ignoring the active theme (no serif-gold wordmark, no dark card, no warm
+   --m-* overrides, no shimmer). Scoped to #authLayer.login-edge so ONLY the
+   login page is reset — setpass / resetkey and the rest of the app keep their
+   theming. Placed last so it wins the cascade. */
+#authLayer.login-edge{
+  background:#f6f4ef !important;
+}
+/* LEFT brand panel wash stays plain green on every theme */
+#authLayer.login-edge #pg-login::before{
+  background:
+    radial-gradient(120% 100% at 12% 18%, rgba(5,150,105,.16) 0%, transparent 55%),
+    linear-gradient(155deg,#e8f2ed 0%,#dceee6 45%,#cfe8dc 100%) !important;
+  background-color:#dceee6 !important;
+  border-right:1px solid var(--accent-bd) !important;
+}
+/* wordmark: plain solid accent, sans-serif, no gradient/shimmer/animation */
+#authLayer.login-edge .auth-logo,
+:is([data-theme="dark"],[data-theme="midnight"],[data-theme="renaissance"]) #authLayer.login-edge .auth-logo{
+  font-family:'Inter',system-ui,sans-serif !important;
+  font-weight:900 !important;
+  background:none !important;
+  -webkit-background-clip:border-box !important; background-clip:border-box !important;
+  -webkit-text-fill-color:var(--accent) !important;
+  color:var(--accent) !important;
+  animation:none !important;
+  letter-spacing:-.04em !important;
+}
+/* tagline: sentence-case, sits under the wordmark on the brand panel */
+#authLayer.login-edge .auth-tagline{
+  color:var(--accent-text) !important; opacity:.9 !important;
+  text-transform:none !important; letter-spacing:.1px !important;
+}
+/* right panel is transparent (form sits on paper, no card chrome) */
+#authLayer.login-edge .auth-right,
+:is([data-theme="dark"],[data-theme="midnight"],[data-theme="renaissance"]) #authLayer.login-edge .auth-right{
+  background:transparent !important; border:none !important;
+  box-shadow:none !important; color:#0f172a !important;
+}
+#authLayer.login-edge .auth-card,
+:is([data-theme="dark"],[data-theme="midnight"],[data-theme="renaissance"]) #authLayer.login-edge .auth-card{
+  background:transparent !important; border:none !important;
+  border-radius:0 !important; box-shadow:none !important;
+  padding:0 !important; animation:none !important; color:#0f172a !important;
+}
+/* greeting text pinned on every theme */
+#authLayer.login-edge .auth-greet h2{ color:#0f172a !important; }
+#authLayer.login-edge .auth-greet p{ color:#64748b !important; }
+/* inputs: plain white with light borders on every theme */
+#authLayer.login-edge .f-input,
+:is([data-theme="dark"],[data-theme="midnight"],[data-theme="renaissance"]) #authLayer.login-edge .f-input{
+  background:#fff !important; border-color:#e2e8f0 !important; color:#0f172a !important;
+}
+#authLayer.login-edge .f-input::placeholder{ color:#94a3b8 !important; }
+#authLayer.login-edge .field-label{ color:#0f172a !important; }
+/* links: plain accent */
+#authLayer.login-edge .auth-link{ color:var(--accent) !important; }
+/* sign-in button: full width, white label on every theme */
+#authLayer.login-edge .auth-card .btn-green,
+:is([data-theme="dark"],[data-theme="midnight"],[data-theme="renaissance"]) #authLayer.login-edge .auth-card .btn-green{
+  width:100% !important; display:block !important;
+  background:linear-gradient(135deg,var(--accent),#047857) !important;
+  color:#fff !important; box-shadow:0 6px 18px rgba(5,150,105,.28) !important;
+}
 </style>
 
 <!-- DialTRAC (Call Log tab) — extracted module. Bump ?v= on each deploy. -->
