@@ -2012,7 +2012,11 @@ body.ready{visibility:visible;}
 .prof-tab.active,.sched-tab.active,.eng-tab.active{
   color:var(--accent);
   border-bottom-color:var(--accent);
-  font-weight:600;
+  /* Faux-bold via text-shadow instead of font-weight:600, so the label doesn't
+     get wider when it becomes active — that width change reflowed the whole tab
+     bar and caused the jump when switching subtabs. */
+  font-weight:500;
+  text-shadow:0 0 .01px currentColor;
 }
 
 /* Mobile */
@@ -2755,7 +2759,8 @@ width:none !important;
 .eng-tab.active{
   color:#0f172a !important;
   border-bottom-color:#0f172a !important;
-  font-weight:600 !important;
+  font-weight:500 !important;
+  text-shadow:0 0 .01px currentColor;
   background:transparent !important;
 }
 :is([data-theme="dark"],[data-theme="midnight"],[data-theme="renaissance"]) .eng-tab.active{
@@ -5399,6 +5404,8 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
 
 <!-- Supabase JS client (for realtime notification sync) -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 
 </head>
 <body>
@@ -5474,8 +5481,38 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
         </div>
         <button class="btn btn-green btn-block" id="loginBtn" onclick="doLogin()">Sign In</button>
       </div>
-      <button class="auth-link" onclick="showAuth('setpass')">First time? Set your password</button>
-      <button class="auth-link" onclick="showAuth('resetkey')">Forgot password? Answer security questions</button>
+      <button class="auth-link" onclick="showAuth('forgot')">Forgot password?</button>
+      </div>
+    </div>
+
+    <!-- Forgot password → email a reset link -->
+    <div id="pg-forgot" style="display:none">
+      <div class="auth-logo">Reset Password</div>
+      <div class="auth-tagline">We'll email you a secure link</div>
+      <div class="auth-card">
+        <div class="alert alert-err" id="fpErr"></div>
+        <div class="alert alert-ok" id="fpOk"></div>
+        <div class="field" style="margin-bottom:20px">
+          <label class="field-label">Email Address</label>
+          <input class="f-input" type="email" id="fpEmail" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="you@example.com" onkeydown="if(event.key==='Enter')doForgotRequest()">
+        </div>
+        <button class="btn btn-green btn-block" id="fpBtn" onclick="doForgotRequest()">Email me a reset link</button>
+        <button class="btn btn-outline btn-block" onclick="showAuth('resetkey')" style="margin-top:8px">No email? Use security questions</button>
+        <button class="btn btn-outline btn-block" onclick="showAuth('login')" style="margin-top:8px">Back to Sign In</button>
+      </div>
+    </div>
+
+    <!-- Set a new password from an emailed reset link (?reset=TOKEN) -->
+    <div id="pg-setnew" style="display:none">
+      <div class="auth-logo">New Password</div>
+      <div class="auth-tagline" id="snWho">Choose a new password</div>
+      <div class="auth-card">
+        <div class="alert alert-err" id="snErr"></div>
+        <div class="alert alert-ok" id="snOk"></div>
+        <div class="field"><label class="field-label">New Password</label><input class="f-input" type="password" id="snNew" placeholder="Minimum 8 characters"></div>
+        <div class="field" style="margin-bottom:20px"><label class="field-label">Confirm Password</label><input class="f-input" type="password" id="snConfirm" placeholder="Repeat your password" onkeydown="if(event.key==='Enter')doSetNewPassword()"></div>
+        <button class="btn btn-green btn-block" id="snBtn" onclick="doSetNewPassword()">Set Password &amp; Sign In</button>
+        <button class="btn btn-outline btn-block" onclick="showAuth('login')" style="margin-top:8px">Back to Sign In</button>
       </div>
     </div>
 
@@ -6325,6 +6362,7 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
       <div class="tab-bar" id="reportsSubtabs" style="margin-bottom:14px;padding:0 4px;">
         <button class="eng-tab active" id="rtab-hours" onclick="showReportsTab('hours')">Hours</button>
         <button class="eng-tab" id="rtab-manager" onclick="showReportsTab('manager')" style="display:none;">Timesheet Manager</button>
+        <button class="eng-tab" id="rtab-teamreport" onclick="showReportsTab('teamreport')" style="display:none;">Team Report</button>
       </div>
       <div id="rsec-hours">
         <div class="card" id="fortReportCard" style="margin-bottom:14px;padding:16px;">
@@ -6390,11 +6428,71 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
         <div id="mgrReportResults" class="card" style="padding:16px;margin-bottom:14px;">Pick a staff member.</div>
       </div>
 
+      <!-- TEAM REPORT (Processing team only; report generator is admin-only) -->
+      <div id="rsec-teamreport" style="display:none;">
+
+        <!-- Staff daily entry -->
+        <div class="card" id="trEntryCard" style="margin-bottom:14px;padding:16px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:4px;">
+            <div class="card-title" style="margin:0;">Daily work log</div>
+            <input type="date" id="trDate" onchange="trLoadDay()" style="border:1.5px solid #e2e8f0;border-radius:8px;padding:7px 11px;font-size:13px;font-family:inherit;outline:none;">
+          </div>
+          <div style="font-size:11.5px;color:#64748b;margin:2px 0 14px;max-width:60ch;">Log your work for the day. You can update it any time during the week; the totals roll up into the weekly report.</div>
+
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:14px;">
+            <div><label class="tr-lbl">Draft Made</label><input type="number" min="0" id="tr_draft" class="tr-num" placeholder="0"></div>
+            <div><label class="tr-lbl">Applications Processed</label><input type="number" min="0" id="tr_apps" class="tr-num" placeholder="0"></div>
+            <div><label class="tr-lbl">Emails Replied</label><input type="number" min="0" id="tr_emails" class="tr-num" placeholder="0"></div>
+            <div><label class="tr-lbl">Logbook Sent</label><input type="number" min="0" id="tr_lbsent" class="tr-num" placeholder="0"></div>
+            <div><label class="tr-lbl">Logbook Scanned</label><input type="number" min="0" id="tr_lbscan" class="tr-num" placeholder="0"></div>
+          </div>
+          <div style="margin-bottom:12px;">
+            <label class="tr-lbl">Today's tasks <span style="color:#94a3b8;font-weight:500;">(one per line — these appear in the weekly checklist)</span></label>
+            <textarea id="tr_tasks" rows="4" class="tr-txt" placeholder="e.g.&#10;Replied ~100 emails&#10;Sent 20 certs&#10;Handled phone calls"></textarea>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+            <button onclick="trSaveDay()" class="btn btn-green" id="trSaveBtn" style="padding:10px 20px;font-size:13px;">Save today's log</button>
+            <span id="trSaveMsg" style="font-size:12px;color:#059669;font-weight:600;"></span>
+          </div>
+        </div>
+
+        <!-- Staff: this week's entries -->
+        <div class="card" id="trMyWeekCard" style="margin-bottom:14px;padding:16px;">
+          <div class="card-title" style="margin-bottom:10px;">Your week so far</div>
+          <div id="trMyWeek"><div style="font-size:12px;color:#94a3b8;">Loading…</div></div>
+        </div>
+
+        <!-- Admin: generate the weekly report -->
+        <div class="card" id="trAdminCard" style="margin-bottom:14px;padding:16px;display:none;">
+          <div class="card-title" style="margin-bottom:4px;">Generate weekly report</div>
+          <div style="font-size:11.5px;color:#64748b;margin-bottom:12px;max-width:60ch;">Pick any date in the week you want; the report covers that Monday–Sunday for the whole Processing team.</div>
+          <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;">
+            <div style="flex:1;min-width:150px;"><label style="font-size:11px;font-weight:600;color:#64748b;">Week of</label><input type="date" id="trWeekPick" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:8px 12px;font-size:13px;font-family:inherit;outline:none;margin-top:3px;"></div>
+            <button onclick="trGenerateReport()" class="btn btn-green" style="padding:9px 16px;font-size:12px;">Generate</button>
+            <button onclick="trDownloadPDF()" id="trPdfBtn" style="padding:9px 16px;font-size:12px;font-weight:700;background:#059669;color:#fff;border:none;border-radius:8px;cursor:pointer;font-family:inherit;display:none;">Download PDF</button>
+            <button onclick="trDownloadPdf()" id="trPrintBtn" style="padding:9px 16px;font-size:12px;font-weight:700;background:#0f172a;color:#fff;border:none;border-radius:8px;cursor:pointer;font-family:inherit;display:none;">Download PDF</button>
+          </div>
+          <div id="trReportOut" style="margin-top:16px;"></div>
+        </div>
+
+      </div>
+
       
 
     </div>
 
     <style>
+.tr-lbl{display:block;font-size:11px;font-weight:600;color:#64748b;margin-bottom:5px;}
+.tr-num{width:100%;box-sizing:border-box;border:1.5px solid #e2e8f0;border-radius:8px;padding:9px 12px;font-size:14px;font-family:inherit;outline:none;}
+.tr-num:focus{border-color:var(--accent);}
+.tr-txt{width:100%;box-sizing:border-box;border:1.5px solid #e2e8f0;border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;outline:none;resize:vertical;line-height:1.5;}
+.tr-txt:focus{border-color:var(--accent);}
+.tr-table{width:100%;border-collapse:collapse;font-size:12.5px;}
+.tr-table th,.tr-table td{padding:8px 10px;text-align:left;border-bottom:1px solid #eef2f7;}
+.tr-table th{font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;color:#94a3b8;font-weight:700;}
+.tr-table td.num,.tr-table th.num{text-align:right;font-variant-numeric:tabular-nums;}
+.tr-table tr.tot td{font-weight:800;border-top:2px solid #e2e8f0;background:#f8fafc;}
+.tr-person-h{font-size:14px;font-weight:800;color:#0f172a;margin:18px 0 6px;}
 .app-footer{
   text-align:center;font-size:11px;color:#cbd5e1;
   padding:20px 16px 30px;letter-spacing:.04em;
@@ -8045,6 +8143,94 @@ async function doResetKey(){
   finally{btn.disabled=false;btn.textContent="Reset Password";}
 }
 
+// ── Email-based password reset ──────────────────────────────────────────
+// Flow: user enters name → server looks up their email, mints a random token,
+// stores its hash in password_resets (server-side, service key), and emails a
+// link to <site>/index.html?reset=TOKEN. Opening that link shows pg-setnew,
+// which posts the token + new password back; the server verifies the token
+// (unexpired, unused) and sets the real auth password.
+function _resetExecUrl(){
+  return localStorage.getItem('oscars_sheet_url') || 'https://script.google.com/macros/s/AKfycby0Bq97bCZAsmnruXFuJuCqXQE_kOxhYE2KFuJnVzLXtT5CV0Y12k5176dxZbdaYVGE/exec';
+}
+function _resetLinkBase(){
+  // The page staff land on when they click the email link. Uses the current
+  // origin+path so it works whether hosted at /Oscar/index.html or elsewhere.
+  try{ return location.origin + location.pathname; }catch(e){ return 'https://oscarstaff.github.io/Oscar/index.html'; }
+}
+
+async function doForgotRequest(){
+  const email=document.getElementById("fpEmail").value.trim();
+  const err=document.getElementById("fpErr"), ok=document.getElementById("fpOk");
+  err.classList.remove("show"); ok.classList.remove("show");
+  if(!email || email.indexOf("@")<1 || email.indexOf(".")<0){ err.textContent="Please enter a valid email address."; err.classList.add("show"); return; }
+  const btn=document.getElementById("fpBtn"); btn.disabled=true; btn.innerHTML='<span class="sp"></span>';
+  // Always show the same success message whether or not the email is on file,
+  // so this can't be used to probe who has an account.
+  const generic="If that email is on file, a reset link is on its way. Check your inbox (and spam).";
+  try{
+    try{
+      const resp=await fetch(_resetExecUrl(),{
+        method:'POST', headers:{'Content-Type':'text/plain'},
+        body:JSON.stringify({ action:'sendResetEmail', email:email, linkBase:_resetLinkBase() })
+      });
+      await resp.json().catch(()=>({}));
+    }catch(e){ /* swallow — still show generic message */ }
+    ok.textContent=generic; ok.classList.add("show");
+  }catch(e){ err.textContent="Something went wrong. Please try again."; err.classList.add("show"); }
+  finally{ btn.disabled=false; btn.textContent="Email me a reset link"; }
+}
+
+async function doSetNewPassword(){
+  const pass=document.getElementById("snNew").value;
+  const conf=document.getElementById("snConfirm").value;
+  const err=document.getElementById("snErr"), ok=document.getElementById("snOk");
+  err.classList.remove("show"); ok.classList.remove("show");
+  const token=window._resetToken||"";
+  if(!token){ err.textContent="This reset link is invalid. Please request a new one."; err.classList.add("show"); return; }
+  if(!pass||pass.length<8){ err.textContent="Password must be at least 8 characters."; err.classList.add("show"); return; }
+  if(pass!==conf){ err.textContent="Passwords do not match."; err.classList.add("show"); return; }
+  const btn=document.getElementById("snBtn"); btn.disabled=true; btn.innerHTML='<span class="sp"></span>';
+  try{
+    const resp=await fetch(_resetExecUrl(),{
+      method:'POST', headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({ action:'consumeReset', token:token, newPassword:pass })
+    });
+    const j=await resp.json().catch(()=>({}));
+    if(!(j&&j.ok)){
+      const map={ 'invalid token':"This reset link is invalid.", 'expired':"This reset link has expired. Please request a new one.", 'used':"This reset link has already been used." };
+      err.textContent=(map[j&&j.error]||"Couldn't reset your password. Please request a new link."); err.classList.add("show");
+      btn.disabled=false; btn.textContent="Set Password & Sign In"; return;
+    }
+    const staff=j.staff;
+    ok.textContent="Password set! Signing you in..."; ok.classList.add("show");
+    try{
+      const auth=getAuthClient();
+      if(auth&&staff){ await auth.signInWithPassword({ email:synthEmailFromName(staff), password:pass }); await refreshSbAuthToken(); }
+    }catch(e){}
+    // clear the token from the URL so a refresh doesn't re-trigger it
+    try{ history.replaceState(null,'',_resetLinkBase()); }catch(e){}
+    window._resetToken=null;
+    if(staff) saveMe(staff);
+    setTimeout(enterHub,1500);
+  }catch(e){ err.textContent="Network error. Please try again."; err.classList.add("show"); btn.disabled=false; btn.textContent="Set Password & Sign In"; }
+}
+
+// On load: if the URL carries ?reset=TOKEN, jump straight to the set-new-password
+// screen. Called from the auth boot path.
+function checkResetLink(){
+  try{
+    var qs=new URLSearchParams(location.search);
+    var t=qs.get('reset');
+    if(t){
+      window._resetToken=t;
+      document.getElementById('authLayer').style.display='flex';
+      showAuth('setnew');
+      return true;
+    }
+  }catch(e){}
+  return false;
+}
+
 // ── Session-expiry watchdog ─────────────────────────────────────────────
 // onAuthStateChange catches refresh-driven sign-outs, but a token can lapse
 // while the tab is idle and no refresh is attempted. This polls the live
@@ -8469,7 +8655,7 @@ function goTo(p){
   if(p==="documents"){loadDocuments();refreshQuizStrip();}
   /* Tasks feature removed */
   if(p==="announcements" || p==="engagement"){ setTimeout(rtUpgradeAll, 50); }
-  if(p==="myreports"){ initReportsPage(); setTimeout(initReportsPage, 600); /* re-run after myIsAdmin settles */ }
+  if(p==="myreports"){ initReportsPage(); }
   
   if(p==="profile"){setTimeout(refreshPushToggleState, 100);
     setTimeout(renderNotifPanel, 50);
@@ -9416,7 +9602,7 @@ async function openGatedApp(ev,app,url){
   }
 }
 function showAuth(s){
-  ["login","setpass","resetkey"].forEach(p=>document.getElementById("pg-"+p).style.display="none");
+  ["login","setpass","resetkey","forgot","setnew"].forEach(p=>{var el=document.getElementById("pg-"+p);if(el)el.style.display="none";});
   // Clear inline display for the login page so the stylesheet's grid layout
   // wins (.login-edge #pg-login{display:grid}). Forcing "block" here was what
   // collapsed / dissociated the split layout when returning from the
@@ -16406,10 +16592,19 @@ function showReportsTab(tab){
   if(tab === 'payroll'){ tab = 'hours'; }
   document.getElementById('rsec-hours').style.display = tab === 'hours' ? '' : 'none';
   document.getElementById('rsec-manager').style.display = tab === 'manager' ? '' : 'none'; if(tab === 'manager' && typeof loadExtraBreakRequests === 'function') loadExtraBreakRequests();
+  var trSec = document.getElementById('rsec-teamreport');
+  if(trSec) trSec.style.display = tab === 'teamreport' ? '' : 'none';
   document.getElementById('rtab-hours').classList.toggle('active', tab === 'hours');
   document.getElementById('rtab-manager').classList.toggle('active', tab === 'manager');
+  var trTab = document.getElementById('rtab-teamreport');
+  if(trTab) trTab.classList.toggle('active', tab === 'teamreport');
   if(tab === 'manager'){ populateMgrStaff(); if(typeof initTeamHours === 'function') initTeamHours(); }
+  if(tab === 'teamreport' && typeof initTeamReport === 'function') initTeamReport();
 }
+
+// Team Report is a Processing-team feature. Everyone on Processing can log their
+// day; only admins additionally see the "Generate weekly report" card.
+function _isProcessing(){ return String(myTeam||'').trim().toLowerCase() === 'processing'; }
 
 function initReportsPage(){
   // Show admin discussion options + tab if admin
@@ -16417,6 +16612,10 @@ function initReportsPage(){
   if(adminOpts) adminOpts.style.display = myIsAdmin ? '' : 'none';
   const mgrBtn = document.getElementById('rtab-manager');
   if(mgrBtn) mgrBtn.style.display = myIsAdmin ? '' : 'none';
+  // Team Report subtab: visible only to Processing staff (or admins, who may
+  // be on any team but should still be able to generate the report).
+  const trBtn = document.getElementById('rtab-teamreport');
+  if(trBtn) trBtn.style.display = (_isProcessing() || myIsAdmin) ? '' : 'none';
   // Default dates: last fortnight
   const today = new Date();
   const start = new Date(today); start.setDate(today.getDate()-13);
@@ -16431,6 +16630,373 @@ function initReportsPage(){
   });
   setTimeout(runHoursReport, 100);
   if(typeof loadFortLeaderboard==='function') loadFortLeaderboard();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TEAM REPORT (Processing) — daily metrics + weekly report
+// ═══════════════════════════════════════════════════════════════
+var TR_FIELDS = [
+  ['draft_made','tr_draft','Draft Made'],
+  ['applications_processed','tr_apps','Applications Processed'],
+  ['emails_replied','tr_emails','Emails Replied'],
+  ['logbook_sent','tr_lbsent','Logbook Sent'],
+  ['logbook_scanned','tr_lbscan','Logbook Scanned']
+];
+function _trHeaders(){
+  return { 'apikey':KEY, 'Authorization':'Bearer '+KEY, 'Content-Type':'application/json' };
+}
+function _trToday(){ return new Date().toISOString().split('T')[0]; }
+// Monday of the week containing d (local). Returns yyyy-mm-dd.
+function _trMonday(dStr){
+  var d = new Date(dStr + 'T00:00:00');
+  var dow = (d.getDay() + 6) % 7;         // 0 = Monday
+  d.setDate(d.getDate() - dow);
+  return d.toISOString().split('T')[0];
+}
+function _trAddDays(dStr, n){
+  var d = new Date(dStr + 'T00:00:00'); d.setDate(d.getDate()+n);
+  return d.toISOString().split('T')[0];
+}
+function _trFmtDay(dStr){
+  return new Date(dStr+'T00:00:00').toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short'});
+}
+function _trEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+var _trInited = false;
+function initTeamReport(){
+  // Admin-only report card
+  var adminCard = document.getElementById('trAdminCard');
+  if(adminCard) adminCard.style.display = myIsAdmin ? '' : 'none';
+  // A non-Processing admin can still generate the report, but hide the personal
+  // entry form for them (they're not logging Processing work themselves).
+  var entryCard = document.getElementById('trEntryCard');
+  var weekCard  = document.getElementById('trMyWeekCard');
+  var showEntry = _isProcessing();
+  if(entryCard) entryCard.style.display = showEntry ? '' : 'none';
+  if(weekCard)  weekCard.style.display  = showEntry ? '' : 'none';
+
+  if(!_trInited){
+    _trInited = true;
+    var dEl = document.getElementById('trDate');   if(dEl && !dEl.value) dEl.value = _trToday();
+    var wEl = document.getElementById('trWeekPick'); if(wEl && !wEl.value) wEl.value = _trToday();
+  }
+  if(showEntry){ trLoadDay(); trRenderMyWeek(); }
+}
+
+// Load an existing entry for the chosen day into the form (or blank it).
+async function trLoadDay(){
+  if(!_isProcessing()) return;
+  var date = document.getElementById('trDate').value || _trToday();
+  document.getElementById('trSaveMsg').textContent = '';
+  try{
+    var url = SB + '/rest/v1/processing_reports?staff_name=eq.' + encodeURIComponent(me) +
+              '&report_date=eq.' + encodeURIComponent(date) + '&limit=1';
+    var r = await fetch(url, { headers:_trHeaders() });
+    var rows = await r.json();
+    var row = (Array.isArray(rows) && rows.length) ? rows[0] : null;
+    TR_FIELDS.forEach(function(f){
+      document.getElementById(f[1]).value = row ? (row[f[0]] || 0) : '';
+    });
+    document.getElementById('tr_tasks').value = row ? (row.tasks || '') : '';
+  }catch(e){ /* leave form as-is on error */ }
+}
+
+async function trSaveDay(){
+  if(!_isProcessing()){ return; }
+  var date = document.getElementById('trDate').value || _trToday();
+  var btn = document.getElementById('trSaveBtn'); var msg = document.getElementById('trSaveMsg');
+  btn.disabled = true; var orig = btn.textContent; btn.textContent = 'Saving…'; msg.textContent='';
+  var body = { staff_name: me, report_date: date,
+    tasks: document.getElementById('tr_tasks').value.trim() };
+  TR_FIELDS.forEach(function(f){
+    var v = parseInt(document.getElementById(f[1]).value, 10);
+    body[f[0]] = isNaN(v) || v < 0 ? 0 : v;
+  });
+  body.updated_at = new Date().toISOString();
+  try{
+    // Upsert on (staff_name, report_date).
+    var r = await fetch(SB + '/rest/v1/processing_reports?on_conflict=staff_name,report_date', {
+      method:'POST',
+      headers: Object.assign({ 'Prefer':'resolution=merge-duplicates,return=minimal' }, _trHeaders()),
+      body: JSON.stringify(body)
+    });
+    if(r.ok){ msg.style.color='#059669'; msg.textContent='✓ Saved'; trRenderMyWeek(); }
+    else { msg.style.color='#dc2626'; msg.textContent='Save failed — try again'; }
+  }catch(e){ msg.style.color='#dc2626'; msg.textContent='Network error'; }
+  finally{ btn.disabled=false; btn.textContent=orig; setTimeout(function(){ if(msg.textContent==='✓ Saved') msg.textContent=''; }, 2500); }
+}
+
+async function trRenderMyWeek(){
+  var mount = document.getElementById('trMyWeek');
+  if(!mount) return;
+  var mon = _trMonday(document.getElementById('trDate').value || _trToday());
+  var sun = _trAddDays(mon, 6);
+  try{
+    var url = SB + '/rest/v1/processing_reports?staff_name=eq.' + encodeURIComponent(me) +
+              '&report_date=gte.' + mon + '&report_date=lte.' + sun + '&order=report_date.asc';
+    var r = await fetch(url, { headers:_trHeaders() });
+    var rows = await r.json();
+    if(!Array.isArray(rows) || !rows.length){ mount.innerHTML = '<div style="font-size:12px;color:#94a3b8;">No entries yet for the week of '+_trFmtDay(mon)+'.</div>'; return; }
+    var tot = { draft_made:0, applications_processed:0, emails_replied:0, logbook_sent:0, logbook_scanned:0 };
+    var body = rows.map(function(row){
+      TR_FIELDS.forEach(function(f){ tot[f[0]] += (row[f[0]]||0); });
+      return '<tr><td>'+_trFmtDay(row.report_date)+'</td>'+
+        '<td class="num">'+(row.draft_made||0)+'</td>'+
+        '<td class="num">'+(row.applications_processed||0)+'</td>'+
+        '<td class="num">'+(row.emails_replied||0)+'</td>'+
+        '<td class="num">'+(row.logbook_sent||0)+'</td>'+
+        '<td class="num">'+(row.logbook_scanned||0)+'</td></tr>';
+    }).join('');
+    mount.innerHTML =
+      '<div style="overflow-x:auto;"><table class="tr-table"><thead><tr>'+
+      '<th>Day</th><th class="num">Draft</th><th class="num">Apps</th><th class="num">Emails</th><th class="num">LB Sent</th><th class="num">LB Scan</th>'+
+      '</tr></thead><tbody>'+body+
+      '<tr class="tot"><td>Total</td>'+
+        '<td class="num">'+tot.draft_made+'</td>'+
+        '<td class="num">'+tot.applications_processed+'</td>'+
+        '<td class="num">'+tot.emails_replied+'</td>'+
+        '<td class="num">'+tot.logbook_sent+'</td>'+
+        '<td class="num">'+tot.logbook_scanned+'</td></tr>'+
+      '</tbody></table></div>';
+  }catch(e){ mount.innerHTML = '<div style="font-size:12px;color:#dc2626;">Could not load your week.</div>'; }
+}
+
+// ── Admin: generate the whole-team weekly report ──
+async function trGenerateReport(){
+  if(!myIsAdmin) return;
+  var out = document.getElementById('trReportOut');
+  var pick = document.getElementById('trWeekPick').value || _trToday();
+  var mon = _trMonday(pick), sun = _trAddDays(mon,6);
+  out.innerHTML = '<div style="color:#94a3b8;font-size:13px;padding:12px 0;">Generating…</div>';
+  document.getElementById('trPrintBtn').style.display = 'none';
+  try{
+    // Who's on Processing (from credentials), so people with zero entries still show.
+    var teamResp = await fetch(SB + '/rest/v1/staff_credentials?team=eq.Processing&select=staff_name&order=staff_name.asc', { headers:_trHeaders() });
+    var teamRows = await teamResp.json();
+    var team = (Array.isArray(teamRows)?teamRows:[]).map(function(x){ return x.staff_name; }).filter(Boolean);
+
+    var repResp = await fetch(SB + '/rest/v1/processing_reports?report_date=gte.' + mon + '&report_date=lte.' + sun + '&order=staff_name.asc,report_date.asc', { headers:_trHeaders() });
+    var reps = await repResp.json();
+    reps = Array.isArray(reps) ? reps : [];
+
+    // Calls come from the DialTRAC call_log (logged_by = the staffer, created_at
+    // in the week, not soft-deleted) — staff don't type these. We count per
+    // person. Week window is [Mon 00:00, next-Mon 00:00) in local terms; using
+    // date-only bounds on created_at's date is close enough and simplest.
+    var callsByStaff = {};
+    try{
+      var sunNext = _trAddDays(mon, 7); // exclusive upper bound
+      var clUrl = SB + '/rest/v1/call_log?created_at=gte.' + mon + '&created_at=lt.' + sunNext +
+                  '&deleted_at=is.null&select=logged_by';
+      var clResp = await fetch(clUrl, { headers:_trHeaders() });
+      var clRows = await clResp.json();
+      (Array.isArray(clRows)?clRows:[]).forEach(function(r){
+        var who = (r.logged_by||'').trim();
+        if(who) callsByStaff[who] = (callsByStaff[who]||0) + 1;
+      });
+    }catch(e){ /* calls column will show 0 if this fails */ }
+
+    // Group by staff.
+    var byStaff = {};
+    reps.forEach(function(r){ (byStaff[r.staff_name] = byStaff[r.staff_name] || []).push(r); });
+    // Include Processing staff with no entries too.
+    team.forEach(function(n){ if(!byStaff[n]) byStaff[n] = []; });
+    var names = Object.keys(byStaff).sort();
+
+    if(!names.length){ out.innerHTML = '<div style="font-size:13px;color:#94a3b8;">No Processing staff found.</div>'; return; }
+
+    // ── Capture structured data for the PDF (7-day grid + metrics) ──
+    var weekDates = [];
+    for(var wi=0; wi<7; wi++) weekDates.push(_trAddDays(mon, wi));
+    var pdfMetrics = [];   // [{name, calls, draft, apps, emails, lbsent, lbscan}]
+    var pdfTasks = [];     // [{name, days:[[..],[..]x7]}]
+    names.forEach(function(nm){
+      var rws = byStaff[nm];
+      var mt = { draft_made:0, applications_processed:0, emails_replied:0, logbook_sent:0, logbook_scanned:0 };
+      var byDate = {};
+      rws.forEach(function(rr){
+        TR_FIELDS.forEach(function(f){ mt[f[0]] += (rr[f[0]]||0); });
+        byDate[rr.report_date] = rr;
+      });
+      pdfMetrics.push({ name:nm, calls:(callsByStaff[nm]||0),
+        draft:mt.draft_made, apps:mt.applications_processed, emails:mt.emails_replied,
+        lbsent:mt.logbook_sent, lbscan:mt.logbook_scanned });
+      var days = weekDates.map(function(d){
+        var rr = byDate[d];
+        if(rr && rr.tasks && rr.tasks.trim()){
+          return rr.tasks.split(/\r?\n/).map(function(x){ return x.trim(); }).filter(Boolean);
+        }
+        return [];
+      });
+      pdfTasks.push({ name:nm, days:days });
+    });
+    window._trReportData = {
+      mon:mon, sun:sun, weekDates:weekDates,
+      metrics:pdfMetrics, tasks:pdfTasks,
+      preparedBy:(window.me || me || '')
+    };
+
+    var grand = { calls:0, draft_made:0, applications_processed:0, emails_replied:0, logbook_sent:0, logbook_scanned:0 };
+    var html = '<div id="trPrintable">';
+    html += '<div style="margin-bottom:14px;"><div style="font-size:16px;font-weight:800;color:#0f172a;">Processing — Weekly Report</div>'+
+            '<div style="font-size:12.5px;color:#64748b;">Week of '+_trFmtDay(mon)+' – '+_trFmtDay(sun)+'</div></div>';
+
+    names.forEach(function(name){
+      var rows = byStaff[name];
+      var t = { draft_made:0, applications_processed:0, emails_replied:0, logbook_sent:0, logbook_scanned:0 };
+      var notes = [];
+      var dayRows = rows.map(function(row){
+        TR_FIELDS.forEach(function(f){ t[f[0]] += (row[f[0]]||0); });
+        if(row.tasks && row.tasks.trim()){
+          row.tasks.split(/\r?\n/).map(function(x){return x.trim();}).filter(Boolean).forEach(function(tk){
+            notes.push(_trFmtDay(row.report_date)+': '+_trEsc(tk));
+          });
+        }
+        return '<tr><td>'+_trFmtDay(row.report_date)+'</td>'+
+          '<td class="num">'+(row.draft_made||0)+'</td>'+
+          '<td class="num">'+(row.applications_processed||0)+'</td>'+
+          '<td class="num">'+(row.emails_replied||0)+'</td>'+
+          '<td class="num">'+(row.logbook_sent||0)+'</td>'+
+          '<td class="num">'+(row.logbook_scanned||0)+'</td></tr>';
+      }).join('');
+      var calls = callsByStaff[name] || 0;
+      Object.keys(t).forEach(function(k){ grand[k]+=t[k]; });
+      grand.calls += calls;
+
+      html += '<div class="tr-person-h">'+_trEsc(name)+'</div>';
+      // Calls line (from call_log) — shows even when there are no report entries.
+      html += '<div style="font-size:12.5px;color:#475569;margin:0 0 8px;"><strong>Calls made this week:</strong> '+calls+'</div>';
+      if(!rows.length){
+        html += '<div style="font-size:12px;color:#cbd5e1;margin-bottom:8px;">No report entries this week.</div>';
+      } else {
+        html += '<div style="overflow-x:auto;"><table class="tr-table"><thead><tr>'+
+          '<th>Day</th><th class="num">Draft</th><th class="num">Apps</th><th class="num">Emails</th><th class="num">LB Sent</th><th class="num">LB Scan</th></tr></thead><tbody>'+
+          dayRows +
+          '<tr class="tot"><td>Total</td><td class="num">'+t.draft_made+'</td><td class="num">'+t.applications_processed+'</td><td class="num">'+t.emails_replied+'</td><td class="num">'+t.logbook_sent+'</td><td class="num">'+t.logbook_scanned+'</td></tr>'+
+          '</tbody></table></div>';
+        if(notes.length){
+          html += '<div style="font-size:12px;color:#475569;margin:8px 0 4px;"><strong>Tasks:</strong></div><ul style="margin:0 0 6px;padding-left:18px;font-size:12px;color:#475569;line-height:1.6;">'+
+            notes.map(function(c){ return '<li>'+c+'</li>'; }).join('') + '</ul>';
+        }
+      }
+    });
+
+    // Team grand total.
+    html += '<div class="tr-person-h" style="margin-top:20px;">Team total</div>'+
+      '<div style="overflow-x:auto;"><table class="tr-table"><thead><tr>'+
+      '<th>Metric</th><th class="num">Total</th></tr></thead><tbody>'+
+      '<tr><td>Calls Made</td><td class="num">'+grand.calls+'</td></tr>'+
+      '<tr><td>Draft Made</td><td class="num">'+grand.draft_made+'</td></tr>'+
+      '<tr><td>Applications Processed</td><td class="num">'+grand.applications_processed+'</td></tr>'+
+      '<tr><td>Emails Replied</td><td class="num">'+grand.emails_replied+'</td></tr>'+
+      '<tr><td>Logbook Sent</td><td class="num">'+grand.logbook_sent+'</td></tr>'+
+      '<tr><td>Logbook Scanned</td><td class="num">'+grand.logbook_scanned+'</td></tr>'+
+      '</tbody></table></div>';
+    html += '</div>';
+    out.innerHTML = html;
+    document.getElementById('trPrintBtn').style.display = '';
+  }catch(e){ out.innerHTML = '<div style="font-size:13px;color:#dc2626;">Could not generate the report.</div>'; }
+}
+
+// Build the landscape 2-page PDF (page 1 team metrics, page 2 task grid)
+// entirely in-browser with jsPDF + autotable (both already loaded via CDN).
+function trDownloadPdf(){
+  var D = window._trReportData;
+  if(!D){ alert('Generate the report first.'); return; }
+  var jsPDFns = window.jspdf || window.jsPDF; 
+  var JsPDF = (window.jspdf && window.jspdf.jsPDF) ? window.jspdf.jsPDF : window.jsPDF;
+  if(!JsPDF){ alert('PDF library not loaded. Please refresh and try again.'); return; }
+  var doc = new JsPDF({ orientation:'landscape', unit:'mm', format:'a4' });
+  var PW = doc.internal.pageSize.getWidth();   // 297
+  var PH = doc.internal.pageSize.getHeight();  // 210
+  var M = 12;
+  var GREEN=[5,150,105], HEAD=[6,95,70], INK=[15,23,42], MUTED=[100,116,139], LINE=[226,232,240], ZEBRA=[246,250,248];
+
+  function fmtDay(dStr){ return new Date(dStr+'T00:00:00').toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short'}); }
+  function rangeStr(){ return fmtDay(D.mon)+' – '+fmtDay(D.sun); }
+
+  function footer(){
+    var pageStr = 'Page ' + doc.internal.getNumberOfPages();
+    doc.setFontSize(7.5); doc.setTextColor.apply(doc, MUTED); doc.setFont(undefined,'normal');
+    doc.text('Prepared by: ' + (D.preparedBy||''), M, PH-7);
+    doc.text('Oscars Training Centre · Processing', PW/2, PH-7, {align:'center'});
+    doc.text(pageStr, PW-M, PH-7, {align:'right'});
+  }
+
+  // ── PAGE 1 — Team Metrics ──
+  doc.setFont(undefined,'bold'); doc.setFontSize(15); doc.setTextColor.apply(doc, INK);
+  doc.text('Oscars Training Centre — Weekly Performance Report', M, M+4);
+  doc.setFont(undefined,'normal'); doc.setFontSize(9.5); doc.setTextColor.apply(doc, MUTED);
+  doc.text('Team Metrics: Processing · ' + rangeStr(), M, M+10);
+
+  var mBody = D.metrics.map(function(r){ return [r.name, r.calls, r.draft, r.apps, r.emails, r.lbsent, r.lbscan]; });
+  var g = {calls:0,draft:0,apps:0,emails:0,lbsent:0,lbscan:0};
+  D.metrics.forEach(function(r){ g.calls+=r.calls;g.draft+=r.draft;g.apps+=r.apps;g.emails+=r.emails;g.lbsent+=r.lbsent;g.lbscan+=r.lbscan; });
+  mBody.push(['Team total', g.calls, g.draft, g.apps, g.emails, g.lbsent, g.lbscan]);
+
+  doc.autoTable({
+    startY: M+16,
+    head: [['Staff','Calls','Draft Made','Applications','Emails Replied','Logbook Sent','Logbook Scanned']],
+    body: mBody,
+    theme:'plain',
+    styles:{ fontSize:9.5, cellPadding:2.6, textColor:INK, lineColor:LINE, lineWidth:0.15 },
+    headStyles:{ fillColor:HEAD, textColor:[255,255,255], fontStyle:'bold', fontSize:9, halign:'center' },
+    columnStyles:{ 0:{halign:'left', cellWidth: 62, fontStyle:'bold'},
+      1:{halign:'center'},2:{halign:'center'},3:{halign:'center'},4:{halign:'center'},5:{halign:'center'},6:{halign:'center'} },
+    alternateRowStyles:{ fillColor:ZEBRA },
+    margin:{ left:M, right:M },
+    didParseCell:function(data){
+      if(data.row.index === mBody.length-1){
+        data.cell.styles.fontStyle='bold';
+        data.cell.styles.fillColor=[236,253,245];
+        data.cell.styles.lineColor=GREEN; data.cell.styles.lineWidth=0.4;
+      }
+    }
+  });
+  var afterY = doc.lastAutoTable.finalY + 6;
+  doc.setFontSize(7.5); doc.setTextColor.apply(doc, MUTED); doc.setFont(undefined,'normal');
+  doc.text('Calls are counted automatically from the call log. Other metrics are self-reported daily by staff.', M, afterY);
+  footer();
+
+  // ── PAGE 2 — Task grid ──
+  doc.addPage('a4','landscape');
+  doc.setFont(undefined,'bold'); doc.setFontSize(15); doc.setTextColor.apply(doc, INK);
+  doc.text('Weekly Task Report: Processing', M, M+4);
+  doc.setFont(undefined,'normal'); doc.setFontSize(9.5); doc.setTextColor.apply(doc, MUTED);
+  doc.text(rangeStr(), M, M+10);
+
+  var dayHeads = D.weekDates.map(function(d){ return fmtDay(d); });
+  var gHead = [['#','Staff'].concat(dayHeads)];
+  var gBody = D.tasks.map(function(p, idx){
+    var row = [String(idx+1), p.name];
+    p.days.forEach(function(items){
+      row.push(items.length ? items.map(function(t){ return '• '+t; }).join('\n') : '—');
+    });
+    return row;
+  });
+  var usable = PW - 2*M;
+  var cNum=7, cName=30, cDay=(usable-cNum-cName)/7;
+  doc.autoTable({
+    startY: M+15,
+    head: gHead,
+    body: gBody,
+    theme:'grid',
+    styles:{ fontSize:7.4, cellPadding:1.8, textColor:INK, lineColor:LINE, lineWidth:0.2, valign:'top', overflow:'linebreak' },
+    headStyles:{ fillColor:HEAD, textColor:[255,255,255], fontStyle:'bold', fontSize:7.5, halign:'center', valign:'middle' },
+    columnStyles: (function(){ var o={0:{cellWidth:cNum,halign:'center'},1:{cellWidth:cName,fontStyle:'bold'}}; for(var i=2;i<9;i++) o[i]={cellWidth:cDay}; return o; })(),
+    alternateRowStyles:{ fillColor:ZEBRA },
+    margin:{ left:M, right:M },
+    didParseCell:function(data){
+      if(data.section==='body' && data.cell.raw==='—'){ data.cell.styles.textColor=[203,213,225]; data.cell.styles.halign='center'; }
+    }
+  });
+  var afterY2 = doc.lastAutoTable.finalY + 6;
+  doc.setFontSize(7.5); doc.setTextColor.apply(doc, MUTED);
+  doc.text('Note: Tasks summarised here are arranged from records provided by staff in the daily work log.', M, afterY2);
+  footer();
+
+  var fn = 'Processing_Weekly_Report_' + D.mon + '.pdf';
+  doc.save(fn);
 }
 
 function populateMgrStaff(){
@@ -19567,6 +20133,12 @@ async function loadMySettings(){
       try{
         document.querySelectorAll('[data-admin-only]').forEach(function(el){ el.style.display = myIsAdmin ? '' : 'none'; });
       }catch(e){}
+      // If the My Reports page is already open, re-apply its subtab gating now
+      // that admin status is known — avoids the tab bar shifting a beat later.
+      try{
+        var rp=document.getElementById('page-myreports');
+        if(rp && rp.classList.contains('active') && typeof initReportsPage==='function'){ initReportsPage(); }
+      }catch(e){}
     }else{
       myIsAdmin=false;
       myCanEditAvail=true;
@@ -19672,7 +20244,8 @@ document.fonts.ready.then(function(){
       // 1C-1: verified auth session wins; else legacy name-string session.
       // AUTH_ONLY: a cached name with NO live auth session is a dead half-state
       // (locked tables would all read empty). Require the real session.
-      if(await restoreAuthSession() || (!AUTH_ONLY_MODE && loadMe())){
+      if(checkResetLink()){ /* landed on set-new-password from an email link */ }
+      else if(await restoreAuthSession() || (!AUTH_ONLY_MODE && loadMe())){
         enterHub();
       }else{
         try{ sessionStorage.removeItem('ou'); }catch(e){}
@@ -19681,6 +20254,7 @@ document.fonts.ready.then(function(){
     }, 280);
   } else {
     (async function(){
+      if(checkResetLink()){ return; }
       if(await restoreAuthSession() || (!AUTH_ONLY_MODE && loadMe())){enterHub();}
       else{try{ sessionStorage.removeItem('ou'); }catch(e){} document.getElementById('authLayer').style.display='flex';}
     })();
