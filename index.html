@@ -6442,16 +6442,12 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
         <div class="card" id="trEntryCard" style="margin-bottom:14px;padding:16px;">
           <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:4px;">
             <div class="card-title" style="margin:0;">Daily work log</div>
-            <input type="date" id="trDate" onchange="trLoadDay()" style="border:1.5px solid #e2e8f0;border-radius:8px;padding:7px 11px;font-size:13px;font-family:inherit;outline:none;">
+            <input type="date" id="trDate" onchange="trDateChanged()" style="border:1.5px solid #e2e8f0;border-radius:8px;padding:7px 11px;font-size:13px;font-family:inherit;outline:none;">
           </div>
           <div style="font-size:11.5px;color:#64748b;margin:2px 0 14px;max-width:60ch;">Log your work for the day. You can update it any time during the week; the totals roll up into the weekly report.</div>
 
-          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:14px;">
-            <div><label class="tr-lbl">Draft Made</label><input type="number" min="0" id="tr_draft" class="tr-num" placeholder="0"></div>
-            <div><label class="tr-lbl">Applications Processed</label><input type="number" min="0" id="tr_apps" class="tr-num" placeholder="0"></div>
-            <div><label class="tr-lbl">Emails Replied</label><input type="number" min="0" id="tr_emails" class="tr-num" placeholder="0"></div>
-            <div><label class="tr-lbl">Logbook Sent</label><input type="number" min="0" id="tr_lbsent" class="tr-num" placeholder="0"></div>
-            <div><label class="tr-lbl">Logbook Scanned</label><input type="number" min="0" id="tr_lbscan" class="tr-num" placeholder="0"></div>
+          <div id="trMetricFields" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:14px;">
+            <div style="font-size:12px;color:#94a3b8;">Loading metrics…</div>
           </div>
           <div style="margin-bottom:12px;">
             <label class="tr-lbl">Today's tasks <span style="color:#94a3b8;font-weight:500;">(one per line — these appear in the weekly checklist)</span></label>
@@ -6470,13 +6466,25 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
         </div>
 
         <!-- Admin: generate the weekly report -->
+        <!-- Admin: manage which metrics staff log -->
+        <div class="card" id="trMetricAdminCard" style="margin-bottom:14px;padding:16px;display:none;">
+          <div class="card-title" style="margin-bottom:4px;">Manage metrics</div>
+          <div style="font-size:11.5px;color:#64748b;margin-bottom:12px;max-width:60ch;">Add, rename, reorder, or archive the metrics your team logs each day. Archiving hides a metric from the form and future reports but keeps past data. Calls are counted automatically and aren't listed here.</div>
+          <div id="trMetricList"><div style="font-size:12px;color:#94a3b8;">Loading…</div></div>
+          <div style="display:flex;gap:8px;align-items:center;margin-top:12px;flex-wrap:wrap;">
+            <input type="text" id="trNewMetric" placeholder="New metric name (e.g. Certificates Sent)" maxlength="40" style="flex:1;min-width:180px;border:1.5px solid #e2e8f0;border-radius:8px;padding:8px 12px;font-size:13px;font-family:inherit;outline:none;" onkeydown="if(event.key==='Enter')trAddMetric()">
+            <button onclick="trAddMetric()" class="btn btn-green" style="padding:9px 16px;font-size:12px;">Add metric</button>
+          </div>
+          <div id="trMetricMsg" style="font-size:12px;margin-top:8px;"></div>
+        </div>
+
+        <!-- Admin: generate the weekly report -->
         <div class="card" id="trAdminCard" style="margin-bottom:14px;padding:16px;display:none;">
           <div class="card-title" style="margin-bottom:4px;">Generate weekly report</div>
           <div style="font-size:11.5px;color:#64748b;margin-bottom:12px;max-width:60ch;">Pick any date in the week you want; the report covers that Monday–Sunday for the whole Processing team.</div>
           <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;">
             <div style="flex:1;min-width:150px;"><label style="font-size:11px;font-weight:600;color:#64748b;">Week of</label><input type="date" id="trWeekPick" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:8px 12px;font-size:13px;font-family:inherit;outline:none;margin-top:3px;"></div>
             <button onclick="trGenerateReport()" class="btn btn-green" style="padding:9px 16px;font-size:12px;">Generate</button>
-            <button onclick="trDownloadPDF()" id="trPdfBtn" style="padding:9px 16px;font-size:12px;font-weight:700;background:#059669;color:#fff;border:none;border-radius:8px;cursor:pointer;font-family:inherit;display:none;">Download PDF</button>
             <button onclick="trDownloadPdf()" id="trPrintBtn" style="padding:9px 16px;font-size:12px;font-weight:700;background:#0f172a;color:#fff;border:none;border-radius:8px;cursor:pointer;font-family:inherit;display:none;">Download PDF</button>
           </div>
           <div id="trReportOut" style="margin-top:16px;"></div>
@@ -16623,6 +16631,19 @@ function initReportsPage(){
   // be on any team but should still be able to generate the report).
   const trBtn = document.getElementById('rtab-teamreport');
   if(trBtn) trBtn.style.display = (_isProcessing() || myIsAdmin) ? '' : 'none';
+  // myTeam loads asynchronously and may not be set yet on first open — if it's
+  // missing, fetch it, then re-apply the Team Report gating so non-admin
+  // Processing staff see the tab too.
+  if(!myTeam && (window.me || me)){
+    (async function(){
+      try{
+        const creds = await sbGet('staff_credentials','?staff_name=eq.'+encodeURIComponent(me)+'&select=team');
+        myTeam = (creds.length && creds[0] && creds[0].team) ? creds[0].team : myTeam;
+      }catch(e){}
+      const b = document.getElementById('rtab-teamreport');
+      if(b) b.style.display = (_isProcessing() || myIsAdmin) ? '' : 'none';
+    })();
+  }
   // Default dates: last fortnight
   const today = new Date();
   const start = new Date(today); start.setDate(today.getDate()-13);
@@ -16642,21 +16663,23 @@ function initReportsPage(){
 // ═══════════════════════════════════════════════════════════════
 // TEAM REPORT (Processing) — daily metrics + weekly report
 // ═══════════════════════════════════════════════════════════════
-var TR_FIELDS = [
-  ['draft_made','tr_draft','Draft Made'],
-  ['applications_processed','tr_apps','Applications Processed'],
-  ['emails_replied','tr_emails','Emails Replied'],
-  ['logbook_sent','tr_lbsent','Logbook Sent'],
-  ['logbook_scanned','tr_lbscan','Logbook Scanned']
-];
+// ═══════════════════════════════════════════════════════════════
+// TEAM REPORT (Processing) — dynamic admin-editable metrics
+// ═══════════════════════════════════════════════════════════════
+// Metrics are defined in the processing_metrics table (admin-editable) and
+// each day's values live in processing_reports.metrics (jsonb). Calls are
+// counted separately from call_log and are not part of this list.
+var TR_TEAM = 'Processing';
+var _trMetrics = [];        // active metric defs [{metric_key,label,sort_order,archived}]
+var _trMetricsAll = [];     // including archived (for the admin manager)
+
 function _trHeaders(){
   return { 'apikey':KEY, 'Authorization':'Bearer '+KEY, 'Content-Type':'application/json' };
 }
 function _trToday(){ return new Date().toISOString().split('T')[0]; }
-// Monday of the week containing d (local). Returns yyyy-mm-dd.
 function _trMonday(dStr){
   var d = new Date(dStr + 'T00:00:00');
-  var dow = (d.getDay() + 6) % 7;         // 0 = Monday
+  var dow = (d.getDay() + 6) % 7;
   d.setDate(d.getDate() - dow);
   return d.toISOString().split('T')[0];
 }
@@ -16668,14 +16691,42 @@ function _trFmtDay(dStr){
   return new Date(dStr+'T00:00:00').toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short'});
 }
 function _trEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function _trFieldId(key){ return 'trm_' + key; }
+
+// Load metric definitions for the team. Populates _trMetrics (active, sorted)
+// and _trMetricsAll (everything).
+async function trLoadMetrics(){
+  try{
+    var url = SB + '/rest/v1/processing_metrics?team=eq.' + encodeURIComponent(TR_TEAM) + '&order=sort_order.asc';
+    var r = await fetch(url, { headers:_trHeaders() });
+    var rows = await r.json();
+    _trMetricsAll = Array.isArray(rows) ? rows : [];
+    _trMetrics = _trMetricsAll.filter(function(m){ return !m.archived; });
+  }catch(e){ _trMetricsAll = _trMetrics = []; }
+  return _trMetrics;
+}
+
+// Render the daily entry inputs from the active metric list.
+function trRenderMetricFields(){
+  var host = document.getElementById('trMetricFields');
+  if(!host) return;
+  if(!_trMetrics.length){
+    host.innerHTML = '<div style="font-size:12px;color:#94a3b8;">No metrics set up yet.' + (myIsAdmin ? ' Add some under \u201CManage metrics\u201D below.' : '') + '</div>';
+    return;
+  }
+  host.innerHTML = _trMetrics.map(function(m){
+    return '<div><label class="tr-lbl">'+_trEsc(m.label)+'</label>'+
+      '<input type="number" min="0" id="'+_trFieldId(m.metric_key)+'" class="tr-num" placeholder="0"></div>';
+  }).join('');
+}
 
 var _trInited = false;
-function initTeamReport(){
-  // Admin-only report card
-  var adminCard = document.getElementById('trAdminCard');
-  if(adminCard) adminCard.style.display = myIsAdmin ? '' : 'none';
-  // A non-Processing admin can still generate the report, but hide the personal
-  // entry form for them (they're not logging Processing work themselves).
+async function initTeamReport(){
+  var adminCard   = document.getElementById('trAdminCard');
+  var metricAdmin = document.getElementById('trMetricAdminCard');
+  if(adminCard)   adminCard.style.display   = myIsAdmin ? '' : 'none';
+  if(metricAdmin) metricAdmin.style.display = myIsAdmin ? '' : 'none';
+
   var entryCard = document.getElementById('trEntryCard');
   var weekCard  = document.getElementById('trMyWeekCard');
   var showEntry = _isProcessing();
@@ -16687,47 +16738,73 @@ function initTeamReport(){
     var dEl = document.getElementById('trDate');   if(dEl && !dEl.value) dEl.value = _trToday();
     var wEl = document.getElementById('trWeekPick'); if(wEl && !wEl.value) wEl.value = _trToday();
   }
-  if(showEntry){ trLoadDay(); trRenderMyWeek(); }
+
+  await trLoadMetrics();
+  if(myIsAdmin) trRenderMetricAdmin();
+  if(showEntry){ trRenderMetricFields(); await trLoadDay(); trRenderMyWeek(); }
 }
 
-// Load an existing entry for the chosen day into the form (or blank it).
+// Snapshot for unsaved-change detection.
+var _trLoadedSnapshot = null;
+var _trLoadedDate = null;
+function _trFormSnapshot(){
+  var parts = _trMetrics.map(function(m){ var el=document.getElementById(_trFieldId(m.metric_key)); return el?String(el.value||''):''; });
+  var t=document.getElementById('tr_tasks'); parts.push(t?String(t.value||''):'');
+  return parts.join('\u0001');
+}
+function _trIsDirty(){ return _trLoadedSnapshot !== null && _trFormSnapshot() !== _trLoadedSnapshot; }
+
+function trDateChanged(){
+  if(_trIsDirty()){
+    var ok = confirm("You have unsaved changes for " + (_trLoadedDate||'this day') + ".\n\nSwitch day and discard them? (Cancel, then click \u201CSave\u201D first to keep them.)");
+    if(!ok){ if(_trLoadedDate) document.getElementById('trDate').value = _trLoadedDate; return; }
+  }
+  trLoadDay();
+}
+
 async function trLoadDay(){
   if(!_isProcessing()) return;
   var date = document.getElementById('trDate').value || _trToday();
-  document.getElementById('trSaveMsg').textContent = '';
+  var msg=document.getElementById('trSaveMsg'); if(msg) msg.textContent='';
   try{
     var url = SB + '/rest/v1/processing_reports?staff_name=eq.' + encodeURIComponent(me) +
               '&report_date=eq.' + encodeURIComponent(date) + '&limit=1';
     var r = await fetch(url, { headers:_trHeaders() });
     var rows = await r.json();
     var row = (Array.isArray(rows) && rows.length) ? rows[0] : null;
-    TR_FIELDS.forEach(function(f){
-      document.getElementById(f[1]).value = row ? (row[f[0]] || 0) : '';
+    var vals = (row && row.metrics) ? row.metrics : {};
+    _trMetrics.forEach(function(m){
+      var el = document.getElementById(_trFieldId(m.metric_key));
+      if(el) el.value = row ? (vals[m.metric_key] != null ? vals[m.metric_key] : 0) : '';
     });
-    document.getElementById('tr_tasks').value = row ? (row.tasks || '') : '';
-  }catch(e){ /* leave form as-is on error */ }
+    var t=document.getElementById('tr_tasks'); if(t) t.value = row ? (row.tasks || '') : '';
+    _trLoadedSnapshot = _trFormSnapshot();
+    _trLoadedDate = date;
+  }catch(e){ /* leave form as-is */ }
 }
 
 async function trSaveDay(){
-  if(!_isProcessing()){ return; }
+  if(!_isProcessing()) return;
   var date = document.getElementById('trDate').value || _trToday();
   var btn = document.getElementById('trSaveBtn'); var msg = document.getElementById('trSaveMsg');
-  btn.disabled = true; var orig = btn.textContent; btn.textContent = 'Saving…'; msg.textContent='';
-  var body = { staff_name: me, report_date: date,
-    tasks: document.getElementById('tr_tasks').value.trim() };
-  TR_FIELDS.forEach(function(f){
-    var v = parseInt(document.getElementById(f[1]).value, 10);
-    body[f[0]] = isNaN(v) || v < 0 ? 0 : v;
+  btn.disabled = true; var orig = btn.textContent; btn.textContent = 'Saving…'; if(msg) msg.textContent='';
+  var vals = {};
+  _trMetrics.forEach(function(m){
+    var el = document.getElementById(_trFieldId(m.metric_key));
+    var v = el ? parseInt(el.value,10) : 0;
+    vals[m.metric_key] = (isNaN(v)||v<0) ? 0 : v;
   });
-  body.updated_at = new Date().toISOString();
+  var body = { staff_name: me, report_date: date,
+    metrics: vals,
+    tasks: (document.getElementById('tr_tasks').value||'').trim(),
+    updated_at: new Date().toISOString() };
   try{
-    // Upsert on (staff_name, report_date).
     var r = await fetch(SB + '/rest/v1/processing_reports?on_conflict=staff_name,report_date', {
       method:'POST',
       headers: Object.assign({ 'Prefer':'resolution=merge-duplicates,return=minimal' }, _trHeaders()),
       body: JSON.stringify(body)
     });
-    if(r.ok){ msg.style.color='#059669'; msg.textContent='✓ Saved'; trRenderMyWeek(); }
+    if(r.ok){ msg.style.color='#059669'; msg.textContent='✓ Saved'; _trLoadedSnapshot=_trFormSnapshot(); _trLoadedDate=date; trRenderMyWeek(); }
     else { msg.style.color='#dc2626'; msg.textContent='Save failed — try again'; }
   }catch(e){ msg.style.color='#dc2626'; msg.textContent='Network error'; }
   finally{ btn.disabled=false; btn.textContent=orig; setTimeout(function(){ if(msg.textContent==='✓ Saved') msg.textContent=''; }, 2500); }
@@ -16744,28 +16821,129 @@ async function trRenderMyWeek(){
     var r = await fetch(url, { headers:_trHeaders() });
     var rows = await r.json();
     if(!Array.isArray(rows) || !rows.length){ mount.innerHTML = '<div style="font-size:12px;color:#94a3b8;">No entries yet for the week of '+_trFmtDay(mon)+'.</div>'; return; }
-    var tot = { draft_made:0, applications_processed:0, emails_replied:0, logbook_sent:0, logbook_scanned:0 };
+    var tot = {}; _trMetrics.forEach(function(m){ tot[m.metric_key]=0; });
+    var head = '<th>Day</th>' + _trMetrics.map(function(m){ return '<th class="num">'+_trEsc(m.label)+'</th>'; }).join('');
     var body = rows.map(function(row){
-      TR_FIELDS.forEach(function(f){ tot[f[0]] += (row[f[0]]||0); });
-      return '<tr><td>'+_trFmtDay(row.report_date)+'</td>'+
-        '<td class="num">'+(row.draft_made||0)+'</td>'+
-        '<td class="num">'+(row.applications_processed||0)+'</td>'+
-        '<td class="num">'+(row.emails_replied||0)+'</td>'+
-        '<td class="num">'+(row.logbook_sent||0)+'</td>'+
-        '<td class="num">'+(row.logbook_scanned||0)+'</td></tr>';
+      var vals = row.metrics || {};
+      var cells = _trMetrics.map(function(m){ var v=vals[m.metric_key]||0; tot[m.metric_key]+=v; return '<td class="num">'+v+'</td>'; }).join('');
+      return '<tr><td>'+_trFmtDay(row.report_date)+'</td>'+cells+'</tr>';
     }).join('');
-    mount.innerHTML =
-      '<div style="overflow-x:auto;"><table class="tr-table"><thead><tr>'+
-      '<th>Day</th><th class="num">Draft</th><th class="num">Apps</th><th class="num">Emails</th><th class="num">LB Sent</th><th class="num">LB Scan</th>'+
-      '</tr></thead><tbody>'+body+
-      '<tr class="tot"><td>Total</td>'+
-        '<td class="num">'+tot.draft_made+'</td>'+
-        '<td class="num">'+tot.applications_processed+'</td>'+
-        '<td class="num">'+tot.emails_replied+'</td>'+
-        '<td class="num">'+tot.logbook_sent+'</td>'+
-        '<td class="num">'+tot.logbook_scanned+'</td></tr>'+
-      '</tbody></table></div>';
+    var totRow = '<tr class="tot"><td>Total</td>' + _trMetrics.map(function(m){ return '<td class="num">'+tot[m.metric_key]+'</td>'; }).join('') + '</tr>';
+    mount.innerHTML = '<div style="overflow-x:auto;"><table class="tr-table"><thead><tr>'+head+'</tr></thead><tbody>'+body+totRow+'</tbody></table></div>';
   }catch(e){ mount.innerHTML = '<div style="font-size:12px;color:#dc2626;">Could not load your week.</div>'; }
+}
+
+// ── Admin: metric manager ──
+function trRenderMetricAdmin(){
+  var host = document.getElementById('trMetricList');
+  if(!host) return;
+  if(!_trMetricsAll.length){ host.innerHTML = '<div style="font-size:12px;color:#94a3b8;">No metrics yet. Add your first below.</div>'; return; }
+  var active = _trMetricsAll.filter(function(m){return !m.archived;}).sort(function(a,b){return a.sort_order-b.sort_order;});
+  var archived = _trMetricsAll.filter(function(m){return m.archived;});
+  var rows = active.map(function(m, i){
+    return '<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #eef2f7;">'+
+      '<span style="font-family:var(--mono);font-size:11px;color:#94a3b8;width:20px;">'+(i+1)+'</span>'+
+      '<span style="flex:1;font-size:13px;color:#0f172a;">'+_trEsc(m.label)+'</span>'+
+      '<button title="Move up" onclick="trMoveMetric(\''+m.metric_key+'\',-1)" style="border:1px solid #e2e8f0;background:#fff;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:12px;"'+(i===0?' disabled':'')+'>↑</button>'+
+      '<button title="Move down" onclick="trMoveMetric(\''+m.metric_key+'\',1)" style="border:1px solid #e2e8f0;background:#fff;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:12px;"'+(i===active.length-1?' disabled':'')+'>↓</button>'+
+      '<button title="Rename" onclick="trRenameMetric(\''+m.metric_key+'\')" style="border:1px solid #e2e8f0;background:#fff;border-radius:6px;padding:3px 10px;cursor:pointer;font-size:12px;">Rename</button>'+
+      '<button title="Archive" onclick="trArchiveMetric(\''+m.metric_key+'\',true)" style="border:1px solid #fecaca;color:#dc2626;background:#fff;border-radius:6px;padding:3px 10px;cursor:pointer;font-size:12px;">Archive</button>'+
+      '</div>';
+  }).join('');
+  var arch = archived.length ? ('<div style="margin-top:12px;font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.04em;">Archived</div>' +
+    archived.map(function(m){
+      return '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;">'+
+        '<span style="flex:1;font-size:13px;color:#94a3b8;text-decoration:line-through;">'+_trEsc(m.label)+'</span>'+
+        '<button onclick="trArchiveMetric(\''+m.metric_key+'\',false)" style="border:1px solid #bbf7d0;color:#059669;background:#fff;border-radius:6px;padding:3px 10px;cursor:pointer;font-size:12px;">Restore</button>'+
+        '</div>';
+    }).join('')) : '';
+  host.innerHTML = rows + arch;
+}
+
+function _trMetricMsg(txt, ok){
+  var m=document.getElementById('trMetricMsg'); if(!m) return;
+  m.style.color = ok ? '#059669' : '#dc2626'; m.textContent = txt;
+  setTimeout(function(){ if(m.textContent===txt) m.textContent=''; }, 3000);
+}
+
+// slugify a label into a stable metric_key
+function _trSlug(label){
+  return String(label).toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'').slice(0,40) || ('metric_'+Date.now());
+}
+
+async function trAddMetric(){
+  if(!myIsAdmin) return;
+  var input = document.getElementById('trNewMetric');
+  var label = (input.value||'').trim();
+  if(!label){ _trMetricMsg('Enter a metric name.', false); return; }
+  var key = _trSlug(label);
+  // avoid key collision; if archived one exists with same key, restore it instead
+  var existing = _trMetricsAll.find(function(m){ return m.metric_key===key; });
+  try{
+    if(existing){
+      if(existing.archived){ await trArchiveMetric(key, false); input.value=''; _trMetricMsg('Restored existing metric.', true); return; }
+      _trMetricMsg('A metric with that name already exists.', false); return;
+    }
+    var maxOrder = _trMetricsAll.reduce(function(a,m){ return Math.max(a, m.sort_order||0); }, 0);
+    var r = await fetch(SB + '/rest/v1/processing_metrics', {
+      method:'POST',
+      headers: Object.assign({ 'Prefer':'return=minimal' }, _trHeaders()),
+      body: JSON.stringify({ team:TR_TEAM, metric_key:key, label:label, sort_order:maxOrder+1 })
+    });
+    if(!r.ok){ _trMetricMsg('Could not add metric.', false); return; }
+    input.value='';
+    await trLoadMetrics(); trRenderMetricAdmin(); if(_isProcessing()) trRenderMetricFields();
+    _trMetricMsg('Metric added.', true);
+  }catch(e){ _trMetricMsg('Network error.', false); }
+}
+
+async function trRenameMetric(key){
+  if(!myIsAdmin) return;
+  var m = _trMetricsAll.find(function(x){return x.metric_key===key;});
+  if(!m) return;
+  var nl = prompt('Rename metric:', m.label);
+  if(nl===null) return;
+  nl = nl.trim(); if(!nl){ _trMetricMsg('Name cannot be empty.', false); return; }
+  try{
+    var r = await fetch(SB + '/rest/v1/processing_metrics?team=eq.'+encodeURIComponent(TR_TEAM)+'&metric_key=eq.'+encodeURIComponent(key), {
+      method:'PATCH', headers: Object.assign({ 'Prefer':'return=minimal' }, _trHeaders()),
+      body: JSON.stringify({ label:nl })
+    });
+    if(!r.ok){ _trMetricMsg('Rename failed.', false); return; }
+    await trLoadMetrics(); trRenderMetricAdmin(); if(_isProcessing()) trRenderMetricFields();
+    _trMetricMsg('Renamed.', true);
+  }catch(e){ _trMetricMsg('Network error.', false); }
+}
+
+async function trArchiveMetric(key, archived){
+  if(!myIsAdmin) return;
+  if(archived && !confirm('Archive this metric? Staff will stop logging it and it will drop out of future reports. Past data is kept.')) return;
+  try{
+    var r = await fetch(SB + '/rest/v1/processing_metrics?team=eq.'+encodeURIComponent(TR_TEAM)+'&metric_key=eq.'+encodeURIComponent(key), {
+      method:'PATCH', headers: Object.assign({ 'Prefer':'return=minimal' }, _trHeaders()),
+      body: JSON.stringify({ archived: !!archived })
+    });
+    if(!r.ok){ _trMetricMsg('Update failed.', false); return; }
+    await trLoadMetrics(); trRenderMetricAdmin(); if(_isProcessing()){ trRenderMetricFields(); trLoadDay(); }
+    _trMetricMsg(archived?'Archived.':'Restored.', true);
+  }catch(e){ _trMetricMsg('Network error.', false); }
+}
+
+async function trMoveMetric(key, dir){
+  if(!myIsAdmin) return;
+  var active = _trMetricsAll.filter(function(m){return !m.archived;}).sort(function(a,b){return a.sort_order-b.sort_order;});
+  var idx = active.findIndex(function(m){return m.metric_key===key;});
+  var swap = idx + dir;
+  if(idx<0 || swap<0 || swap>=active.length) return;
+  var a = active[idx], b = active[swap];
+  try{
+    // swap their sort_order values
+    await fetch(SB + '/rest/v1/processing_metrics?team=eq.'+encodeURIComponent(TR_TEAM)+'&metric_key=eq.'+encodeURIComponent(a.metric_key), {
+      method:'PATCH', headers: Object.assign({ 'Prefer':'return=minimal' }, _trHeaders()), body: JSON.stringify({ sort_order: b.sort_order }) });
+    await fetch(SB + '/rest/v1/processing_metrics?team=eq.'+encodeURIComponent(TR_TEAM)+'&metric_key=eq.'+encodeURIComponent(b.metric_key), {
+      method:'PATCH', headers: Object.assign({ 'Prefer':'return=minimal' }, _trHeaders()), body: JSON.stringify({ sort_order: a.sort_order }) });
+    await trLoadMetrics(); trRenderMetricAdmin(); if(_isProcessing()) trRenderMetricFields();
+  }catch(e){ _trMetricMsg('Reorder failed.', false); }
 }
 
 // ── Admin: generate the whole-team weekly report ──
@@ -16777,233 +16955,159 @@ async function trGenerateReport(){
   out.innerHTML = '<div style="color:#94a3b8;font-size:13px;padding:12px 0;">Generating…</div>';
   document.getElementById('trPrintBtn').style.display = 'none';
   try{
-    // Who's on Processing (from credentials), so people with zero entries still show.
-    var teamResp = await fetch(SB + '/rest/v1/staff_credentials?team=eq.Processing&select=staff_name&order=staff_name.asc', { headers:_trHeaders() });
+    if(!_trMetrics.length) await trLoadMetrics();
+    var teamResp = await fetch(SB + '/rest/v1/staff_credentials?team=eq.'+encodeURIComponent(TR_TEAM)+'&select=staff_name&order=staff_name.asc', { headers:_trHeaders() });
     var teamRows = await teamResp.json();
     var team = (Array.isArray(teamRows)?teamRows:[]).map(function(x){ return x.staff_name; }).filter(Boolean);
 
     var repResp = await fetch(SB + '/rest/v1/processing_reports?report_date=gte.' + mon + '&report_date=lte.' + sun + '&order=staff_name.asc,report_date.asc', { headers:_trHeaders() });
-    var reps = await repResp.json();
-    reps = Array.isArray(reps) ? reps : [];
+    var reps = await repResp.json(); reps = Array.isArray(reps) ? reps : [];
 
-    // Calls come from the DialTRAC call_log (logged_by = the staffer, created_at
-    // in the week, not soft-deleted) — staff don't type these. We count per
-    // person. Week window is [Mon 00:00, next-Mon 00:00) in local terms; using
-    // date-only bounds on created_at's date is close enough and simplest.
+    // calls from call_log
     var callsByStaff = {};
     try{
-      var sunNext = _trAddDays(mon, 7); // exclusive upper bound
-      var clUrl = SB + '/rest/v1/call_log?created_at=gte.' + mon + '&created_at=lt.' + sunNext +
-                  '&deleted_at=is.null&select=logged_by';
+      var sunNext = _trAddDays(mon, 7);
+      var clUrl = SB + '/rest/v1/call_log?created_at=gte.' + mon + '&created_at=lt.' + sunNext + '&deleted_at=is.null&select=logged_by';
       var clResp = await fetch(clUrl, { headers:_trHeaders() });
       var clRows = await clResp.json();
-      (Array.isArray(clRows)?clRows:[]).forEach(function(r){
-        var who = (r.logged_by||'').trim();
-        if(who) callsByStaff[who] = (callsByStaff[who]||0) + 1;
-      });
-    }catch(e){ /* calls column will show 0 if this fails */ }
+      (Array.isArray(clRows)?clRows:[]).forEach(function(r){ var w=(r.logged_by||'').trim(); if(w) callsByStaff[w]=(callsByStaff[w]||0)+1; });
+    }catch(e){}
 
-    // Group by staff.
     var byStaff = {};
-    reps.forEach(function(r){ (byStaff[r.staff_name] = byStaff[r.staff_name] || []).push(r); });
-    // Include Processing staff with no entries too.
-    team.forEach(function(n){ if(!byStaff[n]) byStaff[n] = []; });
+    reps.forEach(function(r){ (byStaff[r.staff_name]=byStaff[r.staff_name]||[]).push(r); });
+    team.forEach(function(n){ if(!byStaff[n]) byStaff[n]=[]; });
     var names = Object.keys(byStaff).sort();
+    if(!names.length){ out.innerHTML = '<div style="font-size:13px;color:#94a3b8;">No '+TR_TEAM+' staff found.</div>'; return; }
 
-    if(!names.length){ out.innerHTML = '<div style="font-size:13px;color:#94a3b8;">No Processing staff found.</div>'; return; }
+    var mkeys = _trMetrics.map(function(m){return m.metric_key;});
+    var mlabels = _trMetrics.map(function(m){return m.label;});
 
-    // ── Capture structured data for the PDF (7-day grid + metrics) ──
-    var weekDates = [];
-    for(var wi=0; wi<7; wi++) weekDates.push(_trAddDays(mon, wi));
-    var pdfMetrics = [];   // [{name, calls, draft, apps, emails, lbsent, lbscan}]
-    var pdfTasks = [];     // [{name, days:[[..],[..]x7]}]
-    names.forEach(function(nm){
-      var rws = byStaff[nm];
-      var mt = { draft_made:0, applications_processed:0, emails_replied:0, logbook_sent:0, logbook_scanned:0 };
-      var byDate = {};
-      rws.forEach(function(rr){
-        TR_FIELDS.forEach(function(f){ mt[f[0]] += (rr[f[0]]||0); });
-        byDate[rr.report_date] = rr;
-      });
-      pdfMetrics.push({ name:nm, calls:(callsByStaff[nm]||0),
-        draft:mt.draft_made, apps:mt.applications_processed, emails:mt.emails_replied,
-        lbsent:mt.logbook_sent, lbscan:mt.logbook_scanned });
-      var days = weekDates.map(function(d){
-        var rr = byDate[d];
-        if(rr && rr.tasks && rr.tasks.trim()){
-          return rr.tasks.split(/\r?\n/).map(function(x){ return x.trim(); }).filter(Boolean);
-        }
-        return [];
-      });
-      pdfTasks.push({ name:nm, days:days });
-    });
-    window._trReportData = {
-      mon:mon, sun:sun, weekDates:weekDates,
-      metrics:pdfMetrics, tasks:pdfTasks,
-      preparedBy:(window.me || me || '')
-    };
+    // capture structured data for PDF
+    var weekDates=[]; for(var wi=0;wi<7;wi++) weekDates.push(_trAddDays(mon,wi));
+    var pdfMetrics=[], pdfTasks=[];
+    var grand={calls:0}; mkeys.forEach(function(k){ grand[k]=0; });
 
-    var grand = { calls:0, draft_made:0, applications_processed:0, emails_replied:0, logbook_sent:0, logbook_scanned:0 };
     var html = '<div id="trPrintable">';
-    html += '<div style="margin-bottom:14px;"><div style="font-size:16px;font-weight:800;color:#0f172a;">Processing — Weekly Report</div>'+
+    html += '<div style="margin-bottom:14px;"><div style="font-size:16px;font-weight:800;color:#0f172a;">'+TR_TEAM+' — Weekly Report</div>'+
             '<div style="font-size:12.5px;color:#64748b;">Week of '+_trFmtDay(mon)+' – '+_trFmtDay(sun)+'</div></div>';
 
     names.forEach(function(name){
       var rows = byStaff[name];
-      var t = { draft_made:0, applications_processed:0, emails_replied:0, logbook_sent:0, logbook_scanned:0 };
-      var notes = [];
+      var t={}; mkeys.forEach(function(k){t[k]=0;});
+      var byDate={}; var notes=[];
       var dayRows = rows.map(function(row){
-        TR_FIELDS.forEach(function(f){ t[f[0]] += (row[f[0]]||0); });
+        var vals=row.metrics||{};
+        byDate[row.report_date]=row;
+        var cells = mkeys.map(function(k){ var v=vals[k]||0; t[k]+=v; return '<td class="num">'+v+'</td>'; }).join('');
         if(row.tasks && row.tasks.trim()){
-          row.tasks.split(/\r?\n/).map(function(x){return x.trim();}).filter(Boolean).forEach(function(tk){
-            notes.push(_trFmtDay(row.report_date)+': '+_trEsc(tk));
-          });
+          row.tasks.split(/\r?\n/).map(function(x){return x.trim();}).filter(Boolean).forEach(function(tk){ notes.push(_trFmtDay(row.report_date)+': '+_trEsc(tk)); });
         }
-        return '<tr><td>'+_trFmtDay(row.report_date)+'</td>'+
-          '<td class="num">'+(row.draft_made||0)+'</td>'+
-          '<td class="num">'+(row.applications_processed||0)+'</td>'+
-          '<td class="num">'+(row.emails_replied||0)+'</td>'+
-          '<td class="num">'+(row.logbook_sent||0)+'</td>'+
-          '<td class="num">'+(row.logbook_scanned||0)+'</td></tr>';
+        return '<tr><td>'+_trFmtDay(row.report_date)+'</td>'+cells+'</tr>';
       }).join('');
-      var calls = callsByStaff[name] || 0;
-      Object.keys(t).forEach(function(k){ grand[k]+=t[k]; });
-      grand.calls += calls;
+      var calls = callsByStaff[name]||0;
+      mkeys.forEach(function(k){ grand[k]+=t[k]; }); grand.calls+=calls;
+
+      pdfMetrics.push(Object.assign({name:name, calls:calls}, (function(){var o={};mkeys.forEach(function(k){o[k]=t[k];});return o;})()));
+      pdfTasks.push({ name:name, days: weekDates.map(function(d){ var rr=byDate[d]; return (rr&&rr.tasks&&rr.tasks.trim())? rr.tasks.split(/\r?\n/).map(function(x){return x.trim();}).filter(Boolean):[]; }) });
 
       html += '<div class="tr-person-h">'+_trEsc(name)+'</div>';
-      // Calls line (from call_log) — shows even when there are no report entries.
       html += '<div style="font-size:12.5px;color:#475569;margin:0 0 8px;"><strong>Calls made this week:</strong> '+calls+'</div>';
-      if(!rows.length){
-        html += '<div style="font-size:12px;color:#cbd5e1;margin-bottom:8px;">No report entries this week.</div>';
-      } else {
-        html += '<div style="overflow-x:auto;"><table class="tr-table"><thead><tr>'+
-          '<th>Day</th><th class="num">Draft</th><th class="num">Apps</th><th class="num">Emails</th><th class="num">LB Sent</th><th class="num">LB Scan</th></tr></thead><tbody>'+
-          dayRows +
-          '<tr class="tot"><td>Total</td><td class="num">'+t.draft_made+'</td><td class="num">'+t.applications_processed+'</td><td class="num">'+t.emails_replied+'</td><td class="num">'+t.logbook_sent+'</td><td class="num">'+t.logbook_scanned+'</td></tr>'+
-          '</tbody></table></div>';
-        if(notes.length){
-          html += '<div style="font-size:12px;color:#475569;margin:8px 0 4px;"><strong>Tasks:</strong></div><ul style="margin:0 0 6px;padding-left:18px;font-size:12px;color:#475569;line-height:1.6;">'+
-            notes.map(function(c){ return '<li>'+c+'</li>'; }).join('') + '</ul>';
-        }
+      if(!rows.length){ html += '<div style="font-size:12px;color:#cbd5e1;margin-bottom:8px;">No report entries this week.</div>'; }
+      else {
+        var head='<th>Day</th>'+mlabels.map(function(l){return '<th class="num">'+_trEsc(l)+'</th>';}).join('');
+        var totRow='<tr class="tot"><td>Total</td>'+mkeys.map(function(k){return '<td class="num">'+t[k]+'</td>';}).join('')+'</tr>';
+        html += '<div style="overflow-x:auto;"><table class="tr-table"><thead><tr>'+head+'</tr></thead><tbody>'+dayRows+totRow+'</tbody></table></div>';
+        if(notes.length){ html += '<div style="font-size:12px;color:#475569;margin:8px 0 4px;"><strong>Tasks:</strong></div><ul style="margin:0 0 6px;padding-left:18px;font-size:12px;color:#475569;line-height:1.6;">'+notes.map(function(c){return '<li>'+c+'</li>';}).join('')+'</ul>'; }
       }
     });
 
-    // Team grand total.
     html += '<div class="tr-person-h" style="margin-top:20px;">Team total</div>'+
-      '<div style="overflow-x:auto;"><table class="tr-table"><thead><tr>'+
-      '<th>Metric</th><th class="num">Total</th></tr></thead><tbody>'+
+      '<div style="overflow-x:auto;"><table class="tr-table"><thead><tr><th>Metric</th><th class="num">Total</th></tr></thead><tbody>'+
       '<tr><td>Calls Made</td><td class="num">'+grand.calls+'</td></tr>'+
-      '<tr><td>Draft Made</td><td class="num">'+grand.draft_made+'</td></tr>'+
-      '<tr><td>Applications Processed</td><td class="num">'+grand.applications_processed+'</td></tr>'+
-      '<tr><td>Emails Replied</td><td class="num">'+grand.emails_replied+'</td></tr>'+
-      '<tr><td>Logbook Sent</td><td class="num">'+grand.logbook_sent+'</td></tr>'+
-      '<tr><td>Logbook Scanned</td><td class="num">'+grand.logbook_scanned+'</td></tr>'+
+      _trMetrics.map(function(m){ return '<tr><td>'+_trEsc(m.label)+'</td><td class="num">'+grand[m.metric_key]+'</td></tr>'; }).join('')+
       '</tbody></table></div>';
     html += '</div>';
     out.innerHTML = html;
+
+    window._trReportData = { mon:mon, sun:sun, weekDates:weekDates, metricKeys:mkeys, metricLabels:mlabels,
+      metrics:pdfMetrics, tasks:pdfTasks, preparedBy:(window.me||me||'') };
     document.getElementById('trPrintBtn').style.display = '';
   }catch(e){ out.innerHTML = '<div style="font-size:13px;color:#dc2626;">Could not generate the report.</div>'; }
 }
 
-// Build the landscape 2-page PDF (page 1 team metrics, page 2 task grid)
-// entirely in-browser with jsPDF + autotable (both already loaded via CDN).
 function trDownloadPdf(){
   var D = window._trReportData;
   if(!D){ alert('Generate the report first.'); return; }
-  var jsPDFns = window.jspdf || window.jsPDF; 
   var JsPDF = (window.jspdf && window.jspdf.jsPDF) ? window.jspdf.jsPDF : window.jsPDF;
   if(!JsPDF){ alert('PDF library not loaded. Please refresh and try again.'); return; }
   var doc = new JsPDF({ orientation:'landscape', unit:'mm', format:'a4' });
-  var PW = doc.internal.pageSize.getWidth();   // 297
-  var PH = doc.internal.pageSize.getHeight();  // 210
+  var PW = doc.internal.pageSize.getWidth();
+  var PH = doc.internal.pageSize.getHeight();
   var M = 12;
   var GREEN=[5,150,105], HEAD=[6,95,70], INK=[15,23,42], MUTED=[100,116,139], LINE=[226,232,240], ZEBRA=[246,250,248];
-
   function fmtDay(dStr){ return new Date(dStr+'T00:00:00').toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short'}); }
   function rangeStr(){ return fmtDay(D.mon)+' – '+fmtDay(D.sun); }
-
   function footer(){
-    var pageStr = 'Page ' + doc.internal.getNumberOfPages();
+    var pageStr='Page '+doc.internal.getNumberOfPages();
     doc.setFontSize(7.5); doc.setTextColor.apply(doc, MUTED); doc.setFont(undefined,'normal');
-    doc.text('Prepared by: ' + (D.preparedBy||''), M, PH-7);
-    doc.text('Oscars Training Centre · Processing', PW/2, PH-7, {align:'center'});
+    doc.text('Prepared by: '+(D.preparedBy||''), M, PH-7);
+    doc.text(TR_TEAM+' · Oscars Training Centre', PW/2, PH-7, {align:'center'});
     doc.text(pageStr, PW-M, PH-7, {align:'right'});
   }
 
-  // ── PAGE 1 — Team Metrics ──
+  // PAGE 1 — metrics
   doc.setFont(undefined,'bold'); doc.setFontSize(15); doc.setTextColor.apply(doc, INK);
   doc.text('Oscars Training Centre — Weekly Performance Report', M, M+4);
   doc.setFont(undefined,'normal'); doc.setFontSize(9.5); doc.setTextColor.apply(doc, MUTED);
-  doc.text('Team Metrics: Processing · ' + rangeStr(), M, M+10);
+  doc.text('Team Metrics: '+TR_TEAM+' · '+rangeStr(), M, M+10);
 
-  var mBody = D.metrics.map(function(r){ return [r.name, r.calls, r.draft, r.apps, r.emails, r.lbsent, r.lbscan]; });
-  var g = {calls:0,draft:0,apps:0,emails:0,lbsent:0,lbscan:0};
-  D.metrics.forEach(function(r){ g.calls+=r.calls;g.draft+=r.draft;g.apps+=r.apps;g.emails+=r.emails;g.lbsent+=r.lbsent;g.lbscan+=r.lbscan; });
-  mBody.push(['Team total', g.calls, g.draft, g.apps, g.emails, g.lbsent, g.lbscan]);
+  var headRow = ['Staff','Calls'].concat(D.metricLabels);
+  var mBody = D.metrics.map(function(r){ return [r.name, r.calls].concat(D.metricKeys.map(function(k){ return r[k]||0; })); });
+  var g={calls:0}; D.metricKeys.forEach(function(k){g[k]=0;});
+  D.metrics.forEach(function(r){ g.calls+=r.calls; D.metricKeys.forEach(function(k){ g[k]+=r[k]||0; }); });
+  mBody.push(['Team total', g.calls].concat(D.metricKeys.map(function(k){ return g[k]; })));
 
-  doc.autoTable({
-    startY: M+16,
-    head: [['Staff','Calls','Draft Made','Applications','Emails Replied','Logbook Sent','Logbook Scanned']],
-    body: mBody,
-    theme:'plain',
-    styles:{ fontSize:9.5, cellPadding:2.6, textColor:INK, lineColor:LINE, lineWidth:0.15 },
-    headStyles:{ fillColor:HEAD, textColor:[255,255,255], fontStyle:'bold', fontSize:9, halign:'center' },
-    columnStyles:{ 0:{halign:'left', cellWidth: 62, fontStyle:'bold'},
-      1:{halign:'center'},2:{halign:'center'},3:{halign:'center'},4:{halign:'center'},5:{halign:'center'},6:{halign:'center'} },
-    alternateRowStyles:{ fillColor:ZEBRA },
-    margin:{ left:M, right:M },
-    didParseCell:function(data){
-      if(data.row.index === mBody.length-1){
-        data.cell.styles.fontStyle='bold';
-        data.cell.styles.fillColor=[236,253,245];
-        data.cell.styles.lineColor=GREEN; data.cell.styles.lineWidth=0.4;
-      }
-    }
+  var colStyles={0:{halign:'left',cellWidth:52,fontStyle:'bold'}};
+  for(var ci=1; ci<headRow.length; ci++) colStyles[ci]={halign:'center'};
+  doc.autoTable({ startY:M+16, head:[headRow], body:mBody, theme:'plain',
+    styles:{ fontSize:9, cellPadding:2.4, textColor:INK, lineColor:LINE, lineWidth:0.15 },
+    headStyles:{ fillColor:HEAD, textColor:[255,255,255], fontStyle:'bold', fontSize:8.5, halign:'center' },
+    columnStyles: colStyles, alternateRowStyles:{ fillColor:ZEBRA }, margin:{ left:M, right:M },
+    didParseCell:function(data){ if(data.row.index===mBody.length-1){ data.cell.styles.fontStyle='bold'; data.cell.styles.fillColor=[236,253,245]; data.cell.styles.lineColor=GREEN; data.cell.styles.lineWidth=0.4; } }
   });
-  var afterY = doc.lastAutoTable.finalY + 6;
+  var afterY=doc.lastAutoTable.finalY+6;
   doc.setFontSize(7.5); doc.setTextColor.apply(doc, MUTED); doc.setFont(undefined,'normal');
   doc.text('Calls are counted automatically from the call log. Other metrics are self-reported daily by staff.', M, afterY);
   footer();
 
-  // ── PAGE 2 — Task grid ──
+  // PAGE 2 — task grid
   doc.addPage('a4','landscape');
   doc.setFont(undefined,'bold'); doc.setFontSize(15); doc.setTextColor.apply(doc, INK);
-  doc.text('Weekly Task Report: Processing', M, M+4);
+  doc.text('Weekly Task Report: '+TR_TEAM, M, M+4);
   doc.setFont(undefined,'normal'); doc.setFontSize(9.5); doc.setTextColor.apply(doc, MUTED);
   doc.text(rangeStr(), M, M+10);
-
   var dayHeads = D.weekDates.map(function(d){ return fmtDay(d); });
   var gHead = [['#','Staff'].concat(dayHeads)];
   var gBody = D.tasks.map(function(p, idx){
-    var row = [String(idx+1), p.name];
-    p.days.forEach(function(items){
-      row.push(items.length ? items.map(function(t){ return '• '+t; }).join('\n') : '—');
-    });
+    var row=[String(idx+1), p.name];
+    p.days.forEach(function(items){ row.push(items.length ? items.map(function(t){return '• '+t;}).join('\n') : '—'); });
     return row;
   });
-  var usable = PW - 2*M;
-  var cNum=7, cName=30, cDay=(usable-cNum-cName)/7;
-  doc.autoTable({
-    startY: M+15,
-    head: gHead,
-    body: gBody,
-    theme:'grid',
+  var usable=PW-2*M, cNum=7, cName=30, cDay=(usable-cNum-cName)/7;
+  var gCol={0:{cellWidth:cNum,halign:'center'},1:{cellWidth:cName,fontStyle:'bold'}};
+  for(var i=2;i<9;i++) gCol[i]={cellWidth:cDay};
+  doc.autoTable({ startY:M+15, head:gHead, body:gBody, theme:'grid',
     styles:{ fontSize:7.4, cellPadding:1.8, textColor:INK, lineColor:LINE, lineWidth:0.2, valign:'top', overflow:'linebreak' },
     headStyles:{ fillColor:HEAD, textColor:[255,255,255], fontStyle:'bold', fontSize:7.5, halign:'center', valign:'middle' },
-    columnStyles: (function(){ var o={0:{cellWidth:cNum,halign:'center'},1:{cellWidth:cName,fontStyle:'bold'}}; for(var i=2;i<9;i++) o[i]={cellWidth:cDay}; return o; })(),
-    alternateRowStyles:{ fillColor:ZEBRA },
-    margin:{ left:M, right:M },
-    didParseCell:function(data){
-      if(data.section==='body' && data.cell.raw==='—'){ data.cell.styles.textColor=[203,213,225]; data.cell.styles.halign='center'; }
-    }
+    columnStyles:gCol, alternateRowStyles:{ fillColor:ZEBRA }, margin:{ left:M, right:M },
+    didParseCell:function(data){ if(data.section==='body' && data.cell.raw==='—'){ data.cell.styles.textColor=[203,213,225]; data.cell.styles.halign='center'; } }
   });
-  var afterY2 = doc.lastAutoTable.finalY + 6;
+  var afterY2=doc.lastAutoTable.finalY+6;
   doc.setFontSize(7.5); doc.setTextColor.apply(doc, MUTED);
   doc.text('Note: Tasks summarised here are arranged from records provided by staff in the daily work log.', M, afterY2);
   footer();
 
-  var fn = 'Processing_Weekly_Report_' + D.mon + '.pdf';
-  doc.save(fn);
+  doc.save(TR_TEAM+'_Weekly_Report_'+D.mon+'.pdf');
 }
 
 function populateMgrStaff(){
