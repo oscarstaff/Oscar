@@ -16670,22 +16670,33 @@ function initReportsPage(){
 // each day's values live in processing_reports.metrics (jsonb). Calls are
 // counted separately from call_log and are not part of this list.
 var TR_TEAM = 'Processing';
+// Work week is Monday–Saturday (6 days). Sunday is not a work day; a Sunday
+// pick rolls back into the preceding Mon–Sat week (via _trMonday).
+var TR_WEEK_DAYS = 6;
 var _trMetrics = [];        // active metric defs [{metric_key,label,sort_order,archived}]
 var _trMetricsAll = [];     // including archived (for the admin manager)
 
 function _trHeaders(){
   return { 'apikey':KEY, 'Authorization':'Bearer '+KEY, 'Content-Type':'application/json' };
 }
-function _trToday(){ return new Date().toISOString().split('T')[0]; }
+function _trToday(){
+  var d=new Date();
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+// Return yyyy-mm-dd from a Date using LOCAL components (never toISOString, which
+// shifts by the UTC offset and rolls Sydney dates back a day).
+function _trYMD(d){
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
 function _trMonday(dStr){
   var d = new Date(dStr + 'T00:00:00');
-  var dow = (d.getDay() + 6) % 7;
+  var dow = (d.getDay() + 6) % 7;         // 0 = Monday
   d.setDate(d.getDate() - dow);
-  return d.toISOString().split('T')[0];
+  return _trYMD(d);
 }
 function _trAddDays(dStr, n){
   var d = new Date(dStr + 'T00:00:00'); d.setDate(d.getDate()+n);
-  return d.toISOString().split('T')[0];
+  return _trYMD(d);
 }
 function _trFmtDay(dStr){
   return new Date(dStr+'T00:00:00').toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short'});
@@ -16814,7 +16825,7 @@ async function trRenderMyWeek(){
   var mount = document.getElementById('trMyWeek');
   if(!mount) return;
   var mon = _trMonday(document.getElementById('trDate').value || _trToday());
-  var sun = _trAddDays(mon, 6);
+  var sun = _trAddDays(mon, TR_WEEK_DAYS-1);  // Saturday
   try{
     var url = SB + '/rest/v1/processing_reports?staff_name=eq.' + encodeURIComponent(me) +
               '&report_date=gte.' + mon + '&report_date=lte.' + sun + '&order=report_date.asc';
@@ -16951,7 +16962,7 @@ async function trGenerateReport(){
   if(!myIsAdmin) return;
   var out = document.getElementById('trReportOut');
   var pick = document.getElementById('trWeekPick').value || _trToday();
-  var mon = _trMonday(pick), sun = _trAddDays(mon,6);
+  var mon = _trMonday(pick), sun = _trAddDays(mon,TR_WEEK_DAYS-1);  // Sat
   out.innerHTML = '<div style="color:#94a3b8;font-size:13px;padding:12px 0;">Generating…</div>';
   document.getElementById('trPrintBtn').style.display = 'none';
   try{
@@ -16966,7 +16977,7 @@ async function trGenerateReport(){
     // calls from call_log
     var callsByStaff = {};
     try{
-      var sunNext = _trAddDays(mon, 7);
+      var sunNext = _trAddDays(mon, TR_WEEK_DAYS);  // exclusive upper bound = Sunday 00:00 → counts Mon–Sat
       var clUrl = SB + '/rest/v1/call_log?created_at=gte.' + mon + '&created_at=lt.' + sunNext + '&deleted_at=is.null&select=logged_by';
       var clResp = await fetch(clUrl, { headers:_trHeaders() });
       var clRows = await clResp.json();
@@ -16983,7 +16994,7 @@ async function trGenerateReport(){
     var mlabels = _trMetrics.map(function(m){return m.label;});
 
     // capture structured data for PDF
-    var weekDates=[]; for(var wi=0;wi<7;wi++) weekDates.push(_trAddDays(mon,wi));
+    var weekDates=[]; for(var wi=0;wi<TR_WEEK_DAYS;wi++) weekDates.push(_trAddDays(mon,wi));
     var pdfMetrics=[], pdfTasks=[];
     var grand={calls:0}; mkeys.forEach(function(k){ grand[k]=0; });
 
@@ -17093,9 +17104,9 @@ function trDownloadPdf(){
     p.days.forEach(function(items){ row.push(items.length ? items.map(function(t){return '• '+t;}).join('\n') : '—'); });
     return row;
   });
-  var usable=PW-2*M, cNum=7, cName=30, cDay=(usable-cNum-cName)/7;
+  var usable=PW-2*M, cNum=7, cName=30, cDay=(usable-cNum-cName)/TR_WEEK_DAYS;
   var gCol={0:{cellWidth:cNum,halign:'center'},1:{cellWidth:cName,fontStyle:'bold'}};
-  for(var i=2;i<9;i++) gCol[i]={cellWidth:cDay};
+  for(var i=2;i<2+TR_WEEK_DAYS;i++) gCol[i]={cellWidth:cDay};
   doc.autoTable({ startY:M+15, head:gHead, body:gBody, theme:'grid',
     styles:{ fontSize:7.4, cellPadding:1.8, textColor:INK, lineColor:LINE, lineWidth:0.2, valign:'top', overflow:'linebreak' },
     headStyles:{ fillColor:HEAD, textColor:[255,255,255], fontStyle:'bold', fontSize:7.5, halign:'center', valign:'middle' },
@@ -19374,14 +19385,14 @@ async function loadHomeAttention(){
 // staff-friendly — what changed and why it helps, not internal detail.
 // date: 'YYYY-MM-DD' (used to sort + flag unseen). tag: 'New' | 'Fixed' | 'Improved'.
 const NEXUS_WHATS_NEW = [
-  { date:'2026-08-15', tag:'New',      title:'What\'s New board',
-    body:'This board — a quick note of what changed in Nexus each week.' },
-  { date:'2026-08-15', tag:'Improved', title:'Retro themes',
-    body:'Two new looks in Settings → Appearance: Retro 95 and Renaissance.' },
-  { date:'2026-08-15', tag:'Fixed',    title:'Fewer sign-outs',
-    body:'Sessions now last through a full shift instead of timing out early.' },
-  { date:'2026-08-15', tag:'Fixed',    title:'Availability saves reliably',
-    body:'Setting a new availability now records properly and won\'t lock you out.' }
+  { date:'2026-08-26', tag:'New',      title:'Team Report (Processing)',
+    body:'Processing staff can now log their daily work under My Reports \u2192 Team Report. Managers can generate a weekly report and download it as a PDF.' },
+  { date:'2026-08-26', tag:'New',      title:'Reset your password by email',
+    body:'Forgot your password? On the sign-in screen, tap \u201CForgot password?\u201D and we\u2019ll email you a secure link to set a new one.' },
+  { date:'2026-08-26', tag:'Improved', title:'Fresh sign-in screen',
+    body:'The login page has a cleaner new look, and it stays the same on every theme.' },
+  { date:'2026-08-26', tag:'Improved', title:'More room on every page',
+    body:'Pages now use the full width of your screen, so there\u2019s less scrolling and more shown at once.' }
 ];
 
 function _whatsNewSeenKey(){
