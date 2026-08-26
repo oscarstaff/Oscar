@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════════════════════════════
    availlock.js — availability edits apply from NEXT week
-   Loaded by index.html:  <script src="availlock.js?v=5"></script>
+   Loaded by index.html:  <script src="availlock.js?v=6"></script>
 
    Separate module by convention — see ARCHITECTURE.md.
 
@@ -25,19 +25,19 @@
 (function(){
   'use strict';
 
-  /* Fortnight anchor: 10 Aug 2026 is a fortnight START (Monday). All fortnight
-     starts are this date + a multiple of 14 days: 10 Aug, 24 Aug, 7 Sep, …
-     Changes never touch the running fortnight (its roster is built), so we
-     always defer to the NEXT fortnight start — including when submitted on a
-     boundary day itself. */
-  var FORTNIGHT_ANCHOR = new Date(2026, 7, 10); // month 7 = August
-  FORTNIGHT_ANCHOR.setHours(0,0,0,0);
+  /* Week anchor: 10 Aug 2026 is a Monday. Every week starts on a Monday, so any
+     Monday is a valid start: 10 Aug, 17 Aug, 24 Aug, 31 Aug, …
+     Changes never touch the running week (its roster is built), so we always
+     defer to the NEXT Monday — including when submitted on a Monday itself.
+     (Cadence moved from fortnightly to weekly once rostering went weekly.) */
+  var WEEK_ANCHOR = new Date(2026, 7, 10); // month 7 = August; a Monday
+  WEEK_ANCHOR.setHours(0,0,0,0);
 
   /* CUTOFF
-     Availability for the upcoming fortnight locks 3 days before it starts:
+     Availability for the upcoming week locks 3 days before it starts:
      Friday 12:00 the week before (Fri -> Sat -> Sun -> Mon). This gives the
      roster builder the finalised patterns by Friday. Submissions AT or AFTER
-     the cutoff defer one extra fortnight.
+     the cutoff defer one extra week.
 
      Sydney wall-clock: we read the current Sydney date AND hour, so the cutoff
      is Fri 12:00 Sydney year-round (correct in both AEST winter and AEDT
@@ -50,39 +50,39 @@
     return new Date(new Date().toLocaleString('en-US', { timeZone: 'Australia/Sydney' }));
   }
 
-  /** Raw next fortnight start from a given Sydney-midnight date (no cutoff). */
-  function _rawNextFortnight(d){
+  /** Raw next week start (Monday) from a given Sydney-midnight date (no cutoff). */
+  function _rawNextWeek(d){
     var DAY = 86400000;
-    var diff = Math.floor((d - FORTNIGHT_ANCHOR) / DAY);
-    var rem = ((diff % 14) + 14) % 14;        // 0 on a boundary day
-    var add = (rem === 0) ? 14 : (14 - rem);  // boundary day -> next fortnight
+    var diff = Math.floor((d - WEEK_ANCHOR) / DAY);
+    var rem = ((diff % 7) + 7) % 7;          // 0 on a Monday
+    var add = (rem === 0) ? 7 : (7 - rem);   // Monday -> next Monday
     var res = new Date(d.getTime() + add * DAY);
     res.setHours(0,0,0,0);
     return res;
   }
 
   /**
-   * True if we're at/after the Fri-12:00-Sydney cutoff for the fortnight that
-   * would otherwise be next. i.e. the upcoming fortnight is locked.
+   * True if we're at/after the Fri-12:00-Sydney cutoff for the week that
+   * would otherwise be next. i.e. the upcoming week is locked.
    */
   function pastCutoff(){
     var now = sydNow();
     var d = new Date(now); d.setHours(0,0,0,0);
-    var start = _rawNextFortnight(d);            // upcoming fortnight Monday
+    var start = _rawNextWeek(d);                 // upcoming week Monday
     // Cutoff = the Friday before that Monday, at 12:00 Sydney (Mon - 3 days).
     var cutoff = new Date(start.getTime() - 3 * 86400000);
     cutoff.setHours(CUTOFF_HOUR, 0, 0, 0);
     return now.getTime() >= cutoff.getTime();
   }
 
-  /** Start of the effective fortnight, Sydney, honouring the 3-day cutoff. */
+  /** Start of the effective week (Monday), Sydney, honouring the 3-day cutoff. */
   function nextMonday(){
     var now = sydNow();
     var d = new Date(now); d.setHours(0,0,0,0);
-    var res = _rawNextFortnight(d);
+    var res = _rawNextWeek(d);
     if(pastCutoff()){
-      // Upcoming fortnight is locked — defer one more fortnight.
-      res = new Date(res.getTime() + 14 * 86400000);
+      // Upcoming week is locked — defer one more week.
+      res = new Date(res.getTime() + 7 * 86400000);
       res.setHours(0,0,0,0);
     }
     return res;
@@ -101,10 +101,10 @@
   function availLockMessage(){
     var base = 'Your new availability starts ' + fmt(nextMonday()) +
                ' and stays that way until you change it again. ' +
-               'This fortnight isn\'t affected — the roster is already set.';
+               'This week isn\'t affected — the roster is already set.';
     if(pastCutoff()){
-      base += ' Submissions for the upcoming fortnight closed Friday 12:00 pm, ' +
-              'so this change applies from the fortnight after.';
+      base += ' Submissions for the upcoming week closed Friday 12:00 pm, ' +
+              'so this change applies from the week after.';
     }
     return base;
   }
@@ -147,8 +147,8 @@
 
   // Kept so existing call sites don't throw.
   function refreshAvailUnlock(){}
-  // locked here means "the upcoming fortnight is closed" — the form still
-  // accepts submissions, they just defer to the fortnight nextMonday() returns.
+  // locked here means "the upcoming week is closed" — the form still
+  // accepts submissions, they just defer to the week nextMonday() returns.
   function availWindow(){
     return { locked: pastCutoff(), appliesFrom: nextMonday(), pastCutoff: pastCutoff() };
   }

@@ -8754,14 +8754,14 @@ function _effFortnightAnchor(){ const d=new Date(2026,7,10); d.setHours(0,0,0,0)
 function _effIsFortnightStart(d){
   const a=_effFortnightAnchor();
   const diff=Math.round((d - a)/86400000);
-  return diff>=0 && diff%14===0;    // a Monday that is a fortnight start
+  return diff>=0 && diff%7===0;    // any Monday (weekly cadence)
 }
 function _effSoonestValid(){
-  // Soonest fortnight-start strictly in the future (never the running one).
+  // Soonest week-start (Monday) strictly in the future (never the running one).
   if(typeof window.availNextFortnight==='function'){ return window.availNextFortnight(); }
   const a=_effFortnightAnchor(); const today=new Date(); today.setHours(0,0,0,0);
   let d=new Date(a);
-  while(d<=today){ d=new Date(d.getTime()+14*86400000); }
+  while(d<=today){ d=new Date(d.getTime()+7*86400000); }
   return d;
 }
 function _effFmtIso(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
@@ -9372,7 +9372,12 @@ async function submitAvail(){
           updated_at: new Date().toISOString() }   // apply immediately (unblocks)
       : { pending_availability: avail,
           pending_from: _effectiveFrom,
-          pending_set_at: new Date().toISOString() };
+          pending_set_at: new Date().toISOString(),
+          // Bump updated_at on a pending change too, so the Submitted
+          // Availability list sorts newest-first and shows a reliable
+          // "last submitted" time. Without this, only pending_set_at moved
+          // and a fresh future-dated change looked stale / sank down the list.
+          updated_at: new Date().toISOString() };
     let res, _wroteRows=null;
     if(existing.length){
       res=await fetch(SB+"/rest/v1/staff_availability?staff_name=eq."+encodeURIComponent(me),{

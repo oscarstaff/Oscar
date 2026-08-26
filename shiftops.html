@@ -4773,6 +4773,17 @@ async function loadSubmittedAvailability(){
       return;
     }
 
+    // Sort newest-first by the most recent activity on each row. The server
+    // order handles the common case, but a row's freshest signal can be
+    // pending_set_at (a future-dated change) rather than updated_at, and some
+    // legacy rows may not have had updated_at bumped — so re-sort client-side
+    // on the max of both to guarantee the newest change is always on top.
+    const _recency = r => Math.max(
+      r.updated_at ? new Date(r.updated_at).getTime() : 0,
+      r.pending_set_at ? new Date(r.pending_set_at).getTime() : 0
+    );
+    rows.sort((a,b) => _recency(b) - _recency(a));
+
     submittedAvailData=rows;
     const DAYS_SHORT=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
     const today=new Date();today.setHours(0,0,0,0);
@@ -4808,7 +4819,11 @@ async function loadSubmittedAvailability(){
         }
       }
 
-      const updated=row.updated_at?new Date(row.updated_at).toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}):'';
+      const _lastTouch = Math.max(
+        row.updated_at ? new Date(row.updated_at).getTime() : 0,
+        row.pending_set_at ? new Date(row.pending_set_at).getTime() : 0
+      );
+      const updated=_lastTouch ? new Date(_lastTouch).toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}):'';
 
       const s=staff.find(x=>`${x.first} ${x.last}`.toLowerCase()===row.staff_name.toLowerCase());
       const _cardTeam=(s&&s.team)?String(s.team).replace(/"/g,'&quot;'):'';
