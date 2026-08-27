@@ -2736,6 +2736,11 @@ async function loadData(){
             // it was raised. Without resolved_by the origin badge silently
             // reported everything as "From Nexus".
             resolved_by:row.resolved_by||'',
+            // Authoritative origin from the leave_submissions.source column:
+            // 'Web'=staff self-request via Nexus, 'Admin'=entered in ShiftOps.
+            // Older rows predate the column (null) — the badge falls back to
+            // the resolved_by heuristic for those.
+            source:row.source||'',
             submitted_at:row.submitted_at||null,
             supabaseId:row.id
           };
@@ -7841,7 +7846,11 @@ function renderLeave(filterName){
     // staff member submitting in Nexus. "WEB" told you the transport; this
     // tells you whether a person asked for it or someone entered it for them,
     // which is the thing a manager actually needs to know.
-    const addedHere = (r.resolved_by||'') === 'Admin (ShiftOps)';
+    // Prefer the authoritative source column; fall back to the resolved_by
+    // heuristic for rows entered before the column existed.
+    const _src = (r.source||'').toLowerCase();
+    const addedHere = _src ? (_src === 'admin')
+                           : ((r.resolved_by||'') === 'Admin (ShiftOps)');
     const _du = (function(){ const f=new Date((r.from||r.from_date||'')+'T00:00:00'); const t=new Date(); t.setHours(0,0,0,0); return isNaN(f)?999:Math.round((f-t)/86400000); })();
     const soonCls = (r.status==='approved' && _du>=0 && _du<=7) ? ' lv-soon' : '';
     // A TABLE, not stacked cards: with every value in a column the eye can
@@ -7853,7 +7862,7 @@ function renderLeave(filterName){
         <span class="avatar lv-ava" style="background:${color}">${s?initials(s):name.slice(0,2).toUpperCase()}</span>
         <span class="lv-who-txt">
           <span class="lv-name">${name}</span>
-          <span class="lv-src ${addedHere?'lv-src-added':'lv-src-nexus'}">${addedHere?'Added':'From Nexus'}</span>
+          <span class="lv-src ${addedHere?'lv-src-added':'lv-src-nexus'}">${addedHere?'Added':'Applied'}</span>
           ${r.reason?`<span class="lv-reason" title="${String(r.reason).replace(/"/g,'&quot;')}">${r.reason}</span>`:''}
         </span>
       </td>
@@ -8139,6 +8148,7 @@ function syncLeaveToPortal(staffId,from,to,reason){
           from:from,        // yyyy-MM-dd from the date inputs
           to:to,
           reason:reason||'',
+          source:'Admin',   // stamps leave_submissions.source (relay must persist this)
           token:GAS_TOKEN
         })
       }).then(function(r){ return r.json().catch(function(){return {};}); })
