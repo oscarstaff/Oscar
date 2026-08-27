@@ -155,6 +155,7 @@
 .cl-label{display:block;font-size:11.5px;font-weight:600;margin-bottom:6px;
   color:var(--m-ink-2);letter-spacing:.01em;}
 .cl-req{color:#dc2626;}
+.cl-req.cl-req-opt{color:#94a3b8;font-weight:400;font-size:.85em;}
 .cl-hint{font-size:11px;color:var(--m-ink-3);margin-top:5px;min-height:14px;
   line-height:1.35;transition:color var(--cl-t) var(--cl-ease);}
 .cl-hint-warn{color:var(--amber);font-weight:600;}
@@ -214,6 +215,35 @@ select.cl-in{appearance:none;-webkit-appearance:none;cursor:pointer;padding-righ
 .cl-check-sub{font-size:11px;color:var(--m-ink-3);}
 .cl-check.on{border-color:var(--amber);background:var(--amber-bg);}
 .cl-check.on .cl-check-main{color:var(--amber);}
+
+/* ══════ PLACEMENT GROUP ══════
+   The "offered" checkbox and its post-offer remarks read as ONE unit: the
+   checkbox is the header, the remarks nest beneath it inside the same amber
+   frame. When ticked, the frame lights and the remarks slide open on a
+   grid-rows transition (animatable, unlike display:none). Detached before —
+   the textarea floated as a stray field with no tie to what triggered it. */
+.cl-plc-group{margin-bottom:14px;border-radius:12px;
+  border:1.5px solid var(--m-border);background:var(--m-card-2);
+  overflow:hidden;transition:border-color var(--cl-t) var(--cl-ease),
+  background var(--cl-t) var(--cl-ease),box-shadow var(--cl-t) var(--cl-ease);}
+.cl-plc-group:hover{border-color:var(--amber-bd);}
+.cl-plc-group.cl-plc-open{border-color:var(--amber);background:var(--amber-bg);
+  box-shadow:0 2px 12px -4px rgba(217,119,6,.25);}
+/* The checkbox header sheds its own border/bg — the group frame carries them. */
+.cl-plc-check{border:none!important;background:transparent!important;
+  border-radius:0;padding:13px 14px;}
+.cl-plc-check:hover{background:transparent!important;}
+/* Slide-open remarks: 0fr→1fr collapses/expands height with no fixed value. */
+.cl-plc-remarks{display:grid;grid-template-rows:0fr;
+  transition:grid-template-rows 260ms var(--cl-ease),opacity 200ms var(--cl-ease);
+  opacity:0;}
+.cl-plc-group.cl-plc-open .cl-plc-remarks{grid-template-rows:1fr;opacity:1;}
+.cl-plc-remarks-inner{overflow:hidden;padding:0 14px;}
+.cl-plc-group.cl-plc-open .cl-plc-remarks-inner{padding:0 14px 14px;}
+/* A hairline rule ties the remarks to the checkbox above it. */
+.cl-plc-remarks-inner .cl-label{padding-top:12px;
+  border-top:1px solid var(--amber-bd);}
+.cl-plc-remarks-inner .cl-in{margin-top:2px;}
 
 .cl-actions{display:flex;gap:8px;margin-top:auto;padding-top:16px;}
 .cl-btn-ghost,.cl-btn-go{min-height:42px;border-radius:11px;cursor:pointer;
@@ -721,7 +751,7 @@ textarea.cl-edit-in{min-height:52px;resize:vertical;line-height:1.45;}
             </div>
 
             <div class="cl-field">
-              <label class="cl-label" for="clPhone">Number <span class="cl-req">*</span></label>
+              <label class="cl-label" for="clPhone">Number <span class="cl-req" id="clPhoneReq">*</span></label>
               <div class="cl-in-wrap">
                 <span class="cl-in-pre">+61</span>
                 <input id="clPhone" class="cl-in cl-in-tel" type="tel" placeholder="0412 345 678" autocomplete="off" />
@@ -783,18 +813,23 @@ textarea.cl-edit-in{min-height:52px;resize:vertical;line-height:1.45;}
             </label>
 
             <!-- Placement-only: shown when For team = Placement (see clForTeam handler) -->
-            <label class="cl-check" id="clPlcWrap" for="clPlcOffered" style="display:none;">
-              <input type="checkbox" id="clPlcOffered" />
-              <span class="cl-check-box" aria-hidden="true">
-                <svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
-              </span>
-              <span class="cl-check-text">
-                <span class="cl-check-main">Placement offered</span>
-              </span>
-            </label>
-            <div class="cl-field" id="clPlcRemarksWrap" style="display:none;">
-              <label class="cl-label" for="clPlcRemarks">Post-offer remarks</label>
-              <textarea id="clPlcRemarks" class="cl-in" maxlength="600" rows="2" placeholder="What happened after the offer? e.g. offered Aubrey Downer — SAKS; denied, wants after 3 weeks"></textarea>
+            <div class="cl-plc-group" id="clPlcWrap" style="display:none;">
+              <label class="cl-check cl-plc-check" for="clPlcOffered">
+                <input type="checkbox" id="clPlcOffered" />
+                <span class="cl-check-box" aria-hidden="true">
+                  <svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                </span>
+                <span class="cl-check-text">
+                  <span class="cl-check-main">Placement offered</span>
+                  <span class="cl-check-sub">Log what happened after the offer</span>
+                </span>
+              </label>
+              <div class="cl-plc-remarks" id="clPlcRemarksWrap">
+                <div class="cl-plc-remarks-inner">
+                  <label class="cl-label" for="clPlcRemarks">Post-offer remarks</label>
+                  <textarea id="clPlcRemarks" class="cl-in" maxlength="600" rows="2" placeholder="What happened after the offer? e.g. offered Aubrey Downer — SAKS; denied, wants after 3 weeks"></textarea>
+                </div>
+              </div>
             </div>
 
             <div class="cl-actions">
@@ -1097,13 +1132,22 @@ function clUpdatePlcFields(){
   const team=((ft&&ft.value)||_mine||'').trim();
   const isPlacement=/^placement$/i.test(team);
   const wrap=document.getElementById('clPlcWrap');
-  const remWrap=document.getElementById('clPlcRemarksWrap');
+  const check=wrap?wrap.querySelector('.cl-plc-check'):null;
   const offered=document.getElementById('clPlcOffered');
   if(wrap) wrap.style.display=isPlacement?'':'none';
-  // Remarks show only when Placement AND offered is ticked.
-  const showRem=isPlacement && offered && offered.checked;
-  if(remWrap) remWrap.style.display=showRem?'':'none';
   if(!isPlacement && offered) offered.checked=false;   // tidy if team changed away
+  // Remarks slide open only when Placement AND offered is ticked. Class-driven
+  // so it animates (grid-rows) instead of snapping via display:none.
+  const showRem=isPlacement && offered && offered.checked;
+  if(wrap) wrap.classList.toggle('cl-plc-open', !!showRem);
+  if(check) check.classList.toggle('on', !!(offered && offered.checked));
+  // Placement can log calls without a number (walk-ins / in-person enquiries),
+  // so reflect that on the label instead of showing a required asterisk.
+  const req=document.getElementById('clPhoneReq');
+  if(req){
+    if(isPlacement){ req.textContent='(optional)'; req.classList.add('cl-req-opt'); }
+    else { req.textContent='*'; req.classList.remove('cl-req-opt'); }
+  }
 }
 
 function clClearForm(){
@@ -1152,9 +1196,15 @@ async function clSaveCall(){
 
   // The number is the key that links repeat attempts to the same caller, so a
   // call without one can't auto-resolve anything and can't be called back.
+  // Placement is exempt: they often log walk-ins / in-person enquiries with no
+  // phone number, so an empty number is allowed when the effective team is
+  // Placement (explicit "For team", else the logger's own team).
+  const _saveForTeam = (document.getElementById('clForTeam')||{}).value ||
+                       ((typeof myTeam !== 'undefined' && myTeam) ? myTeam : '');
+  const _phoneOptional = /^placement$/i.test((_saveForTeam||'').trim());
   const phoneEl = document.getElementById('clPhone');
-  phoneEl.classList.toggle('error', !phone);
-  if(!phone){
+  phoneEl.classList.toggle('error', !phone && !_phoneOptional);
+  if(!phone && !_phoneOptional){
     showToast('Phone number is required','error');
     phoneEl.focus();
     return;
@@ -2351,9 +2401,7 @@ function initCallLog(){
     // Placement: reveal remarks box only once "offered" is ticked
     const plc=document.getElementById('clPlcOffered');
     if(plc) plc.addEventListener('change',()=>{
-      const w=document.getElementById('clPlcWrap');
-      if(w) w.classList.toggle('on', plc.checked);
-      clUpdatePlcFields();
+      clUpdatePlcFields();   // handles the reveal + checked styling
     });
     clUpdatePlcFields();   // set initial visibility based on the logger's team
     // If a live update arrived while the form had focus, apply it once the
