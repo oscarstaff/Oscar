@@ -797,7 +797,7 @@ textarea.cl-edit-in{min-height:52px;resize:vertical;line-height:1.45;}
               <div class="cl-hint" id="clForHint"></div>
             </div>
 
-            <div class="cl-field">
+            <div class="cl-field" id="clNoteField">
               <label class="cl-label" for="clNote">Note</label>
               <textarea id="clNote" class="cl-in" maxlength="600" placeholder="Any extra detail"></textarea>
             </div>
@@ -1141,6 +1141,16 @@ function clUpdatePlcFields(){
   const showRem=isPlacement && offered && offered.checked;
   if(wrap) wrap.classList.toggle('cl-plc-open', !!showRem);
   if(check) check.classList.toggle('on', !!(offered && offered.checked));
+  // Placement doesn't use the general Note — Reason plus the post-offer
+  // remarks cover what they need, and the extra field just crowds a pane
+  // that's already busy. Hide it for Placement, keep it for everyone else.
+  const noteField=document.getElementById('clNoteField');
+  if(noteField){
+    noteField.style.display=isPlacement?'none':'';
+    // Blank it while hidden so text typed before switching to Placement can't
+    // ride along on save where nobody can see or edit it.
+    if(isPlacement){ const nt=document.getElementById('clNote'); if(nt) nt.value=''; }
+  }
   // Placement can log calls without a number (walk-ins / in-person enquiries),
   // so reflect that on the label instead of showing a required asterisk.
   const req=document.getElementById('clPhoneReq');
@@ -2382,6 +2392,13 @@ function initCallLog(){
       clHistLookup(e);
     });
     const ft=document.getElementById('clForTeam');
+    // "My team" (value="") already routes to the logger's own team, so the
+    // named option for that same team is a duplicate — drop it to keep the
+    // list short (Placement in particular has a lot on screen already).
+    if(ft && typeof myTeam!=='undefined' && myTeam){
+      const dup=Array.from(ft.options).find(o=>o.value && o.value===myTeam);
+      if(dup) dup.remove();
+    }
     if(ft) ft.addEventListener('change',()=>{
       const fh=document.getElementById('clForHint');
       if(fh){
