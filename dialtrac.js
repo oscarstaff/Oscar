@@ -57,7 +57,7 @@
   --cl-ease:cubic-bezier(.2,.8,.2,1);
   --cl-spring:cubic-bezier(.34,1.4,.64,1);
   --cl-t:200ms;
-  --cl-rail:336px;
+  --cl-rail:400px;
   --amber:#d97706; --amber-bg:rgba(217,119,6,.11); --amber-bd:rgba(217,119,6,.22);
   display:flex;flex-direction:column;height:100%;min-height:0;
   background:var(--m-canvas);
