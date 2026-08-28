@@ -1743,9 +1743,15 @@ async function clEditSave(id){
 
   nmEl.classList.toggle('err', !name);
   rsEl.classList.toggle('err', !reason);
-  phEl.classList.toggle('err', !phone);
-  if(!name || !reason || !phone){
-    showToast('Name, number and reason are all required','error');
+  // Number is optional for Placement rows (walk-ins / in-person enquiries),
+  // matching the new-call form. The row's own team is the source of truth.
+  const _isPlc=/^placement$/i.test(((r.for_team||r.team||'')).trim());
+  const _needPhone=!_isPlc;
+  phEl.classList.toggle('err', !phone && _needPhone);
+  if(!name || !reason || (!phone && _needPhone)){
+    showToast(_needPhone
+      ? 'Name, number and reason are all required'
+      : 'Name and reason are required','error');
     return;
   }
 
