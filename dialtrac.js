@@ -133,7 +133,7 @@
 
 /* ── capture rail ── */
 .cl-pane-form{background:var(--m-card);border-right:1px solid var(--m-border);
-  padding:20px;overflow-y:auto;min-height:0;
+  padding:24px;overflow-y:auto;min-height:0;
   display:flex;flex-direction:column;gap:0;position:relative;}
 /* Accent hairline down the inner edge, brightening on focus — the rail
    signals it's the active surface without moving anything. */
@@ -143,7 +143,7 @@
 .cl-pane-form:focus-within::after{opacity:.5;}
 
 .cl-form-hd{display:flex;align-items:center;justify-content:space-between;
-  margin-bottom:18px;}
+  margin-bottom:22px;}
 .cl-form-title{font-family:'Fraunces',Georgia,serif;font-size:16px;font-weight:600;
   font-optical-sizing:auto;color:var(--m-ink);margin:0;letter-spacing:-.01em;}
 .cl-keyhint{display:flex;gap:3px;}
@@ -151,8 +151,8 @@
   font-weight:600;padding:2px 5px;border-radius:5px;background:var(--m-card-2);
   border:1px solid var(--m-border);color:var(--m-ink-3);line-height:1.3;}
 
-.cl-field{margin-bottom:14px;}
-.cl-label{display:block;font-size:11.5px;font-weight:600;margin-bottom:6px;
+.cl-field{margin-bottom:19px;}
+.cl-label{display:block;font-size:11.5px;font-weight:600;margin-bottom:7px;
   color:var(--m-ink-2);letter-spacing:.01em;}
 .cl-req{color:#dc2626;}
 .cl-req.cl-req-opt{color:#94a3b8;font-weight:400;font-size:.85em;}
@@ -161,7 +161,7 @@
 .cl-hint-warn{color:var(--amber);font-weight:600;}
 
 .cl-in{width:100%;background:var(--m-card-2);border:1.5px solid var(--m-border);
-  border-radius:10px;color:var(--m-ink);padding:10px 12px;font-size:13.5px;
+  border-radius:10px;color:var(--m-ink);padding:12px 14px;font-size:13.5px;
   font-weight:500;outline:none;font-family:inherit;-webkit-appearance:none;
   box-sizing:border-box;
   transition:border-color var(--cl-t) var(--cl-ease),
