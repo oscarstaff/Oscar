@@ -1035,8 +1035,12 @@ function clSetScope(s){
   });
 
   setTimeout(()=>{
-    clRenderQueue();
-    clRefreshOpenCount();
+    // Scope now changes WHICH rows are fetched (all = this week, team = recent
+    // window), not just how the loaded set is filtered — so re-load from the
+    // server rather than re-filtering stale rows. Skip if a manual date range
+    // is active; that range is authoritative regardless of scope.
+    if(_clFrom || _clTo){ clRenderQueue(); clRefreshOpenCount(); }
+    else { clLoadQueue(); }
   }, 620);
 }
 
@@ -1503,6 +1507,22 @@ async function clLoadQueue(){
       if(_clFrom) _q += '&created_at=gte.'+new Date(_clFrom).toISOString();
       if(_clTo)   _q += '&created_at=lte.'+new Date(_clTo).toISOString();
       _q += '&limit=5000';
+    }else if(_clScope === 'all'){
+      // "Everyone" spans all teams, so a 60-day window blows past the server's
+      // ~1000-row response cap and silently truncates. Scope it to the current
+      // Sydney week (~400 calls) — bounded, fast, always complete. Older calls
+      // remain reachable via the date-range picker.
+      const _monKey = clWeekKey(new Date().toISOString());   // Mon (Sydney) YYYY-MM-DD
+      // Sydney's UTC offset shifts with daylight saving (AEST +10 / AEDT +11),
+      // so derive the real offset for that Monday rather than hardcoding one.
+      const _p = _monKey.split('-').map(Number);
+      const _noonUtc = new Date(Date.UTC(_p[0], _p[1]-1, _p[2], 12, 0, 0));
+      const _sydParts = new Intl.DateTimeFormat('en-US',{timeZone:'Australia/Sydney',
+        hour:'2-digit',hour12:false}).formatToParts(_noonUtc);
+      const _sydHour = parseInt((_sydParts.find(x=>x.type==='hour')||{}).value,10);
+      const _offH = _sydHour - 12;                            // 10 (AEST) or 11 (AEDT)
+      const _monUtc = new Date(Date.UTC(_p[0], _p[1]-1, _p[2], 0,0,0) - _offH*3600000);
+      _q += '&created_at=gte.'+_monUtc.toISOString()+'&limit=5000';
     }else{
       const _since = new Date(Date.now() - CL_RECENT_DAYS*86400000);
       _q += '&created_at=gte.'+_since.toISOString()+'&limit=5000';
