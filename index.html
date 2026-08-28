@@ -6372,13 +6372,6 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
         <button class="eng-tab" id="rtab-teamreport" onclick="showReportsTab('teamreport')" style="display:none;">Team Report</button>
       </div>
       <div id="rsec-hours">
-        <div class="card" id="fortReportCard" style="margin-bottom:14px;padding:16px;">
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:4px;">
-            <div class="card-title" style="margin:0;">Fortnight report</div>
-            <button id="fortReplayBtn" onclick="openFortReport()" style="padding:8px 14px;border:none;border-radius:8px;background:var(--accent);color:#fff;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;">View slideshow ›</button>
-          </div>
-          <div id="fortLeaderboardMount" style="margin-top:10px;"><div style="font-size:12px;color:#94a3b8;">Loading…</div></div>
-        </div>
         <div class="card" style="margin-bottom:14px;">
           <div class="card-title" style="margin-bottom:12px;">Date range</div>
           <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;">
@@ -6388,6 +6381,13 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
           </div>
         </div>
         <div id="hoursReportResults" class="card" style="padding:16px;">Loading...</div>
+        <div class="card" id="fortReportCard" style="margin-bottom:14px;margin-top:14px;padding:16px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:4px;">
+            <div class="card-title" style="margin:0;">Fortnight report</div>
+            <button id="fortReplayBtn" onclick="openFortReport()" style="padding:8px 14px;border:none;border-radius:8px;background:var(--accent);color:#fff;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;">View slideshow ›</button>
+          </div>
+          <div id="fortLeaderboardMount" style="margin-top:10px;"><div style="font-size:12px;color:#94a3b8;">Loading…</div></div>
+        </div>
       </div>
       <div id="rsec-manager" style="display:none;">
         <div class="card" style="margin-bottom:14px;">
@@ -18040,7 +18040,10 @@ function renderHours(){
 const _FORT_ANCHOR_MS = new Date(2026, 4, 4).setHours(0,0,0,0); // Mon 4 May 2026
 const _MS_DAY = 86400000, _MS_FORT = 14*_MS_DAY;
 const _ALLDAY_START = '09:00'; // implied start for a plain "Available" day
-const _PUNCT_GRACE_MIN = 5;    // minutes of slack before "late"
+const _PUNCT_GRACE_MIN = 7;    // minutes of slack before "late" — matches the
+                              // flexClockTime boundary (:07 rounds to :00, :08
+                              // rounds to :15), so on-time here == on-time on the
+                              // payroll sheet. 9:07 = on time, 9:08 = late.
 
 // Availability object active on a date (respects date-range vs ongoing window).
 function _availActiveOn(row, d){
@@ -18086,14 +18089,29 @@ function _onLeave(leaveRows, date){
   });
 }
 
-// Aggregate punctuality score. Rewards both being on time AND working more
-// days, so 6/6 on time ranks above 2/2 on time. Late days drag the rate down.
-// score = onTimeRate*100 * (0.6 + 0.4*min(measuredDays/10,1)); tie-break: measuredDays.
+// Punctuality score = pure on-time rate (0–100). Days-worked is NO LONGER
+// baked in here: two people who were on time every day score the same whether
+// they worked 9 days or 12, which is what "punctuality" should mean. Attendance
+// (measuredDays) is shown as its own column and used only as a ranking
+// tiebreaker (see _punctSort), so more days is rewarded honestly rather than by
+// quietly deflating a part-timer's percentage.
 function _punctScore(onTimeDays, measuredDays){
   if(measuredDays<=0) return 0;
-  const rate = onTimeDays/measuredDays;
-  const volume = 0.6 + 0.4*Math.min(measuredDays/10, 1);
-  return Math.round(rate*100*volume);
+  return Math.round(onTimeDays/measuredDays*100);
+}
+// Minimum days worked to earn a ranked spot. Below this the sample is too small
+// to be meaningful (a single on-time day would otherwise read as a perfect
+// 100%), so these still appear but sort below everyone who met the floor.
+const _PUNCT_MIN_DAYS = 4;
+// Sort: ranked-eligible first, then by on-time rate, then by days worked
+// (attendance tiebreak), then fewer late days, then name.
+function _punctSort(a,b){
+  const aOk=a.measuredDays>=_PUNCT_MIN_DAYS, bOk=b.measuredDays>=_PUNCT_MIN_DAYS;
+  if(aOk!==bOk) return aOk ? -1 : 1;
+  if(b.score!==a.score) return b.score-a.score;
+  if(b.measuredDays!==a.measuredDays) return b.measuredDays-a.measuredDays;
+  if(a.lateDays!==b.lateDays) return a.lateDays-b.lateDays;
+  return String(a.name||'').localeCompare(String(b.name||''));
 }
 
 // From a set of availability snapshots, pick the one that applied on `date`.
@@ -18370,6 +18388,7 @@ function _leaderboardHTML(board){
     '<div style="width:22px;flex-shrink:0;"></div>'+
     '<div style="flex:1;min-width:0;">Name</div>'+
     '<div style="flex-shrink:0;width:44px;text-align:center;">On&nbsp;time</div>'+
+    '<div style="flex-shrink:0;width:34px;text-align:center;">Days</div>'+
     '<div style="flex-shrink:0;width:36px;text-align:center;">Leave</div>'+
     '<div style="flex-shrink:0;min-width:34px;text-align:right;">Score</div>'+
   '</div>';
@@ -18385,11 +18404,12 @@ function _leaderboardHTML(board){
       rankBadge+
       '<div style="flex:1;min-width:0;font-size:13px;font-weight:'+(isMe?'800':'600')+';color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+esc(b.name)+(isMe?' (you)':'')+'</div>'+
       '<div style="flex-shrink:0;width:44px;text-align:center;font-size:11px;color:#94a3b8;">'+b.onTimeDays+'/'+b.measuredDays+'</div>'+
+      '<div style="flex-shrink:0;width:34px;text-align:center;font-size:12px;font-weight:700;color:#475569;">'+b.measuredDays+'</div>'+
       leaveCell+
-      '<div style="flex-shrink:0;min-width:34px;text-align:right;font-size:14px;font-weight:800;color:var(--accent-text,#4f46e5);font-variant-numeric:tabular-nums;">'+b.score+'</div>'+
+      '<div style="flex-shrink:0;min-width:34px;text-align:right;font-size:14px;font-weight:800;color:var(--accent-text,#4f46e5);font-variant-numeric:tabular-nums;">'+b.score+'%</div>'+
     '</div>';
   }).join('')+
-  '<div style="font-size:10.5px;color:#94a3b8;margin-top:10px;line-height:1.4;">Score blends on-time rate with days worked. Clocking in early counts as on time. Leave days are skipped (shown for context, they don\u2019t affect the score).</div>';
+  '<div style="font-size:10.5px;color:#94a3b8;margin-top:10px;line-height:1.4;">Score is your on-time rate (on-time days ÷ days worked). Clocking in within 7 minutes of your rostered start, or early, counts as on time. Days = days worked this fortnight; among equal rates, more days ranks higher. Fewer than '+_PUNCT_MIN_DAYS+' days worked isn\u2019t ranked. Leave days are skipped (shown for context, they don\u2019t affect the score).</div>';
 }
 
 // Mount the leaderboard into My Reports. Only shown Monday-onward until opened.
@@ -18502,7 +18522,7 @@ async function openFortReport(){
           badge+
           '<div class="fr-lb-name">'+esc(b.name)+(isMe?' (you)':'')+'</div>'+
           '<div class="fr-lb-ratio">'+b.onTimeDays+'/'+b.measuredDays+'</div>'+
-          '<div class="fr-lb-score">'+b.score+'</div>'+
+          '<div class="fr-lb-score">'+b.score+'%</div>'+
         '</div>';
       }).join('') : '<div class="fr-muted">No leaderboard data yet.</div>';
       const youLine=(s.myRank>=6)?'<div class="fr-you">You\u2019re #'+(s.myRank+1)+'</div>':'';
@@ -18619,12 +18639,9 @@ async function _buildLeaderboard(fw){
       board.push({ name:nm, score:res.score, onTimeDays:res.onTimeDays, measuredDays:res.measuredDays, lateDays:res.lateDays, leaveDays:res.leaveDays });
     }
   });
-  // Sort: score desc, then more days worked, then fewer late days.
-  board.sort(function(x,y){
-    if(y.score!==x.score) return y.score-x.score;
-    if(y.measuredDays!==x.measuredDays) return y.measuredDays-x.measuredDays;
-    return x.lateDays-y.lateDays;
-  });
+  // Sort: ranked (>= min days) first, then on-time rate, then attendance
+  // (days worked) as an honest tiebreak, then fewer late days, then name.
+  board.sort(_punctSort);
   _leaderboardCache=board;
   return board;
 }
