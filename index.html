@@ -7391,16 +7391,12 @@ const GAS_TOKEN = "oscars_gas_83235a5f0c1f6ba32b18235e2b2d544ac137167d";
 
   function _maybeInactiveReload(){
     if(!_updatePending) return;
-    // Hard-refresh policy: apply the update AS SOON AS it's safe — don't wait
-    // for a long idle window. "Safe" still means we never interrupt a real
-    // action: not mid clock-in, not while typing, not with a dialog open (see
-    // _safeToReload). A tiny 3s settle avoids reloading on the exact keystroke
-    // someone just finished with.
-    const idleMs = Date.now() - _lastActivity;
-    if(idleMs >= 3000 && _safeToReload()){
-      try{ localStorage.removeItem('app_update_pending'); }catch(_){}
-      location.reload();
-    }
+    // FULLY HARD policy: apply the update the instant it's detected. No idle
+    // wait, no safe-moment check, no settle delay — reload immediately even if
+    // someone is mid-action. (Previous versions gated this to avoid disrupting
+    // a clock-in / typing / open modal; that gating is intentionally removed.)
+    try{ localStorage.removeItem('app_update_pending'); }catch(_){}
+    location.reload();
   }
 
   async function checkAppVersion(){
@@ -7430,7 +7426,7 @@ const GAS_TOKEN = "oscars_gas_83235a5f0c1f6ba32b18235e2b2d544ac137167d";
 
   setTimeout(checkAppVersion, 8000);                 // shortly after open
   setInterval(checkAppVersion, 5*60*1000);           // every 5 min
-  setInterval(_maybeInactiveReload, 3000);           // apply as soon as it's safe
+  setInterval(_maybeInactiveReload, 3000);           // apply instantly once an update is pending
   document.addEventListener('visibilitychange', function(){
     if(document.visibilityState === 'hidden'){
       // Tab just went to the background — a natural chance to update.
