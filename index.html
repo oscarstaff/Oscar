@@ -14139,6 +14139,39 @@ async function flushClockSyncQueue(){
   }catch(e){ console.warn('flushClockSyncQueue:', e); }
 }
 
+// A failed punch is parked in localStorage['clock_supabase_queue'], but the
+// flush above used to run only ONCE — 2s after a full page load. On mobile,
+// staff clock out and pocket the phone without ever reloading, so a punch that
+// missed (flaky wifi, GPS-timeout abort, a momentary Supabase blip) sat queued
+// forever: no row ever landed, the 8pm auto-clock-out fired, and next morning
+// they got "your last clock-out didn't go through" while an admin rebuilt the
+// day by hand. Fix: retry on the events that actually signal a chance to
+// succeed — connection restored, tab refocused — plus a slow interval backstop.
+let _clockFlushInFlight = false;
+async function retryClockQueueSafely(reason){
+  // Guard against overlapping runs: two concurrent flushes can both read the
+  // same queue before either writes back, double-posting a punch.
+  if(_clockFlushInFlight) return;
+  // Nothing queued → don't even spin up.
+  try{
+    const a = localStorage.getItem('clock_supabase_queue') || '[]';
+    const b = localStorage.getItem('clock_sync_queue') || '[]';
+    if(a === '[]' && b === '[]') return;
+  }catch(_){}
+  _clockFlushInFlight = true;
+  try{ await flushClockSyncQueue(); }
+  catch(e){ console.warn('[clock] retry ('+reason+') failed', e); }
+  finally{ _clockFlushInFlight = false; }
+}
+// Connection came back after being offline.
+window.addEventListener('online', function(){ retryClockQueueSafely('online'); });
+// Tab brought back to the foreground (staff reopening the app without a reload).
+document.addEventListener('visibilitychange', function(){
+  if(!document.hidden) retryClockQueueSafely('visible');
+});
+// Slow backstop so a queued punch clears even if neither event fires.
+setInterval(function(){ retryClockQueueSafely('interval'); }, 60000);
+
 async function loadClockState(){
   if(!me) return;
   window._clockSyncing = true;   // block clock taps until state is confirmed fresh
@@ -14639,7 +14672,7 @@ function renderClockCard(){
     btn.style.background = '#dc2626';
     if(_clockSinceTs){
       var _shownIn = flexClockTime(_clockSinceTs);
-      sub.textContent = 'Since '+_shownIn.toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit'})+' · '+_shownIn.toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short'});
+      sub.textContent = 'Since '+_shownIn.toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit',timeZone:'Australia/Sydney'})+' · '+_shownIn.toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short',timeZone:'Australia/Sydney'});
     }
   } else {
     status.textContent = 'Not clocked in';
@@ -14648,7 +14681,7 @@ function renderClockCard(){
     btn.style.background = 'var(--accent)';
     if(_clockSinceTs){
       var _shownOut = flexClockTime(_clockSinceTs);
-      sub.textContent = 'Last clock-out: '+_shownOut.toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit'})+' · '+_shownOut.toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short'});
+      sub.textContent = 'Last clock-out: '+_shownOut.toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit',timeZone:'Australia/Sydney'})+' · '+_shownOut.toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short',timeZone:'Australia/Sydney'});
     } else {
       sub.textContent = 'You haven\'t clocked in yet today.';
     }
@@ -15424,8 +15457,8 @@ async function runReport(){
   days.forEach(function(k){
     const d = byDay[k];
     const day = d.date.toLocaleDateString('en-AU',{weekday:'short'});
-    const inS = d.in ? d.in.toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit',hour12:false}) : '—';
-    const outS = d.out ? d.out.toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit',hour12:false}) : '—';
+    const inS = d.in ? d.in.toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit',hour12:false,timeZone:'Australia/Sydney'}) : '—';
+    const outS = d.out ? d.out.toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit',hour12:false,timeZone:'Australia/Sydney'}) : '—';
     totalHours += d.hours;
     // Build ISO date for edit modal
     const isoDate = d.date.toISOString().split('T')[0];
@@ -17244,8 +17277,8 @@ async function renderHoursTable(targetStaff, startStr, endStr, el, allowEdit){
   days.forEach(function(k){
     const d = byDay[k];
     const day = d.date.toLocaleDateString('en-AU',{weekday:'short'});
-    const inS = d.in ? d.in.toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit',hour12:false}) : '—';
-    const outS = d.out ? d.out.toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit',hour12:false}) : '—';
+    const inS = d.in ? d.in.toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit',hour12:false,timeZone:'Australia/Sydney'}) : '—';
+    const outS = d.out ? d.out.toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit',hour12:false,timeZone:'Australia/Sydney'}) : '—';
     const isoDate = (function(dt){ return dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0'); })(d.date);
     const ov = overrides[isoDate] || {};
     const extras = calcDayExtras(d.hours, ov.break_hrs, ov.coffee, d.date);
