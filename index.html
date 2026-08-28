@@ -6507,6 +6507,7 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
 .tr-table th{font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;color:#94a3b8;font-weight:700;}
 .tr-table td.num,.tr-table th.num{text-align:right;font-variant-numeric:tabular-nums;}
 .tr-table tr.tot td{font-weight:800;border-top:2px solid #e2e8f0;background:#f8fafc;}
+.tr-table tr.tr-wk-row:hover td{background:#f1f5f9;}
 .tr-person-h{font-size:14px;font-weight:800;color:#0f172a;margin:18px 0 6px;}
 .app-footer{
   text-align:center;font-size:11px;color:#cbd5e1;
@@ -16849,7 +16850,18 @@ async function trSaveDay(){
       headers: Object.assign({ 'Prefer':'resolution=merge-duplicates,return=minimal' }, _trHeaders()),
       body: JSON.stringify(body)
     });
-    if(r.ok){ msg.style.color='#059669'; msg.textContent='✓ Saved'; _trLoadedSnapshot=_trFormSnapshot(); _trLoadedDate=date; trRenderMyWeek(); }
+    if(r.ok){ msg.style.color='#059669'; msg.textContent='✓ Saved';
+      // Clear the form after saving so the next entry starts from a blank slate.
+      // The saved values are safe in the DB (this is an upsert on staff+date) and
+      // reload if the day is reopened — this just wipes the on-screen inputs.
+      _trMetrics.forEach(function(m){
+        var el = document.getElementById(_trFieldId(m.metric_key));
+        if(el) el.value = '';
+      });
+      var _tt = document.getElementById('tr_tasks'); if(_tt) _tt.value = '';
+      // Reset the snapshot to the now-blank form so the unsaved-changes guard
+      // doesn't treat the cleared fields as dirty on the next day-switch.
+      _trLoadedSnapshot=_trFormSnapshot(); _trLoadedDate=date; trRenderMyWeek(); }
     else { msg.style.color='#dc2626'; msg.textContent='Save failed — try again'; }
   }catch(e){ msg.style.color='#dc2626'; msg.textContent='Network error'; }
   finally{ btn.disabled=false; btn.textContent=orig; setTimeout(function(){ if(msg.textContent==='✓ Saved') msg.textContent=''; }, 2500); }
@@ -16871,11 +16883,29 @@ async function trRenderMyWeek(){
     var body = rows.map(function(row){
       var vals = row.metrics || {};
       var cells = _trMetrics.map(function(m){ var v=vals[m.metric_key]||0; tot[m.metric_key]+=v; return '<td class="num">'+v+'</td>'; }).join('');
-      return '<tr><td>'+_trFmtDay(row.report_date)+'</td>'+cells+'</tr>';
+      // Click a day to load it into the entry form above and edit it. The form
+      // is an upsert on staff+date, so saving writes back to that same day.
+      return '<tr class="tr-wk-row" style="cursor:pointer;" onclick="trEditDay(\''+row.report_date+'\')" title="Click to edit this day">'+
+             '<td>'+_trFmtDay(row.report_date)+'</td>'+cells+'</tr>';
     }).join('');
     var totRow = '<tr class="tot"><td>Total</td>' + _trMetrics.map(function(m){ return '<td class="num">'+tot[m.metric_key]+'</td>'; }).join('') + '</tr>';
     mount.innerHTML = '<div style="overflow-x:auto;"><table class="tr-table"><thead><tr>'+head+'</tr></thead><tbody>'+body+totRow+'</tbody></table></div>';
   }catch(e){ mount.innerHTML = '<div style="font-size:12px;color:#dc2626;">Could not load your week.</div>'; }
+}
+
+// Click a day in "Your week so far" to pull it into the entry form for editing.
+// Respects the same unsaved-changes guard as the date picker, then loads the
+// day and brings the form into view.
+async function trEditDay(date){
+  if(!_isProcessing()) return;
+  if(_trIsDirty()){
+    var ok = confirm("You have unsaved changes for " + (_trLoadedDate||'this day') + ".\n\nSwitch day and discard them? (Cancel, then click \u201CSave\u201D first to keep them.)");
+    if(!ok) return;
+  }
+  var dp = document.getElementById('trDate'); if(dp) dp.value = date;
+  await trLoadDay();
+  var card = document.getElementById('trEntryCard');
+  if(card && card.scrollIntoView) card.scrollIntoView({behavior:'smooth', block:'start'});
 }
 
 // ── Admin: metric manager ──
