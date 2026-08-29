@@ -1617,6 +1617,41 @@ body.tl-readonly .wk-tools{ display:none !important; }
 .avail-hd-row{ background:var(--surface2); border-bottom:1px solid var(--border); }
 @media(max-width:760px){ .avail-team-tally{ display:none; } }
 
+/* ── Button loading state ─────────────────────────────────────────────
+   Clicking a save button shows a spinner + "Saving…" and disables it, so
+   it's obvious the action is running instead of the screen sitting static. */
+.btn.is-loading{ position:relative; color:transparent!important; pointer-events:none; opacity:.85; }
+.btn.is-loading::after{
+  content:''; position:absolute; top:50%; left:50%;
+  width:15px; height:15px; margin:-8px 0 0 -8px;
+  border:2px solid rgba(255,255,255,.4); border-top-color:#fff;
+  border-radius:50%; animation:btnspin .6s linear infinite;
+}
+.btn.btn-save.is-loading::after, .btn.btn-primary.is-loading::after{ border-top-color:#fff; }
+@keyframes btnspin{ to{ transform:rotate(360deg); } }
+
+/* ── Boot skeleton ────────────────────────────────────────────────────
+   A greyed-out shape of the ShiftOps layout while data loads, so the app
+   looks like it's assembling rather than frozen on a blank spinner. */
+.sk-wrap{ padding:16px 20px; max-width:1400px; margin:0 auto; }
+.sk{ background:var(--surface2,#1a1f2e); border-radius:8px; position:relative; overflow:hidden; }
+.sk::after{ content:''; position:absolute; inset:0; transform:translateX(-100%);
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.06),transparent);
+  animation:skShimmer 1.4s infinite; }
+@keyframes skShimmer{ 100%{ transform:translateX(100%); } }
+.sk-topbar{ display:flex; align-items:center; gap:12px; margin-bottom:20px; }
+.sk-logo{ width:130px; height:26px; }
+.sk-tab{ width:74px; height:20px; }
+.sk-btn{ width:96px; height:32px; border-radius:9px; }
+.sk-stats{ display:flex; gap:12px; margin-bottom:22px; flex-wrap:wrap; }
+.sk-stat{ flex:1; min-width:120px; height:64px; border-radius:12px; }
+.sk-grid{ border:1px solid var(--border,#2e3344); border-radius:12px; overflow:hidden; }
+.sk-row{ display:flex; align-items:center; gap:10px; padding:12px 14px; border-bottom:1px solid var(--border,#2e3344); }
+.sk-row-head{ background:var(--surface2,#1a1f2e); }
+.sk-name{ width:150px; height:16px; flex-shrink:0; }
+.sk-cell{ flex:1; height:30px; border-radius:7px; }
+.sk-caption{ text-align:center; font-family:var(--mono,monospace); font-size:12px;
+  color:var(--text-dim,#8b94a8); letter-spacing:.5px; margin-top:20px; }
 </style>
 <style id="polish-2026-07-31">
 /* ═══════════════════════════════════════════════════════════════════════
@@ -1950,7 +1985,7 @@ button, .btn { white-space: nowrap; }
     <div class="appbar-actions">
       <div id="topbarWhoami"></div>
       <div class="save-status" id="saveStatus"><div class="dot"></div><span id="saveLabel">loading…</span></div>
-      <button class="btn btn-save" onclick="saveData()">Save</button>
+      <button class="btn btn-save" onclick="withBtnLoading(this,saveData)">Save</button>
       <button class="btn btn-ghost" onclick="openAddShift()">+ Shift</button>
       <div class="tools-dropdown">
         <button class="btn btn-ghost" onclick="toggleToolsMenu()" id="toolsBtn">Tools</button>
@@ -1973,10 +2008,39 @@ button, .btn { white-space: nowrap; }
 
   <main class="main">
 
-    <div id="soBootLoading" style="position:absolute;inset:0;z-index:500;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:var(--bg,#0f1117);">
-      <div style="width:34px;height:34px;border:3px solid var(--border,#2e3344);border-top-color:var(--accent,#3d9eff);border-radius:50%;animation:soSpin .8s linear infinite;"></div>
-      <div style="font-family:var(--mono,monospace);font-size:12px;color:var(--text-dim,#8b94a8);letter-spacing:.5px;">Loading ShiftOps…</div>
+    <div id="soBootLoading" style="position:absolute;inset:0;z-index:500;background:var(--bg,#0f1117);overflow:hidden;">
+      <div class="sk-wrap" aria-label="Loading ShiftOps">
+        <div class="sk-topbar">
+          <div class="sk sk-logo"></div>
+          <div class="sk sk-tab"></div><div class="sk sk-tab"></div><div class="sk sk-tab"></div>
+          <div style="flex:1"></div>
+          <div class="sk sk-btn"></div>
+        </div>
+        <div class="sk-stats">
+          <div class="sk sk-stat"></div><div class="sk sk-stat"></div>
+          <div class="sk sk-stat"></div><div class="sk sk-stat"></div><div class="sk sk-stat"></div>
+        </div>
+        <div class="sk-grid">
+          <div class="sk-row sk-row-head">
+            <div class="sk sk-name"></div>
+            <div class="sk sk-cell"></div><div class="sk sk-cell"></div><div class="sk sk-cell"></div>
+            <div class="sk sk-cell"></div><div class="sk sk-cell"></div><div class="sk sk-cell"></div><div class="sk sk-cell"></div>
+          </div>
+          <div class="sk-rows" id="skRows"></div>
+        </div>
+        <div class="sk-caption">Loading ShiftOps…</div>
+      </div>
     </div>
+    <script>
+      (function(){
+        var wrap=document.getElementById('skRows');
+        if(!wrap) return;
+        var row='<div class="sk-row"><div class="sk sk-name"></div>'+
+          '<div class="sk sk-cell"></div><div class="sk sk-cell"></div><div class="sk sk-cell"></div>'+
+          '<div class="sk sk-cell"></div><div class="sk sk-cell"></div><div class="sk sk-cell"></div><div class="sk sk-cell"></div></div>';
+        wrap.innerHTML = new Array(9).join(row);
+      })();
+    </script>
     <style>@keyframes soSpin{to{transform:rotate(360deg)}}</style>
 
     <div class="content">
@@ -2202,7 +2266,7 @@ button, .btn { white-space: nowrap; }
     <div class="modal-actions">
       <button class="btn btn-warn" id="shiftDeleteBtn" style="display:none" onclick="deleteCurrentShift()">Delete</button>
       <button class="btn btn-ghost" onclick="closeModal('shiftModal')">Cancel</button>
-      <button class="btn btn-primary" onclick="saveShift()">Save Shift</button>
+      <button class="btn btn-primary" onclick="withBtnLoading(this,saveShift)">Save Shift</button>
     </div>
     <input type="hidden" id="shiftWeek" value="w1">
   </div>
@@ -2311,7 +2375,7 @@ button, .btn { white-space: nowrap; }
     </div><!-- /staffFormMovable -->
     <div class="modal-actions" id="staffModalActions">
       <button class="btn btn-ghost" onclick="closeModal('staffModal')">Cancel</button>
-      <button class="btn btn-primary" onclick="saveStaff()">Save</button>
+      <button class="btn btn-primary" onclick="withBtnLoading(this,saveStaff)">Save</button>
     </div>
   </div>
 </div>
@@ -2410,7 +2474,7 @@ button, .btn { white-space: nowrap; }
     </div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeModal('availTimeModal')">Cancel</button>
-      <button class="btn btn-primary" onclick="saveCustomAvail()">Save</button>
+      <button class="btn btn-primary" onclick="withBtnLoading(this,saveCustomAvail)">Save</button>
     </div>
   </div>
 </div>
@@ -2431,7 +2495,7 @@ button, .btn { white-space: nowrap; }
     </div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeModal('leaveModal')">Cancel</button>
-      <button class="btn btn-primary" onclick="saveLeaveRequest()">Submit Request</button>
+      <button class="btn btn-primary" onclick="withBtnLoading(this,saveLeaveRequest)">Submit Request</button>
     </div>
   </div>
 </div>
@@ -3130,6 +3194,30 @@ function getOfficeManager(){return staff.find(s=>s.isManager==='office'||s.isOff
 function getUniqueTeams(){return[...teams].sort();}
 function getUniqueRoles(){return getUniqueTeams();}
 function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');clearTimeout(t._to);t._to=setTimeout(()=>t.classList.remove('show'),2800);}
+
+/**
+ * Run an async action while showing a loading state on the button that
+ * triggered it: spinner + disabled, restored when done (success or error).
+ * Wrap a button's onclick with this so a save never looks like it did nothing.
+ * Usage in markup: onclick="withBtnLoading(this, saveStaff)"
+ */
+async function withBtnLoading(btn, fn){
+  if(!btn){ try{ return await fn(); }catch(e){ console.warn(e); } return; }
+  if(btn.classList.contains('is-loading')) return;   // ignore double-clicks
+  const prevDisabled = btn.disabled;
+  btn.classList.add('is-loading');
+  btn.disabled = true;
+  try{
+    return await fn();
+  }catch(e){
+    console.warn('[save] action failed:', e);
+    try{ showToast('Save failed — check your connection and try again'); }catch(_){}
+  }finally{
+    btn.classList.remove('is-loading');
+    btn.disabled = prevDisabled;
+  }
+}
+
 
 // ── STATS ─────────────────────────────────────────────────────────────────
 function updateStats(){
@@ -6430,6 +6518,7 @@ async function saveStaffAccess(fullName){
   // row (the merge-duplicates upsert doesn't resolve to an UPDATE, it tries to
   // INSERT and hits unique(name)). Every existing staffer has a row, so admin
   // changes silently failed. PATCH the existing row; only POST if none exists.
+  let _adminWriteFailed = null;
   jobs.push((async ()=>{
     const patchUrl = AA_SB+'/rest/v1/staff_settings?name=eq.'+encodeURIComponent(fullName);
     const pr = await fetch(patchUrl,{method:'PATCH',
@@ -6438,13 +6527,22 @@ async function saveStaffAccess(fullName){
     if(pr.ok){
       const rows = await pr.json().catch(()=>[]);
       if(rows && rows.length) return;           // updated existing row
+    } else {
+      _adminWriteFailed = 'HTTP '+pr.status+' '+(await pr.text().catch(()=>''));
     }
     // No row to update → insert one.
-    await fetch(AA_SB+'/rest/v1/staff_settings',{method:'POST',
+    const ir = await fetch(AA_SB+'/rest/v1/staff_settings',{method:'POST',
       headers:{...HJ,'Prefer':'return=minimal'},
       body:JSON.stringify({name:fullName,is_hub_admin:isAdmin,is_shift_admin:isAdmin})});
+    if(!ir.ok){ _adminWriteFailed = 'HTTP '+ir.status+' '+(await ir.text().catch(()=>'')); }
+    else { _adminWriteFailed = null; }   // insert succeeded, clear the patch note
   })());
-  try{ await Promise.all(jobs.map(p=>p.catch(e=>{console.warn('saveStaffAccess job',e);}))); }catch(e){ console.warn('saveStaffAccess',e); }
+  try{ await Promise.all(jobs.map(p=>p.catch(e=>{console.warn('saveStaffAccess job',e); _adminWriteFailed = _adminWriteFailed || (e && e.message) || 'error';}))); }catch(e){ console.warn('saveStaffAccess',e); }
+  // Surface an admin-flag write failure instead of swallowing it — this was the
+  // "made them admin but nothing happened" bug.
+  if(_adminWriteFailed){
+    try{ showToast('Admin role not saved: '+_relayErrMsg(_adminWriteFailed)); }catch(e){}
+  }
 }
 
 function modalSetPassword(){
@@ -6619,8 +6717,8 @@ async function offboardStaffAccess(fullName){
       headers:{'Content-Type':'text/plain;charset=utf-8'},
       body: JSON.stringify({action:'offboardStaff', staff: fullName, token: GAS_TOKEN, sbAccessToken:_soTok()})
     });
-    let ok=false;
-    try{ const j=await r.json(); ok = j && j.ok; }catch(e){}
+    let ok=false, relayErr='';
+    try{ const j=await r.json(); ok = j && j.ok; if(!ok) relayErr=(j&&j.error)||''; }catch(e){}
     // 2. Revoke app access (anon can delete app_access). The roster tables
     //    (staff_names/directory/settings/availability) are deleted server-side
     //    by the relay's offboardStaff handler, because RLS blocks anon DELETE
@@ -6630,7 +6728,8 @@ async function offboardStaffAccess(fullName){
       const H={apikey:AA_KEY,Authorization:'Bearer '+AA_KEY};
       await fetch(AA_SB+'/rest/v1/app_access?staff_name=eq.'+encodeURIComponent(fullName),{method:'DELETE',headers:H});
     }catch(e){}
-    showToast(ok ? (fullName+' login disabled') : (fullName+' removed (login delete needs check)'));
+    showToast(ok ? (fullName+' login disabled')
+                 : (fullName+' — login delete failed: '+_relayErrMsg(relayErr)));
   }catch(e){
     showToast('Removed locally — login delete failed, check Apps Script');
   }
@@ -8801,7 +8900,7 @@ async function doResetPassword(){
       throw new Error((j&&j.error)||'Failed');
     }
   }catch(e){
-    msg.textContent='Failed to set password: '+(e.message||'connection error')+'.';
+    msg.textContent='Failed to set password: '+_relayErrMsg(e.message||'connection error');
     msg.style.cssText='display:block;background:rgba(255,92,53,.1);border:1px solid rgba(255,92,53,.2);color:var(--warn);font-size:12px;padding:8px 12px;border-radius:8px;margin-bottom:8px';
   }finally{
     btn.disabled=false;btn.textContent='Set Password';
@@ -8854,6 +8953,58 @@ function _soAdminReady(){
   showToast('Session expired — close this tab and reopen ShiftOps from Nexus');
   return false;
 }
+
+/**
+ * Ensure a FRESH access token before a privileged relay call.
+ *
+ * Root cause of the "forbidden" admin failures: _soTok() returned a cached
+ * access token that had aged out (~1h life). The relay verifies it against
+ * Supabase, which replies session_not_found, and the relay returns a bare
+ * "forbidden" that reads like a permissions problem. This proactively refreshes
+ * via the supabase-js client (if we have one + a refresh token) so the token
+ * handed to the relay is current. Returns the fresh token, or the existing one
+ * if refresh isn't possible (caller still guards with _soAdminReady()).
+ */
+/**
+ * Turn a relay error string into a message that says what actually happened
+ * and what to do. Previously these were swallowed (.catch(console.warn)) or
+ * shown raw ("forbidden"), which read as "no permission" when the real cause
+ * was usually an expired session.
+ */
+function _relayErrMsg(err){
+  const e = String(err||'').toLowerCase();
+  if(e.indexOf('forbidden')>=0 || e.indexOf('session')>=0 || e.indexOf('unauthorized')>=0){
+    return 'Session expired — close this tab and reopen ShiftOps from Nexus, then try again.';
+  }
+  if(!e || e==='failed') return 'Something went wrong on the server. Try again.';
+  return err;
+}
+
+async function _soFreshTok(){
+  if(_soTokAlive()) return _soTok();          // still good, no work needed
+  try{
+    let c = window._soSbClient;
+    const rt = sessionStorage.getItem('so_sb_rt');
+    if(!c && window.supabase && rt){
+      c = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+      window._soSbClient = c;
+      await c.auth.setSession({ access_token:_soTok()||'', refresh_token:rt });
+    }
+    if(c){
+      // getSession() auto-refreshes when the access token is near/after expiry.
+      const { data } = await c.auth.getSession();
+      if(data && data.session && data.session.access_token){
+        _soAuthToken = data.session.access_token;
+        try{
+          sessionStorage.setItem('so_sb_at', _soAuthToken);
+          if(data.session.refresh_token) sessionStorage.setItem('so_sb_rt', data.session.refresh_token);
+        }catch(e){}
+      }
+    }
+  }catch(e){ console.warn('[auth] _soFreshTok refresh failed', e); }
+  return _soTok();
+}
+
 (function(){
   const _origFetch = window.fetch.bind(window);
   window.fetch = function(input, init){
@@ -8870,15 +9021,23 @@ function _soAdminReady(){
       // Apps Script relay: attach the admin's Supabase login token so the relay
       // can verify they're an admin (needed for adminSetPw / offboardStaff /
       // adminRenameAuth). Without this the relay returns "forbidden".
-      if(tok && url.indexOf('script.google.com/macros') >= 0 &&
+      // The token must be FRESH: a cached, aged-out token makes the relay's
+      // verification fail with session_not_found → "forbidden". So for relay
+      // calls we refresh first (async), then inject the current token.
+      if(url.indexOf('script.google.com/macros') >= 0 &&
          init && init.body && typeof init.body === 'string'){
-        try{
-          const b = JSON.parse(init.body);
-          if(b && typeof b === 'object' && b.sbAccessToken === undefined){
-            b.sbAccessToken = tok;
-            init = Object.assign({}, init, { body: JSON.stringify(b) });
-          }
-        }catch(e){}
+        return (async function(){
+          let freshTok = tok;
+          try{ freshTok = await _soFreshTok(); }catch(e){ /* fall back to cached */ }
+          try{
+            const b = JSON.parse(init.body);
+            if(b && typeof b === 'object' && b.sbAccessToken === undefined && freshTok){
+              b.sbAccessToken = freshTok;
+              init = Object.assign({}, init, { body: JSON.stringify(b) });
+            }
+          }catch(e){}
+          return _origFetch(input, init);
+        })();
       }
     }catch(e){}
     return _origFetch(input, init);
