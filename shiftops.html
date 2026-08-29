@@ -6425,8 +6425,25 @@ async function saveStaffAccess(fullName){
       jobs.push(fetch(AA_SB+'/rest/v1/app_access?app=eq.'+encodeURIComponent(app)+'&staff_name=eq.'+encodeURIComponent(fullName),{method:'DELETE',headers:H}));
     }
   }
-  // admin flag ->both is_hub_admin + is_shift_admin
-  jobs.push(fetch(AA_SB+'/rest/v1/staff_settings',{method:'POST',headers:{...HJ,'Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({name:fullName,is_hub_admin:isAdmin,is_shift_admin:isAdmin})}));
+  // admin flag ->both is_hub_admin + is_shift_admin.
+  // NOTE: a plain POST upsert 409s for anyone who already has a staff_settings
+  // row (the merge-duplicates upsert doesn't resolve to an UPDATE, it tries to
+  // INSERT and hits unique(name)). Every existing staffer has a row, so admin
+  // changes silently failed. PATCH the existing row; only POST if none exists.
+  jobs.push((async ()=>{
+    const patchUrl = AA_SB+'/rest/v1/staff_settings?name=eq.'+encodeURIComponent(fullName);
+    const pr = await fetch(patchUrl,{method:'PATCH',
+      headers:{...HJ,'Prefer':'return=representation'},
+      body:JSON.stringify({is_hub_admin:isAdmin,is_shift_admin:isAdmin})});
+    if(pr.ok){
+      const rows = await pr.json().catch(()=>[]);
+      if(rows && rows.length) return;           // updated existing row
+    }
+    // No row to update → insert one.
+    await fetch(AA_SB+'/rest/v1/staff_settings',{method:'POST',
+      headers:{...HJ,'Prefer':'return=minimal'},
+      body:JSON.stringify({name:fullName,is_hub_admin:isAdmin,is_shift_admin:isAdmin})});
+  })());
   try{ await Promise.all(jobs.map(p=>p.catch(e=>{console.warn('saveStaffAccess job',e);}))); }catch(e){ console.warn('saveStaffAccess',e); }
 }
 
@@ -9190,9 +9207,22 @@ async function aaSave(){
     setFlag(n,'is_hub_admin',false); setFlag(n,'is_shift_admin',false);
   });
 
-  // one upsert per changed person (merge-duplicates needs unique(name))
+  // one write per changed person. PATCH the existing row (a POST upsert 409s
+  // for anyone who already has a staff_settings row — see saveStaffAccess),
+  // and only INSERT when there's no row to update.
   Object.values(settingsChanges).forEach(rec=>{
-    jobs.push(fetch(AA_SB+'/rest/v1/staff_settings',{method:'POST',headers:{...HJ,'Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify(rec)}));
+    jobs.push((async ()=>{
+      const nm = rec.name;
+      const body = {}; Object.keys(rec).forEach(k=>{ if(k!=='name') body[k]=rec[k]; });
+      const pr = await fetch(AA_SB+'/rest/v1/staff_settings?name=eq.'+encodeURIComponent(nm),
+        {method:'PATCH',headers:{...HJ,'Prefer':'return=representation'},body:JSON.stringify(body)});
+      if(pr.ok){
+        const rows = await pr.json().catch(()=>[]);
+        if(rows && rows.length) return;
+      }
+      await fetch(AA_SB+'/rest/v1/staff_settings',{method:'POST',
+        headers:{...HJ,'Prefer':'return=minimal'},body:JSON.stringify(rec)});
+    })());
   });
 
   // ── fire all in parallel, wait for completion ──
