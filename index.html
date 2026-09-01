@@ -5516,9 +5516,11 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
       <div class="auth-card">
         <div class="alert alert-err" id="snErr"></div>
         <div class="alert alert-ok" id="snOk"></div>
-        <div class="field"><label class="field-label">New Password</label><input class="f-input" type="password" id="snNew" placeholder="Minimum 8 characters"></div>
-        <div class="field" style="margin-bottom:20px"><label class="field-label">Confirm Password</label><input class="f-input" type="password" id="snConfirm" placeholder="Repeat your password" onkeydown="if(event.key==='Enter')doSetNewPassword()"></div>
-        <button class="btn btn-green btn-block" id="snBtn" onclick="doSetNewPassword()">Set Password &amp; Sign In</button>
+        <div id="snForm">
+          <div class="field"><label class="field-label">New Password</label><input class="f-input" type="password" id="snNew" placeholder="Minimum 8 characters"></div>
+          <div class="field" style="margin-bottom:20px"><label class="field-label">Confirm Password</label><input class="f-input" type="password" id="snConfirm" placeholder="Repeat your password" onkeydown="if(event.key==='Enter')doSetNewPassword()"></div>
+          <button class="btn btn-green btn-block" id="snBtn" onclick="doSetNewPassword()">Set Password &amp; Sign In</button>
+        </div>
         <button class="btn btn-outline btn-block" onclick="showAuth('login')" style="margin-top:8px">Back to Sign In</button>
       </div>
     </div>
@@ -8245,20 +8247,51 @@ async function doSetNewPassword(){
   }catch(e){ err.textContent="Network error. Please try again."; err.classList.add("show"); btn.disabled=false; btn.textContent="Set Password & Sign In"; }
 }
 
-// On load: if the URL carries ?reset=TOKEN, jump straight to the set-new-password
-// screen. Called from the auth boot path.
-function checkResetLink(){
+// On load: if the URL carries ?reset=TOKEN, validate the token with the server
+// BEFORE showing the set-new-password screen. A used/expired/invalid token must
+// not present an editable form (you could otherwise sit on the reset screen and
+// type a new password for a spent link — it only failed on submit). We show the
+// form only for a genuinely valid, unused token; otherwise a clear message.
+async function checkResetLink(){
+  var t;
   try{
     var qs=new URLSearchParams(location.search);
-    var t=qs.get('reset');
-    if(t){
-      window._resetToken=t;
-      document.getElementById('authLayer').style.display='flex';
-      showAuth('setnew');
+    t=qs.get('reset');
+  }catch(e){ return false; }
+  if(!t) return false;
+
+  document.getElementById('authLayer').style.display='flex';
+  window._resetToken=t;
+  // Show a lightweight "checking…" state on the set-new screen while we verify.
+  showAuth('setnew');
+  var err=document.getElementById('snErr'), form=document.getElementById('snForm');
+  try{
+    var resp=await fetch(_resetExecUrl(),{
+      method:'POST', headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({ action:'checkReset', resetToken:t })
+    });
+    var j=await resp.json().catch(()=>({}));
+    if(!(j&&j.ok)){
+      // Token is used/expired/invalid — hide the form, show why + how to recover.
+      window._resetToken=null;
+      var map={ 'invalid token':"This reset link is invalid.", 'expired':"This reset link has expired.", 'used':"This reset link has already been used." };
+      if(form) form.style.display='none';
+      if(err){ err.textContent=(map[j&&j.error]||"This reset link is no longer valid.")+" Please request a new one below."; err.classList.add('show'); }
+      // Clear the dead token from the URL so a refresh doesn't reopen this.
+      try{ history.replaceState(null,'',_resetLinkBase()); }catch(e){}
+      // Offer the request-a-link screen after a moment.
+      setTimeout(function(){ try{ showAuth('forgot'); }catch(e){} }, 2200);
       return true;
     }
-  }catch(e){}
-  return false;
+    // Valid token — show the form for real.
+    if(form) form.style.display='';
+    if(err) err.classList.remove('show');
+    return true;
+  }catch(e){
+    // Network error checking the token — let them try, submit will re-validate.
+    if(form) form.style.display='';
+    return true;
+  }
 }
 
 // ── Session-expiry watchdog ─────────────────────────────────────────────
@@ -20566,7 +20599,7 @@ document.fonts.ready.then(function(){
       // 1C-1: verified auth session wins; else legacy name-string session.
       // AUTH_ONLY: a cached name with NO live auth session is a dead half-state
       // (locked tables would all read empty). Require the real session.
-      if(checkResetLink()){ /* landed on set-new-password from an email link */ }
+      if(await checkResetLink()){ /* landed on set-new-password from an email link */ }
       else if(await restoreAuthSession() || (!AUTH_ONLY_MODE && loadMe())){
         enterHub();
       }else{
@@ -20576,7 +20609,7 @@ document.fonts.ready.then(function(){
     }, 280);
   } else {
     (async function(){
-      if(checkResetLink()){ return; }
+      if(await checkResetLink()){ return; }
       if(await restoreAuthSession() || (!AUTH_ONLY_MODE && loadMe())){enterHub();}
       else{try{ sessionStorage.removeItem('ou'); }catch(e){} document.getElementById('authLayer').style.display='flex';}
     })();
