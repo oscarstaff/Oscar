@@ -14817,16 +14817,28 @@ function startBackgroundLocation(){
   if(!me) return; // don't start until user is logged in
   _bgWatchId = navigator.geolocation.watchPosition(
     function(pos){
-      const wasInside = _bgPosition && checkInsideGeofence(_bgPosition.coords);
+      // Was there a REAL prior reading to compare against? The very first fix
+      // after login has no "before", so it can't be an entry transition — the
+      // fresh-login "you're inside, tap Clock In" false prompt came from
+      // treating that first fix as outside→inside.
+      const hadPrior = !!_bgPosition;
+      const wasInside = hadPrior && checkInsideGeofence(_bgPosition.coords);
       // Only accept high-accuracy readings (under 50m accuracy circle)
       if(pos.coords.accuracy <= 50){
         _bgPosition = { coords: pos.coords, ts: Date.now() };
       } else if(!_bgPosition || (Date.now() - _bgPosition.ts) > 60000){
         _bgPosition = { coords: pos.coords, ts: Date.now() };
       }
-      // ENTRY DETECTION: was outside, now inside → fire "Clock in now" notif
+      // ENTRY DETECTION: was outside, now inside → fire "Clock in now" notif.
+      // Guards, all required:
+      //   hadPrior            — need a genuine outside→inside crossing, not the
+      //                         first fix of the session.
+      //   _clockState==='out' — only prompt when clock state is RESOLVED and out.
+      //                         Using '!== in' fired while state was still null
+      //                         (DB not loaded yet on fresh login), which is the
+      //                         other half of the false prompt.
       const nowInside = checkInsideGeofence(_bgPosition.coords);
-      if(!wasInside && nowInside && _clockState !== 'in'){
+      if(hadPrior && !wasInside && nowInside && _clockState === 'out'){
         maybeShowClockInPrompt();
       }
       // EXIT DETECTION removed per request — staff may travel during shifts
@@ -14845,8 +14857,10 @@ function checkInsideGeofence(coords){
 }
 
 function maybeShowClockInPrompt(){
-  // Don't show if already clocked in
-  if(_clockState === 'in') return;
+  // Only prompt when clock state is RESOLVED and genuinely 'out'. While it's
+  // still null (DB not loaded on a fresh login) or 'in', suppress — this is a
+  // second line of defence against the "tap to clock in while already in" bug.
+  if(_clockState !== 'out') return;
   // Throttle — once per 30 minutes max
   const lastKey = 'gf_clockin_prompt_'+me;
   const last = parseInt(sessionStorage.getItem(lastKey)||'0', 10);
