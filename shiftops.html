@@ -2300,6 +2300,7 @@ button, .btn { white-space: nowrap; }
       <button class="aa-tab" id="aatab-formcraft" onclick="aaSwitch('formcraft')">FormCraft</button>
       <button class="aa-tab" id="aatab-slip" onclick="aaSwitch('slip')">Slip</button>
       <button class="aa-tab" id="aatab-dialtrac" onclick="aaSwitch('dialtrac')">Call Logger</button>
+      <button class="aa-tab" id="aatab-borekade" onclick="aaSwitch('borekade')">Bore-KADE</button>
       <button class="aa-tab" id="aatab-shiftops" onclick="aaSwitch('shiftops')">ShiftOps</button>
       <button class="aa-tab" id="aatab-admin" onclick="aaSwitch('admin')">Admin</button>
     </div>
@@ -2361,6 +2362,7 @@ button, .btn { white-space: nowrap; }
         <label class="sa-acc-row"><input type="checkbox" id="saAccess_formcraft"><span class="sa-acc-label">FormCraft</span><span class="sa-acc-desc">PDF form filler</span></label>
         <label class="sa-acc-row"><input type="checkbox" id="saAccess_slip"><span class="sa-acc-label">Slip</span><span class="sa-acc-desc">Tax invoices</span></label>
         <label class="sa-acc-row"><input type="checkbox" id="saAccess_dialtrac"><span class="sa-acc-label">Call Logger</span><span class="sa-acc-desc">Call logging</span></label>
+        <label class="sa-acc-row"><input type="checkbox" id="saAccess_borekade"><span class="sa-acc-label">Bore-KADE</span><span class="sa-acc-desc">Arcade</span></label>
       </div>
 
       <div style="font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:6px;">Permissions</div>
@@ -6472,7 +6474,7 @@ async function loadStaffAccess(s){
     }catch(e){ console.warn('loadStaffAccess admin flag', e); }
   }
   // app access — read this person's rows from app_access
-  ['formcraft','slip','dialtrac','shiftops'].forEach(a=>{ const b=document.getElementById('saAccess_'+a); if(b) b.checked=false; });
+  ['formcraft','slip','dialtrac','borekade','shiftops'].forEach(a=>{ const b=document.getElementById('saAccess_'+a); if(b) b.checked=false; });
   try{
     const rows = await aaGet('app_access?select=app&staff_name=eq.'+encodeURIComponent(full));
     (rows||[]).forEach(r=>{ const b=document.getElementById('saAccess_'+r.app); if(b) b.checked=true; });
@@ -6504,7 +6506,7 @@ async function saveStaffAccess(fullName){
   const isAdmin = !!(document.getElementById('saAccess_admin')||{}).checked;
   // app_access for the 3 apps. Admin ALWAYS gets ShiftOps access, even if the
   // ShiftOps box is unticked — admin rights require it.
-  for(const app of ['formcraft','slip','dialtrac','shiftops']){
+  for(const app of ['formcraft','slip','dialtrac','borekade','shiftops']){
     let want = (document.getElementById('saAccess_'+app)||{}).checked;
     if(app==='shiftops' && isAdmin) want = true;
     if(want){
@@ -9258,8 +9260,8 @@ const AA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZ
 async function aaGet(path){const r=await fetch(AA_SB+'/rest/v1/'+path,{headers:{apikey:AA_KEY,Authorization:'Bearer '+AA_KEY}});if(!r.ok)return[];return r.json();}
 let aaCurrent='formcraft';
 let aaAllStaff=[];
-let aaWork={formcraft:new Set(),slip:new Set(),shiftops:new Set(),admin:new Set()};
-let aaOrig={formcraft:new Set(),slip:new Set(),shiftops:new Set(),admin:new Set()};
+let aaWork={formcraft:new Set(),slip:new Set(),dialtrac:new Set(),borekade:new Set(),shiftops:new Set(),admin:new Set()};
+let aaOrig={formcraft:new Set(),slip:new Set(),dialtrac:new Set(),borekade:new Set(),shiftops:new Set(),admin:new Set()};
 
 async function openAccessAdmin(){
   openModal('accessAdminModal');
@@ -9269,7 +9271,7 @@ async function openAccessAdmin(){
     aaAllStaff=(rows||[]).map(r=>r.name).filter(Boolean);
   }catch(e){ aaAllStaff=[]; }
   // current app_access
-  aaWork={formcraft:new Set(),slip:new Set(),shiftops:new Set(),admin:new Set()};
+  aaWork={formcraft:new Set(),slip:new Set(),dialtrac:new Set(),borekade:new Set(),shiftops:new Set(),admin:new Set()};
   try{
     const rows=await aaGet('app_access?select=app,staff_name');
     (rows||[]).forEach(r=>{ if(aaWork[r.app]) aaWork[r.app].add(r.staff_name); });
@@ -9282,12 +9284,12 @@ async function openAccessAdmin(){
     });
   }catch(e){}
   // snapshot originals for diffing
-  aaOrig={formcraft:new Set(aaWork.formcraft),slip:new Set(aaWork.slip),shiftops:new Set(aaWork.shiftops),admin:new Set(aaWork.admin)};
+  aaOrig={formcraft:new Set(aaWork.formcraft),slip:new Set(aaWork.slip),dialtrac:new Set(aaWork.dialtrac),borekade:new Set(aaWork.borekade),shiftops:new Set(aaWork.shiftops),admin:new Set(aaWork.admin)};
   aaSwitch('formcraft');
 }
 function aaSwitch(app){
   aaCurrent=app;
-  ['formcraft','slip','dialtrac','shiftops','admin'].forEach(a=>{
+  ['formcraft','slip','dialtrac','borekade','shiftops','admin'].forEach(a=>{
     const t=document.getElementById('aatab-'+a);
     if(t)t.className='aa-tab'+(a===app?' aa-active':'');
   });
@@ -9336,8 +9338,8 @@ async function aaSave(){
   const HJ={...H,'Content-Type':'application/json'};
   const jobs=[];
 
-  // ── app_access: formcraft, slip, shiftops ──
-  for(const app of ['formcraft','slip','dialtrac','shiftops']){
+  // ── app_access: formcraft, slip, dialtrac, borekade, shiftops ──
+  for(const app of ['formcraft','slip','dialtrac','borekade','shiftops']){
     const add=[...aaWork[app]].filter(n=>!aaOrig[app].has(n));
     const del=[...aaOrig[app]].filter(n=>!aaWork[app].has(n));
     add.forEach(n=>jobs.push(
@@ -9398,7 +9400,7 @@ async function aaSave(){
   }
 
   // update originals to current so reopening reflects saved state (no false reverts)
-  aaOrig={formcraft:new Set(aaWork.formcraft),slip:new Set(aaWork.slip),shiftops:new Set(aaWork.shiftops),admin:new Set(aaWork.admin)};
+  aaOrig={formcraft:new Set(aaWork.formcraft),slip:new Set(aaWork.slip),dialtrac:new Set(aaWork.dialtrac),borekade:new Set(aaWork.borekade),shiftops:new Set(aaWork.shiftops),admin:new Set(aaWork.admin)};
   // re-render current tab so ticks reflect the (possibly cascaded) state
   aaRender(document.getElementById('aaSearch').value);
 }
