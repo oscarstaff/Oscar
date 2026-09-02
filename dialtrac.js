@@ -1115,15 +1115,20 @@ function clDur(ms){
   return Math.round(h/24)+'d';
 }
 
+// Exact timestamp for a call row. Staff asked for the real time rather than
+// "5h ago" — a relative label made it hard to tell when a call actually came in.
+// Today's calls show just the time (e.g. "2:45 PM"); older calls also show a
+// short date (e.g. "2 Sep, 2:45 PM"). Sydney time, matching the rest of DialTRAC.
 function clAgo(iso){
-  const then=new Date(iso), diff=(Date.now()-then.getTime())/1000;
-  if(diff<60) return 'just now';
-  if(diff<3600) return Math.floor(diff/60)+'m ago';
-  if(diff<86400) return Math.floor(diff/3600)+'h ago';
-  const d=Math.floor(diff/86400);
-  if(d===1) return 'yesterday';
-  if(d<7) return d+'d ago';
-  return then.toLocaleDateString('en-AU',{day:'numeric',month:'short'});
+  const then=new Date(iso);
+  if(isNaN(then.getTime())) return '';
+  const TZ='Australia/Sydney';
+  const time=then.toLocaleTimeString('en-AU',{hour:'numeric',minute:'2-digit',timeZone:TZ});
+  // Is it today (in Sydney)? Compare the Sydney date strings.
+  const dayFmt={day:'numeric',month:'short',timeZone:TZ};
+  const sameDay=then.toLocaleDateString('en-AU',dayFmt)===new Date().toLocaleDateString('en-AU',dayFmt);
+  if(sameDay) return time;
+  return then.toLocaleDateString('en-AU',dayFmt)+', '+time;
 }
 
 // Placement team logs whether a placement was offered + post-offer remarks.
