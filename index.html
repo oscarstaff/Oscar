@@ -14062,6 +14062,10 @@ async function triggerPwaInstall(){
 let _clockState = null; // 'in' | 'out' | null
 let _clockSinceTs = null; // timestamp of last clock in/out
 let _clockTickTimer = null;
+// When a punch write fails and is queued for retry, this holds {action, ts} so
+// the card can show an honest "not synced yet" state instead of pretending the
+// punch is filed. Cleared the moment the write confirms (live or via queue flush).
+let _clockPending = null;
 
 async function checkGpsPermission(){
   if(!navigator.permissions || !navigator.permissions.query){
@@ -14154,8 +14158,11 @@ async function flushClockSyncQueue(){
       // A retry that finally landed may have changed the real clock state, so
       // re-read from the DB and redraw — otherwise the button can disagree with
       // what's now saved.
-      if(_anyFlushed && typeof loadClockState === 'function'){
-        try{ loadClockState(); }catch(_){}
+      if(_anyFlushed){
+        // The pending punch is now filed — drop the amber "not synced" state.
+        if(remSb.length === 0) _clockPending = null;
+        if(typeof loadClockState === 'function'){ try{ loadClockState(); }catch(_){} }
+        try{ renderClockCard(); }catch(_){}
       }
     }
   }catch(e){ console.warn('flush supabase queue:', e); }
@@ -14715,6 +14722,32 @@ function renderClockCard(){
   const now = document.getElementById('clockNow');
   if(!status || !btn) return;
 
+  // ── PENDING SYNC: a punch that failed to save and is queued for retry. ──
+  // Show it honestly so nobody walks away thinking a clock-out is filed when it
+  // isn't yet. This overrides the normal in/out display until the write lands.
+  if(_clockPending){
+    const _pAct = _clockPending.action === 'out' ? 'Clock-out' : 'Clock-in';
+    status.textContent = _pAct + ' not synced yet';
+    status.style.color = '#f59e0b'; // amber
+    // The button still reflects the intended new state, so a tap retries.
+    btn.textContent = (_clockPending.action === 'in') ? 'Clock Out' : 'Clock In';
+    btn.style.background = (_clockPending.action === 'in') ? '#dc2626' : 'var(--accent)';
+    if(sub){
+      var _pWhen = '';
+      try{ _pWhen = flexClockTime(_clockPending.ts).toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit',timeZone:'Australia/Sydney'}); }catch(e){}
+      sub.textContent = 'Saved on your phone' + (_pWhen ? ' at '+_pWhen : '') +
+        ' — will finish when you\u2019re back online. Tap to retry now.';
+    }
+    // keep the live clock ticking, then stop (skip the normal in/out block)
+    if(now){
+      function _tickP(){ now.textContent = new Date().toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit',second:'2-digit',timeZone:'Australia/Sydney'}); }
+      _tickP();
+      if(_clockTickTimer) clearInterval(_clockTickTimer);
+      _clockTickTimer = setInterval(_tickP, 1000);
+    }
+    return;
+  }
+
   if(_clockState === 'in'){
     status.textContent = 'Clocked in';
     status.style.color = '#10b981';
@@ -15171,6 +15204,17 @@ async function toggleClock(){
   window._lastClockAnyToggle = _now;
   window._lastClockToggle = _now;
   window._lastClockAction = _nextAction;
+  // PENDING GUARD: if a punch is already saved-on-phone and waiting to sync,
+  // tapping again before it lands just queues an identical duplicate (this is the
+  // source of the same-minute DOUBLE-IN rows). The pending action equals the
+  // current _clockState (we set state to the intended action on queue), so any
+  // re-tap here is the duplicate. Nudge + retry the flush instead of enqueuing.
+  if(_clockPending){
+    _ccNudge(btn);
+    showToast('Still syncing your last punch — retrying now…','info');
+    try{ if(typeof retryClockQueueSafely === 'function') retryClockQueueSafely('manual-retap'); }catch(_){}
+    return;
+  }
   const next = (_clockState === 'in') ? 'out' : 'in';
   // GUARD: never allow a clock-IN while a previous shift is still open (no
   // clock-out recorded). Verify against the source of truth, not just local
@@ -15321,23 +15365,27 @@ async function toggleClock(){
     sbPost('clock_log', {staff_name: me, action: next, ts: realTs})
       .then(function(res){
         if(res && res.ok === false){ throw new Error('HTTP '+res.status); }
-        // Confirmed saved — NOW show success.
+        // Confirmed saved — NOW show success and clear any pending flag.
+        _clockPending = null;
         showToast(next==='in' ? 'Clocked in ✓' : 'Clocked out ✓','success');
         try{ localStorage.removeItem('clock_pending_'+me); }catch(_){}
+        renderClockCard();
         if(typeof loadAllClockLogs === 'function') loadAllClockLogs();
       })
       .catch(function(err){
         console.warn('[clock] write failed:', err && err.message);
-        // Tell the person plainly — do NOT leave a false "clocked in" on screen.
+        // Keep the intended state, but mark it PENDING so the card tells the
+        // truth: the punch is saved on the phone, not yet in the system. This is
+        // what stops "I clocked out, it said ok, but it hadn't" — the person now
+        // sees it's still syncing, and the 20:00 auto-out won't surprise them.
+        _clockPending = { action: next, ts: realTs };
+        _clockState = next; // intended state stands; card shows amber pending
+        try{ localStorage.setItem('clock_state_'+me, JSON.stringify({state:_clockState, ts:realTs})); }catch(_){}
         showToast(next==='in'
-          ? 'Clock-in didn\u2019t save — check your connection and tap Clock In again'
-          : 'Clock-out didn\u2019t save — tap Clock Out again','error');
-        // Put the button/card back to what it really is, so it matches the DB.
-        _clockState = (next==='in') ? 'out' : 'in';
-        _clockSinceTs = null;
-        try{ localStorage.setItem('clock_state_'+me, JSON.stringify({state:_clockState, ts:new Date().toISOString()})); }catch(_){}
+          ? 'Clock-in saved on your phone — will finish when you\u2019re back online'
+          : 'Clock-out saved on your phone — will finish when you\u2019re back online','warning');
         renderClockCard();
-        // Still keep a backup retry, in case it was a brief network blip.
+        // Queue the retry (the flusher clears _clockPending when it lands).
         try{
           const q = JSON.parse(localStorage.getItem('clock_supabase_queue') || '[]');
           q.push({payload: {staff_name: me, action: next, ts: realTs}, queuedAt: Date.now()});
