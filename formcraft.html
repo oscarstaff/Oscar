@@ -793,7 +793,7 @@
             const d = f.__draw;
             const pg = pages2[(d.page || 1) - 1];
             if (pg) {
-              const txt = String(v).replace(/[\u2012\u2013\u2014\u2015\u2212]/g, '-').replace(/[^\x00-\xFF]/g, '');
+              const txt = String(v).replace(/[\u2012\u2013\u2014\u2015\u2212]/g, '-').replace(/[\r\n\t\f\v]+/g, ' ').replace(/[\x00-\x1F\x7F]/g, '').replace(/[^\x00-\xFF]/g, '');
               pg.drawText(txt, { x: d.x, y: d.y, size: d.size || 12, font: timesBold, color: rgb(0.05, 0.05, 0.1) });
             }
           }
@@ -846,6 +846,13 @@
             .replace(/\u2026/g, '...')
             .replace(/[\u00A0\u2007\u202F]/g, ' ')
             .replace(/[\u2022\u00B7]/g, '-')
+            // Control chars (newline 0x0a, carriage return 0x0d, tab, etc.) are
+            // inside the Latin1 range so they slip past the filter below, but
+            // pdf-lib's WinAnsi font has no glyph for them and throws
+            // "WinAnsi cannot encode (0x000a)". Collapse them to spaces so a
+            // pasted multi-line address or a note with an Enter in it fills fine.
+            .replace(/[\r\n\t\f\v]+/g, ' ')
+            .replace(/[\x00-\x1F\x7F]/g, '')
             .replace(/[^\x00-\xFF]/g, '');
           let text = toWinAnsi(v);
           const isoDate = /^(\d{4})-(\d{2})-(\d{2})$/.exec(text);
