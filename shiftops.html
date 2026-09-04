@@ -6631,6 +6631,20 @@ async function saveStaff(){
     await addStaffToSupabase(fullName, team); // insert-only — safe, won't prune
     await saveRosterConfig(fullName, type, maxHours);   // employment type → who gets shift-open emails
     // (team persisted to directory + credentials above; staff_teams retired)
+
+    // Save personal details (email/DOB/pronouns) for the NEW staff member.
+    // Previously these were only saved on EDIT, so a brand-new person had no
+    // email on file — which the welcome email below needs. Uses the
+    // authenticated token (admins can write any row via sc_admin_write RLS).
+    try{
+      const _ptok=(typeof _soTok==='function' && _soTok())?_soTok():SUPABASE_KEY;
+      const _pH={apikey:SUPABASE_KEY, Authorization:'Bearer '+_ptok, 'Content-Type':'application/json'};
+      const _pbody=JSON.stringify({pronouns:pronouns||null, birthday:birthday||null, email:email||null});
+      const _pr=await fetch(SUPABASE_URL+'/rest/v1/staff_credentials?staff_name=eq.'+encodeURIComponent(fullName),
+        {method:'PATCH',headers:{..._pH,'Prefer':'return=minimal'},body:_pbody});
+      if(!_pr.ok){ console.warn('new-staff personal details save HTTP', _pr.status, await _pr.text().catch(()=> '')); }
+    }catch(e){ console.warn('save new-staff personal details',e); }
+
     // Create the staff's real auth account (temp password, forced reset on first login)
     // so they can actually log in under auth-only mode.
     try{
@@ -6642,6 +6656,25 @@ async function saveStaff(){
       if(j&&j.ok){ showToast(` ${fullName} added — temp password: Oscars2026!`); }
       else { showToast(` ${fullName} added, but auth setup failed: ${(j&&j.error)||'error'}. Use Set Password.`); }
     }catch(e){ showToast(` ${fullName} added, but auth setup failed. Use Set Password to fix.`); }
+
+    // Auto-send the welcome email — only if an email was entered. Runs AFTER the
+    // email is saved above, so the relay can find it. Uses a set-password link
+    // (no plaintext password). Fires only here in the NEW-staff branch, so
+    // editing an existing person never re-sends. Failures are non-fatal — the
+    // person is still added; you can re-send later with Set Password / resend.
+    if(email && email.indexOf('@')>0){
+      try{
+        const wr=await fetch(GAS_EXEC_URL,{
+          method:'POST',headers:{'Content-Type':'text/plain'},
+          body:JSON.stringify({action:'sendWelcomeEmail',staff:fullName,token:GAS_TOKEN,sbAccessToken:_soTok()})
+        });
+        const wj=await wr.json().catch(()=>({}));
+        if(wj&&wj.ok){ showToast(`Welcome email sent to ${email}`); }
+        else { showToast(`Added, but welcome email failed: ${(wj&&wj.error)||'error'}`); }
+      }catch(e){ showToast('Added, but welcome email could not be sent.'); }
+    } else {
+      showToast(`${fullName} added — no email entered, welcome email skipped.`);
+    }
   }
 }
 // Insert ONE new staff member into the Nexus-facing tables. INSERT-ONLY — it
