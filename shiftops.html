@@ -2490,7 +2490,20 @@ button, .btn { white-space: nowrap; }
       <div class="form-group"><label class="form-label">From Date</label><input type="date" class="form-input" id="leaveFrom"></div>
       <div class="form-group"><label class="form-label">To Date</label><input type="date" class="form-input" id="leaveTo"></div>
     </div>
-    <div class="form-group"><label class="form-label">Reason</label><input type="text" class="form-input" id="leaveReason" placeholder="e.g. Annual leave, Medical, Personal…"></div>
+    <div class="form-group"><label class="form-label">Leave type</label>
+      <select class="form-input" id="leaveType">
+        <option value="">— Select a reason —</option>
+        <option value="Time off / away">Time off / away</option>
+        <option value="Sick leave">Sick leave</option>
+        <option value="Medical appointment">Medical appointment</option>
+        <option value="Family / carer's">Family / carer's</option>
+        <option value="Study / exam">Study / exam</option>
+        <option value="Travel">Travel</option>
+        <option value="Family loss / funeral">Family loss / funeral</option>
+        <option value="Other">Other</option>
+      </select>
+    </div>
+    <div class="form-group"><label class="form-label">Notes (optional)</label><input type="text" class="form-input" id="leaveReason" placeholder="e.g. flu, doctor's certificate provided…"></div>
     <div class="form-group" style="display:flex;align-items:center;gap:9px;">
       <input type="checkbox" id="leaveNotify" style="width:16px;height:16px;flex-shrink:0;cursor:pointer;">
       <label for="leaveNotify" style="font-size:13px;color:#475569;cursor:pointer;margin:0;">Email the staff member (they'll get an approved-leave notice)</label>
@@ -7826,49 +7839,88 @@ function countLeaveDays(fromStr, toStr, staffId){
   return Math.max(1,count);
 }
 
+// The 8 leave types, with short labels + colours for the breakdown chips.
+const LV_REASONS = [
+  {key:'Time off / away',        short:'Time off',    col:'#64748b'},
+  {key:'Sick leave',             short:'Sick',        col:'#be1e6d'},
+  {key:'Medical appointment',    short:'Medical',     col:'#0369a1'},
+  {key:"Family / carer's",       short:'Family',      col:'#c2410c'},
+  {key:'Study / exam',           short:'Study',       col:'#6d28d9'},
+  {key:'Travel',                 short:'Travel',      col:'#0f766e'},
+  {key:'Family loss / funeral',  short:'Bereavement', col:'#475569'},
+  {key:'Other',                  short:'Other',       col:'#8b93a3'}
+];
+function _lvReasonMeta(rt){
+  return LV_REASONS.find(function(x){ return x.key===rt; }) ||
+         {key:'Uncategorised', short:'Uncategorised', col:'#8b93a3'};
+}
+// Which reason is the summary filtered to ('' = all reasons).
+window._leaveReasonFilter = window._leaveReasonFilter || '';
+function setLeaveReasonFilter(rt){ window._leaveReasonFilter = rt; renderLeaveSummary(); }
+
 function renderLeaveSummary(){
   const el=document.getElementById('leaveSummaryContent');
   if(!el)return;
 
-  // Build per-staff summary keyed by name
+  const reasonFilter = window._leaveReasonFilter || '';
+
+  // Build per-staff summary keyed by name, now including a per-reason day tally.
   const summary={};
   staff.forEach(s=>{
     const name=`${s.first} ${s.last}`;
-    summary[name]={name,color:s.color,approved:0,pending:0,declined:0,days:0};
+    summary[name]={name,color:s.color,approved:0,pending:0,declined:0,days:0,byReason:{}};
   });
 
   leaveRequests.forEach(r=>{
-    // Resolve name - handle all possible field names
     let name=r.staffName||r.staff_name||'';
     if(!name&&r.staffId){
       const s=staff.find(x=>x.id===r.staffId);
       if(s)name=`${s.first} ${s.last}`;
     }
     if(!name)return;
-    // Case-insensitive match against existing summary keys
     const existingKey=Object.keys(summary).find(k=>k.toLowerCase()===name.toLowerCase());
     const key=existingKey||name;
     if(!summary[key]){
-      summary[key]={name:key,color:'#94a3b8',approved:0,pending:0,declined:0,days:0};
+      summary[key]={name:key,color:'#94a3b8',approved:0,pending:0,declined:0,days:0,byReason:{}};
     }
     const days=countLeaveDays(r.from||r.from_date||'',(r.to||r.to_date||''),(r.staffId||null));
     const status=r.status||'pending';
+    // The reason label — untyped/old leave is grouped as 'Uncategorised'.
+    const rt=(r.reason_type||'').trim()||'Uncategorised';
     summary[key][status]=(summary[key][status]||0)+1;
-    if(status==='approved')summary[key].days+=days;
+    if(status==='approved'){
+      summary[key].days+=days;                                   // full total (all reasons)
+      summary[key].byReason[rt]=(summary[key].byReason[rt]||0)+days;
+    }
   });
 
-  const rows=Object.values(summary).sort((a,b)=>b.days-a.days||a.name.localeCompare(b.name));
-  const maxDays=Math.max(...rows.map(r=>r.days),1);
+  // When a reason filter is active, the "days" shown is that reason's days only,
+  // so the bar and the number reflect exactly what you're focused on.
+  const rows=Object.values(summary).map(function(r){
+    const shownDays = reasonFilter ? (r.byReason[reasonFilter]||0) : r.days;
+    return Object.assign({}, r, {shownDays:shownDays});
+  }).sort((a,b)=>b.shownDays-a.shownDays||a.name.localeCompare(b.name));
+  const maxDays=Math.max.apply(null,[1].concat(rows.map(r=>r.shownDays)));
 
-  let html=`<div style="margin-bottom:20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+  let html=`<div style="margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
     <div>
       <div class="section-title">Leave Summary</div>
-      <div style="font-family:var(--mono);font-size:9px;color:var(--text-dim);margin-top:3px">Approved days taken per staff member</div>
+      <div style="font-family:var(--mono);font-size:9px;color:var(--text-dim);margin-top:3px">Approved days taken per staff member${reasonFilter?(' — showing '+_lvReasonMeta(reasonFilter).short+' only'):', broken down by reason'}</div>
     </div>
     <button class="btn btn-save" onclick="syncLeaveRequests()" style="font-size:11.5px">Sync from Staff</button>
   </div>`;
 
-  // Year filter
+  // ── Reason filter chips: All + each reason ──
+  html+=`<div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;align-items:center">
+    <span style="font-family:var(--mono);font-size:9px;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;padding:4px 2px">Reason:</span>`;
+  html+=`<button onclick="setLeaveReasonFilter('')" style="padding:4px 11px;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;background:${reasonFilter===''?'var(--accent)':'var(--surface)'};color:${reasonFilter===''?'#fff':'var(--text-dim)'};border:1px solid ${reasonFilter===''?'var(--accent-deep)':'var(--border)'}">All</button>`;
+  LV_REASONS.forEach(function(rm){
+    const on=reasonFilter===rm.key;
+    html+=`<button onclick="setLeaveReasonFilter('${rm.key.replace(/'/g,"\\'")}')" style="padding:4px 11px;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:5px;background:${on?rm.col:'var(--surface)'};color:${on?'#fff':'var(--text-dim)'};border:1px solid ${on?rm.col:'var(--border)'}"><i style="width:7px;height:7px;border-radius:50%;background:${on?'#fff':rm.col};display:inline-block"></i>${rm.short}</button>`;
+  });
+  html+=`</div>`;
+
+  // Year filter (unchanged)
   const currentYear=new Date().getFullYear();
   html+=`<div style="display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap">
     <div style="font-size:11px;font-weight:600;color:var(--text-dim);align-self:center">Year:</div>
@@ -7881,34 +7933,47 @@ function renderLeaveSummary(){
   }
 
   html+=`<div style="background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:12px;overflow:hidden">`;
-  // Header
   html+=`<div style="display:grid;grid-template-columns:180px 1fr 70px 70px 70px;gap:8px;padding:10px 16px;background:rgba(255,255,255,.025);border-bottom:1px solid var(--border)">
     <div style="font-family:var(--mono);font-size:8px;font-weight:700;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase">Staff Member</div>
-    <div style="font-family:var(--mono);font-size:8px;font-weight:700;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase">Days Taken</div>
+    <div style="font-family:var(--mono);font-size:8px;font-weight:700;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase">${reasonFilter?(_lvReasonMeta(reasonFilter).short+' days'):'Days Taken · by reason'}</div>
     <div style="font-family:var(--mono);font-size:8px;font-weight:700;letter-spacing:1.5px;color:var(--accent);text-transform:uppercase;text-align:center">Approved</div>
     <div style="font-family:var(--mono);font-size:8px;font-weight:700;letter-spacing:1.5px;color:#f9a825;text-transform:uppercase;text-align:center">Pending</div>
     <div style="font-family:var(--mono);font-size:8px;font-weight:700;letter-spacing:1.5px;color:var(--warn);text-transform:uppercase;text-align:center">Declined</div>
   </div>`;
 
   rows.forEach(r=>{
-    const pct=maxDays>0?(r.days/maxDays)*100:0;
+    const pct=maxDays>0?(r.shownDays/maxDays)*100:0;
     const ava=r.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
-    html+=`<div style="display:grid;grid-template-columns:180px 1fr 70px 70px 70px;gap:8px;padding:11px 16px;border-bottom:1px solid var(--border);align-items:center" onmouseover="this.style.background='rgba(255,255,255,.025)'" onmouseout="this.style.background=''">
-      <div style="display:flex;align-items:center;gap:8px">
+    // Per-reason breakdown line: "60 Time off · 30 Sick · 10 Study", coloured.
+    // Ordered biggest first so the dominant reason reads immediately.
+    const parts=Object.keys(r.byReason)
+      .map(function(rt){ return {rt:rt, d:r.byReason[rt], meta:_lvReasonMeta(rt)}; })
+      .filter(function(p){ return p.d>0 && (!reasonFilter || p.rt===reasonFilter); })
+      .sort(function(a,b){ return b.d-a.d; });
+    const breakdown = parts.length
+      ? '<div style="display:flex;flex-wrap:wrap;gap:4px 10px;margin-top:5px">'+
+        parts.map(function(p){
+          return '<span style="font-family:var(--mono);font-size:9.5px;color:'+p.meta.col+';font-weight:700;display:inline-flex;align-items:center;gap:4px"><i style="width:6px;height:6px;border-radius:50%;background:'+p.meta.col+';display:inline-block"></i>'+p.d+' '+p.meta.short+'</span>';
+        }).join('')+
+        '</div>'
+      : '';
+    html+=`<div style="display:grid;grid-template-columns:180px 1fr 70px 70px 70px;gap:8px;padding:11px 16px;border-bottom:1px solid var(--border);align-items:start" onmouseover="this.style.background='rgba(255,255,255,.025)'" onmouseout="this.style.background=''">
+      <div style="display:flex;align-items:center;gap:8px;padding-top:2px">
         <div class="avatar" style="background:${r.color};width:26px;height:26px;font-size:8px;flex-shrink:0">${ava}</div>
         <div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.name}</div>
       </div>
       <div style="padding-right:12px">
         <div style="display:flex;align-items:center;gap:8px">
           <div style="flex:1;background:rgba(255,255,255,.06);border-radius:3px;height:6px;overflow:hidden">
-            <div style="height:100%;border-radius:3px;background:${r.days>15?'var(--warn)':r.days>7?'var(--gold)':'var(--accent)'};width:${pct}%;transition:width .4s cubic-bezier(.25,.8,.4,1)"></div>
+            <div style="height:100%;border-radius:3px;background:${r.shownDays>15?'var(--warn)':r.shownDays>7?'var(--gold)':'var(--accent)'};width:${pct}%;transition:width .4s cubic-bezier(.25,.8,.4,1)"></div>
           </div>
-          <div style="font-family:var(--mono);font-size:11px;font-weight:700;color:var(--text);min-width:28px">${r.days}d</div>
+          <div style="font-family:var(--mono);font-size:11px;font-weight:700;color:var(--text);min-width:28px">${r.shownDays}d</div>
         </div>
+        ${breakdown}
       </div>
-      <div style="text-align:center;font-family:var(--mono);font-size:12px;font-weight:700;color:${r.approved?'var(--accent)':'var(--muted)'}">${r.approved||'—'}</div>
-      <div style="text-align:center;font-family:var(--mono);font-size:12px;font-weight:700;color:${r.pending?'#f9a825':'var(--muted)'}">${r.pending||'—'}</div>
-      <div style="text-align:center;font-family:var(--mono);font-size:12px;font-weight:700;color:${r.declined?'var(--warn)':'var(--muted)'}">${r.declined||'—'}</div>
+      <div style="text-align:center;font-family:var(--mono);font-size:12px;font-weight:700;color:${r.approved?'var(--accent)':'var(--muted)'};padding-top:2px">${r.approved||'—'}</div>
+      <div style="text-align:center;font-family:var(--mono);font-size:12px;font-weight:700;color:${r.pending?'#f9a825':'var(--muted)'};padding-top:2px">${r.pending||'—'}</div>
+      <div style="text-align:center;font-family:var(--mono);font-size:12px;font-weight:700;color:${r.declined?'var(--warn)':'var(--muted)'};padding-top:2px">${r.declined||'—'}</div>
     </div>`;
   });
   html+=`</div>`;
@@ -8119,6 +8184,7 @@ function openLeaveModal(){
   document.getElementById('leaveFrom').value=today;
   document.getElementById('leaveTo').value=today;
   document.getElementById('leaveReason').value='';
+  var _lt=document.getElementById('leaveType'); if(_lt) _lt.value='';
   var nb=document.getElementById('leaveNotify'); if(nb){ nb.checked=false; if(nb.parentElement) nb.parentElement.style.display=''; }
   openModal('leaveModal');
 }
@@ -8138,6 +8204,7 @@ function openLeaveEdit(id){
   document.getElementById('leaveFrom').value = r.from || r.from_date || '';
   document.getElementById('leaveTo').value = r.to || r.to_date || '';
   document.getElementById('leaveReason').value = r.reason || '';
+  var _lte=document.getElementById('leaveType'); if(_lte) _lte.value = r.reason_type || '';
   var nbRow=document.getElementById('leaveNotify'); if(nbRow){ nbRow.checked=false; if(nbRow.parentElement) nbRow.parentElement.style.display='none'; }
   // Swap the save button onclick
   const saveBtn = document.querySelector('#leaveModal button.btn-primary');
@@ -8156,6 +8223,7 @@ function saveLeaveEdit(){
   const newFrom = document.getElementById('leaveFrom').value;
   const newTo = document.getElementById('leaveTo').value;
   const newReason = document.getElementById('leaveReason').value.trim();
+  const newReasonType = (document.getElementById('leaveType')||{}).value||'';
   if(!newFrom || !newTo){ showToast('Please select dates'); return; }
   if(newFrom >newTo){ showToast('End date must be after start date'); return; }
 
@@ -8191,6 +8259,7 @@ function saveLeaveEdit(){
   if('from_date' in r) r.from_date = newFrom;
   if('to_date' in r) r.to_date = newTo;
   r.reason = newReason;
+  r.reason_type = newReasonType;
 
   // If was approved, re-add LEAVE blocks for new range
   if(wasApproved){
@@ -8218,7 +8287,7 @@ function saveLeaveEdit(){
     fetch(
       `${SUPABASE_URL}/rest/v1/leave_submissions?id=eq.${r.supabaseId}`,
       {method:'PATCH', headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`,'Content-Type':'application/json','Prefer':'return=minimal'},
-       body: JSON.stringify({from_date: newFrom, to_date: newTo, reason: newReason})}
+       body: JSON.stringify({from_date: newFrom, to_date: newTo, reason: newReason, reason_type: newReasonType})}
     ).catch(e =>console.warn('Supabase update failed:', e));
   }
 
@@ -8242,24 +8311,26 @@ function saveLeaveRequest(){
   const from=document.getElementById('leaveFrom').value;
   const to=document.getElementById('leaveTo').value;
   const reason=document.getElementById('leaveReason').value.trim();
+  const reasonType=(document.getElementById('leaveType')||{}).value||'';
   const notify=!!(document.getElementById('leaveNotify')&&document.getElementById('leaveNotify').checked);
   if(!from||!to){showToast('Please select dates');return;}
   if(from>to){showToast('End date must be after start date');return;}
-  leaveRequests.push({id:nextLeaveId++,staffId,from,to,reason,status:'pending'});
+  leaveRequests.push({id:nextLeaveId++,staffId,from,to,reason,reason_type:reasonType,status:'pending'});
   closeModal('leaveModal');markDirty();renderLeave();showToast('Leave request added');
   // Sync to the shared leave_submissions table so it appears on the staff's own
   // portal record (Nexus reads this table). Admin-entered leave lands pre-approved.
   // Best-effort: a failure here never blocks the local ShiftOps save above.
-  syncLeaveToPortal(staffId,from,to,reason);
+  syncLeaveToPortal(staffId,from,to,reason,reasonType);
   // Only email if the admin explicitly ticked "notify" — admin-entered leave is
   // often just recording something already agreed, so it's opt-in per entry.
-  if(notify) sendAdminLeaveEmail(staffId,from,to,reason);
+  // The picked reason sets the email TONE, matching how Nexus self-submissions work.
+  if(notify) sendAdminLeaveEmail(staffId,from,to,reason,reasonType);
 }
 
 // Email an admin-added leave using the APPROVED template (admin-entered leave is
 // pre-approved). Mirrors the approve/decline email path: same relay, same payload,
 // looks the recipient's address up from staff_credentials, best-effort/silent.
-function sendAdminLeaveEmail(staffId,from,to,reason){
+function sendAdminLeaveEmail(staffId,from,to,reason,reasonType){
   try{
     const s=staff.find(x=>x.id===staffId);
     if(!s) return;
@@ -8283,7 +8354,7 @@ function sendAdminLeaveEmail(staffId,from,to,reason){
           fromDate:from,
           toDate:to,
           reason:(reason||''),
-          reasonType:'',   // no preset picker on admin-add → neutral tone
+          reasonType:(reasonType||''),   // picked reason → matching email tone (same as Nexus)
           declineReason:'',
           decidedBy:(typeof currentUser!=='undefined'&&currentUser)?currentUser:''
         })
@@ -8298,7 +8369,7 @@ function sendAdminLeaveEmail(staffId,from,to,reason){
 // The staff_name MUST match what Nexus uses, so we build it the same way
 // ShiftOps does everywhere else: `first last`. The fetch interceptor auto-adds
 // sbAccessToken for the relay's admin gate.
-function syncLeaveToPortal(staffId,from,to,reason){
+function syncLeaveToPortal(staffId,from,to,reason,reasonType){
   try{
     const s=staff.find(x=>x.id===staffId);
     if(!s){return;}
@@ -8321,6 +8392,7 @@ function syncLeaveToPortal(staffId,from,to,reason){
           from:from,        // yyyy-MM-dd from the date inputs
           to:to,
           reason:reason||'',
+          reasonType:reasonType||'',   // categorised leave type → leave_submissions.reason_type
           source:'Admin',   // stamps leave_submissions.source (relay must persist this)
           token:GAS_TOKEN
         })
