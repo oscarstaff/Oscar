@@ -851,7 +851,7 @@ textarea.cl-edit-in{min-height:52px;resize:vertical;line-height:1.45;}
 
             <div class="cl-field">
               <label class="cl-label" for="clName">Contact <span class="cl-req">*</span></label>
-              <input id="clName" class="cl-in" type="text" placeholder="Search or add a contact…" autocomplete="off" oninput="clContactSuggest(this.value)" />
+              <input id="clName" class="cl-in" type="text" placeholder="Search or add a contact…" autocomplete="off" oninput="clContactSuggest(this.value)" onblur="clContactSuggestBlur()" onfocus="clContactSuggest(this.value)" />
               <div class="cl-contact-sugg" id="clContactSugg" style="display:none;"></div>
               <div class="cl-contact-sel" id="clContactSel" style="display:none;"></div>
             </div>
@@ -1017,7 +1017,7 @@ textarea.cl-edit-in{min-height:52px;resize:vertical;line-height:1.45;}
               <h3>Contacts</h3>
               <button class="cl-modal-x" onclick="clCloseContacts()" aria-label="Close">×</button>
             </div>
-            <div class="cl-modal-tools">
+            <div class="cl-modal-tools" id="clContactsTools">
               <input id="clContactsSearch" class="cl-in" type="text" placeholder="Search name, number or email…" autocomplete="off" oninput="clRenderContactsList(this.value)" />
               <button class="cl-act cl-act-relog" onclick="clContactFormNew()"><span>+ New contact</span></button>
             </div>
@@ -1383,6 +1383,16 @@ function clContactSuggest(q){
   }, 180);
 }
 
+// Close the suggestion dropdown when the name field loses focus. Delay slightly
+// so a click on a suggestion (which blurs the input first) still registers.
+function clContactSuggestBlur(){
+  clearTimeout(_clContactSuggTimer);
+  setTimeout(function(){
+    const box=document.getElementById('clContactSugg');
+    if(box){ box.style.display='none'; }
+  }, 160);
+}
+
 function clPickContact(id){
   const c=(_clContacts||[]).find(function(x){ return x.id===id; });
   if(!c) return;
@@ -1457,7 +1467,7 @@ async function clCreateContactInline(){
 async function clOpenContacts(){
   const m=document.getElementById('clContactsModal'); if(!m) return;
   m.style.display='flex';
-  const f=document.getElementById('clContactForm'); if(f){ f.style.display='none'; f.innerHTML=''; }
+  clContactViewList();
   document.getElementById('clContactsList').innerHTML='<div style="padding:20px;color:var(--m-mut,#64748b);">Loading…</div>';
   await clLoadContacts(true);
   clRenderContactsList('');
@@ -1503,8 +1513,23 @@ function clRenderContactsList(q){
 }
 function clContactFormNew(){ clContactForm(null); }
 function clContactFormEdit(id){ clContactForm((_clContacts||[]).find(function(c){return c.id===id;})||null); }
+// Toggle between the list view and the form view inside the modal so the form
+// isn't buried under a scrolling list.
+function clContactViewList(){
+  const list=document.getElementById('clContactsList');
+  const tools=document.getElementById('clContactsTools');
+  const f=document.getElementById('clContactForm');
+  if(list) list.style.display='';
+  if(tools) tools.style.display='';
+  if(f){ f.style.display='none'; f.innerHTML=''; }
+}
 function clContactForm(c){
   const f=document.getElementById('clContactForm'); if(!f) return;
+  // Hide the list + search while editing/creating so the form owns the modal.
+  const list=document.getElementById('clContactsList');
+  const tools=document.getElementById('clContactsTools');
+  if(list) list.style.display='none';
+  if(tools) tools.style.display='none';
   const v=function(x){ return x==null?'':clEsc(String(x)); };
   const isEdit=!!c;
   const admin=clIsAdmin();
@@ -1527,7 +1552,7 @@ function clContactForm(c){
     '</div>';
   f.style.display='block';
 }
-function clContactFormCancel(){ const f=document.getElementById('clContactForm'); if(f){ f.style.display='none'; f.innerHTML=''; } }
+function clContactFormCancel(){ const f=document.getElementById('clContactForm'); if(f){ f.style.display='none'; f.innerHTML=''; } clContactViewList(); }
 async function clContactSave(id){
   const name=(document.getElementById('cfName').value||'').trim();
   if(!name){ showToast('Name is required','error'); return; }
