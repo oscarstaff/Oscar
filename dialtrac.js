@@ -152,6 +152,56 @@
   border:1px solid var(--m-border);color:var(--m-ink-3);line-height:1.3;}
 
 .cl-field{margin-bottom:19px;}
+/* Contact autosuggest (Phase 2) */
+.cl-field{position:relative;}
+.cl-contact-sugg{position:absolute;left:0;right:0;top:100%;margin-top:4px;z-index:30;
+  background:var(--m-card,#fff);border:1.5px solid var(--m-border);border-radius:10px;
+  box-shadow:0 12px 30px -10px rgba(16,24,40,.35);overflow:hidden;max-height:280px;overflow-y:auto;}
+.cl-sugg-item{display:flex;flex-direction:column;align-items:flex-start;gap:2px;width:100%;
+  text-align:left;background:none;border:none;border-bottom:1px solid var(--m-border);
+  padding:9px 12px;cursor:pointer;font-family:inherit;color:var(--m-ink,#0f172a);}
+.cl-sugg-item:last-child{border-bottom:none;}
+.cl-sugg-item:hover{background:var(--m-card-2,#f1f5f9);}
+.cl-sugg-nm{font-size:13px;font-weight:600;}
+.cl-sugg-ph{font-size:11px;color:var(--m-mut,#64748b);font-variant-numeric:tabular-nums;}
+.cl-sugg-new{color:var(--accent,#2563eb);font-size:12.5px;font-weight:600;}
+.cl-contact-sel{margin-top:7px;}
+.cl-contact-chip{display:inline-flex;align-items:center;gap:8px;background:var(--accent-dim,#eff6ff);
+  border:1px solid var(--accent,#2563eb);color:var(--accent-text,#1d4ed8);border-radius:999px;
+  padding:4px 6px 4px 11px;font-size:12.5px;font-weight:600;}
+.cl-contact-chip-ph{font-weight:400;font-variant-numeric:tabular-nums;opacity:.8;}
+.cl-contact-chip-x{background:none;border:none;color:inherit;font-size:16px;line-height:1;
+  cursor:pointer;padding:0 4px;opacity:.7;}
+.cl-contact-chip-x:hover{opacity:1;}
+/* Contacts button in ribbon */
+.cl-contacts-btn{display:inline-flex;align-items:center;gap:6px;margin-left:10px;
+  background:var(--m-card-2,#f1f5f9);border:1.5px solid var(--m-border);border-radius:9px;
+  padding:6px 11px;font-size:12px;font-weight:600;color:var(--m-ink,#0f172a);cursor:pointer;font-family:inherit;}
+.cl-contacts-btn:hover{border-color:var(--accent,#2563eb);color:var(--accent-text,#1d4ed8);}
+/* Contacts modal */
+.cl-modal{position:fixed;inset:0;z-index:200;background:rgba(15,23,42,.5);
+  display:flex;align-items:center;justify-content:center;padding:20px;}
+.cl-modal-card{background:var(--m-card,#fff);border-radius:16px;width:100%;max-width:560px;
+  max-height:85vh;display:flex;flex-direction:column;box-shadow:0 24px 60px -12px rgba(0,0,0,.4);overflow:hidden;}
+.cl-modal-hd{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--m-border);}
+.cl-modal-hd h3{margin:0;font-size:16px;color:var(--m-ink,#0f172a);}
+.cl-modal-x{background:none;border:none;font-size:24px;line-height:1;cursor:pointer;color:var(--m-mut,#64748b);}
+.cl-modal-tools{display:flex;gap:8px;padding:14px 20px;border-bottom:1px solid var(--m-border);}
+.cl-modal-tools .cl-in{flex:1;}
+.cl-contacts-list{overflow-y:auto;flex:1;padding:6px 0;}
+.cl-contact-row{display:flex;align-items:center;gap:10px;padding:9px 20px;border-bottom:1px solid var(--m-border);}
+.cl-contact-row:hover{background:var(--m-card-2,#f8fafc);}
+.cl-contact-row-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;}
+.cl-contact-row-nm{font-size:13.5px;font-weight:600;color:var(--m-ink,#0f172a);}
+.cl-contact-type{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;
+  background:var(--m-card-2,#e2e8f0);color:var(--m-mut,#64748b);padding:1px 6px;border-radius:999px;margin-left:6px;}
+.cl-contact-row-sub{font-size:11.5px;color:var(--m-mut,#64748b);font-variant-numeric:tabular-nums;}
+.cl-contact-form{padding:16px 20px;border-top:1px solid var(--m-border);background:var(--m-card-2,#f8fafc);}
+.cl-cf-hd{font-size:13px;font-weight:700;color:var(--m-ink,#0f172a);margin-bottom:12px;}
+.cl-cf-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.cl-cf-grid label{display:flex;flex-direction:column;gap:4px;font-size:11px;font-weight:600;color:var(--m-mut,#64748b);}
+.cl-cf-full{grid-column:1 / -1;}
+.cl-cf-act{display:flex;gap:8px;margin-top:14px;}
 .cl-label{display:block;font-size:11.5px;font-weight:600;margin-bottom:7px;
   color:var(--m-ink-2);letter-spacing:.01em;}
 .cl-req{color:#dc2626;}
@@ -740,6 +790,10 @@ textarea.cl-edit-in{min-height:52px;resize:vertical;line-height:1.45;}
               </button>
               <button class="cl-sc" id="clScAll" onclick="clSetScope('all')">Everyone</button>
             </div>
+            <button class="cl-contacts-btn" onclick="clOpenContacts()" title="Manage contacts">
+              <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z"/></svg>
+              <span>Contacts</span>
+            </button>
           </div>
         </header>
 
@@ -755,7 +809,9 @@ textarea.cl-edit-in{min-height:52px;resize:vertical;line-height:1.45;}
 
             <div class="cl-field">
               <label class="cl-label" for="clName">Caller <span class="cl-req">*</span></label>
-              <input id="clName" class="cl-in" type="text" placeholder="Who called?" autocomplete="off" />
+              <input id="clName" class="cl-in" type="text" placeholder="Who called?" autocomplete="off" oninput="clContactSuggest(this.value)" />
+              <div class="cl-contact-sugg" id="clContactSugg" style="display:none;"></div>
+              <div class="cl-contact-sel" id="clContactSel" style="display:none;"></div>
             </div>
 
             <div class="cl-field">
@@ -910,6 +966,22 @@ textarea.cl-edit-in{min-height:52px;resize:vertical;line-height:1.45;}
             </div>
           </section>
 
+        </div>
+
+        <!-- ── CONTACTS MODAL (Phase 2) ── -->
+        <div class="cl-modal" id="clContactsModal" style="display:none;" onclick="if(event.target===this)clCloseContacts()">
+          <div class="cl-modal-card">
+            <div class="cl-modal-hd">
+              <h3>Contacts</h3>
+              <button class="cl-modal-x" onclick="clCloseContacts()" aria-label="Close">×</button>
+            </div>
+            <div class="cl-modal-tools">
+              <input id="clContactsSearch" class="cl-in" type="text" placeholder="Search name, number or email…" autocomplete="off" oninput="clRenderContactsList(this.value)" />
+              <button class="cl-act cl-act-relog" onclick="clContactFormNew()"><span>+ New contact</span></button>
+            </div>
+            <div class="cl-contacts-list" id="clContactsList"></div>
+            <div class="cl-contact-form" id="clContactForm" style="display:none;"></div>
+          </div>
         </div>
       </div>`;
   function mount(){
@@ -1182,6 +1254,8 @@ function clClearForm(){
     const el=document.getElementById(id);
     if(el){ el.value=''; el.classList.remove('error'); }
   });
+  _clSelContact=null; clRenderSelContact();
+  const _sg=document.getElementById('clContactSugg'); if(_sg){ _sg.style.display='none'; _sg.innerHTML=''; }
   document.querySelectorAll('#clQuick button').forEach(b=>b.classList.remove('on'));
   const ft=document.getElementById('clForTeam');
   if(ft) ft.value='';
@@ -1202,6 +1276,261 @@ function clClearForm(){
   clHistLookup(null);
   const n=document.getElementById('clName');
   if(n) n.focus();
+}
+
+// ══ CONTACTS (Phase 2) ══════════════════════════════════════════════
+// Contacts give each caller a stable identity. Attaching one when logging a
+// call is OPTIONAL — the name field still works exactly as before if you skip
+// it. As you type the caller name, matching existing contacts suggest inline;
+// pick one to attach, or keep typing and it stays a plain (unlinked) call.
+let _clContacts = null;         // cached contact list
+let _clSelContact = null;       // the contact attached to the call being logged
+let _clContactSuggTimer = null;
+
+async function clLoadContacts(force){
+  if(_clContacts && !force) return _clContacts;
+  try{
+    _clContacts = await sbGet('contacts','?select=*&order=name.asc');
+  }catch(e){ console.warn('clLoadContacts',e); _clContacts = _clContacts || []; }
+  return _clContacts;
+}
+
+// Debounced inline suggestions as the caller name is typed.
+function clContactSuggest(q){
+  const box=document.getElementById('clContactSugg');
+  if(!box) return;
+  // Typing a new name clears any previously-picked contact (they're changing who it is)
+  if(_clSelContact && (_clSelContact.name||'').toLowerCase() !== (q||'').trim().toLowerCase()){
+    // don't clear if they've only added to the name; clear only on real divergence
+  }
+  const t=(q||'').trim().toLowerCase();
+  if(t.length < 2){ box.style.display='none'; box.innerHTML=''; return; }
+  clearTimeout(_clContactSuggTimer);
+  _clContactSuggTimer=setTimeout(async function(){
+    await clLoadContacts();
+    const digits=t.replace(/\D/g,'');
+    const hits=(_clContacts||[]).filter(function(c){
+      return (c.name||'').toLowerCase().includes(t) ||
+             (digits.length>=3 && (
+               (c.phone_primary||'').replace(/\D/g,'').includes(digits) ||
+               (c.phone_secondary||'').replace(/\D/g,'').includes(digits)));
+    }).slice(0,6);
+    let html='';
+    hits.forEach(function(c){
+      const ph=clFmtPhone(c.phone_primary)||c.phone_primary||'no number';
+      html+='<button type="button" class="cl-sugg-item" onclick="clPickContact(\''+c.id+'\')">'+
+        '<span class="cl-sugg-nm">'+clEsc(c.name)+'</span>'+
+        '<span class="cl-sugg-ph">'+clEsc(ph)+(c.type?' · '+clEsc(c.type):'')+'</span>'+
+        '</button>';
+    });
+    // Always offer create-new (unless an exact name match already exists)
+    const exact=(_clContacts||[]).some(function(c){ return (c.name||'').trim().toLowerCase()===t; });
+    if(!exact){
+      html+='<button type="button" class="cl-sugg-item cl-sugg-new" onclick="clCreateContactInline()">'+
+        '+ Create contact "<b>'+clEsc((q||'').trim())+'</b>"</button>';
+    }
+    box.innerHTML=html;
+    box.style.display = html ? 'block' : 'none';
+  }, 180);
+}
+
+function clPickContact(id){
+  const c=(_clContacts||[]).find(function(x){ return x.id===id; });
+  if(!c) return;
+  _clSelContact=c;
+  const nm=document.getElementById('clName'); if(nm) nm.value=c.name;
+  // Pre-fill phone if the form's empty and the contact has one
+  const ph=document.getElementById('clPhone');
+  if(ph && !ph.value && c.phone_primary){
+    // strip +61 to match the input's expected local format
+    ph.value = String(c.phone_primary).replace(/^\+61/,'0');
+  }
+  const box=document.getElementById('clContactSugg'); if(box){ box.style.display='none'; box.innerHTML=''; }
+  clRenderSelContact();
+}
+
+function clRenderSelContact(){
+  const el=document.getElementById('clContactSel');
+  if(!el) return;
+  if(!_clSelContact){ el.style.display='none'; el.innerHTML=''; return; }
+  const c=_clSelContact;
+  const ph=clFmtPhone(c.phone_primary)||c.phone_primary||'no number';
+  el.innerHTML='<span class="cl-contact-chip">🔗 '+clEsc(c.name)+
+    '<span class="cl-contact-chip-ph">'+clEsc(ph)+'</span>'+
+    '<button type="button" class="cl-contact-chip-x" title="Detach contact" onclick="clClearSelContact()">×</button>'+
+    '</span>';
+  el.style.display='block';
+}
+function clClearSelContact(){
+  _clSelContact=null;
+  clRenderSelContact();
+}
+
+// Create a contact inline from whatever's in the form right now, attach it.
+async function clCreateContactInline(){
+  const name=(document.getElementById('clName').value||'').trim();
+  if(!name){ showToast('Enter a name first','error'); return; }
+  const phoneLocal=(document.getElementById('clPhone').value||'').trim();
+  const phone=phoneLocal ? clToE164(phoneLocal) : null;
+  // Soft duplicate warning on phone
+  if(phone){
+    await clLoadContacts();
+    const dup=(_clContacts||[]).find(function(c){ return c.phone_primary===phone; });
+    if(dup && !confirm('A contact with this number already exists:\n\n'+dup.name+' · '+(clFmtPhone(phone)||phone)+'\n\nCreate a separate contact anyway?')){
+      return;
+    }
+  }
+  const who=(window.me||me||'Unknown');
+  try{
+    const res=await fetch(SB+'/rest/v1/contacts',{
+      method:'POST',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+_sbBearer(),
+               'Content-Type':'application/json','Prefer':'return=representation'},
+      body:JSON.stringify({name:name, phone_primary:phone, created_by:who})
+    });
+    if(!res.ok){ showToast('Could not create contact','error'); return; }
+    const rows=await res.json();
+    const c=rows && rows[0];
+    if(c){
+      if(_clContacts) _clContacts.unshift(c);
+      _clSelContact=c;
+      const box=document.getElementById('clContactSugg'); if(box){ box.style.display='none'; box.innerHTML=''; }
+      clRenderSelContact();
+      showToast('Contact created','success');
+    }
+  }catch(e){ console.warn('clCreateContactInline',e); showToast('Network error','error'); }
+}
+
+// ── Manage Contacts modal ────────────────────────────────────────────
+async function clOpenContacts(){
+  const m=document.getElementById('clContactsModal'); if(!m) return;
+  m.style.display='flex';
+  const f=document.getElementById('clContactForm'); if(f){ f.style.display='none'; f.innerHTML=''; }
+  document.getElementById('clContactsList').innerHTML='<div style="padding:20px;color:var(--m-mut,#64748b);">Loading…</div>';
+  await clLoadContacts(true);
+  clRenderContactsList('');
+}
+function clCloseContacts(){
+  const m=document.getElementById('clContactsModal'); if(m) m.style.display='none';
+}
+function clRenderContactsList(q){
+  const el=document.getElementById('clContactsList'); if(!el) return;
+  const t=(q||'').trim().toLowerCase();
+  const digits=t.replace(/\D/g,'');
+  let list=(_clContacts||[]).slice();
+  if(t){
+    list=list.filter(function(c){
+      return (c.name||'').toLowerCase().includes(t) ||
+             (c.email||'').toLowerCase().includes(t) ||
+             (digits.length>=3 && (
+               (c.phone_primary||'').replace(/\D/g,'').includes(digits) ||
+               (c.phone_secondary||'').replace(/\D/g,'').includes(digits)));
+    });
+  }
+  if(!list.length){ el.innerHTML='<div style="padding:20px;color:var(--m-mut,#64748b);">'+(t?'No matches.':'No contacts yet.')+'</div>'; return; }
+  el.innerHTML=list.map(function(c){
+    const ph=clFmtPhone(c.phone_primary)||c.phone_primary||'—';
+    return '<div class="cl-contact-row">'+
+      '<div class="cl-contact-row-main">'+
+        '<span class="cl-contact-row-nm">'+clEsc(c.name)+(c.type?' <span class="cl-contact-type">'+clEsc(c.type)+'</span>':'')+'</span>'+
+        '<span class="cl-contact-row-sub">'+clEsc(ph)+(c.email?' · '+clEsc(c.email):'')+'</span>'+
+      '</div>'+
+      '<button class="cl-act cl-act-edit" title="Edit" onclick="clContactFormEdit(\''+c.id+'\')">'+
+        '<svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/></svg>'+
+      '</button>'+
+    '</div>';
+  }).join('');
+}
+function clContactFormNew(){ clContactForm(null); }
+function clContactFormEdit(id){ clContactForm((_clContacts||[]).find(function(c){return c.id===id;})||null); }
+function clContactForm(c){
+  const f=document.getElementById('clContactForm'); if(!f) return;
+  const v=function(x){ return x==null?'':clEsc(String(x)); };
+  const isEdit=!!c;
+  const admin=clIsAdmin();
+  f.innerHTML=
+    '<div class="cl-cf-hd">'+(isEdit?'Edit contact':'New contact')+'</div>'+
+    '<div class="cl-cf-grid">'+
+      '<label>Name<input id="cfName" class="cl-in" value="'+(isEdit?v(c.name):'')+'"></label>'+
+      '<label>Type<select id="cfType" class="cl-in"><option value="">—</option>'+
+        ['student','agent','other'].map(function(t){ return '<option value="'+t+'"'+(isEdit&&c.type===t?' selected':'')+'>'+t+'</option>'; }).join('')+
+      '</select></label>'+
+      '<label>Primary phone<input id="cfPhone1" class="cl-in" value="'+(isEdit?v(c.phone_primary):'')+'" placeholder="+61…"></label>'+
+      '<label>Secondary phone<input id="cfPhone2" class="cl-in" value="'+(isEdit?v(c.phone_secondary):'')+'" placeholder="+61…"></label>'+
+      '<label class="cl-cf-full">Email<input id="cfEmail" class="cl-in" value="'+(isEdit?v(c.email):'')+'"></label>'+
+      '<label class="cl-cf-full">Notes<textarea id="cfNotes" class="cl-in" rows="2">'+(isEdit?v(c.notes):'')+'</textarea></label>'+
+    '</div>'+
+    '<div class="cl-cf-act">'+
+      '<button class="cl-act cl-act-relog" onclick="clContactSave('+(isEdit?'\''+c.id+'\'':'null')+')"><span>'+(isEdit?'Save':'Create')+'</span></button>'+
+      (isEdit&&admin?'<button class="cl-act cl-act-del" title="Delete (admin)" onclick="clContactDelete(\''+c.id+'\')"><svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9z" clip-rule="evenodd"/></svg></button>':'')+
+      '<button class="cl-act" onclick="clContactFormCancel()">Cancel</button>'+
+    '</div>';
+  f.style.display='block';
+}
+function clContactFormCancel(){ const f=document.getElementById('clContactForm'); if(f){ f.style.display='none'; f.innerHTML=''; } }
+async function clContactSave(id){
+  const name=(document.getElementById('cfName').value||'').trim();
+  if(!name){ showToast('Name is required','error'); return; }
+  const norm=function(x){ x=(x||'').trim(); return x?clToE164(x):null; };
+  const payload={
+    name:name,
+    phone_primary:norm(document.getElementById('cfPhone1').value),
+    phone_secondary:norm(document.getElementById('cfPhone2').value),
+    email:(document.getElementById('cfEmail').value||'').trim()||null,
+    type:(document.getElementById('cfType').value||'')||null,
+    notes:(document.getElementById('cfNotes').value||'').trim()||null,
+    updated_at:new Date().toISOString()
+  };
+  // Soft duplicate check on primary phone (skip the record being edited)
+  if(payload.phone_primary){
+    const dup=(_clContacts||[]).find(function(c){ return c.phone_primary===payload.phone_primary && c.id!==id; });
+    if(dup && !confirm('Another contact already has this number:\n\n'+dup.name+'\n\nSave anyway?')) return;
+  }
+  try{
+    let res;
+    if(id){
+      res=await fetch(SB+'/rest/v1/contacts?id=eq.'+encodeURIComponent(id),{
+        method:'PATCH',
+        headers:{'apikey':KEY,'Authorization':'Bearer '+_sbBearer(),'Content-Type':'application/json','Prefer':'return=minimal'},
+        body:JSON.stringify(payload)
+      });
+    } else {
+      payload.created_by=(window.me||me||'Unknown');
+      res=await fetch(SB+'/rest/v1/contacts',{
+        method:'POST',
+        headers:{'apikey':KEY,'Authorization':'Bearer '+_sbBearer(),'Content-Type':'application/json','Prefer':'return=minimal'},
+        body:JSON.stringify(payload)
+      });
+    }
+    if(!res.ok){ showToast('Save failed','error'); return; }
+    await clLoadContacts(true);
+    clRenderContactsList((document.getElementById('clContactsSearch')||{}).value||'');
+    clContactFormCancel();
+    showToast(id?'Contact updated':'Contact created','success');
+  }catch(e){ console.warn('clContactSave',e); showToast('Network error','error'); }
+}
+async function clContactDelete(id){
+  if(!clIsAdmin()){ showToast('Only admins can delete contacts','error'); return; }
+  const c=(_clContacts||[]).find(function(x){return x.id===id;});
+  if(!c) return;
+  if(!confirm('Delete contact "'+c.name+'"?\n\nCalls already linked to them stay in the log but lose the link.')) return;
+  try{
+    // Null out the link on any calls first so we don't orphan a FK.
+    await fetch(SB+'/rest/v1/call_log?contact_id=eq.'+encodeURIComponent(id),{
+      method:'PATCH',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+_sbBearer(),'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({contact_id:null})
+    });
+    const res=await fetch(SB+'/rest/v1/contacts?id=eq.'+encodeURIComponent(id),{
+      method:'DELETE',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+_sbBearer(),'Prefer':'return=minimal'}
+    });
+    if(!res.ok){ showToast('Delete failed','error'); return; }
+    await clLoadContacts(true);
+    clRenderContactsList((document.getElementById('clContactsSearch')||{}).value||'');
+    clContactFormCancel();
+    showToast('Contact deleted','success');
+  }catch(e){ console.warn('clContactDelete',e); showToast('Network error','error'); }
 }
 
 async function clSaveCall(){
@@ -1292,6 +1621,7 @@ async function clSaveCall(){
                 ((typeof myTeam !== 'undefined' && myTeam) ? myTeam : null),
       plc_offered: _plcOffered,
       plc_remarks: _plcRemarks || null,
+      contact_id: _clSelContact ? _clSelContact.id : null,
       resolved_at: needsCallback ? null : now,
       resolved_by: needsCallback ? null : who
     });
@@ -1887,9 +2217,14 @@ async function clMarkCalledBack(id){
   const r=_clQueue.find(x=>x.id===id);
   if(!r) return;
   if(r.resolved_at){ showToast('Already handled','info'); return; }
+  // Ask how the callback went — the note is the whole point of logging it.
+  const note = prompt('How did the callback go? (optional note)\n\nCalling back: '+r.caller_name+
+                      (clFmtPhone(r.phone_e164)?' · '+clFmtPhone(r.phone_e164):''));
+  if(note === null) return; // cancelled
   const who=(window.me||me||'Unknown');
   const now=new Date().toISOString();
   try{
+    // 1) Resolve the original waiting row (credit the caller-backer).
     const res=await fetch(SB+'/rest/v1/call_log?id=eq.'+encodeURIComponent(id)+'&resolved_at=is.null&deleted_at=is.null',{
       method:'PATCH',
       headers:{'apikey':KEY,'Authorization':'Bearer '+_sbBearer(),
@@ -1898,8 +2233,29 @@ async function clMarkCalledBack(id){
     });
     if(!res.ok){ showToast('Could not mark called back','error'); return; }
     r.resolved_at=now; r.resolved_by=who;
-    clRenderQueue(); clRefreshOpenCount();
-    showToast('Marked called back','success');
+
+    // 2) Log a NEW entry recording the callback itself — resolved on the spot,
+    //    carrying the same caller identity so it stacks under the same number
+    //    and stays attached to the contact.
+    try{
+      await sbPost('call_log', {
+        caller_name: r.caller_name,
+        phone_e164:  r.phone_e164 || null,
+        reason:      'Callback',
+        note:        (note||'').trim() || null,
+        logged_by:   who,
+        team:        r.for_team || r.team || ((typeof myTeam!=='undefined'&&myTeam)?myTeam:null),
+        for_team:    r.for_team || r.team || null,
+        contact_id:  r.contact_id || null,
+        plc_offered: false,
+        plc_remarks: null,
+        resolved_at: now,
+        resolved_by: who
+      });
+    }catch(e){ console.warn('callback entry insert',e); }
+
+    clLoadQueue();  // reload so the new entry appears + counts refresh
+    showToast('Called back'+((note||'').trim()?' · note saved':'')+' — logged','success');
   }catch(e){ console.warn('clMarkCalledBack',e); showToast('Network error','error'); }
 }
 
