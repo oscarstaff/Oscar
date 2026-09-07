@@ -126,6 +126,11 @@ function _pExtras(rawHours, customBreak, customCoffee, dateObj){
 .pp-coffee{color:#10b981;font-weight:600;font-variant-numeric:tabular-nums;}
 .pp-coffee.zero{color:var(--pp-mut2);font-weight:400;}
 .pp-coffee-note{color:#10b981;font-size:11px;font-weight:700;margin-left:4px;}
+.pp-drag-th{width:26px;}
+.pp-drag{width:26px;text-align:center;color:var(--pp-mut2);cursor:grab;user-select:none;font-size:15px;line-height:1;}
+.pp-drag:active{cursor:grabbing;}
+.pp-table tbody tr.pp-dragging{opacity:.5;background:var(--pp-prem-soft);}
+.pp-table tbody tr[draggable="true"]{transition:background .12s;}
 .pp-flagrow{background:#fef2f2;}
 :is([data-theme="dark"],[data-theme="midnight"]) .pp-flagrow{background:rgba(239,68,68,.08);}
 .pp-chip{font-size:10px;font-weight:800;padding:2px 7px;border-radius:6px;margin-left:6px;white-space:nowrap;}
@@ -377,35 +382,18 @@ async function runPayroll(){
     });
   }
 
-  // sort: flagged (no rate / open) first, then by gross desc
-  _payResults.sort(function(a,b){
-    const fa = (a.noRate?2:0)+(a.open?1:0), fb = (b.noRate?2:0)+(b.open?1:0);
-    if(fa !== fb) return fb - fa;
-    return b.total - a.total;
-  });
+  // Row order: use the admin's saved custom order if one exists (manual order
+  // wins — flags do NOT jump to the top). Names with no saved position fall to
+  // the bottom, alphabetically, until dragged into place. Falls back to the old
+  // flag-first / total-desc sort only when no custom order has been set yet.
+  _payApplyOrder();
 
   let totGross=0, totCoffee=0, totNet=0, totOrdG=0, totPremG=0, totPremH=0, paidCount=0, premEarners=0, flags=0;
-  let rows = '';
-  _payResults.forEach(function(r, i){
-    let chips = '';
-    if(r.noRate) chips += '<span class="pp-chip norate">NO RATE</span>';
-    if(r.open)   chips += '<span class="pp-chip open" title="'+r.open+' unclosed clock-in(s) — hours may be understated">⚠ '+r.open+' OPEN</span>';
+  _payResults.forEach(function(r){
     if(!r.noRate){ totGross+=r.gross; totCoffee+=r.coffee; totNet+=r.net; totOrdG+=r.ordG; totPremG+=r.premG; totPremH+=r.premH; paidCount++; if(r.premH>0) premEarners++; }
     if(r.noRate || r.open) flags++;
-    const structTxt = r.structure==='tiered' ? ('Tiered · '+(r.rate?parseFloat(r.rate.pay_cap):'')+'h cap') : (r.structure==='flat'?'Flat rate':'—');
-    // premG already includes coffee (added at data level above).
-    const premCell = (r.premG>0)
-      ? '<span class="pp-prem-pill"><span class="h">'+(r.premH>0?r.premH.toFixed(2)+'h':'coffee')+'</span><span class="d">$'+r.premG.toFixed(2)+'</span></span>'+(r.coffee>0&&r.premH>0?'<span class="pp-coffee-note" title="Includes $'+r.coffee.toFixed(2)+' coffee"> +☕</span>':'')
-      : '<span class="pp-prem-zero">—</span>';
-    const delay = Math.min(i*32, 420);
-    rows += '<tr'+(r.noRate?' class="pp-flagrow"':'')+' style="animation-delay:'+delay+'ms;">'+
-      '<td><div class="pp-name">'+r.name+chips+'</div><div class="pp-struct">'+structTxt+'</div></td>'+
-      '<td class="r pp-net">'+r.net.toFixed(2)+'h</td>'+
-      '<td class="r pp-ord">'+r.ordH.toFixed(2)+'h · $'+r.ordG.toFixed(2)+'</td>'+
-      '<td class="r pp-prem-cell">'+premCell+'</td>'+
-      '<td class="r"><span class="pp-total">'+(r.noRate?'—':'$'+r.total.toFixed(2))+'</span></td>'+
-    '</tr>';
   });
+  const rows = _payRowsHtml();
 
   const warn = flags ? '<div class="pp-warn"><strong>'+flags+' row(s) need a look.</strong> NO RATE = excluded from totals until you set a rate below. ⚠ OPEN = clocked in with no matching clock-out, so hours may read low — fix the punch in Timesheet Manager, then re-run.</div>' : '';
 
@@ -420,16 +408,18 @@ async function runPayroll(){
         '<div class="pp-stat"><div class="lbl">Total pay</div><div class="val grand">$'+totGross.toFixed(2)+'</div><div class="note">'+paidCount+' paid · '+totNet.toFixed(1)+'h net</div></div>'+
         '<div class="pp-stat"><div class="lbl">Ordinary</div><div class="val">$'+totOrdG.toFixed(2)+'</div><div class="note">standard-rate hours</div></div>'+
       '</div>'+
-      '<div class="pp-head-row"><div class="t">Payrun · '+startStr+' → '+endStr+'</div><div class="c">'+_payResults.length+' listed</div></div>'+
+      '<div class="pp-head-row"><div class="t">Payrun · '+startStr+' → '+endStr+'</div><div class="c">'+_payResults.length+' listed · <span style="color:var(--pp-mut2,#94a3b8);">drag ≡ to reorder</span> <button onclick="_payResetOrder()" style="background:none;border:none;color:var(--accent);font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;padding:0 0 0 8px;">reset</button></div></div>'+
       '<div class="pp-scroll"><table class="pp-table">'+
       '<thead><tr>'+
+        '<th class="pp-drag-th"></th>'+
         '<th>Staff</th>'+
         '<th class="r">Net hrs</th>'+
         '<th class="r">Ordinary</th>'+
         '<th class="r prem">Premium ▲ +☕</th>'+
         '<th class="r">Total pay</th>'+
-      '</tr></thead><tbody>'+rows+'</tbody>'+
+      '</tr></thead><tbody id="payTbody">'+rows+'</tbody>'+
       '<tfoot><tr class="pp-foot">'+
+        '<td></td>'+
         '<td class="lbl">Totals · '+paidCount+' paid</td>'+
         '<td class="r lbl">'+totNet.toFixed(2)+'h</td>'+
         '<td class="r pp-ord">$'+totOrdG.toFixed(2)+'</td>'+
@@ -438,6 +428,121 @@ async function runPayroll(){
       '</tr></tfoot>'+
       '</table></div>'+warn+
     '</div>';
+  _paySetupDrag();
+}
+
+// ── Custom row ordering (drag to reorder, saved per-user in this browser) ──
+function _payOrderKey(){
+  var who = '';
+  try{ who = (typeof _pMe==='function') ? (_pMe()||'') : ''; }catch(e){}
+  return 'oscars_payroll_order_' + (who || 'default');
+}
+function _payLoadOrder(){
+  try{ var raw = localStorage.getItem(_payOrderKey()); return raw ? JSON.parse(raw) : null; }
+  catch(e){ return null; }
+}
+function _paySaveOrder(){
+  try{
+    var names = _payResults.map(function(r){ return r.name; });
+    localStorage.setItem(_payOrderKey(), JSON.stringify(names));
+  }catch(e){ console.warn('save order', e); }
+}
+function _payResetOrder(){
+  try{ localStorage.removeItem(_payOrderKey()); }catch(e){}
+  // Re-apply default order and re-render the current results in place.
+  _payApplyOrder(true);
+  _payRerenderBody();
+  if(typeof showToast==='function') showToast('Order reset');
+}
+// Order _payResults: saved custom order first (manual wins, flags do NOT float
+// up), unknown names appended alphabetically. If forceDefault or no saved order,
+// use the original flag-first / total-desc sort.
+function _payApplyOrder(forceDefault){
+  var saved = forceDefault ? null : _payLoadOrder();
+  if(saved && saved.length){
+    var pos = {};
+    saved.forEach(function(n,i){ pos[n]=i; });
+    _payResults.sort(function(a,b){
+      var pa = (a.name in pos) ? pos[a.name] : Infinity;
+      var pb = (b.name in pos) ? pos[b.name] : Infinity;
+      if(pa !== pb) return pa - pb;
+      return a.name.localeCompare(b.name); // both unknown → alphabetical
+    });
+  } else {
+    _payResults.sort(function(a,b){
+      var fa = (a.noRate?2:0)+(a.open?1:0), fb = (b.noRate?2:0)+(b.open?1:0);
+      if(fa !== fb) return fb - fa;
+      return b.total - a.total;
+    });
+  }
+}
+// Build just the <tr> rows (used on first render and after each drag).
+function _payRowsHtml(){
+  var rows = '';
+  _payResults.forEach(function(r, i){
+    var chips = '';
+    if(r.noRate) chips += '<span class="pp-chip norate">NO RATE</span>';
+    if(r.open)   chips += '<span class="pp-chip open" title="'+r.open+' unclosed clock-in(s) — hours may be understated">⚠ '+r.open+' OPEN</span>';
+    var structTxt = r.structure==='tiered' ? ('Tiered · '+(r.rate?parseFloat(r.rate.pay_cap):'')+'h cap') : (r.structure==='flat'?'Flat rate':'—');
+    var premCell = (r.premG>0)
+      ? '<span class="pp-prem-pill"><span class="h">'+(r.premH>0?r.premH.toFixed(2)+'h':'coffee')+'</span><span class="d">$'+r.premG.toFixed(2)+'</span></span>'+(r.coffee>0&&r.premH>0?'<span class="pp-coffee-note" title="Includes $'+r.coffee.toFixed(2)+' coffee"> +☕</span>':'')
+      : '<span class="pp-prem-zero">—</span>';
+    rows += '<tr'+(r.noRate?' class="pp-flagrow"':'')+' draggable="true" data-name="'+String(r.name).replace(/"/g,'&quot;')+'">'+
+      '<td class="pp-drag" title="Drag to reorder">≡</td>'+
+      '<td><div class="pp-name">'+r.name+chips+'</div><div class="pp-struct">'+structTxt+'</div></td>'+
+      '<td class="r pp-net">'+r.net.toFixed(2)+'h</td>'+
+      '<td class="r pp-ord">'+r.ordH.toFixed(2)+'h · $'+r.ordG.toFixed(2)+'</td>'+
+      '<td class="r pp-prem-cell">'+premCell+'</td>'+
+      '<td class="r"><span class="pp-total">'+(r.noRate?'—':'$'+r.total.toFixed(2))+'</span></td>'+
+    '</tr>';
+  });
+  return rows;
+}
+function _payRerenderBody(){
+  var tb = document.getElementById('payTbody');
+  if(tb){ tb.innerHTML = _payRowsHtml(); _paySetupDrag(); }
+}
+// HTML5 drag-and-drop on the tbody rows. On drop, reorder _payResults to match
+// the new DOM order and persist it.
+function _paySetupDrag(){
+  var tb = document.getElementById('payTbody');
+  if(!tb) return;
+  var dragEl = null;
+  var rows = tb.querySelectorAll('tr[draggable="true"]');
+  rows.forEach(function(tr){
+    tr.addEventListener('dragstart', function(e){
+      dragEl = tr; tr.classList.add('pp-dragging');
+      try{ e.dataTransfer.effectAllowed='move'; e.dataTransfer.setData('text/plain', tr.getAttribute('data-name')||''); }catch(_e){}
+    });
+    tr.addEventListener('dragend', function(){
+      if(dragEl) dragEl.classList.remove('pp-dragging');
+      dragEl = null;
+      _payCommitOrderFromDom();
+    });
+    tr.addEventListener('dragover', function(e){
+      e.preventDefault();
+      if(!dragEl || dragEl===tr) return;
+      var rect = tr.getBoundingClientRect();
+      var after = (e.clientY - rect.top) > rect.height/2;
+      if(after){ tr.parentNode.insertBefore(dragEl, tr.nextSibling); }
+      else { tr.parentNode.insertBefore(dragEl, tr); }
+    });
+  });
+}
+function _payCommitOrderFromDom(){
+  var tb = document.getElementById('payTbody');
+  if(!tb) return;
+  var order = [];
+  tb.querySelectorAll('tr[data-name]').forEach(function(tr){ order.push(tr.getAttribute('data-name')); });
+  // Reorder _payResults to match the DOM
+  var byName = {};
+  _payResults.forEach(function(r){ byName[r.name]=r; });
+  var reordered = [];
+  order.forEach(function(n){ if(byName[n]) reordered.push(byName[n]); });
+  // safety: keep any rows not captured (shouldn't happen)
+  _payResults.forEach(function(r){ if(order.indexOf(r.name)<0) reordered.push(r); });
+  _payResults = reordered;
+  _paySaveOrder();
 }
 
 function exportPayrollCsv(){
