@@ -241,12 +241,10 @@ function initPayrollTab(){
   const s = document.getElementById('payStart'), e = document.getElementById('payEnd');
   if(s && !s.value) s.value = _payFmt(start);
   if(e && !e.value) e.value = _payFmt(end);
-  // Surface a failure instead of leaving "Loading…" on screen forever — a
-  // silent rejection here is exactly what hid the missing STAFF global.
-  loadPayRates().then(renderRatesEditor).catch(function(err){
-    console.error('[PAYROLL] rates editor failed', err);
-    const el=document.getElementById('payRatesEditor');
-    if(el) el.innerHTML='<div style="color:#b91c1c;font-size:13px;">Couldn\'t load rates — see console.</div>';
+  // Rates are edited per-employee (Employees → staff member → Payroll) now.
+  // We still load them here so the payrun can price everyone.
+  loadPayRates().catch(function(err){
+    console.error('[PAYROLL] rates load failed', err);
   });
 }
 
@@ -447,62 +445,8 @@ function exportPayrollCsv(){
   setTimeout(function(){ URL.revokeObjectURL(a.href); }, 1000);
 }
 
-// ── Rates editor ──
-function renderRatesEditor(){
-  const el = document.getElementById('payRatesEditor');
-  if(!el) return;
-  const roster = Array.from(new Set([].concat(
-    Object.keys(_payRates),
-    _pStaffNames().filter(Boolean)
-  ))).sort(function(a,b){ return a.localeCompare(b); });
-  let html = '<div style="overflow-x:auto;"><table class="pp-rates">'+
-    '<thead><tr>'+
-      '<th>Staff</th>'+
-      '<th>Structure</th>'+
-      '<th>Std $/h</th>'+
-      '<th class="prem">Prem $/h ▲</th>'+
-      '<th>Cap</th>'+
-    '</tr></thead><tbody>';
-  roster.forEach(function(n){
-    const r = _payRates[n] || {structure:'flat', std_rate:0, prem_rate:0, pay_cap:48};
-    const nn = n.replace(/"/g,'&quot;');
-    const missing = !_payRates[n];
-    const isFlat = (r.structure!=='tiered');
-    html += '<tr class="'+(missing?'unset ':'')+(isFlat?'is-flat':'')+'" data-name="'+nn+'">'+
-      '<td style="font-weight:600;color:var(--pp-ink,#0f172a);">'+n+(missing?' <span style="color:#b91c1c;font-size:10px;font-weight:800;">unset</span>':'')+'</td>'+
-      '<td><select class="pr-struct" onchange="this.closest(\'tr\').classList.toggle(\'is-flat\', this.value!==\'tiered\')"><option value="tiered"'+(r.structure==='tiered'?' selected':'')+'>Tiered</option><option value="flat"'+(isFlat?' selected':'')+'>Flat</option></select></td>'+
-      '<td><input class="pr-std" type="number" step="0.01" value="'+(parseFloat(r.std_rate)||0)+'" style="width:66px;"></td>'+
-      '<td><input class="pr-prem" type="number" step="0.01" value="'+(parseFloat(r.prem_rate)||0)+'" style="width:66px;"></td>'+
-      '<td><select class="pr-cap"><option value="48"'+(parseFloat(r.pay_cap)===48?' selected':'')+'>48</option><option value="76"'+(parseFloat(r.pay_cap)===76?' selected':'')+'>76</option></select></td>'+
-    '</tr>';
-  });
-  html += '</tbody></table></div>'+
-    '<button onclick="savePayRates()" class="btn btn-green" style="margin-top:14px;padding:10px 18px;font-size:12px;">Save all rates</button>';
-  el.innerHTML = html;
-}
 
-async function savePayRates(){
-  if(!_canPayroll()){ return; }
-  const rows = document.querySelectorAll('#payRatesEditor tr[data-name]');
-  const payload = [];
-  rows.forEach(function(tr){
-    payload.push({
-      staff_name: tr.getAttribute('data-name'),
-      structure: tr.querySelector('.pr-struct').value,
-      std_rate: parseFloat(tr.querySelector('.pr-std').value) || 0,
-      prem_rate: parseFloat(tr.querySelector('.pr-prem').value) || 0,
-      pay_cap: parseFloat(tr.querySelector('.pr-cap').value) || 48,
-      updated_at: new Date().toISOString(),
-      updated_by: _pMe()
-    });
-  });
-  try{
-    const res = await fetch(_pUrl()+'/rest/v1/payroll_rates',{
-      method:'POST',
-      headers:{'apikey':_pKey(),'Authorization':'Bearer '+_pBearer(),'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},
-      body: JSON.stringify(payload)
-    });
-    if(res.ok){ if(typeof showToast==='function') showToast('Rates saved'); await loadPayRates(); renderRatesEditor(); }
-    else { const t = await res.text().catch(function(){return '';}); if(typeof showToast==='function') showToast('Save failed ('+res.status+')'); console.warn('savePayRates', res.status, t); }
-  }catch(e){ if(typeof showToast==='function') showToast('Save failed'); console.warn(e); }
-}
+// ── Rates editor ──
+// Per-employee rate/cap editing lives in shiftops.html (Employees → staff → Payroll).
+// The old all-staff table (renderRatesEditor / savePayRates / _prCapToggle) was
+// removed when payroll editing moved into the Employee tab.
