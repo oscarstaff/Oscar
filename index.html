@@ -17938,7 +17938,15 @@ async function savePunchEdit(){
       const outH = parseInt(outP[0]) + parseInt(outP[1])/60;
       let raw = outH - inH;
       if(raw < 0) raw += 24;
-      if(breakHrs === '') breakHrs = raw > 5 ? '0.5' : '0';
+      // Weekend (Sat/Sun) gets NO auto break. isoDate is YYYY-MM-DD so we can
+      // read the weekday from its parts directly — no timezone ambiguity.
+      let _isWeekend = false;
+      try{
+        const _p = isoDate.split('-');
+        const _dow = new Date(parseInt(_p[0],10), parseInt(_p[1],10)-1, parseInt(_p[2],10)).getDay();
+        _isWeekend = (_dow === 0 || _dow === 6); // 0=Sun, 6=Sat
+      }catch(_e){}
+      if(breakHrs === '') breakHrs = _isWeekend ? '0' : (raw > 5 ? '0.5' : '0');
       if(coffee === '') coffee = raw >= 4 ? '5' : '';
     }
   }
