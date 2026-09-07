@@ -322,10 +322,18 @@ select.cl-in{appearance:none;-webkit-appearance:none;cursor:pointer;padding-righ
 .cl-plc-group.cl-plc-open{border-color:#86efac;background:var(--m-card);
   box-shadow:0 2px 14px -6px rgba(22,163,74,.22);}
 /* Soft green tint behind the header only — the body stays clean white so the
-   textarea sits on a calm surface instead of a muddy amber field. */
-.cl-plc-group.cl-plc-open .cl-plc-check{
+   textarea sits on a calm surface instead of a muddy amber field. The extra
+   specificity here beats the generic `.cl-check.on` amber fill, which the
+   placement label also picks up (it carries both cl-check and cl-plc-check). */
+.cl-plc-group.cl-plc-open .cl-plc-check,
+.cl-plc-check.cl-check.on{
   background:linear-gradient(180deg,
-    color-mix(in srgb,#16a34a 7%,transparent),transparent)!important;}
+    color-mix(in srgb,#16a34a 8%,transparent),transparent)!important;
+  border-color:transparent!important;}
+/* Placement's own checkbox ticks green, matching its group (not the amber
+   used by the generic "needs a call back" checkbox). */
+.cl-plc-check input:checked ~ .cl-check-box{
+  background:#16a34a!important;border-color:#16a34a!important;}
 /* The checkbox header sheds its own border/bg — the group frame carries them. */
 .cl-plc-check{border:none!important;background:transparent!important;
   border-radius:0;padding:16px;}
