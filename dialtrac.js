@@ -237,13 +237,38 @@
 .cl-contacts-empty-t{font-size:14.5px;font-weight:700;color:var(--m-ink);margin-bottom:5px;}
 .cl-contacts-empty-s{font-size:12px;color:var(--m-ink-3,var(--m-mut));max-width:38ch;margin:0 auto;line-height:1.5;}
 .cl-contact-form{padding:16px 20px 20px;border-top:1px solid var(--m-border);background:var(--m-card-2);}
-.cl-cf-hd{font-size:13.5px;font-weight:700;color:var(--m-ink);margin-bottom:13px;}
-.cl-cf-grid{display:grid;grid-template-columns:1fr 1fr;gap:11px;}
-.cl-cf-grid label{display:flex;flex-direction:column;gap:5px;font-size:11px;font-weight:600;color:var(--m-ink-3,var(--m-mut));}
-.cl-cf-grid .cl-in{font-size:13px;}
-.cl-cf-grid textarea.cl-in{resize:vertical;font-family:inherit;}
+.cl-contact-form{padding:18px 20px 20px;}
+.cl-cf-hd{font-size:15px;font-weight:700;color:var(--m-ink);margin-bottom:16px;
+  letter-spacing:-.01em;}
+.cl-cf-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.cl-cf-grid label{display:flex;flex-direction:column;gap:6px;
+  font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;
+  color:var(--m-ink-2);}
+/* Crisp fields — solid card fill and a real border so inputs read as inputs,
+   not ghosted panels on the beige. */
+.cl-cf-grid .cl-in{font-size:14px;font-weight:500;background:var(--m-card);
+  border:1.5px solid color-mix(in srgb,var(--m-ink) 16%,transparent);
+  border-radius:10px;padding:11px 13px;}
+.cl-cf-grid .cl-in:hover{border-color:color-mix(in srgb,var(--m-ink) 26%,transparent);}
+.cl-cf-grid .cl-in:focus{border-color:var(--accent);
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 22%,transparent);}
+.cl-cf-grid textarea.cl-in{resize:vertical;font-family:inherit;min-height:84px;line-height:1.5;}
 .cl-cf-full{grid-column:1 / -1;}
-.cl-cf-act{display:flex;gap:8px;margin-top:15px;}
+/* Action row: primary (Save) left, Cancel next to it, destructive Delete pushed
+   to the far right so it can't be hit by accident. */
+.cl-cf-act{display:flex;align-items:center;gap:10px;margin-top:20px;
+  padding-top:16px;border-top:1px solid var(--m-border);}
+.cl-cf-act .cl-cf-spacer{flex:1;}
+.cl-cf-btn{font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;
+  border-radius:10px;padding:10px 18px;border:1.5px solid transparent;
+  display:inline-flex;align-items:center;gap:7px;
+  transition:background var(--cl-t) var(--cl-ease),border-color var(--cl-t) var(--cl-ease),color var(--cl-t) var(--cl-ease);}
+.cl-cf-save{background:var(--accent);color:#fff;}
+.cl-cf-save:hover{background:color-mix(in srgb,var(--accent) 88%,#000);}
+.cl-cf-cancel{background:transparent;color:var(--m-ink-2);border-color:var(--m-border-hi,var(--m-border));}
+.cl-cf-cancel:hover{background:var(--m-card-2);color:var(--m-ink);}
+.cl-cf-del{background:transparent;color:#c0392b;border-color:color-mix(in srgb,#c0392b 30%,transparent);}
+.cl-cf-del:hover{background:color-mix(in srgb,#c0392b 10%,transparent);border-color:#c0392b;}
 .cl-label{display:block;font-size:11.5px;font-weight:600;margin-bottom:7px;
   color:var(--m-ink-2);letter-spacing:.01em;}
 .cl-req{color:#dc2626;}
@@ -1700,9 +1725,10 @@ function clContactForm(c){
       '<label class="cl-cf-full">Notes<textarea id="cfNotes" class="cl-in" rows="2">'+(isEdit?v(c.notes):'')+'</textarea></label>'+
     '</div>'+
     '<div class="cl-cf-act">'+
-      '<button class="cl-act cl-act-relog" onclick="clContactSave('+(isEdit?'\''+c.id+'\'':'null')+')"><span>'+(isEdit?'Save':'Create')+'</span></button>'+
-      (isEdit&&admin?'<button class="cl-act cl-act-del" title="Delete (admin)" onclick="clContactDelete(\''+c.id+'\')"><svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9z" clip-rule="evenodd"/></svg></button>':'')+
-      '<button class="cl-act" onclick="clContactFormCancel()">Cancel</button>'+
+      '<button class="cl-cf-btn cl-cf-save" onclick="clContactSave('+(isEdit?'\''+c.id+'\'':'null')+')">'+(isEdit?'Save changes':'Create contact')+'</button>'+
+      '<button class="cl-cf-btn cl-cf-cancel" onclick="clContactFormCancel()">Cancel</button>'+
+      '<span class="cl-cf-spacer"></span>'+
+      (isEdit&&admin?'<button class="cl-cf-btn cl-cf-del" title="Delete contact (admin only)" onclick="clContactDelete(\''+c.id+'\')"><svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9z" clip-rule="evenodd"/></svg>Delete</button>':'')+
     '</div>';
   f.style.display='block';
 }
