@@ -575,6 +575,13 @@ textarea.cl-edit-in{min-height:52px;resize:vertical;line-height:1.45;}
   background:color-mix(in srgb,var(--accent) 88%,#000);}
 .cl-act-relog:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
 
+/* Mark called back — a positive, affirmative action. Auto width like Relog,
+   green so it reads as "resolve" without competing with Relog's accent. */
+.cl-act-back{width:auto;padding:0 13px 0 11px;border-color:transparent;color:#fff;
+  background:#16a34a;}
+.cl-act-back:hover{border-color:transparent;color:#fff;background:#15803d;}
+.cl-act-back:focus-visible{outline:2px solid #16a34a;outline-offset:2px;}
+
 /* Edit and Remove are conditional: edit shows only inside your own
    15-minute window, remove only for admins. Both stay quiet at rest and
    pick up their colour on hover, so they never compete with Relog. */
@@ -643,6 +650,7 @@ textarea.cl-edit-in{min-height:52px;resize:vertical;line-height:1.45;}
   .cl-card-act{width:100%;justify-content:flex-start;
     padding-top:10px;border-top:1px solid var(--m-border);}
   .cl-act-relog{flex:1;}
+  .cl-act-back{flex:1;}
   .cl-line1,.cl-line2{gap:6px;}
   .cl-nm{font-size:14px;}
   .cl-search{width:100%;}
@@ -1868,6 +1876,33 @@ async function clRestoreRow(id){
   }catch(e){ console.warn('clRestoreRow',e); showToast('Network error','error'); }
 }
 
+// ── Mark called back (Phase 1) ────────────────────────────────────────
+// Manually clears a WAITING callback by its id — not by phone number. This is
+// the only way a no-number callback can ever be cleared (the auto-resolve path
+// keys off phone_e164, so a row with no number sat waiting forever). Stamps
+// resolved_at/resolved_by in the SAME shape as auto-resolve, so "helped" credit
+// and reporting keep working. Anyone who can see the row can press it — whoever
+// actually rings the person back should be able to clear it.
+async function clMarkCalledBack(id){
+  const r=_clQueue.find(x=>x.id===id);
+  if(!r) return;
+  if(r.resolved_at){ showToast('Already handled','info'); return; }
+  const who=(window.me||me||'Unknown');
+  const now=new Date().toISOString();
+  try{
+    const res=await fetch(SB+'/rest/v1/call_log?id=eq.'+encodeURIComponent(id)+'&resolved_at=is.null&deleted_at=is.null',{
+      method:'PATCH',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+_sbBearer(),
+               'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({resolved_at:now, resolved_by:who})
+    });
+    if(!res.ok){ showToast('Could not mark called back','error'); return; }
+    r.resolved_at=now; r.resolved_by=who;
+    clRenderQueue(); clRefreshOpenCount();
+    showToast('Marked called back','success');
+  }catch(e){ console.warn('clMarkCalledBack',e); showToast('Network error','error'); }
+}
+
 // ── All-time search ───────────────────────────────────────────────
 // The queue only loads a recent window (CL_RECENT_DAYS) so normal use stays
 // fast. But a caller from months ago should still be findable by name or
@@ -2078,6 +2113,15 @@ function clRenderQueue(){
     const tier = done ? '' : clAgeTier(r.created_at);
     const oldish = !done && (tier==='aging' || tier==='stale' || tier==='cold');
 
+    // "Mark called back" — clears a WAITING callback by id (the only way a
+    // no-number row can be cleared). Anyone who sees the row can press it.
+    const markBack = !done
+      ? '<button class="cl-act cl-act-back" title="Mark this callback as done — records you as the one who rang back" aria-label="Mark called back" '+
+        'onclick="event.stopPropagation();clMarkCalledBack(\''+r.id+'\')">'+
+        '<svg width="15" height="15" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>'+
+        '<span>Called back</span></button>'
+      : '';
+
     return sep+
     '<article class="cl-card'+(done?' done':' cl-age-'+tier)+'" id="clc-'+r.id+'">'+
       '<div class="cl-card-main">'+
@@ -2143,7 +2187,7 @@ function clRenderQueue(){
           'onclick="event.stopPropagation();clPullToForm(\''+r.id+'\')">'+
           '<svg width="15" height="15" viewBox="0 0 20 20" fill="currentColor"><path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z"/></svg>'+
           '<span>Relog</span></button>'+
-        edit+del+
+        markBack+edit+del+
       '</div>'+
       '<div class="cl-edit" id="cledit-'+r.id+'"></div>'+
     '</article>';
