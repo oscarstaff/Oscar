@@ -221,6 +221,20 @@ function _canPayroll(){
 
 let _payRates = {};    // staff_name -> rate row
 let _payResults = [];  // last run, for CSV
+let _payCredNames = null; // current staff from staff_credentials (source of truth)
+
+// Names of CURRENT staff, straight from staff_credentials — the source of
+// truth. Used to build the rates-editor list so offboarded people and
+// misspelled rate rows never appear as phantom entries.
+async function _payLoadCredNames(){
+  try{
+    const r = await fetch(_pUrl()+'/rest/v1/staff_credentials?select=staff_name',
+      {headers:{apikey:_pKey(), Authorization:'Bearer '+_pBearer()}});
+    if(!r.ok){ console.warn('[PAYROLL] cred names', r.status); _payCredNames=null; return; }
+    const rows = await r.json();
+    _payCredNames = (rows||[]).map(function(x){ return (x.staff_name||'').trim(); }).filter(Boolean);
+  }catch(e){ console.warn('[PAYROLL] cred names failed', e); _payCredNames=null; }
+}
 
 function _payMondayOf(d){ const x = new Date(d); const dow = (x.getDay()+6)%7; x.setDate(x.getDate()-dow); x.setHours(0,0,0,0); return x; }
 function _payFmt(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
@@ -242,9 +256,8 @@ function initPayrollTab(){
   const s = document.getElementById('payStart'), e = document.getElementById('payEnd');
   if(s && !s.value) s.value = _payFmt(start);
   if(e && !e.value) e.value = _payFmt(end);
-  // Surface a failure instead of leaving "Loading…" on screen forever — a
-  // silent rejection here is exactly what hid the missing STAFF global.
-  loadPayRates().then(renderRatesEditor).catch(function(err){
+  // Load rates + current-staff names (from credentials) before rendering.
+  Promise.all([loadPayRates(), _payLoadCredNames()]).then(renderRatesEditor).catch(function(err){
     console.error('[PAYROLL] rates editor failed', err);
     const el=document.getElementById('payRatesEditor');
     if(el) el.innerHTML='<div style="color:#b91c1c;font-size:13px;">Couldn\'t load rates — see console.</div>';
@@ -461,10 +474,19 @@ function _prCapToggle(sel){
 function renderRatesEditor(){
   const el = document.getElementById('payRatesEditor');
   if(!el) return;
-  const roster = Array.from(new Set([].concat(
-    Object.keys(_payRates),
-    _pStaffNames().filter(Boolean)
-  ))).sort(function(a,b){ return a.localeCompare(b); });
+  // Roster comes from staff_credentials (current staff) so offboarded people
+  // and misspelled leftover rate rows never show as phantoms. If the creds
+  // fetch failed, fall back to the old union (rates + host staff list) so the
+  // editor still works rather than showing nobody.
+  let roster;
+  if(Array.isArray(_payCredNames) && _payCredNames.length){
+    roster = Array.from(new Set(_payCredNames)).sort(function(a,b){ return a.localeCompare(b); });
+  } else {
+    roster = Array.from(new Set([].concat(
+      Object.keys(_payRates),
+      _pStaffNames().filter(Boolean)
+    ))).sort(function(a,b){ return a.localeCompare(b); });
+  }
   let html = '<div style="overflow-x:auto;"><table class="pp-rates">'+
     '<thead><tr>'+
       '<th>Staff</th>'+
