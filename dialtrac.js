@@ -318,9 +318,14 @@ select.cl-in{appearance:none;-webkit-appearance:none;cursor:pointer;padding-righ
   border:1.5px solid var(--m-border);background:var(--m-card-2);
   overflow:hidden;transition:border-color var(--cl-t) var(--cl-ease),
   background var(--cl-t) var(--cl-ease),box-shadow var(--cl-t) var(--cl-ease);}
-.cl-plc-group:hover{border-color:var(--amber-bd);}
-.cl-plc-group.cl-plc-open{border-color:var(--amber);background:var(--amber-bg);
-  box-shadow:0 2px 12px -4px rgba(217,119,6,.25);}
+.cl-plc-group:hover{border-color:color-mix(in srgb,#16a34a 40%,transparent);}
+.cl-plc-group.cl-plc-open{border-color:#86efac;background:var(--m-card);
+  box-shadow:0 2px 14px -6px rgba(22,163,74,.22);}
+/* Soft green tint behind the header only — the body stays clean white so the
+   textarea sits on a calm surface instead of a muddy amber field. */
+.cl-plc-group.cl-plc-open .cl-plc-check{
+  background:linear-gradient(180deg,
+    color-mix(in srgb,#16a34a 7%,transparent),transparent)!important;}
 /* The checkbox header sheds its own border/bg — the group frame carries them. */
 .cl-plc-check{border:none!important;background:transparent!important;
   border-radius:0;padding:16px;}
@@ -332,10 +337,9 @@ select.cl-in{appearance:none;-webkit-appearance:none;cursor:pointer;padding-righ
 .cl-plc-group.cl-plc-open .cl-plc-remarks{grid-template-rows:1fr;opacity:1;}
 .cl-plc-remarks-inner{overflow:hidden;padding:0 16px;}
 .cl-plc-group.cl-plc-open .cl-plc-remarks-inner{padding:0 16px 16px;}
-/* A hairline rule ties the remarks to the checkbox above it. */
-.cl-plc-remarks-inner .cl-label{padding-top:12px;
-  border-top:1px solid var(--amber-bd);}
-.cl-plc-remarks-inner .cl-in{margin-top:2px;}
+/* Label sits above the textarea with real breathing room — no clashing rule. */
+.cl-plc-remarks-inner .cl-label{padding-top:2px;color:color-mix(in srgb,#166534 62%,var(--m-mut));}
+.cl-plc-remarks-inner .cl-in{margin-top:7px;}
 
 .cl-actions{display:flex;gap:8px;margin-top:auto;padding-top:16px;}
 .cl-btn-ghost,.cl-btn-go{min-height:42px;border-radius:11px;cursor:pointer;
