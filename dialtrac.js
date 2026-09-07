@@ -587,24 +587,23 @@ textarea.cl-edit-in{min-height:52px;resize:vertical;line-height:1.45;}
   overflow:hidden;transition:all var(--cl-t) var(--cl-ease);}
 .cl-card:hover .cl-note{-webkit-line-clamp:8;border-left-color:var(--accent);}
 /* Placement-offered line (Placement team only) */
-/* Placement offered + post-offer remarks — one coherent green card, rather
-   than a green pill + green stripe + grey box all fighting each other. */
+/* Placement offered + post-offer remarks — a clean neutral card with a compact
+   green status chip and the remark quoted beneath with a green left-accent.
+   Green signals status without flooding the whole block. */
 .cl-plc{margin:9px 0 0;
-  background:linear-gradient(160deg,
-    color-mix(in srgb,#16a34a 7%,var(--m-card)),
-    color-mix(in srgb,#16a34a 12%,var(--m-card)));
-  border:1px solid color-mix(in srgb,#16a34a 26%,transparent);
-  border-radius:12px;padding:12px 14px;}
+  background:var(--m-card);
+  border:1px solid var(--m-border);
+  border-radius:12px;padding:14px 16px;}
 .cl-plc-badge{display:inline-flex;align-items:center;gap:6px;
-  font-size:11.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;
-  color:#166534;}
+  font-size:11px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;
+  color:#166534;background:color-mix(in srgb,#16a34a 14%,transparent);
+  border-radius:6px;padding:3px 9px;}
 .cl-plc-badge svg{color:#16a34a;flex-shrink:0;}
-.cl-plc-rem{font-size:14px;line-height:1.6;
-  color:color-mix(in srgb,#14532d 88%,var(--m-ink));
-  margin-top:8px;white-space:pre-wrap;overflow-wrap:anywhere;}
-.cl-plc-rem-lbl{display:block;font-size:10.5px;font-weight:700;letter-spacing:.04em;
-  text-transform:uppercase;color:color-mix(in srgb,#166534 62%,var(--m-mut));
-  margin-bottom:3px;}
+.cl-plc-rem{font-size:14px;line-height:1.6;color:var(--m-ink-2);
+  margin-top:10px;padding-left:12px;
+  border-left:3px solid color-mix(in srgb,#16a34a 45%,transparent);
+  white-space:pre-wrap;overflow-wrap:anywhere;}
+.cl-plc-rem-lbl{display:none;}
 
 /* ── AGE TIERS ──
    A callback waiting three days looked identical to one from an hour ago,
