@@ -151,57 +151,99 @@
   font-weight:600;padding:2px 5px;border-radius:5px;background:var(--m-card-2);
   border:1px solid var(--m-border);color:var(--m-ink-3);line-height:1.3;}
 
-.cl-field{margin-bottom:19px;}
-/* Contact autosuggest (Phase 2) */
-.cl-field{position:relative;}
-.cl-contact-sugg{position:absolute;left:0;right:0;top:100%;margin-top:4px;z-index:30;
-  background:var(--m-card,#fff);border:1.5px solid var(--m-border);border-radius:10px;
-  box-shadow:0 12px 30px -10px rgba(16,24,40,.35);overflow:hidden;max-height:280px;overflow-y:auto;}
-.cl-sugg-item{display:flex;flex-direction:column;align-items:flex-start;gap:2px;width:100%;
-  text-align:left;background:none;border:none;border-bottom:1px solid var(--m-border);
-  padding:9px 12px;cursor:pointer;font-family:inherit;color:var(--m-ink,#0f172a);}
+.cl-field{margin-bottom:19px;position:relative;}
+/* ── Contact autosuggest & chip (Phase 2) ── */
+.cl-contact-sugg{position:absolute;left:0;right:0;top:100%;margin-top:6px;z-index:40;
+  background:var(--m-card);border:1px solid var(--m-border);border-radius:12px;
+  box-shadow:var(--m-sh-2,0 16px 40px -12px rgba(16,24,40,.4));overflow:hidden;
+  max-height:300px;overflow-y:auto;animation:clSuggIn .14s var(--cl-ease,ease);}
+@keyframes clSuggIn{from{opacity:0;transform:translateY(-4px);}to{opacity:1;transform:none;}}
+.cl-sugg-item{display:flex;align-items:center;gap:11px;width:100%;text-align:left;
+  background:none;border:none;border-bottom:1px solid var(--m-border);
+  padding:10px 13px;cursor:pointer;font-family:inherit;color:var(--m-ink);}
 .cl-sugg-item:last-child{border-bottom:none;}
-.cl-sugg-item:hover{background:var(--m-card-2,#f1f5f9);}
-.cl-sugg-nm{font-size:13px;font-weight:600;}
-.cl-sugg-ph{font-size:11px;color:var(--m-mut,#64748b);font-variant-numeric:tabular-nums;}
-.cl-sugg-new{color:var(--accent,#2563eb);font-size:12.5px;font-weight:600;}
-.cl-contact-sel{margin-top:7px;}
-.cl-contact-chip{display:inline-flex;align-items:center;gap:8px;background:var(--accent-dim,#eff6ff);
-  border:1px solid var(--accent,#2563eb);color:var(--accent-text,#1d4ed8);border-radius:999px;
-  padding:4px 6px 4px 11px;font-size:12.5px;font-weight:600;}
-.cl-contact-chip-ph{font-weight:400;font-variant-numeric:tabular-nums;opacity:.8;}
-.cl-contact-chip-x{background:none;border:none;color:inherit;font-size:16px;line-height:1;
-  cursor:pointer;padding:0 4px;opacity:.7;}
-.cl-contact-chip-x:hover{opacity:1;}
-/* Contacts button in ribbon */
+.cl-sugg-item:hover,.cl-sugg-item:focus-visible{background:var(--m-card-2);outline:none;}
+.cl-sugg-ava{flex-shrink:0;width:30px;height:30px;border-radius:50%;display:flex;
+  align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;
+  background:hsl(var(--h,210),52%,52%);letter-spacing:.02em;}
+.cl-sugg-txt{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px;}
+.cl-sugg-nm{font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.cl-sugg-ph{font-size:11px;color:var(--m-ink-3,var(--m-mut));font-variant-numeric:tabular-nums;}
+.cl-sugg-type{font-size:9.5px;font-weight:700;text-transform:capitalize;
+  background:var(--m-card-2);color:var(--m-ink-3,var(--m-mut));padding:1px 7px;border-radius:999px;}
+.cl-sugg-go{flex-shrink:0;color:var(--m-ink-3,var(--m-mut));opacity:0;transition:opacity .12s,transform .12s;transform:translateX(-3px);}
+.cl-sugg-item:hover .cl-sugg-go{opacity:.7;transform:none;}
+.cl-sugg-new{color:var(--accent);}
+.cl-sugg-new .cl-sugg-nm{font-weight:600;color:var(--accent);}
+.cl-sugg-new-ic{flex-shrink:0;width:30px;height:30px;border-radius:50%;display:flex;
+  align-items:center;justify-content:center;color:var(--accent);
+  background:var(--accent-dim);border:1px dashed color-mix(in srgb,var(--accent) 45%,transparent);}
+.cl-contact-sel{margin-top:8px;}
+.cl-contact-chip{display:inline-flex;align-items:center;gap:9px;padding:5px 7px 5px 7px;
+  background:var(--accent-dim);border:1px solid color-mix(in srgb,var(--accent) 40%,transparent);
+  border-radius:999px;font-size:12.5px;font-weight:600;color:var(--m-ink);}
+.cl-contact-chip-ava{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;font-size:9.5px;font-weight:700;color:#fff;background:hsl(var(--h,210),52%,52%);}
+.cl-contact-chip-ph{font-weight:400;font-variant-numeric:tabular-nums;color:var(--m-ink-3,var(--m-mut));}
+.cl-contact-chip-x{background:none;border:none;color:var(--m-ink-3,var(--m-mut));font-size:17px;
+  line-height:1;cursor:pointer;padding:0 5px;border-radius:50%;}
+.cl-contact-chip-x:hover{color:var(--m-ink);}
+/* ── Contacts button in ribbon ── */
 .cl-contacts-btn{display:inline-flex;align-items:center;gap:6px;margin-left:10px;
-  background:var(--m-card-2,#f1f5f9);border:1.5px solid var(--m-border);border-radius:9px;
-  padding:6px 11px;font-size:12px;font-weight:600;color:var(--m-ink,#0f172a);cursor:pointer;font-family:inherit;}
-.cl-contacts-btn:hover{border-color:var(--accent,#2563eb);color:var(--accent-text,#1d4ed8);}
-/* Contacts modal */
-.cl-modal{position:fixed;inset:0;z-index:200;background:rgba(15,23,42,.5);
-  display:flex;align-items:center;justify-content:center;padding:20px;}
-.cl-modal-card{background:var(--m-card,#fff);border-radius:16px;width:100%;max-width:560px;
-  max-height:85vh;display:flex;flex-direction:column;box-shadow:0 24px 60px -12px rgba(0,0,0,.4);overflow:hidden;}
-.cl-modal-hd{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--m-border);}
-.cl-modal-hd h3{margin:0;font-size:16px;color:var(--m-ink,#0f172a);}
-.cl-modal-x{background:none;border:none;font-size:24px;line-height:1;cursor:pointer;color:var(--m-mut,#64748b);}
-.cl-modal-tools{display:flex;gap:8px;padding:14px 20px;border-bottom:1px solid var(--m-border);}
+  background:var(--m-card);border:1px solid var(--m-border);border-radius:9px;box-shadow:var(--m-sh-1);
+  padding:7px 12px;font-size:12px;font-weight:600;color:var(--m-ink);cursor:pointer;font-family:inherit;
+  transition:border-color .14s,color .14s;}
+.cl-contacts-btn:hover{border-color:var(--accent);color:var(--accent);}
+.cl-contacts-btn svg{color:var(--m-ink-3,var(--m-mut));}
+.cl-contacts-btn:hover svg{color:var(--accent);}
+/* ── Contacts modal ── */
+.cl-modal{position:fixed;inset:0;z-index:200;background:color-mix(in srgb,var(--m-ink) 45%,transparent);
+  backdrop-filter:blur(2px);display:flex;align-items:center;justify-content:center;padding:20px;
+  animation:clModalBg .16s ease;}
+@keyframes clModalBg{from{opacity:0;}to{opacity:1;}}
+.cl-modal-card{background:var(--m-canvas);border:1px solid var(--m-border);border-radius:18px;
+  width:100%;max-width:540px;max-height:86vh;display:flex;flex-direction:column;
+  box-shadow:0 32px 70px -18px color-mix(in srgb,var(--m-ink) 55%,transparent);overflow:hidden;
+  animation:clModalIn .2s var(--cl-spring,ease);}
+@keyframes clModalIn{from{opacity:0;transform:translateY(10px) scale(.985);}to{opacity:1;transform:none;}}
+.cl-modal-hd{display:flex;align-items:center;justify-content:space-between;padding:18px 20px 14px;}
+.cl-modal-hd h3{margin:0;font-size:17px;font-weight:700;letter-spacing:-.01em;color:var(--m-ink);}
+.cl-modal-x{background:none;border:none;font-size:22px;line-height:1;cursor:pointer;
+  color:var(--m-ink-3,var(--m-mut));width:32px;height:32px;border-radius:8px;}
+.cl-modal-x:hover{background:var(--m-card-2);color:var(--m-ink);}
+.cl-modal-tools{display:flex;gap:9px;padding:0 20px 14px;border-bottom:1px solid var(--m-border);}
 .cl-modal-tools .cl-in{flex:1;}
-.cl-contacts-list{overflow-y:auto;flex:1;padding:6px 0;}
-.cl-contact-row{display:flex;align-items:center;gap:10px;padding:9px 20px;border-bottom:1px solid var(--m-border);}
-.cl-contact-row:hover{background:var(--m-card-2,#f8fafc);}
+.cl-contacts-list{overflow-y:auto;flex:1;padding:6px 0;min-height:120px;}
+.cl-contact-row{display:flex;align-items:center;gap:12px;padding:10px 20px;cursor:pointer;
+  border-bottom:1px solid color-mix(in srgb,var(--m-border) 60%,transparent);transition:background .1s;}
+.cl-contact-row:last-child{border-bottom:none;}
+.cl-contact-row:hover{background:var(--m-card-2);}
+.cl-contact-ava{flex-shrink:0;width:36px;height:36px;border-radius:50%;display:flex;
+  align-items:center;justify-content:center;font-size:12.5px;font-weight:700;color:#fff;
+  background:hsl(var(--h,210),52%,52%);}
 .cl-contact-row-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;}
-.cl-contact-row-nm{font-size:13.5px;font-weight:600;color:var(--m-ink,#0f172a);}
-.cl-contact-type{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;
-  background:var(--m-card-2,#e2e8f0);color:var(--m-mut,#64748b);padding:1px 6px;border-radius:999px;margin-left:6px;}
-.cl-contact-row-sub{font-size:11.5px;color:var(--m-mut,#64748b);font-variant-numeric:tabular-nums;}
-.cl-contact-form{padding:16px 20px;border-top:1px solid var(--m-border);background:var(--m-card-2,#f8fafc);}
-.cl-cf-hd{font-size:13px;font-weight:700;color:var(--m-ink,#0f172a);margin-bottom:12px;}
-.cl-cf-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
-.cl-cf-grid label{display:flex;flex-direction:column;gap:4px;font-size:11px;font-weight:600;color:var(--m-mut,#64748b);}
+.cl-contact-row-nm{font-size:13.5px;font-weight:600;color:var(--m-ink);display:flex;align-items:center;gap:7px;}
+.cl-contact-type{font-size:9.5px;font-weight:700;text-transform:capitalize;
+  background:var(--m-card-2);color:var(--m-ink-3,var(--m-mut));padding:1px 8px;border-radius:999px;}
+.cl-contact-row-sub{font-size:11.5px;color:var(--m-ink-3,var(--m-mut));font-variant-numeric:tabular-nums;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.cl-contact-row-go{flex-shrink:0;color:var(--m-ink-3,var(--m-mut));opacity:0;transition:opacity .12s;}
+.cl-contact-row:hover .cl-contact-row-go{opacity:.6;}
+.cl-contacts-empty{text-align:center;padding:44px 24px;}
+.cl-contacts-empty-ic{width:56px;height:56px;margin:0 auto 14px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;color:var(--m-ink-3,var(--m-mut));
+  background:var(--m-card-2);}
+.cl-contacts-empty-t{font-size:14.5px;font-weight:700;color:var(--m-ink);margin-bottom:5px;}
+.cl-contacts-empty-s{font-size:12px;color:var(--m-ink-3,var(--m-mut));max-width:38ch;margin:0 auto;line-height:1.5;}
+.cl-contact-form{padding:16px 20px 20px;border-top:1px solid var(--m-border);background:var(--m-card-2);}
+.cl-cf-hd{font-size:13.5px;font-weight:700;color:var(--m-ink);margin-bottom:13px;}
+.cl-cf-grid{display:grid;grid-template-columns:1fr 1fr;gap:11px;}
+.cl-cf-grid label{display:flex;flex-direction:column;gap:5px;font-size:11px;font-weight:600;color:var(--m-ink-3,var(--m-mut));}
+.cl-cf-grid .cl-in{font-size:13px;}
+.cl-cf-grid textarea.cl-in{resize:vertical;font-family:inherit;}
 .cl-cf-full{grid-column:1 / -1;}
-.cl-cf-act{display:flex;gap:8px;margin-top:14px;}
+.cl-cf-act{display:flex;gap:8px;margin-top:15px;}
 .cl-label{display:block;font-size:11.5px;font-weight:600;margin-bottom:7px;
   color:var(--m-ink-2);letter-spacing:.01em;}
 .cl-req{color:#dc2626;}
@@ -808,8 +850,8 @@ textarea.cl-edit-in{min-height:52px;resize:vertical;line-height:1.45;}
             </div>
 
             <div class="cl-field">
-              <label class="cl-label" for="clName">Caller <span class="cl-req">*</span></label>
-              <input id="clName" class="cl-in" type="text" placeholder="Who called?" autocomplete="off" oninput="clContactSuggest(this.value)" />
+              <label class="cl-label" for="clName">Contact <span class="cl-req">*</span></label>
+              <input id="clName" class="cl-in" type="text" placeholder="Search or add a contact…" autocomplete="off" oninput="clContactSuggest(this.value)" />
               <div class="cl-contact-sugg" id="clContactSugg" style="display:none;"></div>
               <div class="cl-contact-sel" id="clContactSel" style="display:none;"></div>
             </div>
@@ -1318,16 +1360,23 @@ function clContactSuggest(q){
     let html='';
     hits.forEach(function(c){
       const ph=clFmtPhone(c.phone_primary)||c.phone_primary||'no number';
+      const hue=clHue(c.name);
       html+='<button type="button" class="cl-sugg-item" onclick="clPickContact(\''+c.id+'\')">'+
-        '<span class="cl-sugg-nm">'+clEsc(c.name)+'</span>'+
-        '<span class="cl-sugg-ph">'+clEsc(ph)+(c.type?' · '+clEsc(c.type):'')+'</span>'+
+        '<span class="cl-sugg-ava" style="--h:'+hue+';">'+clEsc(clInitials(c.name))+'</span>'+
+        '<span class="cl-sugg-txt">'+
+          '<span class="cl-sugg-nm">'+clEsc(c.name)+(c.type?'<span class="cl-sugg-type">'+clEsc(c.type)+'</span>':'')+'</span>'+
+          '<span class="cl-sugg-ph">'+clEsc(ph)+'</span>'+
+        '</span>'+
+        '<span class="cl-sugg-go" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg></span>'+
         '</button>';
     });
     // Always offer create-new (unless an exact name match already exists)
     const exact=(_clContacts||[]).some(function(c){ return (c.name||'').trim().toLowerCase()===t; });
     if(!exact){
       html+='<button type="button" class="cl-sugg-item cl-sugg-new" onclick="clCreateContactInline()">'+
-        '+ Create contact "<b>'+clEsc((q||'').trim())+'</b>"</button>';
+        '<span class="cl-sugg-new-ic" aria-hidden="true"><svg width="15" height="15" viewBox="0 0 20 20" fill="currentColor"><path d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z"/></svg></span>'+
+        '<span class="cl-sugg-txt"><span class="cl-sugg-nm">Add “'+clEsc((q||'').trim())+'” as a new contact</span></span>'+
+        '</button>';
     }
     box.innerHTML=html;
     box.style.display = html ? 'block' : 'none';
@@ -1355,7 +1404,10 @@ function clRenderSelContact(){
   if(!_clSelContact){ el.style.display='none'; el.innerHTML=''; return; }
   const c=_clSelContact;
   const ph=clFmtPhone(c.phone_primary)||c.phone_primary||'no number';
-  el.innerHTML='<span class="cl-contact-chip">🔗 '+clEsc(c.name)+
+  const hue=clHue(c.name);
+  el.innerHTML='<span class="cl-contact-chip">'+
+    '<span class="cl-contact-chip-ava" style="--h:'+hue+';">'+clEsc(clInitials(c.name))+'</span>'+
+    clEsc(c.name)+
     '<span class="cl-contact-chip-ph">'+clEsc(ph)+'</span>'+
     '<button type="button" class="cl-contact-chip-x" title="Detach contact" onclick="clClearSelContact()">×</button>'+
     '</span>';
@@ -1427,17 +1479,25 @@ function clRenderContactsList(q){
                (c.phone_secondary||'').replace(/\D/g,'').includes(digits)));
     });
   }
-  if(!list.length){ el.innerHTML='<div style="padding:20px;color:var(--m-mut,#64748b);">'+(t?'No matches.':'No contacts yet.')+'</div>'; return; }
+  if(!list.length){
+    el.innerHTML='<div class="cl-contacts-empty">'+
+      '<div class="cl-contacts-empty-ic"><svg width="30" height="30" viewBox="0 0 20 20" fill="currentColor"><path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM14 15a4 4 0 00-8 0v3h8v-3z"/></svg></div>'+
+      '<div class="cl-contacts-empty-t">'+(t?'No contacts match “'+clEsc(q.trim())+'”':'No contacts yet')+'</div>'+
+      '<div class="cl-contacts-empty-s">'+(t?'Try a different name or number.':'Add your first contact, or they’ll build up as you log calls.')+'</div>'+
+      (t?'':'<button class="cl-act cl-act-relog" style="margin-top:12px;" onclick="clContactFormNew()"><span>+ New contact</span></button>')+
+      '</div>';
+    return;
+  }
   el.innerHTML=list.map(function(c){
     const ph=clFmtPhone(c.phone_primary)||c.phone_primary||'—';
-    return '<div class="cl-contact-row">'+
+    const hue=clHue(c.name);
+    return '<div class="cl-contact-row" onclick="clContactFormEdit(\''+c.id+'\')">'+
+      '<span class="cl-contact-ava" style="--h:'+hue+';">'+clEsc(clInitials(c.name))+'</span>'+
       '<div class="cl-contact-row-main">'+
-        '<span class="cl-contact-row-nm">'+clEsc(c.name)+(c.type?' <span class="cl-contact-type">'+clEsc(c.type)+'</span>':'')+'</span>'+
+        '<span class="cl-contact-row-nm">'+clEsc(c.name)+(c.type?'<span class="cl-contact-type">'+clEsc(c.type)+'</span>':'')+'</span>'+
         '<span class="cl-contact-row-sub">'+clEsc(ph)+(c.email?' · '+clEsc(c.email):'')+'</span>'+
       '</div>'+
-      '<button class="cl-act cl-act-edit" title="Edit" onclick="clContactFormEdit(\''+c.id+'\')">'+
-        '<svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/></svg>'+
-      '</button>'+
+      '<span class="cl-contact-row-go" aria-hidden="true"><svg width="15" height="15" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg></span>'+
     '</div>';
   }).join('');
 }
