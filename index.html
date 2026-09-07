@@ -17449,7 +17449,16 @@ function calcDayExtras(rawHours, customBreak, customCoffee, dateObj){
   let isWeekend = false;
   if(dateObj){
     const d = (dateObj instanceof Date) ? dateObj : new Date(dateObj);
-    const dow = d.getDay();
+    // Judge the day-of-week in SYDNEY time, not the browser's local zone. A raw
+    // getDay() on a UTC-parsed timestamp can land on the wrong calendar day
+    // (e.g. a Saturday shift reading as Friday), which wrongly gave weekend
+    // shifts the 0.5 weekday break. Format to Sydney, then read the weekday.
+    let dow;
+    try{
+      const wd = d.toLocaleDateString('en-US', {timeZone:'Australia/Sydney', weekday:'short'});
+      const map = {Sun:0, Mon:1, Tue:2, Wed:3, Thu:4, Fri:5, Sat:6};
+      dow = (wd in map) ? map[wd] : d.getDay();
+    }catch(e){ dow = d.getDay(); }
     isWeekend = (dow === 0 || dow === 6); // Sun=0, Sat=6
   }
   const autoBreak = isWeekend ? 0 : (rawHours > 5 ? 0.5 : 0);
