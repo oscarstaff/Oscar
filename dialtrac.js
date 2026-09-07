@@ -792,6 +792,144 @@ textarea.cl-edit-in{min-height:52px;resize:vertical;line-height:1.45;}
 /* Waiting view toggle bar reuses subbar chrome; hidden unless Waiting tab on */
 #clWaitViewBar{display:none;}
 #clWaitViewBar.on{display:flex;}
+
+/* ══════════════════════════════════════════════════════════════════════
+   macOS DESKTOP ENHANCEMENT LAYER
+   Appended override layer (desktop only where noted). Mimics native macOS
+   window materials, ambient status glow, high-density mode, spring physics,
+   and native keycap / focus-ring styling. Scoped under .cl-console so it
+   can't leak into the rest of Nexus.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* ── 1 · Glassmorphism & depth (ribbon, qbar, modal) ──────────────────
+   Translucent materials + backdrop blur, hairline inner shadow instead of a
+   solid 1px border → bezel-less Mac-desktop feel. backdrop-filter only kicks
+   in where supported; the underlying solid bg remains as a fallback. */
+@supports ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+  .cl-console .cl-ribbon{
+    background:color-mix(in srgb,var(--m-card) 72%,transparent);
+    -webkit-backdrop-filter:blur(24px) saturate(150%);
+    backdrop-filter:blur(24px) saturate(150%);
+    border-bottom:none;
+    box-shadow:inset 0 -0.5px 0 color-mix(in srgb,var(--m-ink) 12%,transparent);}
+  .cl-console .cl-qbar{
+    background:color-mix(in srgb,var(--m-canvas) 68%,transparent);
+    -webkit-backdrop-filter:blur(20px) saturate(140%);
+    backdrop-filter:blur(20px) saturate(140%);
+    border-bottom:none;
+    box-shadow:inset 0 -0.5px 0 color-mix(in srgb,var(--m-ink) 10%,transparent);
+    position:sticky;top:0;z-index:20;}
+  .cl-modal{
+    background:color-mix(in srgb,var(--m-ink) 32%,transparent);
+    -webkit-backdrop-filter:blur(6px) saturate(120%);
+    backdrop-filter:blur(6px) saturate(120%);}
+  .cl-modal-card{
+    background:color-mix(in srgb,var(--m-card) 82%,transparent);
+    -webkit-backdrop-filter:blur(30px) saturate(160%);
+    backdrop-filter:blur(30px) saturate(160%);
+    border:0.5px solid color-mix(in srgb,var(--m-ink) 14%,transparent);
+    box-shadow:0 32px 80px -20px color-mix(in srgb,var(--m-ink) 60%,transparent),
+               inset 0 0.5px 0 color-mix(in srgb,#fff 40%,transparent);}
+  .cl-modal-tools{border-bottom:none;
+    box-shadow:inset 0 -0.5px 0 color-mix(in srgb,var(--m-ink) 10%,transparent);}
+}
+
+/* ── 2 · Ambient status glow (overdue callbacks bleed heat) ────────────
+   The left rail already changes colour per age; this adds a soft tinted
+   drop-shadow so bottlenecks glow against the canvas. Stays off .done rows,
+   and warms further on hover. */
+.cl-console .cl-card.cl-age-aging{
+  box-shadow:0 8px 32px color-mix(in srgb,#ea580c 15%,transparent);}
+.cl-console .cl-card.cl-age-stale{
+  box-shadow:0 8px 32px color-mix(in srgb,#dc2626 17%,transparent);}
+.cl-console .cl-card.cl-age-cold{
+  box-shadow:0 8px 34px color-mix(in srgb,#b91c1c 20%,transparent);}
+.cl-console .cl-card.cl-age-aging:hover{
+  box-shadow:0 10px 38px color-mix(in srgb,#ea580c 24%,transparent);transform:translateY(-1px);}
+.cl-console .cl-card.cl-age-stale:hover{
+  box-shadow:0 10px 40px color-mix(in srgb,#dc2626 26%,transparent);transform:translateY(-1px);}
+.cl-console .cl-card.cl-age-cold:hover{
+  box-shadow:0 10px 42px color-mix(in srgb,#b91c1c 30%,transparent);transform:translateY(-1px);}
+.cl-console .cl-card.done{box-shadow:none;}
+
+/* ── 3 · Pro high-density mode (.cl-compact on the queue pane) ─────────
+   Opt-in via adding class "cl-compact" to .cl-pane-queue. Squeezes padding,
+   shrinks the avatar, collapses the note to one line (full on hover), and
+   folds line1+line2 into a single grid row so 12–15 cards fit on a 1080p
+   display. Desktop only — never applied on touch/narrow layouts. */
+@media(min-width:900px){
+  .cl-pane-queue.cl-compact .cl-card{
+    padding:8px 12px;gap:10px;border-radius:11px;}
+  .cl-pane-queue.cl-compact .cl-card::before{top:8px;bottom:8px;}
+  .cl-pane-queue.cl-compact .cl-ava{width:24px;height:24px;border-radius:8px;font-size:10px;}
+  .cl-pane-queue.cl-compact .cl-card-body{
+    display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;
+    column-gap:12px;row-gap:0;}
+  .cl-pane-queue.cl-compact .cl-line1{margin-bottom:0;flex-wrap:nowrap;overflow:hidden;}
+  .cl-pane-queue.cl-compact .cl-line2{justify-content:flex-end;flex-wrap:nowrap;white-space:nowrap;}
+  .cl-pane-queue.cl-compact .cl-note{
+    grid-column:1 / -1;margin:4px 0 0;padding:4px 9px;
+    display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    -webkit-line-clamp:unset;line-height:1.4;}
+  .cl-pane-queue.cl-compact .cl-card:hover .cl-note{
+    white-space:normal;overflow:visible;}
+  .cl-pane-queue.cl-compact .cl-scroll{gap:6px;}
+}
+
+/* ── 4 · Spring-physics motion ────────────────────────────────────────
+   Retune the shared easing vars to Apple-style springs. --cl-spring uses a
+   linear() keyframe easing (progressive-enhancement: browsers without
+   linear() fall back to the cubic-bezier already set inline earlier). */
+.cl-console{
+  --cl-ease:cubic-bezier(.32,.72,0,1);
+  --cl-spring:linear(0,.006,.025 2.8%,.101 6.1%,.539 18.9%,.721 25.3%,.849 31.5%,
+    .937 38.1%,.968 41.8%,.991 45.7%,1.006 50.1%,1.015 55%,1.017 63.9%,1.001 100%);}
+.cl-console .cl-sc-glide{transition:transform 420ms var(--cl-spring);}
+.cl-console .cl-check input:checked ~ .cl-check-box{
+  animation:clCheckPop 420ms var(--cl-spring);}
+@keyframes clCheckPop{0%{transform:scale(.8);}55%{transform:scale(1.12);}100%{transform:scale(1);}}
+.cl-console .cl-card{transition:
+  border-color var(--cl-t) var(--cl-ease),
+  box-shadow 420ms var(--cl-spring),
+  transform 420ms var(--cl-spring);}
+
+/* ── 5 · Native keycaps + unified focus ring ──────────────────────────
+   <kbd> chips read like real macOS shortcut keys; every focusable control
+   shares one thick translucent accent ring. */
+.cl-console .cl-keyhint kbd,
+.cl-console .cl-search-kbd{
+  background:linear-gradient(180deg,
+    color-mix(in srgb,#fff 96%,var(--m-card)),
+    color-mix(in srgb,#fff 82%,var(--m-card)));
+  color:var(--m-ink-2);
+  border:1px solid color-mix(in srgb,var(--m-ink) 18%,transparent);
+  border-radius:6px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.9),
+             0 1px 1.5px color-mix(in srgb,var(--m-ink) 18%,transparent);
+  padding:2px 6px;min-width:16px;text-align:center;}
+.cl-console :focus-visible,
+.cl-console .cl-stat:focus-visible,
+.cl-console .cl-sc:focus-visible,
+.cl-console .cl-chip:focus-visible,
+.cl-console .cl-sub:focus-visible,
+.cl-console .cl-refresh:focus-visible,
+.cl-console .cl-btn-ghost:focus-visible,
+.cl-console .cl-btn-go:focus-visible,
+.cl-console .cl-card:focus-visible,
+.cl-console input:focus-visible,
+.cl-console button:focus-visible,
+.cl-console .cl-check input:focus-visible ~ .cl-check-box{
+  outline:3px solid color-mix(in srgb,var(--accent) 50%,transparent);
+  outline-offset:1px;
+  transition:outline-color .1s ease;}
+
+/* Respect reduced-motion: drop the springy transforms/animations. */
+@media(prefers-reduced-motion:reduce){
+  .cl-console .cl-sc-glide,
+  .cl-console .cl-card{transition-duration:1ms;}
+  .cl-console .cl-check input:checked ~ .cl-check-box{animation:none;}
+}
+
 `;
   const CL_HTML = `      <div class="cl-console">
 
