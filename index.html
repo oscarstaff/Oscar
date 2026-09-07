@@ -7580,6 +7580,12 @@ function showSchedTab(tab){
 
 // ── DOCUMENTS ──
 let myTeam = '';
+// Hub app-access caches. Declared with `var` (hoisted, no temporal dead zone)
+// and pre-initialized so early callers — including the background [poll] tick
+// that runs loadHubAccess before the rest of init — can never hit a
+// "can't access lexical declaration before initialization" ReferenceError.
+var _accessCache = { formcraft:[], slip:[], dialtrac:[], borekade:[], shiftops:[] };
+var _accessWorking = null;
 let docsData = [];
 let _lastUploadedDocId = null;
 let _quizBuilder = null;

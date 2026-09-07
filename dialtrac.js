@@ -323,7 +323,7 @@ select.cl-in{appearance:none;-webkit-appearance:none;cursor:pointer;padding-righ
   box-shadow:0 2px 14px -6px rgba(22,163,74,.22);}
 /* Soft green tint behind the header only — the body stays clean white so the
    textarea sits on a calm surface instead of a muddy amber field. The extra
-   specificity here beats the generic `.cl-check.on` amber fill, which the
+   specificity here beats the generic .cl-check.on amber fill, which the
    placement label also picks up (it carries both cl-check and cl-plc-check). */
 .cl-plc-group.cl-plc-open .cl-plc-check,
 .cl-plc-check.cl-check.on{
