@@ -587,19 +587,24 @@ textarea.cl-edit-in{min-height:52px;resize:vertical;line-height:1.45;}
   overflow:hidden;transition:all var(--cl-t) var(--cl-ease);}
 .cl-card:hover .cl-note{-webkit-line-clamp:8;border-left-color:var(--accent);}
 /* Placement-offered line (Placement team only) */
-.cl-plc{margin:8px 0 0;display:flex;flex-direction:column;gap:5px;}
-.cl-plc-badge{align-self:flex-start;display:inline-flex;align-items:center;gap:5px;
-  font-size:12px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;
-  color:#166534;background:#dcfce7;border:1px solid #bbf7d0;
-  border-radius:999px;padding:4px 12px;}
-.cl-plc-badge::before{content:"";width:5px;height:5px;border-radius:50%;
-  background:#16a34a;flex-shrink:0;}
-.cl-plc-rem{font-size:14px;line-height:1.6;color:var(--m-ink-2);
-  background:var(--m-card-2);border-radius:9px;padding:12px 16px;
-  border-left:2px solid #86efac;
-  white-space:pre-wrap;word-break:break-word;}
-.cl-plc-rem-lbl{display:block;font-size:11px;font-weight:700;letter-spacing:.04em;
-  text-transform:uppercase;color:var(--m-ink-3);margin-bottom:5px;}
+/* Placement offered + post-offer remarks — one coherent green card, rather
+   than a green pill + green stripe + grey box all fighting each other. */
+.cl-plc{margin:9px 0 0;
+  background:linear-gradient(160deg,
+    color-mix(in srgb,#16a34a 7%,var(--m-card)),
+    color-mix(in srgb,#16a34a 12%,var(--m-card)));
+  border:1px solid color-mix(in srgb,#16a34a 26%,transparent);
+  border-radius:12px;padding:12px 14px;}
+.cl-plc-badge{display:inline-flex;align-items:center;gap:6px;
+  font-size:11.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;
+  color:#166534;}
+.cl-plc-badge svg{color:#16a34a;flex-shrink:0;}
+.cl-plc-rem{font-size:14px;line-height:1.6;
+  color:color-mix(in srgb,#14532d 88%,var(--m-ink));
+  margin-top:8px;white-space:pre-wrap;overflow-wrap:anywhere;}
+.cl-plc-rem-lbl{display:block;font-size:10.5px;font-weight:700;letter-spacing:.04em;
+  text-transform:uppercase;color:color-mix(in srgb,#166534 62%,var(--m-mut));
+  margin-bottom:3px;}
 
 /* ── AGE TIERS ──
    A callback waiting three days looked identical to one from an hour ago,
@@ -2732,7 +2737,7 @@ function clRenderQueue(){
           '</div>'+
           (r.note?'<p class="cl-note">'+clEsc(r.note)+'</p>':'')+
           (r.plc_offered
-            ? '<div class="cl-plc"><span class="cl-plc-badge">Placement offered</span>'+
+            ? '<div class="cl-plc"><span class="cl-plc-badge"><svg viewBox="0 0 20 20" fill="currentColor" width="13" height="13"><path fill-rule="evenodd" d="M16.7 5.3a1 1 0 010 1.4l-8 8a1 1 0 01-1.4 0l-4-4a1 1 0 011.4-1.4L8 12.6l7.3-7.3a1 1 0 011.4 0z" clip-rule="evenodd"/></svg>Placement offered</span>'+
               (r.plc_remarks?'<div class="cl-plc-rem"><span class="cl-plc-rem-lbl">Post-offer remarks</span>'+clEsc(r.plc_remarks)+'</div>':'')+'</div>'
             : '')+
           (stack.length?'<div class="cl-stack" id="clstk-'+r.id+'">'+
