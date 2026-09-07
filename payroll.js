@@ -36,10 +36,18 @@ function _pBearer(){
   return _pKey();
 }
 async function _pGet(table, qs){
-  if(typeof sbGet === 'function') return _pGet(table, qs);
+  // NOTE: previously this delegated with `return _pGet(...)` which called ITSELF
+  // (infinite recursion / stack overflow) whenever sbGet existed — that silently
+  // blew up payroll fetches. Do the fetch directly and THROW on failure so the
+  // caller can tell "no hours" apart from "the request failed".
   const r = await fetch(_pUrl()+'/rest/v1/'+table+(qs||''),
     {headers:{apikey:_pKey(), Authorization:'Bearer '+_pBearer()}});
-  if(!r.ok){ console.warn('payroll _pGet', table, r.status); return []; }
+  if(!r.ok){
+    console.warn('payroll _pGet', table, r.status);
+    var err = new Error('fetch failed '+r.status+' for '+table);
+    err.status = r.status;
+    throw err;
+  }
   return r.json();
 }
 function _pEsc(s){
@@ -270,19 +278,37 @@ function initPayrollTab(){
 }
 
 async function loadPayRates(){
-  _payRates = {};
-  try{
-    const rows = await _pGet('payroll_rates','?select=*');
-    (rows||[]).forEach(function(r){ _payRates[r.staff_name] = r; });
-  }catch(e){ console.warn('loadPayRates', e); }
+  // Retry once — a transient failure here used to leave _payRates empty, so
+  // EVERYONE showed "NO RATE" and dropped out of the run. Return true/false so
+  // runPayroll can stop with a clear message instead of a broken partial table.
+  for(let attempt=0; attempt<2; attempt++){
+    try{
+      const rows = await _pGet('payroll_rates','?select=*');
+      _payRates = {};
+      (rows||[]).forEach(function(r){ _payRates[r.staff_name] = r; });
+      return true;
+    }catch(e){
+      console.warn('loadPayRates attempt '+attempt, e);
+      if(attempt===0){ await new Promise(function(res){ setTimeout(res, 400); }); }
+    }
+  }
+  return false;
 }
 
 // Mirrors renderHoursTable pairing exactly → net hours + coffee for one staff.
 async function _payHoursFor(staff, startStr, endStr){
   const start = new Date(startStr+'T00:00:00');
   const end   = new Date(endStr+'T23:59:59');
-  let logs = [];
-  try{ logs = await _pGet('clock_log','?staff_name=eq.'+encodeURIComponent(staff)+'&order=ts.asc&limit=2000'); }catch(e){}
+  let logs = null;
+  // Try up to 2 times — a single expired-token/network blip shouldn't wipe a
+  // staff member's hours. If BOTH attempts fail, return an error flag so the
+  // caller shows "couldn't load" rather than a silent 0 (the old bug: a failed
+  // fetch looked identical to "worked no hours", so rows vanished mid-payrun).
+  for(let attempt=0; attempt<2 && logs===null; attempt++){
+    try{ logs = await _pGet('clock_log','?staff_name=eq.'+encodeURIComponent(staff)+'&order=ts.asc&limit=2000'); }
+    catch(e){ logs = null; if(attempt===0){ await new Promise(function(res){ setTimeout(res, 400); }); } }
+  }
+  if(logs === null){ return {net:0, coffee:0, raw:0, open:0, days:0, loadError:true}; }
   logs = (logs||[]).filter(function(r){ const t = new Date(r.ts); return t >= start && t <= end; });
   if(!logs.length) return {net:0, coffee:0, raw:0, open:0, days:0};
   logs.sort(function(a,b){ return new Date(a.ts) - new Date(b.ts); });
@@ -352,7 +378,24 @@ async function runPayroll(){
   const endStr   = document.getElementById('payEnd').value;
   const el = document.getElementById('payResults');
   if(!startStr || !endStr){ el.innerHTML = '<div style="color:#dc2626;">Pick both dates.</div>'; return; }
-  await loadPayRates();
+  el.innerHTML = '<div style="color:#94a3b8;text-align:center;padding:20px;">Loading…</div>';
+
+  // Proactively refresh the auth token before a run so a long payrun doesn't
+  // fail partway through on an expired session (the "only 3–4 staff show" bug).
+  try{
+    if(window._soSbClient && window._soSbClient.auth){
+      const sess = await window._soSbClient.auth.getSession();
+      if(sess && sess.data && sess.data.session && sess.data.session.access_token){
+        try{ sessionStorage.setItem('so_sb_at', sess.data.session.access_token); }catch(_e){}
+      }
+    }
+  }catch(_e){}
+
+  const ratesOk = await loadPayRates();
+  if(!ratesOk){
+    el.innerHTML = '<div style="color:#dc2626;padding:20px;text-align:center;"><b>Couldn\'t load pay rates.</b><br>Your session may have expired — refresh the page (or log in again) and run the payrun once more.</div>';
+    return;
+  }
 
   // Roster = everyone with a rate OR any punches in this range (canonical STAFF).
   const roster = Array.from(new Set([].concat(
@@ -363,11 +406,14 @@ async function runPayroll(){
   el.innerHTML = '<div style="color:#94a3b8;text-align:center;padding:20px;">Running payrun for '+roster.length+' staff…</div>';
 
   _payResults = [];
+  let _loadErrors = 0;
   for(const name of roster){
     const h = await _payHoursFor(name, startStr, endStr);
     const rate = _payRates[name] || null;
-    // skip people with neither hours nor a rate (not on payroll this run)
-    if(!rate && h.net <= 0 && h.open === 0) continue;
+    if(h.loadError) _loadErrors++;
+    // skip people with neither hours nor a rate (not on payroll this run) —
+    // BUT never skip someone whose hours failed to load; show them flagged.
+    if(!rate && h.net <= 0 && h.open === 0 && !h.loadError) continue;
     const calc = _payCalc(rate, h.net);
     // Keep premium and coffee as DISTINCT figures so the table can show them
     // separately AND combined:
@@ -384,7 +430,7 @@ async function runPayroll(){
       ordH:calc.ordH, premH:calc.premH, ordG:calc.ordG,
       premOnly:premOnly, premPlus:premPlus,
       premG:premPlus,  // kept for back-compat (CSV etc.)
-      gross:grossAll, total: grossAll, noRate: !rate
+      gross:grossAll, total: grossAll, noRate: !rate, loadError: !!h.loadError
     });
   }
 
@@ -403,9 +449,11 @@ async function runPayroll(){
   const rows = _payRowsHtml();
 
   const warn = flags ? '<div class="pp-warn"><strong>'+flags+' row(s) need a look.</strong> NO RATE = excluded from totals until you set a rate below. ⚠ OPEN = clocked in with no matching clock-out, so hours may read low — fix the punch in Timesheet Manager, then re-run.</div>' : '';
+  const loadWarn = _loadErrors ? '<div class="pp-warn" style="background:#fef2f2;border-color:#fecaca;color:#991b1b;"><strong>⚠ '+_loadErrors+' staff member(s) failed to load</strong> — their hours may be missing or wrong. This is usually an expired session. <b>Refresh the page and run the payrun again</b> before using these figures.</div>' : '';
 
   el.innerHTML =
     '<div class="pp-animate">'+
+      loadWarn+
       '<div class="pp-summary">'+
         '<div class="pp-hero">'+
           '<div class="lbl">Premium payout</div>'+
@@ -527,6 +575,7 @@ function _payRowsHtml(){
   _payResults.forEach(function(r, i){
     try{
     var chips = '';
+    if(r.loadError) chips += '<span class="pp-chip open" style="background:#fecaca;color:#991b1b;">⚠ LOAD FAILED</span>';
     if(r.noRate) chips += '<span class="pp-chip norate">NO RATE</span>';
     if(r.open)   chips += '<span class="pp-chip open" title="'+r.open+' unclosed clock-in(s) — hours may be understated">⚠ '+r.open+' OPEN</span>';
     var structTxt = r.structure==='tiered' ? ('Tiered · '+(r.rate?parseFloat(r.rate.pay_cap):'')+'h cap') : (r.structure==='flat'?'Flat rate':'—');

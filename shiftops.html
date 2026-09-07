@@ -9326,6 +9326,14 @@ async function _soFreshTok(){
       setInterval(async function(){
         try{ const { data } = await _c.auth.getSession(); if(data && data.session && data.session.access_token){ _soAuthToken = data.session.access_token; sessionStorage.setItem('so_sb_at', _soAuthToken); } }catch(e){}
       }, 5*60*1000);
+      // setInterval is throttled/paused while a tab is backgrounded or the laptop
+      // sleeps, so also refresh whenever the tab regains focus — this is what
+      // keeps a long-idle session from lapsing and returning partial data.
+      document.addEventListener('visibilitychange', async function(){
+        if(document.visibilityState === 'visible'){
+          try{ const { data } = await _c.auth.getSession(); if(data && data.session && data.session.access_token){ _soAuthToken = data.session.access_token; sessionStorage.setItem('so_sb_at', _soAuthToken); } }catch(e){}
+        }
+      });
     }
   }catch(e){ console.warn('so session init', e); }
 })();
