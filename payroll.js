@@ -452,6 +452,12 @@ function exportPayrollCsv(){
 }
 
 // ── Rates editor ──
+function _prCapToggle(sel){
+  var inp = sel.closest('td').querySelector('.pr-cap-custom');
+  if(!inp) return;
+  if(sel.value==='__custom'){ inp.style.display=''; inp.focus(); } else { inp.style.display='none'; }
+}
+
 function renderRatesEditor(){
   const el = document.getElementById('payRatesEditor');
   if(!el) return;
@@ -477,7 +483,7 @@ function renderRatesEditor(){
       '<td><select class="pr-struct" onchange="this.closest(\'tr\').classList.toggle(\'is-flat\', this.value!==\'tiered\')"><option value="tiered"'+(r.structure==='tiered'?' selected':'')+'>Tiered</option><option value="flat"'+(isFlat?' selected':'')+'>Flat</option></select></td>'+
       '<td><input class="pr-std" type="number" step="0.01" value="'+(parseFloat(r.std_rate)||0)+'" style="width:66px;"></td>'+
       '<td><input class="pr-prem" type="number" step="0.01" value="'+(parseFloat(r.prem_rate)||0)+'" style="width:66px;"></td>'+
-      '<td><select class="pr-cap"><option value="48"'+(parseFloat(r.pay_cap)===48?' selected':'')+'>48</option><option value="76"'+(parseFloat(r.pay_cap)===76?' selected':'')+'>76</option></select></td>'+
+      "<td>" + (function(){ var cap=parseFloat(r.pay_cap); var isPreset=(cap===48||cap===76); var isCustom=(!isNaN(cap)&&!isPreset); return '<select class="pr-cap" onchange="_prCapToggle(this)"><option value="48"'+(cap===48?' selected':'')+'>48</option><option value="76"'+(cap===76?' selected':'')+'>76</option><option value="__custom"'+(isCustom?' selected':'')+'>Custom\u2026</option></select><input class="pr-cap-custom" type="number" step="0.01" min="0" placeholder="hrs" value="'+(isCustom?cap:'')+'" style="width:66px;margin-left:6px;'+(isCustom?'':'display:none;')+'">'; })() + "</td>" +
     '</tr>';
   });
   html += '</tbody></table></div>'+
@@ -495,7 +501,7 @@ async function savePayRates(){
       structure: tr.querySelector('.pr-struct').value,
       std_rate: parseFloat(tr.querySelector('.pr-std').value) || 0,
       prem_rate: parseFloat(tr.querySelector('.pr-prem').value) || 0,
-      pay_cap: parseFloat(tr.querySelector('.pr-cap').value) || 48,
+      pay_cap: (function(){ var sel=tr.querySelector('.pr-cap'); if(sel.value==='__custom'){ var c=parseFloat(tr.querySelector('.pr-cap-custom').value); return (!isNaN(c)&&c>0)?c:48; } return parseFloat(sel.value)||48; })(),
       updated_at: new Date().toISOString(),
       updated_by: _pMe()
     });
