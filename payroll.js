@@ -125,6 +125,7 @@ function _pExtras(rawHours, customBreak, customCoffee, dateObj){
 .pp-total{font-weight:900;color:var(--pp-ink);font-size:14px;font-variant-numeric:tabular-nums;}
 .pp-coffee{color:#10b981;font-weight:600;font-variant-numeric:tabular-nums;}
 .pp-coffee.zero{color:var(--pp-mut2);font-weight:400;}
+.pp-coffee-note{color:#10b981;font-size:11px;font-weight:700;margin-left:4px;}
 .pp-flagrow{background:#fef2f2;}
 :is([data-theme="dark"],[data-theme="midnight"]) .pp-flagrow{background:rgba(239,68,68,.08);}
 .pp-chip{font-size:10px;font-weight:800;padding:2px 7px;border-radius:6px;margin-left:6px;white-space:nowrap;}
@@ -241,10 +242,12 @@ function initPayrollTab(){
   const s = document.getElementById('payStart'), e = document.getElementById('payEnd');
   if(s && !s.value) s.value = _payFmt(start);
   if(e && !e.value) e.value = _payFmt(end);
-  // Rates are edited per-employee (Employees → staff member → Payroll) now.
-  // We still load them here so the payrun can price everyone.
-  loadPayRates().catch(function(err){
-    console.error('[PAYROLL] rates load failed', err);
+  // Surface a failure instead of leaving "Loading…" on screen forever — a
+  // silent rejection here is exactly what hid the missing STAFF global.
+  loadPayRates().then(renderRatesEditor).catch(function(err){
+    console.error('[PAYROLL] rates editor failed', err);
+    const el=document.getElementById('payRatesEditor');
+    if(el) el.innerHTML='<div style="color:#b91c1c;font-size:13px;">Couldn\'t load rates — see console.</div>';
   });
 }
 
@@ -372,8 +375,10 @@ async function runPayroll(){
     if(!r.noRate){ totGross+=r.gross; totCoffee+=r.coffee; totNet+=r.net; totOrdG+=r.ordG; totPremG+=r.premG; totPremH+=r.premH; paidCount++; if(r.premH>0) premEarners++; }
     if(r.noRate || r.open) flags++;
     const structTxt = r.structure==='tiered' ? ('Tiered · '+(r.rate?parseFloat(r.rate.pay_cap):'')+'h cap') : (r.structure==='flat'?'Flat rate':'—');
-    const premCell = r.premH>0
-      ? '<span class="pp-prem-pill"><span class="h">'+r.premH.toFixed(2)+'h</span><span class="d">$'+r.premG.toFixed(2)+'</span></span>'
+    // Coffee ($/day allowance) is folded into the Premium column for everyone.
+    const premPlusCoffee = r.premG + r.coffee;
+    const premCell = (premPlusCoffee>0)
+      ? '<span class="pp-prem-pill"><span class="h">'+(r.premH>0?r.premH.toFixed(2)+'h':'coffee')+'</span><span class="d">$'+premPlusCoffee.toFixed(2)+'</span></span>'+(r.coffee>0&&r.premH>0?'<span class="pp-coffee-note" title="Includes $'+r.coffee.toFixed(2)+' coffee"> +☕</span>':'')
       : '<span class="pp-prem-zero">—</span>';
     const delay = Math.min(i*32, 420);
     rows += '<tr'+(r.noRate?' class="pp-flagrow"':'')+' style="animation-delay:'+delay+'ms;">'+
@@ -381,7 +386,6 @@ async function runPayroll(){
       '<td class="r pp-net">'+r.net.toFixed(2)+'h</td>'+
       '<td class="r pp-ord">'+r.ordH.toFixed(2)+'h · $'+r.ordG.toFixed(2)+'</td>'+
       '<td class="r pp-prem-cell">'+premCell+'</td>'+
-      '<td class="r"><span class="pp-coffee'+(r.coffee?'':' zero')+'">'+(r.coffee?'$'+r.coffee.toFixed(2):'—')+'</span></td>'+
       '<td class="r"><span class="pp-total">'+(r.noRate?'—':'$'+r.total.toFixed(2))+'</span></td>'+
     '</tr>';
   });
@@ -393,11 +397,11 @@ async function runPayroll(){
       '<div class="pp-summary">'+
         '<div class="pp-hero">'+
           '<div class="lbl">Premium payout</div>'+
-          '<div class="val">$'+totPremG.toFixed(2)+'</div>'+
-          '<div class="sub"><b>'+totPremH.toFixed(1)+' hrs</b> above cap · <b>'+premEarners+'</b> earning premium</div>'+
+          '<div class="val">$'+(totPremG+totCoffee).toFixed(2)+'</div>'+
+          '<div class="sub"><b>'+totPremH.toFixed(1)+' hrs</b> above cap · incl. <b>$'+totCoffee.toFixed(2)+'</b> coffee</div>'+
         '</div>'+
         '<div class="pp-stat"><div class="lbl">Total pay</div><div class="val grand">$'+(totGross+totCoffee).toFixed(2)+'</div><div class="note">'+paidCount+' paid · '+totNet.toFixed(1)+'h net</div></div>'+
-        '<div class="pp-stat"><div class="lbl">Ordinary + coffee</div><div class="val">$'+totOrdG.toFixed(2)+'</div><div class="note">+ $'+totCoffee.toFixed(2)+' coffee</div></div>'+
+        '<div class="pp-stat"><div class="lbl">Ordinary</div><div class="val">$'+totOrdG.toFixed(2)+'</div><div class="note">standard-rate hours</div></div>'+
       '</div>'+
       '<div class="pp-head-row"><div class="t">Payrun · '+startStr+' → '+endStr+'</div><div class="c">'+_payResults.length+' listed</div></div>'+
       '<div class="pp-scroll"><table class="pp-table">'+
@@ -405,16 +409,14 @@ async function runPayroll(){
         '<th>Staff</th>'+
         '<th class="r">Net hrs</th>'+
         '<th class="r">Ordinary</th>'+
-        '<th class="r prem">Premium ▲</th>'+
-        '<th class="r">Coffee</th>'+
+        '<th class="r prem">Premium ▲ +☕</th>'+
         '<th class="r">Total pay</th>'+
       '</tr></thead><tbody>'+rows+'</tbody>'+
       '<tfoot><tr class="pp-foot">'+
         '<td class="lbl">Totals · '+paidCount+' paid</td>'+
         '<td class="r lbl">'+totNet.toFixed(2)+'h</td>'+
         '<td class="r pp-ord">$'+totOrdG.toFixed(2)+'</td>'+
-        '<td class="r prem">'+totPremH.toFixed(2)+'h · $'+totPremG.toFixed(2)+'</td>'+
-        '<td class="r pp-coffee">$'+totCoffee.toFixed(2)+'</td>'+
+        '<td class="r prem">'+totPremH.toFixed(2)+'h · $'+(totPremG+totCoffee).toFixed(2)+'</td>'+
         '<td class="r grand">$'+(totGross+totCoffee).toFixed(2)+'</td>'+
       '</tr></tfoot>'+
       '</table></div>'+warn+
@@ -445,8 +447,62 @@ function exportPayrollCsv(){
   setTimeout(function(){ URL.revokeObjectURL(a.href); }, 1000);
 }
 
-
 // ── Rates editor ──
-// Per-employee rate/cap editing lives in shiftops.html (Employees → staff → Payroll).
-// The old all-staff table (renderRatesEditor / savePayRates / _prCapToggle) was
-// removed when payroll editing moved into the Employee tab.
+function renderRatesEditor(){
+  const el = document.getElementById('payRatesEditor');
+  if(!el) return;
+  const roster = Array.from(new Set([].concat(
+    Object.keys(_payRates),
+    _pStaffNames().filter(Boolean)
+  ))).sort(function(a,b){ return a.localeCompare(b); });
+  let html = '<div style="overflow-x:auto;"><table class="pp-rates">'+
+    '<thead><tr>'+
+      '<th>Staff</th>'+
+      '<th>Structure</th>'+
+      '<th>Std $/h</th>'+
+      '<th class="prem">Prem $/h ▲</th>'+
+      '<th>Cap</th>'+
+    '</tr></thead><tbody>';
+  roster.forEach(function(n){
+    const r = _payRates[n] || {structure:'flat', std_rate:0, prem_rate:0, pay_cap:48};
+    const nn = n.replace(/"/g,'&quot;');
+    const missing = !_payRates[n];
+    const isFlat = (r.structure!=='tiered');
+    html += '<tr class="'+(missing?'unset ':'')+(isFlat?'is-flat':'')+'" data-name="'+nn+'">'+
+      '<td style="font-weight:600;color:var(--pp-ink,#0f172a);">'+n+(missing?' <span style="color:#b91c1c;font-size:10px;font-weight:800;">unset</span>':'')+'</td>'+
+      '<td><select class="pr-struct" onchange="this.closest(\'tr\').classList.toggle(\'is-flat\', this.value!==\'tiered\')"><option value="tiered"'+(r.structure==='tiered'?' selected':'')+'>Tiered</option><option value="flat"'+(isFlat?' selected':'')+'>Flat</option></select></td>'+
+      '<td><input class="pr-std" type="number" step="0.01" value="'+(parseFloat(r.std_rate)||0)+'" style="width:66px;"></td>'+
+      '<td><input class="pr-prem" type="number" step="0.01" value="'+(parseFloat(r.prem_rate)||0)+'" style="width:66px;"></td>'+
+      '<td><select class="pr-cap"><option value="48"'+(parseFloat(r.pay_cap)===48?' selected':'')+'>48</option><option value="76"'+(parseFloat(r.pay_cap)===76?' selected':'')+'>76</option></select></td>'+
+    '</tr>';
+  });
+  html += '</tbody></table></div>'+
+    '<button onclick="savePayRates()" class="btn btn-green" style="margin-top:14px;padding:10px 18px;font-size:12px;">Save all rates</button>';
+  el.innerHTML = html;
+}
+
+async function savePayRates(){
+  if(!_canPayroll()){ return; }
+  const rows = document.querySelectorAll('#payRatesEditor tr[data-name]');
+  const payload = [];
+  rows.forEach(function(tr){
+    payload.push({
+      staff_name: tr.getAttribute('data-name'),
+      structure: tr.querySelector('.pr-struct').value,
+      std_rate: parseFloat(tr.querySelector('.pr-std').value) || 0,
+      prem_rate: parseFloat(tr.querySelector('.pr-prem').value) || 0,
+      pay_cap: parseFloat(tr.querySelector('.pr-cap').value) || 48,
+      updated_at: new Date().toISOString(),
+      updated_by: _pMe()
+    });
+  });
+  try{
+    const res = await fetch(_pUrl()+'/rest/v1/payroll_rates',{
+      method:'POST',
+      headers:{'apikey':_pKey(),'Authorization':'Bearer '+_pBearer(),'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},
+      body: JSON.stringify(payload)
+    });
+    if(res.ok){ if(typeof showToast==='function') showToast('Rates saved'); await loadPayRates(); renderRatesEditor(); }
+    else { const t = await res.text().catch(function(){return '';}); if(typeof showToast==='function') showToast('Save failed ('+res.status+')'); console.warn('savePayRates', res.status, t); }
+  }catch(e){ if(typeof showToast==='function') showToast('Save failed'); console.warn(e); }
+}
