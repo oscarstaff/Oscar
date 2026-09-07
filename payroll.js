@@ -369,16 +369,22 @@ async function runPayroll(){
     // skip people with neither hours nor a rate (not on payroll this run)
     if(!rate && h.net <= 0 && h.open === 0) continue;
     const calc = _payCalc(rate, h.net);
-    // Coffee ($/day allowance) is added DIRECTLY into premium. After this,
-    // premG already contains coffee, gross already contains coffee, and
-    // total === gross (no separate coffee line anywhere).
-    const premGWithCoffee = calc.premG + h.coffee;
-    const grossWithCoffee = calc.ordG + premGWithCoffee;
+    // Keep premium and coffee as DISTINCT figures so the table can show them
+    // separately AND combined:
+    //   premOnly  = pay for premium hours only (no coffee)
+    //   coffee    = daily coffee allowance
+    //   premPlus  = premOnly + coffee (the combined column)
+    // gross/total include everything (ordinary + premium + coffee).
+    const premOnly = calc.premG;
+    const premPlus = premOnly + h.coffee;
+    const grossAll = calc.ordG + premPlus;
     _payResults.push({
       name:name, rate:rate, net:h.net, coffee:h.coffee, open:h.open,
       structure: rate ? rate.structure : '—',
-      ordH:calc.ordH, premH:calc.premH, ordG:calc.ordG, premG:premGWithCoffee,
-      gross:grossWithCoffee, total: grossWithCoffee, noRate: !rate
+      ordH:calc.ordH, premH:calc.premH, ordG:calc.ordG,
+      premOnly:premOnly, premPlus:premPlus,
+      premG:premPlus,  // kept for back-compat (CSV etc.)
+      gross:grossAll, total: grossAll, noRate: !rate
     });
   }
 
@@ -389,9 +395,9 @@ async function runPayroll(){
   await _payLoadOrder();
   _payApplyOrder();
 
-  let totGross=0, totCoffee=0, totNet=0, totOrdG=0, totPremG=0, totPremH=0, paidCount=0, premEarners=0, flags=0;
+  let totGross=0, totCoffee=0, totNet=0, totOrdG=0, totPremOnly=0, totPremPlus=0, totPremH=0, paidCount=0, premEarners=0, flags=0;
   _payResults.forEach(function(r){
-    if(!r.noRate){ totGross+=r.gross; totCoffee+=r.coffee; totNet+=r.net; totOrdG+=r.ordG; totPremG+=r.premG; totPremH+=r.premH; paidCount++; if(r.premH>0) premEarners++; }
+    if(!r.noRate){ totGross+=r.gross; totCoffee+=r.coffee; totNet+=r.net; totOrdG+=r.ordG; totPremOnly+=r.premOnly; totPremPlus+=r.premPlus; totPremH+=r.premH; paidCount++; if(r.premH>0) premEarners++; }
     if(r.noRate || r.open) flags++;
   });
   const rows = _payRowsHtml();
@@ -403,7 +409,7 @@ async function runPayroll(){
       '<div class="pp-summary">'+
         '<div class="pp-hero">'+
           '<div class="lbl">Premium payout</div>'+
-          '<div class="val">$'+totPremG.toFixed(2)+'</div>'+
+          '<div class="val">$'+totPremPlus.toFixed(2)+'</div>'+
           '<div class="sub"><b>'+totPremH.toFixed(1)+' hrs</b> above cap · incl. <b>$'+totCoffee.toFixed(2)+'</b> coffee</div>'+
         '</div>'+
         '<div class="pp-stat"><div class="lbl">Total pay</div><div class="val grand">$'+totGross.toFixed(2)+'</div><div class="note">'+paidCount+' paid · '+totNet.toFixed(1)+'h net</div></div>'+
@@ -416,7 +422,9 @@ async function runPayroll(){
         '<th>Staff</th>'+
         '<th class="r">Net hrs</th>'+
         '<th class="r">Ordinary</th>'+
-        '<th class="r prem">Premium ▲ +☕</th>'+
+        '<th class="r prem">Premium ▲</th>'+
+        '<th class="r">Coffee ☕</th>'+
+        '<th class="r prem">Prem + Coffee</th>'+
         '<th class="r">Total pay</th>'+
       '</tr></thead><tbody id="payTbody">'+rows+'</tbody>'+
       '<tfoot><tr class="pp-foot">'+
@@ -424,7 +432,9 @@ async function runPayroll(){
         '<td class="lbl">Totals · '+paidCount+' paid</td>'+
         '<td class="r lbl">'+totNet.toFixed(2)+'h</td>'+
         '<td class="r pp-ord">$'+totOrdG.toFixed(2)+'</td>'+
-        '<td class="r prem">'+totPremH.toFixed(2)+'h · $'+totPremG.toFixed(2)+'</td>'+
+        '<td class="r prem">'+totPremH.toFixed(2)+'h · $'+totPremOnly.toFixed(2)+'</td>'+
+        '<td class="r pp-coffee">$'+totCoffee.toFixed(2)+'</td>'+
+        '<td class="r prem">$'+totPremPlus.toFixed(2)+'</td>'+
         '<td class="r grand">$'+totGross.toFixed(2)+'</td>'+
       '</tr></tfoot>'+
       '</table></div>'+warn+
@@ -520,20 +530,29 @@ function _payRowsHtml(){
     if(r.noRate) chips += '<span class="pp-chip norate">NO RATE</span>';
     if(r.open)   chips += '<span class="pp-chip open" title="'+r.open+' unclosed clock-in(s) — hours may be understated">⚠ '+r.open+' OPEN</span>';
     var structTxt = r.structure==='tiered' ? ('Tiered · '+(r.rate?parseFloat(r.rate.pay_cap):'')+'h cap') : (r.structure==='flat'?'Flat rate':'—');
-    var premCell = (r.premG>0)
-      ? '<span class="pp-prem-pill"><span class="h">'+(r.premH>0?r.premH.toFixed(2)+'h':'coffee')+'</span><span class="d">$'+r.premG.toFixed(2)+'</span></span>'+(r.coffee>0&&r.premH>0?'<span class="pp-coffee-note" title="Includes $'+r.coffee.toFixed(2)+' coffee"> +☕</span>':'')
+    // Three cells: premium-only, coffee-only, and the two combined.
+    var premOnlyCell = (r.premOnly>0)
+      ? '<span class="pp-prem-pill"><span class="h">'+r.premH.toFixed(2)+'h</span><span class="d">$'+r.premOnly.toFixed(2)+'</span></span>'
+      : '<span class="pp-prem-zero">—</span>';
+    var coffeeCell = (r.coffee>0)
+      ? '<span class="pp-coffee">$'+r.coffee.toFixed(2)+'</span>'
+      : '<span class="pp-coffee zero">—</span>';
+    var premPlusCell = (r.premPlus>0)
+      ? '<span class="pp-prem-pill"><span class="d">$'+r.premPlus.toFixed(2)+'</span></span>'
       : '<span class="pp-prem-zero">—</span>';
     rows += '<tr'+(r.noRate?' class="pp-flagrow"':'')+' draggable="true" data-name="'+String(r.name).replace(/"/g,'&quot;')+'">'+
       '<td class="pp-drag" title="Drag to reorder">≡</td>'+
       '<td><div class="pp-name">'+r.name+chips+'</div><div class="pp-struct">'+structTxt+'</div></td>'+
       '<td class="r pp-net">'+r.net.toFixed(2)+'h</td>'+
       '<td class="r pp-ord">'+r.ordH.toFixed(2)+'h · $'+r.ordG.toFixed(2)+'</td>'+
-      '<td class="r pp-prem-cell">'+premCell+'</td>'+
+      '<td class="r pp-prem-cell">'+premOnlyCell+'</td>'+
+      '<td class="r">'+coffeeCell+'</td>'+
+      '<td class="r pp-prem-cell">'+premPlusCell+'</td>'+
       '<td class="r"><span class="pp-total">'+(r.noRate?'—':'$'+r.total.toFixed(2))+'</span></td>'+
     '</tr>';
     }catch(e){
       console.warn('[PAYROLL] row render failed for', r&&r.name, e);
-      rows += '<tr data-name="'+String((r&&r.name)||'?').replace(/"/g,'&quot;')+'"><td class="pp-drag">≡</td><td>'+((r&&r.name)||'?')+'</td><td class="r">—</td><td class="r">—</td><td class="r">—</td><td class="r">—</td></tr>';
+      rows += '<tr data-name="'+String((r&&r.name)||'?').replace(/"/g,'&quot;')+'"><td class="pp-drag">≡</td><td>'+((r&&r.name)||'?')+'</td><td class="r">—</td><td class="r">—</td><td class="r">—</td><td class="r">—</td><td class="r">—</td><td class="r">—</td></tr>';
     }
   });
   return rows;
@@ -591,15 +610,15 @@ function exportPayrollCsv(){
   if(!_payResults.length){ if(typeof showToast==='function') showToast('Run a payrun first'); return; }
   const startStr = document.getElementById('payStart').value;
   const endStr   = document.getElementById('payEnd').value;
-  const head = ['Staff','Structure','Cap','Std rate','Prem rate','Net hours','Ordinary hrs','Ordinary $','Premium hrs','Premium $ (incl coffee)','of which Coffee $','Total pay $','Open punches','Note'];
+  const head = ['Staff','Structure','Cap','Std rate','Prem rate','Net hours','Ordinary hrs','Ordinary $','Premium hrs','Premium $','Coffee $','Prem + Coffee $','Total pay $','Open punches','Note'];
   const esc = function(v){ v = (v==null?'':String(v)); return /[",\n]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v; };
   const lines = [head.join(',')];
   _payResults.forEach(function(r){
     lines.push([
       r.name, r.structure,
       r.rate?parseFloat(r.rate.pay_cap):'', r.rate?parseFloat(r.rate.std_rate):'', r.rate?parseFloat(r.rate.prem_rate):'',
-      r.net.toFixed(2), r.ordH.toFixed(2), r.ordG.toFixed(2), r.premH.toFixed(2), r.premG.toFixed(2),
-      r.coffee.toFixed(2), r.noRate?'':r.total.toFixed(2), r.open||0,
+      r.net.toFixed(2), r.ordH.toFixed(2), r.ordG.toFixed(2), r.premH.toFixed(2), r.premOnly.toFixed(2),
+      r.coffee.toFixed(2), r.premPlus.toFixed(2), r.noRate?'':r.total.toFixed(2), r.open||0,
       r.noRate?'NO RATE SET':(r.open?'HAS OPEN PUNCHES':'')
     ].map(esc).join(','));
   });
