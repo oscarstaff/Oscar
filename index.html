@@ -7580,12 +7580,6 @@ function showSchedTab(tab){
 
 // ── DOCUMENTS ──
 let myTeam = '';
-// Hub app-access caches. Declared with `var` (hoisted, no temporal dead zone)
-// and pre-initialized so early callers — including the background [poll] tick
-// that runs loadHubAccess before the rest of init — can never hit a
-// "can't access lexical declaration before initialization" ReferenceError.
-var _accessCache = { formcraft:[], slip:[], dialtrac:[], borekade:[], shiftops:[] };
-var _accessWorking = null;
 let docsData = [];
 let _lastUploadedDocId = null;
 let _quizBuilder = null;
@@ -9754,14 +9748,19 @@ async function makeAppToken(app,name){
   return b64+'.'+sig;
 }
 async function loadHubAccess(){
-  // Load access lists from Supabase
+  // Load access lists from Supabase. Use window._accessCache (property access,
+  // never throws) rather than the bare identifier — dialtrac.js declares
+  // _accessCache but loads LAST, so an early [poll] tick calling this before
+  // dialtrac.js has run would otherwise hit a TDZ/ReferenceError and take the
+  // whole hub down with it.
   try{
     const rows=await sbGet('app_access','?select=app,staff_name');
-    _accessCache={formcraft:[],slip:[],dialtrac:[],borekade:[],shiftops:[]};
-    (rows||[]).forEach(r=>{ if(_accessCache[r.app]) _accessCache[r.app].push(r.staff_name); });
+    const _c={formcraft:[],slip:[],dialtrac:[],borekade:[],shiftops:[]};
+    (rows||[]).forEach(r=>{ if(_c[r.app]) _c[r.app].push(r.staff_name); });
+    window._accessCache=_c;
   }catch(e){ console.warn('loadHubAccess',e); }
   // Show/hide cards for current user
-  const _ac = _accessCache || { formcraft:[], slip:[], dialtrac:[], borekade:[], shiftops:[] };
+  const _ac = window._accessCache || { formcraft:[], slip:[], dialtrac:[], borekade:[], shiftops:[] };
   const fc=document.getElementById('hubcard-formcraft');
   const sl=document.getElementById('hubcard-slip');
   if(fc) fc.style.display=(_ac.formcraft||[]).includes(me)?'':'none';
@@ -9797,8 +9796,8 @@ async function gateCallLog(){
       try{ if(team) myTeam = team; }catch(e){}
     }
     let granted = false;
-    if(_accessCache && _accessCache.dialtrac && _accessCache.dialtrac.length){
-      granted = _accessCache.dialtrac.includes(me);
+    if(window._accessCache && window._accessCache.dialtrac && window._accessCache.dialtrac.length){
+      granted = window._accessCache.dialtrac.includes(me);
     }else if(team !== 'Enrolment'){
       // Access lists aren't loaded yet (Nodes not visited) — check directly
       // so non-Enrolment staff with individual access aren't left waiting.
@@ -24762,7 +24761,7 @@ input:focus{
 </style>
 
 <!-- DialTRAC (Call Log tab) — extracted module. Bump ?v= on each deploy. -->
-<script src="dialtrac.js?v=21"></script>
+<script src="dialtrac.js?v=22"></script>
 <script src="quizreview.js?v=2"></script>
 <script src="teamhours.js?v=2"></script>
 <script src="availlock.js?v=8"></script>

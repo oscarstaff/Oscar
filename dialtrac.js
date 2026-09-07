@@ -3172,10 +3172,14 @@ async function buildTeamButtons(){
 
 // ── Globals restored (were removed with the discussions cut) ──
 const APP_GATE_SECRET='oscars_nexus_gate_v1_8f3a2c91';
-let _accessCache={formcraft:[],slip:[],dialtrac:[],shiftops:[]};
-let _accessCurrentApp='formcraft';
-let _accessWorking={formcraft:new Set(),slip:new Set(),dialtrac:new Set(),shiftops:new Set()};
-let _accessAllStaff=[];
+// Access caches: assign onto window WITHOUT a `let`/`var`/`const` declaration so
+// this can never throw "redeclaration of non-configurable global property" no
+// matter what index.html declares or what load order occurs. Guarded so a value
+// already set by index.html isn't clobbered.
+window._accessCache = window._accessCache || {formcraft:[],slip:[],dialtrac:[],borekade:[],shiftops:[]};
+window._accessCurrentApp = window._accessCurrentApp || 'formcraft';
+window._accessWorking = window._accessWorking || {formcraft:new Set(),slip:new Set(),dialtrac:new Set(),shiftops:new Set()};
+window._accessAllStaff = window._accessAllStaff || [];
 // Cross-file flag: Nexus's realtime hook sets window._clQueueDirty, so this
 // must be a window property, NOT a let — a top-level let would shadow the
 // property and the dirty signal from realtime would never be seen here.
