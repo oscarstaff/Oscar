@@ -129,8 +129,8 @@ function _pExtras(rawHours, customBreak, customCoffee, dateObj){
 .pp-drag-th{width:26px;}
 .pp-drag{width:26px;text-align:center;color:var(--pp-mut2);cursor:grab;user-select:none;font-size:15px;line-height:1;}
 .pp-drag:active{cursor:grabbing;}
-.pp-table tbody tr.pp-dragging{opacity:.5;background:var(--pp-prem-soft);}
-.pp-table tbody tr[draggable="true"]{transition:background .12s;}
+.pp-table tbody tr{transition:transform .16s cubic-bezier(.22,1,.36,1), background .12s, box-shadow .18s;}
+.pp-table tbody tr.pp-dragging{opacity:.92;background:var(--pp-prem-soft);box-shadow:0 10px 26px -10px rgba(16,24,40,.4);position:relative;z-index:5;}
 .pp-flagrow{background:#fef2f2;}
 :is([data-theme="dark"],[data-theme="midnight"]) .pp-flagrow{background:rgba(239,68,68,.08);}
 .pp-chip{font-size:10px;font-weight:800;padding:2px 7px;border-radius:6px;margin-left:6px;white-space:nowrap;}
@@ -386,6 +386,7 @@ async function runPayroll(){
   // wins — flags do NOT jump to the top). Names with no saved position fall to
   // the bottom, alphabetically, until dragged into place. Falls back to the old
   // flag-first / total-desc sort only when no custom order has been set yet.
+  await _payLoadOrder();
   _payApplyOrder();
 
   let totGross=0, totCoffee=0, totNet=0, totOrdG=0, totPremG=0, totPremH=0, paidCount=0, premEarners=0, flags=0;
@@ -431,55 +432,90 @@ async function runPayroll(){
   _paySetupDrag();
 }
 
-// ── Custom row ordering (drag to reorder, saved per-user in this browser) ──
-function _payOrderKey(){
-  var who = '';
-  try{ who = (typeof _pMe==='function') ? (_pMe()||'') : ''; }catch(e){}
-  return 'oscars_payroll_order_' + (who || 'default');
+// ── Custom row ordering (drag to reorder — SHARED for everyone, saved in
+//    Supabase app_settings under key 'payroll_order'). One order, visible to
+//    every admin on every device. Manual order wins; flags don't float up. ──
+var _payOrder = null;   // cached array of names, loaded from app_settings
+
+// Load the shared order from app_settings (anon can read). Called before render.
+async function _payLoadOrder(){
+  try{
+    var r = await fetch(_pUrl()+"/rest/v1/app_settings?key=eq.payroll_order&select=value&limit=1",
+      {headers:{apikey:_pKey(), Authorization:'Bearer '+_pBearer()}});
+    if(!r.ok){ _payOrder=null; return null; }
+    var rows = await r.json();
+    if(rows && rows.length && rows[0].value){
+      _payOrder = JSON.parse(rows[0].value);
+    } else {
+      _payOrder = null;
+    }
+  }catch(e){ console.warn('[PAYROLL] load order', e); _payOrder=null; }
+  return _payOrder;
 }
-function _payLoadOrder(){
-  try{ var raw = localStorage.getItem(_payOrderKey()); return raw ? JSON.parse(raw) : null; }
-  catch(e){ return null; }
-}
-function _paySaveOrder(){
+// Save the shared order to app_settings (authenticated write via upsert).
+async function _paySaveOrder(){
   try{
     var names = _payResults.map(function(r){ return r.name; });
-    localStorage.setItem(_payOrderKey(), JSON.stringify(names));
-  }catch(e){ console.warn('save order', e); }
+    _payOrder = names;
+    var who = '';
+    try{ who = (typeof _pMe==='function') ? (_pMe()||'') : ''; }catch(e){}
+    var res = await fetch(_pUrl()+"/rest/v1/app_settings",{
+      method:'POST',
+      headers:{
+        apikey:_pKey(), Authorization:'Bearer '+_pBearer(),
+        'Content-Type':'application/json',
+        'Prefer':'resolution=merge-duplicates,return=minimal'
+      },
+      body: JSON.stringify([{ key:'payroll_order', value:JSON.stringify(names), updated_by:who, updated_at:new Date().toISOString() }])
+    });
+    if(!res.ok){
+      var t = await res.text().catch(function(){return '';});
+      console.warn('[PAYROLL] save order', res.status, t);
+      if(typeof showToast==='function') showToast('Order not saved ('+res.status+')');
+    }
+  }catch(e){ console.warn('[PAYROLL] save order failed', e); }
 }
-function _payResetOrder(){
-  try{ localStorage.removeItem(_payOrderKey()); }catch(e){}
-  // Re-apply default order and re-render the current results in place.
+async function _payResetOrder(){
+  try{
+    // Clear the shared order row, then re-render with default sort.
+    await fetch(_pUrl()+"/rest/v1/app_settings?key=eq.payroll_order",{
+      method:'DELETE', headers:{apikey:_pKey(), Authorization:'Bearer '+_pBearer(), 'Prefer':'return=minimal'}
+    });
+  }catch(e){ console.warn('[PAYROLL] reset order', e); }
+  _payOrder = null;
   _payApplyOrder(true);
   _payRerenderBody();
-  if(typeof showToast==='function') showToast('Order reset');
+  if(typeof showToast==='function') showToast('Order reset for everyone');
 }
-// Order _payResults: saved custom order first (manual wins, flags do NOT float
-// up), unknown names appended alphabetically. If forceDefault or no saved order,
-// use the original flag-first / total-desc sort.
+// Order _payResults using the cached shared order (_payOrder). Manual order
+// wins; unknown names appended alphabetically. forceDefault or no saved order
+// → original flag-first / total-desc sort.
 function _payApplyOrder(forceDefault){
-  var saved = forceDefault ? null : _payLoadOrder();
-  if(saved && saved.length){
-    var pos = {};
-    saved.forEach(function(n,i){ pos[n]=i; });
-    _payResults.sort(function(a,b){
-      var pa = (a.name in pos) ? pos[a.name] : Infinity;
-      var pb = (b.name in pos) ? pos[b.name] : Infinity;
-      if(pa !== pb) return pa - pb;
-      return a.name.localeCompare(b.name); // both unknown → alphabetical
-    });
-  } else {
-    _payResults.sort(function(a,b){
-      var fa = (a.noRate?2:0)+(a.open?1:0), fb = (b.noRate?2:0)+(b.open?1:0);
-      if(fa !== fb) return fb - fa;
-      return b.total - a.total;
-    });
-  }
+  try{
+    var saved = forceDefault ? null : _payOrder;
+    if(saved && saved.length){
+      var pos = {};
+      saved.forEach(function(n,i){ pos[n]=i; });
+      _payResults.sort(function(a,b){
+        var pa = (a.name in pos) ? pos[a.name] : Infinity;
+        var pb = (b.name in pos) ? pos[b.name] : Infinity;
+        if(pa !== pb) return pa - pb;
+        return a.name.localeCompare(b.name);
+      });
+      return;
+    }
+  }catch(e){ console.warn('[PAYROLL] custom order failed, using default', e); }
+  _payResults.sort(function(a,b){
+    var fa = (a.noRate?2:0)+(a.open?1:0), fb = (b.noRate?2:0)+(b.open?1:0);
+    if(fa !== fb) return fb - fa;
+    return b.total - a.total;
+  });
 }
 // Build just the <tr> rows (used on first render and after each drag).
 function _payRowsHtml(){
   var rows = '';
   _payResults.forEach(function(r, i){
+    try{
     var chips = '';
     if(r.noRate) chips += '<span class="pp-chip norate">NO RATE</span>';
     if(r.open)   chips += '<span class="pp-chip open" title="'+r.open+' unclosed clock-in(s) — hours may be understated">⚠ '+r.open+' OPEN</span>';
@@ -495,6 +531,10 @@ function _payRowsHtml(){
       '<td class="r pp-prem-cell">'+premCell+'</td>'+
       '<td class="r"><span class="pp-total">'+(r.noRate?'—':'$'+r.total.toFixed(2))+'</span></td>'+
     '</tr>';
+    }catch(e){
+      console.warn('[PAYROLL] row render failed for', r&&r.name, e);
+      rows += '<tr data-name="'+String((r&&r.name)||'?').replace(/"/g,'&quot;')+'"><td class="pp-drag">≡</td><td>'+((r&&r.name)||'?')+'</td><td class="r">—</td><td class="r">—</td><td class="r">—</td><td class="r">—</td></tr>';
+    }
   });
   return rows;
 }
@@ -505,6 +545,7 @@ function _payRerenderBody(){
 // HTML5 drag-and-drop on the tbody rows. On drop, reorder _payResults to match
 // the new DOM order and persist it.
 function _paySetupDrag(){
+  try{
   var tb = document.getElementById('payTbody');
   if(!tb) return;
   var dragEl = null;
@@ -528,6 +569,7 @@ function _paySetupDrag(){
       else { tr.parentNode.insertBefore(dragEl, tr); }
     });
   });
+  }catch(e){ console.warn('[PAYROLL] drag setup failed', e); }
 }
 function _payCommitOrderFromDom(){
   var tb = document.getElementById('payTbody');
