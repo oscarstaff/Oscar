@@ -264,7 +264,7 @@
   box-shadow:0 0 0 3px var(--accent-dim);}
 .cl-in::placeholder{color:var(--m-ink-3);font-weight:400;}
 .cl-in.error{border-color:#dc2626!important;box-shadow:0 0 0 3px rgba(220,38,38,.1);}
-textarea.cl-in{min-height:64px;resize:vertical;line-height:1.5;}
+textarea.cl-in{min-height:84px;resize:vertical;line-height:1.5;}
 select.cl-in{appearance:none;-webkit-appearance:none;cursor:pointer;padding-right:32px;
   background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%2394a3b8'%3E%3Cpath d='M5.5 8l4.5 4.5L14.5 8z'/%3E%3C/svg%3E");
   background-repeat:no-repeat;background-position:right 10px center;background-size:14px;}
@@ -323,15 +323,15 @@ select.cl-in{appearance:none;-webkit-appearance:none;cursor:pointer;padding-righ
   box-shadow:0 2px 12px -4px rgba(217,119,6,.25);}
 /* The checkbox header sheds its own border/bg — the group frame carries them. */
 .cl-plc-check{border:none!important;background:transparent!important;
-  border-radius:0;padding:13px 14px;}
+  border-radius:0;padding:16px;}
 .cl-plc-check:hover{background:transparent!important;}
 /* Slide-open remarks: 0fr→1fr collapses/expands height with no fixed value. */
 .cl-plc-remarks{display:grid;grid-template-rows:0fr;
   transition:grid-template-rows 260ms var(--cl-ease),opacity 200ms var(--cl-ease);
   opacity:0;}
 .cl-plc-group.cl-plc-open .cl-plc-remarks{grid-template-rows:1fr;opacity:1;}
-.cl-plc-remarks-inner{overflow:hidden;padding:0 14px;}
-.cl-plc-group.cl-plc-open .cl-plc-remarks-inner{padding:0 14px 14px;}
+.cl-plc-remarks-inner{overflow:hidden;padding:0 16px;}
+.cl-plc-group.cl-plc-open .cl-plc-remarks-inner{padding:0 16px 16px;}
 /* A hairline rule ties the remarks to the checkbox above it. */
 .cl-plc-remarks-inner .cl-label{padding-top:12px;
   border-top:1px solid var(--amber-bd);}
@@ -511,7 +511,7 @@ select.cl-in{appearance:none;-webkit-appearance:none;cursor:pointer;padding-righ
 .cl-att-ch{transition:transform var(--cl-t) var(--cl-ease);opacity:.75;}
 .cl-att-btn.on .cl-att-ch{transform:rotate(180deg);}
 /* ── Inline edit panel (replaces the prompt() popups) ── */
-.cl-edit{display:none;margin-top:10px;padding:12px;border-radius:11px;
+.cl-edit{display:none;margin-top:10px;padding:16px;border-radius:11px;
   background:var(--m-card-2);border:1px solid var(--accent-bd,var(--m-border));}
 .cl-edit.on{display:block;}
 .cl-edit-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;}
@@ -580,8 +580,8 @@ textarea.cl-edit-in{min-height:52px;resize:vertical;line-height:1.45;}
 .cl-meta{font-size:11.5px;color:var(--m-ink-3);white-space:nowrap;}
 
 /* The note is the point of taking one — it reads inline, no click. */
-.cl-note{font-size:12.5px;line-height:1.5;color:var(--m-ink-2);margin:7px 0 0;
-  padding:8px 11px;border-radius:9px;background:var(--m-card-2);
+.cl-note{font-size:14px;line-height:1.6;color:var(--m-ink-2);margin:9px 0 0;
+  padding:12px 16px;border-radius:9px;background:var(--m-card-2);
   border-left:2px solid var(--m-border-hi);
   display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
   overflow:hidden;transition:all var(--cl-t) var(--cl-ease);}
@@ -589,17 +589,17 @@ textarea.cl-edit-in{min-height:52px;resize:vertical;line-height:1.45;}
 /* Placement-offered line (Placement team only) */
 .cl-plc{margin:8px 0 0;display:flex;flex-direction:column;gap:5px;}
 .cl-plc-badge{align-self:flex-start;display:inline-flex;align-items:center;gap:5px;
-  font-size:10px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;
+  font-size:12px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;
   color:#166534;background:#dcfce7;border:1px solid #bbf7d0;
-  border-radius:999px;padding:3px 10px;}
+  border-radius:999px;padding:4px 12px;}
 .cl-plc-badge::before{content:"";width:5px;height:5px;border-radius:50%;
   background:#16a34a;flex-shrink:0;}
-.cl-plc-rem{font-size:12.5px;line-height:1.5;color:var(--m-ink-2);
-  background:var(--m-card-2);border-radius:9px;padding:7px 11px;
+.cl-plc-rem{font-size:14px;line-height:1.6;color:var(--m-ink-2);
+  background:var(--m-card-2);border-radius:9px;padding:12px 16px;
   border-left:2px solid #86efac;
   white-space:pre-wrap;word-break:break-word;}
-.cl-plc-rem-lbl{display:block;font-size:9.5px;font-weight:700;letter-spacing:.04em;
-  text-transform:uppercase;color:var(--m-ink-3);margin-bottom:3px;}
+.cl-plc-rem-lbl{display:block;font-size:11px;font-weight:700;letter-spacing:.04em;
+  text-transform:uppercase;color:var(--m-ink-3);margin-bottom:5px;}
 
 /* ── AGE TIERS ──
    A callback waiting three days looked identical to one from an hour ago,
