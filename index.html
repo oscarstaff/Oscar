@@ -6388,6 +6388,7 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
             <div class="card-title" style="margin:0;">Fortnight report</div>
             <button id="fortReplayBtn" onclick="openFortReport()" style="padding:8px 14px;border:none;border-radius:8px;background:var(--accent);color:#fff;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;">View slideshow ›</button>
           </div>
+          <div id="fortStreakMount" style="margin-top:10px;"></div>
           <div id="fortLeaderboardMount" style="margin-top:10px;"><div style="font-size:12px;color:#94a3b8;">Loading…</div></div>
         </div>
       </div>
@@ -18283,33 +18284,10 @@ function renderHours(){
 // are skipped entirely (not counted, not penalised).
 const _FORT_ANCHOR_MS = new Date(2026, 4, 4).setHours(0,0,0,0); // Mon 4 May 2026
 const _MS_DAY = 86400000, _MS_FORT = 14*_MS_DAY;
-const _ALLDAY_START = '09:00'; // implied start for a plain "Available" day
 const _PUNCT_GRACE_MIN = 7;    // minutes of slack before "late" — matches the
                               // flexClockTime boundary (:07 rounds to :00, :08
                               // rounds to :15), so on-time here == on-time on the
                               // payroll sheet. 9:07 = on time, 9:08 = late.
-
-// Availability object active on a date (respects date-range vs ongoing window).
-function _availActiveOn(row, d){
-  if(!row) return null;
-  const ymd = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
-  if(!row.is_ongoing){
-    if(row.valid_from && ymd < row.valid_from) return null;
-    if(row.valid_until && ymd > row.valid_until) return null;
-  }
-  return row.availability || null;
-}
-
-// The expected start "HH:MM" for a given day slot, or null if the staffer is
-// not expected in that day (unavailable / unset / no slot).
-function _expectedStartFor(avail, date){
-  if(!avail) return null;
-  const slot = avail[(date.getDay()+6)%7]; // avail keys: 0=Mon
-  if(!slot) return null;
-  if(slot.type==='custom' && slot.start) return slot.start;
-  if(slot.type==='all' || slot.type==='available') return _ALLDAY_START; // all-day implies 09:00
-  return null; // 'no' (unavailable), 'unset', or malformed
-}
 
 // First clock-in on a local calendar day, or null.
 function _firstClockInOn(logs, d){
@@ -18333,58 +18311,31 @@ function _onLeave(leaveRows, date){
   });
 }
 
-// Punctuality score = pure on-time rate (0–100). Days-worked is NO LONGER
-// baked in here: two people who were on time every day score the same whether
-// they worked 9 days or 12, which is what "punctuality" should mean. Attendance
-// (measuredDays) is shown as its own column and used only as a ranking
-// tiebreaker (see _punctSort), so more days is rewarded honestly rather than by
-// quietly deflating a part-timer's percentage.
+// Punctuality score = on-time rate (0–100) = on-time days ÷ measured days.
+// Used for the personal card and to decide On-Time Club tiers. Volume (on-time
+// count) is tracked separately so a low-attendance perfect score can't outrank
+// a high-attendance one on the Volume Leader list.
 function _punctScore(onTimeDays, measuredDays){
   if(measuredDays<=0) return 0;
   return Math.round(onTimeDays/measuredDays*100);
 }
-// Minimum days worked to earn a ranked spot. Below this the sample is too small
-// to be meaningful (a single on-time day would otherwise read as a perfect
-// 100%), so these still appear but sort below everyone who met the floor.
+// Minimum measured days to qualify for an On-Time Club badge. Below this the
+// sample is too small to be meaningful (a single on-time day would read as a
+// perfect 100%), so low-sample people simply don't earn a badge.
 const _PUNCT_MIN_DAYS = 4;
-// Sort: ranked-eligible first, then by on-time rate, then by days worked
-// (attendance tiebreak), then fewer late days, then name.
-function _punctSort(a,b){
-  const aOk=a.measuredDays>=_PUNCT_MIN_DAYS, bOk=b.measuredDays>=_PUNCT_MIN_DAYS;
-  if(aOk!==bOk) return aOk ? -1 : 1;
+// On-Time Club tiers by on-time rate: Gold ≥ 90%, Silver ≥ 80%.
+const _CLUB_GOLD = 90, _CLUB_SILVER = 80;
+// Hall-of-Fame sort: by on-time count (volume) first so the Volume Leader list
+// reads top-down, then by rate, then fewer late days, then name. This is NOT a
+// competitive ranking shown to staff — the render slices it into positive
+// sections only.
+function _hofSort(a,b){
+  if(b.onTimeDays!==a.onTimeDays) return b.onTimeDays-a.onTimeDays;
   if(b.score!==a.score) return b.score-a.score;
-  if(b.measuredDays!==a.measuredDays) return b.measuredDays-a.measuredDays;
   if(a.lateDays!==b.lateDays) return a.lateDays-b.lateDays;
   return String(a.name||'').localeCompare(String(b.name||''));
 }
 
-// From a set of availability snapshots, pick the one that applied on `date`.
-// A snapshot applies if it's ongoing, or its [valid_from, valid_until] window
-// covers the date. Among applicable snapshots, prefer the one saved most
-// recently (latest saved_at) — that's the version in effect at the time.
-// `snaps` may be a single row (legacy) or an array of history rows.
-function _resolveAvailForDay(snaps, date){
-  if(!snaps) return null;
-  const list = Array.isArray(snaps) ? snaps : [snaps];
-  const ymd = date.getFullYear()+'-'+String(date.getMonth()+1).padStart(2,'0')+'-'+String(date.getDate()).padStart(2,'0');
-  let best=null, bestTs=-1;
-  for(const s of list){
-    let applies=false;
-    if(s.is_ongoing){ applies=true; }
-    else if(s.valid_from && s.valid_until){ applies = (ymd>=s.valid_from && ymd<=s.valid_until); }
-    else if(s.valid_from && !s.valid_until){ applies = (ymd>=s.valid_from); }
-    if(!applies) continue;
-    const ts = s.saved_at ? new Date(s.saved_at).getTime() : 0;
-    if(ts>=bestTs){ bestTs=ts; best=s; }
-  }
-  return best ? (best.availability||null) : null;
-}
-
-// Compute one staff member's fortnight punctuality from pre-fetched data.
-// `availSnaps` is an array of history snapshots (or a single row).
-// `ctx` = { classDays:Set<'YYYY-MM-DD'>, classStart:'HH:MM'|null,
-//           overrides:{ymd:{name:start|null}}, name:staffName } — on a class day,
-// a per-date override (if present) wins over the roster start.
 /**
  * Snap a clock-in to the same 15-minute block the timesheet records.
  * Mirrors flexTimeStr() in the Apps Script: ≤7 → :00, ≤22 → :15, ≤37 → :30,
@@ -18401,104 +18352,202 @@ function _flexRound(dt){
   return new Date(dt.getFullYear(), dt.getMonth(), dt.getDate(), hh, m, 0, 0);
 }
 
-function _computePunctuality(availSnaps, logs, leaveRows, start, end, ctx){
-  ctx = ctx || {};
-  const classDays = ctx.classDays || null;
-  const classStart = ctx.classStart || null;
-  const overrides = ctx.overrides || null;
-  const myName = ctx.name || null;
-  let measuredDays=0, onTimeDays=0, lateDays=0, totalLateMin=0, worstMin=0, worstDay='', leaveDays=0;
+// Compute one staff member's fortnight punctuality from pre-fetched data.
+// Expected start comes ONLY from roster_shifts (status='assigned'). No
+// availability, no class days, no 9am fallback. A day is measured only when the
+// person had an assigned shift AND clocked in. Rostered-but-absent days are
+// counted (absentDays) for the streak feature but never touch the punctuality
+// score. Approved leave days are skipped entirely.
+//   shiftsByYmd: { 'YYYY-MM-DD': 'HH:MM[:SS]' }  — assigned shift start per day
+function _computePunctuality(shiftsByYmd, logs, leaveRows, start, end){
+  shiftsByYmd = shiftsByYmd || {};
+  let measuredDays=0, onTimeDays=0, lateDays=0, totalLateMin=0, worstMin=0, worstDay='',
+      leaveDays=0, absentDays=0;
   const cur=new Date(start);
   while(cur<end){
     if(_onLeave(leaveRows, cur)){ leaveDays++; cur.setDate(cur.getDate()+1); continue; }
-    // Saturday and Sunday still count as worked days, but are never marked
-    // late — they run at a relaxed pace and holding them to a weekday start
-    // punished people for coming in at all.
-    const isWeekend = (cur.getDay()===0 || cur.getDay()===6);
     const ymd = cur.getFullYear()+'-'+String(cur.getMonth()+1).padStart(2,'0')+'-'+String(cur.getDate()).padStart(2,'0');
-    const isClassDay = classDays && classDays.has(ymd);
-
-    let expStart=null;
-    if(isClassDay){
-      // Per-date override for this person? (present key wins, even if null = excluded)
-      const dayOv = overrides && overrides[ymd];
-      const hasOv = dayOv && myName && Object.prototype.hasOwnProperty.call(dayOv, myName);
-      if(hasOv){
-        expStart = dayOv[myName]; // 'HH:MM' or null (null = excluded → falls through below)
-        if(expStart===null){
-          // Excluded this class day → use availability instead.
-          const av=_resolveAvailForDay(availSnaps, cur);
-          expStart=_expectedStartFor(av, cur);
-          if(!expStart && av===null && _firstClockInOn(logs, cur)) expStart=_ALLDAY_START;
-        }
-      }else if(classStart){
-        expStart = classStart; // roster default
-      }
-    }else{
-      const avail=_resolveAvailForDay(availSnaps, cur);
-      expStart=_expectedStartFor(avail, cur);
-      if(!expStart && avail===null && _firstClockInOn(logs, cur)){
-        expStart=_ALLDAY_START;
-      }
-    }
+    const expStart = shiftsByYmd[ymd] || null; // assigned shift start, or none
 
     if(expStart){
       const firstIn=_firstClockInOn(logs, cur);
       if(firstIn){
         measuredDays++;
-        const pp=expStart.split(':');
-        const expected=new Date(cur.getFullYear(),cur.getMonth(),cur.getDate(),+pp[0],+pp[1],0);
+        const pp=String(expStart).split(':');
+        const expected=new Date(cur.getFullYear(),cur.getMonth(),cur.getDate(),+pp[0],+pp[1]||0,0);
         // Compare the SAME rounded time the timesheet records, not the raw
         // clock. flexTimeStr snaps to 15-minute blocks, so an 08:07 arrival is
         // written to payroll as 08:00 — without this, someone reads "08:00" on
         // their timesheet and "late" on their report, from one clock-in.
         const lateMin=Math.round((_flexRound(firstIn)-expected)/60000); // negative if early
-        if(lateMin>_PUNCT_GRACE_MIN && !isWeekend){
+        if(lateMin>_PUNCT_GRACE_MIN){
           lateDays++; totalLateMin+=lateMin;
           if(lateMin>worstMin){ worstMin=lateMin; worstDay=cur.toLocaleDateString('en-AU',{weekday:'long'}); }
         }else{
-          onTimeDays++; // on time, early, or a weekend
+          onTimeDays++; // on time or early
         }
-      }
-    }else{
-      // No expected start (not rostered/available that day). If the person was
-      // explicitly UNAVAILABLE but still clocked in, reward it: count as a
-      // measured + on-time day. Can never be late (no start to beat), so it only
-      // helps — and their real expected days still count normally, so marking
-      // days unavailable can't be used to dodge late marks.
-      const av=_resolveAvailForDay(availSnaps, cur);
-      const slot=av ? av[(cur.getDay()+6)%7] : null;
-      const isUnavailable = slot && slot.type==='no';
-      if(isUnavailable && _firstClockInOn(logs, cur)){
-        measuredDays++; onTimeDays++;
+      }else{
+        // Rostered but never clocked in → absent. Ignored by punctuality;
+        // used only to break the attendance streak (Phase 2).
+        absentDays++;
       }
     }
+    // No assigned shift that day → the day does not exist in the calc.
     cur.setDate(cur.getDate()+1);
   }
   return { measuredDays, onTimeDays, lateDays, totalLateMin, worstMin, worstDay, leaveDays,
-           score:_punctScore(onTimeDays, measuredDays) };
+           absentDays, score:_punctScore(onTimeDays, measuredDays) };
 }
 
-// Load class days (Set of YYYY-MM-DD), roster (name->start), and per-date
-// overrides (ymd -> {name -> start|null}). Overrides win over the roster.
-let _classCtxCache=null;
-async function _loadClassContext(){
-  if(_classCtxCache) return _classCtxCache;
-  let days=new Set(), roster={}, overrides={};
+// Load assigned roster shifts for the fortnight window, keyed by staff name then
+// date: { staffName: { 'YYYY-MM-DD': 'HH:MM:SS' } }. This is the SOLE source of
+// expected start times for punctuality. Only status='assigned' shifts count —
+// open/pending_release shifts are not "theirs" for scoring purposes.
+// `end` is exclusive; shift_date is a plain date so we compare on the date part.
+let _rosterShiftCache=null;
+async function _loadRosterShifts(fw){
+  if(_rosterShiftCache) return _rosterShiftCache;
+  const byName={};
+  const startYmd = fw.start.getFullYear()+'-'+String(fw.start.getMonth()+1).padStart(2,'0')+'-'+String(fw.start.getDate()).padStart(2,'0');
+  const endD = new Date(fw.end.getTime()-_MS_DAY); // inclusive last day
+  const endYmd = endD.getFullYear()+'-'+String(endD.getMonth()+1).padStart(2,'0')+'-'+String(endD.getDate()).padStart(2,'0');
   try{
-    const d=await sbGet('class_days','?select=class_date')||[];
-    d.forEach(function(r){ if(r.class_date) days.add(r.class_date); });
+    const rows=await sbGet('roster_shifts',
+      '?status=eq.assigned&shift_date=gte.'+startYmd+'&shift_date=lte.'+endYmd+
+      '&select=staff_name,shift_date,start_time&order=shift_date.asc&limit=5000')||[];
+    rows.forEach(function(r){
+      if(!r.staff_name || !r.shift_date || !r.start_time) return;
+      // If someone has more than one assigned shift on a day, the earliest start
+      // is the one they're expected to hit — keep the min.
+      const m=(byName[r.staff_name]=byName[r.staff_name]||{});
+      if(!m[r.shift_date] || r.start_time < m[r.shift_date]) m[r.shift_date]=r.start_time;
+    });
   }catch(e){}
+  _rosterShiftCache=byName;
+  return _rosterShiftCache;
+}
+
+// ── WORK STREAK ──────────────────────
+// A streak = consecutive ASSIGNED shifts the person clocked in for (late still
+// counts — it's attendance, not punctuality). An absent day (assigned shift, no
+// clock-in) breaks it. Approved leave on an assigned shift also breaks it.
+// Non-rostered days aren't shifts, so they're simply not in the list and the
+// streak carries across them. Future shifts and an un-clocked-in today are
+// excluded so an upcoming roster entry never looks like a break.
+//
+// Returns { current, best, lastYmd }. Roster history only goes back as far as
+// roster_shifts exists, so streaks grow naturally from there.
+async function _computeMyStreak(){
+  const now=new Date();
+  const todayYmd = now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
+
+  // All of my assigned shifts up to and including today.
+  let shifts=[];
   try{
-    const r=await sbGet('class_roster','?select=staff_name,start_time')||[];
-    r.forEach(function(x){ roster[x.staff_name]=x.start_time; });
-  }catch(e){}
+    shifts=await sbGet('roster_shifts',
+      '?status=eq.assigned&staff_name=eq.'+encodeURIComponent(me)+
+      '&shift_date=lte.'+todayYmd+
+      '&select=shift_date&order=shift_date.asc&limit=2000')||[];
+  }catch(e){ shifts=[]; }
+  // Unique, sorted ascending list of shift dates (a person can have >1 row/day).
+  const dates=Array.from(new Set(shifts.map(function(r){return r.shift_date;}).filter(Boolean))).sort();
+  if(!dates.length) return { current:0, best:0, lastYmd:null };
+
+  // My clock-in days as a Set of YMD, over the shift span.
+  const firstD=dates[0];
+  let inDays=new Set();
   try{
-    const o=await sbGet('class_day_overrides','?select=class_date,staff_name,start_time')||[];
-    o.forEach(function(x){ (overrides[x.class_date]=overrides[x.class_date]||{})[x.staff_name]=x.start_time; }); // start_time may be null
+    const logs=await sbGet('clock_log',
+      '?staff_name=eq.'+encodeURIComponent(me)+'&action=eq.in'+
+      '&ts=gte.'+new Date(firstD+'T00:00:00').toISOString()+
+      '&select=ts&order=ts.asc&limit=5000')||[];
+    logs.forEach(function(r){
+      const t=new Date(r.ts);
+      inDays.add(t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0'));
+    });
   }catch(e){}
-  _classCtxCache={ days, roster, overrides };
-  return _classCtxCache;
+
+  // Approved leave ranges.
+  let leave=[];
+  try{ leave=await sbGet('leave_submissions','?staff_name=eq.'+encodeURIComponent(me)+'&status=eq.approved&select=from_date,to_date&limit=200')||[]; }catch(e){}
+  function onLeave(ymd){
+    return leave.some(function(l){ return l.from_date && l.to_date && ymd>=l.from_date && ymd<=l.to_date; });
+  }
+
+  // Classify each shift day: 'in' (kept), or break. Today only counts if already
+  // clocked in — otherwise drop it so a not-yet-worked shift isn't a break.
+  const kept=[]; // array of booleans in date order: true=clocked in, false=break
+  dates.forEach(function(ymd){
+    if(ymd===todayYmd && !inDays.has(ymd)) return; // today not worked yet → ignore
+    if(onLeave(ymd)){ kept.push(false); return; }   // leave breaks
+    kept.push(inDays.has(ymd));                      // in = keep, absent = break
+  });
+
+  // Best = longest run of true. Current = run of true ending at the last entry.
+  let best=0, run=0, current=0;
+  for(let i=0;i<kept.length;i++){
+    if(kept[i]){ run++; if(run>best) best=run; }
+    else run=0;
+  }
+  // current = trailing run
+  for(let i=kept.length-1;i>=0;i--){ if(kept[i]) current++; else break; }
+
+  return { current, best, lastYmd:dates[dates.length-1] };
+}
+
+// ── MOST IMPROVED (fortnight-over-fortnight) ──────────────────────
+// Persist this-fortnight snapshots to punctuality_history so future reports can
+// diff against them, and read back the person's improvement vs their previous
+// QUALIFYING fortnight. Roster coverage has gaps, so "previous" means the most
+// recent earlier fortnight where they met the shift floor — not blindly the
+// prior slot.
+const _IMPROVE_MIN_DAYS = 4; // must have >= this many measured shifts BOTH periods
+
+// Write-on-open: snapshot every measured staffer for a completed fortnight.
+// Idempotent (PK is fort_key+staff_name); safe to call repeatedly. Runs once per
+// page session via the guard flag.
+let _histWritten=false;
+async function _writeFortnightHistory(fw, board){
+  if(_histWritten) return;
+  _histWritten=true;
+  if(!fw || !board || !board.length) return;
+  const fortKey = fw.start.getFullYear()+String(fw.start.getMonth()+1).padStart(2,'0')+String(fw.start.getDate()).padStart(2,'0');
+  const fortStart = fw.start.getFullYear()+'-'+String(fw.start.getMonth()+1).padStart(2,'0')+'-'+String(fw.start.getDate()).padStart(2,'0');
+  const rows=board.filter(function(b){return b.measuredDays>0;}).map(function(b){
+    return { fort_key:fortKey, staff_name:b.name, score:b.score, y:b.onTimeDays, x:b.measuredDays, fort_start:fortStart };
+  });
+  if(!rows.length) return;
+  // Upsert with merge-duplicates so re-opens don't error on the PK. sbPost fixes
+  // Prefer to return=minimal, so post directly here to set the resolution.
+  try{
+    await fetch(SB+"/rest/v1/punctuality_history?on_conflict=fort_key,staff_name",{
+      method:"POST",
+      headers:{ "apikey":KEY, "Authorization":"Bearer "+_sbBearer(),
+                "Content-Type":"application/json",
+                "Prefer":"resolution=merge-duplicates,return=minimal" },
+      body:JSON.stringify(rows)
+    });
+  }catch(e){}
+}
+
+// My improvement vs my previous qualifying fortnight. `curScore`/`curX` are this
+// fortnight's freshly computed numbers (already in hand), so we don't depend on
+// the current history row being written yet. Returns null if there's no
+// comparable prior (new staffer, gap, or under the floor either period).
+async function _computeMyImprovement(fw, curScore, curX){
+  if(!(curX>=_IMPROVE_MIN_DAYS)) return null;
+  const curStart = fw.start.getFullYear()+'-'+String(fw.start.getMonth()+1).padStart(2,'0')+'-'+String(fw.start.getDate()).padStart(2,'0');
+  let hist=[];
+  try{
+    hist=await sbGet('punctuality_history',
+      '?staff_name=eq.'+encodeURIComponent(me)+
+      '&x=gte.'+_IMPROVE_MIN_DAYS+
+      '&fort_start=lt.'+curStart+
+      '&select=score,fort_start&order=fort_start.desc&limit=1')||[];
+  }catch(e){ return null; }
+  if(!hist.length) return null;
+  const prev=hist[0];
+  return { delta: curScore - prev.score, cur: curScore, prev: prev.score };
 }
 
 // The last COMPLETED fortnight window + storage key.
@@ -18548,21 +18597,15 @@ async function _computeMyFortnight(){
   const fw=_lastFortnight();
   if(!fw) return null;
 
-  let myAvail=[], myLeave=[], myLogs=[];
-  try{
-    myAvail=await sbGet('staff_availability_history','?staff_name=eq.'+encodeURIComponent(me)+'&saved_at=lt.'+fw.end.toISOString()+'&select=availability,is_ongoing,valid_from,valid_until,saved_at&order=saved_at.desc&limit=50')||[];
-  }catch(e){ myAvail=[]; }
-  if(!myAvail.length){
-    try{ const a=await sbGet('staff_availability','?staff_name=eq.'+encodeURIComponent(me)+'&order=updated_at.desc&limit=1'); if(a&&a.length) myAvail=a; }catch(e){}
-  }
+  let myLeave=[], myLogs=[];
   try{ myLeave=await sbGet('leave_submissions','?staff_name=eq.'+encodeURIComponent(me)+'&status=eq.approved&limit=100')||[]; }catch(e){ myLeave=[]; }
   myLogs=(_hoursLogs||[]).filter(function(r){ const t=new Date(r.ts); return t>=fw.start && t<fw.end; });
   if(!myLogs.length){
     try{ myLogs=await sbGet('clock_log','?staff_name=eq.'+encodeURIComponent(me)+'&ts=gte.'+fw.start.toISOString()+'&ts=lt.'+fw.end.toISOString()+'&order=ts.asc&limit=1000')||[]; }catch(e){ myLogs=[]; }
   }
 
-  const cctx=await _loadClassContext();
-  const mine=_computePunctuality(myAvail, myLogs, myLeave, fw.start, fw.end, { classDays:cctx.days, classStart:cctx.roster[me]||null, overrides:cctx.overrides, name:me });
+  const rosterBy=await _loadRosterShifts(fw);
+  const mine=_computePunctuality(rosterBy[me]||{}, myLogs, myLeave, fw.start, fw.end);
 
   // Fun fact: how many of this fortnight's punches were hand-entered/amended by
   // an admin, or auto-generated by the system. Purely informational — has zero
@@ -18587,7 +18630,13 @@ async function _computeMyFortnight(){
   const onTimeDays = mine.measuredDays - mine.lateDays;
   const onTimePct = mine.measuredDays ? Math.round(onTimeDays/mine.measuredDays*100) : null;
 
-  _myFortCache={ fw, mine, myFortLeaves, lostStr, onTimePct, amendedCount, autoCount };
+  let streak={ current:0, best:0, lastYmd:null };
+  try{ streak=await _computeMyStreak(); }catch(e){}
+
+  let improvement=null;
+  try{ improvement=await _computeMyImprovement(fw, mine.score, mine.measuredDays); }catch(e){}
+
+  _myFortCache={ fw, mine, myFortLeaves, lostStr, onTimePct, amendedCount, autoCount, streak, improvement };
   return _myFortCache;
 }
 
@@ -18623,37 +18672,65 @@ function dismissPunctualityNote(fortKey){
   if(el) el.innerHTML='';
 }
 
-// Render the leaderboard as HTML into a mount element (used by My Reports).
+// Render the positive-only Hall of Fame into a mount element (used by My
+// Reports). Two sections: the On-Time Club (everyone who hit a tier, shown as
+// badges — no numeric rank) and Volume Leaders (top few by on-time shift count).
+// There is deliberately no full ranked ladder and no "you're #23".
 function _leaderboardHTML(board){
   if(!board || !board.length) return '<div style="font-size:12.5px;color:#94a3b8;">No punctuality data for this fortnight yet.</div>';
-  const rankColors=['#c9a227','#8a94a6','#b06b3a']; // gold, silver, bronze
-  // Column header
-  const header='<div style="display:flex;align-items:center;gap:10px;padding:2px 9px 6px;font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#b3b9c6;">'+
-    '<div style="width:22px;flex-shrink:0;"></div>'+
-    '<div style="flex:1;min-width:0;">Name</div>'+
-    '<div style="flex-shrink:0;width:44px;text-align:center;">On&nbsp;time</div>'+
-    '<div style="flex-shrink:0;width:34px;text-align:center;">Days</div>'+
-    '<div style="flex-shrink:0;width:36px;text-align:center;">Leave</div>'+
-    '<div style="flex-shrink:0;min-width:34px;text-align:right;">Score</div>'+
-  '</div>';
-  return header + board.map(function(b,i){  // FULL board — no cap
+
+  // On-Time Club: anyone meeting the min-days floor and a tier cutoff.
+  const club=board.filter(function(b){ return b.measuredDays>=_PUNCT_MIN_DAYS && b.score>=_CLUB_SILVER; })
+                  .slice().sort(function(a,b){ return b.score-a.score || b.onTimeDays-a.onTimeDays || String(a.name).localeCompare(String(b.name)); });
+  const gold=club.filter(function(b){ return b.score>=_CLUB_GOLD; });
+  const silver=club.filter(function(b){ return b.score>=_CLUB_SILVER && b.score<_CLUB_GOLD; });
+
+  function medal(color){
+    return '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" style="flex-shrink:0;"><circle cx="12" cy="14" r="7" fill="'+color+'"/><circle cx="12" cy="14" r="7" fill="none" stroke="rgba(0,0,0,.12)" stroke-width="1"/><path d="M9 2l3 5 3-5" stroke="'+color+'" stroke-width="2.4" stroke-linecap="round" fill="none"/></svg>';
+  }
+  function chip(b, color){
     const isMe=b.name===me;
-    const rc = i<3 ? rankColors[i] : '#c7ccd6';
-    const rankBadge = '<div style="width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;flex-shrink:0;'+
-      (i<3?('background:'+rc+';color:#fff;'):('background:#f1f3f7;color:#8a94a6;'))+'">'+(i+1)+'</div>';
-    const leaveCell = (b.leaveDays>0)
-      ? '<div style="flex-shrink:0;width:36px;text-align:center;font-size:11px;font-weight:700;color:#0ea5e9;">'+b.leaveDays+'</div>'
-      : '<div style="flex-shrink:0;width:36px;text-align:center;font-size:11px;color:#d1d5db;">–</div>';
-    return '<div class="fr-lbmr-row'+(isMe?' me':'')+'" style="display:flex;align-items:center;gap:10px;padding:8px 9px;border-radius:8px;margin-bottom:4px;background:'+(isMe?'var(--accent-dim,#eef2ff)':'transparent')+';">'+
-      rankBadge+
-      '<div style="flex:1;min-width:0;font-size:13px;font-weight:'+(isMe?'800':'600')+';color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+esc(b.name)+(isMe?' (you)':'')+'</div>'+
-      '<div style="flex-shrink:0;width:44px;text-align:center;font-size:11px;color:#94a3b8;">'+b.onTimeDays+'/'+b.measuredDays+'</div>'+
-      '<div style="flex-shrink:0;width:34px;text-align:center;font-size:12px;font-weight:700;color:#475569;">'+b.measuredDays+'</div>'+
-      leaveCell+
-      '<div style="flex-shrink:0;min-width:34px;text-align:right;font-size:14px;font-weight:800;color:var(--accent-text,#4f46e5);font-variant-numeric:tabular-nums;">'+b.score+'%</div>'+
-    '</div>';
-  }).join('')+
-  '<div style="font-size:10.5px;color:#94a3b8;margin-top:10px;line-height:1.4;">Score is your on-time rate (on-time days ÷ days worked). Clocking in within 7 minutes of your rostered start, or early, counts as on time. Days = days worked this fortnight; among equal rates, more days ranks higher. Fewer than '+_PUNCT_MIN_DAYS+' days worked isn\u2019t ranked. Leave days are skipped (shown for context, they don\u2019t affect the score).</div>';
+    return '<span class="fr-hof-chip'+(isMe?' me':'')+'" style="display:inline-flex;align-items:center;gap:6px;padding:5px 10px 5px 8px;border-radius:999px;margin:0 6px 6px 0;font-size:12.5px;font-weight:'+(isMe?'800':'600')+';background:'+(isMe?'var(--accent-dim,#eef2ff)':'#f4f6fa')+';color:#0f172a;border:1px solid '+(isMe?'var(--accent-bd,#c7d2fe)':'#e6e9f0')+';">'+
+      medal(color)+esc(b.name)+(isMe?' (you)':'')+
+      '<span style="font-weight:800;color:#64748b;font-variant-numeric:tabular-nums;">'+b.score+'%</span></span>';
+  }
+
+  let html='';
+
+  if(gold.length || silver.length){
+    html+='<div style="font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#64748b;margin:2px 0 8px;">On-Time Club</div>';
+    if(gold.length){
+      html+='<div style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:#b7791f;margin:0 0 5px;">'+medal('#e0a92e')+'Gold \u00b7 '+_CLUB_GOLD+'%+</div>';
+      html+='<div style="margin-bottom:10px;">'+gold.map(function(b){return chip(b,'#e0a92e');}).join('')+'</div>';
+    }
+    if(silver.length){
+      html+='<div style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:#7a8496;margin:0 0 5px;">'+medal('#aab2c0')+'Silver \u00b7 '+_CLUB_SILVER+'\u2013'+(_CLUB_GOLD-1)+'%</div>';
+      html+='<div style="margin-bottom:10px;">'+silver.map(function(b){return chip(b,'#aab2c0');}).join('')+'</div>';
+    }
+  }else{
+    html+='<div style="font-size:12.5px;color:#94a3b8;margin-bottom:10px;">No On-Time Club members this fortnight \u2014 next one\u2019s yours.</div>';
+  }
+
+  // Volume Leaders: top by on-time shift count (board is already _hofSort'd).
+  const vol=board.filter(function(b){ return b.onTimeDays>0; }).slice(0,5);
+  if(vol.length){
+    html+='<div style="font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#64748b;margin:6px 0 8px;">Most on-time shifts</div>';
+    const maxY=vol[0].onTimeDays||1;
+    html+=vol.map(function(b){
+      const isMe=b.name===me;
+      const pct=Math.round((b.onTimeDays/maxY)*100);
+      return '<div style="display:flex;align-items:center;gap:10px;padding:6px 4px;">'+
+        '<div style="flex:1;min-width:0;">'+
+          '<div style="font-size:13px;font-weight:'+(isMe?'800':'600')+';color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:3px;">'+esc(b.name)+(isMe?' (you)':'')+'</div>'+
+          '<div style="height:6px;border-radius:4px;background:#eef1f6;overflow:hidden;"><div style="height:100%;width:'+pct+'%;border-radius:4px;background:'+(isMe?'var(--accent,#4f46e5)':'#9aa6c4')+';"></div></div>'+
+        '</div>'+
+        '<div style="flex-shrink:0;font-size:13px;font-weight:800;color:#475569;font-variant-numeric:tabular-nums;">'+b.onTimeDays+'</div>'+
+      '</div>';
+    }).join('');
+  }
+
+  html+='<div style="font-size:10.5px;color:#94a3b8;margin-top:12px;line-height:1.4;">On-time means clocking in within '+_PUNCT_GRACE_MIN+' minutes of your rostered shift start (or early). Expected start comes from the published roster. The On-Time Club needs at least '+_PUNCT_MIN_DAYS+' shifts worked to qualify. Approved leave days are skipped.</div>';
+  return html;
 }
 
 // Mount the leaderboard into My Reports. Only shown Monday-onward until opened.
@@ -18665,9 +18742,45 @@ async function loadFortLeaderboard(){
   if(!fw || !_fortReportShowable(fw)){ if(card) card.style.display='none'; return; }
   if(card) card.style.display='';
   mount.innerHTML='<div style="font-size:12px;color:#94a3b8;">Loading…</div>';
+
+  // Personal work streak (private — this card is only shown to the viewer).
+  const streakEl=document.getElementById('fortStreakMount');
+  if(streakEl){
+    try{
+      const d=await _computeMyFortnight();
+      const st=d&&d.streak;
+      if(st && (st.current>0 || st.best>0)){
+        const cur=st.current, best=st.best;
+        const sub = (cur>0 && cur===best && cur>1) ? 'your best run yet'
+                  : (cur>0 ? 'consecutive shift'+(cur===1?'':'s')+' clocked in'+(best>cur?' \u00b7 best '+best:'')
+                           : 'best run '+best+' \u2014 start a new one');
+        streakEl.innerHTML=
+          '<div style="display:flex;align-items:center;gap:12px;padding:11px 13px;border-radius:10px;background:linear-gradient(135deg,#fff7ed,#ffedd5);border:1px solid #fed7aa;">'+
+            '<div style="font-size:26px;line-height:1;">'+(cur>0?'\uD83D\uDD25':'\u2728')+'</div>'+
+            '<div style="flex:1;min-width:0;">'+
+              '<div style="font-size:15px;font-weight:800;color:#9a3412;">'+(cur>0?cur+' shift'+(cur===1?'':'s')+' on a roll':'No active streak')+'</div>'+
+              '<div style="font-size:11.5px;color:#b45309;margin-top:1px;">'+sub+'</div>'+
+            '</div>'+
+          '</div>';
+      }else{ streakEl.innerHTML=''; }
+      // Most Improved — append below the streak banner when there's a gain.
+      const imp=d&&d.improvement;
+      if(imp && imp.delta>0){
+        streakEl.innerHTML+=
+          '<div style="display:flex;align-items:center;gap:12px;padding:11px 13px;border-radius:10px;margin-top:8px;background:linear-gradient(135deg,#ecfdf5,#d1fae5);border:1px solid #a7f3d0;">'+
+            '<div style="font-size:24px;line-height:1;">\uD83D\uDCC8</div>'+
+            '<div style="flex:1;min-width:0;">'+
+              '<div style="font-size:15px;font-weight:800;color:#065f46;">Most improved \u00b7 +'+imp.delta+' pts</div>'+
+              '<div style="font-size:11.5px;color:#047857;margin-top:1px;">on-time rate '+imp.prev+'% \u2192 '+imp.cur+'% since last fortnight</div>'+
+            '</div>'+
+          '</div>';
+      }
+    }catch(e){ streakEl.innerHTML=''; }
+  }
+
   const board=await _buildLeaderboard(fw);
   mount.innerHTML=
-    '<div style="font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#64748b;margin-bottom:8px;">Punctuality leaderboard \u00b7 '+fw.period+'</div>'+
+    '<div style="font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#64748b;margin-bottom:8px;">Hall of Fame \u00b7 '+fw.period+'</div>'+
     _leaderboardHTML(board);
 }
 
@@ -18711,18 +18824,36 @@ async function openFortReport(){
   slides.push({kind:'hero', label:'Fortnight report', big:'Your two weeks', sub:fw.period});
 
   if(m.measuredDays>0){
-    slides.push({label:'Days you clocked in', big:m.measuredDays+'', sub:'tracked working day'+(m.measuredDays===1?'':'s')});
+    slides.push({label:'Rostered shifts you worked', big:m.measuredDays+'', sub:'clocked-in shift'+(m.measuredDays===1?'':'s')+' this fortnight'});
     slides.push({label:'On time', big:(data.onTimePct!=null?data.onTimePct+'%':'\u2014'),
-      sub:(m.measuredDays-m.lateDays)+' of '+m.measuredDays+' days \u00b7 arriving early counts as on time'});
+      sub:(m.measuredDays-m.lateDays)+' of '+m.measuredDays+' shifts \u00b7 arriving early counts as on time'});
     if(m.lateDays>0){
-      slides.push({label:'Late starts', big:m.lateDays+'', sub:'day'+(m.lateDays===1?'':'s')+' after your start time'});
+      slides.push({label:'Late starts', big:m.lateDays+'', sub:'shift'+(m.lateDays===1?'':'s')+' after your rostered start'});
       slides.push({label:'Time lost to lateness', big:data.lostStr, sub:m.worstMin?('longest wait: '+m.worstDay+', '+m.worstMin+' min'):''});
     }else{
       slides.push({label:'Late starts', big:'0', sub:'a flawless fortnight'});
     }
   }else{
-    slides.push({label:'Punctuality', big:'\u2014', sub:'no tracked working days this fortnight'});
+    slides.push({label:'Punctuality', big:'\u2014', sub:'no rostered shifts worked this fortnight'});
   }
+  // Work streak — consecutive rostered shifts clocked in (late still counts).
+  if(data.streak && (data.streak.current>0 || data.streak.best>0)){
+    const cur=data.streak.current, best=data.streak.best;
+    let sub;
+    if(cur>0 && cur===best && cur>1) sub='your best run yet \u2014 keep it going';
+    else if(cur>0) sub='consecutive rostered shift'+(cur===1?'':'s')+' clocked in'+(best>cur?' \u00b7 best: '+best:'');
+    else sub='best run: '+best+' shift'+(best===1?'':'s')+' \u2014 start a new one';
+    slides.push({kind:'streak', label:'Work streak', big:(cur>0?'\uD83D\uDD25 '+cur:'0'), sub:sub});
+  }
+
+  // Most Improved — rate gain vs previous qualifying fortnight. Positive-only:
+  // a decline isn't framed as an award (shown neutrally on the card instead).
+  if(data.improvement && data.improvement.delta>0){
+    const imp=data.improvement;
+    slides.push({label:'Most improved', big:'+'+imp.delta+' pts',
+      sub:'on-time rate up from '+imp.prev+'% to '+imp.cur+'% since last fortnight'});
+  }
+
   slides.push({label:'Leave taken', big:data.myFortLeaves+'', sub:data.myFortLeaves===0?'no leave this fortnight':'approved request'+(data.myFortLeaves===1?'':'s')});
 
   // Fun fact — purely informational, never affects the score.
@@ -18735,8 +18866,7 @@ async function openFortReport(){
     slides.push({label:'Fun fact', big:(amend>0?amend:auto)+'', sub:sub});
   }
 
-  const myRank = board ? board.findIndex(function(b){return b.name===me;}) : -1;
-  slides.push({kind:'leaderboard', board:board, myRank:myRank, label:'Punctuality leaderboard'});
+  slides.push({kind:'leaderboard', board:board, label:'On-Time Club'});
 
   slides.push({kind:'thanks', big:'Thank you', sub:'for your presence at the workplace this week.'});
 
@@ -18758,19 +18888,20 @@ async function openFortReport(){
 
   function slideInner(s){
     if(s.kind==='leaderboard'){
-      const rankColors=['#c9a227','#8a94a6','#b06b3a'];
-      const rows=(s.board&&s.board.length)? s.board.slice(0,6).map(function(b,i){
-        const isMe=b.name===me; const rc=i<3?rankColors[i]:'#c7ccd6';
-        const badge='<div class="fr-lb-rank" style="'+(i<3?('background:'+rc+';color:#fff;'):('background:#eceef3;color:#8a94a6;'))+'">'+(i+1)+'</div>';
+      // Positive-only: On-Time Club members (Gold/Silver), no numeric ranking.
+      const club=(s.board||[]).filter(function(b){ return b.measuredDays>=_PUNCT_MIN_DAYS && b.score>=_CLUB_SILVER; })
+        .slice().sort(function(a,b){ return b.score-a.score || b.onTimeDays-a.onTimeDays || String(a.name).localeCompare(String(b.name)); });
+      const rows=club.length? club.slice(0,8).map(function(b,i){
+        const isMe=b.name===me;
+        const color=b.score>=_CLUB_GOLD?'#e0a92e':'#aab2c0';
+        const dot='<div class="fr-lb-rank" style="background:'+color+';color:#fff;font-size:9px;">'+(b.score>=_CLUB_GOLD?'G':'S')+'</div>';
         return '<div class="fr-lb-row fr-stagger'+(isMe?' me':'')+'" style="--d:'+(i*70)+'ms;">'+
-          badge+
+          dot+
           '<div class="fr-lb-name">'+esc(b.name)+(isMe?' (you)':'')+'</div>'+
-          '<div class="fr-lb-ratio">'+b.onTimeDays+'/'+b.measuredDays+'</div>'+
           '<div class="fr-lb-score">'+b.score+'%</div>'+
         '</div>';
-      }).join('') : '<div class="fr-muted">No leaderboard data yet.</div>';
-      const youLine=(s.myRank>=6)?'<div class="fr-you">You\u2019re #'+(s.myRank+1)+'</div>':'';
-      return '<div class="fr-label">'+s.label+'</div><div class="fr-lb">'+rows+youLine+'</div>';
+      }).join('') : '<div class="fr-muted">No On-Time Club members this fortnight \u2014 next one\u2019s yours.</div>';
+      return '<div class="fr-label">'+s.label+'</div><div class="fr-lb">'+rows+'</div>';
     }
     if(s.kind==='hero'){
       return '<div class="fr-icon fr-draw">'+svgCal+'</div><div class="fr-label">'+s.label+'</div><div class="fr-hero">'+s.big+'</div><div class="fr-sub">'+s.sub+'</div>';
@@ -18848,23 +18979,10 @@ let _leaderboardCache=null;
 async function _buildLeaderboard(fw){
   if(_leaderboardCache) return _leaderboardCache;
 
-  // Availability HISTORY snapshots saved up to the fortnight end — this lets us
-  // resolve each day against the availability that actually applied then.
-  let histRows=[];
-  try{ histRows=await sbGet('staff_availability_history','?saved_at=lt.'+fw.end.toISOString()+'&select=staff_name,availability,is_ongoing,valid_from,valid_until,saved_at&order=saved_at.desc&limit=5000')||[]; }catch(e){}
-
-  const availBy={};
-  histRows.forEach(function(a){ (availBy[a.staff_name]=availBy[a.staff_name]||[]).push(a); });
-
-  // Fallback: anyone with no history yet uses their current live row.
-  try{
-    const live=await sbGet('staff_availability','?select=staff_name,availability,is_ongoing,valid_from,valid_until,updated_at')||[];
-    live.forEach(function(r){
-      if(!availBy[r.staff_name]){ availBy[r.staff_name]=[{availability:r.availability,is_ongoing:r.is_ongoing,valid_from:r.valid_from,valid_until:r.valid_until,saved_at:r.updated_at}]; }
-    });
-  }catch(e){}
-
-  if(!Object.keys(availBy).length) return null;
+  // The roster is the sole source of who's measured. Everyone with an assigned
+  // shift this fortnight is a candidate; nobody else can be scored.
+  const rosterBy=await _loadRosterShifts(fw);
+  if(!Object.keys(rosterBy).length) return null;
 
   // Fetch all approved leave + all clock logs in the window once, then bucket.
   let allLeave=[], allLogs=[];
@@ -18875,18 +18993,21 @@ async function _buildLeaderboard(fw){
   allLeave.forEach(function(l){ (leaveBy[l.staff_name]=leaveBy[l.staff_name]||[]).push(l); });
   allLogs.forEach(function(r){ (logsBy[r.staff_name]=logsBy[r.staff_name]||[]).push(r); });
 
-  const cctx=await _loadClassContext();
   const board=[];
-  Object.keys(availBy).forEach(function(nm){
-    const res=_computePunctuality(availBy[nm], logsBy[nm]||[], leaveBy[nm]||[], fw.start, fw.end, { classDays:cctx.days, classStart:cctx.roster[nm]||null, overrides:cctx.overrides, name:nm });
-    if(res.measuredDays>0){ // only rank people with tracked working days
-      board.push({ name:nm, score:res.score, onTimeDays:res.onTimeDays, measuredDays:res.measuredDays, lateDays:res.lateDays, leaveDays:res.leaveDays });
+  Object.keys(rosterBy).forEach(function(nm){
+    const res=_computePunctuality(rosterBy[nm], logsBy[nm]||[], leaveBy[nm]||[], fw.start, fw.end);
+    if(res.measuredDays>0){ // only include people with measured working days
+      board.push({ name:nm, score:res.score, onTimeDays:res.onTimeDays, measuredDays:res.measuredDays, lateDays:res.lateDays, leaveDays:res.leaveDays, absentDays:res.absentDays });
     }
   });
-  // Sort: ranked (>= min days) first, then on-time rate, then attendance
-  // (days worked) as an honest tiebreak, then fewer late days, then name.
-  board.sort(_punctSort);
+  // Positive-only board sorts by on-time count (volume), then rate, then name.
+  // No competitive "you're 23rd" ranking — the render splits this into an
+  // On-Time Club (badges) and a Volume Leader list.
+  board.sort(_hofSort);
   _leaderboardCache=board;
+  // Snapshot this fortnight to history (idempotent) so Most Improved has data to
+  // diff against next time. Fire-and-forget; never blocks the board.
+  _writeFortnightHistory(fw, board);
   return board;
 }
 
