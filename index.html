@@ -2824,19 +2824,25 @@ width:none !important;
 .fr-sub{ font-size:14px;font-weight:500;color:#71768a;margin-top:14px;line-height:1.45;padding:0 6px; }
 .fr-thanks-sub{ font-size:15px;font-weight:600;color:#4a4f63;margin-top:12px;line-height:1.5;padding:0 6px; }
 .fr-muted{ font-size:13px;color:#9498a8; }
-/* Golden name — reigning perfect-fortnight status. Slow, tasteful shimmer. */
-.golden-name{
+/* Glow names — reigning perfect-fortnight status, with pickable skins. A shared
+   flow animation; each skin swaps the gradient. Tasteful, slow shimmer. */
+.glow-name{
   font-weight:800;
-  background:linear-gradient(100deg,#b8860b 0%,#e6b422 20%,#fff2c2 40%,#e6b422 60%,#b8860b 80%,#e6b422 100%);
   background-size:220% auto;
   -webkit-background-clip:text;background-clip:text;
   -webkit-text-fill-color:transparent;color:transparent;
-  animation:goldenFlow 5.5s linear infinite;
+  animation:glowFlow 5.5s linear infinite;
 }
-@keyframes goldenFlow{ to{ background-position:-220% center; } }
-@media(prefers-reduced-motion:reduce){
-  .golden-name{ animation:none;background-position:0 center; }
-}
+@keyframes glowFlow{ to{ background-position:-220% center; } }
+.glow-gold        { background-image:linear-gradient(100deg,#b8860b,#e6b422 20%,#fff2c2 40%,#e6b422 60%,#b8860b 80%,#e6b422 100%); }
+.glow-ocean       { background-image:linear-gradient(100deg,#0369a1,#22d3ee 25%,#a5f3fc 45%,#22d3ee 65%,#0369a1 90%,#22d3ee 100%); }
+.glow-sunset      { background-image:linear-gradient(100deg,#c2410c,#fb923c 25%,#fde68a 45%,#f472b6 65%,#c2410c 90%,#fb923c 100%); }
+.glow-molten      { background-image:linear-gradient(100deg,#7f1d1d,#ef4444 25%,#fbbf24 45%,#ef4444 65%,#7f1d1d 90%,#ef4444 100%); }
+.glow-holographic { background-image:linear-gradient(100deg,#a78bfa,#f0abfc 20%,#7dd3fc 40%,#6ee7b7 60%,#fca5a5 80%,#a78bfa 100%); }
+.glow-emerald     { background-image:linear-gradient(100deg,#065f46,#10b981 25%,#a7f3d0 45%,#10b981 65%,#065f46 90%,#34d399 100%); }
+.glow-rosegold    { background-image:linear-gradient(100deg,#9f1239,#fb7185 25%,#ffe4e6 45%,#fda4af 65%,#9f1239 90%,#fb7185 100%); }
+.glow-galaxy      { background-image:linear-gradient(100deg,#312e81,#7c3aed 25%,#c4b5fd 45%,#6366f1 65%,#1e1b4b 90%,#a855f7 100%); }
+@media(prefers-reduced-motion:reduce){ .glow-name{ animation:none;background-position:0 center; } }
 .fr-timelost{ display:flex;flex-direction:column;align-items:center;gap:8px;background:#fcebeb;border:1px solid #f3b6b6;border-radius:18px;padding:22px 20px;margin:2px auto 0;max-width:320px; }
 .fr-tl-ic{ margin-bottom:2px; }
 .fr-tl-big{ font-size:clamp(40px,12vw,54px);font-weight:800;line-height:1;letter-spacing:-.03em;color:#c0392b;font-variant-numeric:tabular-nums; }
@@ -11819,7 +11825,14 @@ function viewStaffProfile(name){
   if(!p)return;
   const ava=name.split(' ').map(function(w){return w[0];}).join('').slice(0,2).toUpperCase();
   document.getElementById('svProfAva').textContent=ava;
-  document.getElementById('svProfName').textContent=name;
+  // Name — glowy if they hold the status (skin-aware).
+  const nameEl=document.getElementById('svProfName');
+  if(window.isGoldenName && window.isGoldenName(name)){
+    const skin=window.glowSkinFor(name);
+    nameEl.innerHTML='<span class="glow-name glow-'+skin+'">'+esc(name)+'</span>';
+  }else{
+    nameEl.textContent=name;
+  }
   const pronEl=document.getElementById('svProfPronouns');
   if(p.pronouns){pronEl.textContent=p.pronouns;pronEl.style.display='block';}
   else pronEl.style.display='none';
@@ -11829,7 +11842,86 @@ function viewStaffProfile(name){
   const roleEl=document.getElementById('svProfRole');
   if(p.is_admin){roleEl.textContent='Admin';roleEl.style.display='block';}
   else roleEl.style.display='none';
+
+  // Glow section: info tag + "why", and (own profile only) the skin picker.
+  _setupProfileGlow(name);
+
   document.getElementById('staffProfileViewOverlay').style.display='flex';
+}
+
+// Wire up the glow tag, explanation, and picker for a profile.
+window._svGlowName=null;
+async function _setupProfileGlow(name){
+  _svGlowName=name;
+  const infoEl=document.getElementById('svProfGlowInfo');
+  const tagEl=document.getElementById('svProfGlowTag');
+  const whyEl=document.getElementById('svProfGlowWhy');
+  const pickerEl=document.getElementById('svProfGlowPicker');
+  whyEl.style.display='none';
+  const isGolden = window.isGoldenName && window.isGoldenName(name);
+  if(!isGolden){ infoEl.style.display='none'; pickerEl.style.display='none'; return; }
+
+  const skin=window.glowSkinFor(name);
+  tagEl.className='glow-name glow-'+skin;
+  tagEl.textContent='Glowing \u00b7 '+(window.GLOW_SKIN_LABELS[skin]||skin);
+  infoEl.style.display='flex';
+
+  // Build the "why" text from their perfect fortnight record.
+  whyEl.dataset.text='This name glows because '+name.split(' ')[0]+' had a perfect fortnight \u2014 100% on time. It stays until a fortnight breaks the streak.';
+  try{
+    const latest=await sbGet('punctuality_history','?select=fort_start&order=fort_start.desc&limit=1');
+    if(latest&&latest.length){
+      const fs=latest[0].fort_start;
+      const rec=await sbGet('punctuality_history','?staff_name=eq.'+encodeURIComponent(name)+'&fort_start=eq.'+fs+'&select=x,fort_start&limit=1');
+      if(rec&&rec.length){
+        const d=new Date(rec[0].fort_start);
+        const endD=new Date(d.getTime()+13*86400000);
+        const fmt=function(x){return x.toLocaleDateString('en-AU',{day:'numeric',month:'short'});};
+        whyEl.dataset.text='This name glows because '+name.split(' ')[0]+' had a perfect fortnight \u2014 100% on time across all '+rec[0].x+' rostered shift'+(rec[0].x===1?'':'s')+' ('+fmt(d)+' \u2013 '+fmt(endD)+'). It stays until a fortnight breaks the streak.';
+      }
+    }
+  }catch(e){}
+
+  // Picker only on your OWN profile.
+  if(name===(window.me||me)){
+    pickerEl.style.display='block';
+    const wrap=document.getElementById('svProfGlowSwatches');
+    wrap.innerHTML=window.GLOW_SKINS.map(function(sk){
+      const sel=(sk===skin);
+      return '<button onclick="pickGlowSkin(\''+sk+'\')" title="'+(window.GLOW_SKIN_LABELS[sk]||sk)+'" '+
+        'style="cursor:pointer;border-radius:10px;padding:7px 11px;font-family:inherit;font-size:12px;font-weight:800;'+
+        'background:#fff;border:2px solid '+(sel?'#0f172a':'#e5e7eb')+';">'+
+        '<span class="glow-name glow-'+sk+'">'+(window.GLOW_SKIN_LABELS[sk]||sk)+'</span></button>';
+    }).join('');
+  }else{
+    pickerEl.style.display='none';
+  }
+}
+
+function toggleGlowWhy(){
+  const w=document.getElementById('svProfGlowWhy');
+  if(w.style.display==='none'){ w.textContent=w.dataset.text||''; w.style.display='block'; }
+  else w.style.display='none';
+}
+
+// Save a skin choice (own profile). Optimistic: update locally + re-render.
+async function pickGlowSkin(skin){
+  const name=window.me||me;
+  if(!window.GLOW_SKINS || window.GLOW_SKINS.indexOf(skin)<0) return;
+  window._glowSkins=window._glowSkins||{};
+  window._glowSkins[name]=skin;
+  _setupProfileGlow(name); // refresh swatches + tag + name
+  const nameEl=document.getElementById('svProfName');
+  if(nameEl) nameEl.innerHTML='<span class="glow-name glow-'+skin+'">'+esc(name)+'</span>';
+  try{
+    await fetch(SB+"/rest/v1/staff_glow?on_conflict=staff_name",{
+      method:"POST",
+      headers:{ "apikey":KEY, "Authorization":"Bearer "+_sbBearer(),
+                "Content-Type":"application/json",
+                "Prefer":"resolution=merge-duplicates,return=minimal" },
+      body:JSON.stringify([{ staff_name:name, skin:skin, updated_at:new Date().toISOString() }])
+    });
+  }catch(e){ showToast&&showToast('Could not save glow'); }
 }
 
 function closeStaffProfileView(){
@@ -18513,24 +18605,32 @@ async function _computeMyStreak(){
   return { current, best, lastYmd:dates[dates.length-1] };
 }
 
-// ── GOLDEN NAME (reigning perfect-fortnight status) ──────────────────────
+// ── GOLDEN NAME (reigning perfect-fortnight status) + SKINS ──────────────
 // A staffer who was PERFECT last completed fortnight (100% on-time, >= the shift
-// floor) gets a flowing golden name everywhere their name shows — directory,
-// call log, fortnight report — until a later fortnight breaks the streak. It
-// reflects the most recent COMPLETED fortnight and refreshes as each one closes.
+// floor) gets a flowing glowy name everywhere their name shows — directory, call
+// log, fortnight report — until a later fortnight breaks the streak. Default
+// glow is gold; while they hold the status they can pick a skin (ocean, sunset,
+// molten, holographic, emerald, rose-gold, galaxy). The pick is remembered and
+// shown to everyone. Losing the status hides the glow (picker locks) but keeps
+// the saved choice for next time.
 //
-// Shared across index.html and dialtrac.js, so use the window-guard pattern (no
-// declaration keyword) to avoid let/var collisions between the two files.
-window._goldenNames = window._goldenNames || null;   // Set<staffName> once loaded
-window._goldenLoading = window._goldenLoading || null; // in-flight promise
+// Shared across index.html and dialtrac.js — window-guard pattern, no declaration
+// keyword, to avoid let/var collisions between the two files.
+window.GLOW_SKINS = window.GLOW_SKINS || ['gold','ocean','sunset','molten','holographic','emerald','rosegold','galaxy'];
+window.GLOW_SKIN_LABELS = window.GLOW_SKIN_LABELS || {
+  gold:'Gold', ocean:'Ocean', sunset:'Sunset', molten:'Molten',
+  holographic:'Holographic', emerald:'Emerald', rosegold:'Rose gold', galaxy:'Galaxy'
+};
+window._goldenNames = window._goldenNames || null;   // Set<staffName> currently perfect
+window._glowSkins = window._glowSkins || null;        // { staffName: skin }
+window._goldenLoading = window._goldenLoading || null;
 
-window.loadGoldenNames = window.loadGoldenNames || async function(){
-  if(window._goldenNames) return window._goldenNames;
+window.loadGoldenNames = window.loadGoldenNames || async function(force){
+  if(!force && window._goldenNames) return window._goldenNames;
   if(window._goldenLoading) return window._goldenLoading;
   window._goldenLoading = (async function(){
-    const set=new Set();
+    const set=new Set(); const skins={};
     try{
-      // Most recent fortnight present in history.
       const latest=await sbGet('punctuality_history','?select=fort_start&order=fort_start.desc&limit=1');
       if(latest && latest.length){
         const fs=latest[0].fort_start;
@@ -18538,8 +18638,11 @@ window.loadGoldenNames = window.loadGoldenNames || async function(){
           '?fort_start=eq.'+fs+'&score=eq.100&x=gte.4&select=staff_name&limit=200')||[];
         rows.forEach(function(r){ if(r.staff_name) set.add(r.staff_name); });
       }
+      // Chosen skins (only meaningful for those currently in the set).
+      const gl=await sbGet('staff_glow','?select=staff_name,skin&limit=500')||[];
+      gl.forEach(function(g){ if(g.staff_name) skins[g.staff_name]=g.skin||'gold'; });
     }catch(e){}
-    window._goldenNames=set;
+    window._goldenNames=set; window._glowSkins=skins;
     window._goldenLoading=null;
     return set;
   })();
@@ -18550,13 +18653,18 @@ window.isGoldenName = window.isGoldenName || function(name){
   return !!(window._goldenNames && name && window._goldenNames.has(name));
 };
 
-// Return a staff name wrapped in the golden span when they hold the status, else
-// the escaped plain name. `escFn` lets each file pass its own escaper.
+// Skin for a name (defaults to gold). Only applies visually when isGoldenName.
+window.glowSkinFor = window.glowSkinFor || function(name){
+  const s = window._glowSkins && window._glowSkins[name];
+  return (s && window.GLOW_SKINS.indexOf(s)>=0) ? s : 'gold';
+};
+
+// Wrap a staff name in the glow span when they hold status, using their skin.
 window.renderStaffName = window.renderStaffName || function(name, escFn){
   const e = (escFn||function(s){return s;});
   const safe = e(name||'');
   if(window.isGoldenName(name)){
-    return '<span class="golden-name" title="Perfect attendance last fortnight">'+safe+'</span>';
+    return '<span class="glow-name glow-'+window.glowSkinFor(name)+'" title="Perfect attendance last fortnight">'+safe+'</span>';
   }
   return safe;
 };
@@ -24053,9 +24161,18 @@ window.addEventListener('resize', function(){
       <div style="padding:24px 20px;text-align:center;">
         <div id="svProfAva" style="width:72px;height:72px;border-radius:50%;background:linear-gradient(135deg,var(--accent),#7c3aed);display:flex;align-items:center;justify-content:center;margin:0 auto 12px;color:#fff;font-size:24px;font-weight:800;">?</div>
         <div id="svProfName" style="font-size:18px;font-weight:700;color:#0f172a;"></div>
+        <div id="svProfGlowInfo" style="display:none;margin-top:6px;align-items:center;justify-content:center;gap:5px;">
+          <span style="font-size:11px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;" class="glow-name glow-gold" id="svProfGlowTag">Glowing</span>
+          <button onclick="toggleGlowWhy()" title="Why is this name glowing?" style="width:16px;height:16px;border-radius:50%;border:none;background:#fde68a;color:#92400e;font-size:11px;font-weight:800;line-height:1;cursor:pointer;font-family:inherit;padding:0;">i</button>
+        </div>
+        <div id="svProfGlowWhy" style="display:none;margin:8px auto 0;max-width:300px;font-size:12px;color:#64748b;line-height:1.45;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:8px 11px;"></div>
         <div id="svProfPronouns" style="font-size:12px;color:#94a3b8;margin-top:4px;display:none;"></div>
         <div id="svProfTeam" style="font-size:13px;color:#64748b;margin-top:8px;font-weight:500;display:none;"></div>
         <div id="svProfRole" style="font-size:11px;color:#94a3b8;margin-top:4px;display:none;"></div>
+        <div id="svProfGlowPicker" style="display:none;margin-top:16px;padding-top:14px;border-top:1px solid #f1f5f9;">
+          <div style="font-size:11px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:#94a3b8;margin-bottom:10px;">Your glow \u2014 pick a style</div>
+          <div id="svProfGlowSwatches" style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;"></div>
+        </div>
       </div>
     </div>
   </div>

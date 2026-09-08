@@ -1391,7 +1391,8 @@ function clEsc(s){
 function clStaffName(fullName, display){
   const shown = clEsc(display != null ? display : fullName);
   if(window.isGoldenName && window.isGoldenName(fullName)){
-    return '<span class="golden-name" title="Perfect attendance last fortnight">'+shown+'</span>';
+    const skin = (window.glowSkinFor ? window.glowSkinFor(fullName) : 'gold');
+    return '<span class="glow-name glow-'+skin+'" title="Perfect attendance last fortnight">'+shown+'</span>';
   }
   return shown;
 }
