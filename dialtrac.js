@@ -1383,6 +1383,19 @@ function clEsc(s){
   return String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 }
 /**
+ * Wrap a staff member's displayed name in the golden style if they currently
+ * hold perfect-fortnight status. `fullName` is matched against the shared golden
+ * set (loaded by index.html); `display` is what actually shows (often first
+ * name only in the call log). Falls back to the escaped display text.
+ */
+function clStaffName(fullName, display){
+  const shown = clEsc(display != null ? display : fullName);
+  if(window.isGoldenName && window.isGoldenName(fullName)){
+    return '<span class="golden-name" title="Perfect attendance last fortnight">'+shown+'</span>';
+  }
+  return shown;
+}
+/**
  * How stale a waiting callback is. Returns a tier the card styles against —
  * a three-day-old callback and an hour-old one currently look identical,
  * which is why the queue gets logged but not worked.
@@ -2154,6 +2167,9 @@ function clSyncSub(){
 async function clLoadQueue(){
   const empty=document.getElementById('clQueueEmpty');
   const body=document.getElementById('clQueueBody');
+  // Golden-name status (perfect-fortnight holders) for logged_by styling. Shared
+  // loader lives in index.html; safe no-op if unavailable.
+  try{ if(window.loadGoldenNames) await window.loadGoldenNames(); }catch(e){}
   // Skeletons on first load; on a refresh the existing rows stay put so the
   // table doesn't flash for what is usually a sub-second fetch.
   if(body && !(_clQueue && _clQueue.length)){
@@ -2834,7 +2850,7 @@ function clRenderQueue(){
             (pretty?'<button class="cl-num" onclick="event.stopPropagation();clCopy(this,\''+clEsc(r.phone_e164)+'\')" title="Copy">'+
               clEsc(pretty)+'</button>':'<span class="cl-dash">no number</span>')+
             '<span class="cl-tag">'+clEsc(r.reason)+'</span>'+
-            '<span class="cl-meta">'+clEsc(r.logged_by.split(' ')[0])+
+            '<span class="cl-meta">'+clStaffName(r.logged_by, (r.logged_by||'').split(' ')[0])+
               (_clScope==='all' && r.team && !handoff?' · '+clEsc(r.team):'')+
               ' · '+clAgo(stamp)+
               (backLabel?' · rung back '+backLabel+' later':'')+'</span>'+
@@ -2858,7 +2874,7 @@ function clRenderQueue(){
               return '<div class="cl-stack-row">'+
                 '<div class="cl-stack-head">'+
                   '<span class="cl-stack-t">'+t+'</span>'+
-                  '<span class="cl-stack-by">'+clEsc((s.logged_by||'').split(' ')[0])+'</span>'+
+                  '<span class="cl-stack-by">'+clStaffName(s.logged_by, (s.logged_by||'').split(' ')[0])+'</span>'+
                   (s.reason && !naRe.test(String(s.reason).trim())
                     ?'<span class="cl-stack-rs">'+clEsc(s.reason)+'</span>':'')+
                   sPill+

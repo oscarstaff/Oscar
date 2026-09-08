@@ -2824,6 +2824,23 @@ width:none !important;
 .fr-sub{ font-size:14px;font-weight:500;color:#71768a;margin-top:14px;line-height:1.45;padding:0 6px; }
 .fr-thanks-sub{ font-size:15px;font-weight:600;color:#4a4f63;margin-top:12px;line-height:1.5;padding:0 6px; }
 .fr-muted{ font-size:13px;color:#9498a8; }
+/* Golden name — reigning perfect-fortnight status. Slow, tasteful shimmer. */
+.golden-name{
+  font-weight:800;
+  background:linear-gradient(100deg,#b8860b 0%,#e6b422 20%,#fff2c2 40%,#e6b422 60%,#b8860b 80%,#e6b422 100%);
+  background-size:220% auto;
+  -webkit-background-clip:text;background-clip:text;
+  -webkit-text-fill-color:transparent;color:transparent;
+  animation:goldenFlow 5.5s linear infinite;
+}
+@keyframes goldenFlow{ to{ background-position:-220% center; } }
+@media(prefers-reduced-motion:reduce){
+  .golden-name{ animation:none;background-position:0 center; }
+}
+.fr-timelost{ display:flex;flex-direction:column;align-items:center;gap:8px;background:#fcebeb;border:1px solid #f3b6b6;border-radius:18px;padding:22px 20px;margin:2px auto 0;max-width:320px; }
+.fr-tl-ic{ margin-bottom:2px; }
+.fr-tl-big{ font-size:clamp(40px,12vw,54px);font-weight:800;line-height:1;letter-spacing:-.03em;color:#c0392b;font-variant-numeric:tabular-nums; }
+.fr-tl-ctx{ font-size:13.5px;font-weight:600;color:#a3352d;line-height:1.35; }
 .fr-you{ font-size:12.5px;color:#9498a8;margin-top:8px; }
 /* leaderboard rows */
 .fr-lb{ margin-top:4px;text-align:left; }
@@ -11729,6 +11746,7 @@ async function openStaffDirectory(){
       };
     }).filter(function(p){return p.staff_name;});
     console.log('[directory] loaded', _staffDirData.length, 'staff');
+    try{ await loadGoldenNames(); }catch(e){}
     renderStaffDirectory(_staffDirData);
   }catch(e){
     console.warn('[directory] error:', e);
@@ -11779,7 +11797,7 @@ function renderStaffDirectory(list){
         }
         return '<div onclick="viewStaffProfile(\''+p.staff_name.replace(/'/g,"&#39;")+'\')" style="display:flex;align-items:center;gap:10px;padding:8px 8px;border-radius:8px;cursor:pointer;transition:background .1s;" onmouseover="this.style.background=\'#f8fafc\'" onmouseout="this.style.background=\'\'" >'+
           '<div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--accent),#7c3aed);display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700;flex-shrink:0;">'+ava+'</div>'+
-          '<div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:600;color:#0f172a;">'+esc(p.staff_name)+pron+badge+'</div></div>'+
+          '<div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:600;color:#0f172a;">'+renderStaffName(p.staff_name, esc)+pron+badge+'</div></div>'+
           quizBlock+
           (myIsAdmin?'':'<svg width="14" height="14" viewBox="0 0 20 20" fill="#cbd5e1"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>')+
           '</div>';
@@ -18495,7 +18513,55 @@ async function _computeMyStreak(){
   return { current, best, lastYmd:dates[dates.length-1] };
 }
 
-// ── MOST IMPROVED (fortnight-over-fortnight) ──────────────────────
+// ── GOLDEN NAME (reigning perfect-fortnight status) ──────────────────────
+// A staffer who was PERFECT last completed fortnight (100% on-time, >= the shift
+// floor) gets a flowing golden name everywhere their name shows — directory,
+// call log, fortnight report — until a later fortnight breaks the streak. It
+// reflects the most recent COMPLETED fortnight and refreshes as each one closes.
+//
+// Shared across index.html and dialtrac.js, so use the window-guard pattern (no
+// declaration keyword) to avoid let/var collisions between the two files.
+window._goldenNames = window._goldenNames || null;   // Set<staffName> once loaded
+window._goldenLoading = window._goldenLoading || null; // in-flight promise
+
+window.loadGoldenNames = window.loadGoldenNames || async function(){
+  if(window._goldenNames) return window._goldenNames;
+  if(window._goldenLoading) return window._goldenLoading;
+  window._goldenLoading = (async function(){
+    const set=new Set();
+    try{
+      // Most recent fortnight present in history.
+      const latest=await sbGet('punctuality_history','?select=fort_start&order=fort_start.desc&limit=1');
+      if(latest && latest.length){
+        const fs=latest[0].fort_start;
+        const rows=await sbGet('punctuality_history',
+          '?fort_start=eq.'+fs+'&score=eq.100&x=gte.4&select=staff_name&limit=200')||[];
+        rows.forEach(function(r){ if(r.staff_name) set.add(r.staff_name); });
+      }
+    }catch(e){}
+    window._goldenNames=set;
+    window._goldenLoading=null;
+    return set;
+  })();
+  return window._goldenLoading;
+};
+
+window.isGoldenName = window.isGoldenName || function(name){
+  return !!(window._goldenNames && name && window._goldenNames.has(name));
+};
+
+// Return a staff name wrapped in the golden span when they hold the status, else
+// the escaped plain name. `escFn` lets each file pass its own escaper.
+window.renderStaffName = window.renderStaffName || function(name, escFn){
+  const e = (escFn||function(s){return s;});
+  const safe = e(name||'');
+  if(window.isGoldenName(name)){
+    return '<span class="golden-name" title="Perfect attendance last fortnight">'+safe+'</span>';
+  }
+  return safe;
+};
+
+
 // Persist this-fortnight snapshots to punctuality_history so future reports can
 // diff against them, and read back the person's improvement vs their previous
 // QUALIFYING fortnight. Roster coverage has gaps, so "previous" means the most
@@ -18685,27 +18751,42 @@ function _leaderboardHTML(board){
   const gold=club.filter(function(b){ return b.score>=_CLUB_GOLD; });
   const silver=club.filter(function(b){ return b.score>=_CLUB_SILVER && b.score<_CLUB_GOLD; });
 
-  function medal(color){
-    return '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" style="flex-shrink:0;"><circle cx="12" cy="14" r="7" fill="'+color+'"/><circle cx="12" cy="14" r="7" fill="none" stroke="rgba(0,0,0,.12)" stroke-width="1"/><path d="M9 2l3 5 3-5" stroke="'+color+'" stroke-width="2.4" stroke-linecap="round" fill="none"/></svg>';
+  function medal(fill, ring){
+    // Clean disc + two ribbon tails. No font dependency.
+    return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" style="flex-shrink:0;display:block;">'+
+      '<path d="M8.5 2h3l-2.2 7h-3z" fill="'+ring+'"/>'+
+      '<path d="M15.5 2h-3l2.2 7h3z" fill="'+ring+'"/>'+
+      '<circle cx="12" cy="15" r="6.5" fill="'+fill+'"/>'+
+      '<circle cx="12" cy="15" r="6.5" fill="none" stroke="'+ring+'" stroke-width="1.5"/>'+
+      '<circle cx="12" cy="15" r="2.6" fill="'+ring+'" opacity=".55"/>'+
+    '</svg>';
   }
-  function chip(b, color){
+  // Tier palettes: [chip bg, chip border, disc fill, disc ring/text]
+  const GOLD_C  = { bg:'#faeeda', bd:'#ef9f27', disc:'#efa927', ring:'#633806' };
+  const SILV_C  = { bg:'#f4f4f2', bd:'#c9c8c1', disc:'#c2c1ba', ring:'#4a4a46' };
+  function chip(b, C){
     const isMe=b.name===me;
-    return '<span class="fr-hof-chip'+(isMe?' me':'')+'" style="display:inline-flex;align-items:center;gap:6px;padding:5px 10px 5px 8px;border-radius:999px;margin:0 6px 6px 0;font-size:12.5px;font-weight:'+(isMe?'800':'600')+';background:'+(isMe?'var(--accent-dim,#eef2ff)':'#f4f6fa')+';color:#0f172a;border:1px solid '+(isMe?'var(--accent-bd,#c7d2fe)':'#e6e9f0')+';">'+
-      medal(color)+esc(b.name)+(isMe?' (you)':'')+
-      '<span style="font-weight:800;color:#64748b;font-variant-numeric:tabular-nums;">'+b.score+'%</span></span>';
+    const bg = isMe ? 'var(--accent-dim,#eef2ff)' : C.bg;
+    const bd = isMe ? 'var(--accent-bd,#c7d2fe)' : C.bd;
+    const nameCol = isMe ? 'var(--accent-text,#4f46e5)' : '#0f172a';
+    const scoreCol = isMe ? 'var(--accent-text,#4f46e5)' : C.ring;
+    return '<span class="fr-hof-chip'+(isMe?' me':'')+'" style="display:inline-flex;align-items:center;gap:7px;padding:6px 12px 6px 8px;border-radius:999px;margin:0 7px 7px 0;background:'+bg+';border:1px solid '+bd+';">'+
+      medal(C.disc, C.ring)+
+      '<span style="font-size:13px;font-weight:'+(isMe?'800':'600')+';color:'+nameCol+';">'+renderStaffName(b.name, esc)+(isMe?' (you)':'')+'</span>'+
+      '<span style="font-size:12px;font-weight:800;color:'+scoreCol+';font-variant-numeric:tabular-nums;">'+b.score+'%</span></span>';
   }
 
   let html='';
 
   if(gold.length || silver.length){
-    html+='<div style="font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#64748b;margin:2px 0 8px;">On-Time Club</div>';
+    html+='<div style="font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#64748b;margin:2px 0 10px;">On-Time Club</div>';
     if(gold.length){
-      html+='<div style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:#b7791f;margin:0 0 5px;">'+medal('#e0a92e')+'Gold \u00b7 '+_CLUB_GOLD+'%+</div>';
-      html+='<div style="margin-bottom:10px;">'+gold.map(function(b){return chip(b,'#e0a92e');}).join('')+'</div>';
+      html+='<div style="display:flex;align-items:center;gap:7px;font-size:11px;font-weight:700;color:#854f0b;margin:0 0 7px;">'+medal(GOLD_C.disc,GOLD_C.ring)+'Gold \u00b7 '+_CLUB_GOLD+'%+</div>';
+      html+='<div style="margin-bottom:14px;">'+gold.map(function(b){return chip(b,GOLD_C);}).join('')+'</div>';
     }
     if(silver.length){
-      html+='<div style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:#7a8496;margin:0 0 5px;">'+medal('#aab2c0')+'Silver \u00b7 '+_CLUB_SILVER+'\u2013'+(_CLUB_GOLD-1)+'%</div>';
-      html+='<div style="margin-bottom:10px;">'+silver.map(function(b){return chip(b,'#aab2c0');}).join('')+'</div>';
+      html+='<div style="display:flex;align-items:center;gap:7px;font-size:11px;font-weight:700;color:#5f5e5a;margin:0 0 7px;">'+medal(SILV_C.disc,SILV_C.ring)+'Silver \u00b7 '+_CLUB_SILVER+'\u2013'+(_CLUB_GOLD-1)+'%</div>';
+      html+='<div style="margin-bottom:10px;">'+silver.map(function(b){return chip(b,SILV_C);}).join('')+'</div>';
     }
   }else{
     html+='<div style="font-size:12.5px;color:#94a3b8;margin-bottom:10px;">No On-Time Club members this fortnight \u2014 next one\u2019s yours.</div>';
@@ -18721,7 +18802,7 @@ function _leaderboardHTML(board){
       const pct=Math.round((b.onTimeDays/maxY)*100);
       return '<div style="display:flex;align-items:center;gap:10px;padding:6px 4px;">'+
         '<div style="flex:1;min-width:0;">'+
-          '<div style="font-size:13px;font-weight:'+(isMe?'800':'600')+';color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:3px;">'+esc(b.name)+(isMe?' (you)':'')+'</div>'+
+          '<div style="font-size:13px;font-weight:'+(isMe?'800':'600')+';color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:3px;">'+renderStaffName(b.name, esc)+(isMe?' (you)':'')+'</div>'+
           '<div style="height:6px;border-radius:4px;background:#eef1f6;overflow:hidden;"><div style="height:100%;width:'+pct+'%;border-radius:4px;background:'+(isMe?'var(--accent,#4f46e5)':'#9aa6c4')+';"></div></div>'+
         '</div>'+
         '<div style="flex-shrink:0;font-size:13px;font-weight:800;color:#475569;font-variant-numeric:tabular-nums;">'+b.onTimeDays+'</div>'+
@@ -18829,7 +18910,8 @@ async function openFortReport(){
       sub:(m.measuredDays-m.lateDays)+' of '+m.measuredDays+' shifts \u00b7 arriving early counts as on time'});
     if(m.lateDays>0){
       slides.push({label:'Late starts', big:m.lateDays+'', sub:'shift'+(m.lateDays===1?'':'s')+' after your rostered start'});
-      slides.push({label:'Time lost to lateness', big:data.lostStr, sub:m.worstMin?('longest wait: '+m.worstDay+', '+m.worstMin+' min'):''});
+      slides.push({kind:'timelost', label:'Time lost to lateness', big:data.lostStr,
+        totalMin:m.totalLateMin, worstMin:m.worstMin, worstDay:m.worstDay});
     }else{
       slides.push({label:'Late starts', big:'0', sub:'a flawless fortnight'});
     }
@@ -18893,15 +18975,35 @@ async function openFortReport(){
         .slice().sort(function(a,b){ return b.score-a.score || b.onTimeDays-a.onTimeDays || String(a.name).localeCompare(String(b.name)); });
       const rows=club.length? club.slice(0,8).map(function(b,i){
         const isMe=b.name===me;
-        const color=b.score>=_CLUB_GOLD?'#e0a92e':'#aab2c0';
-        const dot='<div class="fr-lb-rank" style="background:'+color+';color:#fff;font-size:9px;">'+(b.score>=_CLUB_GOLD?'G':'S')+'</div>';
+        const isGold=b.score>=_CLUB_GOLD;
+        const disc=isGold?'#efa927':'#c2c1ba', ring=isGold?'#633806':'#4a4a46';
+        const dot='<div class="fr-lb-rank" style="background:transparent;padding:0;width:20px;height:20px;display:flex;align-items:center;justify-content:center;">'+
+          '<svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M8.5 2h3l-2.2 7h-3z" fill="'+ring+'"/><path d="M15.5 2h-3l2.2 7h3z" fill="'+ring+'"/><circle cx="12" cy="15" r="6.5" fill="'+disc+'"/><circle cx="12" cy="15" r="2.6" fill="'+ring+'" opacity=".55"/></svg></div>';
         return '<div class="fr-lb-row fr-stagger'+(isMe?' me':'')+'" style="--d:'+(i*70)+'ms;">'+
           dot+
-          '<div class="fr-lb-name">'+esc(b.name)+(isMe?' (you)':'')+'</div>'+
+          '<div class="fr-lb-name">'+renderStaffName(b.name, esc)+(isMe?' (you)':'')+'</div>'+
           '<div class="fr-lb-score">'+b.score+'%</div>'+
         '</div>';
       }).join('') : '<div class="fr-muted">No On-Time Club members this fortnight \u2014 next one\u2019s yours.</div>';
       return '<div class="fr-label">'+s.label+'</div><div class="fr-lb">'+rows+'</div>';
+    }
+    if(s.kind==='timelost'){
+      // Neutral framing of the cost of lateness. Translate minutes into a
+      // relatable unit when it's substantial (a shift is ~7.6h).
+      let context='';
+      const h=s.totalMin/60;
+      if(h>=7.6) context='about '+(Math.round(h/7.6*10)/10)+' full shifts';
+      else if(h>=3.8) context='most of a shift';
+      else if(s.totalMin>=60) context='over an hour';
+      else context='across the fortnight';
+      const worst = s.worstMin ? (s.worstDay+' was the latest, '+s.worstMin+' min after your start') : '';
+      return '<div class="fr-label">'+s.label+'</div>'+
+        '<div class="fr-timelost">'+
+          '<svg class="fr-tl-ic" width="30" height="30" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="13" r="8" fill="none" stroke="#e24b4a" stroke-width="2"/><path d="M12 9v4.5" stroke="#e24b4a" stroke-width="2" stroke-linecap="round"/><path d="M9.5 3h5" stroke="#e24b4a" stroke-width="2" stroke-linecap="round"/><path d="M15.5 6.5l1.5-1.5" stroke="#e24b4a" stroke-width="2" stroke-linecap="round"/></svg>'+
+          '<div class="fr-tl-big">'+s.big+'</div>'+
+          '<div class="fr-tl-ctx">'+context+' not at your desk</div>'+
+        '</div>'+
+        (worst?'<div class="fr-sub" style="margin-top:14px;">'+worst+'</div>':'');
     }
     if(s.kind==='hero'){
       return '<div class="fr-icon fr-draw">'+svgCal+'</div><div class="fr-label">'+s.label+'</div><div class="fr-hero">'+s.big+'</div><div class="fr-sub">'+s.sub+'</div>';
@@ -18978,6 +19080,7 @@ function closeFortReport(){
 let _leaderboardCache=null;
 async function _buildLeaderboard(fw){
   if(_leaderboardCache) return _leaderboardCache;
+  try{ await loadGoldenNames(); }catch(e){}
 
   // The roster is the sole source of who's measured. Everyone with an assigned
   // shift this fortnight is a candidate; nobody else can be scored.
