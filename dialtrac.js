@@ -1901,6 +1901,24 @@ async function clSaveCall(){
     let msg = needsCallback ? 'Logged — still waiting on a callback' : 'Call logged';
     if(closedCount) msg += ' · cleared '+closedCount+' earlier callback'+(closedCount>1?'s':'');
     showToast(msg,'success');
+    // Backfill: if this call is linked to a contact that has NO number yet, and
+    // the call carries one, save it onto the contact. Covers the common flow of
+    // creating a contact by name first, then typing the number before logging.
+    // Only fills a blank — never overwrites an existing contact number.
+    if(_clSelContact && phone && !_clSelContact.phone_primary){
+      try{
+        const ur = await fetch(SB+'/rest/v1/contacts?id=eq.'+encodeURIComponent(_clSelContact.id),{
+          method:'PATCH',
+          headers:{'apikey':KEY,'Authorization':'Bearer '+_sbBearer(),
+                   'Content-Type':'application/json','Prefer':'return=minimal'},
+          body:JSON.stringify({phone_primary:phone, updated_at:new Date().toISOString()})
+        });
+        if(ur.ok){
+          _clSelContact.phone_primary = phone;
+          if(_clContacts){ const cc=_clContacts.find(x=>x.id===_clSelContact.id); if(cc) cc.phone_primary=phone; }
+        } else { console.warn('contact phone backfill', ur.status); }
+      }catch(e){ console.warn('contact phone backfill', e); }
+    }
     clAddRecent({ name, phone, reason, callback: needsCallback, cleared: closedCount });
     clClearForm();
     clLoadQueue();
