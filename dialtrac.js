@@ -1875,6 +1875,38 @@ async function clSaveCall(){
       ? ((document.getElementById('clPlcRemarks')||{}).value||'').trim()
       : '';
 
+    // ── Auto-create-or-link a contact (Option B) ──
+    // Make the natural flow "type name → type number → log" always attach a
+    // contact, without needing to click "Create contact" first. Resolution:
+    //   1. a contact was already picked/created → use it
+    //   2. else a contact with this exact number exists → link to it
+    //   3. else create a new contact from the name (+ number) → link it
+    // Only runs when we have a name; a number is used when present.
+    let _resolvedContactId = _clSelContact ? _clSelContact.id : null;
+    if(!_resolvedContactId && name){
+      try{
+        if(phone){
+          const found = await sbGet('contacts','?phone_primary=eq.'+encodeURIComponent(phone)+'&select=id&limit=1');
+          if(found && found.length) _resolvedContactId = found[0].id;
+        }
+        if(!_resolvedContactId){
+          const cr = await fetch(SB+'/rest/v1/contacts',{
+            method:'POST',
+            headers:{'apikey':KEY,'Authorization':'Bearer '+_sbBearer(),
+                     'Content-Type':'application/json','Prefer':'return=representation'},
+            body:JSON.stringify({name:name, phone_primary:phone||null, created_by:who})
+          });
+          if(cr.ok){
+            const crows = await cr.json();
+            if(crows && crows[0]){
+              _resolvedContactId = crows[0].id;
+              if(_clContacts) _clContacts.unshift(crows[0]);
+            }
+          } else { console.warn('auto-create contact', cr.status); }
+        }
+      }catch(e){ console.warn('auto contact resolve', e); }
+    }
+
     const r = await sbPost('call_log', {
       caller_name: name,
       phone_e164: phone,
@@ -1886,7 +1918,7 @@ async function clSaveCall(){
                 ((typeof myTeam !== 'undefined' && myTeam) ? myTeam : null),
       plc_offered: _plcOffered,
       plc_remarks: _plcRemarks || null,
-      contact_id: _clSelContact ? _clSelContact.id : null,
+      contact_id: _resolvedContactId,
       resolved_at: needsCallback ? null : now,
       resolved_by: needsCallback ? null : who
     });
