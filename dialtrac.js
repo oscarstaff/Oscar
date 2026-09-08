@@ -1511,8 +1511,21 @@ let _clContactSuggTimer = null;
 async function clLoadContacts(force){
   if(_clContacts && !force) return _clContacts;
   try{
-    _clContacts = await sbGet('contacts','?select=*&order=name.asc');
-  }catch(e){ console.warn('clLoadContacts',e); _clContacts = _clContacts || []; }
+    // Supabase caps a single response at 1000 rows. We have more contacts than
+    // that, so page through with offset/limit until a short page comes back —
+    // otherwise everything alphabetically past the 1000th (e.g. "Testing")
+    // silently never loads and looks "unsaved" after a refresh.
+    const PAGE=1000;
+    let all=[], from=0;
+    for(let guard=0; guard<50; guard++){
+      const page=await sbGet('contacts','?select=*&order=name.asc&offset='+from+'&limit='+PAGE);
+      if(!page || !page.length) break;
+      all=all.concat(page);
+      if(page.length<PAGE) break;   // last page
+      from+=PAGE;
+    }
+    _clContacts=all;
+  }catch(e){ console.warn('clLoadContacts',e); _clContacts=_clContacts||[]; }
   return _clContacts;
 }
 
