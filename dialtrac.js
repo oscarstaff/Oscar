@@ -1549,14 +1549,18 @@ function clContactSuggest(q){
         '<span class="cl-sugg-go" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg></span>'+
         '</button>';
     });
-    // Always offer create-new (unless an exact name match already exists)
+    // ALWAYS offer create-new — even when a same-name contact already exists —
+    // so two different people with the same name (e.g. two "Aakriti Panday")
+    // can each be added as separate contacts. The wording changes to make the
+    // "another person, same name" case explicit.
     const exact=(_clContacts||[]).some(function(c){ return (c.name||'').trim().toLowerCase()===t; });
-    if(!exact){
-      html+='<button type="button" class="cl-sugg-item cl-sugg-new" onclick="clCreateContactInline()">'+
-        '<span class="cl-sugg-new-ic" aria-hidden="true"><svg width="15" height="15" viewBox="0 0 20 20" fill="currentColor"><path d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z"/></svg></span>'+
-        '<span class="cl-sugg-txt"><span class="cl-sugg-nm">Add “'+clEsc((q||'').trim())+'” as a new contact</span></span>'+
-        '</button>';
-    }
+    const _label = exact
+      ? 'Add another “'+clEsc((q||'').trim())+'” (different person)'
+      : 'Add “'+clEsc((q||'').trim())+'” as a new contact';
+    html+='<button type="button" class="cl-sugg-item cl-sugg-new" onclick="clCreateContactInline()">'+
+      '<span class="cl-sugg-new-ic" aria-hidden="true"><svg width="15" height="15" viewBox="0 0 20 20" fill="currentColor"><path d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z"/></svg></span>'+
+      '<span class="cl-sugg-txt"><span class="cl-sugg-nm">'+_label+'</span></span>'+
+      '</button>';
     box.innerHTML=html;
     box.style.display = html ? 'block' : 'none';
   }, 180);
