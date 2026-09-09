@@ -6688,15 +6688,24 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
       <div id="psec-account">
         <div class="card" style="margin-bottom:12px">
           <div style="display:flex;align-items:center;gap:14px;">
-            <div style="width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,var(--accent),#7c3aed);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <div id="profAvaWrap" onclick="document.getElementById('profAvaFile').click()" title="Change photo" style="position:relative;width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,var(--accent),#7c3aed);display:flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer;background-size:cover;background-position:center;">
               <span style="color:#fff;font-size:17px;font-weight:800;" id="profAva">?</span>
+              <div style="position:absolute;bottom:-2px;right:-2px;width:20px;height:20px;border-radius:50%;background:#fff;border:1px solid #e5e7eb;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 3px rgba(0,0,0,.15);">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+              </div>
             </div>
+            <input type="file" id="profAvaFile" accept="image/*" style="display:none;" onchange="uploadMyAvatar(event)">
             <div>
               <div style="display:flex;align-items:baseline;gap:6px;flex-wrap:wrap;"><div style="font-size:15px;font-weight:700;color:#0f172a;" id="profName"></div><span id="profNamePronouns" style="font-size:12px;color:#94a3b8;font-weight:500;display:none;"></span></div>
               <div style="font-size:12px;color:#94a3b8;margin-top:2px;" id="profRole">Staff</div>
               <div id="profTeam" style="display:none;font-size:12px;color:#64748b;margin-top:2px;font-weight:500;"></div>
             </div>
           </div>
+        </div>
+        <div class="card" style="margin-bottom:12px">
+          <div class="card-hd"><div class="card-title">Name appearance</div></div>
+          <div style="font-size:12px;color:#94a3b8;margin:2px 0 12px;">Pick a glow for your name. Shows in the directory, call log, and sidebar.</div>
+          <div id="profSkinSwatches" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
         </div>
         <div class="card" style="margin-bottom:12px;cursor:pointer;" onclick="openStaffDirectory()">
           <div style="display:flex;align-items:center;justify-content:space-between;">
@@ -8428,14 +8437,20 @@ async function enterHub(){
   document.getElementById("hubLayer").classList.add("ready");
   const first=me.split(" ")[0];
   await loadMySettings();
+  try{ await loadProfileCosmetics(); }catch(e){}
   const ava=me.split(" ").slice(0,2).map(w=>w[0]).join("").toUpperCase();
-  const _el_sbAvatar=document.getElementById("sbAvatar");if(_el_sbAvatar)_el_sbAvatar.textContent=ava;
-  const _el_sbName=document.getElementById("sbName");if(_el_sbName)_el_sbName.textContent=me;
-  const _el_mhAva=document.getElementById("mhAva");if(_el_mhAva)_el_mhAva.textContent=ava;
-  const profAvaEl=document.getElementById("profAva");if(profAvaEl)profAvaEl.textContent=ava;
-  const profNameEl=document.getElementById("profName");if(profNameEl)profNameEl.textContent=me;
+  // Own avatar (photo if set) applied to the round avatar spots.
+  const _myImg = (window.avatarFor && window.avatarFor(me)) || null;
+  function _paintAva(elId){
+    const el=document.getElementById(elId); if(!el) return;
+    if(_myImg){ el.textContent=''; el.style.backgroundImage='url('+_myImg+')'; el.style.backgroundSize='cover'; el.style.backgroundPosition='center'; }
+    else { el.style.backgroundImage=''; el.textContent=ava; }
+  }
+  _paintAva("sbAvatar"); _paintAva("mhAva"); _paintAva("profAva");
+  const _el_sbName=document.getElementById("sbName");if(_el_sbName)_el_sbName.innerHTML=renderStaffName(me, esc);
+  const profNameEl=document.getElementById("profName");if(profNameEl)profNameEl.innerHTML=renderStaffName(me, esc);
   const _el_mhName=document.getElementById("mhName");if(_el_mhName)_el_mhName.textContent=first;
-  const _el_mhNameInline=document.getElementById("mhNameInline");if(_el_mhNameInline)_el_mhNameInline.textContent=first;
+  const _el_mhNameInline=document.getElementById("mhNameInline");if(_el_mhNameInline)_el_mhNameInline.innerHTML=renderStaffName(me, esc);
   const hr=new Date().getHours();
   const _el_homeGreeting=document.getElementById("homeGreeting");if(_el_homeGreeting)_el_homeGreeting.textContent=(hr<12?"Good morning":hr<17?"Good afternoon":"Good evening")+", "+first;
   const _el_homeWeekSub=document.getElementById("homeWeekSub");if(_el_homeWeekSub)_el_homeWeekSub.textContent=wkL(weekStart);
@@ -11752,7 +11767,7 @@ async function openStaffDirectory(){
       };
     }).filter(function(p){return p.staff_name;});
     console.log('[directory] loaded', _staffDirData.length, 'staff');
-    try{ await loadGoldenNames(); }catch(e){}
+    try{ await loadProfileCosmetics(); }catch(e){}
     renderStaffDirectory(_staffDirData);
   }catch(e){
     console.warn('[directory] error:', e);
@@ -11802,7 +11817,7 @@ function renderStaffDirectory(list){
           quizBlock = '<div style="display:flex;align-items:center;gap:4px;flex-shrink:0;">'+statusBadge+toggleBtn+'</div>';
         }
         return '<div onclick="viewStaffProfile(\''+p.staff_name.replace(/'/g,"&#39;")+'\')" style="display:flex;align-items:center;gap:10px;padding:8px 8px;border-radius:8px;cursor:pointer;transition:background .1s;" onmouseover="this.style.background=\'#f8fafc\'" onmouseout="this.style.background=\'\'" >'+
-          '<div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--accent),#7c3aed);display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700;flex-shrink:0;">'+ava+'</div>'+
+          renderStaffAvatar(p.staff_name, 32)+
           '<div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:600;color:#0f172a;">'+renderStaffName(p.staff_name, esc)+pron+badge+'</div></div>'+
           quizBlock+
           (myIsAdmin?'':'<svg width="14" height="14" viewBox="0 0 20 20" fill="#cbd5e1"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>')+
@@ -11823,16 +11838,13 @@ function filterStaffDirectory(){
 function viewStaffProfile(name){
   const p=_staffDirData.find(function(x){return x.staff_name===name;});
   if(!p)return;
-  const ava=name.split(' ').map(function(w){return w[0];}).join('').slice(0,2).toUpperCase();
-  document.getElementById('svProfAva').textContent=ava;
-  // Name — glowy if they hold the status (skin-aware).
-  const nameEl=document.getElementById('svProfName');
-  if(window.isGoldenName && window.isGoldenName(name)){
-    const skin=window.glowSkinFor(name);
-    nameEl.innerHTML='<span class="glow-name glow-'+skin+'">'+esc(name)+'</span>';
-  }else{
-    nameEl.textContent=name;
-  }
+  // Avatar (photo or initials) into the big circle.
+  const avaEl=document.getElementById('svProfAva');
+  const img=window.avatarFor&&window.avatarFor(name);
+  if(img){ avaEl.textContent=''; avaEl.style.backgroundImage='url('+img+')'; avaEl.style.backgroundSize='cover'; avaEl.style.backgroundPosition='center'; }
+  else { avaEl.style.backgroundImage=''; avaEl.textContent=name.split(' ').map(function(w){return w[0];}).join('').slice(0,2).toUpperCase(); }
+  // Name with the person's chosen skin.
+  document.getElementById('svProfName').innerHTML=renderStaffName(name, esc);
   const pronEl=document.getElementById('svProfPronouns');
   if(p.pronouns){pronEl.textContent=p.pronouns;pronEl.style.display='block';}
   else pronEl.style.display='none';
@@ -11842,90 +11854,101 @@ function viewStaffProfile(name){
   const roleEl=document.getElementById('svProfRole');
   if(p.is_admin){roleEl.textContent='Admin';roleEl.style.display='block';}
   else roleEl.style.display='none';
-
-  // Glow section: info tag + "why", and (own profile only) the skin picker.
-  _setupProfileGlow(name);
-
   document.getElementById('staffProfileViewOverlay').style.display='flex';
-}
-
-// Wire up the glow tag, explanation, and picker for a profile.
-window._svGlowName=null;
-async function _setupProfileGlow(name){
-  _svGlowName=name;
-  const infoEl=document.getElementById('svProfGlowInfo');
-  const tagEl=document.getElementById('svProfGlowTag');
-  const whyEl=document.getElementById('svProfGlowWhy');
-  const pickerEl=document.getElementById('svProfGlowPicker');
-  whyEl.style.display='none';
-  const isGolden = window.isGoldenName && window.isGoldenName(name);
-  if(!isGolden){ infoEl.style.display='none'; pickerEl.style.display='none'; return; }
-
-  const skin=window.glowSkinFor(name);
-  tagEl.className='glow-name glow-'+skin;
-  tagEl.textContent='Glowing \u00b7 '+(window.GLOW_SKIN_LABELS[skin]||skin);
-  infoEl.style.display='flex';
-
-  // Build the "why" text from their perfect fortnight record.
-  whyEl.dataset.text='This name glows because '+name.split(' ')[0]+' had a perfect fortnight \u2014 100% on time. It stays until a fortnight breaks the streak.';
-  try{
-    const latest=await sbGet('punctuality_history','?select=fort_start&order=fort_start.desc&limit=1');
-    if(latest&&latest.length){
-      const fs=latest[0].fort_start;
-      const rec=await sbGet('punctuality_history','?staff_name=eq.'+encodeURIComponent(name)+'&fort_start=eq.'+fs+'&select=x,fort_start&limit=1');
-      if(rec&&rec.length){
-        const d=new Date(rec[0].fort_start);
-        const endD=new Date(d.getTime()+13*86400000);
-        const fmt=function(x){return x.toLocaleDateString('en-AU',{day:'numeric',month:'short'});};
-        whyEl.dataset.text='This name glows because '+name.split(' ')[0]+' had a perfect fortnight \u2014 100% on time across all '+rec[0].x+' rostered shift'+(rec[0].x===1?'':'s')+' ('+fmt(d)+' \u2013 '+fmt(endD)+'). It stays until a fortnight breaks the streak.';
-      }
-    }
-  }catch(e){}
-
-  // Picker only on your OWN profile.
-  if(name===(window.me||me)){
-    pickerEl.style.display='block';
-    const wrap=document.getElementById('svProfGlowSwatches');
-    wrap.innerHTML=window.GLOW_SKINS.map(function(sk){
-      const sel=(sk===skin);
-      return '<button onclick="pickGlowSkin(\''+sk+'\')" title="'+(window.GLOW_SKIN_LABELS[sk]||sk)+'" '+
-        'style="cursor:pointer;border-radius:10px;padding:7px 11px;font-family:inherit;font-size:12px;font-weight:800;'+
-        'background:#fff;border:2px solid '+(sel?'#0f172a':'#e5e7eb')+';">'+
-        '<span class="glow-name glow-'+sk+'">'+(window.GLOW_SKIN_LABELS[sk]||sk)+'</span></button>';
-    }).join('');
-  }else{
-    pickerEl.style.display='none';
-  }
-}
-
-function toggleGlowWhy(){
-  const w=document.getElementById('svProfGlowWhy');
-  if(w.style.display==='none'){ w.textContent=w.dataset.text||''; w.style.display='block'; }
-  else w.style.display='none';
-}
-
-// Save a skin choice (own profile). Optimistic: update locally + re-render.
-async function pickGlowSkin(skin){
-  const name=window.me||me;
-  if(!window.GLOW_SKINS || window.GLOW_SKINS.indexOf(skin)<0) return;
-  window._glowSkins=window._glowSkins||{};
-  window._glowSkins[name]=skin;
-  _setupProfileGlow(name); // refresh swatches + tag + name
-  const nameEl=document.getElementById('svProfName');
-  if(nameEl) nameEl.innerHTML='<span class="glow-name glow-'+skin+'">'+esc(name)+'</span>';
-  try{
-    await fetch(SB+"/rest/v1/staff_glow?on_conflict=staff_name",{
-      method:"POST",
-      headers:{ "apikey":KEY, "Authorization":"Bearer "+_sbBearer(),
-                "Content-Type":"application/json",
-                "Prefer":"resolution=merge-duplicates,return=minimal" },
-      body:JSON.stringify([{ staff_name:name, skin:skin, updated_at:new Date().toISOString() }])
-    });
-  }catch(e){ showToast&&showToast('Could not save glow'); }
 }
 
 function closeStaffProfileView(){
   document.getElementById('staffProfileViewOverlay').style.display='none';
+}
+
+// ── My Profile: name-skin picker + avatar upload ──
+function renderMySkinSwatches(){
+  const wrap=document.getElementById('profSkinSwatches'); if(!wrap) return;
+  const cur=(window.glowSkinFor?window.glowSkinFor(me):'gold');
+  wrap.innerHTML=(window.GLOW_SKINS||[]).map(function(sk){
+    const sel=(sk===cur);
+    const label=(window.GLOW_SKIN_LABELS&&window.GLOW_SKIN_LABELS[sk])||sk;
+    const inner = (sk==='none')
+      ? '<span style="font-weight:800;color:#0f172a;">'+label+'</span>'
+      : '<span class="glow-name glow-'+sk+'">'+label+'</span>';
+    return '<button onclick="pickMySkin(\''+sk+'\')" title="'+label+'" '+
+      'style="cursor:pointer;border-radius:10px;padding:8px 12px;font-family:inherit;font-size:13px;font-weight:800;'+
+      'background:#fff;border:2px solid '+(sel?'var(--accent,#4f46e5)':'#e5e7eb')+';">'+inner+'</button>';
+  }).join('');
+}
+
+async function pickMySkin(skin){
+  if(!window.GLOW_SKINS || window.GLOW_SKINS.indexOf(skin)<0) return;
+  window._nameSkins=window._nameSkins||{};
+  window._nameSkins[me]=skin;
+  renderMySkinSwatches();
+  // Live-update own name everywhere it shows now.
+  ['profName','sbName','mhNameInline'].forEach(function(id){
+    const el=document.getElementById(id); if(el) el.innerHTML=renderStaffName(me, esc);
+  });
+  try{
+    await fetch(SB+"/rest/v1/staff_credentials?staff_name=eq."+encodeURIComponent(me),{
+      method:"PATCH",
+      headers:{ "apikey":KEY, "Authorization":"Bearer "+_sbBearer(),
+                "Content-Type":"application/json", "Prefer":"return=minimal" },
+      body:JSON.stringify({ name_skin:skin })
+    });
+  }catch(e){ showToast&&showToast('Could not save appearance'); }
+}
+
+// Compress an uploaded image to a small square avatar (<=256px) and store as
+// base64 in staff_avatars. Keeps the blob tiny so reads stay fast.
+async function uploadMyAvatar(ev){
+  const file=ev && ev.target && ev.target.files && ev.target.files[0];
+  if(!file) return;
+  if(!/^image\//.test(file.type)){ showToast&&showToast('Please choose an image'); return; }
+  try{
+    const dataUrl=await _readFileAsDataURL(file);
+    const compressed=await _compressAvatar(dataUrl, 256, 0.82);
+    window._avatars=window._avatars||{};
+    window._avatars[me]=compressed;
+    // Live-update own avatar spots.
+    ['profAvaWrap','sbAvatar','mhAva'].forEach(function(id){
+      const el=document.getElementById(id); if(!el) return;
+      const span=(id==='profAvaWrap')?document.getElementById('profAva'):null;
+      if(span) span.textContent='';
+      el.textContent = (id==='profAvaWrap') ? el.textContent : '';
+      el.style.backgroundImage='url('+compressed+')';
+      el.style.backgroundSize='cover'; el.style.backgroundPosition='center';
+    });
+    await fetch(SB+"/rest/v1/staff_avatars?on_conflict=staff_name",{
+      method:"POST",
+      headers:{ "apikey":KEY, "Authorization":"Bearer "+_sbBearer(),
+                "Content-Type":"application/json",
+                "Prefer":"resolution=merge-duplicates,return=minimal" },
+      body:JSON.stringify([{ staff_name:me, avatar:compressed, updated_at:new Date().toISOString() }])
+    });
+    showToast&&showToast('Photo updated');
+  }catch(e){ showToast&&showToast('Could not update photo'); }
+  finally{ if(ev&&ev.target) ev.target.value=''; }
+}
+
+function _readFileAsDataURL(file){
+  return new Promise(function(res,rej){
+    const r=new FileReader();
+    r.onload=function(){res(r.result);}; r.onerror=rej;
+    r.readAsDataURL(file);
+  });
+}
+// Center-crop to a square and scale down, returning a compressed JPEG data URL.
+function _compressAvatar(dataUrl, size, quality){
+  return new Promise(function(res,rej){
+    const img=new Image();
+    img.onload=function(){
+      const side=Math.min(img.width, img.height);
+      const sx=(img.width-side)/2, sy=(img.height-side)/2;
+      const c=document.createElement('canvas'); c.width=size; c.height=size;
+      const ctx=c.getContext('2d');
+      ctx.drawImage(img, sx, sy, side, side, 0, 0, size, size);
+      res(c.toDataURL('image/jpeg', quality));
+    };
+    img.onerror=rej; img.src=dataUrl;
+  });
 }
 
 // ── PRONOUNS ──
@@ -12020,9 +12043,15 @@ function toggleSection(id){
 async function loadProfilePage(){
   // Set avatar and name
   const ava=me.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase();
-  const profAvaEl=document.getElementById("profAva");if(profAvaEl)profAvaEl.textContent=ava;
-  const profNameEl=document.getElementById("profName");if(profNameEl)profNameEl.textContent=me;
+  try{ await loadProfileCosmetics(); }catch(e){}
+  const profAvaEl=document.getElementById("profAva");
+  const _pImg=(window.avatarFor&&window.avatarFor(me))||null;
+  const _pWrap=document.getElementById("profAvaWrap");
+  if(_pImg){ if(profAvaEl)profAvaEl.textContent=''; if(_pWrap)_pWrap.style.backgroundImage='url('+_pImg+')'; }
+  else { if(profAvaEl)profAvaEl.textContent=ava; if(_pWrap)_pWrap.style.backgroundImage=''; }
+  const profNameEl=document.getElementById("profName");if(profNameEl)profNameEl.innerHTML=renderStaffName(me, esc);
   const profRoleEl=document.getElementById("profRole");if(profRoleEl)profRoleEl.textContent=myIsAdmin?"Admin":"Staff";
+  renderMySkinSwatches();
   // Load team name
   try{
     const teamRows=await sbGet('staff_credentials','?staff_name=eq.'+encodeURIComponent(me)+'&select=team');
@@ -18605,68 +18634,73 @@ async function _computeMyStreak(){
   return { current, best, lastYmd:dates[dates.length-1] };
 }
 
-// ── GOLDEN NAME (reigning perfect-fortnight status) + SKINS ──────────────
-// A staffer who was PERFECT last completed fortnight (100% on-time, >= the shift
-// floor) gets a flowing glowy name everywhere their name shows — directory, call
-// log, fortnight report — until a later fortnight breaks the streak. Default
-// glow is gold; while they hold the status they can pick a skin (ocean, sunset,
-// molten, holographic, emerald, rose-gold, galaxy). The pick is remembered and
-// shown to everyone. Losing the status hides the glow (picker locks) but keeps
-// the saved choice for next time.
+// ── NAME SKIN + AVATAR (cosmetic personalisation, everyone) ──────────────
+// Every staffer can pick a glow style for their name and upload a profile
+// picture, both set in My Profile. Rendered in the sidebar, profile card, staff
+// directory, and call log. Purely cosmetic — no performance gating.
 //
-// Shared across index.html and dialtrac.js — window-guard pattern, no declaration
-// keyword, to avoid let/var collisions between the two files.
-window.GLOW_SKINS = window.GLOW_SKINS || ['gold','ocean','sunset','molten','holographic','emerald','rosegold','galaxy'];
+// Shared across index.html and dialtrac.js via the window-guard pattern (no
+// declaration keyword) to avoid let/var collisions between the files.
+window.GLOW_SKINS = window.GLOW_SKINS || ['none','gold','ocean','sunset','molten','holographic','emerald','rosegold','galaxy'];
 window.GLOW_SKIN_LABELS = window.GLOW_SKIN_LABELS || {
-  gold:'Gold', ocean:'Ocean', sunset:'Sunset', molten:'Molten',
+  none:'Plain', gold:'Gold', ocean:'Ocean', sunset:'Sunset', molten:'Molten',
   holographic:'Holographic', emerald:'Emerald', rosegold:'Rose gold', galaxy:'Galaxy'
 };
-window._goldenNames = window._goldenNames || null;   // Set<staffName> currently perfect
-window._glowSkins = window._glowSkins || null;        // { staffName: skin }
-window._goldenLoading = window._goldenLoading || null;
+window._nameSkins = window._nameSkins || null;   // { staffName: skin }
+window._avatars   = window._avatars   || null;   // { staffName: base64 }
+window._profileLoading = window._profileLoading || null;
 
-window.loadGoldenNames = window.loadGoldenNames || async function(force){
-  if(!force && window._goldenNames) return window._goldenNames;
-  if(window._goldenLoading) return window._goldenLoading;
-  window._goldenLoading = (async function(){
-    const set=new Set(); const skins={};
+window.loadProfileCosmetics = window.loadProfileCosmetics || async function(force){
+  if(!force && window._nameSkins && window._avatars) return true;
+  if(window._profileLoading) return window._profileLoading;
+  window._profileLoading = (async function(){
+    const skins={}, avs={};
     try{
-      const latest=await sbGet('punctuality_history','?select=fort_start&order=fort_start.desc&limit=1');
-      if(latest && latest.length){
-        const fs=latest[0].fort_start;
-        const rows=await sbGet('punctuality_history',
-          '?fort_start=eq.'+fs+'&score=eq.100&x=gte.4&select=staff_name&limit=200')||[];
-        rows.forEach(function(r){ if(r.staff_name) set.add(r.staff_name); });
-      }
-      // Chosen skins (only meaningful for those currently in the set).
-      const gl=await sbGet('staff_glow','?select=staff_name,skin&limit=500')||[];
-      gl.forEach(function(g){ if(g.staff_name) skins[g.staff_name]=g.skin||'gold'; });
+      const rows=await sbGet('staff_credentials','?select=staff_name,name_skin&limit=500')||[];
+      rows.forEach(function(r){ if(r.staff_name) skins[r.staff_name]=r.name_skin||'gold'; });
     }catch(e){}
-    window._goldenNames=set; window._glowSkins=skins;
-    window._goldenLoading=null;
-    return set;
+    try{
+      const av=await sbGet('staff_avatars','?select=staff_name,avatar&limit=500')||[];
+      av.forEach(function(a){ if(a.staff_name && a.avatar) avs[a.staff_name]=a.avatar; });
+    }catch(e){}
+    window._nameSkins=skins; window._avatars=avs;
+    window._profileLoading=null;
+    return true;
   })();
-  return window._goldenLoading;
+  return window._profileLoading;
 };
 
-window.isGoldenName = window.isGoldenName || function(name){
-  return !!(window._goldenNames && name && window._goldenNames.has(name));
-};
-
-// Skin for a name (defaults to gold). Only applies visually when isGoldenName.
+// Skin for a name (defaults to gold). 'none' = plain, no glow.
 window.glowSkinFor = window.glowSkinFor || function(name){
-  const s = window._glowSkins && window._glowSkins[name];
+  const s = window._nameSkins && window._nameSkins[name];
   return (s && window.GLOW_SKINS.indexOf(s)>=0) ? s : 'gold';
 };
 
-// Wrap a staff name in the glow span when they hold status, using their skin.
+// Wrap a staff name in the chosen glow span. 'none' renders plain.
 window.renderStaffName = window.renderStaffName || function(name, escFn){
   const e = (escFn||function(s){return s;});
   const safe = e(name||'');
-  if(window.isGoldenName(name)){
-    return '<span class="glow-name glow-'+window.glowSkinFor(name)+'" title="Perfect attendance last fortnight">'+safe+'</span>';
+  const skin = window.glowSkinFor(name);
+  if(skin && skin!=='none'){
+    return '<span class="glow-name glow-'+skin+'">'+safe+'</span>';
   }
   return safe;
+};
+
+// Return avatar markup for a name: the uploaded photo if present, else initials.
+// `size` px, `bg` optional gradient for the initials fallback.
+window.avatarFor = window.avatarFor || function(name){
+  return (window._avatars && window._avatars[name]) || null;
+};
+window.renderStaffAvatar = window.renderStaffAvatar || function(name, size, extraStyle){
+  size = size||36; extraStyle = extraStyle||'';
+  const img = window.avatarFor(name);
+  const base='width:'+size+'px;height:'+size+'px;border-radius:50%;flex-shrink:0;'+extraStyle;
+  if(img){
+    return '<div style="'+base+'background-image:url('+img+');background-size:cover;background-position:center;"></div>';
+  }
+  const initials=String(name||'?').split(' ').map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase();
+  return '<div style="'+base+'background:linear-gradient(135deg,var(--accent),#7c3aed);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:'+Math.round(size*0.36)+'px;">'+initials+'</div>';
 };
 
 
@@ -18880,7 +18914,7 @@ function _leaderboardHTML(board){
     const scoreCol = isMe ? 'var(--accent-text,#4f46e5)' : C.ring;
     return '<span class="fr-hof-chip'+(isMe?' me':'')+'" style="display:inline-flex;align-items:center;gap:7px;padding:6px 12px 6px 8px;border-radius:999px;margin:0 7px 7px 0;background:'+bg+';border:1px solid '+bd+';">'+
       medal(C.disc, C.ring)+
-      '<span style="font-size:13px;font-weight:'+(isMe?'800':'600')+';color:'+nameCol+';">'+renderStaffName(b.name, esc)+(isMe?' (you)':'')+'</span>'+
+      '<span style="font-size:13px;font-weight:'+(isMe?'800':'600')+';color:'+nameCol+';">'+esc(b.name)+(isMe?' (you)':'')+'</span>'+
       '<span style="font-size:12px;font-weight:800;color:'+scoreCol+';font-variant-numeric:tabular-nums;">'+b.score+'%</span></span>';
   }
 
@@ -18910,7 +18944,7 @@ function _leaderboardHTML(board){
       const pct=Math.round((b.onTimeDays/maxY)*100);
       return '<div style="display:flex;align-items:center;gap:10px;padding:6px 4px;">'+
         '<div style="flex:1;min-width:0;">'+
-          '<div style="font-size:13px;font-weight:'+(isMe?'800':'600')+';color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:3px;">'+renderStaffName(b.name, esc)+(isMe?' (you)':'')+'</div>'+
+          '<div style="font-size:13px;font-weight:'+(isMe?'800':'600')+';color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:3px;">'+esc(b.name)+(isMe?' (you)':'')+'</div>'+
           '<div style="height:6px;border-radius:4px;background:#eef1f6;overflow:hidden;"><div style="height:100%;width:'+pct+'%;border-radius:4px;background:'+(isMe?'var(--accent,#4f46e5)':'#9aa6c4')+';"></div></div>'+
         '</div>'+
         '<div style="flex-shrink:0;font-size:13px;font-weight:800;color:#475569;font-variant-numeric:tabular-nums;">'+b.onTimeDays+'</div>'+
@@ -19089,7 +19123,7 @@ async function openFortReport(){
           '<svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M8.5 2h3l-2.2 7h-3z" fill="'+ring+'"/><path d="M15.5 2h-3l2.2 7h3z" fill="'+ring+'"/><circle cx="12" cy="15" r="6.5" fill="'+disc+'"/><circle cx="12" cy="15" r="2.6" fill="'+ring+'" opacity=".55"/></svg></div>';
         return '<div class="fr-lb-row fr-stagger'+(isMe?' me':'')+'" style="--d:'+(i*70)+'ms;">'+
           dot+
-          '<div class="fr-lb-name">'+renderStaffName(b.name, esc)+(isMe?' (you)':'')+'</div>'+
+          '<div class="fr-lb-name">'+esc(b.name)+(isMe?' (you)':'')+'</div>'+
           '<div class="fr-lb-score">'+b.score+'%</div>'+
         '</div>';
       }).join('') : '<div class="fr-muted">No On-Time Club members this fortnight \u2014 next one\u2019s yours.</div>';
@@ -19188,8 +19222,6 @@ function closeFortReport(){
 let _leaderboardCache=null;
 async function _buildLeaderboard(fw){
   if(_leaderboardCache) return _leaderboardCache;
-  try{ await loadGoldenNames(); }catch(e){}
-
   // The roster is the sole source of who's measured. Everyone with an assigned
   // shift this fortnight is a candidate; nobody else can be scored.
   const rosterBy=await _loadRosterShifts(fw);
@@ -24161,18 +24193,9 @@ window.addEventListener('resize', function(){
       <div style="padding:24px 20px;text-align:center;">
         <div id="svProfAva" style="width:72px;height:72px;border-radius:50%;background:linear-gradient(135deg,var(--accent),#7c3aed);display:flex;align-items:center;justify-content:center;margin:0 auto 12px;color:#fff;font-size:24px;font-weight:800;">?</div>
         <div id="svProfName" style="font-size:18px;font-weight:700;color:#0f172a;"></div>
-        <div id="svProfGlowInfo" style="display:none;margin-top:6px;align-items:center;justify-content:center;gap:5px;">
-          <span style="font-size:11px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;" class="glow-name glow-gold" id="svProfGlowTag">Glowing</span>
-          <button onclick="toggleGlowWhy()" title="Why is this name glowing?" style="width:16px;height:16px;border-radius:50%;border:none;background:#fde68a;color:#92400e;font-size:11px;font-weight:800;line-height:1;cursor:pointer;font-family:inherit;padding:0;">i</button>
-        </div>
-        <div id="svProfGlowWhy" style="display:none;margin:8px auto 0;max-width:300px;font-size:12px;color:#64748b;line-height:1.45;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:8px 11px;"></div>
         <div id="svProfPronouns" style="font-size:12px;color:#94a3b8;margin-top:4px;display:none;"></div>
         <div id="svProfTeam" style="font-size:13px;color:#64748b;margin-top:8px;font-weight:500;display:none;"></div>
         <div id="svProfRole" style="font-size:11px;color:#94a3b8;margin-top:4px;display:none;"></div>
-        <div id="svProfGlowPicker" style="display:none;margin-top:16px;padding-top:14px;border-top:1px solid #f1f5f9;">
-          <div style="font-size:11px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:#94a3b8;margin-bottom:10px;">Your glow \u2014 pick a style</div>
-          <div id="svProfGlowSwatches" style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;"></div>
-        </div>
       </div>
     </div>
   </div>

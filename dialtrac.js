@@ -1390,9 +1390,9 @@ function clEsc(s){
  */
 function clStaffName(fullName, display){
   const shown = clEsc(display != null ? display : fullName);
-  if(window.isGoldenName && window.isGoldenName(fullName)){
-    const skin = (window.glowSkinFor ? window.glowSkinFor(fullName) : 'gold');
-    return '<span class="glow-name glow-'+skin+'" title="Perfect attendance last fortnight">'+shown+'</span>';
+  const skin = (window.glowSkinFor ? window.glowSkinFor(fullName) : 'gold');
+  if(skin && skin!=='none'){
+    return '<span class="glow-name glow-'+skin+'">'+shown+'</span>';
   }
   return shown;
 }
@@ -1455,25 +1455,30 @@ function clUpdatePlcFields(){
   // Effective team = explicit "For team" if set, else the logger's own team.
   const team=((ft&&ft.value)||_mine||'').trim();
   const isPlacement=/^placement$/i.test(team);
+  // The reason decides the path for a Placement call: mentioning "offer"
+  // (offered/offering/…) means a placement was offered → show the offered
+  // checkbox + remarks and hide the general Note. Otherwise Placement behaves
+  // like everyone else — a plain Note, no checkbox.
+  const reasonEl=document.getElementById('clReason');
+  const reasonHasOffer=/offer/i.test((reasonEl&&reasonEl.value)||'');
+  const showOfferFlow = isPlacement && reasonHasOffer;
+
   const wrap=document.getElementById('clPlcWrap');
   const check=wrap?wrap.querySelector('.cl-plc-check'):null;
   const offered=document.getElementById('clPlcOffered');
-  if(wrap) wrap.style.display=isPlacement?'':'none';
-  if(!isPlacement && offered) offered.checked=false;   // tidy if team changed away
-  // Remarks slide open only when Placement AND offered is ticked. Class-driven
-  // so it animates (grid-rows) instead of snapping via display:none.
-  const showRem=isPlacement && offered && offered.checked;
+  if(wrap) wrap.style.display=showOfferFlow?'':'none';
+  if(!showOfferFlow && offered) offered.checked=false;   // tidy if path changed away
+  // Remarks slide open only when the offer flow is active AND offered is ticked.
+  const showRem=showOfferFlow && offered && offered.checked;
   if(wrap) wrap.classList.toggle('cl-plc-open', !!showRem);
   if(check) check.classList.toggle('on', !!(offered && offered.checked));
-  // Placement doesn't use the general Note — Reason plus the post-offer
-  // remarks cover what they need, and the extra field just crowds a pane
-  // that's already busy. Hide it for Placement, keep it for everyone else.
+  // Note is hidden only on the offer path (remarks replace it). On every other
+  // call — including Placement calls whose reason doesn't mention an offer —
+  // the Note is shown so nothing goes uncaptured.
   const noteField=document.getElementById('clNoteField');
   if(noteField){
-    noteField.style.display=isPlacement?'none':'';
-    // Blank it while hidden so text typed before switching to Placement can't
-    // ride along on save where nobody can see or edit it.
-    if(isPlacement){ const nt=document.getElementById('clNote'); if(nt) nt.value=''; }
+    noteField.style.display=showOfferFlow?'none':'';
+    if(showOfferFlow){ const nt=document.getElementById('clNote'); if(nt) nt.value=''; }
   }
   // Placement can log calls without a number (walk-ins / in-person enquiries),
   // so reflect that on the label instead of showing a required asterisk.
@@ -2170,7 +2175,7 @@ async function clLoadQueue(){
   const body=document.getElementById('clQueueBody');
   // Golden-name status (perfect-fortnight holders) for logged_by styling. Shared
   // loader lives in index.html; safe no-op if unavailable.
-  try{ if(window.loadGoldenNames) await window.loadGoldenNames(); }catch(e){}
+  try{ if(window.loadProfileCosmetics) await window.loadProfileCosmetics(); }catch(e){}
   // Skeletons on first load; on a refresh the existing rows stay put so the
   // table doesn't flash for what is usually a sub-second fetch.
   if(body && !(_clQueue && _clQueue.length)){
@@ -2340,6 +2345,7 @@ function clQuickReason(v){
   el.classList.remove('error');
   document.querySelectorAll('#clQuick button').forEach(b=>
     b.classList.toggle('on', b.textContent.trim()===v));
+  if(typeof clUpdatePlcFields==='function') clUpdatePlcFields();  // reason changed
   const n=document.getElementById('clNote');
   if(n) n.focus();
 }
@@ -2401,11 +2407,11 @@ function clEditRow(id){
       '<div class="cl-edit-f"><span class="cl-edit-lbl">Number</span>'+
         '<input class="cl-edit-in" id="ced-phone-'+id+'" type="tel" value="'+clEsc(phonePretty)+'" /></div>'+
       '<div class="cl-edit-f full"><span class="cl-edit-lbl">Reason</span>'+
-        '<input class="cl-edit-in" id="ced-reason-'+id+'" type="text" value="'+clEsc(r.reason||'')+'" /></div>'+
-      '<div class="cl-edit-f full"><span class="cl-edit-lbl">Note</span>'+
+        '<input class="cl-edit-in" id="ced-reason-'+id+'" type="text" value="'+clEsc(r.reason||'')+'" oninput="clEditReasonChanged(\''+id+'\')" /></div>'+
+      '<div class="cl-edit-f full" id="ced-note-wrap-'+id+'"><span class="cl-edit-lbl">Note</span>'+
         '<textarea class="cl-edit-in" id="ced-note-'+id+'">'+clEsc(r.note||'')+'</textarea></div>'+
       (/^placement$/i.test(((r.for_team||r.team||'')).trim())
-        ? '<div class="cl-edit-f full"><label class="cl-edit-plc-chk">'+
+        ? '<div class="cl-edit-f full" id="ced-plc-chk-wrap-'+id+'"><label class="cl-edit-plc-chk">'+
             '<input type="checkbox" id="ced-plc-'+id+'"'+(r.plc_offered?' checked':'')+
             ' onchange="clEditPlcToggle(\''+id+'\')" />'+
             '<span>Placement offered</span></label></div>'+
@@ -2422,8 +2428,27 @@ function clEditRow(id){
       '<button class="cl-edit-btn cl-edit-save" id="ced-save-'+id+'" onclick="event.stopPropagation();clEditSave(\''+id+'\')">Save</button>'+
     '</div>';
   box.classList.add('on');
+  clEditReasonChanged(id);   // set initial note/placement visibility from reason
   const nm=document.getElementById('ced-name-'+id);
   if(nm){ nm.focus(); nm.select(); }
+}
+
+// Same rule as the log form: for a Placement call, "offer" in the reason shows
+// the offered checkbox + remarks and hides the Note; otherwise the Note shows
+// and the offered flow is hidden. No-ops for non-Placement calls (no checkbox
+// was rendered).
+function clEditReasonChanged(id){
+  const rs=document.getElementById('ced-reason-'+id);
+  const chkWrap=document.getElementById('ced-plc-chk-wrap-'+id);
+  if(!chkWrap) return;   // not a Placement call — nothing to toggle
+  const noteWrap=document.getElementById('ced-note-wrap-'+id);
+  const remWrap=document.getElementById('ced-plcrem-wrap-'+id);
+  const chk=document.getElementById('ced-plc-'+id);
+  const hasOffer=/offer/i.test((rs&&rs.value)||'');
+  chkWrap.style.display = hasOffer ? '' : 'none';
+  if(noteWrap) noteWrap.style.display = hasOffer ? 'none' : '';
+  if(!hasOffer && chk) chk.checked=false;                 // leave offer path
+  if(remWrap) remWrap.style.display=(hasOffer && chk && chk.checked)?'':'none';
 }
 
 function clEditCancel(id){
@@ -2470,14 +2495,20 @@ async function clEditSave(id){
   const saveBtn=document.getElementById('ced-save-'+id);
   if(saveBtn){ saveBtn.disabled=true; saveBtn.textContent='Saving…'; }
 
-  // Placement fields, if this editor showed them.
+  // Placement fields, if this editor showed them. The reason decides the path:
+  // "offer" → save the offered flag + remarks, drop the note; otherwise save the
+  // note and clear any stale placement flags.
   const plcEl=document.getElementById('ced-plc-'+id);
   const plcRemEl=document.getElementById('ced-plcrem-'+id);
+  const _onOfferPath = /offer/i.test(reason) && !!plcEl;
   const _patch={caller_name:name, phone_e164:phone, reason:reason,
-    note:note||null, edited_at:new Date().toISOString()};
+    note: _onOfferPath ? null : (note||null),
+    edited_at:new Date().toISOString()};
   if(plcEl){
-    _patch.plc_offered=!!plcEl.checked;
-    _patch.plc_remarks=plcEl.checked ? ((plcRemEl&&plcRemEl.value||'').trim()||null) : null;
+    // Only the offer path can set these; off-path clears them so a reason edit
+    // that removes "offer" doesn't leave an orphaned placement flag.
+    _patch.plc_offered = _onOfferPath ? !!plcEl.checked : false;
+    _patch.plc_remarks = (_onOfferPath && plcEl.checked) ? ((plcRemEl&&plcRemEl.value||'').trim()||null) : null;
   }
   try{
     const res=await fetch(SB+'/rest/v1/call_log?id=eq.'+encodeURIComponent(id),{
@@ -3200,6 +3231,13 @@ function initCallLog(){
     if(plc) plc.addEventListener('change',()=>{
       clUpdatePlcFields();   // handles the reveal + checked styling
     });
+    // Reason drives the Placement path (offer → checkbox, else Note), so
+    // re-evaluate as it's typed or picked from the datalist.
+    const rsn=document.getElementById('clReason');
+    if(rsn && !rsn.dataset.plcBound){
+      rsn.addEventListener('input', clUpdatePlcFields);
+      rsn.dataset.plcBound='1';
+    }
     clUpdatePlcFields();   // set initial visibility based on the logger's team
     // If a live update arrived while the form had focus, apply it once the
     // person moves away rather than leaving them on a stale queue.
