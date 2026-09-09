@@ -1734,7 +1734,7 @@ body.ready{visibility:visible;}
 :is([data-theme="dark"],[data-theme="midnight"],[data-theme="renaissance"]) .sb-brand-name { color: #f1f5f9 !important; }
 :is([data-theme="dark"],[data-theme="midnight"],[data-theme="renaissance"]) .sb-brand-sub,
 :is([data-theme="dark"],[data-theme="midnight"],[data-theme="renaissance"]) .sb-role,
-:is([data-theme="dark"],[data-theme="midnight"],[data-theme="renaissance"]) .nav-section-lbl { color: #4b6480; }
+:is([data-theme="dark"],[data-theme="midnight"],[data-theme="renaissance"]) .nav-section-lbl { color: #8ba0b8 !important; }
 :is([data-theme="dark"],[data-theme="midnight"],[data-theme="renaissance"]) .nav-item { color: #64748b; }
 :is([data-theme="dark"],[data-theme="midnight"],[data-theme="renaissance"]) .nav-item:hover { background: #1e293b; color: #94a3b8; }
 :is([data-theme="dark"],[data-theme="midnight"],[data-theme="renaissance"]) .nav-item.active { background: var(--accent-dim); color: var(--accent); }
@@ -2844,6 +2844,11 @@ width:none !important;
 .glow-rosegold    { background-image:linear-gradient(100deg,#9f1239,#fb7185 15%,#ffe4e6 30%,#fda4af 45%,#9f1239 50%,#fda4af 65%,#ffe4e6 70%,#fb7185 85%,#9f1239 100%); }
 .glow-galaxy      { background-image:linear-gradient(100deg,#4338ca,#7c3aed 15%,#c4b5fd 30%,#818cf8 45%,#4338ca 50%,#818cf8 65%,#c4b5fd 70%,#7c3aed 85%,#4338ca 100%); }
 @media(prefers-reduced-motion:reduce){ .glow-name{ animation:none;background-position:0 center; } }
+/* Hall of Fame chips are physical "medal" pills — always light bg, dark text,
+   in every theme. Force it so dark-theme text cascades can't wash them out. */
+.fr-hof-chip{ background-clip:padding-box; }
+.fr-hof-chip .fr-hof-nm{ color:#1a1d29 !important; }
+.fr-hof-chip.me .fr-hof-nm{ color:var(--accent-text,#4f46e5) !important; }
 .fr-timelost{ display:flex;flex-direction:column;align-items:center;gap:8px;background:#fcebeb;border:1px solid #f3b6b6;border-radius:18px;padding:22px 20px;margin:2px auto 0;max-width:320px; }
 .fr-tl-ic{ margin-bottom:2px; }
 .fr-tl-big{ font-size:clamp(40px,12vw,54px);font-weight:800;line-height:1;letter-spacing:-.03em;color:#c0392b;font-variant-numeric:tabular-nums; }
@@ -19060,8 +19065,8 @@ function _leaderboardHTML(board){
     const scoreCol = isMe ? 'var(--accent-text,#4f46e5)' : C.ring;
     return '<span class="fr-hof-chip'+(isMe?' me':'')+'" style="display:inline-flex;align-items:center;gap:7px;padding:6px 12px 6px 8px;border-radius:999px;margin:0 7px 7px 0;background:'+bg+';border:1px solid '+bd+';">'+
       medal(C.disc, C.ring)+
-      '<span style="font-size:13px;font-weight:'+(isMe?'800':'600')+';color:'+nameCol+';">'+esc(b.name)+(isMe?' (you)':'')+'</span>'+
-      '<span style="font-size:12px;font-weight:800;color:'+scoreCol+';font-variant-numeric:tabular-nums;">'+b.score+'%</span></span>';
+      '<span class="fr-hof-nm" style="font-size:13px;font-weight:'+(isMe?'800':'600')+';color:'+nameCol+';">'+esc(b.name)+(isMe?' (you)':'')+'</span>'+
+      '<span class="fr-hof-sc" style="font-size:12px;font-weight:800;color:'+scoreCol+';font-variant-numeric:tabular-nums;">'+b.score+'%</span></span>';
   }
 
   let html='';
