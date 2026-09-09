@@ -1390,9 +1390,9 @@ function clEsc(s){
  */
 function clStaffName(fullName, display){
   const shown = clEsc(display != null ? display : fullName);
-  const skin = (window.glowSkinFor ? window.glowSkinFor(fullName) : 'gold');
-  if(skin && skin!=='none'){
-    return '<span class="glow-name glow-'+skin+'">'+shown+'</span>';
+  if(window.hasEarnedGlow && window.hasEarnedGlow(fullName)){
+    const skin=(window.glowSkinFor?window.glowSkinFor(fullName):'gold');
+    return '<span class="glow-name glow-'+skin+'" title="Earned a perfect fortnight">'+shown+'</span>';
   }
   return shown;
 }
@@ -2173,9 +2173,8 @@ function clSyncSub(){
 async function clLoadQueue(){
   const empty=document.getElementById('clQueueEmpty');
   const body=document.getElementById('clQueueBody');
-  // Golden-name status (perfect-fortnight holders) for logged_by styling. Shared
-  // loader lives in index.html; safe no-op if unavailable.
-  try{ if(window.loadProfileCosmetics) await window.loadProfileCosmetics(); }catch(e){}
+  // Earned-glow status for logged_by styling (shared loader in index.html).
+  try{ if(window.loadGlowData) await window.loadGlowData(); }catch(e){}
   // Skeletons on first load; on a refresh the existing rows stay put so the
   // table doesn't flash for what is usually a sub-second fetch.
   if(body && !(_clQueue && _clQueue.length)){

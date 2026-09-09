@@ -2824,8 +2824,7 @@ width:none !important;
 .fr-sub{ font-size:14px;font-weight:500;color:#71768a;margin-top:14px;line-height:1.45;padding:0 6px; }
 .fr-thanks-sub{ font-size:15px;font-weight:600;color:#4a4f63;margin-top:12px;line-height:1.5;padding:0 6px; }
 .fr-muted{ font-size:13px;color:#9498a8; }
-/* Glow names — reigning perfect-fortnight status, with pickable skins. A shared
-   flow animation; each skin swaps the gradient. Tasteful, slow shimmer. */
+/* Earned glow — perfect-fortnight achievement. Slow, tasteful shimmer. */
 .glow-name{
   font-weight:800;
   background-size:220% auto;
@@ -2841,7 +2840,7 @@ width:none !important;
 .glow-holographic { background-image:linear-gradient(100deg,#a78bfa,#f0abfc 20%,#7dd3fc 40%,#6ee7b7 60%,#fca5a5 80%,#a78bfa 100%); }
 .glow-emerald     { background-image:linear-gradient(100deg,#065f46,#10b981 25%,#a7f3d0 45%,#10b981 65%,#065f46 90%,#34d399 100%); }
 .glow-rosegold    { background-image:linear-gradient(100deg,#9f1239,#fb7185 25%,#ffe4e6 45%,#fda4af 65%,#9f1239 90%,#fb7185 100%); }
-.glow-galaxy      { background-image:linear-gradient(100deg,#312e81,#7c3aed 25%,#c4b5fd 45%,#6366f1 65%,#1e1b4b 90%,#a855f7 100%); }
+.glow-galaxy      { background-image:linear-gradient(100deg,#4338ca,#7c3aed 25%,#c4b5fd 45%,#818cf8 65%,#6d28d9 90%,#a855f7 100%); }
 @media(prefers-reduced-motion:reduce){ .glow-name{ animation:none;background-position:0 center; } }
 .fr-timelost{ display:flex;flex-direction:column;align-items:center;gap:8px;background:#fcebeb;border:1px solid #f3b6b6;border-radius:18px;padding:22px 20px;margin:2px auto 0;max-width:320px; }
 .fr-tl-ic{ margin-bottom:2px; }
@@ -6703,8 +6702,16 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
           </div>
         </div>
         <div class="card" style="margin-bottom:12px">
-          <div class="card-hd"><div class="card-title">Name appearance</div></div>
-          <div style="font-size:12px;color:#94a3b8;margin:2px 0 12px;">Pick a glow for your name. Shows in the directory, call log, and sidebar.</div>
+          <div class="card-hd"><div class="card-title">Nickname</div></div>
+          <div style="font-size:12px;color:#94a3b8;margin:2px 0 10px;">A name just for you \u2014 shows in your sidebar and here. Coworkers still see your real name.</div>
+          <div style="display:flex;gap:8px;">
+            <input class="f-input" type="text" id="profNickname" maxlength="40" placeholder="e.g. Sanny" style="flex:1;">
+            <button class="btn btn-green" style="padding:10px 16px;" onclick="saveMyNickname()">Save</button>
+          </div>
+        </div>
+        <div class="card" id="profGlowCard" style="margin-bottom:12px;display:none;">
+          <div class="card-hd"><div class="card-title">Your glow</div></div>
+          <div style="font-size:12px;color:#94a3b8;margin:2px 0 12px;" id="profGlowSub">You earned a glowing name with a perfect fortnight. Pick your style \u2014 it shows in the directory, call log, and here.</div>
           <div id="profSkinSwatches" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
         </div>
         <div class="card" style="margin-bottom:12px;cursor:pointer;" onclick="openStaffDirectory()">
@@ -8437,9 +8444,9 @@ async function enterHub(){
   document.getElementById("hubLayer").classList.add("ready");
   const first=me.split(" ")[0];
   await loadMySettings();
-  try{ await loadProfileCosmetics(); }catch(e){}
+  try{ await loadGlowData(); }catch(e){}
+  try{ await loadMyNickname(); }catch(e){}
   const ava=me.split(" ").slice(0,2).map(w=>w[0]).join("").toUpperCase();
-  // Own avatar (photo if set) applied to the round avatar spots.
   const _myImg = (window.avatarFor && window.avatarFor(me)) || null;
   function _paintAva(elId){
     const el=document.getElementById(elId); if(!el) return;
@@ -8447,10 +8454,15 @@ async function enterHub(){
     else { el.style.backgroundImage=''; el.textContent=ava; }
   }
   _paintAva("sbAvatar"); _paintAva("mhAva"); _paintAva("profAva");
-  const _el_sbName=document.getElementById("sbName");if(_el_sbName)_el_sbName.innerHTML=renderStaffName(me, esc);
-  const profNameEl=document.getElementById("profName");if(profNameEl)profNameEl.innerHTML=renderStaffName(me, esc);
-  const _el_mhName=document.getElementById("mhName");if(_el_mhName)_el_mhName.textContent=first;
-  const _el_mhNameInline=document.getElementById("mhNameInline");if(_el_mhNameInline)_el_mhNameInline.innerHTML=renderStaffName(me, esc);
+  // Sidebar shows the nickname PLAIN (no glow here — it looked tacky). The glow
+  // lives in directory, call log, and My Profile.
+  const _disp=(window.myDisplayName?window.myDisplayName():me);
+  const _dispFirst=_disp.split(" ")[0];
+  const _el_sbName=document.getElementById("sbName");if(_el_sbName)_el_sbName.textContent=_disp;
+  const _el_mhName=document.getElementById("mhName");if(_el_mhName)_el_mhName.textContent=_dispFirst;
+  const _el_mhNameInline=document.getElementById("mhNameInline");if(_el_mhNameInline)_el_mhNameInline.textContent=_dispFirst;
+  // My Profile card: nickname text, glowing if earned.
+  const profNameEl=document.getElementById("profName");if(profNameEl)profNameEl.innerHTML=renderStaffName(me, esc, _disp);
   const hr=new Date().getHours();
   const _el_homeGreeting=document.getElementById("homeGreeting");if(_el_homeGreeting)_el_homeGreeting.textContent=(hr<12?"Good morning":hr<17?"Good afternoon":"Good evening")+", "+first;
   const _el_homeWeekSub=document.getElementById("homeWeekSub");if(_el_homeWeekSub)_el_homeWeekSub.textContent=wkL(weekStart);
@@ -11767,7 +11779,7 @@ async function openStaffDirectory(){
       };
     }).filter(function(p){return p.staff_name;});
     console.log('[directory] loaded', _staffDirData.length, 'staff');
-    try{ await loadProfileCosmetics(); }catch(e){}
+    try{ await loadGlowData(); }catch(e){}
     renderStaffDirectory(_staffDirData);
   }catch(e){
     console.warn('[directory] error:', e);
@@ -11861,31 +11873,61 @@ function closeStaffProfileView(){
   document.getElementById('staffProfileViewOverlay').style.display='none';
 }
 
-// ── My Profile: name-skin picker + avatar upload ──
-function renderMySkinSwatches(){
-  const wrap=document.getElementById('profSkinSwatches'); if(!wrap) return;
+// ── My Profile: nickname + avatar upload ──
+// Populate the nickname input with the current value.
+function fillMyNickname(){
+  const el=document.getElementById('profNickname'); if(!el) return;
+  el.value=(window._myNickname||'');
+}
+
+async function saveMyNickname(){
+  const el=document.getElementById('profNickname'); if(!el) return;
+  const nick=(el.value||'').trim();
+  window._myNickname=nick||null;
+  const disp=(window.myDisplayName?window.myDisplayName():me);
+  const first=disp.split(' ')[0];
+  const set=function(id,val){ const e=document.getElementById(id); if(e) e.textContent=val; };
+  set('sbName',disp); set('mhName',first); set('mhNameInline',first);
+  // Profile card keeps the glow (if earned), with the new nickname text.
+  const pn=document.getElementById('profName'); if(pn) pn.innerHTML=renderStaffName(me, esc, disp);
+  try{
+    await fetch(SB+"/rest/v1/staff_credentials?staff_name=eq."+encodeURIComponent(me),{
+      method:"PATCH",
+      headers:{ "apikey":KEY, "Authorization":"Bearer "+_sbBearer(),
+                "Content-Type":"application/json", "Prefer":"return=minimal" },
+      body:JSON.stringify({ nickname: nick||null })
+    });
+    showToast&&showToast(nick?'Nickname saved':'Nickname cleared');
+  }catch(e){ showToast&&showToast('Could not save nickname'); }
+}
+
+// Earned-glow skin picker — only shown to staff who've earned the glow.
+function renderMySkinPicker(){
+  const card=document.getElementById('profGlowCard');
+  const wrap=document.getElementById('profSkinSwatches');
+  if(!card||!wrap) return;
+  if(!(window.hasEarnedGlow&&window.hasEarnedGlow(me))){ card.style.display='none'; return; }
+  card.style.display='';
   const cur=(window.glowSkinFor?window.glowSkinFor(me):'gold');
   wrap.innerHTML=(window.GLOW_SKINS||[]).map(function(sk){
     const sel=(sk===cur);
     const label=(window.GLOW_SKIN_LABELS&&window.GLOW_SKIN_LABELS[sk])||sk;
-    const inner = (sk==='none')
-      ? '<span style="font-weight:800;color:#0f172a;">'+label+'</span>'
-      : '<span class="glow-name glow-'+sk+'">'+label+'</span>';
     return '<button onclick="pickMySkin(\''+sk+'\')" title="'+label+'" '+
       'style="cursor:pointer;border-radius:10px;padding:8px 12px;font-family:inherit;font-size:13px;font-weight:800;'+
-      'background:#fff;border:2px solid '+(sel?'var(--accent,#4f46e5)':'#e5e7eb')+';">'+inner+'</button>';
+      'background:#fff;border:2px solid '+(sel?'var(--accent,#4f46e5)':'#e5e7eb')+';">'+
+      '<span class="glow-name glow-'+sk+'">'+label+'</span></button>';
   }).join('');
 }
 
 async function pickMySkin(skin){
   if(!window.GLOW_SKINS || window.GLOW_SKINS.indexOf(skin)<0) return;
+  if(!(window.hasEarnedGlow&&window.hasEarnedGlow(me))) return;   // earners only
   window._nameSkins=window._nameSkins||{};
   window._nameSkins[me]=skin;
-  renderMySkinSwatches();
-  // Live-update own name everywhere it shows now.
-  ['profName','sbName','mhNameInline'].forEach(function(id){
-    const el=document.getElementById(id); if(el) el.innerHTML=renderStaffName(me, esc);
-  });
+  renderMySkinPicker();
+  // Live-update own glowing name on the profile card.
+  const disp=(window.myDisplayName?window.myDisplayName():me);
+  const pn=document.getElementById('profName'); if(pn) pn.innerHTML=renderStaffName(me, esc, disp);
   try{
     await fetch(SB+"/rest/v1/staff_credentials?staff_name=eq."+encodeURIComponent(me),{
       method:"PATCH",
@@ -11893,29 +11935,112 @@ async function pickMySkin(skin){
                 "Content-Type":"application/json", "Prefer":"return=minimal" },
       body:JSON.stringify({ name_skin:skin })
     });
-  }catch(e){ showToast&&showToast('Could not save appearance'); }
+  }catch(e){ showToast&&showToast('Could not save glow'); }
 }
 
 // Compress an uploaded image to a small square avatar (<=256px) and store as
 // base64 in staff_avatars. Keeps the blob tiny so reads stay fast.
 async function uploadMyAvatar(ev){
   const file=ev && ev.target && ev.target.files && ev.target.files[0];
+  if(ev&&ev.target) ev.target.value='';
   if(!file) return;
   if(!/^image\//.test(file.type)){ showToast&&showToast('Please choose an image'); return; }
   try{
     const dataUrl=await _readFileAsDataURL(file);
-    const compressed=await _compressAvatar(dataUrl, 256, 0.82);
-    window._avatars=window._avatars||{};
-    window._avatars[me]=compressed;
-    // Live-update own avatar spots.
-    ['profAvaWrap','sbAvatar','mhAva'].forEach(function(id){
-      const el=document.getElementById(id); if(!el) return;
-      const span=(id==='profAvaWrap')?document.getElementById('profAva'):null;
-      if(span) span.textContent='';
-      el.textContent = (id==='profAvaWrap') ? el.textContent : '';
-      el.style.backgroundImage='url('+compressed+')';
-      el.style.backgroundSize='cover'; el.style.backgroundPosition='center';
-    });
+    openAvatarCrop(dataUrl);   // adjust (drag + zoom), then Save commits
+  }catch(e){ showToast&&showToast('Could not read image'); }
+}
+
+// ── Avatar crop: drag to reposition, slider to zoom, within a circular frame ──
+window._crop = window._crop || null;
+function openAvatarCrop(dataUrl){
+  const img=new Image();
+  img.onload=function(){
+    const V=260; // viewport (px)
+    // Base scale = smallest zoom that still fills the circle.
+    const base=Math.max(V/img.width, V/img.height);
+    window._crop={ img:img, V:V, base:base, zoom:1,
+                   x:0, y:0, drag:false, lx:0, ly:0 };
+    document.getElementById('avatarCropOverlay').style.display='flex';
+    const z=document.getElementById('avatarCropZoom'); if(z) z.value='1';
+    _cropClamp(); _cropDraw();
+  };
+  img.onerror=function(){ showToast&&showToast('Could not load image'); };
+  img.src=dataUrl;
+}
+function _cropDraw(){
+  const c=window._crop; if(!c) return;
+  const cv=document.getElementById('avatarCropCanvas'); if(!cv) return;
+  cv.width=c.V; cv.height=c.V;
+  const ctx=cv.getContext('2d');
+  ctx.clearRect(0,0,c.V,c.V);
+  const s=c.base*c.zoom;
+  const w=c.img.width*s, h=c.img.height*s;
+  ctx.drawImage(c.img, c.x, c.y, w, h);
+  // Dim outside the circle.
+  ctx.save();
+  ctx.globalCompositeOperation='destination-in';
+  ctx.beginPath(); ctx.arc(c.V/2,c.V/2,c.V/2,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+}
+function _cropClamp(){
+  const c=window._crop; if(!c) return;
+  const s=c.base*c.zoom;
+  const w=c.img.width*s, h=c.img.height*s;
+  // Keep the image covering the viewport.
+  if(c.x>0) c.x=0; if(c.y>0) c.y=0;
+  if(c.x < c.V-w) c.x=c.V-w;
+  if(c.y < c.V-h) c.y=c.V-h;
+}
+function cropZoom(v){
+  const c=window._crop; if(!c) return;
+  // Zoom around the viewport centre.
+  const cx=c.V/2, cy=c.V/2;
+  const oldS=c.base*c.zoom;
+  c.zoom=parseFloat(v)||1;
+  const newS=c.base*c.zoom;
+  const k=newS/oldS;
+  c.x=cx-(cx-c.x)*k; c.y=cy-(cy-c.y)*k;
+  _cropClamp(); _cropDraw();
+}
+function _cropStart(e){
+  const c=window._crop; if(!c) return;
+  c.drag=true;
+  const p=e.touches?e.touches[0]:e;
+  c.lx=p.clientX; c.ly=p.clientY;
+}
+function _cropMove(e){
+  const c=window._crop; if(!c||!c.drag) return;
+  const p=e.touches?e.touches[0]:e;
+  c.x+=(p.clientX-c.lx); c.y+=(p.clientY-c.ly);
+  c.lx=p.clientX; c.ly=p.clientY;
+  _cropClamp(); _cropDraw();
+  if(e.cancelable) e.preventDefault();
+}
+function _cropEnd(){ if(window._crop) window._crop.drag=false; }
+function closeAvatarCrop(){
+  const o=document.getElementById('avatarCropOverlay'); if(o) o.style.display='none';
+  window._crop=null;
+}
+async function saveAvatarCrop(){
+  const c=window._crop; if(!c) return;
+  const OUT=256;
+  const out=document.createElement('canvas'); out.width=OUT; out.height=OUT;
+  const ctx=out.getContext('2d');
+  const s=c.base*c.zoom, k=OUT/c.V;
+  ctx.drawImage(c.img, c.x*k, c.y*k, c.img.width*s*k, c.img.height*s*k);
+  const compressed=out.toDataURL('image/jpeg',0.82);
+  closeAvatarCrop();
+  window._avatars=window._avatars||{};
+  window._avatars[me]=compressed;
+  ['profAvaWrap','sbAvatar','mhAva'].forEach(function(id){
+    const el=document.getElementById(id); if(!el) return;
+    if(id==='profAvaWrap'){ const sp=document.getElementById('profAva'); if(sp) sp.textContent=''; }
+    else el.textContent='';
+    el.style.backgroundImage='url('+compressed+')';
+    el.style.backgroundSize='cover'; el.style.backgroundPosition='center';
+  });
+  try{
     await fetch(SB+"/rest/v1/staff_avatars?on_conflict=staff_name",{
       method:"POST",
       headers:{ "apikey":KEY, "Authorization":"Bearer "+_sbBearer(),
@@ -11924,8 +12049,7 @@ async function uploadMyAvatar(ev){
       body:JSON.stringify([{ staff_name:me, avatar:compressed, updated_at:new Date().toISOString() }])
     });
     showToast&&showToast('Photo updated');
-  }catch(e){ showToast&&showToast('Could not update photo'); }
-  finally{ if(ev&&ev.target) ev.target.value=''; }
+  }catch(e){ showToast&&showToast('Could not save photo'); }
 }
 
 function _readFileAsDataURL(file){
@@ -11933,21 +12057,6 @@ function _readFileAsDataURL(file){
     const r=new FileReader();
     r.onload=function(){res(r.result);}; r.onerror=rej;
     r.readAsDataURL(file);
-  });
-}
-// Center-crop to a square and scale down, returning a compressed JPEG data URL.
-function _compressAvatar(dataUrl, size, quality){
-  return new Promise(function(res,rej){
-    const img=new Image();
-    img.onload=function(){
-      const side=Math.min(img.width, img.height);
-      const sx=(img.width-side)/2, sy=(img.height-side)/2;
-      const c=document.createElement('canvas'); c.width=size; c.height=size;
-      const ctx=c.getContext('2d');
-      ctx.drawImage(img, sx, sy, side, side, 0, 0, size, size);
-      res(c.toDataURL('image/jpeg', quality));
-    };
-    img.onerror=rej; img.src=dataUrl;
   });
 }
 
@@ -12043,15 +12152,17 @@ function toggleSection(id){
 async function loadProfilePage(){
   // Set avatar and name
   const ava=me.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase();
-  try{ await loadProfileCosmetics(); }catch(e){}
+  try{ await loadGlowData(); }catch(e){}
+  if(window._myNickname===null || typeof window._myNickname==='undefined'){ try{ await loadMyNickname(); }catch(e){} }
   const profAvaEl=document.getElementById("profAva");
   const _pImg=(window.avatarFor&&window.avatarFor(me))||null;
   const _pWrap=document.getElementById("profAvaWrap");
   if(_pImg){ if(profAvaEl)profAvaEl.textContent=''; if(_pWrap)_pWrap.style.backgroundImage='url('+_pImg+')'; }
   else { if(profAvaEl)profAvaEl.textContent=ava; if(_pWrap)_pWrap.style.backgroundImage=''; }
-  const profNameEl=document.getElementById("profName");if(profNameEl)profNameEl.innerHTML=renderStaffName(me, esc);
+  const profNameEl=document.getElementById("profName");if(profNameEl)profNameEl.innerHTML=renderStaffName(me, esc, (window.myDisplayName?window.myDisplayName():me));
   const profRoleEl=document.getElementById("profRole");if(profRoleEl)profRoleEl.textContent=myIsAdmin?"Admin":"Staff";
-  renderMySkinSwatches();
+  fillMyNickname();
+  renderMySkinPicker();
   // Load team name
   try{
     const teamRows=await sbGet('staff_credentials','?staff_name=eq.'+encodeURIComponent(me)+'&select=team');
@@ -18634,61 +18745,71 @@ async function _computeMyStreak(){
   return { current, best, lastYmd:dates[dates.length-1] };
 }
 
-// ── NAME SKIN + AVATAR (cosmetic personalisation, everyone) ──────────────
-// Every staffer can pick a glow style for their name and upload a profile
-// picture, both set in My Profile. Rendered in the sidebar, profile card, staff
-// directory, and call log. Purely cosmetic — no performance gating.
+// ── EARNED GLOW + AVATAR + NICKNAME ──────────────
+// GLOW: earned by EVER having a perfect fortnight (100% on-time, >= floor) —
+// permanent. Earners pick a skin (persisted); shown in directory, call log, and
+// My Profile. Not the sidebar.
+// AVATAR: photo (drag/zoom-cropped) shown wherever a face appears.
+// NICKNAME: display-only vanity label; replaces the shown name ONLY in the
+// person's own sidebar + profile card. staff_name stays the identity key.
 //
-// Shared across index.html and dialtrac.js via the window-guard pattern (no
-// declaration keyword) to avoid let/var collisions between the files.
-window.GLOW_SKINS = window.GLOW_SKINS || ['none','gold','ocean','sunset','molten','holographic','emerald','rosegold','galaxy'];
+// Shared across index.html and dialtrac.js via the window-guard pattern.
+window.GLOW_SKINS = window.GLOW_SKINS || ['gold','ocean','sunset','molten','holographic','emerald','rosegold','galaxy'];
 window.GLOW_SKIN_LABELS = window.GLOW_SKIN_LABELS || {
-  none:'Plain', gold:'Gold', ocean:'Ocean', sunset:'Sunset', molten:'Molten',
+  gold:'Gold', ocean:'Ocean', sunset:'Sunset', molten:'Molten',
   holographic:'Holographic', emerald:'Emerald', rosegold:'Rose gold', galaxy:'Galaxy'
 };
-window._nameSkins = window._nameSkins || null;   // { staffName: skin }
-window._avatars   = window._avatars   || null;   // { staffName: base64 }
-window._profileLoading = window._profileLoading || null;
+window._earnedGlow = window._earnedGlow || null;  // Set<staffName> who ever went perfect
+window._nameSkins  = window._nameSkins  || null;  // { staffName: skin }
+window._avatars    = window._avatars    || null;  // { staffName: base64 }
+window._myNickname = (typeof window._myNickname === 'undefined') ? null : window._myNickname;
+window._glowLoading = window._glowLoading || null;
 
-window.loadProfileCosmetics = window.loadProfileCosmetics || async function(force){
-  if(!force && window._nameSkins && window._avatars) return true;
-  if(window._profileLoading) return window._profileLoading;
-  window._profileLoading = (async function(){
-    const skins={}, avs={};
+window.loadGlowData = window.loadGlowData || async function(force){
+  if(!force && window._earnedGlow && window._nameSkins && window._avatars) return true;
+  if(window._glowLoading) return window._glowLoading;
+  window._glowLoading = (async function(){
+    const earned=new Set(), skins={}, avs={};
     try{
-      const rows=await sbGet('staff_credentials','?select=staff_name,name_skin&limit=500')||[];
-      rows.forEach(function(r){ if(r.staff_name) skins[r.staff_name]=r.name_skin||'gold'; });
+      // Earned = anyone with a perfect fortnight anywhere in history (permanent).
+      const rows=await sbGet('punctuality_history','?score=eq.100&x=gte.4&select=staff_name&limit=2000')||[];
+      rows.forEach(function(r){ if(r.staff_name) earned.add(r.staff_name); });
+    }catch(e){}
+    try{
+      const sk=await sbGet('staff_credentials','?select=staff_name,name_skin&limit=500')||[];
+      sk.forEach(function(r){ if(r.staff_name) skins[r.staff_name]=r.name_skin||'gold'; });
     }catch(e){}
     try{
       const av=await sbGet('staff_avatars','?select=staff_name,avatar&limit=500')||[];
       av.forEach(function(a){ if(a.staff_name && a.avatar) avs[a.staff_name]=a.avatar; });
     }catch(e){}
-    window._nameSkins=skins; window._avatars=avs;
-    window._profileLoading=null;
+    window._earnedGlow=earned; window._nameSkins=skins; window._avatars=avs;
+    window._glowLoading=null;
     return true;
   })();
-  return window._profileLoading;
+  return window._glowLoading;
 };
 
-// Skin for a name (defaults to gold). 'none' = plain, no glow.
+window.hasEarnedGlow = window.hasEarnedGlow || function(name){
+  return !!(window._earnedGlow && name && window._earnedGlow.has(name));
+};
 window.glowSkinFor = window.glowSkinFor || function(name){
   const s = window._nameSkins && window._nameSkins[name];
   return (s && window.GLOW_SKINS.indexOf(s)>=0) ? s : 'gold';
 };
 
-// Wrap a staff name in the chosen glow span. 'none' renders plain.
-window.renderStaffName = window.renderStaffName || function(name, escFn){
+// Render a name: glowing (with the person's skin) if they've earned it, else
+// plain. `plainOverride` lets callers pass alternate display text (e.g. a
+// nickname) while still keying the earned check on the real staff_name.
+window.renderStaffName = window.renderStaffName || function(name, escFn, plainOverride){
   const e = (escFn||function(s){return s;});
-  const safe = e(name||'');
-  const skin = window.glowSkinFor(name);
-  if(skin && skin!=='none'){
-    return '<span class="glow-name glow-'+skin+'">'+safe+'</span>';
+  const shown = e(plainOverride!=null ? plainOverride : (name||''));
+  if(window.hasEarnedGlow(name)){
+    return '<span class="glow-name glow-'+window.glowSkinFor(name)+'" title="Earned a perfect fortnight">'+shown+'</span>';
   }
-  return safe;
+  return shown;
 };
 
-// Return avatar markup for a name: the uploaded photo if present, else initials.
-// `size` px, `bg` optional gradient for the initials fallback.
 window.avatarFor = window.avatarFor || function(name){
   return (window._avatars && window._avatars[name]) || null;
 };
@@ -18701,6 +18822,18 @@ window.renderStaffAvatar = window.renderStaffAvatar || function(name, size, extr
   }
   const initials=String(name||'?').split(' ').map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase();
   return '<div style="'+base+'background:linear-gradient(135deg,var(--accent),#7c3aed);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:'+Math.round(size*0.36)+'px;">'+initials+'</div>';
+};
+
+// Load just the current user's nickname (only they see it).
+window.loadMyNickname = window.loadMyNickname || async function(){
+  try{
+    const rows=await sbGet('staff_credentials','?staff_name=eq.'+encodeURIComponent(me)+'&select=nickname&limit=1');
+    window._myNickname=(rows&&rows.length)?(rows[0].nickname||null):null;
+  }catch(e){ window._myNickname=null; }
+  return window._myNickname;
+};
+window.myDisplayName = window.myDisplayName || function(){
+  return (window._myNickname && window._myNickname.trim()) ? window._myNickname.trim() : me;
 };
 
 
@@ -24183,6 +24316,28 @@ window.addEventListener('resize', function(){
     </div>
   </div>
 
+  <!-- AVATAR CROP (drag to reposition, slider to zoom) -->
+  <div id="avatarCropOverlay" style="display:none;position:fixed;inset:0;z-index:9600;background:rgba(0,0,0,.55);align-items:center;justify-content:center;" onclick="if(event.target===this)closeAvatarCrop()">
+    <div style="background:#fff;border-radius:16px;width:92%;max-width:340px;padding:20px;box-shadow:0 20px 60px rgba(0,0,0,.3);animation:popIn .18s cubic-bezier(.34,1.4,.7,1);">
+      <div style="font-size:15px;font-weight:700;color:#0f172a;margin-bottom:14px;text-align:center;">Adjust your photo</div>
+      <div style="display:flex;justify-content:center;">
+        <canvas id="avatarCropCanvas" width="260" height="260"
+          style="width:260px;height:260px;border-radius:50%;touch-action:none;cursor:grab;background:#f1f5f9;box-shadow:0 0 0 1px #e5e7eb, 0 0 0 6px #fff, 0 0 0 7px #e5e7eb;"
+          onmousedown="_cropStart(event)" onmousemove="_cropMove(event)" onmouseup="_cropEnd()" onmouseleave="_cropEnd()"
+          ontouchstart="_cropStart(event)" ontouchmove="_cropMove(event)" ontouchend="_cropEnd()"></canvas>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;margin:16px 2px 4px;">
+        <svg width="14" height="14" viewBox="0 0 20 20" fill="#94a3b8"><path d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" opacity="0"/><circle cx="9" cy="9" r="6" fill="none" stroke="#94a3b8" stroke-width="2"/><path d="M13.5 13.5L17 17" stroke="#94a3b8" stroke-width="2" stroke-linecap="round"/></svg>
+        <input type="range" id="avatarCropZoom" min="1" max="3" step="0.01" value="1" oninput="cropZoom(this.value)" style="flex:1;accent-color:var(--accent,#4f46e5);">
+      </div>
+      <div style="font-size:11px;color:#94a3b8;text-align:center;margin-bottom:14px;">Drag to reposition \u00b7 slide to zoom</div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-outline" style="flex:1;" onclick="closeAvatarCrop()">Cancel</button>
+        <button class="btn btn-green" style="flex:1;" onclick="saveAvatarCrop()">Save photo</button>
+      </div>
+    </div>
+  </div>
+
   <!-- STAFF PROFILE VIEW (when clicking a coworker) -->
   <div id="staffProfileViewOverlay" style="display:none;position:fixed;inset:0;z-index:9100;background:rgba(0,0,0,.35);align-items:center;justify-content:center;" onclick="if(event.target===this)closeStaffProfileView()">
     <div style="background:#fff;border-radius:14px;width:92%;max-width:380px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.25);animation:popIn .18s cubic-bezier(.34,1.4,.7,1);">
@@ -25125,7 +25280,7 @@ input:focus{
 </style>
 
 <!-- DialTRAC (Call Log tab) — extracted module. Bump ?v= on each deploy. -->
-<script src="dialtrac.js?v=28"></script>
+<script src="dialtrac.js?v=27"></script>
 <script src="quizreview.js?v=2"></script>
 <script src="teamhours.js?v=2"></script>
 <script src="availlock.js?v=8"></script>
