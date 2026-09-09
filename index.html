@@ -8452,8 +8452,17 @@ async function enterHub(){
   const _myImg = (window.avatarFor && window.avatarFor(me)) || null;
   function _paintAva(elId){
     const el=document.getElementById(elId); if(!el) return;
-    if(_myImg){ el.textContent=''; el.style.backgroundImage='url('+_myImg+')'; el.style.backgroundSize='cover'; el.style.backgroundPosition='center'; }
-    else { el.style.backgroundImage=''; el.textContent=ava; }
+    if(_myImg){
+      el.textContent='';
+      el.classList.add('has-photo');
+      el.style.setProperty('background-image','url('+_myImg+')','important');
+      el.style.setProperty('background-size','cover','important');
+      el.style.setProperty('background-position','center','important');
+    } else {
+      el.classList.remove('has-photo');
+      el.style.removeProperty('background-image');
+      el.textContent=ava;
+    }
   }
   _paintAva("sbAvatar"); _paintAva("mhAva"); _paintAva("profAva");
   // Sidebar shows the nickname PLAIN (no glow here — it looked tacky). The glow
@@ -12039,8 +12048,10 @@ async function saveAvatarCrop(){
     const el=document.getElementById(id); if(!el) return;
     if(id==='profAvaWrap'){ const sp=document.getElementById('profAva'); if(sp) sp.textContent=''; }
     else el.textContent='';
-    el.style.backgroundImage='url('+compressed+')';
-    el.style.backgroundSize='cover'; el.style.backgroundPosition='center';
+    el.classList.add('has-photo');
+    el.style.setProperty('background-image','url('+compressed+')','important');
+    el.style.setProperty('background-size','cover','important');
+    el.style.setProperty('background-position','center','important');
   });
   try{
     await fetch(SB+"/rest/v1/staff_avatars?on_conflict=staff_name",{
@@ -24897,9 +24908,10 @@ input:focus{
 }
 
 /* ── 8. Avatars / pills warm gradient (was emerald→violet) ───── */
-.sb-avatar,.mh-ava{
+.sb-avatar:not(.has-photo),.mh-ava:not(.has-photo){
   background:linear-gradient(135deg,var(--accent),#e8a85a) !important;
 }
+.sb-avatar.has-photo,.mh-ava.has-photo{ background-size:cover !important; background-position:center !important; }
 
 /* ── 9. Sidebar surface warmer ───────────────────────────────── */
 .signout{
