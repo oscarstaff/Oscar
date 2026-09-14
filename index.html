@@ -8929,15 +8929,48 @@ function _effIsFortnightStart(d){
   return diff>=0 && diff%7===0;    // any Monday (weekly cadence)
 }
 function _effSoonestValid(){
-  // Soonest week-start (Monday) strictly in the future (never the running one).
-  if(typeof window.availNextFortnight==='function'){ return window.availNextFortnight(); }
-  const a=_effFortnightAnchor(); const today=new Date(); today.setHours(0,0,0,0);
-  let d=new Date(a);
-  while(d<=today){ d=new Date(d.getTime()+7*86400000); }
-  return d;
+  // Soonest editable week-start (Monday), respecting the Friday-12pm cutoff:
+  // once past Fri 12pm the upcoming week is locked, so the floor moves on.
+  const floor=_availCutoffFloor();
+  let base;
+  if(typeof window.availNextFortnight==='function'){ base=window.availNextFortnight(); }
+  else {
+    const a=_effFortnightAnchor(); const today=new Date(); today.setHours(0,0,0,0);
+    let d=new Date(a);
+    while(d<=today){ d=new Date(d.getTime()+7*86400000); }
+    base=d;
+  }
+  // Never earlier than the cutoff floor.
+  return (base < floor) ? floor : base;
 }
 function _effFmtIso(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 function _effFmtNice(d){ return d.toLocaleDateString('en-AU',{weekday:'long',day:'numeric',month:'long'}); }
+
+// ── FRIDAY-12PM CUTOFF ─────────────────────────────────────────────
+// A week (Mon-start) locks for availability at 12:00pm the Friday BEFORE it.
+// Returns the earliest week-start Monday a staff member may still edit, given
+// "now". Before Fri 12pm: the upcoming Monday is still open. From Fri 12pm on
+// (through the weekend and the week itself): the upcoming week is locked, so the
+// floor is the Monday after it. Computed in SYDNEY wall-clock time so the
+// boundary is correct regardless of the device's timezone. Self-contained.
+function _sydneyNow(){
+  // Re-express the current instant as Sydney local wall-clock.
+  return new Date(new Date().toLocaleString('en-US',{timeZone:'Australia/Sydney'}));
+}
+function _availCutoffFloor(now){
+  now = now || _sydneyNow();
+  const d = new Date(now); d.setHours(0,0,0,0);
+  // Monday of the current calendar week (Mon=0).
+  const dow = (d.getDay()+6)%7;
+  const thisMon = new Date(d.getTime() - dow*86400000);
+  const nextMon = new Date(thisMon.getTime() + 7*86400000);
+  // The cutoff that locks NEXT week is 12:00 the Friday of THIS week
+  // (Friday = thisMon + 4 days).
+  const friday = new Date(thisMon.getTime() + 4*86400000);
+  friday.setHours(12,0,0,0);
+  // Before that cutoff → next Monday still editable. At/after → week after.
+  return (now < friday) ? nextMon : new Date(nextMon.getTime() + 7*86400000);
+}
 
 function initEffDate(){
   // Default to the soonest valid week; staff can change it.
@@ -8952,7 +8985,11 @@ function _renderEffLabel(){
   if(_effChosen){
     const d=new Date(_effChosen+'T00:00:00');
     if(lbl) lbl.textContent='Week of '+_effFmtNice(d);
-    if(hint) hint.textContent='✓ starts this week';
+    if(hint){
+      const floor=_availCutoffFloor();
+      const soonest=_effFmtIso(floor);
+      hint.textContent = (_effChosen===soonest) ? '✓ soonest available week' : '✓ starts '+_effFmtNice(d);
+    }
   }else{
     if(lbl) lbl.textContent='Select week…';
     if(hint) hint.textContent='';
@@ -8980,6 +9017,7 @@ function _renderEffCal(){
   const startDow=(first.getDay()+6)%7;         // Mon=0
   const daysInMonth=new Date(y,mo+1,0).getDate();
   const today=new Date(); today.setHours(0,0,0,0);
+  const cutoffFloor=_availCutoffFloor();   // earliest week locked in by Fri-12pm rule
 
   let html='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">'+
     '<button type="button" onclick="effCalNav(-1)" style="background:none;border:none;cursor:pointer;font-size:16px;color:#64748b;padding:2px 8px;">‹</button>'+
@@ -8993,7 +9031,7 @@ function _renderEffCal(){
   for(let day=1;day<=daysInMonth;day++){
     const d=new Date(y,mo,day); d.setHours(0,0,0,0);
     const iso=_effFmtIso(d);
-    const selectable=_effIsFortnightStart(d) && d>today;
+    const selectable=_effIsFortnightStart(d) && d>=cutoffFloor;
     const isSel=(iso===_effChosen);
     if(selectable){
       html+='<button type="button" onclick="pickEffDate(\''+iso+'\')" title="Week starting '+_effFmtNice(d)+'" '+
@@ -9528,7 +9566,8 @@ async function submitAvail(){
       try{
         const cd=new Date(_effChosen+'T00:00:00');
         const _today=new Date(); _today.setHours(0,0,0,0);
-        if(typeof _effIsFortnightStart==='function' && _effIsFortnightStart(cd) && cd>_today){
+        const _floor=(typeof _availCutoffFloor==='function')?_availCutoffFloor():_today;
+        if(typeof _effIsFortnightStart==='function' && _effIsFortnightStart(cd) && cd>=_floor){
           _effectiveFrom = _effChosen;
         }
       }catch(e){}
