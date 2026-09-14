@@ -5788,6 +5788,12 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
         <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M9 2a1 1 0 00-1 1v1H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V6a2 2 0 00-2-2h-2V3a1 1 0 00-1-1H9zm0 2h2v1H9V4zm-2 5a1 1 0 011-1h4a1 1 0 110 2H8a1 1 0 01-1-1zm1 3a1 1 0 100 2h3a1 1 0 100-2H8z"/></svg>
         My Reports
       </div>
+
+      <!-- TEAM ACHIEVEMENTS -->
+      <div class="nav-item" id="nav-achievements" data-tab="achievements" onclick="goTo('achievements')">
+        <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M9 2a1 1 0 000 2v6.5a3.5 3.5 0 002 3.163V16H8a1 1 0 100 2h4a1 1 0 100-2h-3v-2.337A3.5 3.5 0 0011 10.5V4a1 1 0 100-2H9zM5 4a1 1 0 00-1 1 4 4 0 003 3.874V5a1 1 0 00-1-1H5zm10 0a1 1 0 00-1 1v3.874A4 4 0 0016 5a1 1 0 00-1-1h-1z"/></svg>
+        Achievements
+      </div>
       
       <!-- HUB — external apps launcher (Mcd Connect style) -->
       <div class="nav-item" id="nav-hub" data-tab="hub" onclick="goTo('hub')">
@@ -5893,6 +5899,19 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
         <div id="whatsNewBody" style="display:none;border-top:1px solid #f1f5f9;padding:6px 16px 14px;"></div>
       </div>
 
+      <!-- Recently Earned (achievement feed preview → Team Achievements tab) -->
+      <div class="card" id="homeAchievements" style="margin-bottom:12px;padding:0;overflow:hidden;display:none;">
+        <div onclick="goTo('achievements')" style="display:flex;align-items:center;gap:10px;padding:12px 16px;cursor:pointer;user-select:none;">
+          <div style="font-size:20px;line-height:1;flex-shrink:0;">🏆</div>
+          <div style="flex:1;min-width:0;">
+            <span class="card-title" style="font-size:14px;">Recently Earned</span>
+            <div style="font-size:11px;color:#64748b;margin-top:1px;">What the team's been achieving</div>
+          </div>
+          <div style="font-size:12px;color:var(--accent);font-weight:700;flex-shrink:0;">See all ›</div>
+        </div>
+        <div id="homeAchList" style="border-top:1px solid #f1f5f9;padding:4px 4px 6px;"></div>
+      </div>
+
       <!-- My tasks due -->
 
       <!-- Upcoming events (calendar preview) -->
@@ -5919,6 +5938,24 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
       </div>
 
 
+    </div>
+
+    <!-- TEAM ACHIEVEMENTS page -->
+    <div class="page" id="page-achievements">
+      <div class="page-hd">
+        <div class="page-title" style="letter-spacing:-.025em;">Team Achievements</div>
+        <div class="page-sub" style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.08em;margin-top:2px;">Tap a name to see their profile</div>
+      </div>
+      <!-- Currently glowing strip -->
+      <div class="card" id="achGlowStrip" style="margin-bottom:14px;padding:14px 16px;display:none;">
+        <div style="font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#94a3b8;margin-bottom:10px;">✦ Currently Glowing</div>
+        <div id="achGlowList" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
+      </div>
+      <!-- Full feed -->
+      <div class="card" style="padding:8px 6px;">
+        <div style="font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#94a3b8;margin:8px 10px 4px;">Recent activity</div>
+        <div id="achFeedList"><div style="text-align:center;color:#94a3b8;padding:28px;font-size:13px;">Loading…</div></div>
+      </div>
     </div>
 
     <!-- TASKS page -->
@@ -6954,7 +6991,7 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
 }
 @media (max-width: 700px) {
   .bottom-nav { display: flex; flex-direction: column; }
-  .main { padding-bottom: calc(54px + env(safe-area-inset-bottom, 0px)); }
+  .main { padding-bottom: calc(58px + env(safe-area-inset-bottom, 0px)); }
 }
 
 /* Items row — TIGHT (no extra spacing between items) */
@@ -6968,15 +7005,17 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
   justify-content: space-around;
 }
 
-/* Each tab — equal width, icon centered */
+/* Each tab — equal width, icon + label stacked and centered */
 .bn-item {
   flex: 1 1 0;
   min-width: 0;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 0;
-  height: 54px;
+  gap: 3px;
+  padding: 0 2px;
+  height: 58px;
   cursor: pointer;
   position: relative;
   -webkit-tap-highlight-color: transparent;
@@ -6986,10 +7025,27 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
 }
 .bn-item:active { transform: scale(.92); opacity: .7; }
 
+/* Label under each icon */
+.bn-label {
+  font-size: 10px;
+  line-height: 1;
+  font-weight: 600;
+  color: #94a3b8;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: color .15s;
+  letter-spacing: .1px;
+}
+.bn-item.active .bn-label { color: var(--accent); }
+:is([data-theme="dark"],[data-theme="midnight"],[data-theme="renaissance"]) .bn-label { color: #64748b; }
+:is([data-theme="dark"],[data-theme="midnight"],[data-theme="renaissance"]) .bn-item.active .bn-label { color: var(--accent); }
+
 /* Icons */
 .bn-icon {
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
   color: #94a3b8;
   display: block;
   flex-shrink: 0;
@@ -7330,29 +7386,35 @@ function switchProfileTab(t){
       <!-- HOME -->
       <div class="bn-item active" id="bn-home" data-tab="home" onclick="if(navigator.vibrate)navigator.vibrate(8);goTo('home')" aria-label="Home">
         <svg class="bn-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h4v-4h2v4h4a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z"/></svg>
+        <span class="bn-label">Home</span>
       </div>
       <!-- ROSTER — people icon (matches sidebar) -->
       <div class="bn-item" id="bn-schedule" data-tab="schedule" onclick="if(navigator.vibrate)navigator.vibrate(8);openRoster()" aria-label="My Time">
         <svg class="bn-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"/></svg>
+        <span class="bn-label">Time</span>
       </div>
       <!-- LIBRARY — opens Learnings/Documents chooser -->
       <div class="bn-item" id="bn-library" data-tab="library" onclick="if(navigator.vibrate)navigator.vibrate(8);openLibrary()" aria-label="Library">
         <svg class="bn-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M10.394 2.08a1 1 0 00-.788 0l-7 3a1 1 0 000 1.84L5.25 8.051a.999.999 0 01.356-.257l4-1.714a1 1 0 11.788 1.838L7.667 9.088l1.94.831a1 1 0 00.787 0l7-3a1 1 0 000-1.838l-7-3zM3.31 9.397L5 10.12v4.102a8.969 8.969 0 00-1.05-.174 1 1 0 01-.89-.89 11.115 11.115 0 01.25-3.762zM9.3 16.573A9.026 9.026 0 007 14.935v-3.957l1.818.78a3 3 0 002.364 0l5.508-2.361a11.026 11.026 0 01.25 3.762 1 1 0 01-.89.89 8.968 8.968 0 00-5.35 2.524 1 1 0 01-1.4 0zM6 18a1 1 0 001-1v-2.065a8.935 8.935 0 00-2-.712V17a1 1 0 001 1z"/></svg>
+        <span class="bn-label">Library</span>
         <div class="bn-badge" id="bnLibraryBadge"></div>
       </div>
       <!-- ROSTER & SHIFTS — calendar-clock icon -->
       <div class="bn-item" id="bn-shifts" data-tab="shifts" onclick="if(navigator.vibrate)navigator.vibrate(8);openShiftsTab()" aria-label="Roster &amp; Shifts">
         <svg class="bn-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm10 5H4v9h12V7zm-6 1.5a1 1 0 011 1V12h1.5a1 1 0 110 2H10a1 1 0 01-1-1V9.5a1 1 0 011-1z" clip-rule="evenodd"/></svg>
+        <span class="bn-label">Shifts</span>
         <div class="bn-badge" id="bnShiftsBadge"></div>
       </div>
       <!-- MY REPORTS — clipboard icon -->
       <div class="bn-item" id="bn-myreports" data-tab="myreports" onclick="if(navigator.vibrate)navigator.vibrate(8);goTo('myreports')" aria-label="My Reports">
         <svg class="bn-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M9 2a1 1 0 00-1 1v1H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V6a2 2 0 00-2-2h-2V3a1 1 0 00-1-1H9zm0 2h2v1H9V4zm-2 5a1 1 0 011-1h4a1 1 0 110 2H8a1 1 0 01-1-1zm1 3a1 1 0 100 2h3a1 1 0 100-2H8z"/></svg>
+        <span class="bn-label">Reports</span>
         <div class="bn-badge" id="bnReportsBadge"></div>
       </div>
       <!-- NOTIFICATIONS — bell icon (kept) -->
       <div class="bn-item" id="bn-notifs" data-tab="notifs" onclick="if(navigator.vibrate)navigator.vibrate(8);goTo('notifs')" aria-label="Notifications">
         <svg class="bn-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z"/></svg>
+        <span class="bn-label">Alerts</span>
         <div class="bn-badge" id="bnNotifBadge"></div>
       </div>
     </div>
@@ -8761,7 +8823,7 @@ function goTo(p){
   setActiveNavChild(p);
   if(typeof _setBottomNavActive==='function') _setBottomNavActive(p);
   // Update URL hash + document title
-  const titles={home:'Home',schedule:'Schedule',profile:'Profile',announcements:'Announcements',engagement:'Engagement',documents:'Documents',messages:'Messages',kudos:'Kudos'};
+  const titles={home:'Home',schedule:'Schedule',profile:'Profile',announcements:'Announcements',engagement:'Engagement',documents:'Documents',messages:'Messages',kudos:'Kudos',achievements:'Team Achievements'};
   const appName='Nexus';
   document.title='Nexus · '+(titles[p]||'Nexus');
   if(history.replaceState)history.replaceState(null,'','#'+p);
@@ -8776,7 +8838,8 @@ function goTo(p){
   }
   if(p==="schedule"){showSchedTab("leave");}
   if(p==="profile")loadProfilePage();
-  if(p==="home"){loadHomeData();loadClockState();loadWhatsNew();loadHomeCalendar();loadHomeAttention();renderTodayChip();}
+  if(p==="home"){loadHomeData();loadClockState();loadWhatsNew();loadHomeCalendar();loadHomeAttention();renderTodayChip();loadHomeAchievements();}
+  if(p==="achievements"){loadAchievementsPage();}
   if(p==="notifs"){renderNotifsPage();}
   
   if(p==="training"){renderMyTraining();}
@@ -11758,6 +11821,79 @@ let _convoMenuPeer = null;
 // ── STAFF DIRECTORY ──
 let _staffDirData = [];
 
+// Loads staff directory data into _staffDirData (idempotent unless force).
+// Split out of openStaffDirectory so other surfaces (achievement feed, profile
+// deep-links from Home) can guarantee the data exists before viewStaffProfile.
+async function ensureStaffDirData(force){
+  if(!force && _staffDirData && _staffDirData.length) return _staffDirData;
+  // Fetch staff list from staff_names, then credentials for team/pronouns, then settings for admin
+  const [names, creds, settings, quizAccess, quizResults, passedCustom, passedTraining, punctHistory] = await Promise.all([
+    sbGet('staff_names','?order=name.asc'),
+    sbGet('staff_credentials','?select=staff_name,team,pronouns'),
+    sbGet('staff_settings','?select=name,is_hub_admin'),
+    myIsAdmin ? sbGet('quiz_access','?quiz_id=eq.checklist_v1') : Promise.resolve([]),
+    myIsAdmin ? sbGet('training_quiz_results','?quiz_id=eq.checklist_v1&order=created_at.desc') : Promise.resolve([]),
+    sbGet('custom_quiz_results','?select=staff_name,quiz_id&passed=is.true'),
+    sbGet('training_quiz_results','?select=staff_name,quiz_id&passed=is.true'),
+    sbGet('punctuality_history','?select=staff_name,score,x,fort_start&order=fort_start.desc&limit=2000')
+  ]);
+  const quizAccessSet = new Set((quizAccess||[]).map(function(q){return q.staff_name;}));
+  const quizResultMap = {};
+  (quizResults||[]).forEach(function(r){ if(!quizResultMap[r.staff_name]) quizResultMap[r.staff_name] = r; });
+  window._sdQuizAccess = quizAccessSet;
+  window._sdQuizResults = quizResultMap;
+  // Training count badge: DISTINCT quizzes passed per staff (retakes don't inflate).
+  const passedSets = {};
+  function _addPass(r){
+    if(!r || !r.staff_name || !r.quiz_id) return;
+    (passedSets[r.staff_name] = passedSets[r.staff_name] || new Set()).add(r.quiz_id);
+  }
+  (passedCustom||[]).forEach(_addPass);
+  (passedTraining||[]).forEach(_addPass);
+  const trainingCountMap = {};
+  Object.keys(passedSets).forEach(function(nm){ trainingCountMap[nm] = passedSets[nm].size; });
+  window._sdTrainingCount = trainingCountMap;
+  // Punctuality tier: latest fortnight per staff. Gold >= 90, Silver >= 80,
+  // both need >= 4 measured days. Volatile/current-period status.
+  const tierMap = {};
+  (punctHistory||[]).forEach(function(r){
+    if(!r || !r.staff_name || tierMap[r.staff_name]) return;
+    const days = Number(r.x)||0, sc = Number(r.score)||0;
+    let tier = null;
+    if(days >= 4 && sc >= 90) tier = 'gold';
+    else if(days >= 4 && sc >= 80) tier = 'silver';
+    tierMap[r.staff_name] = { tier: tier, score: sc };
+  });
+  window._sdPunctTier = tierMap;
+  const credMap={};
+  (creds||[]).forEach(function(c){ credMap[c.staff_name]=c; });
+  const settMap={};
+  (settings||[]).forEach(function(s){ settMap[s.name]=s; });
+  _staffDirData = (names||[]).map(function(n){
+    const nm=n.name;
+    const c=credMap[nm]||{};
+    const s=settMap[nm]||{};
+    return {
+      staff_name: nm,
+      team: c.team||'',
+      pronouns: c.pronouns||'',
+      is_admin: s.is_hub_admin===true,
+      training_count: trainingCountMap[nm]||0,
+      punct: tierMap[nm]||null
+    };
+  }).filter(function(p){return p.staff_name;});
+  try{ await loadGlowData(); }catch(e){}
+  return _staffDirData;
+}
+
+// Open a profile by name from anywhere (feed rows, Home). Guarantees the
+// directory data + glow data are loaded first, so a tap from a cold Home page
+// still resolves instead of silently no-op'ing.
+async function viewStaffProfileByName(name){
+  try{ await ensureStaffDirData(); }catch(e){}
+  viewStaffProfile(name);
+}
+
 async function openStaffDirectory(){
   document.getElementById('staffDirectoryOverlay').style.display='flex';
   document.getElementById('staffDirList').innerHTML='<div style="text-align:center;color:#94a3b8;padding:32px;font-size:13px;">Loading...</div>';
@@ -11765,37 +11901,8 @@ async function openStaffDirectory(){
   const _bb = document.getElementById('sdQuizBulkBar');
   if(_bb) _bb.style.display = "none"; // Bulk bar removed — per-quiz controls now
   try{
-    // Fetch staff list from staff_names, then credentials for team/pronouns, then settings for admin
-    const [names, creds, settings, quizAccess, quizResults] = await Promise.all([
-      sbGet('staff_names','?order=name.asc'),
-      sbGet('staff_credentials','?select=staff_name,team,pronouns'),
-      sbGet('staff_settings','?select=name,is_hub_admin'),
-      myIsAdmin ? sbGet('quiz_access','?quiz_id=eq.checklist_v1') : Promise.resolve([]),
-      myIsAdmin ? sbGet('training_quiz_results','?quiz_id=eq.checklist_v1&order=created_at.desc') : Promise.resolve([])
-    ]);
-    // Build maps for quiz access + latest result per staff
-    const quizAccessSet = new Set((quizAccess||[]).map(function(q){return q.staff_name;}));
-    const quizResultMap = {};
-    (quizResults||[]).forEach(function(r){ if(!quizResultMap[r.staff_name]) quizResultMap[r.staff_name] = r; });
-    window._sdQuizAccess = quizAccessSet;
-    window._sdQuizResults = quizResultMap;
-    const credMap={};
-    (creds||[]).forEach(function(c){ credMap[c.staff_name]=c; });
-    const settMap={};
-    (settings||[]).forEach(function(s){ settMap[s.name]=s; });
-    _staffDirData = (names||[]).map(function(n){
-      const nm=n.name;
-      const c=credMap[nm]||{};
-      const s=settMap[nm]||{};
-      return {
-        staff_name: nm,
-        team: c.team||'',
-        pronouns: c.pronouns||'',
-        is_admin: s.is_hub_admin===true
-      };
-    }).filter(function(p){return p.staff_name;});
+    await ensureStaffDirData(true);
     console.log('[directory] loaded', _staffDirData.length, 'staff');
-    try{ await loadGlowData(); }catch(e){}
     renderStaffDirectory(_staffDirData);
   }catch(e){
     console.warn('[directory] error:', e);
@@ -11806,6 +11913,67 @@ async function openStaffDirectory(){
 function closeStaffDirectory(){
   document.getElementById('staffDirectoryOverlay').style.display='none';
   const s=document.getElementById('staffDirSearch');if(s)s.value='';
+}
+
+// Medal disc for punctuality tiers — mirrors the On-Time Club leaderboard style.
+function _tierMedal(fill, ring){
+  return '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" style="flex-shrink:0;display:block;">'+
+    '<path d="M8.5 2h3l-2.2 7h-3z" fill="'+ring+'"/>'+
+    '<path d="M15.5 2h-3l2.2 7h3z" fill="'+ring+'"/>'+
+    '<circle cx="12" cy="15" r="6.5" fill="'+fill+'"/>'+
+    '<circle cx="12" cy="15" r="6.5" fill="none" stroke="'+ring+'" stroke-width="1.5"/>'+
+    '<circle cx="12" cy="15" r="2.6" fill="'+ring+'" opacity=".55"/></svg>';
+}
+// One achievement row: leading visual + title + sublabel.
+function _achRow(visual, title, sub, bg, bd){
+  return '<div style="display:flex;align-items:center;gap:11px;padding:9px 12px;border-radius:10px;'+
+    'background:'+(bg||'#f8fafc')+';border:1px solid '+(bd||'#eef2f7')+';">'+
+    '<div style="flex-shrink:0;display:flex;align-items:center;justify-content:center;">'+visual+'</div>'+
+    '<div style="min-width:0;"><div style="font-size:13px;font-weight:700;color:#0f172a;line-height:1.2;">'+title+'</div>'+
+    (sub?'<div style="font-size:11px;color:#94a3b8;margin-top:2px;">'+sub+'</div>':'')+'</div></div>';
+}
+// Build the achievements list for a person. Returns '' if they have none.
+function buildAchievements(p){
+  const rows=[];
+  // Glow — permanent, earned by a perfect fortnight. Shows in their chosen skin.
+  if(window.hasEarnedGlow && window.hasEarnedGlow(p.staff_name)){
+    const skin=(window.glowSkinFor?window.glowSkinFor(p.staff_name):'gold');
+    const skinLabel=(window.GLOW_SKIN_LABELS&&window.GLOW_SKIN_LABELS[skin])||skin;
+    const chip='<span class="glow-name glow-'+skin+'" style="font-size:14px;font-weight:800;">Glow</span>';
+    rows.push(_achRow(chip,'Perfect Fortnight',skinLabel+' glow earned','#fffdf5','#f6e9c8'));
+  }
+  // Punctuality tier — current fortnight only, so labelled as such.
+  if(p.punct && p.punct.tier){
+    const isGold=p.punct.tier==='gold';
+    const fill=isGold?'#efa927':'#c2c1ba', ring=isGold?'#633806':'#4a4a46';
+    const bg=isGold?'#faeeda':'#f4f4f2', bd=isGold?'#ef9f27':'#c9c8c1';
+    rows.push(_achRow(_tierMedal(fill,ring),(isGold?'Gold':'Silver')+' — On-Time Club',
+      'This fortnight · '+p.punct.score+'% on time',bg,bd));
+  }
+  // Training — distinct quizzes passed.
+  if(p.training_count>0){
+    const cap='<svg width="18" height="18" viewBox="0 0 20 20" fill="#047857" style="flex-shrink:0;">'+
+      '<path d="M10 2 1 6l9 4 7.36-3.27V11a1 1 0 1 0 1 0V6L10 2Z"/>'+
+      '<path d="M4 10.3V13c0 1.66 2.69 3 6 3s6-1.34 6-3v-2.7l-6 2.67-6-2.67Z"/></svg>';
+    rows.push(_achRow(cap,p.training_count+' Training'+(p.training_count===1?'':'s')+' Passed',
+      'Completed assigned quizzes','#f0fdf9','#cdeee3'));
+  }
+  return rows.join('');
+}
+
+// Training badge — count of DISTINCT quizzes passed. Positive-only: no pill at 0.
+// title uses singular/plural. Green graduation-cap pill, sits inline after the name.
+function renderTrainingBadge(count){
+  const n = Number(count)||0;
+  if(n < 1) return '';
+  const label = n+' training'+(n===1?'':'s')+' passed';
+  return ' <span title="'+label+'" style="display:inline-flex;align-items:center;gap:3px;'+
+    'font-size:9px;font-weight:700;color:#047857;background:#d1fae5;'+
+    'padding:1px 6px 1px 5px;border-radius:10px;vertical-align:middle;line-height:1.6;">'+
+    '<svg width="10" height="10" viewBox="0 0 20 20" fill="#047857" style="flex-shrink:0;">'+
+    '<path d="M10 2 1 6l9 4 7.36-3.27V11a1 1 0 1 0 1 0V6L10 2Z"/>'+
+    '<path d="M4 10.3V13c0 1.66 2.69 3 6 3s6-1.34 6-3v-2.7l-6 2.67-6-2.67Z"/>'+
+    '</svg>'+n+'</span>';
 }
 
 function renderStaffDirectory(list){
@@ -11846,7 +12014,7 @@ function renderStaffDirectory(list){
         }
         return '<div onclick="viewStaffProfile(\''+p.staff_name.replace(/'/g,"&#39;")+'\')" style="display:flex;align-items:center;gap:10px;padding:8px 8px;border-radius:8px;cursor:pointer;transition:background .1s;" onmouseover="this.style.background=\'#f8fafc\'" onmouseout="this.style.background=\'\'" >'+
           renderStaffAvatar(p.staff_name, 32)+
-          '<div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:600;color:#0f172a;">'+renderStaffName(p.staff_name, esc)+pron+badge+'</div></div>'+
+          '<div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:600;color:#0f172a;">'+renderStaffName(p.staff_name, esc)+pron+badge+renderTrainingBadge(p.training_count)+'</div></div>'+
           quizBlock+
           (myIsAdmin?'':'<svg width="14" height="14" viewBox="0 0 20 20" fill="#cbd5e1"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>')+
           '</div>';
@@ -11871,17 +12039,31 @@ function viewStaffProfile(name){
   const img=window.avatarFor&&window.avatarFor(name);
   if(img){ avaEl.textContent=''; avaEl.style.backgroundImage='url('+img+')'; avaEl.style.backgroundSize='cover'; avaEl.style.backgroundPosition='center'; }
   else { avaEl.style.backgroundImage=''; avaEl.textContent=name.split(' ').map(function(w){return w[0];}).join('').slice(0,2).toUpperCase(); }
-  // Name with the person's chosen skin.
+  // Name with the person's chosen glow skin. (Training now lives in Achievements.)
   document.getElementById('svProfName').innerHTML=renderStaffName(name, esc);
   const pronEl=document.getElementById('svProfPronouns');
   if(p.pronouns){pronEl.textContent=p.pronouns;pronEl.style.display='block';}
   else pronEl.style.display='none';
   const teamEl=document.getElementById('svProfTeam');
-  if(p.team){teamEl.textContent=p.team+' team';teamEl.style.display='block';}
+  if(p.team){teamEl.textContent=p.team+' team';teamEl.style.display='inline-block';}
   else teamEl.style.display='none';
   const roleEl=document.getElementById('svProfRole');
-  if(p.is_admin){roleEl.textContent='Admin';roleEl.style.display='block';}
+  if(p.is_admin){roleEl.textContent='Admin';roleEl.style.display='inline-block';}
   else roleEl.style.display='none';
+  // Achievements section.
+  const achHtml=buildAchievements(p);
+  const achWrap=document.getElementById('svProfAchievements');
+  const achList=document.getElementById('svProfAchList');
+  const noAch=document.getElementById('svProfNoAch');
+  if(achHtml){
+    achList.innerHTML=achHtml;
+    achWrap.style.display='block';
+    noAch.style.display='none';
+  }else{
+    achList.innerHTML='';
+    achWrap.style.display='none';
+    noAch.style.display='block';
+  }
   document.getElementById('staffProfileViewOverlay').style.display='flex';
 }
 
@@ -18816,6 +18998,137 @@ window.glowSkinFor = window.glowSkinFor || function(name){
   return (s && window.GLOW_SKINS.indexOf(s)>=0) ? s : 'gold';
 };
 
+// ── Achievement feed ─────────────────────────────────────────────────
+// Merges two honestly-timestamped achievement sources into one newest-first
+// list. Training: created_at from quiz results. Glow: the EARLIEST perfect
+// fortnight per person (fort_start is a real date), so each person contributes
+// at most one glow event — the moment they first earned it.
+// Cached on window._achFeed; pass force=true to rebuild.
+window.loadAchievementFeed = async function(force){
+  if(!force && window._achFeed) return window._achFeed;
+  if(window._achFeedLoading) return window._achFeedLoading;
+  window._achFeedLoading = (async function(){
+    const events=[];
+    // Training passes (custom + fixed). quiz_id types differ across tables but
+    // we only need staff_name + created_at here.
+    try{
+      const pc=await sbGet('custom_quiz_results','?select=staff_name,created_at&passed=is.true&order=created_at.desc&limit=200')||[];
+      pc.forEach(function(r){
+        if(r.staff_name && r.created_at) events.push({name:r.staff_name,type:'training',date:r.created_at});
+      });
+    }catch(e){}
+    try{
+      const pt=await sbGet('training_quiz_results','?select=staff_name,created_at&passed=is.true&order=created_at.desc&limit=200')||[];
+      pt.forEach(function(r){
+        if(r.staff_name && r.created_at) events.push({name:r.staff_name,type:'training',date:r.created_at});
+      });
+    }catch(e){}
+    // Glow earned — earliest perfect fortnight per person.
+    try{
+      const gr=await sbGet('punctuality_history','?select=staff_name,fort_start&score=eq.100&x=gte.4&order=fort_start.asc&limit=2000')||[];
+      const firstGlow={};
+      gr.forEach(function(r){
+        if(r.staff_name && r.fort_start && !firstGlow[r.staff_name]) firstGlow[r.staff_name]=r.fort_start;
+      });
+      Object.keys(firstGlow).forEach(function(nm){
+        events.push({name:nm,type:'glow',date:firstGlow[nm]});
+      });
+    }catch(e){}
+    // Newest first. fort_start is a date (midnight); created_at a full ts —
+    // Date parsing handles both.
+    events.sort(function(a,b){ return new Date(b.date) - new Date(a.date); });
+    window._achFeed=events; window._achFeedLoading=null;
+    return events;
+  })();
+  return window._achFeedLoading;
+};
+
+// Relative "time ago" for feed dates. Coarse on purpose — glow dates are
+// fortnight starts, so hour precision would be misleading there.
+window.achAgo = function(iso){
+  const then=new Date(iso), now=new Date();
+  const days=Math.floor((now-then)/86400000);
+  if(days<=0) return 'today';
+  if(days===1) return 'yesterday';
+  if(days<7) return days+'d ago';
+  if(days<30) return Math.floor(days/7)+'w ago';
+  if(days<365) return Math.floor(days/30)+'mo ago';
+  return Math.floor(days/365)+'y ago';
+};
+
+// One feed row's inner HTML (icon + name + action text + time). Tapping the
+// row opens that person's profile. Used by both the Home strip and the tab.
+window.achRowHTML = function(ev, esc){
+  const e=(esc||function(s){return s;});
+  const nm=window.renderStaffName(ev.name, e);
+  let icon, action;
+  if(ev.type==='glow'){
+    const skin=window.glowSkinFor(ev.name);
+    icon='<span class="glow-name glow-'+skin+'" style="font-size:15px;font-weight:800;">✦</span>';
+    action='earned <b>Glow</b> — a perfect fortnight';
+  }else{
+    icon='<svg width="15" height="15" viewBox="0 0 20 20" fill="#047857" style="flex-shrink:0;"><path d="M10 2 1 6l9 4 7.36-3.27V11a1 1 0 1 0 1 0V6L10 2Z"/><path d="M4 10.3V13c0 1.66 2.69 3 6 3s6-1.34 6-3v-2.7l-6 2.67-6-2.67Z"/></svg>';
+    action='passed a <b>training</b>';
+  }
+  return '<div onclick="viewStaffProfileByName(\''+String(ev.name).replace(/'/g,"\\'")+'\')" '+
+    'style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;cursor:pointer;'+
+    'transition:background .12s;" onmouseover="this.style.background=\'#f8fafc\'" onmouseout="this.style.background=\'transparent\'">'+
+    '<div style="width:24px;height:24px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">'+icon+'</div>'+
+    '<div style="flex:1;min-width:0;font-size:13px;color:#475569;line-height:1.35;">'+
+    '<span style="font-weight:700;color:#0f172a;">'+nm+'</span> '+action+'</div>'+
+    '<div style="font-size:11px;color:#94a3b8;flex-shrink:0;">'+window.achAgo(ev.date)+'</div></div>';
+};
+
+// Home preview — top 3 events. Hides the whole card if the feed is empty.
+window.loadHomeAchievements = async function(){
+  const card=document.getElementById('homeAchievements');
+  const list=document.getElementById('homeAchList');
+  if(!card||!list) return;
+  try{
+    const feed=await window.loadAchievementFeed();
+    if(!feed || !feed.length){ card.style.display='none'; return; }
+    list.innerHTML=feed.slice(0,3).map(function(ev){return window.achRowHTML(ev, esc);}).join('');
+    card.style.display='block';
+  }catch(e){ card.style.display='none'; }
+};
+
+// Full Team Achievements tab — glowing strip + full feed.
+window.loadAchievementsPage = async function(){
+  const feedEl=document.getElementById('achFeedList');
+  const stripCard=document.getElementById('achGlowStrip');
+  const stripList=document.getElementById('achGlowList');
+  try{ await ensureStaffDirData(); }catch(e){}
+  // Glowing strip — everyone who currently holds glow, as tappable chips.
+  try{
+    await loadGlowData();
+    const glowing=[];
+    if(window._earnedGlow) window._earnedGlow.forEach(function(n){ glowing.push(n); });
+    glowing.sort();
+    if(glowing.length && stripCard && stripList){
+      stripList.innerHTML=glowing.map(function(n){
+        const skin=window.glowSkinFor(n);
+        return '<span onclick="viewStaffProfileByName(\''+String(n).replace(/'/g,"\\'")+'\')" '+
+          'class="glow-name glow-'+skin+'" style="cursor:pointer;font-size:14px;font-weight:800;padding:4px 10px;'+
+          'border:1px solid #eef2f7;border-radius:999px;background:#fffdf5;">'+esc(n)+'</span>';
+      }).join('');
+      stripCard.style.display='block';
+    }else if(stripCard){ stripCard.style.display='none'; }
+  }catch(e){ if(stripCard) stripCard.style.display='none'; }
+  // Full feed.
+  try{
+    const feed=await window.loadAchievementFeed(true);
+    if(!feedEl) return;
+    if(!feed || !feed.length){
+      feedEl.innerHTML='<div style="text-align:center;color:#cbd5e1;padding:28px;font-size:13px;font-style:italic;">No achievements yet — early days.</div>';
+      return;
+    }
+    feedEl.innerHTML=feed.map(function(ev){return window.achRowHTML(ev, esc);}).join('');
+  }catch(e){
+    if(feedEl) feedEl.innerHTML='<div style="text-align:center;color:#94a3b8;padding:28px;font-size:13px;">Couldn\'t load achievements.</div>';
+  }
+};
+
+
 // Render a name: glowing (with the person's skin) if they've earned it, else
 // plain. `plainOverride` lets callers pass alternate display text (e.g. a
 // nickname) while still keying the earned check on the real staff_name.
@@ -24363,12 +24676,19 @@ window.addEventListener('resize', function(){
         <div style="font-size:13px;font-weight:600;color:#94a3b8;">Coworker</div>
         <button onclick="closeStaffProfileView()" style="background:none;border:none;font-size:20px;line-height:1;color:#94a3b8;cursor:pointer;padding:4px 8px;">×</button>
       </div>
-      <div style="padding:24px 20px;text-align:center;">
-        <div id="svProfAva" style="width:72px;height:72px;border-radius:50%;background:linear-gradient(135deg,var(--accent),#7c3aed);display:flex;align-items:center;justify-content:center;margin:0 auto 12px;color:#fff;font-size:24px;font-weight:800;">?</div>
-        <div id="svProfName" style="font-size:18px;font-weight:700;color:#0f172a;"></div>
+      <div style="padding:24px 20px 20px;text-align:center;">
+        <div id="svProfAva" style="width:80px;height:80px;border-radius:50%;background:linear-gradient(135deg,var(--accent),#7c3aed);display:flex;align-items:center;justify-content:center;margin:0 auto 12px;color:#fff;font-size:26px;font-weight:800;"></div>
+        <div id="svProfName" style="font-size:19px;font-weight:700;color:#0f172a;line-height:1.3;"></div>
         <div id="svProfPronouns" style="font-size:12px;color:#94a3b8;margin-top:4px;display:none;"></div>
-        <div id="svProfTeam" style="font-size:13px;color:#64748b;margin-top:8px;font-weight:500;display:none;"></div>
-        <div id="svProfRole" style="font-size:11px;color:#94a3b8;margin-top:4px;display:none;"></div>
+        <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:10px;flex-wrap:wrap;">
+          <span id="svProfTeam" style="font-size:12px;color:#475569;background:#f1f5f9;padding:3px 10px;border-radius:999px;font-weight:600;display:none;"></span>
+          <span id="svProfRole" style="font-size:11px;color:#92400e;background:#fef3c7;padding:3px 10px;border-radius:999px;font-weight:700;display:none;"></span>
+        </div>
+        <div id="svProfAchievements" style="margin-top:18px;text-align:left;display:none;">
+          <div style="font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#94a3b8;margin:0 0 10px;">Achievements</div>
+          <div id="svProfAchList" style="display:flex;flex-direction:column;gap:8px;"></div>
+        </div>
+        <div id="svProfNoAch" style="margin-top:18px;font-size:12px;color:#cbd5e1;font-style:italic;display:none;">No achievements yet — early days.</div>
       </div>
     </div>
   </div>
