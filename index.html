@@ -5990,7 +5990,7 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
           <div style="display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap;">
             <span id="pvTeam" style="font-size:12px;color:#475569;background:#f1f5f9;padding:4px 12px;border-radius:999px;font-weight:600;display:none;"></span>
             <span id="pvPronouns" style="font-size:12px;color:#94a3b8;display:none;"></span>
-            <span id="pvRole" style="font-size:11px;color:#92400e;background:#fef3c7;padding:4px 12px;border-radius:999px;font-weight:700;display:none;"></span>
+            <span id="pvRole" title="Admin" style="color:#92400e;background:#fef3c7;padding:4px 8px;border-radius:999px;display:none;align-items:center;justify-content:center;"></span>
           </div>
         </div>
       </div>
@@ -12039,7 +12039,7 @@ async function openProfilePage(name){
   const pr=document.getElementById('pvPronouns');
   if(p.pronouns){ pr.textContent=p.pronouns; pr.style.display='inline-block'; } else pr.style.display='none';
   const role=document.getElementById('pvRole');
-  if(p.is_admin){ role.textContent='Admin'; role.style.display='inline-block'; } else role.style.display='none';
+  if(p.is_admin){ role.innerHTML=(window.adminIcon?window.adminIcon(15):'Admin'); role.style.display='inline-flex'; } else role.style.display='none';
   // Achievements (full rows)
   const achHtml=(typeof buildAchievementsRows==='function')?buildAchievementsRows(p):'';
   const achCard=document.getElementById('pvAchCard');
@@ -12280,7 +12280,7 @@ function renderStaffDirectory(list){
       members.map(function(p){
         const ava=p.staff_name.split(' ').map(function(w){return w[0];}).join('').slice(0,2).toUpperCase();
         const pron=p.pronouns?' <span style="font-size:10px;color:#94a3b8;font-weight:400;">('+esc(p.pronouns)+')</span>':'';
-        const badge=p.is_admin?' <span style="font-size:9px;background:#fef3c7;color:#92400e;padding:1px 6px;border-radius:10px;font-weight:700;">ADMIN</span>':'';
+        const badge=p.is_admin?' <span title="Admin" style="color:#92400e;display:inline-flex;vertical-align:middle;">'+(window.adminIcon?window.adminIcon(13):'ADMIN')+'</span>':'';
         // Quiz access UI moved to per-quiz admin pages
         let quizBlock = '';
         if(false && myIsAdmin){
@@ -12339,7 +12339,7 @@ function viewStaffProfile(name){
   if(p.team){teamEl.textContent=p.team+' team';teamEl.style.display='inline-block';}
   else teamEl.style.display='none';
   const roleEl=document.getElementById('svProfRole');
-  if(p.is_admin){roleEl.textContent='Admin';roleEl.style.display='inline-block';}
+  if(p.is_admin){roleEl.innerHTML=(window.adminIcon?window.adminIcon(14):'Admin');roleEl.style.display='inline-flex';}
   else roleEl.style.display='none';
   // Inline achievement badges (icon-only, click for info).
   // Inline achievement badges now render next to the name (achBadgesInline).
@@ -19674,6 +19674,17 @@ window.loadAchievementsPage = async function(){
 // nickname) while still keying the earned check on the real staff_name.
 // Display name for anyone: their nickname if set, else their real name.
 // Backed by the global _nickNames map from loadGlowData.
+// Admin marker — person-with-key icon, shown instead of the word "Admin".
+// size in px; inherits currentColor so callers can set the colour.
+window.adminIcon = window.adminIcon || function(size){
+  const s=size||14;
+  return '<svg viewBox="0 0 552 552" width="'+s+'" height="'+s+'" fill="currentColor" '+
+    'style="vertical-align:-2px;flex-shrink:0;" role="img" aria-label="Admin">'+
+    '<path d="M197 236a99 99 0 1 0 0-198 99 99 0 0 0 0 198zm0-49a50 50 0 1 1 0-100 50 50 0 0 1 0 100z"/>'+
+    '<path d="M356 314 251 419a86 86 0 1 0 34 34l43-43 34 34 41-41-34-34 26-26 41 41 41-41-90-90-31 31zM251 484a37 37 0 1 1 0-74 37 37 0 0 1 0 74z"/>'+
+    '<path d="M197 246c-92 0-166 74-166 166v100h148v-49H80v-51a117 117 0 0 1 175-101l35-35a165 165 0 0 0-93-30z"/>'+
+    '</svg>';
+};
 window.displayNameFor = window.displayNameFor || function(name){
   const n = window._nickNames && window._nickNames[name];
   return (n && n.trim()) ? n.trim() : name;
@@ -25238,7 +25249,7 @@ window.addEventListener('resize', function(){
         <div id="svProfPronouns" style="font-size:12px;color:#94a3b8;margin-top:8px;display:none;"></div>
         <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:10px;flex-wrap:wrap;">
           <span id="svProfTeam" style="font-size:12px;color:#475569;background:#f1f5f9;padding:3px 10px;border-radius:999px;font-weight:600;display:none;"></span>
-          <span id="svProfRole" style="font-size:11px;color:#92400e;background:#fef3c7;padding:3px 10px;border-radius:999px;font-weight:700;display:none;"></span>
+          <span id="svProfRole" title="Admin" style="color:#92400e;background:#fef3c7;padding:3px 8px;border-radius:999px;display:none;align-items:center;"></span>
         </div>
         <div id="svProfNoAch" style="margin-top:14px;font-size:12px;color:#cbd5e1;font-style:italic;display:none;">No achievements yet — early days.</div>
       </div>
