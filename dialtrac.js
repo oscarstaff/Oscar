@@ -1392,7 +1392,15 @@ function clStaffName(fullName, display){
   const shown = clEsc(display != null ? display : fullName);
   if(window.hasEarnedGlow && window.hasEarnedGlow(fullName)){
     const skin=(window.glowSkinFor?window.glowSkinFor(fullName):'gold');
-    return '<span class="glow-name glow-'+skin+'" title="Earned a perfect fortnight">'+shown+'</span>';
+    // Tooltip reflects how the glow was earned. Elite (1000 calls) wearing the
+    // Dark Emerald reads as The Call-Handler; a 1000-caller on another skin is
+    // still elite; otherwise it's the perfect-fortnight glow.
+    const elite = window.isEliteCaller && window.isEliteCaller(fullName);
+    let title;
+    if(elite && skin==='darkemerald') title='The Call-Handler — 1000 calls logged';
+    else if(elite) title='Elite — 1000 calls logged';
+    else title='Earned a perfect fortnight';
+    return '<span class="glow-name glow-'+skin+'" title="'+title+'">'+shown+'</span>';
   }
   return shown;
 }

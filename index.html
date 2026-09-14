@@ -2843,6 +2843,7 @@ width:none !important;
 .glow-emerald     { background-image:linear-gradient(100deg,#065f46,#10b981 15%,#a7f3d0 30%,#10b981 45%,#065f46 50%,#10b981 65%,#a7f3d0 70%,#10b981 85%,#065f46 100%); }
 .glow-rosegold    { background-image:linear-gradient(100deg,#9f1239,#fb7185 15%,#ffe4e6 30%,#fda4af 45%,#9f1239 50%,#fda4af 65%,#ffe4e6 70%,#fb7185 85%,#9f1239 100%); }
 .glow-galaxy      { background-image:linear-gradient(100deg,#4338ca,#7c3aed 15%,#c4b5fd 30%,#818cf8 45%,#4338ca 50%,#818cf8 65%,#c4b5fd 70%,#7c3aed 85%,#4338ca 100%); }
+.glow-darkemerald { background-image:linear-gradient(100deg,#022c22,#047857 15%,#34d399 28%,#065f46 45%,#022c22 50%,#065f46 60%,#34d399 72%,#047857 85%,#022c22 100%); animation-duration:5s; }
 @media(prefers-reduced-motion:reduce){ .glow-name{ animation:none;background-position:0 center; } }
 /* Hall of Fame chips are physical "medal" pills — always light bg, dark text,
    in every theme. Force it so dark-theme text cascades can't wash them out. */
@@ -11860,7 +11861,7 @@ let _staffDirData = [];
 async function ensureStaffDirData(force){
   if(!force && _staffDirData && _staffDirData.length) return _staffDirData;
   // Fetch staff list from staff_names, then credentials for team/pronouns, then settings for admin
-  const [names, creds, settings, quizAccess, quizResults, passedCustom, passedTraining, punctHistory] = await Promise.all([
+  const [names, creds, settings, quizAccess, quizResults, passedCustom, passedTraining, punctHistory, callMs] = await Promise.all([
     sbGet('staff_names','?order=name.asc'),
     sbGet('staff_credentials','?select=staff_name,team,pronouns'),
     sbGet('staff_settings','?select=name,is_hub_admin'),
@@ -11868,7 +11869,8 @@ async function ensureStaffDirData(force){
     myIsAdmin ? sbGet('training_quiz_results','?quiz_id=eq.checklist_v1&order=created_at.desc') : Promise.resolve([]),
     sbGet('custom_quiz_results','?select=staff_name,quiz_id&passed=is.true'),
     sbGet('training_quiz_results','?select=staff_name,quiz_id&passed=is.true'),
-    sbGet('punctuality_history','?select=staff_name,score,x,fort_start&order=fort_start.desc&limit=2000')
+    sbGet('punctuality_history','?select=staff_name,score,x,fort_start&order=fort_start.desc&limit=2000'),
+    sbGet('call_milestones','?select=staff_name,milestone')
   ]);
   const quizAccessSet = new Set((quizAccess||[]).map(function(q){return q.staff_name;}));
   const quizResultMap = {};
@@ -11898,6 +11900,13 @@ async function ensureStaffDirData(force){
     tierMap[r.staff_name] = { tier: tier, score: sc };
   });
   window._sdPunctTier = tierMap;
+  // Call milestones reached per staff — highest threshold crossed (100/500/1000).
+  const callMsMap = {};
+  (callMs||[]).forEach(function(r){
+    if(!r || !r.staff_name) return;
+    const m=Number(r.milestone)||0;
+    if(m > (callMsMap[r.staff_name]||0)) callMsMap[r.staff_name]=m;
+  });
   const credMap={};
   (creds||[]).forEach(function(c){ credMap[c.staff_name]=c; });
   const settMap={};
@@ -11912,7 +11921,8 @@ async function ensureStaffDirData(force){
       pronouns: c.pronouns||'',
       is_admin: s.is_hub_admin===true,
       training_count: trainingCountMap[nm]||0,
-      punct: tierMap[nm]||null
+      punct: tierMap[nm]||null,
+      call_milestone: callMsMap[nm]||0
     };
   }).filter(function(p){return p.staff_name;});
   try{ await loadGlowData(); }catch(e){}
@@ -11990,6 +12000,24 @@ function buildAchievements(p){
       '<path d="M4 10.3V13c0 1.66 2.69 3 6 3s6-1.34 6-3v-2.7l-6 2.67-6-2.67Z"/></svg>';
     rows.push(_achRow(cap,p.training_count+' Training'+(p.training_count===1?'':'s')+' Passed',
       'Completed assigned quizzes','#f0fdf9','#cdeee3'));
+  }
+  // Call milestones — one row per threshold crossed (100, 500, 1000), tiered.
+  const top=Number(p.call_milestone)||0;
+  if(top>0){
+    // Per-tier colour: 100 blue (standard), 500 gold, 1000 dark emerald (elite).
+    const tiers={
+      100:{fill:'#2563eb',bg:'#eff6ff',bd:'#dbeafe',txt:'#1e293b',sub:'Call volume milestone'},
+      500:{fill:'#b8860b',bg:'#fffbeb',bd:'#fde68a',txt:'#78350f',sub:'Gold — consistent dedication'},
+      1000:{fill:'#047857',bg:'#ecfdf5',bd:'#a7f3d0',txt:'#064e3b',sub:'Elite — The Call-Handler'}
+    };
+    const phoneFor=function(fill){
+      return '<svg width="18" height="18" viewBox="0 0 20 20" fill="'+fill+'" style="flex-shrink:0;">'+
+      '<path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z"/></svg>';
+    };
+    [1000,500,100].forEach(function(m){
+      if(top>=m){ const t=tiers[m];
+        rows.push(_achRow(phoneFor(t.fill), m+' Calls Logged', t.sub, t.bg, t.bd)); }
+    });
   }
   return rows.join('');
 }
@@ -12074,6 +12102,13 @@ function viewStaffProfile(name){
   else { avaEl.style.backgroundImage=''; avaEl.textContent=name.split(' ').map(function(w){return w[0];}).join('').slice(0,2).toUpperCase(); }
   // Name with the person's chosen glow skin. (Training now lives in Achievements.)
   document.getElementById('svProfName').innerHTML=renderStaffName(name, esc);
+  const titleEl=document.getElementById('svProfTitle');
+  if(titleEl){
+    if(window.isEliteCaller && window.isEliteCaller(name)){
+      titleEl.textContent='The Call-Handler';
+      titleEl.style.display='block';
+    }else{ titleEl.style.display='none'; }
+  }
   const pronEl=document.getElementById('svProfPronouns');
   if(p.pronouns){pronEl.textContent=p.pronouns;pronEl.style.display='block';}
   else pronEl.style.display='none';
@@ -12111,9 +12146,40 @@ function fillMyNickname(){
   el.value=(window._myNickname||'');
 }
 
+// ── Banned nickname filter ───────────────────────────────────────────
+// Blocks profane nicknames (English + Nepali romanised). Matches on a
+// normalised form so simple evasions (spacing, leetspeak, repeats) are caught.
+// Substring match is intentional so "fucker99" is blocked; the list is kept to
+// unambiguous profanity to limit false positives on innocent names.
+const BANNED_NICK_WORDS = [
+  'fuck','fucker','motherfucker','fuk','fuc','shit','bitch','cunt','dick','pussy',
+  'asshole','bastard','whore','slut','nigger','nigga','fag','faggot','cock','wank',
+  // Nepali / romanised
+  'machikne','mathsikne','machikni','randi','radi','bhalu','sala','saala','khate',
+  'muji','mooji','mujhi','muzi','lado','lauda','laado','puti','gadha','gu','chikne'
+];
+function _normNick(s){
+  return String(s||'')
+    .toLowerCase()
+    .replace(/[013457@$]/g, function(c){ return {'0':'o','1':'i','3':'e','4':'a','5':'s','7':'t','@':'a','$':'s'}[c]; })
+    .replace(/[^a-z]/g,'')        // drop spaces, punctuation, digits left over
+    .replace(/(.)\1+/g,'$1');     // collapse repeated letters: fuuuck -> fuck
+}
+function nicknameIsBanned(nick){
+  const n=_normNick(nick);
+  if(!n) return false;
+  return BANNED_NICK_WORDS.some(function(w){ return n.indexOf(_normNick(w))!==-1; });
+}
+
 async function saveMyNickname(){
   const el=document.getElementById('profNickname'); if(!el) return;
   const nick=(el.value||'').trim();
+  // Block profanity before saving anything.
+  if(nick && nicknameIsBanned(nick)){
+    showToast && showToast("That nickname isn't allowed — please choose another");
+    el.focus();
+    return;
+  }
   window._myNickname=nick||null;
   const disp=(window.myDisplayName?window.myDisplayName():me);
   const first=disp.split(' ')[0];
@@ -12140,18 +12206,23 @@ function renderMySkinPicker(){
   if(!(window.hasEarnedGlow&&window.hasEarnedGlow(me))){ card.style.display='none'; return; }
   card.style.display='';
   const cur=(window.glowSkinFor?window.glowSkinFor(me):'gold');
-  wrap.innerHTML=(window.GLOW_SKINS||[]).map(function(sk){
+  const skins=(window.allowedSkinsFor?window.allowedSkinsFor(me):(window.GLOW_SKINS||[]));
+  const eliteSet=new Set(window.ELITE_SKINS||[]);
+  wrap.innerHTML=skins.map(function(sk){
     const sel=(sk===cur);
     const label=(window.GLOW_SKIN_LABELS&&window.GLOW_SKIN_LABELS[sk])||sk;
-    return '<button onclick="pickMySkin(\''+sk+'\')" title="'+label+'" '+
+    const isElite=eliteSet.has(sk);
+    const border=sel?'var(--accent,#4f46e5)':(isElite?'#047857':'#e5e7eb');
+    return '<button onclick="pickMySkin(\''+sk+'\')" title="'+label+(isElite?' — elite, unlocked at 1000 calls':'')+'" '+
       'style="cursor:pointer;border-radius:10px;padding:8px 12px;font-family:inherit;font-size:13px;font-weight:800;'+
-      'background:#fff;border:2px solid '+(sel?'var(--accent,#4f46e5)':'#e5e7eb')+';">'+
+      'background:#fff;border:2px solid '+border+';">'+
       '<span class="glow-name glow-'+sk+'">'+label+'</span></button>';
   }).join('');
 }
 
 async function pickMySkin(skin){
-  if(!window.GLOW_SKINS || window.GLOW_SKINS.indexOf(skin)<0) return;
+  const allowed=(window.allowedSkinsFor?window.allowedSkinsFor(me):(window.GLOW_SKINS||[]));
+  if(allowed.indexOf(skin)<0) return;
   if(!(window.hasEarnedGlow&&window.hasEarnedGlow(me))) return;   // earners only
   window._nameSkins=window._nameSkins||{};
   window._nameSkins[me]=skin;
@@ -19075,11 +19146,16 @@ async function _computeMyStreak(){
 //
 // Shared across index.html and dialtrac.js via the window-guard pattern.
 window.GLOW_SKINS = window.GLOW_SKINS || ['gold','ocean','sunset','molten','holographic','emerald','rosegold','galaxy'];
+// Elite skins are NOT in GLOW_SKINS — they're unlocked by specific milestones,
+// not offered to every glow-earner. darkemerald unlocks at 1000 calls.
+window.ELITE_SKINS = window.ELITE_SKINS || ['darkemerald'];
 window.GLOW_SKIN_LABELS = window.GLOW_SKIN_LABELS || {
   gold:'Gold', ocean:'Ocean', sunset:'Sunset', molten:'Molten',
-  holographic:'Holographic', emerald:'Emerald', rosegold:'Rose gold', galaxy:'Galaxy'
+  holographic:'Holographic', emerald:'Emerald', rosegold:'Rose gold', galaxy:'Galaxy',
+  darkemerald:'Dark Emerald'
 };
 window._earnedGlow = window._earnedGlow || null;  // Set<staffName> who ever went perfect
+window._eliteCallers = window._eliteCallers || null;  // Set<staffName> with 1000+ calls
 window._nameSkins  = window._nameSkins  || null;  // { staffName: skin }
 window._avatars    = window._avatars    || null;  // { staffName: base64 }
 window._myNickname = (typeof window._myNickname === 'undefined') ? null : window._myNickname;
@@ -19089,11 +19165,16 @@ window.loadGlowData = window.loadGlowData || async function(force){
   if(!force && window._earnedGlow && window._nameSkins && window._avatars) return true;
   if(window._glowLoading) return window._glowLoading;
   window._glowLoading = (async function(){
-    const earned=new Set(), skins={}, avs={};
+    const earned=new Set(), skins={}, avs={}, elite=new Set();
     try{
       // Earned = anyone with a perfect fortnight anywhere in history (permanent).
       const rows=await sbGet('punctuality_history','?score=eq.100&x=gte.4&select=staff_name&limit=2000')||[];
       rows.forEach(function(r){ if(r.staff_name) earned.add(r.staff_name); });
+    }catch(e){}
+    try{
+      // Elite = anyone who has logged 1000+ calls (from the call_milestones view).
+      const em=await sbGet('call_milestones','?select=staff_name&milestone=eq.1000&limit=500')||[];
+      em.forEach(function(r){ if(r.staff_name) elite.add(r.staff_name); });
     }catch(e){}
     try{
       const sk=await sbGet('staff_credentials','?select=staff_name,name_skin&limit=500')||[];
@@ -19103,19 +19184,31 @@ window.loadGlowData = window.loadGlowData || async function(force){
       const av=await sbGet('staff_avatars','?select=staff_name,avatar&limit=500')||[];
       av.forEach(function(a){ if(a.staff_name && a.avatar) avs[a.staff_name]=a.avatar; });
     }catch(e){}
-    window._earnedGlow=earned; window._nameSkins=skins; window._avatars=avs;
+    window._earnedGlow=earned; window._nameSkins=skins; window._avatars=avs; window._eliteCallers=elite;
     window._glowLoading=null;
     return true;
   })();
   return window._glowLoading;
 };
 
+window.isEliteCaller = window.isEliteCaller || function(name){
+  return !!(window._eliteCallers && name && window._eliteCallers.has(name));
+};
+// Glow is earned by a perfect fortnight OR by reaching 1000 calls (second path).
 window.hasEarnedGlow = window.hasEarnedGlow || function(name){
-  return !!(window._earnedGlow && name && window._earnedGlow.has(name));
+  return !!(name && ((window._earnedGlow && window._earnedGlow.has(name)) || window.isEliteCaller(name)));
+};
+// Skins a given person is allowed to use: the 8 standard skins for any earner,
+// plus elite skins they've unlocked (darkemerald at 1000 calls).
+window.allowedSkinsFor = window.allowedSkinsFor || function(name){
+  const list = (window.GLOW_SKINS||[]).slice();
+  if(window.isEliteCaller(name)) list.push.apply(list, (window.ELITE_SKINS||[]));
+  return list;
 };
 window.glowSkinFor = window.glowSkinFor || function(name){
   const s = window._nameSkins && window._nameSkins[name];
-  return (s && window.GLOW_SKINS.indexOf(s)>=0) ? s : 'gold';
+  const allowed = window.allowedSkinsFor(name);
+  return (s && allowed.indexOf(s)>=0) ? s : 'gold';
 };
 
 // ── Achievement feed ─────────────────────────────────────────────────
@@ -19154,6 +19247,16 @@ window.loadAchievementFeed = async function(force){
         events.push({name:nm,type:'glow',date:firstGlow[nm]});
       });
     }catch(e){}
+    // Call milestones — 100/500/1000 calls, from the call_milestones view.
+    // reached_at is the real timestamp of the Nth call, so each is an honest event.
+    try{
+      const cm=await sbGet('call_milestones','?select=staff_name,milestone,reached_at&order=reached_at.desc&limit=500')||[];
+      cm.forEach(function(r){
+        if(r.staff_name && r.milestone && r.reached_at){
+          events.push({name:r.staff_name,type:'calls',milestone:Number(r.milestone),date:r.reached_at});
+        }
+      });
+    }catch(e){}
     // Newest first. fort_start is a date (midnight); created_at a full ts —
     // Date parsing handles both.
     events.sort(function(a,b){ return new Date(b.date) - new Date(a.date); });
@@ -19185,6 +19288,9 @@ window.achRowHTML = function(ev, esc){
   if(ev.type==='glow'){
     icon='<svg width="15" height="15" viewBox="0 0 20 20" fill="#e6b422" style="flex-shrink:0;"><path d="M10 1.5l2.6 5.27 5.82.845-4.21 4.105.994 5.795L10 14.77l-5.204 2.735.994-5.795L1.58 7.615l5.82-.845z"/></svg>';
     action='earned <b>Glow</b>, a perfect fortnight';
+  }else if(ev.type==='calls'){
+    icon='<svg width="15" height="15" viewBox="0 0 20 20" fill="#2563eb" style="flex-shrink:0;"><path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z"/></svg>';
+    action='logged <b>'+(ev.milestone||0)+' calls</b>';
   }else{
     icon='<svg width="15" height="15" viewBox="0 0 20 20" fill="#047857" style="flex-shrink:0;"><path d="M10 2 1 6l9 4 7.36-3.27V11a1 1 0 1 0 1 0V6L10 2Z"/><path d="M4 10.3V13c0 1.66 2.69 3 6 3s6-1.34 6-3v-2.7l-6 2.67-6-2.67Z"/></svg>';
     action='passed a <b>training</b>';
@@ -24799,6 +24905,7 @@ window.addEventListener('resize', function(){
       <div style="padding:24px 20px 20px;text-align:center;">
         <div id="svProfAva" style="width:80px;height:80px;border-radius:50%;background:linear-gradient(135deg,var(--accent),#7c3aed);display:flex;align-items:center;justify-content:center;margin:0 auto 12px;color:#fff;font-size:26px;font-weight:800;"></div>
         <div id="svProfName" style="font-size:19px;font-weight:700;color:#0f172a;line-height:1.3;"></div>
+        <div id="svProfTitle" style="font-size:12px;font-weight:700;color:#047857;margin-top:3px;display:none;letter-spacing:.02em;"></div>
         <div id="svProfPronouns" style="font-size:12px;color:#94a3b8;margin-top:4px;display:none;"></div>
         <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:10px;flex-wrap:wrap;">
           <span id="svProfTeam" style="font-size:12px;color:#475569;background:#f1f5f9;padding:3px 10px;border-radius:999px;font-weight:600;display:none;"></span>
