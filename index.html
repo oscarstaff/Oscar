@@ -12013,14 +12013,22 @@ async function openProfilePage(name){
   _pvReturnPage = (cur && cur.id) ? cur.id.replace('page-','') : 'home';
   // If a coworker popup is open, close it.
   const ov=document.getElementById('staffProfileViewOverlay'); if(ov) ov.style.display='none';
+  // If the staff directory overlay is open, close it too (else it covers the page).
+  const dov=document.getElementById('staffDirectoryOverlay'); if(dov) dov.style.display='none';
 
   // Avatar
   const ava=document.getElementById('pvAva');
   const img=window.avatarFor&&window.avatarFor(name);
   if(img){ ava.textContent=''; ava.style.backgroundImage='url('+img+')'; ava.style.backgroundSize='cover'; ava.style.backgroundPosition='center'; }
   else { ava.style.backgroundImage=''; ava.textContent=name.split(' ').map(function(w){return w[0];}).join('').slice(0,2).toUpperCase(); }
-  // Name + inline badges
-  document.getElementById('pvName').innerHTML=renderStaffName(name, esc)+(window.achBadgesInline?window.achBadgesInline(name,{size:16}):'');
+  // Name + inline badges. Profile page shows the REAL name (glowing if earned),
+  // with the nickname in parentheses when the person has one — this is the one
+  // place both are shown, so a nickname elsewhere can always be traced here.
+  const _nick=(window.displayNameFor?window.displayNameFor(name):name);
+  const _hasNick=_nick && _nick!==name;
+  const _nameHtml=renderStaffName(name, esc, name)   // force REAL name as shown text
+    + (_hasNick ? '<span style="font-size:15px;font-weight:600;color:#94a3b8;margin-left:6px;">('+esc(_nick)+')</span>' : '');
+  document.getElementById('pvName').innerHTML=_nameHtml+(window.achBadgesInline?window.achBadgesInline(name,{size:16}):'');
   // Title
   const tEl=document.getElementById('pvTitle');
   if(window.isEliteCaller && window.isEliteCaller(name)){ tEl.textContent='The Call-Handler'; tEl.style.display='block'; }
@@ -12288,7 +12296,7 @@ function renderStaffDirectory(list){
           const toggleBtn = '<button onclick="event.stopPropagation();toggleQuizAccess(\''+p.staff_name.replace(/'/g,"\\'")+'\',\'checklist_v1\','+(!hasAccess)+');setTimeout(openStaffDirectory,400);" title="'+(hasAccess?'Revoke quiz access':'Grant quiz access')+'" style="background:'+(hasAccess?'#dc2626':'#10b981')+';color:#fff;border:none;border-radius:6px;padding:3px 8px;font-size:10px;font-weight:700;cursor:pointer;font-family:inherit;flex-shrink:0;">'+(hasAccess?'Revoke quiz':'Give quiz')+'</button>';
           quizBlock = '<div style="display:flex;align-items:center;gap:4px;flex-shrink:0;">'+statusBadge+toggleBtn+'</div>';
         }
-        return '<div onclick="viewStaffProfile(\''+p.staff_name.replace(/'/g,"&#39;")+'\')" style="display:flex;align-items:center;gap:10px;padding:8px 8px;border-radius:8px;cursor:pointer;transition:background .1s;" onmouseover="this.style.background=\'#f8fafc\'" onmouseout="this.style.background=\'\'" >'+
+        return '<div onclick="openProfilePage(\''+p.staff_name.replace(/'/g,"&#39;")+'\')" style="display:flex;align-items:center;gap:10px;padding:8px 8px;border-radius:8px;cursor:pointer;transition:background .1s;" onmouseover="this.style.background=\'#f8fafc\'" onmouseout="this.style.background=\'\'" >'+
           renderStaffAvatar(p.staff_name, 32)+
           '<div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:600;color:#0f172a;">'+renderStaffName(p.staff_name, esc)+pron+badge+(window.achBadgesInline?window.achBadgesInline(p.staff_name):'')+'</div></div>'+
           quizBlock+
