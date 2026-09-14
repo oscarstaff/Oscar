@@ -1390,6 +1390,7 @@ function clEsc(s){
  */
 function clStaffName(fullName, display){
   const shown = clEsc(display != null ? display : fullName);
+  const badges = (window.achBadgesInline ? window.achBadgesInline(fullName) : '');
   if(window.hasEarnedGlow && window.hasEarnedGlow(fullName)){
     const skin=(window.glowSkinFor?window.glowSkinFor(fullName):'gold');
     // Tooltip reflects how the glow was earned. Elite (1000 calls) wearing the
@@ -1400,9 +1401,9 @@ function clStaffName(fullName, display){
     if(elite && skin==='darkemerald') title='The Call-Handler — 1000 calls logged';
     else if(elite) title='Elite — 1000 calls logged';
     else title='Earned a perfect fortnight';
-    return '<span class="glow-name glow-'+skin+'" title="'+title+'">'+shown+'</span>';
+    return '<span class="glow-name glow-'+skin+'" title="'+title+'">'+shown+'</span>'+badges;
   }
-  return shown;
+  return shown+badges;
 }
 /**
  * How stale a waiting callback is. Returns a tier the card styles against —

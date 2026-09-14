@@ -8554,7 +8554,7 @@ async function enterHub(){
   const _el_mhName=document.getElementById("mhName");if(_el_mhName)_el_mhName.textContent=_dispFirst;
   const _el_mhNameInline=document.getElementById("mhNameInline");if(_el_mhNameInline)_el_mhNameInline.textContent=_dispFirst;
   // My Profile card: nickname text, glowing if earned.
-  const profNameEl=document.getElementById("profName");if(profNameEl)profNameEl.innerHTML=renderStaffName(me, esc, _disp);
+  const profNameEl=document.getElementById("profName");if(profNameEl)profNameEl.innerHTML=renderStaffName(me, esc, _disp)+(window.achBadgesInline?window.achBadgesInline(me):"");
   const hr=new Date().getHours();
   const _el_homeGreeting=document.getElementById("homeGreeting");if(_el_homeGreeting)_el_homeGreeting.textContent=(hr<12?"Good morning":hr<17?"Good afternoon":"Good evening")+", "+first;
   const _el_homeWeekSub=document.getElementById("homeWeekSub");if(_el_homeWeekSub)_el_homeWeekSub.textContent=wkL(weekStart);
@@ -12153,7 +12153,7 @@ function renderStaffDirectory(list){
         }
         return '<div onclick="viewStaffProfile(\''+p.staff_name.replace(/'/g,"&#39;")+'\')" style="display:flex;align-items:center;gap:10px;padding:8px 8px;border-radius:8px;cursor:pointer;transition:background .1s;" onmouseover="this.style.background=\'#f8fafc\'" onmouseout="this.style.background=\'\'" >'+
           renderStaffAvatar(p.staff_name, 32)+
-          '<div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:600;color:#0f172a;">'+renderStaffName(p.staff_name, esc)+pron+badge+renderTrainingBadge(p.training_count)+'</div></div>'+
+          '<div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:600;color:#0f172a;">'+renderStaffName(p.staff_name, esc)+pron+badge+(window.achBadgesInline?window.achBadgesInline(p.staff_name):'')+'</div></div>'+
           quizBlock+
           (myIsAdmin?'':'<svg width="14" height="14" viewBox="0 0 20 20" fill="#cbd5e1"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>')+
           '</div>';
@@ -12179,7 +12179,7 @@ function viewStaffProfile(name){
   if(img){ avaEl.textContent=''; avaEl.style.backgroundImage='url('+img+')'; avaEl.style.backgroundSize='cover'; avaEl.style.backgroundPosition='center'; }
   else { avaEl.style.backgroundImage=''; avaEl.textContent=name.split(' ').map(function(w){return w[0];}).join('').slice(0,2).toUpperCase(); }
   // Name with the person's chosen glow skin. (Training now lives in Achievements.)
-  document.getElementById('svProfName').innerHTML=renderStaffName(name, esc);
+  document.getElementById('svProfName').innerHTML=renderStaffName(name, esc)+(window.achBadgesInline?window.achBadgesInline(name):'');
   const titleEl=document.getElementById('svProfTitle');
   if(titleEl){
     if(window.isEliteCaller && window.isEliteCaller(name)){
@@ -12197,7 +12197,8 @@ function viewStaffProfile(name){
   if(p.is_admin){roleEl.textContent='Admin';roleEl.style.display='inline-block';}
   else roleEl.style.display='none';
   // Inline achievement badges (icon-only, click for info).
-  renderProfileBadges(p);
+  // Inline achievement badges now render next to the name (achBadgesInline).
+  // renderProfileBadges(p);  // old circle strip — superseded by inline badges
   document.getElementById('staffProfileViewOverlay').style.display='flex';
 }
 
@@ -12252,7 +12253,7 @@ async function saveMyNickname(){
   const set=function(id,val){ const e=document.getElementById(id); if(e) e.textContent=val; };
   set('sbName',disp); set('mhName',first); set('mhNameInline',first);
   // Profile card keeps the glow (if earned), with the new nickname text.
-  const pn=document.getElementById('profName'); if(pn) pn.innerHTML=renderStaffName(me, esc, disp);
+  const pn=document.getElementById('profName'); if(pn) pn.innerHTML=renderStaffName(me, esc, disp)+(window.achBadgesInline?window.achBadgesInline(me):'');
   try{
     await fetch(SB+"/rest/v1/staff_credentials?staff_name=eq."+encodeURIComponent(me),{
       method:"PATCH",
@@ -12295,7 +12296,7 @@ async function pickMySkin(skin){
   renderMySkinPicker();
   // Live-update own glowing name on the profile card.
   const disp=(window.myDisplayName?window.myDisplayName():me);
-  const pn=document.getElementById('profName'); if(pn) pn.innerHTML=renderStaffName(me, esc, disp);
+  const pn=document.getElementById('profName'); if(pn) pn.innerHTML=renderStaffName(me, esc, disp)+(window.achBadgesInline?window.achBadgesInline(me):'');
   try{
     await fetch(SB+"/rest/v1/staff_credentials?staff_name=eq."+encodeURIComponent(me),{
       method:"PATCH",
@@ -12529,7 +12530,7 @@ async function loadProfilePage(){
   const _pWrap=document.getElementById("profAvaWrap");
   if(_pImg){ if(profAvaEl)profAvaEl.textContent=''; if(_pWrap)_pWrap.style.backgroundImage='url('+_pImg+')'; }
   else { if(profAvaEl)profAvaEl.textContent=ava; if(_pWrap)_pWrap.style.backgroundImage=''; }
-  const profNameEl=document.getElementById("profName");if(profNameEl)profNameEl.innerHTML=renderStaffName(me, esc, (window.myDisplayName?window.myDisplayName():me));
+  const profNameEl=document.getElementById("profName");if(profNameEl)profNameEl.innerHTML=renderStaffName(me, esc, (window.myDisplayName?window.myDisplayName():me))+(window.achBadgesInline?window.achBadgesInline(me):"");
   const profRoleEl=document.getElementById("profRole");if(profRoleEl)profRoleEl.textContent=myIsAdmin?"Admin":"Staff";
   fillMyNickname();
   renderMySkinPicker();
@@ -19232,15 +19233,30 @@ window.loadGlowData = window.loadGlowData || async function(force){
   if(window._glowLoading) return window._glowLoading;
   window._glowLoading = (async function(){
     const earned=new Set(), skins={}, avs={}, elite=new Set();
+    const callMs={};   // { staffName: highest milestone reached }
+    const trainCt={};  // { staffName: distinct trainings passed }
     try{
       // Earned = anyone with a perfect fortnight anywhere in history (permanent).
       const rows=await sbGet('punctuality_history','?score=eq.100&x=gte.4&select=staff_name&limit=2000')||[];
       rows.forEach(function(r){ if(r.staff_name) earned.add(r.staff_name); });
     }catch(e){}
     try{
-      // Elite = anyone who has logged 1000+ calls (from the call_milestones view).
-      const em=await sbGet('call_milestones','?select=staff_name&milestone=eq.1000&limit=500')||[];
-      em.forEach(function(r){ if(r.staff_name) elite.add(r.staff_name); });
+      // Call milestones — keep highest per person; 1000 also marks elite.
+      const cm=await sbGet('call_milestones','?select=staff_name,milestone&limit=1000')||[];
+      cm.forEach(function(r){
+        if(!r.staff_name) return;
+        const m=Number(r.milestone)||0;
+        if(m > (callMs[r.staff_name]||0)) callMs[r.staff_name]=m;
+        if(m>=1000) elite.add(r.staff_name);
+      });
+    }catch(e){}
+    try{
+      // Training passes — DISTINCT quizzes per person (retakes don't inflate).
+      const sets={};
+      const add=function(r){ if(r&&r.staff_name&&r.quiz_id){ (sets[r.staff_name]=sets[r.staff_name]||new Set()).add(r.quiz_id); } };
+      (await sbGet('custom_quiz_results','?select=staff_name,quiz_id&passed=is.true&limit=5000')||[]).forEach(add);
+      (await sbGet('training_quiz_results','?select=staff_name,quiz_id&passed=is.true&limit=5000')||[]).forEach(add);
+      Object.keys(sets).forEach(function(nm){ trainCt[nm]=sets[nm].size; });
     }catch(e){}
     try{
       const sk=await sbGet('staff_credentials','?select=staff_name,name_skin&limit=500')||[];
@@ -19251,6 +19267,7 @@ window.loadGlowData = window.loadGlowData || async function(force){
       av.forEach(function(a){ if(a.staff_name && a.avatar) avs[a.staff_name]=a.avatar; });
     }catch(e){}
     window._earnedGlow=earned; window._nameSkins=skins; window._avatars=avs; window._eliteCallers=elite;
+    window._callMsMap=callMs; window._trainCtMap=trainCt;
     window._glowLoading=null;
     return true;
   })();
@@ -19276,6 +19293,56 @@ window.glowSkinFor = window.glowSkinFor || function(name){
   const allowed = window.allowedSkinsFor(name);
   return (s && allowed.indexOf(s)>=0) ? s : 'gold';
 };
+
+// ── Inline achievement badges (shown right after a name) ──────────────
+// Returns a compact HTML string of small icon badges to append after any
+// staff name — used in Staff Directory, Call Log, and My Profile. The ICON
+// itself carries the glowing/flowing gradient (no circle around it). Reads the
+// name-keyed maps populated by loadGlowData, so it works anywhere once glow
+// data is loaded. title= gives a hover/tap tooltip for what each badge means.
+window.ACH_BADGE_ICONS = window.ACH_BADGE_ICONS || {
+  phone:'<path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z"/>',
+  cap:'<path d="M10 2 1 6l9 4 7.36-3.27V11a1 1 0 1 0 1 0V6L10 2Z"/><path d="M4 10.3V13c0 1.66 2.69 3 6 3s6-1.34 6-3v-2.7l-6 2.67-6-2.67Z"/>'
+};
+// A flowing-gradient icon: the glyph is filled by an animated gradient via a
+// per-badge SVG <linearGradient>, so the icon shape glows, not a background.
+window._achFlowSeq = window._achFlowSeq || 0;
+window.achFlowIcon = function(paths, stops, title, sizePx){
+  const id='agf'+(window._achFlowSeq++);
+  const sz=sizePx||14;
+  const grad='<defs><linearGradient id="'+id+'" x1="0" y1="0" x2="1" y2="0">'+
+    stops+
+    '<animate attributeName="x1" values="-1;1" dur="4s" repeatCount="indefinite"/>'+
+    '<animate attributeName="x2" values="0;2" dur="4s" repeatCount="indefinite"/>'+
+    '</linearGradient></defs>';
+  return '<svg viewBox="0 0 20 20" width="'+sz+'" height="'+sz+'" style="vertical-align:-2px;flex-shrink:0;" '+
+    (title?'aria-label="'+String(title).replace(/"/g,'')+'"':'')+'>'+grad+
+    '<g fill="url(#'+id+')">'+paths+'</g></svg>';
+};
+window.achBadgesInline = function(name, opts){
+  if(!name) return '';
+  opts=opts||{};
+  const gap=opts.gap||4, sz=opts.size||14;
+  const out=[];
+  // Call milestone — highest tier only; icon glows in tier colours.
+  const cm=(window._callMsMap && window._callMsMap[name])||0;
+  if(cm>0){
+    let stops, tip;
+    if(cm>=1000){ stops='<stop offset="0%" stop-color="#022c22"/><stop offset="35%" stop-color="#047857"/><stop offset="60%" stop-color="#34d399"/><stop offset="100%" stop-color="#022c22"/>'; tip='1000 calls logged — The Call-Handler'; }
+    else if(cm>=500){ stops='<stop offset="0%" stop-color="#78350f"/><stop offset="35%" stop-color="#d4a017"/><stop offset="55%" stop-color="#fff2c2"/><stop offset="100%" stop-color="#78350f"/>'; tip='500 calls logged'; }
+    else { stops='<stop offset="0%" stop-color="#1e40af"/><stop offset="40%" stop-color="#3b82f6"/><stop offset="60%" stop-color="#93c5fd"/><stop offset="100%" stop-color="#1e40af"/>'; tip='100 calls logged'; }
+    out.push('<span title="'+tip+'" style="display:inline-flex;align-items:center;">'+window.achFlowIcon(window.ACH_BADGE_ICONS.phone, stops, tip, sz)+'</span>');
+  }
+  // Training — solid green cap with the count beside it.
+  const tc=(window._trainCtMap && window._trainCtMap[name])||0;
+  if(tc>0){
+    out.push('<span title="'+tc+' training'+(tc===1?'':'s')+' passed" style="display:inline-flex;align-items:center;gap:1px;color:#047857;font-weight:800;font-size:'+(sz-2)+'px;">'+
+      '<svg viewBox="0 0 20 20" width="'+sz+'" height="'+sz+'" fill="#047857" style="vertical-align:-2px;">'+window.ACH_BADGE_ICONS.cap+'</svg>'+tc+'</span>');
+  }
+  if(!out.length) return '';
+  return '<span class="ach-inline" style="display:inline-flex;align-items:center;gap:'+gap+'px;margin-left:6px;vertical-align:middle;">'+out.join('')+'</span>';
+};
+
 
 // ── Achievement feed ─────────────────────────────────────────────────
 // Merges two honestly-timestamped achievement sources into one newest-first
