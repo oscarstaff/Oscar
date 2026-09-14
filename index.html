@@ -16477,6 +16477,8 @@ function skipTour(){
   const ov = document.getElementById('spotlightTour');
   if(ov) ov.style.display = 'none';
   markTourDone();
+  // After the tour closes, offer the one-time profile prompt (once).
+  setTimeout(function(){ if(typeof maybeShowProfilePrompt==='function') maybeShowProfilePrompt(); }, 400);
 }
 
 async function maybeShowTour(){
@@ -16490,6 +16492,7 @@ async function maybeShowTour(){
     if(rows && rows.length){
       if(rows[0].nexus_tour_done === true){
         localStorage.setItem('nexus_tour_done_'+me,'1');
+        if(typeof maybeShowProfilePrompt==='function') maybeShowProfilePrompt();
         return;
       }
       // DB explicitly says NOT done → clear any stale local flag and continue.
@@ -16499,11 +16502,11 @@ async function maybeShowTour(){
     } else {
       // No settings row yet → fall back to local flag to avoid re-showing
       // the tour every load for users without a row.
-      if(localDone) return;
+      if(localDone){ if(typeof maybeShowProfilePrompt==='function') maybeShowProfilePrompt(); return; }
     }
   }catch(e){
     // Network/DB failure → fall back to local flag so we don't loop the tour.
-    if(localDone) return;
+    if(localDone){ if(typeof maybeShowProfilePrompt==='function') maybeShowProfilePrompt(); return; }
   }
   // Don't show while the SQ/DOB lock overlay is up.
   const lock = document.getElementById('onboardLockOverlay');
@@ -16527,8 +16530,92 @@ async function markTourDone(){
   }catch(e){ /* localStorage fallback already written */ }
 }
 
-// ── ONBOARDING CHECKLIST RENDER ──────────
-let _onboardingProgress = {};
+// ── ONE-TIME PROFILE PROMPT (picture + nickname) ─────────────────────
+// Full-screen modal, shown once per user AFTER the tour. Mirrors the tour's
+// persistence: localStorage for instant no-repeat + staff_settings.profile_
+// prompt_done as the cross-device source of truth (admin can reset it to
+// re-fire). Disappears for good after showing once, whether they act or skip.
+function showProfilePrompt(){
+  let ov = document.getElementById('profilePromptOverlay');
+  if(!ov){
+    ov = document.createElement('div');
+    ov.id = 'profilePromptOverlay';
+    ov.innerHTML =
+      '<div class="pp-mask"></div>'+
+      '<div class="pp-card">'+
+        '<div class="pp-icon">'+
+          '<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/></svg>'+
+        '</div>'+
+        '<div class="pp-title">Make your profile yours</div>'+
+        '<div class="pp-body">Add a profile picture and a nickname so your teammates recognise you across the roster, call log, and directory. Takes about a minute.</div>'+
+        '<div class="pp-btns">'+
+          '<button class="pp-skip" onclick="dismissProfilePrompt()">Maybe later</button>'+
+          '<button class="pp-go" onclick="goProfilePromptSetup()">Set it up</button>'+
+        '</div>'+
+      '</div>';
+    document.body.appendChild(ov);
+  }
+  ov.style.display = 'block';
+}
+
+// Route into the profile Account section (avatar upload + nickname field live
+// there), then mark done so it never shows again.
+function goProfilePromptSetup(){
+  markProfilePromptDone();
+  const ov = document.getElementById('profilePromptOverlay');
+  if(ov) ov.style.display = 'none';
+  if(typeof goTo === 'function'){ try{ goTo('profile'); }catch(e){} }
+  setTimeout(function(){
+    if(typeof showProfileSection === 'function'){ try{ showProfileSection('account'); }catch(e){} }
+    const f=document.getElementById('profNickname'); if(f){ try{ f.focus(); }catch(e){} }
+  }, 350);
+}
+
+function dismissProfilePrompt(){
+  const ov = document.getElementById('profilePromptOverlay');
+  if(ov) ov.style.display = 'none';
+  markProfilePromptDone();
+}
+
+async function markProfilePromptDone(){
+  if(!me) return;
+  localStorage.setItem('profile_prompt_done_'+me,'1');
+  try{
+    await fetch(SB+'/rest/v1/staff_settings?name=eq.'+encodeURIComponent(me),{
+      method:'PATCH',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body: JSON.stringify({profile_prompt_done: true})
+    });
+  }catch(e){ /* localStorage fallback already written */ }
+}
+
+// Decide whether to show it. Called after the tour completes. DB is source of
+// truth (so an admin reset re-fires it); localStorage is the offline fallback.
+async function maybeShowProfilePrompt(){
+  if(!me) return;
+  const localDone = localStorage.getItem('profile_prompt_done_'+me) === '1';
+  try{
+    const rows = await sbGet('staff_settings','?name=eq.'+encodeURIComponent(me)+'&select=profile_prompt_done');
+    if(rows && rows.length){
+      if(rows[0].profile_prompt_done === true){
+        localStorage.setItem('profile_prompt_done_'+me,'1');
+        return;
+      }
+      if(rows[0].profile_prompt_done === false){
+        localStorage.removeItem('profile_prompt_done_'+me);
+      }
+    } else {
+      if(localDone) return;
+    }
+  }catch(e){
+    if(localDone) return;
+  }
+  // Don't stack on top of the SQ/DOB lock overlay.
+  const lock = document.getElementById('onboardLockOverlay');
+  if(lock && lock.style.display !== 'none' && lock.style.display !== ''){ return; }
+  setTimeout(showProfilePrompt, 500);
+}
+
 
 async function loadOnboardingProgress(){
   _onboardingProgress = {};
@@ -25002,6 +25089,22 @@ window.addEventListener('resize', function(){
 #spotRing{display:none;position:absolute;border-radius:14px;box-shadow:0 0 0 9999px rgba(15,23,42,.72), 0 0 0 3px var(--accent,#10b981);transition:left .3s ease,top .3s ease,width .3s ease,height .3s ease;pointer-events:none;animation:spotPulse 1.8s ease-in-out infinite;}
 @keyframes spotPulse{0%,100%{box-shadow:0 0 0 9999px rgba(15,23,42,.72),0 0 0 3px var(--accent,#10b981);}50%{box-shadow:0 0 0 9999px rgba(15,23,42,.72),0 0 0 7px rgba(16,185,129,.45);}}
 #spotCard{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;border-radius:18px;padding:22px 22px 18px;width:90%;max-width:380px;box-shadow:0 24px 60px rgba(0,0,0,.4);pointer-events:auto;}
+/* One-time profile prompt modal */
+#profilePromptOverlay{position:fixed;inset:0;z-index:9600;display:none;}
+#profilePromptOverlay .pp-mask{position:absolute;inset:0;background:rgba(15,23,42,.55);backdrop-filter:blur(2px);}
+#profilePromptOverlay .pp-card{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;border-radius:18px;padding:26px 24px 20px;width:90%;max-width:360px;box-shadow:0 24px 60px rgba(0,0,0,.4);text-align:center;animation:ppPop .25s cubic-bezier(.34,1.4,.7,1) both;}
+@keyframes ppPop{from{opacity:0;transform:translate(-50%,-46%) scale(.96);}to{opacity:1;transform:translate(-50%,-50%) scale(1);}}
+#profilePromptOverlay .pp-icon{width:60px;height:60px;border-radius:50%;margin:0 auto 14px;display:flex;align-items:center;justify-content:center;background:var(--accent-dim,#e0f2fe);color:var(--accent,#0ea5e9);}
+#profilePromptOverlay .pp-title{font-size:18px;font-weight:800;color:#0f172a;letter-spacing:-.01em;margin-bottom:8px;}
+#profilePromptOverlay .pp-body{font-size:13.5px;line-height:1.5;color:#64748b;margin-bottom:20px;}
+#profilePromptOverlay .pp-btns{display:flex;gap:10px;}
+#profilePromptOverlay .pp-skip{flex:1;padding:11px;border-radius:10px;border:1px solid #e2e8f0;background:#fff;color:#64748b;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;transition:background .15s;}
+#profilePromptOverlay .pp-skip:hover{background:#f8fafc;}
+#profilePromptOverlay .pp-go{flex:1.4;padding:11px;border-radius:10px;border:none;background:var(--accent,#0ea5e9);color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;transition:filter .15s;}
+#profilePromptOverlay .pp-go:hover{filter:brightness(1.05);}
+:is([data-theme="dark"],[data-theme="midnight"]) #profilePromptOverlay .pp-card{background:#1e293b;}
+:is([data-theme="dark"],[data-theme="midnight"]) #profilePromptOverlay .pp-title{color:#f1f5f9;}
+:is([data-theme="dark"],[data-theme="midnight"]) #profilePromptOverlay .pp-skip{background:#334155;border-color:#475569;color:#cbd5e1;}
 #spotCard.anchored{max-width:320px;}
 #spotHeader{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;}
 #spotKicker{font-size:11px;font-weight:800;letter-spacing:.12em;color:var(--accent,#10b981);text-transform:uppercase;}
