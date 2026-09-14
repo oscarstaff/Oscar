@@ -1382,6 +1382,16 @@ function clFmtPhone(e164){
 function clEsc(s){
   return String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 }
+// Reduce a phone number to its national significant digits so that a locally-
+// typed number (0448 802 013) matches the E.164-stored form (+61448802013).
+// Strips a leading Australian country code (61) or trunk zero, leaving the part
+// that's identical in both formats (448802013).
+function clPhoneKey(s){
+  let d=String(s||'').replace(/\D/g,'');
+  if(d.indexOf('61')===0 && d.length>9) d=d.slice(2); // drop +61 country code
+  d=d.replace(/^0+/,'');                               // drop trunk / leading zeros
+  return d;
+}
 /**
  * Wrap a staff member's displayed name in the golden style if they currently
  * hold perfect-fortnight status. `fullName` is matched against the shared golden
@@ -1571,11 +1581,12 @@ function clContactSuggest(q){
   _clContactSuggTimer=setTimeout(async function(){
     await clLoadContacts();
     const digits=t.replace(/\D/g,'');
+    const pkey=clPhoneKey(t);
     const hits=(_clContacts||[]).filter(function(c){
       return (c.name||'').toLowerCase().includes(t) ||
-             (digits.length>=3 && (
-               (c.phone_primary||'').replace(/\D/g,'').includes(digits) ||
-               (c.phone_secondary||'').replace(/\D/g,'').includes(digits)));
+             (pkey.length>=3 && (
+               clPhoneKey(c.phone_primary).includes(pkey) ||
+               clPhoneKey(c.phone_secondary).includes(pkey)));
     }).slice(0,6);
     let html='';
     hits.forEach(function(c){
@@ -1703,14 +1714,15 @@ function clRenderContactsList(q){
   const el=document.getElementById('clContactsList'); if(!el) return;
   const t=(q||'').trim().toLowerCase();
   const digits=t.replace(/\D/g,'');
+  const pkey=clPhoneKey(t);
   let list=(_clContacts||[]).slice();
   if(t){
     list=list.filter(function(c){
       return (c.name||'').toLowerCase().includes(t) ||
              (c.email||'').toLowerCase().includes(t) ||
-             (digits.length>=3 && (
-               (c.phone_primary||'').replace(/\D/g,'').includes(digits) ||
-               (c.phone_secondary||'').replace(/\D/g,'').includes(digits)));
+             (pkey.length>=3 && (
+               clPhoneKey(c.phone_primary).includes(pkey) ||
+               clPhoneKey(c.phone_secondary).includes(pkey)));
     });
   }
   if(!list.length){
