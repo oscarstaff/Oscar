@@ -2844,6 +2844,25 @@ width:none !important;
 .glow-rosegold    { background-image:linear-gradient(100deg,#9f1239,#fb7185 15%,#ffe4e6 30%,#fda4af 45%,#9f1239 50%,#fda4af 65%,#ffe4e6 70%,#fb7185 85%,#9f1239 100%); }
 .glow-galaxy      { background-image:linear-gradient(100deg,#4338ca,#7c3aed 15%,#c4b5fd 30%,#818cf8 45%,#4338ca 50%,#818cf8 65%,#c4b5fd 70%,#7c3aed 85%,#4338ca 100%); }
 .glow-darkemerald { background-image:linear-gradient(100deg,#022c22,#047857 15%,#34d399 28%,#065f46 45%,#022c22 50%,#065f46 60%,#34d399 72%,#047857 85%,#022c22 100%); animation-duration:5s; }
+/* ── Inline achievement badges (profile) ── */
+.ach-badge{width:34px;height:34px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;
+  cursor:pointer;position:relative;border:none;padding:0;flex-shrink:0;
+  transition:transform .14s cubic-bezier(.34,1.4,.7,1);color:#fff;}
+.ach-badge:hover{transform:translateY(-2px) scale(1.08);}
+.ach-badge:active{transform:scale(.94);}
+.ach-badge.sel{box-shadow:0 0 0 2px #fff,0 0 0 4px var(--accent,#4f46e5);}
+.ach-badge svg{width:17px;height:17px;position:relative;z-index:1;}
+.ach-badge .ach-num{position:relative;z-index:1;font-size:13px;font-weight:800;line-height:1;}
+/* Solid badges */
+.ach-badge.solid-green{background:#047857;}
+.ach-badge.solid-gold{background:#b8860b;}
+.ach-badge.solid-slate{background:#64748b;}
+/* Glowy flowing badges — animated gradient fill (mirrors name glow motion) */
+.ach-badge.flow{background-size:200% auto;animation:glowFlow 5s linear infinite;}
+.ach-badge.flow-blue    {background-image:linear-gradient(100deg,#1e40af,#3b82f6 25%,#93c5fd 50%,#3b82f6 75%,#1e40af);}
+.ach-badge.flow-gold    {background-image:linear-gradient(100deg,#78350f,#d4a017 25%,#fff2c2 50%,#d4a017 75%,#78350f);}
+.ach-badge.flow-emerald {background-image:linear-gradient(100deg,#022c22,#047857 22%,#34d399 50%,#047857 78%,#022c22);}
+@media(prefers-reduced-motion:reduce){ .ach-badge.flow{animation:none;background-position:0 center;} }
 @media(prefers-reduced-motion:reduce){ .glow-name{ animation:none;background-position:0 center; } }
 /* Hall of Fame chips are physical "medal" pills — always light bg, dark text,
    in every theme. Force it so dark-theme text cascades can't wash them out. */
@@ -11975,51 +11994,110 @@ function _achRow(visual, title, sub, bg, bd){
     '<div style="min-width:0;"><div style="font-size:13px;font-weight:700;color:#0f172a;line-height:1.2;">'+title+'</div>'+
     (sub?'<div style="font-size:11px;color:#94a3b8;margin-top:2px;">'+sub+'</div>':'')+'</div></div>';
 }
-// Build the achievements list for a person. Returns '' if they have none.
-function buildAchievements(p){
-  const rows=[];
-  // Glow — permanent, earned by a perfect fortnight. Shows in their chosen skin.
+
+// SVG glyphs for badges.
+const _ACH_ICONS = {
+  cap:  '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M10 2 1 6l9 4 7.36-3.27V11a1 1 0 1 0 1 0V6L10 2Z"/><path d="M4 10.3V13c0 1.66 2.69 3 6 3s6-1.34 6-3v-2.7l-6 2.67-6-2.67Z"/></svg>',
+  phone:'<svg viewBox="0 0 20 20" fill="currentColor"><path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z"/></svg>',
+  medal:'<svg viewBox="0 0 20 20" fill="currentColor"><path d="M7 1h2l-1.4 4.5h-2zM11 1h2l1.4 4.5h-2z"/><circle cx="10" cy="13" r="5.2"/><circle cx="10" cy="13" r="2.1" fill="rgba(255,255,255,.55)"/></svg>',
+  star: '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M10 1.5l2.6 5.27 5.82.845-4.21 4.105.994 5.795L10 14.77l-5.204 2.735.994-5.795L1.58 7.615l5.82-.845z"/></svg>'
+};
+
+// Build the person's inline achievement badges. Returns an array of badge
+// descriptors {cls, inner, title, sub}. Rendered as clickable icon circles.
+function buildAchievementBadges(p){
+  const badges=[];
+  // Elite glow (1000 calls) OR perfect-fortnight glow → a glowing star badge.
   if(window.hasEarnedGlow && window.hasEarnedGlow(p.staff_name)){
     const skin=(window.glowSkinFor?window.glowSkinFor(p.staff_name):'gold');
     const skinLabel=(window.GLOW_SKIN_LABELS&&window.GLOW_SKIN_LABELS[skin])||skin;
-    const chip='<span class="glow-name glow-'+skin+'" style="font-size:14px;font-weight:800;">Glow</span>';
-    rows.push(_achRow(chip,'Perfect Fortnight',skinLabel+' glow earned','#fffdf5','#f6e9c8'));
-  }
-  // Punctuality tier — current fortnight only, so labelled as such.
-  if(p.punct && p.punct.tier){
-    const isGold=p.punct.tier==='gold';
-    const fill=isGold?'#efa927':'#c2c1ba', ring=isGold?'#633806':'#4a4a46';
-    const bg=isGold?'#faeeda':'#f4f4f2', bd=isGold?'#ef9f27':'#c9c8c1';
-    rows.push(_achRow(_tierMedal(fill,ring),(isGold?'Gold':'Silver')+' — On-Time Club',
-      'This fortnight · '+p.punct.score+'% on time',bg,bd));
-  }
-  // Training — distinct quizzes passed.
-  if(p.training_count>0){
-    const cap='<svg width="18" height="18" viewBox="0 0 20 20" fill="#047857" style="flex-shrink:0;">'+
-      '<path d="M10 2 1 6l9 4 7.36-3.27V11a1 1 0 1 0 1 0V6L10 2Z"/>'+
-      '<path d="M4 10.3V13c0 1.66 2.69 3 6 3s6-1.34 6-3v-2.7l-6 2.67-6-2.67Z"/></svg>';
-    rows.push(_achRow(cap,p.training_count+' Training'+(p.training_count===1?'':'s')+' Passed',
-      'Completed assigned quizzes','#f0fdf9','#cdeee3'));
-  }
-  // Call milestones — one row per threshold crossed (100, 500, 1000), tiered.
-  const top=Number(p.call_milestone)||0;
-  if(top>0){
-    // Per-tier colour: 100 blue (standard), 500 gold, 1000 dark emerald (elite).
-    const tiers={
-      100:{fill:'#2563eb',bg:'#eff6ff',bd:'#dbeafe',txt:'#1e293b',sub:'Call volume milestone'},
-      500:{fill:'#b8860b',bg:'#fffbeb',bd:'#fde68a',txt:'#78350f',sub:'Gold — consistent dedication'},
-      1000:{fill:'#047857',bg:'#ecfdf5',bd:'#a7f3d0',txt:'#064e3b',sub:'Elite — The Call-Handler'}
-    };
-    const phoneFor=function(fill){
-      return '<svg width="18" height="18" viewBox="0 0 20 20" fill="'+fill+'" style="flex-shrink:0;">'+
-      '<path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z"/></svg>';
-    };
-    [1000,500,100].forEach(function(m){
-      if(top>=m){ const t=tiers[m];
-        rows.push(_achRow(phoneFor(t.fill), m+' Calls Logged', t.sub, t.bg, t.bd)); }
+    const elite=window.isEliteCaller && window.isEliteCaller(p.staff_name);
+    badges.push({
+      cls:'flow flow-emerald',
+      inner:_ACH_ICONS.star,
+      title: elite ? 'The Call-Handler' : 'Perfect Fortnight',
+      sub:   elite ? 'Elite glow — 1000 calls logged' : (skinLabel+' glow earned')
     });
   }
-  return rows.join('');
+  // Call milestone — HIGHEST tier only, glowy flowing, tier-coloured.
+  const top=Number(p.call_milestone)||0;
+  if(top>0){
+    const tierCls = top>=1000 ? 'flow flow-emerald' : (top>=500 ? 'flow flow-gold' : 'flow flow-blue');
+    const tierSub = top>=1000 ? 'Elite — The Call-Handler' : (top>=500 ? 'Gold — consistent dedication' : 'Call volume milestone');
+    badges.push({
+      cls:tierCls,
+      inner:_ACH_ICONS.phone,
+      title:top+' Calls Logged',
+      sub:tierSub
+    });
+  }
+  // Punctuality tier — solid, current fortnight.
+  if(p.punct && p.punct.tier){
+    const isGold=p.punct.tier==='gold';
+    badges.push({
+      cls: isGold?'solid-gold':'solid-slate',
+      inner:_ACH_ICONS.medal,
+      title:(isGold?'Gold':'Silver')+' — On-Time Club',
+      sub:'This fortnight · '+p.punct.score+'% on time'
+    });
+  }
+  // Training — solid green, NUMBER shown on the badge.
+  if(p.training_count>0){
+    badges.push({
+      cls:'solid-green',
+      inner:'<span class="ach-num">'+p.training_count+'</span>',
+      title:p.training_count+' Training'+(p.training_count===1?'':'s')+' Passed',
+      sub:'Completed assigned quizzes'
+    });
+  }
+  return badges;
+}
+
+// Render the inline badge strip + wire click-to-reveal-info.
+function renderProfileBadges(p){
+  const strip=document.getElementById('svProfBadges');
+  const pop=document.getElementById('svBadgePop');
+  const noAch=document.getElementById('svProfNoAch');
+  if(!strip) return;
+  const badges=buildAchievementBadges(p);
+  if(pop) pop.style.display='none';
+  if(!badges.length){
+    strip.style.display='none'; strip.innerHTML='';
+    if(noAch) noAch.style.display='block';
+    return;
+  }
+  if(noAch) noAch.style.display='none';
+  window._svBadgeData=badges;
+  strip.innerHTML=badges.map(function(b,i){
+    return '<button class="ach-badge '+b.cls+'" data-i="'+i+'" onclick="showBadgeInfo('+i+')" '+
+      'aria-label="'+(b.title||'').replace(/"/g,'')+'">'+b.inner+'</button>';
+  }).join('');
+  strip.style.display='flex';
+}
+
+// Click a badge → show its title + sub in the popover, toggle selection ring.
+function showBadgeInfo(i){
+  const badges=window._svBadgeData||[];
+  const b=badges[i]; if(!b) return;
+  const pop=document.getElementById('svBadgePop');
+  const t=document.getElementById('svBadgePopTitle');
+  const s=document.getElementById('svBadgePopSub');
+  const strip=document.getElementById('svProfBadges');
+  if(strip){ strip.querySelectorAll('.ach-badge').forEach(function(el){
+    el.classList.toggle('sel', String(el.getAttribute('data-i'))===String(i)); }); }
+  // Clicking the already-selected badge closes the popover.
+  const already = pop && pop.style.display!=='none' && t && t.textContent===b.title;
+  if(already){ pop.style.display='none';
+    if(strip) strip.querySelectorAll('.ach-badge').forEach(function(el){el.classList.remove('sel');});
+    return; }
+  if(t) t.textContent=b.title||'';
+  if(s) s.textContent=b.sub||'';
+  if(pop) pop.style.display='block';
+}
+
+// Legacy: kept so any old caller doesn't break. No longer used for the profile.
+function buildAchievements(p){
+  return '';
 }
 
 // Training badge — count of DISTINCT quizzes passed. Positive-only: no pill at 0.
@@ -12118,20 +12196,8 @@ function viewStaffProfile(name){
   const roleEl=document.getElementById('svProfRole');
   if(p.is_admin){roleEl.textContent='Admin';roleEl.style.display='inline-block';}
   else roleEl.style.display='none';
-  // Achievements section.
-  const achHtml=buildAchievements(p);
-  const achWrap=document.getElementById('svProfAchievements');
-  const achList=document.getElementById('svProfAchList');
-  const noAch=document.getElementById('svProfNoAch');
-  if(achHtml){
-    achList.innerHTML=achHtml;
-    achWrap.style.display='block';
-    noAch.style.display='none';
-  }else{
-    achList.innerHTML='';
-    achWrap.style.display='none';
-    noAch.style.display='block';
-  }
+  // Inline achievement badges (icon-only, click for info).
+  renderProfileBadges(p);
   document.getElementById('staffProfileViewOverlay').style.display='flex';
 }
 
@@ -24906,16 +24972,19 @@ window.addEventListener('resize', function(){
         <div id="svProfAva" style="width:80px;height:80px;border-radius:50%;background:linear-gradient(135deg,var(--accent),#7c3aed);display:flex;align-items:center;justify-content:center;margin:0 auto 12px;color:#fff;font-size:26px;font-weight:800;"></div>
         <div id="svProfName" style="font-size:19px;font-weight:700;color:#0f172a;line-height:1.3;"></div>
         <div id="svProfTitle" style="font-size:12px;font-weight:700;color:#047857;margin-top:3px;display:none;letter-spacing:.02em;"></div>
-        <div id="svProfPronouns" style="font-size:12px;color:#94a3b8;margin-top:4px;display:none;"></div>
+        <!-- Inline achievement badges (icon-only, click for info) -->
+        <div id="svProfBadges" style="display:none;justify-content:center;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap;"></div>
+        <!-- Popover shown when a badge is clicked -->
+        <div id="svBadgePop" style="display:none;margin:10px auto 0;max-width:280px;background:#f8fafc;border:1px solid #e5e7eb;border-radius:10px;padding:9px 12px;text-align:center;">
+          <div id="svBadgePopTitle" style="font-size:13px;font-weight:700;color:#0f172a;"></div>
+          <div id="svBadgePopSub" style="font-size:11.5px;color:#64748b;margin-top:2px;"></div>
+        </div>
+        <div id="svProfPronouns" style="font-size:12px;color:#94a3b8;margin-top:8px;display:none;"></div>
         <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:10px;flex-wrap:wrap;">
           <span id="svProfTeam" style="font-size:12px;color:#475569;background:#f1f5f9;padding:3px 10px;border-radius:999px;font-weight:600;display:none;"></span>
           <span id="svProfRole" style="font-size:11px;color:#92400e;background:#fef3c7;padding:3px 10px;border-radius:999px;font-weight:700;display:none;"></span>
         </div>
-        <div id="svProfAchievements" style="margin-top:18px;text-align:left;display:none;">
-          <div style="font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#94a3b8;margin:0 0 10px;">Achievements</div>
-          <div id="svProfAchList" style="display:flex;flex-direction:column;gap:8px;"></div>
-        </div>
-        <div id="svProfNoAch" style="margin-top:18px;font-size:12px;color:#cbd5e1;font-style:italic;display:none;">No achievements yet — early days.</div>
+        <div id="svProfNoAch" style="margin-top:14px;font-size:12px;color:#cbd5e1;font-style:italic;display:none;">No achievements yet — early days.</div>
       </div>
     </div>
   </div>
@@ -25862,7 +25931,7 @@ input:focus{
 </style>
 
 <!-- DialTRAC (Call Log tab) — extracted module. Bump ?v= on each deploy. -->
-<script src="dialtrac.js?v=28"></script>
+<script src="dialtrac.js?v=27"></script>
 <script src="quizreview.js?v=2"></script>
 <script src="teamhours.js?v=2"></script>
 <script src="availlock.js?v=8"></script>
