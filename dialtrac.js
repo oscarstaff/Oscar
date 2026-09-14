@@ -1390,7 +1390,7 @@ function clEsc(s){
  */
 function clStaffName(fullName, display){
   const shown = clEsc(display != null ? display : fullName);
-  const badges = (window.achBadgesInline ? window.achBadgesInline(fullName) : '');
+  const badges = (window.achBadgesInline ? window.achBadgesInline(fullName, {noTraining:true}) : '');
   if(window.hasEarnedGlow && window.hasEarnedGlow(fullName)){
     const skin=(window.glowSkinFor?window.glowSkinFor(fullName):'gold');
     // Tooltip reflects how the glow was earned. Elite (1000 calls) wearing the
