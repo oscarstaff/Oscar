@@ -17308,6 +17308,8 @@ async function loadMyBreakHistory(){
         ? '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:999px;background:rgba(22,163,74,.12);color:#16a34a;">Approved</span>'
         : st==='declined'
         ? '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:999px;background:rgba(220,38,38,.1);color:#dc2626;">Declined</span>'
+        : st==='voided'
+        ? '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:999px;background:rgba(100,116,139,.12);color:#64748b;">Voided</span>'
         : '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:999px;background:rgba(217,119,6,.12);color:#d97706;">Pending</span>';
       // request_date -> local, human. Build from parts to avoid the UTC shift.
       var dLabel = '';
@@ -17317,7 +17319,9 @@ async function loadMyBreakHistory(){
         dLabel = d.toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short'});
       }catch(e){ dLabel = r.request_date || ''; }
       var who = (st==='approved'||st==='declined') && r.resolved_by
-        ? '<div style="font-size:11px;color:#94a3b8;margin-top:2px;">by '+esc(r.resolved_by)+'</div>' : '';
+        ? '<div style="font-size:11px;color:#94a3b8;margin-top:2px;">by '+esc(r.resolved_by)+'</div>'
+        : st==='voided'
+        ? '<div style="font-size:11px;color:#94a3b8;margin-top:2px;">cleared automatically — timesheet was edited</div>' : '';
       var reason = r.reason
         ? '<div style="font-size:11px;color:#94a3b8;margin-top:1px;">“'+esc(r.reason)+'”</div>' : '';
       return '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;padding:9px 0;border-bottom:1px solid #f4f6f9;">'+
@@ -18645,11 +18649,11 @@ async function nukeBreakOnly(){
       method:'DELETE',
       headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Prefer':'return=minimal'}
     });
-    // 2. Reset any approved extra-break requests for this day
+    // 2. Void any approved extra-break requests for this day (system-clear, not a decline)
     await fetch(SB+'/rest/v1/extra_break_requests?staff_name=eq.'+encodeURIComponent(staff)+'&request_date=eq.'+isoDate+'&status=eq.approved',{
       method:'PATCH',
       headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
-      body: JSON.stringify({status:'declined', resolved_by:me+' (nuked)'})
+      body: JSON.stringify({status:'voided', resolved_by:me+' (cleared on edit)'})
     });
     // 3. Clear the sheet break cell — send blank to trigger auto-rule
     const [y,mo,d] = isoDate.split('-');
@@ -18807,11 +18811,12 @@ async function savePunchEdit(){
         method:'DELETE',
         headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Prefer':'return=minimal'}
       });
-      // ALSO mark all approved extra_break_requests for this day as declined so they don't get re-applied
+      // ALSO void all approved extra_break_requests for this day so they don't get re-applied.
+      // 'voided' (not 'declined') keeps this a system-clear, not a manager rejection.
       await fetch(SB+'/rest/v1/extra_break_requests?staff_name=eq.'+encodeURIComponent(staff)+'&request_date=eq.'+isoDate+'&status=eq.approved',{
         method:'PATCH',
         headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
-        body: JSON.stringify({status:'declined', resolved_by: me+' (cleared on edit)'})
+        body: JSON.stringify({status:'voided', resolved_by: me+' (cleared on edit)'})
       });
     }
   }catch(e){ console.warn('pre-clear:',e); }
