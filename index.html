@@ -17431,29 +17431,39 @@ async function approveExtraBreak(id, staff, date, minutes){
       headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
       body: JSON.stringify({status:'approved', resolved_by: me})
     });
-    // 2. Top up break_hrs in clock_overrides — verified write
+    // 2. Top up break_hrs in clock_overrides — verified write.
+    // The extra break must be ADDED ON TOP of the standard break the shift is
+    // entitled to (0.5h on a weekday shift over 5h), NOT on top of whatever
+    // partial value exists mid-shift. If someone requests the extra while still
+    // clocked in, an existing override may have break_hrs=0 (the >5h rule hasn't
+    // fired yet); adding the extra to 0 loses the standard 0.5.
     const existing = await sbGet('clock_overrides','?staff_name=eq.'+encodeURIComponent(staff)+'&date=eq.'+date);
-    let currentBreak;
-    if(existing && existing.length){
-      currentBreak = parseFloat(existing[0].break_hrs) || 0;
-    } else {
-      // No override yet — compute the auto break from actual clock_log for this day
-      // Mirrors calcDayExtras: weekend = 0, weekday with >5h = 0.5, else 0
+    const _dow = new Date(date + 'T00:00:00').getDay(); // 0=Sun,6=Sat
+    const _isWeekend = (_dow === 0 || _dow === 6);
+    // Work out the day's hours from clock_log. If still mid-shift (no clock-out
+    // yet), assume a standard full shift so the 0.5 isn't wrongly dropped.
+    let rawHours = 0, clockedOut = false;
+    try{
       const dayStart = new Date(date + 'T00:00:00');
       const dayEnd = new Date(date + 'T23:59:59');
       const dayLogs = await sbGet('clock_log','?staff_name=eq.'+encodeURIComponent(staff)+'&ts=gte.'+dayStart.toISOString()+'&ts=lte.'+dayEnd.toISOString()+'&order=ts.asc');
-      let rawHours = 0;
       const inTs = (dayLogs||[]).find(function(r){return r.action==='in';});
-      const outTs = (dayLogs||[]).reverse().find(function(r){return r.action==='out';});
-      if(inTs && outTs){
-        rawHours = (new Date(outTs.ts) - new Date(inTs.ts)) / 3600000;
-      }
-      const dow = dayStart.getDay(); // 0=Sun, 6=Sat
-      const isWeekend = (dow === 0 || dow === 6);
-      currentBreak = isWeekend ? 0 : (rawHours > 5 ? 0.5 : 0);
+      const outTs = (dayLogs||[]).slice().reverse().find(function(r){return r.action==='out';});
+      if(inTs && outTs){ rawHours = (new Date(outTs.ts) - new Date(inTs.ts)) / 3600000; clockedOut = true; }
+    }catch(e){}
+    // Standard break: weekend = 0; weekday = 0.5 if the shift is (or will be) >5h.
+    // Mid-shift (not clocked out yet) → assume a full shift so we don't lose 0.5.
+    const standardBreak = _isWeekend ? 0 : ((!clockedOut || rawHours > 5) ? 0.5 : 0);
+    let currentBreak;
+    if(existing && existing.length){
+      const existingBreak = parseFloat(existing[0].break_hrs) || 0;
+      // Never let a mid-shift 0 (or under-standard value) erase the standard break.
+      currentBreak = Math.max(existingBreak, standardBreak);
+    } else {
+      currentBreak = standardBreak;
     }
     const newBreak = currentBreak + (minutes / 60);
-    console.log('[approveBreak] staff:', staff, 'date:', date, 'current:', currentBreak, 'add:', minutes/60, 'new:', newBreak);
+    console.log('[approveBreak] staff:', staff, 'date:', date, 'standard:', standardBreak, 'clockedOut:', clockedOut, 'base:', currentBreak, 'add:', minutes/60, 'new:', newBreak);
     let writeRes;
     if(existing && existing.length){
       writeRes = await fetch(SB+'/rest/v1/clock_overrides?staff_name=eq.'+encodeURIComponent(staff)+'&date=eq.'+date,{
