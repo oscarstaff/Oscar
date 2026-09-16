@@ -128,7 +128,19 @@ function _pExtras(rawHours, customBreak, customCoffee, dateObj){
 .pp-prem-pill{display:inline-flex;align-items:baseline;gap:6px;background:var(--pp-prem-soft);border:1px solid var(--pp-prem-bd);border-radius:999px;padding:3px 11px;}
 .pp-prem-pill .h{font-size:11px;font-weight:700;color:var(--pp-prem);font-variant-numeric:tabular-nums;}
 .pp-prem-pill .d{font-size:13px;font-weight:900;color:var(--pp-prem-ink);font-variant-numeric:tabular-nums;}
-.pp-prem-zero{color:var(--pp-mut2);font-size:12px;}
+.pp-prem-zero{color:var(--pp-mut2);font-size:12px;opacity:.4;}
+/* Premium emphasis — the columns Accounts scans first get a tinted band down
+   the whole column so they lock the eye, and rows WITH premium pop while
+   zero-premium cells recede. */
+.pp-table thead th.prem{color:var(--pp-prem);background:var(--pp-prem-soft);}
+.pp-table td.pp-prem-cell{background:var(--pp-prem-soft);}
+.pp-table thead th.prem:first-of-type,
+.pp-table td.pp-prem-cell.pp-prem-first{box-shadow:inset 1px 0 0 var(--pp-prem-bd);}
+.pp-table thead th.prem:last-of-type,
+.pp-table td.pp-prem-cell.pp-prem-last{box-shadow:inset -1px 0 0 var(--pp-prem-bd);}
+.pp-table td.pp-prem-cell.pp-prem-first.pp-prem-last{box-shadow:inset 1px 0 0 var(--pp-prem-bd),inset -1px 0 0 var(--pp-prem-bd);}
+/* A row that earned premium: give its premium pills full strength. */
+.pp-prem-pill .d{font-size:14px;}
 .pp-net{font-weight:600;color:var(--pp-ink);}
 .pp-total{font-weight:900;color:var(--pp-ink);font-size:14px;font-variant-numeric:tabular-nums;}
 .pp-coffee{color:#10b981;font-weight:600;font-variant-numeric:tabular-nums;}
@@ -470,8 +482,8 @@ async function runPayroll(){
         '<th>Staff</th>'+
         '<th class="r">Net hrs</th>'+
         '<th class="r">Ordinary</th>'+
-        '<th class="r prem">Premium ▲</th>'+
         '<th class="r">Coffee ☕</th>'+
+        '<th class="r prem">Premium ▲</th>'+
         '<th class="r prem">Prem + Coffee</th>'+
         '<th class="r">Total pay</th>'+
       '</tr></thead><tbody id="payTbody">'+rows+'</tbody>'+
@@ -480,8 +492,8 @@ async function runPayroll(){
         '<td class="lbl">Totals · '+paidCount+' paid</td>'+
         '<td class="r lbl">'+totNet.toFixed(2)+'h</td>'+
         '<td class="r pp-ord">$'+totOrdG.toFixed(2)+'</td>'+
-        '<td class="r prem">'+totPremH.toFixed(2)+'h · $'+totPremOnly.toFixed(2)+'</td>'+
         '<td class="r pp-coffee">$'+totCoffee.toFixed(2)+'</td>'+
+        '<td class="r prem">'+totPremH.toFixed(2)+'h · $'+totPremOnly.toFixed(2)+'</td>'+
         '<td class="r prem">$'+totPremPlus.toFixed(2)+'</td>'+
         '<td class="r grand">$'+totGross.toFixed(2)+'</td>'+
       '</tr></tfoot>'+
@@ -594,9 +606,9 @@ function _payRowsHtml(){
       '<td><div class="pp-name">'+r.name+chips+'</div><div class="pp-struct">'+structTxt+'</div></td>'+
       '<td class="r pp-net">'+r.net.toFixed(2)+'h</td>'+
       '<td class="r pp-ord">'+r.ordH.toFixed(2)+'h · $'+r.ordG.toFixed(2)+'</td>'+
-      '<td class="r pp-prem-cell">'+premOnlyCell+'</td>'+
       '<td class="r">'+coffeeCell+'</td>'+
-      '<td class="r pp-prem-cell">'+premPlusCell+'</td>'+
+      '<td class="r pp-prem-cell pp-prem-first">'+premOnlyCell+'</td>'+
+      '<td class="r pp-prem-cell pp-prem-last">'+premPlusCell+'</td>'+
       '<td class="r"><span class="pp-total">'+(r.noRate?'—':'$'+r.total.toFixed(2))+'</span></td>'+
     '</tr>';
     }catch(e){
