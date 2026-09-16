@@ -1733,9 +1733,20 @@ html{ scrollbar-gutter:stable; }
 /* Content fade so tab/page swaps don't hard-cut (no position change → no jump). */
 #empProfBody, #payResults{ animation:soPolishFade .22s ease both; }
 @keyframes soPolishFade{ from{ opacity:0; } to{ opacity:1; } }
+
+/* Top nav (Dashboard/Roster/Availability/Employees): smooth the active pill so
+   switching doesn't hard-cut, and stop the conflicting hover transforms that
+   made it feel jittery. */
+.appbar-nav .nav-item{ transition:background .18s ease, color .18s ease, box-shadow .18s ease !important; will-change:auto !important; border-radius:10px; }
+.appbar-nav .nav-item:hover{ transform:none !important; }
+.appbar-nav .nav-item:active{ transform:scale(.97) !important; }
+.appbar-nav .nav-item.active{ box-shadow:inset 0 0 0 1px var(--border); }
+/* Section swaps fade + rise in instead of popping (main content area). */
+.tab-content.active{ animation:soSectionIn .26s cubic-bezier(.22,1,.36,1) both; }
+@keyframes soSectionIn{ from{ opacity:0; transform:translateY(6px); } to{ opacity:1; transform:none; } }
 @media (prefers-reduced-motion: reduce){
   html{ scroll-behavior:auto; }
-  .btn, .card, .stat-card, .modal, #empProfBody, #payResults{ animation:none !important; transition:none !important; transform:none !important; }
+  .btn, .card, .stat-card, .modal, #empProfBody, #payResults, .tab-content.active, .appbar-nav .nav-item{ animation:none !important; transition:none !important; transform:none !important; }
 }
 /* ═══ END SAFE POLISH LAYER ═══ */
 </style>
