@@ -1705,6 +1705,39 @@ body.tl-readonly .wk-tools{ display:none !important; }
 .ep-pay-live .row{ display:flex; justify-content:space-between; padding:4px 0; font-size:12.5px; }
 .ep-pay-live .row.total{ border-top:1px solid var(--border); margin-top:5px; padding-top:8px; font-weight:700; }
 .ep-pay-live .row .prem{ color:var(--gold); font-weight:700; }
+
+/* ═══ SAFE POLISH LAYER (additive — smooth motion, hover lift, softer shadow,
+   no-jump scrolling). Respects prefers-reduced-motion. Remove this block to
+   revert entirely. ═══ */
+html{ scroll-behavior:smooth; }
+/* Kill horizontal layout shift when scrollbars appear/disappear on tab switch. */
+html{ scrollbar-gutter:stable; }
+/* Buttons: gentle lift + press feedback. */
+.btn{ transition:transform .14s cubic-bezier(.34,1.4,.7,1), box-shadow .18s ease, background .15s ease, opacity .15s ease; }
+.btn:hover{ transform:translateY(-1px); }
+.btn:active{ transform:translateY(0) scale(.97); }
+.btn-primary:hover, .btn-green:hover{ box-shadow:0 6px 18px -6px rgba(61,158,255,.5); }
+/* Cards & stat cards: soften shadow, lift slightly on hover. */
+.card, .stat-card{ transition:transform .18s cubic-bezier(.22,1,.36,1), box-shadow .22s ease, border-color .18s ease; }
+.stat-card:hover{ transform:translateY(-2px); box-shadow:0 12px 28px -14px rgba(16,24,40,.45); }
+/* Tabs (main + access-admin + profile sub-tabs): smooth colour/underline. */
+.aa-tab, [data-eptab]{ transition:color .16s ease, border-color .16s ease, background .16s ease; }
+/* Modals: fade + rise in. */
+.modal-overlay{ transition:opacity .2s ease; }
+.modal{ animation:soPolishRise .24s cubic-bezier(.22,1,.36,1) both; }
+@keyframes soPolishRise{ from{ opacity:0; transform:translateY(10px) scale(.985); } to{ opacity:1; transform:none; } }
+/* Table rows: subtle hover so dense tables are easier to track. */
+.pp-table tbody tr:hover, table tbody tr:hover{ background:rgba(125,125,145,.06); }
+/* Inputs: clean focus ring. */
+.form-input:focus, input:focus, select:focus{ transition:box-shadow .15s ease, border-color .15s ease; }
+/* Content fade so tab/page swaps don't hard-cut (no position change → no jump). */
+#empProfBody, #payResults{ animation:soPolishFade .22s ease both; }
+@keyframes soPolishFade{ from{ opacity:0; } to{ opacity:1; } }
+@media (prefers-reduced-motion: reduce){
+  html{ scroll-behavior:auto; }
+  .btn, .card, .stat-card, .modal, #empProfBody, #payResults{ animation:none !important; transition:none !important; transform:none !important; }
+}
+/* ═══ END SAFE POLISH LAYER ═══ */
 </style>
 <style id="polish-2026-07-31">
 /* ═══════════════════════════════════════════════════════════════════════
@@ -6441,14 +6474,43 @@ async function _epLoadLeave(reset){
   try{
     const rows=await _cdGet('leave_submissions?staff_name=eq.'+encodeURIComponent(full)+'&order=from_date.desc&limit='+_EP_PAGE+'&offset='+off+'&select=from_date,to_date,reason,status,reason_type');
     const b=document.getElementById('empProfBody');
-    if(reset && (!rows||!rows.length)){ b.innerHTML=_epEmpty('No leave records.'); return; }
+    // Note: even with no records we still render the add-leave form below.
     const badge=st=>{ const c={approved:'#10b981',pending:'#f59e0b',declined:'#ef4444'}[st]||'var(--text-dim)'; return '<span style="color:'+c+';font-weight:700;text-transform:capitalize;">'+(st||'—')+'</span>'; };
     const rowsHtml=(rows||[]).map(function(r){
       const range=r.from_date===r.to_date?_epDate(r.from_date):(_epDate(r.from_date)+' → '+_epDate(r.to_date));
       return _epRow([{v:range,w:'1.6fr'},{v:'<span style="color:var(--text-dim);">'+_cdEsc(r.reason||r.reason_type||'')+'</span>'},{v:badge(r.status)}]);
     }).join('');
     if(reset){
-      b.innerHTML='<div style="border:1px solid var(--border);border-radius:11px;overflow:hidden;"><div id="_epLvRows">'+
+      const addForm=
+        '<div style="border:1px solid var(--border);border-radius:11px;padding:14px 16px;margin-bottom:14px;background:var(--panel,rgba(255,255,255,.02));">'+
+          '<div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;" onclick="_epToggleAddLeave()">'+
+            '<div style="font-size:12.5px;font-weight:700;color:var(--text,#e6e9ef);">Add leave for '+_cdEsc(full)+'</div>'+
+            '<button class="btn btn-primary" style="padding:6px 14px;font-size:12px;font-weight:700;" onclick="event.stopPropagation();_epToggleAddLeave()"><span id="_epAddLvCaret">+ Add leave</span></button>'+
+          '</div>'+
+          '<div id="_epAddLvBody" style="display:none;margin-top:14px;">'+
+            '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;">'+
+              '<div style="flex:1;min-width:130px;"><label style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-dim);font-weight:700;">From</label>'+
+                '<input type="date" id="_epLvFrom" class="form-input" style="width:100%;"></div>'+
+              '<div style="flex:1;min-width:130px;"><label style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-dim);font-weight:700;">To</label>'+
+                '<input type="date" id="_epLvTo" class="form-input" style="width:100%;"></div>'+
+            '</div>'+
+            '<div style="margin-bottom:10px;"><label style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-dim);font-weight:700;">Reason</label>'+
+              '<select id="_epLvReason" class="form-input" style="width:100%;" onchange="_epLvReasonChange()">'+
+                '<option value="">Select a reason…</option>'+
+                '<option>Time off / away</option><option>Sick leave</option><option>Medical appointment</option>'+
+                '<option>Family / carer\'s</option><option>Study / exam</option><option>Travel</option>'+
+                '<option>Family loss / funeral</option><option>Other</option>'+
+              '</select></div>'+
+            '<div id="_epLvOtherWrap" style="display:none;margin-bottom:10px;"><label style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-dim);font-weight:700;">Please specify</label>'+
+              '<input type="text" id="_epLvOther" class="form-input" maxlength="200" placeholder="Briefly describe the reason" style="width:100%;"></div>'+
+            '<div id="_epLvMsg" style="font-size:12px;margin-bottom:8px;"></div>'+
+            '<div style="display:flex;justify-content:flex-end;gap:8px;">'+
+              '<button class="btn btn-ghost" style="padding:8px 16px;font-size:12px;" onclick="_epToggleAddLeave()">Cancel</button>'+
+              '<button class="btn btn-primary" id="_epLvSaveBtn" style="padding:8px 18px;font-size:12px;font-weight:700;" onclick="_epAddLeave()">Add as approved</button>'+
+            '</div>'+
+          '</div>'+
+        '</div>';
+      b.innerHTML=addForm+'<div style="border:1px solid var(--border);border-radius:11px;overflow:hidden;"><div id="_epLvRows">'+
         _epRow([{v:'Dates',w:'1.6fr',style:'font-weight:700;color:var(--text-dim);font-size:10px;text-transform:uppercase;letter-spacing:.5px;'},{v:'Reason',style:'font-weight:700;color:var(--text-dim);font-size:10px;text-transform:uppercase;letter-spacing:.5px;'},{v:'Status',style:'font-weight:700;color:var(--text-dim);font-size:10px;text-transform:uppercase;letter-spacing:.5px;'}])+
         rowsHtml+'</div></div>'+((rows&&rows.length===_EP_PAGE)?_epMoreBtn('leave'):'');
     }else{
@@ -6456,6 +6518,62 @@ async function _epLoadLeave(reset){
       if(!rows||rows.length<_EP_PAGE){ const btn=document.querySelector('#empProfBody .btn'); if(btn&&btn.parentNode) btn.parentNode.remove(); }
     }
   }catch(e){ const b=document.getElementById('empProfBody'); if(reset&&b) b.innerHTML=_epEmpty('Couldn\'t load leave.'); }
+}
+
+// Add-leave form controls (admin adds an already-approved leave for this staffer).
+function _epToggleAddLeave(){
+  const body=document.getElementById('_epAddLvBody');
+  const caret=document.getElementById('_epAddLvCaret');
+  if(!body) return;
+  const open=body.style.display!=='none';
+  body.style.display=open?'none':'block';
+  if(caret) caret.textContent=open?'+ Add leave':'Close';
+}
+function _epLvReasonChange(){
+  const sel=document.getElementById('_epLvReason');
+  const wrap=document.getElementById('_epLvOtherWrap');
+  if(sel&&wrap) wrap.style.display=(sel.value==='Other')?'block':'none';
+}
+async function _epAddLeave(){
+  const s=_epStaff; if(!s) return;
+  const full=(s.first+' '+s.last).trim();
+  const from=document.getElementById('_epLvFrom').value;
+  const to=document.getElementById('_epLvTo').value;
+  const sel=document.getElementById('_epLvReason').value;
+  const otherTxt=(document.getElementById('_epLvOther').value||'').trim();
+  const msg=document.getElementById('_epLvMsg');
+  const setMsg=(t,c)=>{ if(msg){ msg.textContent=t; msg.style.color=c||'#ef4444'; } };
+  if(!from||!to){ setMsg('Please choose both dates.'); return; }
+  if(from>to){ setMsg('End date must be on or after start date.'); return; }
+  if(!sel){ setMsg('Please choose a reason.'); return; }
+  if(sel==='Other' && !otherTxt){ setMsg('Please specify the reason.'); return; }
+  const reason=(sel==='Other')?otherTxt:sel;
+  const btn=document.getElementById('_epLvSaveBtn');
+  if(btn){ btn.disabled=true; btn.textContent='Adding…'; }
+  try{
+    // Admin-added → approved immediately. resolved_by records who added it.
+    const who=(typeof currentUser!=='undefined'&&currentUser)?currentUser:'Admin';
+    const res=await fetch(SUPABASE_URL+'/rest/v1/leave_submissions',{
+      method:'POST',
+      headers:{'apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({
+        staff_name:full, from_date:from, to_date:to, reason:reason, reason_type:sel,
+        status:'approved', source:'ShiftOps', resolved_by:(who+' (added in profile)')
+      })
+    });
+    if(!(res.ok||res.status===201)) throw new Error('insert failed '+res.status);
+    setMsg('Leave added and approved.', '#10b981');
+    // Reset + refresh the list so the new row shows immediately.
+    document.getElementById('_epLvFrom').value='';
+    document.getElementById('_epLvTo').value='';
+    document.getElementById('_epLvReason').value='';
+    const ow=document.getElementById('_epLvOtherWrap'); if(ow) ow.style.display='none';
+    _epPage.leave=0;
+    setTimeout(function(){ _epLoadLeave(true); }, 500);
+  }catch(e){
+    setMsg('Could not add leave — try again.');
+    if(btn){ btn.disabled=false; btn.textContent='Add as approved'; }
+  }
 }
 
 // Punctuality: pair each day's first clock-in against the rostered start isn't
