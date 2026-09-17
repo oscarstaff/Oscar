@@ -7668,6 +7668,13 @@ function clearAvailBadge(){
 
 function switchNav(id,el){
   if(_navSwitchPending)return;
+  // ACCESS GUARD: team leads (read-only) must not reach Employees or Payroll,
+  // even via dashboard stat cards or find-a-person that call switchNav directly.
+  // The Employees nav item is only *hidden* (data-tl-hide), so navigation itself
+  // must enforce the lock centrally here — this covers every caller.
+  if((id==='staff'||id==='payroll') && document.body.classList.contains('tl-readonly')){
+    return;
+  }
   _navSwitchPending=true;
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   if(el)el.classList.add('active');
@@ -7686,6 +7693,8 @@ function applyHashNav(){
   var valid={home:1,roster:1,availability:1,staff:1,payroll:1};
   var h=(location.hash||'').replace(/^#/,'').toLowerCase();
   var id=valid[h]?h:'home';
+  // Same access guard as switchNav: team leads can't deep-link to staff/payroll.
+  if((id==='staff'||id==='payroll') && document.body.classList.contains('tl-readonly')){ id='home'; }
   var nav=document.querySelector('.nav-item[onclick*="switchNav(\''+id+'\'"]');
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   if(nav)nav.classList.add('active');
@@ -10086,8 +10095,11 @@ function _hhmmFlexSydney(iso){
 function renderDashStrip(c){
   const el=document.getElementById('dashStrip');
   if(!el) return;
+  // Team leads can't open the Employees/Leave area, so its cards shouldn't act
+  // like buttons for them (the nav guard blocks it anyway — this avoids dead taps).
+  const tlLocked=document.body.classList.contains('tl-readonly');
   const goRoster = "switchNav('roster',document.querySelectorAll('.nav-item')[1])";
-  const goLeave  = "switchNav('staff',document.querySelectorAll('.nav-item')[3]);setTimeout(function(){showSubTab('leave');},80)";
+  const goLeave  = tlLocked ? '' : "switchNav('staff',document.querySelectorAll('.nav-item')[3]);setTimeout(function(){showSubTab('leave');},80)";
   const tile=function(n,label,cls,go){
     return '<button class="ds-tile'+(n?(cls?' '+cls:''):' ds-zero')+'"'+(go?' onclick="'+go+'"':'')+'>'+
              '<div class="ds-num">'+n+'</div><div class="ds-lbl">'+label+'</div></button>';
