@@ -1567,6 +1567,33 @@ async function clLoadContacts(force){
   return _clContacts;
 }
 
+// ── Live contacts sync ────────────────────────────────────────────────
+// Called by index.html's realtime subscription whenever ANYONE adds, edits or
+// deletes a contact. Reloads the cache and, if a contacts view is open,
+// re-renders it in place — preserving the current search text so the user's
+// filter isn't lost. Debounced so a burst of edits triggers one refresh.
+let _clContactsSyncTimer = null;
+window.clOnContactsChanged = function(){
+  clearTimeout(_clContactsSyncTimer);
+  _clContactsSyncTimer = setTimeout(async function(){
+    try{
+      await clLoadContacts(true);   // force re-fetch
+      // Re-render the full contacts list if its modal is open.
+      const modal=document.getElementById('clContactsModal');
+      if(modal && modal.style.display!=='none' && modal.style.display!==''){
+        const box=document.getElementById('clContactsSearch');
+        clRenderContactsList(box ? box.value : '');
+      }
+      // Refresh the live suggestions dropdown if the user is mid-search.
+      const sugg=document.getElementById('clContactSugg');
+      if(sugg && sugg.style.display!=='none' && sugg.style.display!==''){
+        const nameInput=document.getElementById('clName');
+        if(nameInput && typeof clContactSuggest==='function') clContactSuggest(nameInput.value||'');
+      }
+    }catch(e){ console.warn('[contacts-sync]',e); }
+  }, 400);
+};
+
 // Debounced inline suggestions as the caller name is typed.
 function clContactSuggest(q){
   const box=document.getElementById('clContactSugg');

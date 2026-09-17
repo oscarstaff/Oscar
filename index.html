@@ -24117,6 +24117,15 @@ function initNotifSync(){
         const row = payload.new;
         if(row && row.is_read) handleRemoteDismiss(row.notif_key);
       })
+      .on('postgres_changes', {
+        // Contacts live-sync: any add/edit/delete by anyone → refresh the
+        // dialtrac contact cache + re-render its list. No filter = all rows.
+        event: '*',
+        schema: 'public',
+        table: 'contacts'
+      }, function(){
+        try{ if(typeof window.clOnContactsChanged==='function') window.clOnContactsChanged(); }catch(e){}
+      })
       .subscribe();
     console.log('[notif-sync] listening for', me);
   }catch(e){ console.warn('[notif-sync] init failed:', e); }
