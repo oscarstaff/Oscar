@@ -5469,6 +5469,19 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
 </div>
 <style>@keyframes nbSpin{to{transform:rotate(360deg)}}
 #nexusBootOverlay.nb-hide{opacity:0;pointer-events:none;transition:opacity .35s ease;}</style>
+<script>
+// GUARANTEED safety net: lift the boot overlay after 10s no matter what — even
+// if the app crashes before enterHub() ever runs. Armed at page load, not inside
+// any app function, so nothing can prevent it. (enterHub also hides it as soon
+// as data is ready; this is only the backstop.)
+setTimeout(function(){
+  var ov=document.getElementById('nexusBootOverlay');
+  if(ov && !ov.classList.contains('nb-hide')){
+    ov.classList.add('nb-hide');
+    setTimeout(function(){ if(ov) ov.style.display='none'; }, 400);
+  }
+}, 10000);
+</script>
 <!-- ── COLD-LOAD SPLASH: star strikes the N, N turns metallic ── -->
 <div id="nxSplash" aria-hidden="true">
   <div id="nxStage">
