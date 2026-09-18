@@ -5458,6 +5458,17 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
 
 </head>
 <body>
+<!-- Full-screen boot overlay: blocks the whole page until core data + clock
+     state have loaded, so nobody taps clock-in/out into a half-loaded page.
+     Shown at boot, hidden when the startup Promise.all resolves (with a safety
+     timeout so a failed load can't strand it). -->
+<div id="nexusBootOverlay" style="display:none;position:fixed;inset:0;z-index:99999;background:linear-gradient(160deg,#0f172a,#1e293b);flex-direction:column;align-items:center;justify-content:center;gap:18px;color:#fff;font-family:inherit;">
+  <div style="width:44px;height:44px;border:4px solid rgba(255,255,255,.18);border-top-color:#fff;border-radius:50%;animation:nbSpin .7s linear infinite;"></div>
+  <div style="font-size:17px;font-weight:700;letter-spacing:.01em;">Loading Nexus…</div>
+  <div style="font-size:12.5px;color:rgba(255,255,255,.6);max-width:260px;text-align:center;line-height:1.5;">Please wait — don't clock in or out until this finishes loading.</div>
+</div>
+<style>@keyframes nbSpin{to{transform:rotate(360deg)}}
+#nexusBootOverlay.nb-hide{opacity:0;pointer-events:none;transition:opacity .35s ease;}</style>
 <!-- ── COLD-LOAD SPLASH: star strikes the N, N turns metallic ── -->
 <div id="nxSplash" aria-hidden="true">
   <div id="nxStage">
@@ -7429,6 +7440,22 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
 :is([data-theme="dark"],[data-theme="midnight"],[data-theme="renaissance"]) .prof-tab:hover { color: #f1f5f9; }
 </style>
 <script>
+// Lift the full-screen boot overlay. Idempotent — safe to call from the boot
+// Promise's .then/.catch and the safety timeout.
+function hideNexusBoot(){
+  var ov=document.getElementById('nexusBootOverlay');
+  if(!ov || ov.classList.contains('nb-hide')) return;
+  ov.classList.add('nb-hide');
+  setTimeout(function(){ if(ov && ov.parentNode) ov.style.display='none'; }, 400);
+}
+// Show the boot overlay — called at the START of the post-login boot, so it
+// never covers the login screen. Auto-lifted when boot data resolves.
+function showNexusBoot(){
+  var ov=document.getElementById('nexusBootOverlay');
+  if(!ov) return;
+  ov.classList.remove('nb-hide');
+  ov.style.display='flex';
+}
 function switchProfileTab(t){
   document.querySelectorAll('.prof-tab').forEach(function(el){ el.classList.toggle('active', el.dataset.profTab===t); });
   if(t === 'reports'){
@@ -8610,11 +8637,15 @@ async function enterHub(){
   document.getElementById("leaveTo").value=today;
   buildAvailForm();
   showSchedTab('leave'); // default schedule sub-tab
+  showNexusBoot();   // block the page until the boot loads below resolve
   startBackgroundLocation();ensureStaffSettingsRow();loadStaffTheme();Promise.all([loadHomeData(),loadNotifications(),loadLeaveHistory(),refreshAnnBadge(),loadWhatsNew(),loadHomeCalendar(),loadHomeAttention(),renderTodayChip(),maybeShowOnboarding(),checkFeedbackInvites(),checkNewNotifications(),loadAnnReads(),loadClockState(),loadAllClockLogs()]).then(function(){
+    hideNexusBoot();   // core data + clock state ready → lift the overlay
     setTimeout(function(){
       maybeShowTour();
     }, 300);
-  });
+  }).catch(function(){ hideNexusBoot(); });   // never strand the overlay on a failed load
+  // Safety net: lift after 8s no matter what, so a hung request can't lock people out.
+  setTimeout(hideNexusBoot, 8000);
   if(typeof applySavedTextColor === 'function') applySavedTextColor();
   loadGlobalGeofence(); // pull global geofence value at startup
   setTimeout(rtUpgradeAll, 200);
@@ -15508,6 +15539,22 @@ function ccBurst(){ /* celebratory burst removed */ }
 function ccWorldForToday(){ return 0; }
 function _ccWatchDayChange(){ /* no daily world to repaint */ }
 
+// Format a Date as a Sydney-local time rounded to the NEAREST 15 minutes,
+// for DISPLAY ONLY (the real stored timestamp is never changed). Rounding tips
+// at 8 min into each quarter: 9:07→9:00, 9:08→9:15, 9:23→9:30, 9:38→9:45.
+function _fmtClockRounded15(dateObj){
+  try{
+    // Read the time in Sydney wall-clock, round the minutes, re-render.
+    const syd = new Date(dateObj.toLocaleString('en-US',{timeZone:'Australia/Sydney'}));
+    const rounded = new Date(syd);
+    rounded.setSeconds(0,0);
+    const m = syd.getMinutes();
+    rounded.setMinutes(Math.round(m/15)*15); // nearest 15; JS rolls the hour over at 60
+    return rounded.toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit'});
+  }catch(e){
+    return dateObj.toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit',timeZone:'Australia/Sydney'});
+  }
+}
 function renderClockCard(){
   // Daily theme: recolour the card per weekday so today's card is visually
   // distinct — makes it obvious at a glance whether you're looking at a live
@@ -15557,7 +15604,7 @@ function renderClockCard(){
     btn.style.background = '#dc2626';
     if(_clockSinceTs){
       var _shownIn = flexClockTime(_clockSinceTs);
-      sub.textContent = 'Since '+_shownIn.toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit',timeZone:'Australia/Sydney'})+' · '+_shownIn.toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short',timeZone:'Australia/Sydney'});
+      sub.textContent = 'Since '+_fmtClockRounded15(_shownIn)+' · '+_shownIn.toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short',timeZone:'Australia/Sydney'});
     }
   } else {
     status.textContent = 'Not clocked in';
@@ -15566,7 +15613,7 @@ function renderClockCard(){
     btn.style.background = 'var(--accent)';
     if(_clockSinceTs){
       var _shownOut = flexClockTime(_clockSinceTs);
-      sub.textContent = 'Last clock-out: '+_shownOut.toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit',timeZone:'Australia/Sydney'})+' · '+_shownOut.toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short',timeZone:'Australia/Sydney'});
+      sub.textContent = 'Last clock-out: '+_fmtClockRounded15(_shownOut)+' · '+_shownOut.toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short',timeZone:'Australia/Sydney'});
     } else {
       sub.textContent = 'You haven\'t clocked in yet today.';
     }
@@ -18446,7 +18493,11 @@ async function renderHoursTable(targetStaff, startStr, endStr, el, allowEdit){
     totalCoffee += extras.coffee;
     const inHHMM = d.in ? (String(d.in.getHours()).padStart(2,'0')+':'+String(d.in.getMinutes()).padStart(2,'0')) : '';
     const outHHMM = d.out ? (String(d.out.getHours()).padStart(2,'0')+':'+String(d.out.getMinutes()).padStart(2,'0')) : '';
-    const editBtn = allowEdit ? '<td style="padding:7px 6px;border-bottom:1px solid #f1f5f9;text-align:right;"><button onclick="openPunchEdit(\''+targetStaff.replace(/\'/g,"\\'")+'\',\''+isoDate+'\',\''+inHHMM+'\',\''+outHHMM+'\',\''+d.in_id+'\',\''+d.out_id+'\')" style="background:#f1f5f9;border:none;font-size:11px;padding:4px 10px;border-radius:6px;cursor:pointer;font-family:inherit;font-weight:600;color:var(--accent);">Edit</button></td>' : '';
+    const _rowId = 'mrow_'+isoDate.replace(/-/g,'');
+    const editBtn = allowEdit ? '<td style="padding:7px 6px;border-bottom:1px solid #f1f5f9;text-align:right;white-space:nowrap;">'+
+      '<button onclick="openPunchEdit(\''+targetStaff.replace(/\'/g,"\\'")+'\',\''+isoDate+'\',\''+inHHMM+'\',\''+outHHMM+'\',\''+d.in_id+'\',\''+d.out_id+'\')" style="background:#f1f5f9;border:none;font-size:11px;padding:4px 10px;border-radius:6px;cursor:pointer;font-family:inherit;font-weight:600;color:var(--accent);">Edit</button>'+
+      ' <button onclick="toggleRowAdvanced(\''+_rowId+'\')" title="Advanced" style="background:none;border:none;font-size:11px;padding:4px 6px;border-radius:6px;cursor:pointer;font-family:inherit;font-weight:600;color:#94a3b8;">⋯</button>'+
+      '</td>' : '';
     html += '<tr><td style="padding:7px 6px;border-bottom:1px solid #f1f5f9;">'+k+'</td>'+
       '<td style="padding:7px 6px;border-bottom:1px solid #f1f5f9;color:#64748b;">'+day+'</td>'+
       '<td style="padding:7px 6px;border-bottom:1px solid #f1f5f9;">'+inS+'</td>'+
@@ -18454,6 +18505,17 @@ async function renderHoursTable(targetStaff, startStr, endStr, el, allowEdit){
       '<td style="padding:7px 6px;border-bottom:1px solid #f1f5f9;text-align:right;font-variant-numeric:tabular-nums;color:#64748b;">'+(extras.breakHrs?extras.breakHrs.toFixed(2)+'h':'—')+'</td>'+
       '<td style="padding:7px 6px;border-bottom:1px solid #f1f5f9;text-align:right;font-weight:600;font-variant-numeric:tabular-nums;">'+extras.netHours.toFixed(2)+'h</td>'+
       '<td style="padding:7px 6px;border-bottom:1px solid #f1f5f9;text-align:right;color:'+(extras.coffee?'#10b981':'#cbd5e1')+';font-weight:600;font-variant-numeric:tabular-nums;">'+(extras.coffee?'$'+extras.coffee:'—')+'</td>'+editBtn+'</tr>';
+    // Collapsible per-row Advanced (Inspect / Delete punch / Nuke breaks — scoped to this row).
+    if(allowEdit){
+      const sEsc = targetStaff.replace(/\'/g,"\\'");
+      html += '<tr id="'+_rowId+'" style="display:none;"><td colspan="8" style="padding:0 6px 10px;border-bottom:1px solid #f1f5f9;background:#fafbfc;">'+
+        '<div style="display:flex;gap:8px;flex-wrap:wrap;padding:8px 4px;align-items:center;">'+
+          '<span style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:#94a3b8;font-weight:700;margin-right:2px;">Advanced · '+isoDate+'</span>'+
+          '<button onclick="rowInspect(\''+sEsc+'\',\''+isoDate+'\')" style="padding:5px 11px;font-size:11px;font-weight:600;background:#f1f5f9;border:1px solid #e2e8f0;color:#475569;border-radius:6px;cursor:pointer;font-family:inherit;">Inspect</button>'+
+          '<button onclick="rowNukeBreaks(\''+sEsc+'\',\''+isoDate+'\')" style="padding:5px 11px;font-size:11px;font-weight:600;background:#fef9c3;border:1px solid #fde68a;color:#854d0e;border-radius:6px;cursor:pointer;font-family:inherit;">Nuke breaks</button>'+
+          '<button onclick="rowDeletePunch(\''+sEsc+'\',\''+isoDate+'\')" style="padding:5px 11px;font-size:11px;font-weight:600;background:#fee2e2;border:1px solid #fecaca;color:#991b1b;border-radius:6px;cursor:pointer;font-family:inherit;">Delete punch</button>'+
+        '</div></td></tr>';
+    }
   });
   const totalEditCell = allowEdit ? '<td></td>' : '';
   html += '<tr><td colspan="5" style="padding:10px 6px;font-weight:700;color:#0f172a;">Total</td>'+
@@ -18463,7 +18525,36 @@ async function renderHoursTable(targetStaff, startStr, endStr, el, allowEdit){
   el.innerHTML = html;
 }
 
-// ── DEBUG TOOLS ──────────────────────
+// ── Per-row Advanced (Inspect / Delete / Nuke breaks, scoped to one punch) ──
+function toggleRowAdvanced(rowId){
+  const r=document.getElementById(rowId);
+  if(r) r.style.display = (r.style.display==='none'||!r.style.display) ? 'table-row' : 'none';
+}
+// These reuse the existing, tested actions. deletePunch/nukeBreakOnly read the
+// hidden peStaff/peDate fields, so we set those first, then delegate — no logic
+// is duplicated (keeps the RLS-verify + sheet sync intact).
+function _rowSetTarget(staff,isoDate){
+  const s=document.getElementById('peStaff'); const d=document.getElementById('peDate');
+  if(s) s.value=staff; if(d) d.value=isoDate;
+}
+function rowDeletePunch(staff,isoDate){ _rowSetTarget(staff,isoDate); if(typeof deletePunch==='function') deletePunch(); }
+function rowNukeBreaks(staff,isoDate){ _rowSetTarget(staff,isoDate); if(typeof nukeBreakOnly==='function') nukeBreakOnly(); }
+async function rowInspect(staff,isoDate){
+  // Inspect just this staff+day's raw clock rows.
+  try{
+    const [y,mo,dd]=isoDate.split('-');
+    const start=new Date(+y,+mo-1,+dd,0,0,0), end=new Date(+y,+mo-1,+dd,23,59,59);
+    const wideStart=new Date(start.getTime()-864e5).toISOString(), wideEnd=new Date(end.getTime()+864e5).toISOString();
+    const rows=(await sbGet('clock_log','?staff_name=eq.'+encodeURIComponent(staff)+'&ts=gte.'+wideStart+'&ts=lte.'+wideEnd+'&order=ts.asc'))||[];
+    const same=rows.filter(function(r){ const t=new Date(r.ts); return (t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0'))===isoDate; });
+    if(!same.length){ alert('No raw clock rows for '+staff+' on '+isoDate); return; }
+    const lines=same.map(function(r){
+      const t=new Date(r.ts).toLocaleString('en-AU',{timeZone:'Australia/Sydney'});
+      return r.action.toUpperCase()+'  '+t+(r.notes?('  — '+r.notes):'')+'  ['+r.id+']';
+    });
+    alert('Raw clock rows — '+staff+' · '+isoDate+':\n\n'+lines.join('\n'));
+  }catch(e){ alert('Inspect failed: '+e.message); }
+}
 function openCreateEntry(){
   // Pick staff: from dropdown if set, else show prompt
   const sel = document.getElementById('mgrStaffSel');
