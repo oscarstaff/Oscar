@@ -9160,6 +9160,9 @@ function buildAvailForm(){
   const el=document.getElementById("availForm");
   DAYS.forEach((day,i)=>{
     dayState[i]={type:"unset"};
+    const isWeekend = (i>=5);              // Sat=5, Sun=6
+    const availLabel = isWeekend ? 'Available (9\u20134)' : 'Available (9\u201319)';
+    const defEnd = isWeekend ? '16:00' : '19:00';
     const wrap=document.createElement("div");
     wrap.id="dayWrap-"+i;
     wrap.style.cssText="margin-bottom:10px;";
@@ -9167,7 +9170,7 @@ function buildAvailForm(){
       '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #f1f5f9;">'+
         '<div style="font-size:13px;font-weight:600;color:#1e293b;">'+day+'</div>'+
         '<div style="display:flex;gap:6px;">'+
-          '<button class="ao" id="ao-yes-'+i+'" onclick="setDay('+i+',\'all\')">Available (9–19)</button>'+
+          '<button class="ao" id="ao-yes-'+i+'" onclick="setDay('+i+',\'all\')">'+availLabel+'</button>'+
           '<button class="ao" id="ao-custom-'+i+'" onclick="setDay('+i+',\'custom\')">Custom hours</button>'+
           '<button class="ao" id="ao-no-'+i+'" onclick="setDay('+i+',\'no\')">Unavailable</button>'+
         '</div>'+
@@ -9176,7 +9179,7 @@ function buildAvailForm(){
         '<div style="display:flex;align-items:center;gap:8px;">'+
           '<input type="time" class="f-input" id="cs-'+i+'" value="09:00" style="width:130px;padding:6px 10px;font-size:13px;">'+
           '<span style="color:#94a3b8;font-size:13px;">to</span>'+
-          '<input type="time" class="f-input" id="ce-'+i+'" value="19:00" style="width:130px;padding:6px 10px;font-size:13px;">'+
+          '<input type="time" class="f-input" id="ce-'+i+'" value="'+defEnd+'" style="width:130px;padding:6px 10px;font-size:13px;">'+
         '</div>'+
       '</div>';
     el.appendChild(wrap);
@@ -9632,6 +9635,10 @@ async function submitAvail(){
       if(st<floor){err.textContent=DAYS[i]+": earliest start you're approved for is "+floor+".";err.classList.add("show");document.getElementById("cs-"+i).value=floor;return;}
       if(st>=en){err.textContent=DAYS[i]+": end time must be after start time.";err.classList.add("show");return;}
       avail[i]={type:"custom",start:st,end:en};
+    }else if(s.type==="all" && i>=5){
+      // Weekend 'Available' means 9–4, saved as explicit custom hours so the
+      // real stored window (and the roster) reflect 9:00–16:00, not 9–19.
+      avail[i]={type:"custom",start:"09:00",end:"16:00"};
     }else avail[i]={type:s.type};
   }
   // Always ongoing — the date-range option was removed.

@@ -3974,6 +3974,12 @@ function getAvail(staffId,day){
 }
 function setAvail(staffId,day,val){
   if(!availability[staffId])availability[staffId]={};
+  // Weekend 'Available' means 9–4, not the weekday 9–7. Store it as explicit
+  // custom 09:00–16:00 so every reader (labels, roster fill, saves) reflects the
+  // real weekend window without needing day-aware logic elsewhere.
+  if(val && val.type==='all' && (day===5 || day===6)){
+    val={type:'custom',start:'09:00',end:'16:00'};
+  }
   availability[staffId][day]=val;
   markDirty();
   // Buffer during edit mode — the write happens on Save, not on every click.
@@ -4507,6 +4513,10 @@ async function _hkAvailableLate(dateStr){
       if(a.type==='all'){ ok.add(key); return; }              // 9-7 full day
       if(a.type==='custom'){
         const end=_hkToMin(a.end);
+        // Weekend full day is 9–16, so 16:00 is a complete weekend shift — don't
+        // apply the weekday 17:50 minimum-end rule to it.
+        const isWeekend=(dayIdx===5||dayIdx===6);
+        if(isWeekend && a.start==='09:00' && a.end==='16:00'){ ok.add(key); return; }
         if(end!=null && end>=HK_MIN_END_MIN) ok.add(key);
         else if(end!=null) tooEarly.set(key, a.end);
         else unavail.add(key);
@@ -5236,13 +5246,16 @@ function downloadSubmittedAvailability(){
 
 function cycleAvail(staffId,day){
   const av=getAvail(staffId,day);
+  // A weekend day showing our 9–16 window is the weekend 'Available' state, so
+  // it should cycle to 'no' next (same as a weekday 'all'), keeping Off reachable.
+  const isWeekendAll = (day===5||day===6) && av.type==='custom' && av.start==='09:00' && av.end==='16:00';
   // Cycle: unset -> all -> no -> unset.
   // Custom is not part of the forward cycle (it's set via the Custom button),
   // but a day that IS custom must be able to leave it — otherwise clicking a
   // custom chip had no exit and the day was stuck on custom forever. Treating
   // custom like 'no' here sends the next click to unset, rejoining the loop.
   if(av.type==='unset')setAvail(staffId,day,{type:'all'});
-  else if(av.type==='all')setAvail(staffId,day,{type:'no'});
+  else if(av.type==='all' || isWeekendAll)setAvail(staffId,day,{type:'no'});
   else setAvail(staffId,day,{type:'unset'});   // covers 'no' AND 'custom'
   renderAvailability();renderRoster();
 }
