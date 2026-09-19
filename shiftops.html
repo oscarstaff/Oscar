@@ -9897,17 +9897,12 @@ setTimeout(function(){ try{ var b=document.getElementById('soBootLoading'); if(b
   // Data's in — drop the loading screen so the dashboard shows its real state
   // instead of a blank/half-built view during the multi-second fetch+retry.
   try{ var _bl=document.getElementById('soBootLoading'); if(_bl) _bl.style.display='none'; }catch(e){}
-  // Always open on the week that contains TODAY, and keep availWeekKey and
-  // currentWeekStart in lockstep.
-  //
-  // Previously availWeekKey was restored from the saved blob while
-  // currentWeekStart was initialised to today, so they could disagree: the
-  // grid drew today's dates while loadWeek() filled it with a different
-  // week's shifts, and saveCurrentWeek() then wrote back under the OTHER
-  // week's key. That desync is the root of the "wrong week" family of bugs
-  // (it's why the Morning Board showed a leave a week early), and it becomes
-  // far more dangerous now that real shifts live in roster_shifts.
-  currentWeekStart=getMonday(new Date());
+  // Open on the week to work on: normally the week containing TODAY, but from
+  // Saturday 8am through Sunday, jump to NEXT week so the upcoming availability
+  // is visible and the roster can be built over the weekend. availWeekKey stays
+  // in lockstep (derived from currentWeekStart below), avoiding the wrong-week
+  // desync described above.
+  currentWeekStart=_defaultRosterWeekStart();
   availWeekKey=weekKey(currentWeekStart);
   loadWeek(availWeekKey);
   renderAll();
