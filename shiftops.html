@@ -9709,11 +9709,19 @@ async function _syncAvailabilityCore(silent){
       }
       const s=staff.find(x=>`${x.first} ${x.last}`.toLowerCase()===row.staff_name.toLowerCase());
       if(!s)return;
+      // Pick the version effective for the WEEK BEING VIEWED. Staff can queue a
+      // future change (pending_availability, effective pending_from); once the
+      // viewed week starts on/after that date, the grid must show the pending
+      // version — otherwise it keeps drawing the old current one (the "shows
+      // last week's availability" bug), even though the new one is effective.
+      let av = row.availability || {};
+      if(row.pending_availability && row.pending_from){
+        const pf = new Date(row.pending_from + 'T00:00:00');
+        if(pf <= _wkStart) av = row.pending_availability;   // effective from its week onward
+      }
       // Replace this person's availability WHOLESALE, don't merge into the old
-      // object — otherwise a day they removed/changed in their latest edit
-      // lingers from the previous version (the "shows old availability" bug).
+      // object — otherwise a day they removed/changed lingers from the prior version.
       const fresh={};
-      const av=row.availability||{};
       Object.keys(av).forEach(d=>{ fresh[parseInt(d)]=av[d]; });
       availability[s.id]=fresh;
       applied++;
