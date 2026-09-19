@@ -5458,29 +5458,159 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
 
 </head>
 <body>
-<!-- Full-screen boot overlay: blocks the whole page until core data + clock
-     state have loaded, so nobody taps clock-in/out into a half-loaded page.
-     Shown at boot, hidden when the startup Promise.all resolves (with a safety
-     timeout so a failed load can't strand it). -->
-<div id="nexusBootOverlay" style="position:fixed;inset:0;z-index:99999;background:linear-gradient(160deg,#0f172a,#1e293b);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;color:#fff;font-family:inherit;">
-  <div style="width:44px;height:44px;border:4px solid rgba(255,255,255,.18);border-top-color:#fff;border-radius:50%;animation:nbSpin .7s linear infinite;"></div>
-  <div style="font-size:17px;font-weight:700;letter-spacing:.01em;">Loading Nexus…</div>
-  <div style="font-size:12.5px;color:rgba(255,255,255,.6);max-width:260px;text-align:center;line-height:1.5;">Please wait — don't clock in or out until this finishes loading.</div>
+<!-- Boot skeleton: ghost of the home screen shown while the app loads + verifies
+     its version. Stays a MINIMUM of 5s (so nobody taps a half-loaded page), lifts
+     once version-check + data are done, and is HARD-CAPPED at 15s so it can never
+     hang (a failed version fetch / crash still lets people in). -->
+<div id="nexusBootOverlay">
+  <!-- Desktop: ghost left sidebar (hidden on mobile) -->
+  <div class="nbk-side">
+    <div class="nbk-bar nbk-side-brand"></div>
+    <div class="nbk-bar nbk-side-user"></div>
+    <div class="nbk-side-nav">
+      <div class="nbk-bar nbk-nav-item"></div><div class="nbk-bar nbk-nav-item"></div>
+      <div class="nbk-bar nbk-nav-item"></div><div class="nbk-bar nbk-nav-item"></div>
+      <div class="nbk-bar nbk-nav-item"></div><div class="nbk-bar nbk-nav-item"></div>
+    </div>
+  </div>
+  <!-- Mobile: ghost top bar (avatar chip + centred title); hidden on desktop -->
+  <div class="nbk-topbar">
+    <div class="nbk-bar nbk-chip"></div>
+    <div class="nbk-bar nbk-topttl"></div>
+    <div style="width:60px;"></div>
+  </div>
+  <div class="nbk-main">
+    <div class="nbk-wrap">
+      <!-- greeting -->
+      <div class="nbk-head">
+        <div class="nbk-bar nbk-title"></div>
+        <div class="nbk-bar nbk-sub"></div>
+      </div>
+      <!-- clock card: side-by-side on desktop, stacked on mobile -->
+      <div class="nbk-card nbk-clock">
+        <div class="nbk-col">
+          <div class="nbk-bar nbk-lbl"></div>
+          <div class="nbk-bar nbk-status"></div>
+          <div class="nbk-bar nbk-since"></div>
+          <div class="nbk-bar nbk-now"></div>
+        </div>
+        <div class="nbk-actions">
+          <div class="nbk-btn nbk-btn-a"></div>
+          <div class="nbk-btn nbk-btn-b"></div>
+        </div>
+      </div>
+      <!-- two stat cards -->
+      <div class="nbk-stats">
+        <div class="nbk-stat"></div><div class="nbk-stat"></div>
+      </div>
+      <!-- Recently Earned list -->
+      <div class="nbk-card">
+        <div class="nbk-bar nbk-cardhd"></div>
+        <div class="nbk-row"></div><div class="nbk-row"></div><div class="nbk-row"></div>
+      </div>
+      <div class="nbk-foot">Loading Nexus… please wait before clocking in or out</div>
+    </div>
+  </div>
 </div>
-<style>@keyframes nbSpin{to{transform:rotate(360deg)}}
-#nexusBootOverlay.nb-hide{opacity:0;pointer-events:none;transition:opacity .35s ease;}</style>
+<style>
+#nexusBootOverlay{position:fixed;inset:0;z-index:99999;background:var(--bg,#eef2f4);overflow-y:auto;display:flex;}
+#nexusBootOverlay.nb-hide{opacity:0;pointer-events:none;transition:opacity .4s ease;}
+@keyframes nbkShimmer{0%{background-position:-400px 0}100%{background-position:400px 0}}
+.nbk-bar,.nbk-stat,.nbk-btn,.nbk-row,.nbk-nav-item{background:#dde3ea;background-image:linear-gradient(90deg,#dde3ea 0px,#eef2f7 200px,#dde3ea 400px);background-size:800px 100%;animation:nbkShimmer 1.2s linear infinite;border-radius:8px;}
+.nbk-card{background:#fff;border:1px solid #e8edf3;border-radius:16px;padding:18px;}
+/* --- Desktop sidebar --- */
+.nbk-side{width:240px;flex-shrink:0;background:#fff;border-right:1px solid #e8edf3;padding:22px 16px;display:flex;flex-direction:column;gap:14px;}
+.nbk-side-brand{height:22px;width:120px;}
+.nbk-side-user{height:44px;width:100%;border-radius:12px;margin-bottom:6px;}
+.nbk-side-nav{display:flex;flex-direction:column;gap:10px;}
+.nbk-nav-item{height:34px;width:100%;border-radius:9px;}
+/* --- Mobile top bar --- */
+.nbk-topbar{display:none;}
+/* --- Main content --- */
+.nbk-main{flex:1;min-width:0;overflow-y:auto;}
+.nbk-wrap{max-width:1100px;margin:0 auto;padding:28px 40px;display:flex;flex-direction:column;gap:14px;}
+.nbk-head{display:flex;flex-direction:column;gap:10px;margin-bottom:6px;}
+.nbk-title{height:30px;width:280px;border-radius:9px;}
+.nbk-sub{height:12px;width:150px;}
+.nbk-clock{display:flex;align-items:center;justify-content:space-between;gap:16px;}
+.nbk-col{display:flex;flex-direction:column;gap:9px;min-width:180px;}
+.nbk-lbl{height:11px;width:90px;} .nbk-status{height:22px;width:140px;border-radius:7px;} .nbk-since{height:12px;width:180px;}
+.nbk-now{height:26px;width:120px;border-radius:7px;margin-top:2px;}
+.nbk-actions{display:flex;align-items:center;gap:10px;flex-shrink:0;}
+.nbk-btn{height:46px;border-radius:12px;} .nbk-btn-a{width:130px;} .nbk-btn-b{width:150px;}
+.nbk-stats{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.nbk-stat{height:96px;border-radius:16px;}
+.nbk-cardhd{height:14px;width:150px;margin-bottom:6px;}
+.nbk-row{height:15px;margin:12px 0;} .nbk-row:nth-child(2){width:88%;} .nbk-row:nth-child(3){width:70%;} .nbk-row:nth-child(4){width:78%;}
+.nbk-foot{text-align:center;font-size:12px;color:#94a3b8;margin-top:10px;font-family:inherit;}
+/* ===== MOBILE (≤700px): hide sidebar, show top bar, stack clock card ===== */
+@media(max-width:700px){
+  .nbk-side{display:none;}
+  .nbk-topbar{display:flex;align-items:center;justify-content:space-between;gap:12px;
+    position:fixed;top:0;left:0;right:0;height:60px;padding:0 16px;background:#fff;
+    border-bottom:1px solid #e8edf3;z-index:2;}
+  .nbk-chip{height:38px;width:120px;border-radius:999px;}
+  .nbk-topttl{height:18px;width:70px;}
+  .nbk-main{padding-top:60px;}
+  .nbk-wrap{padding:20px 16px;}
+  .nbk-title{height:26px;width:240px;}
+  /* Clock card stacks: status/time on top, both buttons full-width below */
+  .nbk-clock{flex-direction:column;align-items:stretch;gap:14px;}
+  .nbk-col{min-width:0;}
+  .nbk-now{height:30px;width:150px;}
+  .nbk-actions{width:100%;}
+  .nbk-btn{flex:1;height:52px;} .nbk-btn-a,.nbk-btn-b{width:auto;}
+}
+/* ===== Dark theme ===== */
+:is([data-theme="dark"],[data-theme="midnight"]) #nexusBootOverlay{background:#0f172a;}
+:is([data-theme="dark"],[data-theme="midnight"]) .nbk-card,
+:is([data-theme="dark"],[data-theme="midnight"]) .nbk-side,
+:is([data-theme="dark"],[data-theme="midnight"]) .nbk-topbar{background:#1e293b;border-color:#334155;}
+:is([data-theme="dark"],[data-theme="midnight"]) .nbk-bar,
+:is([data-theme="dark"],[data-theme="midnight"]) .nbk-stat,
+:is([data-theme="dark"],[data-theme="midnight"]) .nbk-btn,
+:is([data-theme="dark"],[data-theme="midnight"]) .nbk-row,
+:is([data-theme="dark"],[data-theme="midnight"]) .nbk-nav-item{background:#334155;background-image:linear-gradient(90deg,#334155 0px,#3f4d63 200px,#334155 400px);}
+</style>
 <script>
-// GUARANTEED safety net: lift the boot overlay after 10s no matter what — even
-// if the app crashes before enterHub() ever runs. Armed at page load, not inside
-// any app function, so nothing can prevent it. (enterHub also hides it as soon
-// as data is ready; this is only the backstop.)
-setTimeout(function(){
-  var ov=document.getElementById('nexusBootOverlay');
-  if(ov && !ov.classList.contains('nb-hide')){
+// ── Boot skeleton controller ──────────────────────────────────────────
+// The skeleton lifts only when BOTH are true: (1) at least 5s has passed, and
+// (2) the app has signalled it's ready (data loaded + version checked). A hard
+// 15s cap force-lifts it no matter what, so a hung fetch or a crash before the
+// app runs can never strand anyone on the loading screen.
+(function(){
+  var shownAt = Date.now();
+  var MIN_MS = 5000, MAX_MS = 15000;
+  var appReady = false, lifted = false;
+  function doLift(){
+    if(lifted) return; lifted = true;
+    var ov = document.getElementById('nexusBootOverlay');
+    if(!ov) return;
     ov.classList.add('nb-hide');
-    setTimeout(function(){ if(ov) ov.style.display='none'; }, 400);
+    setTimeout(function(){ if(ov) ov.style.display='none'; }, 450);
   }
-}, 10000);
+  function tryLift(){
+    if(lifted) return;
+    var waited = Date.now() - shownAt;
+    if(appReady && waited >= MIN_MS){ doLift(); return; }
+    if(appReady && waited < MIN_MS){ setTimeout(doLift, MIN_MS - waited); lifted='pending'; }
+  }
+  // The app calls this once boot data + version check are done.
+  window.nexusBootReady = function(){
+    appReady = true;
+    if(lifted) return;
+    var waited = Date.now() - shownAt;
+    if(waited >= MIN_MS) doLift(); else setTimeout(doLift, MIN_MS - waited);
+  };
+  // Restart the skeleton's timing — used when it's re-shown after a login step,
+  // so the 5s floor and 15s cap apply to the fresh post-login boot.
+  window.nexusBootRestart = function(){
+    shownAt = Date.now(); appReady = false; lifted = false;
+    setTimeout(doLift, MAX_MS);
+  };
+  // Hard cap — always lifts, whatever happens.
+  setTimeout(doLift, MAX_MS);
+})();
 </script>
 <!-- ── COLD-LOAD SPLASH: star strikes the N, N turns metallic ── -->
 <div id="nxSplash" aria-hidden="true">
@@ -5872,8 +6002,8 @@ setTimeout(function(){
 
       <!-- Clock In/Out card -->
       <div id="clockCard" class="card" style="margin-bottom:12px;padding:18px;">
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;">
-          <div style="flex:1;min-width:180px;">
+        <div class="cc-head">
+          <div class="cc-head-left">
             <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
               <div class="cc-lbl">Time clock</div>
               <div id="nepaliDateBadge" class="cc-npd"></div>
@@ -5881,13 +6011,13 @@ setTimeout(function(){
             <div id="clockStatus" class="cc-status">Loading...</div>
             <div id="clockSubStatus" class="cc-sub"></div>
           </div>
-          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <div class="cc-head-right">
             <div id="clockNow" class="cc-now"></div>
-            <button id="clockBtn" onclick="toggleClock()" class="cc-btn">Clock In</button>
-            <button id="pwaInstallBtn" onclick="triggerPwaInstall()" class="cc-btn2" style="display:none;"> Install</button>
-          </div>
-          <div style="margin-top:10px;">
-            <button onclick="openExtraBreakRequest()" class="cc-btn3">+ Request extra break</button>
+            <div class="cc-actions">
+              <button id="clockBtn" onclick="toggleClock()" class="cc-btn">Clock In</button>
+              <button id="pwaInstallBtn" onclick="triggerPwaInstall()" class="cc-btn2" style="display:none;"> Install</button>
+              <button onclick="openExtraBreakRequest()" class="cc-btn3">+ Request extra break</button>
+            </div>
           </div>
         </div>
         <!-- Hours summary toggle -->
@@ -7453,21 +7583,19 @@ setTimeout(function(){
 :is([data-theme="dark"],[data-theme="midnight"],[data-theme="renaissance"]) .prof-tab:hover { color: #f1f5f9; }
 </style>
 <script>
-// Lift the full-screen boot overlay. Idempotent — safe to call from the boot
-// Promise's .then/.catch and the safety timeout.
+// Signal the boot skeleton that the app is ready. The skeleton controller
+// (defined inline at page load) enforces the 5s minimum and 15s cap; this just
+// tells it data + version check are done. Idempotent.
 function hideNexusBoot(){
-  var ov=document.getElementById('nexusBootOverlay');
-  if(!ov || ov.classList.contains('nb-hide')) return;
-  ov.classList.add('nb-hide');
-  setTimeout(function(){ if(ov && ov.parentNode) ov.style.display='none'; }, 400);
+  if(typeof window.nexusBootReady==='function') window.nexusBootReady();
 }
-// Show the boot overlay — called at the START of the post-login boot, so it
-// never covers the login screen. Auto-lifted when boot data resolves.
+// Re-show the skeleton — used if login was needed first, then the user entered.
 function showNexusBoot(){
   var ov=document.getElementById('nexusBootOverlay');
   if(!ov) return;
   ov.classList.remove('nb-hide');
-  ov.style.display='flex';
+  ov.style.display='block';
+  if(typeof window.nexusBootRestart==='function') window.nexusBootRestart();
 }
 function switchProfileTab(t){
   document.querySelectorAll('.prof-tab').forEach(function(el){ el.classList.toggle('active', el.dataset.profTab===t); });
@@ -8650,15 +8778,17 @@ async function enterHub(){
   document.getElementById("leaveTo").value=today;
   buildAvailForm();
   showSchedTab('leave'); // default schedule sub-tab
-  showNexusBoot();   // block the page until the boot loads below resolve
+  showNexusBoot();   // ensure skeleton is up for the boot below (re-shows after login)
   startBackgroundLocation();ensureStaffSettingsRow();loadStaffTheme();Promise.all([loadHomeData(),loadNotifications(),loadLeaveHistory(),refreshAnnBadge(),loadWhatsNew(),loadHomeCalendar(),loadHomeAttention(),renderTodayChip(),maybeShowOnboarding(),checkFeedbackInvites(),checkNewNotifications(),loadAnnReads(),loadClockState(),loadAllClockLogs()]).then(function(){
-    hideNexusBoot();   // core data + clock state ready → lift the overlay
+    // Data ready — now also confirm the current version before lifting the
+    // skeleton, so people never land on a stale build. Either outcome signals
+    // ready; the controller still enforces the 5s floor and 15s hard cap.
+    Promise.resolve(typeof checkAppVersion==='function'?checkAppVersion():null)
+      .then(hideNexusBoot).catch(hideNexusBoot);
     setTimeout(function(){
       maybeShowTour();
     }, 300);
-  }).catch(function(){ hideNexusBoot(); });   // never strand the overlay on a failed load
-  // Safety net: lift after 8s no matter what, so a hung request can't lock people out.
-  setTimeout(hideNexusBoot, 8000);
+  }).catch(function(){ hideNexusBoot(); });   // never strand the skeleton on a failed load
   if(typeof applySavedTextColor === 'function') applySavedTextColor();
   loadGlobalGeofence(); // pull global geofence value at startup
   setTimeout(rtUpgradeAll, 200);
@@ -9952,7 +10082,9 @@ async function openGatedApp(ev,app,url){
 function showAuth(s){
   // Any auth screen means we're NOT auto-entering — lift the boot overlay so it
   // doesn't cover the login page.
-  try{ hideNexusBoot(); }catch(e){}
+  // Login needed — lift the skeleton immediately (bypass the 5s floor, which is
+  // only for the post-login boot).
+  try{ var _bo=document.getElementById('nexusBootOverlay'); if(_bo){ _bo.classList.add('nb-hide'); setTimeout(function(){ _bo.style.display='none'; },400); } }catch(e){}
   ["login","setpass","resetkey","forgot","setnew"].forEach(p=>{var el=document.getElementById("pg-"+p);if(el)el.style.display="none";});
   // Clear inline display for the login page so the stylesheet's grid layout
   // wins (.login-edge #pg-login{display:grid}). Forcing "block" here was what
@@ -25442,6 +25574,19 @@ window.addEventListener('resize', function(){
     }
     #clockCard .cc-lbl{ font-size:11px; font-weight:700; text-transform:uppercase;
       letter-spacing:.06em; color:var(--m-ink2,#64748b); }
+    /* Header layout: status on the left, time + actions grouped on the right.
+       The left block does NOT flex-grow, so it can't shove the right cluster to
+       the far edge (that was the desktop gap). Wraps cleanly on mobile. */
+    #clockCard .cc-head{ display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; }
+    #clockCard .cc-head-left{ min-width:180px; }
+    #clockCard .cc-head-right{ display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+    #clockCard .cc-actions{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+    @media (max-width:560px){
+      /* On phones, let the right cluster fill the row and sit under the status. */
+      #clockCard .cc-head-right{ width:100%; }
+      #clockCard .cc-actions{ width:100%; }
+      #clockCard .cc-actions .cc-btn{ flex:1; }
+    }
     #clockCard .cc-status{ font-size:18px; font-weight:800; letter-spacing:-.01em;
       color:var(--m-ink,#0f172a); }
     #clockCard .cc-sub{ font-size:12px; margin-top:2px; color:var(--m-ink2,#64748b); }
