@@ -2809,7 +2809,22 @@ let nextStaffId=1; // was 6 to clear the 5 seed staff; no seed data now
 let teams=['Enrolment','Processing','Placement','Evershine','Accounts','Education'];
 let devices=[]; // [{id, name, assignedTo: staffId|null}]
 let nextDeviceId=1;
-let currentWeekStart=getMonday(new Date());
+// Which week the grid should open on. Normally the current week — but from
+// Saturday 8am (Sydney) through Sunday, it jumps to NEXT week, so managers can
+// see the upcoming week's availability and build that roster over the weekend.
+// (Monday onward, that week is simply the current one again.) Manager can still
+// click back to any week.
+function _defaultRosterWeekStart(){
+  // "now" in Sydney wall-clock, so the 8am boundary is correct on any device.
+  const now = new Date(new Date().toLocaleString('en-US',{timeZone:'Australia/Sydney'}));
+  const dow = now.getDay();           // 0=Sun, 6=Sat
+  const thisMon = getMonday(now);
+  const rollForward =
+    (dow === 6 && now.getHours() >= 8) ||   // Saturday from 8am
+    (dow === 0);                            // all of Sunday
+  return rollForward ? addDays(thisMon, 7) : thisMon;
+}
+let currentWeekStart=_defaultRosterWeekStart();
 let editingShift=null,editingStaffId=null,isDirty=false,activeRoleFilter=null,staffSortOrder='asc';
 
 // ── PERSISTENCE ───────────────────────────────────────────────────────────
