@@ -1247,7 +1247,7 @@ body.ready{visibility:visible;}
 #nxSplash{
   position:fixed; inset:0; z-index:10000;
   display:flex; align-items:center; justify-content:center;
-  background:radial-gradient(circle at 50% 42%, #131a2e 0%, #0b1020 70%);
+  background:radial-gradient(circle at 50% 42%, #ffffff 0%, #eef2f7 70%);
   opacity:1; transition:opacity .5s ease;
 }
 #nxSplash.nx-done{ opacity:0; pointer-events:none; }
@@ -1255,32 +1255,51 @@ body.ready{visibility:visible;}
 #nxLogo{ overflow:visible; }
 #nxWord{
   font-family:'Inter',system-ui,sans-serif; font-weight:700; font-size:20px;
-  letter-spacing:.16em; text-transform:uppercase; color:#e8edf5;
-  opacity:0; transform:translateY(6px);
-  animation:nxWordIn .6s 1.5s ease forwards;
+  letter-spacing:.16em; text-transform:uppercase; color:#0f172a;
+  opacity:0; transform:translateY(14px);
+  animation:nxWordIn .7s 1.35s cubic-bezier(.22,1,.36,1) forwards;
 }
 @keyframes nxWordIn{ to{ opacity:1; transform:translateY(0); } }
+/* ── Smooth & premium intro: the whole N eases in (fade + gentle scale) in
+   Nexus green, a soft light sweep passes across it, then a subtle glow. ── */
 .nx-edge{
-  stroke:#6366f1; stroke-width:6; stroke-linecap:round; stroke-linejoin:round; fill:none;
-  stroke-dasharray:var(--len); stroke-dashoffset:var(--len);
-  animation:nxDraw .55s var(--d) cubic-bezier(.6,0,.3,1) forwards;
+  stroke:#059669; stroke-width:6; stroke-linecap:round; stroke-linejoin:round; fill:none;
+  /* strokes pre-drawn — the whole N reveals as one piece, not stroke-by-stroke */
+  stroke-dasharray:none; stroke-dashoffset:0;
 }
-@keyframes nxDraw{ to{ stroke-dashoffset:0; } }
-.nx-node{
-  fill:#8b5cf6; opacity:0; transform:scale(0);
+.nx-node{ fill:#10b981; }
+/* The N group fades + scales in as one smooth motion. */
+#nxN{
+  opacity:0; transform:scale(.82);
   transform-box:fill-box; transform-origin:center;
-  animation:nxPop .4s var(--nd) cubic-bezier(.34,1.5,.6,1) forwards;
+  animation:nxRise 1.1s .15s cubic-bezier(.22,1,.36,1) forwards;
 }
-@keyframes nxPop{ to{ opacity:1; transform:scale(1); } }
-#nxN.glow{ animation:nxGlow 1s 1.2s ease forwards; }
+@keyframes nxRise{
+  0%   { opacity:0; transform:scale(.82); }
+  100% { opacity:1; transform:scale(1); }
+}
+/* Soft light sweep: a bright diagonal band glides across the N once. */
+#nxLogo{ position:relative; overflow:visible; }
+#nxSweep{
+  fill:none; stroke:rgba(255,255,255,.9); stroke-width:16; stroke-linecap:round;
+  opacity:0; filter:blur(3px);
+  animation:nxSweep 1.1s 1.0s ease-out forwards;
+}
+@keyframes nxSweep{
+  0%   { opacity:0; transform:translateX(-120px) rotate(0deg); }
+  20%  { opacity:.85; }
+  80%  { opacity:.85; }
+  100% { opacity:0; transform:translateX(120px) rotate(0deg); }
+}
+#nxN.glow{ animation:nxRise 1.1s .15s cubic-bezier(.22,1,.36,1) forwards, nxGlow 1.4s 1.1s ease forwards; }
 @keyframes nxGlow{
-  0%   { filter:drop-shadow(0 0 0 rgba(139,92,246,0)); }
-  40%  { filter:drop-shadow(0 0 10px rgba(139,92,246,.55)); }
-  100% { filter:drop-shadow(0 0 4px rgba(139,92,246,.25)); }
+  0%   { filter:drop-shadow(0 0 0 rgba(5,150,105,0)); }
+  45%  { filter:drop-shadow(0 0 14px rgba(16,185,129,.5)); }
+  100% { filter:drop-shadow(0 0 5px rgba(5,150,105,.28)); }
 }
 @media (prefers-reduced-motion:reduce){
-  .nx-edge{ stroke-dashoffset:0; animation:none; }
-  .nx-node{ opacity:1; transform:none; animation:none; }
+  #nxN{ opacity:1; transform:none; animation:none; }
+  #nxSweep{ display:none; }
   #nxWord{ opacity:1; transform:none; animation:none; }
 }
 
@@ -5513,7 +5532,8 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
   </div>
 </div>
 <style>
-#nexusBootOverlay{position:fixed;inset:0;z-index:99999;background:var(--bg,#eef2f4);overflow-y:auto;display:flex;}
+#nexusBootOverlay{position:fixed;inset:0;z-index:99999;background:#f1f5f9;overflow-y:auto;display:none;}
+#nexusBootOverlay.nbk-show{display:flex;}
 #nexusBootOverlay.nb-hide{opacity:0;pointer-events:none;transition:opacity .4s ease;}
 @keyframes nbkShimmer{0%{background-position:-400px 0}100%{background-position:400px 0}}
 .nbk-bar,.nbk-stat,.nbk-btn,.nbk-row,.nbk-nav-item{background:#dde3ea;background-image:linear-gradient(90deg,#dde3ea 0px,#eef2f7 200px,#dde3ea 400px);background-size:800px 100%;animation:nbkShimmer 1.2s linear infinite;border-radius:8px;}
@@ -5610,20 +5630,38 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
   };
   // Hard cap — always lifts, whatever happens.
   setTimeout(doLift, MAX_MS);
+  // Safety reveal: the intro normally reveals the skeleton at 2.7s as it fades.
+  // If the intro failed to run, reveal it anyway at 3s so nobody is left on a
+  // blank page while the app loads underneath.
+  setTimeout(function(){
+    var ov=document.getElementById('nexusBootOverlay');
+    if(ov && !ov.classList.contains('nb-hide') && !ov.classList.contains('nbk-show')){
+      ov.classList.add('nbk-show');
+    }
+  }, 3000);
 })();
 </script>
 <!-- ── COLD-LOAD SPLASH: star strikes the N, N turns metallic ── -->
 <div id="nxSplash" aria-hidden="true">
   <div id="nxStage">
     <svg id="nxLogo" width="150" height="150" viewBox="0 0 200 200" overflow="visible" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <clipPath id="nxClip">
+          <path d="M62 150 L62 50 L138 150 L138 50" stroke="#000" stroke-width="16" fill="none"/>
+        </clipPath>
+      </defs>
       <g id="nxN">
-        <path class="nx-edge" style="--len:100;--d:.05s" d="M62 150 L62 50"/>
-        <path class="nx-edge" style="--len:126;--d:.55s" d="M62 50 L138 150"/>
-        <path class="nx-edge" style="--len:100;--d:1.0s" d="M138 150 L138 50"/>
-        <circle class="nx-node" style="--nd:0s"    cx="62"  cy="150" r="7"/>
-        <circle class="nx-node" style="--nd:.5s"   cx="62"  cy="50"  r="7"/>
-        <circle class="nx-node" style="--nd:1.0s"  cx="138" cy="150" r="7"/>
-        <circle class="nx-node" style="--nd:1.45s" cx="138" cy="50"  r="7"/>
+        <path class="nx-edge" d="M62 150 L62 50"/>
+        <path class="nx-edge" d="M62 50 L138 150"/>
+        <path class="nx-edge" d="M138 150 L138 50"/>
+        <circle class="nx-node" cx="62"  cy="150" r="7"/>
+        <circle class="nx-node" cx="62"  cy="50"  r="7"/>
+        <circle class="nx-node" cx="138" cy="150" r="7"/>
+        <circle class="nx-node" cx="138" cy="50"  r="7"/>
+      </g>
+      <!-- soft light sweep, clipped to the N shape so it glides along the letter -->
+      <g clip-path="url(#nxClip)">
+        <line id="nxSweep" x1="100" y1="30" x2="100" y2="170"/>
       </g>
     </svg>
     <div id="nxWord">Nexus</div>
@@ -5656,7 +5694,14 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
     setTimeout(function(){ N.classList.add('glow'); }, 1200);
 
     // hold a beat, then fade the whole splash away
-    setTimeout(function(){ splash.classList.add('nx-done'); }, 2700);
+    setTimeout(function(){
+      splash.classList.add('nx-done');
+      // Reveal the boot skeleton underneath as the intro fades — they run in
+      // sequence (intro first, then skeleton), never stacked. The skeleton's own
+      // 5s-from-page-load floor still governs when it finally lifts.
+      var sk=document.getElementById('nexusBootOverlay');
+      if(sk && !sk.classList.contains('nb-hide')) sk.classList.add('nbk-show');
+    }, 2700);
     setTimeout(function(){ if(splash&&splash.parentNode) splash.parentNode.removeChild(splash); }, 3250);
   }
 
@@ -7594,7 +7639,8 @@ function showNexusBoot(){
   var ov=document.getElementById('nexusBootOverlay');
   if(!ov) return;
   ov.classList.remove('nb-hide');
-  ov.style.display='block';
+  ov.classList.add('nbk-show');
+  ov.style.display='flex';
   if(typeof window.nexusBootRestart==='function') window.nexusBootRestart();
 }
 function switchProfileTab(t){
