@@ -3971,6 +3971,14 @@ function switchWeek(newStart){
   availWeekKey=weekKey(currentWeekStart);
   console.log('[WEEK-DEBUG] switchWeek: after save, now availWeekKey="'+availWeekKey+'"');
   loadWeek(availWeekKey);
+  // Re-pull availability for the newly-viewed week, so date-ranged windows are
+  // validated against THIS week (not the week we were on before). Clear the
+  // change-signature first so the guard doesn't skip the re-apply — the DB data
+  // is the same, but the WEEK changed, which is what we need re-evaluated.
+  if(typeof _syncAvailabilityCore==='function'){
+    _lastAvailSig='';
+    _syncAvailabilityCore(true).then(function(){ try{ renderRoster(); renderAvailability(); }catch(e){} });
+  }
   // Shifts come from roster_shifts, not the blob — pull the new week.
   loadWeekShiftsFromDB(currentWeekStart);
   renderPublishState();
@@ -9684,11 +9692,17 @@ async function _syncAvailabilityCore(silent){
     _lastAvailSig=sig;
 
     let applied=0;
-    const today=new Date();today.setHours(0,0,0,0);
+    // Validate date-ranged availability against the WEEK BEING VIEWED, not today.
+    // (Building next week's roster must use next week's window — otherwise an
+    // availability that starts next week is skipped because today is before it,
+    // and the grid shows the wrong window.) A window applies if it overlaps the
+    // viewed Mon–Sun at all.
+    const _wkStart=new Date(currentWeekStart); _wkStart.setHours(0,0,0,0);
+    const _wkEnd=addDays(_wkStart,6); _wkEnd.setHours(23,59,59,999);
     rows.forEach(row=>{
       if(row.is_ongoing===false){
-        if(row.valid_from){ const from=new Date(row.valid_from+'T00:00:00'); if(today<from)return; }
-        if(row.valid_until){ const until=new Date(row.valid_until+'T00:00:00'); if(today>until)return; }
+        if(row.valid_from){ const from=new Date(row.valid_from+'T00:00:00'); if(from>_wkEnd)return; }   // window starts after this week
+        if(row.valid_until){ const until=new Date(row.valid_until+'T23:59:59'); if(until<_wkStart)return; } // window ended before this week
       }
       const s=staff.find(x=>`${x.first} ${x.last}`.toLowerCase()===row.staff_name.toLowerCase());
       if(!s)return;
