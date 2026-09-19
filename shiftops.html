@@ -9692,9 +9692,13 @@ async function _syncAvailabilityCore(silent){
       }
       const s=staff.find(x=>`${x.first} ${x.last}`.toLowerCase()===row.staff_name.toLowerCase());
       if(!s)return;
-      if(!availability[s.id])availability[s.id]={};
-      const av=row.availability;
-      Object.keys(av).forEach(d=>{ availability[s.id][parseInt(d)]=av[d]; });
+      // Replace this person's availability WHOLESALE, don't merge into the old
+      // object — otherwise a day they removed/changed in their latest edit
+      // lingers from the previous version (the "shows old availability" bug).
+      const fresh={};
+      const av=row.availability||{};
+      Object.keys(av).forEach(d=>{ fresh[parseInt(d)]=av[d]; });
+      availability[s.id]=fresh;
       applied++;
     });
 
