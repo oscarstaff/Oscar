@@ -7765,6 +7765,7 @@ const GAS_TOKEN = "oscars_gas_83235a5f0c1f6ba32b18235e2b2d544ac137167d";
   function sig(s){ let h=5381; for(let i=0;i<s.length;i+=7){ h=((h<<5)+h+s.charCodeAt(i))>>>0; } return h.toString(36)+'-'+s.length; }
   let _lastFgCheck = 0;
   let _updatePending = false;
+  let _versionBaselined = false;   // true once we've adopted the sig for this page load
   let _lastActivity = Date.now();
 
   // Track activity so we know when it's safe to slip a reload in.
@@ -7812,8 +7813,18 @@ const GAS_TOKEN = "oscars_gas_83235a5f0c1f6ba32b18235e2b2d544ac137167d";
       const stored = localStorage.getItem('app_deploy_sig');
       if(!stored){ localStorage.setItem('app_deploy_sig', remote); return; }
       if(stored === remote) return;
-      // New deploy detected — record it, clear stale caches, and mark an update
-      // pending. The reload itself waits for an inactive moment.
+      // Signature changed. If this is the FIRST check of a fresh page load, the
+      // user is already running the newest code they just fetched — adopt the new
+      // signature silently, no reload (reloading here replays intro+skeleton for
+      // nothing). Only a change detected LATER (a deploy while they sit on the
+      // page) warrants the reload.
+      if(!_versionBaselined){
+        _versionBaselined = true;
+        localStorage.setItem('app_deploy_sig', remote);
+        return;
+      }
+      // New deploy detected mid-session — record it, clear stale caches, mark
+      // an update pending. The reload waits for an inactive moment.
       localStorage.setItem('app_deploy_sig', remote);
       localStorage.setItem('app_update_pending', '1');
       _updatePending = true;
@@ -8826,11 +8837,11 @@ async function enterHub(){
   showSchedTab('leave'); // default schedule sub-tab
   showNexusBoot();   // ensure skeleton is up for the boot below (re-shows after login)
   startBackgroundLocation();ensureStaffSettingsRow();loadStaffTheme();Promise.all([loadHomeData(),loadNotifications(),loadLeaveHistory(),refreshAnnBadge(),loadWhatsNew(),loadHomeCalendar(),loadHomeAttention(),renderTodayChip(),maybeShowOnboarding(),checkFeedbackInvites(),checkNewNotifications(),loadAnnReads(),loadClockState(),loadAllClockLogs()]).then(function(){
-    // Data ready — now also confirm the current version before lifting the
-    // skeleton, so people never land on a stale build. Either outcome signals
-    // ready; the controller still enforces the 5s floor and 15s hard cap.
-    Promise.resolve(typeof checkAppVersion==='function'?checkAppVersion():null)
-      .then(hideNexusBoot).catch(hideNexusBoot);
+    // Data ready → lift the skeleton. (The version check runs on its own timer
+    // a few seconds later; it must NOT be part of the boot gate, or a detected
+    // update would reload the page mid-boot and replay the intro+skeleton — the
+    // "it loads twice" bug.)
+    hideNexusBoot();
     setTimeout(function(){
       maybeShowTour();
     }, 300);
