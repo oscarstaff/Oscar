@@ -9190,12 +9190,13 @@ async function syncLeaveRequests(){
       // Check if already imported (by supabaseId)
       const exists=leaveRequests.find(r=>r.supabaseId===row.id);
       if(exists){
-        // Update status if it changed in Supabase (e.g. approved/declined from hub)
-        if(exists.status!==row.status){
-          exists.status=row.status;
-          if(row.decline_reason)exists.declineReason=row.decline_reason;
-          updated++;
-        }
+        // The DB is authoritative — refresh reason/type/status from it, not just
+        // status. Previously only status synced, so an approved leave's reason
+        // went blank after "Sync from Staff" (it was never re-read from the row).
+        if(row.reason!==undefined) exists.reason=row.reason||'';
+        if(row.reason_type!==undefined) exists.reason_type=row.reason_type||'';
+        if(exists.status!==row.status){ exists.status=row.status; updated++; }
+        if(row.decline_reason) exists.declineReason=row.decline_reason;
         return;
       }
       // Don't re-import records that were deleted locally — skip if status is declined
@@ -9208,6 +9209,7 @@ async function syncLeaveRequests(){
         from:row.from_date,
         to:row.to_date,
         reason:row.reason||'',
+        reason_type:row.reason_type||'',
         status:row.status||'pending',  // use actual status from Supabase
         declineReason:row.decline_reason||'',
         supabaseId:row.id
