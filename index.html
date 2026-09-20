@@ -18748,11 +18748,15 @@ function toggleRowAdvanced(rowId){
   if(r) r.style.display = (r.style.display==='none'||!r.style.display) ? 'table-row' : 'none';
 }
 // These reuse the existing, tested actions. deletePunch/nukeBreakOnly read the
-// hidden peStaff/peDate fields, so we set those first, then delegate — no logic
-// is duplicated (keeps the RLS-verify + sheet sync intact).
+// hidden peStaff/peDate fields — but those only exist inside the punch-edit
+// modal, which isn't open here. So we ensure the fields exist (create detached
+// hidden inputs if needed), set them, then delegate — no logic duplicated.
 function _rowSetTarget(staff,isoDate){
-  const s=document.getElementById('peStaff'); const d=document.getElementById('peDate');
-  if(s) s.value=staff; if(d) d.value=isoDate;
+  let s=document.getElementById('peStaff');
+  if(!s){ s=document.createElement('input'); s.type='hidden'; s.id='peStaff'; document.body.appendChild(s); }
+  let d=document.getElementById('peDate');
+  if(!d){ d=document.createElement('input'); d.type='hidden'; d.id='peDate'; document.body.appendChild(d); }
+  s.value=staff; d.value=isoDate;
 }
 function rowDeletePunch(staff,isoDate){ _rowSetTarget(staff,isoDate); if(typeof deletePunch==='function') deletePunch(); }
 function rowNukeBreaks(staff,isoDate){ _rowSetTarget(staff,isoDate); if(typeof nukeBreakOnly==='function') nukeBreakOnly(); }
@@ -18988,7 +18992,7 @@ async function nukeBreakOnly(){
       })
     }).catch(function(){});
     showToast('Break data wiped for '+isoDate);
-    document.getElementById('punchEditBack').style.display='none';
+    var _peb2=document.getElementById('punchEditBack'); if(_peb2) _peb2.style.display='none';
     // Refresh views
     if(typeof runHoursReport === 'function') runHoursReport();
     if(typeof runManagerReport === 'function') runManagerReport();
@@ -19094,7 +19098,7 @@ async function deletePunch(){
       })
     });
     showToast('Punch deleted · all data wiped');
-    document.getElementById('punchEditBack').style.display='none';
+    var _peb=document.getElementById('punchEditBack'); if(_peb) _peb.style.display='none';
     // Force-refresh all views with delay for DB consistency
     setTimeout(async function(){
       // Always refresh both report views regardless of which subtab is visible
