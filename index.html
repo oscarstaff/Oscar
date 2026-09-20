@@ -6094,7 +6094,7 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
       <div id="homeAttention" style="display:none;margin-bottom:14px;"></div>
 
       <!-- Stats -->
-      <div class="stats-row" id="homeStats"></div>
+      <div class="stats-row" id="homeStats" style="display:none;"></div>
 
       <!-- What's New in Nexus (product changelog) -->
       <div class="card" id="homeWhatsNew" style="margin-bottom:12px;padding:0;overflow:hidden;">
@@ -11557,7 +11557,12 @@ function renderBdayCalendar(){
       const dotCls=u.type==='birthday'?'cal-dot-bday':u.type==='event'?'cal-dot-event':'cal-dot-holiday';
       const icon=u.type==='birthday'?'':u.type==='event'?'':'';
       html+='<div class="cal-upcoming-item">';
-      html+='<div class="cal-dot '+dotCls+'"></div>';
+      // Birthdays show the person's profile picture; events/holidays keep a dot.
+      if(u.type==='birthday' && window.renderStaffAvatar){
+        html+='<div style="flex-shrink:0;">'+window.renderStaffAvatar(u.label, 26)+'</div>';
+      }else{
+        html+='<div class="cal-dot '+dotCls+'"></div>';
+      }
       html+='<div class="cal-upcoming-main"><div class="cal-upcoming-title">'+icon+' '+u.label+'</div><div class="cal-upcoming-when">'+lbl+'</div></div>';
       html+='</div>';
     });
@@ -19913,25 +19918,40 @@ window.achAgo = function(iso){
 
 // One feed row's inner HTML (icon + name + action text + time). Tapping the
 // row opens that person's profile. Used by both the Home strip and the tab.
-window.achRowHTML = function(ev, esc){
+window.achRowHTML = function(ev, esc, opts){
   const e=(esc||function(s){return s;});
+  opts=opts||{};
+  const rich=!!opts.rich;
   const nm=window.renderStaffName(ev.name, e);
-  let icon, action;
+  // Corner badge glyph + colour per achievement type.
+  let badgeSvg, badgeBg, action;
   if(ev.type==='glow'){
-    icon='<svg width="15" height="15" viewBox="0 0 20 20" fill="#e6b422" style="flex-shrink:0;"><path d="M10 1.5l2.6 5.27 5.82.845-4.21 4.105.994 5.795L10 14.77l-5.204 2.735.994-5.795L1.58 7.615l5.82-.845z"/></svg>';
+    badgeBg='#e6b422';
+    badgeSvg='<svg width="10" height="10" viewBox="0 0 20 20" fill="#fff"><path d="M10 1.5l2.6 5.27 5.82.845-4.21 4.105.994 5.795L10 14.77l-5.204 2.735.994-5.795L1.58 7.615l5.82-.845z"/></svg>';
     action='earned <b>Glow</b>, a perfect fortnight';
   }else if(ev.type==='calls'){
-    icon='<svg width="15" height="15" viewBox="0 0 20 20" fill="#2563eb" style="flex-shrink:0;"><path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z"/></svg>';
+    badgeBg='#2563eb';
+    badgeSvg='<svg width="10" height="10" viewBox="0 0 20 20" fill="#fff"><path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z"/></svg>';
     action='logged <b>'+(ev.milestone||0)+' calls</b>';
   }else{
-    icon='<svg width="15" height="15" viewBox="0 0 20 20" fill="#047857" style="flex-shrink:0;"><path d="M10 2 1 6l9 4 7.36-3.27V11a1 1 0 1 0 1 0V6L10 2Z"/><path d="M4 10.3V13c0 1.66 2.69 3 6 3s6-1.34 6-3v-2.7l-6 2.67-6-2.67Z"/></svg>';
+    badgeBg='#047857';
+    badgeSvg='<svg width="10" height="10" viewBox="0 0 20 20" fill="#fff"><path d="M10 2 1 6l9 4 7.36-3.27V11a1 1 0 1 0 1 0V6L10 2Z"/><path d="M4 10.3V13c0 1.66 2.69 3 6 3s6-1.34 6-3v-2.7l-6 2.67-6-2.67Z"/></svg>';
     action='passed a <b>training</b>';
   }
+  const avSize=rich?42:30;
+  const bDim=rich?18:15;
+  // Avatar with the achievement badge overlaid on its bottom-right corner.
+  const avatar=
+    '<div style="position:relative;flex-shrink:0;width:'+avSize+'px;height:'+avSize+'px;">'+
+      (window.renderStaffAvatar?window.renderStaffAvatar(ev.name, avSize):'')+
+      '<span style="position:absolute;right:-2px;bottom:-2px;width:'+bDim+'px;height:'+bDim+'px;border-radius:50%;'+
+      'background:'+badgeBg+';border:2px solid #fff;display:flex;align-items:center;justify-content:center;">'+badgeSvg+'</span>'+
+    '</div>';
   return '<div onclick="viewStaffProfileByName(\''+String(ev.name).replace(/'/g,"\\'")+'\')" '+
-    'style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;cursor:pointer;'+
-    'transition:background .12s;" onmouseover="this.style.background=\'#f8fafc\'" onmouseout="this.style.background=\'transparent\'">'+
-    '<div style="width:24px;height:24px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">'+icon+'</div>'+
-    '<div style="flex:1;min-width:0;font-size:13px;color:#475569;line-height:1.35;">'+
+    'style="display:flex;align-items:center;gap:'+(rich?'14px':'11px')+';padding:'+(rich?'12px 14px':'10px 12px')+';border-radius:'+(rich?'12px':'10px')+';cursor:pointer;'+
+    'transition:background .12s;'+(rich?'border:1px solid #f1f5f9;margin-bottom:8px;':'')+'" onmouseover="this.style.background=\'#f8fafc\'" onmouseout="this.style.background=\''+(rich?'#fff':'transparent')+'\'">'+
+    avatar+
+    '<div style="flex:1;min-width:0;font-size:'+(rich?'14px':'13px')+';color:#475569;line-height:1.35;">'+
     '<span style="font-weight:700;color:#0f172a;">'+nm+'</span> '+action+'</div>'+
     '<div style="font-size:11px;color:#94a3b8;flex-shrink:0;">'+window.achAgo(ev.date)+'</div></div>';
 };
@@ -19980,7 +20000,7 @@ window.loadAchievementsPage = async function(){
       feedEl.innerHTML='<div style="text-align:center;color:#cbd5e1;padding:28px;font-size:13px;font-style:italic;">No achievements yet — early days.</div>';
       return;
     }
-    feedEl.innerHTML=feed.map(function(ev){return window.achRowHTML(ev, esc);}).join('');
+    feedEl.innerHTML=feed.map(function(ev){return window.achRowHTML(ev, esc, {rich:true});}).join('');
   }catch(e){
     if(feedEl) feedEl.innerHTML='<div style="text-align:center;color:#94a3b8;padding:28px;font-size:13px;">Couldn\'t load achievements.</div>';
   }
@@ -21577,6 +21597,7 @@ async function loadHomeCalendar(){
 
 async function loadHomeData(){
   const statsEl=document.getElementById("homeStats"),sumEl=document.getElementById("homeAvailSummary");if(!statsEl)return;
+  return; // Home stat cards (Available Days / Pending Leave) removed — no longer shown.
   try{
     const [ar,lr]=await Promise.all([
       sbGet("staff_availability","?staff_name=eq."+encodeURIComponent(me)+"&limit=1"),
