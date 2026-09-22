@@ -511,7 +511,7 @@
     });
   })();
   async function hmacHex(secret,msg){var enc=new TextEncoder();var k=await crypto.subtle.importKey('raw',enc.encode(secret),{name:'HMAC',hash:'SHA-256'},false,['verify','sign']);var s=await crypto.subtle.sign('HMAC',k,enc.encode(msg));return Array.from(new Uint8Array(s)).map(x=>x.toString(16).padStart(2,'0')).join('');}
-  if(sessionStorage.getItem('ngate_'+APP)==='1'){pass();return;}
+  if(sessionStorage.getItem('ngate_'+APP)==='1'){ window.NEXUS_USER=window.NEXUS_USER||sessionStorage.getItem('ngate_user_'+APP)||''; if(window.NEXUS_ADMIN!==true){window.NEXUS_ADMIN=sessionStorage.getItem('ngate_admin_'+APP)==='1';} pass();return;}
   (async function(){
     try{
       var hash=location.hash||'';
@@ -529,10 +529,13 @@
       if(Date.now()>payload.exp){fail('Token expired — relaunch from Nexus.');return;}
       var name=payload.name||'';
       window.NEXUS_USER=name;
+      window.NEXUS_ADMIN=(payload.is_admin===true);
       var r=await fetch(SB+'/rest/v1/app_access?app=eq.'+APP+'&staff_name=eq.'+encodeURIComponent(name)+'&select=staff_name',{headers:{apikey:KEY,Authorization:'Bearer '+KEY}});
       var rows=r.ok?await r.json():[];
       if(!rows.length){fail('You no longer have access to this app.');return;}
       sessionStorage.setItem('ngate_'+APP,'1');
+      try{sessionStorage.setItem('ngate_user_'+APP,name);}catch(e){}
+      try{sessionStorage.setItem('ngate_admin_'+APP,(payload.is_admin===true)?'1':'0');}catch(e){}
       try{history.replaceState(null,'',location.pathname+location.search);}catch(e){}
       pass();
     }catch(e){ fail('Access check failed.'); console.warn('gate',e); }
@@ -1389,8 +1392,19 @@
     // ── Shared library (Supabase) — forms live here as rows with embedded PDFs ──
     const SB_URL = window.NEXUS_SB || '';
     const SB_KEY = window.NEXUS_KEY || '';
-    const SB_USER = window.NEXUS_USER || '';
     const sbHeaders = { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY, 'Content-Type': 'application/json' };
+    // Resolve the logged-in staff name LIVE at call time (not once at load).
+    // window.NEXUS_USER can be unset after a reload/re-entry (the gate strips the
+    // token from the URL and takes its sessionStorage shortcut), so fall back to
+    // the name the gate persisted. This is what stops fills logging a blank filler.
+    function fcCurrentUser(){
+      return (window.NEXUS_USER || sessionStorage.getItem('ngate_user_formcraft') || '').trim();
+    }
+    // Admin = the caller's Nexus hub-admin status, signed into the launch token
+    // (so it auto-tracks is_hub_admin and can't be forged by editing the URL).
+    function fcIsAdmin(){
+      return window.NEXUS_ADMIN === true || sessionStorage.getItem('ngate_admin_formcraft') === '1';
+    }
 
     // Send the form's fields + the pasted text or uploaded file to the
     // parse-enrolment Edge Function (Gemini). Returns { values, unmatched }.
@@ -1425,7 +1439,7 @@
     async function saveTemplateToCloud(name, fingerprint, data) {
       const r = await fetch(SB_URL + '/rest/v1/formcraft_templates', {
         method: 'POST', headers: { ...sbHeaders, Prefer: 'return=representation' },
-        body: JSON.stringify({ name, pdf_fingerprint: fingerprint, data, created_by: SB_USER }),
+        body: JSON.stringify({ name, pdf_fingerprint: fingerprint, data, created_by: fcCurrentUser() || null }),
       });
       if (!r.ok) throw new Error('save failed (' + r.status + ')');
       return (await r.json())[0];
@@ -1453,6 +1467,79 @@
       } catch (e) { console.warn('logFill', e); }
     }
 
+    // Admin-only audit trail: who filled which student's form, when.
+    // Reads formcraft_fills (anon-readable) and flags rows with no filler recorded.
+    function AuditPanel({ sbUrl, sbHeaders, onClose }) {
+      const [rows, setRows] = useState(null);   // null = loading
+      const [err, setErr] = useState('');
+      const [q, setQ] = useState('');
+      const [onlyMissing, setOnlyMissing] = useState(false);
+      useEffect(() => {
+        (async () => {
+          try {
+            const r = await fetch(sbUrl + '/rest/v1/formcraft_fills?select=*&order=filled_at.desc&limit=2000', { headers: sbHeaders });
+            if (!r.ok) { setErr('Could not load the fill log (HTTP ' + r.status + ').'); setRows([]); return; }
+            setRows(await r.json());
+          } catch (e) { setErr('Could not load the fill log.'); setRows([]); }
+        })();
+      }, []);
+      const fmt = (iso) => { try { return new Date(iso).toLocaleString('en-AU', { timeZone: 'Australia/Sydney', day: '2-digit', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' }); } catch (e) { return iso || ''; } };
+      const hasFiller = (r) => !!(r.staff_name && r.staff_name.trim());
+      const missingCount = (rows || []).filter(r => !hasFiller(r)).length;
+      const list = (rows || []).filter(r => {
+        if (onlyMissing && hasFiller(r)) return false;
+        if (!q.trim()) return true;
+        const hay = ((r.staff_name || '') + ' ' + (r.student_first || '') + ' ' + (r.student_last || '') + ' ' + (r.form_name || '') + ' ' + (r.student_dob || '')).toLowerCase();
+        return hay.indexOf(q.trim().toLowerCase()) !== -1;
+      });
+      const ov = { position: 'fixed', inset: 0, background: 'rgba(15,23,42,.55)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', zIndex: 9999, padding: '40px 16px', overflow: 'auto' };
+      const card = { background: '#fff', borderRadius: '14px', width: 'min(940px,100%)', maxHeight: '86vh', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,.3)' };
+      const th = { textAlign: 'left', padding: '8px 10px', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '.04em', color: '#64748b', borderBottom: '1px solid #e2e8f0', position: 'sticky', top: 0, background: '#fff' };
+      const td = { padding: '8px 10px', fontSize: '13px', borderBottom: '1px solid #f1f5f9', verticalAlign: 'top' };
+      const missTag = { color: '#b91c1c', fontWeight: 700, fontSize: '11px', background: '#fee2e2', padding: '2px 7px', borderRadius: '999px' };
+      return (
+        <div style={ov} onClick={onClose}>
+          <div style={card} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px 18px', borderBottom: '1px solid #e2e8f0' }}>
+              <div style={{ fontWeight: 800, fontSize: '16px', flex: 1 }}><i className="fa-solid fa-clipboard-list" /> Fill audit trail</div>
+              <button className="btn btn-ghost" onClick={onClose}><i className="fa-solid fa-xmark" /> Close</button>
+            </div>
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center', padding: '12px 18px', borderBottom: '1px solid #f1f5f9', flexWrap: 'wrap' }}>
+              <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search student, staff, form, DOB…" style={{ flex: 1, minWidth: '220px', padding: '8px 12px', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '13px' }} />
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#334155', cursor: 'pointer' }}>
+                <input type="checkbox" checked={onlyMissing} onChange={e => setOnlyMissing(e.target.checked)} />
+                Only missing filler{missingCount ? ' (' + missingCount + ')' : ''}
+              </label>
+            </div>
+            <div style={{ overflow: 'auto', padding: '0 6px' }}>
+              {rows === null ? <div style={{ padding: '24px', color: '#64748b' }}>Loading…</div>
+                : err ? <div style={{ padding: '24px', color: '#b91c1c' }}>{err}</div>
+                : list.length === 0 ? <div style={{ padding: '24px', color: '#64748b' }}>No matching fills.</div>
+                : (
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead><tr><th style={th}>Filled (Sydney)</th><th style={th}>Filler</th><th style={th}>Student</th><th style={th}>DOB</th><th style={th}>Form</th></tr></thead>
+                    <tbody>
+                      {list.map(r => (
+                        <tr key={r.id}>
+                          <td style={td}>{fmt(r.filled_at)}</td>
+                          <td style={td}>{hasFiller(r) ? r.staff_name : <span style={missTag}>— missing —</span>}</td>
+                          <td style={td}>{((r.student_first || '') + ' ' + (r.student_last || '')).trim() || '—'}</td>
+                          <td style={td}>{r.student_dob || '—'}</td>
+                          <td style={td}>{r.form_name || '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+            </div>
+            <div style={{ padding: '10px 18px', borderTop: '1px solid #e2e8f0', fontSize: '12px', color: '#64748b' }}>
+              {rows ? (list.length + ' of ' + rows.length + ' fills') : ''}{missingCount ? ' · ' + missingCount + ' with no filler recorded' : ''}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     function App() {
       const [pdfBytes, setPdfBytes] = useState(null);
       const [pdfJsDoc, setPdfJsDoc] = useState(null);
@@ -1478,6 +1565,21 @@
         }, 60);
         return () => clearTimeout(t);
       }, [highlight]);
+
+      const [isAdmin, setIsAdmin] = useState(fcIsAdmin());
+      const [auditOpen, setAuditOpen] = useState(false);
+      useEffect(() => {
+        if (fcIsAdmin()) { setIsAdmin(true); return; }   // Nexus hub-admin (from the signed launch token)
+        const u = fcCurrentUser();
+        if (!u) return;
+        // Fallback: explicit grant in app_access (manual override / older tokens).
+        (async () => {
+          try {
+            const r = await fetch(SB_URL + '/rest/v1/app_access?app=eq.formcraft_admin&staff_name=eq.' + encodeURIComponent(u) + '&select=staff_name', { headers: sbHeaders });
+            if (r.ok) { const rows = await r.json(); if (Array.isArray(rows) && rows.length > 0) setIsAdmin(true); }
+          } catch (e) {}
+        })();
+      }, []);
 
       const [library, setLibrary] = useState([]);
       const [showLibrary, setShowLibrary] = useState(false);
@@ -1793,7 +1895,7 @@
           downloadBytes(out, outName);
           // Fire-and-forget audit log: who filled which form for which student.
           logFill({
-            staff_name: SB_USER || null,
+            staff_name: fcCurrentUser() || null,
             form_name: formTitle,
             student_first: first || null,
             student_last: last || null,
@@ -1914,6 +2016,7 @@
 
       return (
         <div className="app">
+          {auditOpen && <AuditPanel sbUrl={SB_URL} sbHeaders={sbHeaders} onClose={() => setAuditOpen(false)} />}
           <header className="header">
             <div className="header-left">
               <span className="logo" onClick={() => pdfBytes && onReset()}>form<em>Craft</em></span>
@@ -1934,6 +2037,7 @@
               )}
             </div>
             <div className="header-right">
+              {isAdmin && <button className="btn btn-ghost" onClick={() => setAuditOpen(true)} title="Fill audit trail (admin)"><i className="fa-solid fa-clipboard-list" /> Audit</button>}
               {pdfBytes && (
                 <React.Fragment>
                   <button className="btn btn-ghost" onClick={openLibrary}><i className="fa-solid fa-folder-open" /> Team forms{library.length ? ' (' + library.length + ')' : ''}</button>
