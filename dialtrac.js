@@ -1044,8 +1044,8 @@ textarea.cl-edit-in{min-height:52px;resize:vertical;line-height:1.45;}
 
             <div class="cl-field">
               <div class="cl-dir" id="clDir" role="group" aria-label="Call direction">
-                <button type="button" class="cl-dir-btn active" id="clDirIn" data-dir="in" onclick="clSetDir('in')">Incoming</button>
-                <button type="button" class="cl-dir-btn" id="clDirOut" data-dir="out" onclick="clSetDir('out')">Outgoing</button>
+                <button type="button" class="cl-dir-btn" id="clDirIn" data-dir="in" onclick="clSetDir('in')">Incoming</button>
+                <button type="button" class="cl-dir-btn active" id="clDirOut" data-dir="out" onclick="clSetDir('out')">Outgoing</button>
               </div>
             </div>
 
@@ -1545,7 +1545,7 @@ function clClearForm(){
   if(cb) cb.checked=false;
   const w=document.getElementById('clCbWrap');
   if(w) w.classList.remove('on');
-  clSetDir('in');   // reset direction toggle + restore the callback box
+  clSetDir('out');  // reset direction toggle back to the default
   // Reset Placement-only fields
   const po=document.getElementById('clPlcOffered');
   if(po) po.checked=false;
@@ -1904,19 +1904,15 @@ async function clContactDelete(id){
   }catch(e){ console.warn('clContactDelete',e); showToast('Network error','error'); }
 }
 
-// Call direction (incoming vs outgoing). Default incoming — the callback model
-// assumes someone rang us. Outgoing calls are resolved on the spot (you made the
-// call), so the "needs a call back" option is hidden while Outgoing is selected.
-window._clDir = window._clDir || 'in';
+// Call direction (incoming vs outgoing). Defaults to outgoing. Either direction
+// can need a call back — an outgoing follow-up (e.g. no answer) waits in the
+// queue just like an inbound callback — so the checkbox shows for both.
+window._clDir = window._clDir || 'out';
 function clSetDir(d){
   window._clDir = (d === 'out') ? 'out' : 'in';
   const inB=document.getElementById('clDirIn'), outB=document.getElementById('clDirOut');
   if(inB)  inB.classList.toggle('active', window._clDir==='in');
   if(outB) outB.classList.toggle('active', window._clDir==='out');
-  // Outgoing has nothing to wait on — hide + uncheck the callback box.
-  const cbWrap=document.getElementById('clCbWrap'), cb=document.getElementById('clCallback');
-  if(cbWrap) cbWrap.style.display = (window._clDir==='out') ? 'none' : '';
-  if(cb && window._clDir==='out') cb.checked=false;
 }
 
 async function clSaveCall(){
@@ -1933,9 +1929,8 @@ async function clSaveCall(){
   if(bad){ showToast('Name and reason are required','error'); return; }
 
   const cbEl = document.getElementById('clCallback');
-  let needsCallback = !!(cbEl && cbEl.checked);
+  const needsCallback = !!(cbEl && cbEl.checked);
   const direction = (window._clDir === 'out') ? 'out' : 'in';
-  if(direction === 'out') needsCallback = false;  // outgoing = resolved on the spot
   const who = (window.me || me || 'Unknown');
 
   // The number is the key that links repeat attempts to the same caller, so a
