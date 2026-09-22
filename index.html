@@ -19706,9 +19706,12 @@ async function _computeMyStreak(){
 }
 
 // ── EARNED GLOW + AVATAR + NICKNAME ──────────────
-// GLOW: earned by EVER having a perfect fortnight (100% on-time, >= floor) —
-// permanent. Earners pick a skin (persisted); shown in directory, call log, and
-// My Profile. Not the sidebar.
+// GLOW: earned by a perfect fortnight (100% on-time, >= floor) in the MOST
+// RECENT COMPLETED fortnight — it lapses if the last finished fortnight wasn't
+// perfect (current standing, not history). The 1000-calls elite glow is a
+// separate, permanent path (see hasEarnedGlow). Earners pick a skin (persisted,
+// and kept through a lapse so it returns if they re-earn); shown in directory,
+// call log, and My Profile. Not the sidebar.
 // AVATAR: photo (drag/zoom-cropped) shown wherever a face appears.
 // NICKNAME: display-only vanity label; replaces the shown name ONLY in the
 // person's own sidebar + profile card. staff_name stays the identity key.
@@ -19723,7 +19726,7 @@ window.GLOW_SKIN_LABELS = window.GLOW_SKIN_LABELS || {
   holographic:'Holographic', emerald:'Emerald', rosegold:'Rose gold', galaxy:'Galaxy',
   darkemerald:'Dark Emerald'
 };
-window._earnedGlow = window._earnedGlow || null;  // Set<staffName> who ever went perfect
+window._earnedGlow = window._earnedGlow || null;  // Set<staffName> perfect in the last completed fortnight
 window._eliteCallers = window._eliteCallers || null;  // Set<staffName> with 1000+ calls
 window._nameSkins  = window._nameSkins  || null;  // { staffName: skin }
 window._avatars    = window._avatars    || null;  // { staffName: base64 }
@@ -19738,9 +19741,27 @@ window.loadGlowData = window.loadGlowData || async function(force){
     const callMs={};   // { staffName: highest milestone reached }
     const trainCt={};  // { staffName: distinct trainings passed }
     try{
-      // Earned = anyone with a perfect fortnight anywhere in history (permanent).
-      const rows=await sbGet('punctuality_history','?score=eq.100&x=gte.4&select=staff_name&limit=2000')||[];
-      rows.forEach(function(r){ if(r.staff_name) earned.add(r.staff_name); });
+      // Earned = perfect (score 100, >=4 shifts) in the MOST RECENT COMPLETED
+      // fortnight only, so the glow reflects current standing and lapses the
+      // moment a finished fortnight isn't perfect. The in-progress fortnight is
+      // excluded — its snapshot is written to history on board open, but a
+      // fortnight counts only once its 14-day window has ended.
+      const rows=await sbGet('punctuality_history',
+        '?select=staff_name,score,x,fort_start&order=fort_start.desc&limit=2000')||[];
+      const DAY=86400000, now=Date.now();
+      const hasEnded=function(fs){ return new Date(fs+'T00:00:00').getTime() + 14*DAY <= now; };
+      const starts=[];
+      rows.forEach(function(r){ if(r.fort_start && starts.indexOf(r.fort_start)<0) starts.push(r.fort_start); });
+      starts.sort();            // 'YYYY-MM-DD' strings sort chronologically
+      let target=null;          // most recent fortnight whose window has closed
+      for(let i=starts.length-1;i>=0;i--){ if(hasEnded(starts[i])){ target=starts[i]; break; } }
+      if(target){
+        rows.forEach(function(r){
+          if(r.fort_start===target && Number(r.score)===100 && Number(r.x)>=4 && r.staff_name){
+            earned.add(r.staff_name);
+          }
+        });
+      }
     }catch(e){}
     try{
       // Call milestones — keep highest per person; 1000 also marks elite.
