@@ -675,6 +675,20 @@ textarea.cl-edit-in{min-height:52px;resize:vertical;line-height:1.45;}
   box-shadow:inset 0 0 0 1px var(--m-border);}
 .cl-pill.back{color:#047857;background:rgba(16,185,129,.1);
   box-shadow:inset 0 0 0 1px rgba(16,185,129,.2);}
+/* Call direction — form toggle + per-row chip */
+.cl-dir{display:flex;gap:0;border-radius:999px;padding:3px;
+  background:var(--m-card-2);box-shadow:inset 0 0 0 1px var(--m-border);}
+.cl-dir-btn{flex:1;border:none;background:transparent;cursor:pointer;
+  font-family:inherit;font-size:12px;font-weight:700;color:var(--m-ink-2);
+  padding:6px 16px;border-radius:999px;transition:background .15s,color .15s;}
+.cl-dir-btn.active{color:#fff;background:var(--accent);}
+.cl-dirpill{display:inline-flex;align-items:center;gap:3px;font-size:10.5px;
+  font-weight:700;padding:2px 7px;border-radius:999px;white-space:nowrap;
+  letter-spacing:.02em;vertical-align:middle;margin-right:2px;}
+.cl-dirpill.in{color:var(--m-ink-3);background:var(--m-card-2);
+  box-shadow:inset 0 0 0 1px var(--m-border);}
+.cl-dirpill.out{color:#2563eb;background:rgba(37,99,235,.1);
+  box-shadow:inset 0 0 0 1px rgba(37,99,235,.22);}
 .cl-pip{width:5px;height:5px;border-radius:50%;background:currentColor;
   flex-shrink:0;animation:clPulse 2.4s ease-in-out infinite;}
 @keyframes clPulse{0%,100%{opacity:1;}50%{opacity:.35;}}
@@ -1026,6 +1040,13 @@ textarea.cl-edit-in{min-height:52px;resize:vertical;line-height:1.45;}
             <div class="cl-form-hd">
               <h3 class="cl-form-title">New call</h3>
               <span class="cl-keyhint"><kbd>⌥</kbd><kbd>S</kbd></span>
+            </div>
+
+            <div class="cl-field">
+              <div class="cl-dir" id="clDir" role="group" aria-label="Call direction">
+                <button type="button" class="cl-dir-btn active" id="clDirIn" data-dir="in" onclick="clSetDir('in')">Incoming</button>
+                <button type="button" class="cl-dir-btn" id="clDirOut" data-dir="out" onclick="clSetDir('out')">Outgoing</button>
+              </div>
             </div>
 
             <div class="cl-field">
@@ -1524,6 +1545,7 @@ function clClearForm(){
   if(cb) cb.checked=false;
   const w=document.getElementById('clCbWrap');
   if(w) w.classList.remove('on');
+  clSetDir('in');   // reset direction toggle + restore the callback box
   // Reset Placement-only fields
   const po=document.getElementById('clPlcOffered');
   if(po) po.checked=false;
@@ -1619,7 +1641,7 @@ function clContactSuggest(q){
     hits.forEach(function(c){
       const ph=clFmtPhone(c.phone_primary)||c.phone_primary||'no number';
       const hue=clHue(c.name);
-      html+='<button type="button" class="cl-sugg-item" onclick="clPickContact(\''+c.id+'\')">'+
+      html+='<button type="button" class="cl-sugg-item" onmousedown="event.preventDefault();clPickContact(\''+c.id+'\')" onclick="clPickContact(\''+c.id+'\')">'+
         '<span class="cl-sugg-ava" style="--h:'+hue+';">'+clEsc(clInitials(c.name))+'</span>'+
         '<span class="cl-sugg-txt">'+
           '<span class="cl-sugg-nm">'+clEsc(c.name)+(c.type?'<span class="cl-sugg-type">'+clEsc(c.type)+'</span>':'')+'</span>'+
@@ -1636,7 +1658,7 @@ function clContactSuggest(q){
     const _label = exact
       ? 'Add another “'+clEsc((q||'').trim())+'” (different person)'
       : 'Add “'+clEsc((q||'').trim())+'” as a new contact';
-    html+='<button type="button" class="cl-sugg-item cl-sugg-new" onclick="clCreateContactInline()">'+
+    html+='<button type="button" class="cl-sugg-item cl-sugg-new" onmousedown="event.preventDefault();clCreateContactInline()" onclick="clCreateContactInline()">'+
       '<span class="cl-sugg-new-ic" aria-hidden="true"><svg width="15" height="15" viewBox="0 0 20 20" fill="currentColor"><path d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z"/></svg></span>'+
       '<span class="cl-sugg-txt"><span class="cl-sugg-nm">'+_label+'</span></span>'+
       '</button>';
@@ -1882,6 +1904,21 @@ async function clContactDelete(id){
   }catch(e){ console.warn('clContactDelete',e); showToast('Network error','error'); }
 }
 
+// Call direction (incoming vs outgoing). Default incoming — the callback model
+// assumes someone rang us. Outgoing calls are resolved on the spot (you made the
+// call), so the "needs a call back" option is hidden while Outgoing is selected.
+window._clDir = window._clDir || 'in';
+function clSetDir(d){
+  window._clDir = (d === 'out') ? 'out' : 'in';
+  const inB=document.getElementById('clDirIn'), outB=document.getElementById('clDirOut');
+  if(inB)  inB.classList.toggle('active', window._clDir==='in');
+  if(outB) outB.classList.toggle('active', window._clDir==='out');
+  // Outgoing has nothing to wait on — hide + uncheck the callback box.
+  const cbWrap=document.getElementById('clCbWrap'), cb=document.getElementById('clCallback');
+  if(cbWrap) cbWrap.style.display = (window._clDir==='out') ? 'none' : '';
+  if(cb && window._clDir==='out') cb.checked=false;
+}
+
 async function clSaveCall(){
   const nameEl=document.getElementById('clName');
   const reasonEl=document.getElementById('clReason');
@@ -1896,7 +1933,9 @@ async function clSaveCall(){
   if(bad){ showToast('Name and reason are required','error'); return; }
 
   const cbEl = document.getElementById('clCallback');
-  const needsCallback = !!(cbEl && cbEl.checked);
+  let needsCallback = !!(cbEl && cbEl.checked);
+  const direction = (window._clDir === 'out') ? 'out' : 'in';
+  if(direction === 'out') needsCallback = false;  // outgoing = resolved on the spot
   const who = (window.me || me || 'Unknown');
 
   // The number is the key that links repeat attempts to the same caller, so a
@@ -1995,6 +2034,7 @@ async function clSaveCall(){
       caller_name: name,
       phone_e164: phone,
       reason: reason,
+      direction: direction,
       note: note || null,
       logged_by: who,
       team: (typeof myTeam !== 'undefined' && myTeam) ? myTeam : null,
@@ -2669,6 +2709,7 @@ async function clMarkCalledBack(id){
         caller_name: r.caller_name,
         phone_e164:  r.phone_e164 || null,
         reason:      'Callback',
+        direction:   'out',
         note:        (note||'').trim() || null,
         logged_by:   who,
         team:        r.for_team || r.team || ((typeof myTeam!=='undefined'&&myTeam)?myTeam:null),
@@ -2871,6 +2912,9 @@ function clRenderQueue(){
       ? '<span class="cl-pill wait"><span class="cl-pip"></span>Waiting</span>'
       : onCall ? '<span class="cl-pill ok">Handled</span>'
                : '<span class="cl-pill back">Called back</span>';
+    const _dir = (r.direction==='out') ? 'out' : 'in';
+    const dirPill = '<span class="cl-dirpill '+_dir+'" title="'+(_dir==='out'?'Outgoing call':'Incoming call')+'">'+
+      (_dir==='out'?'\u2197 Out':'\u2199 In')+'</span>';
 
     // Direct buttons, not a ⋯ menu. Both are conditional anyway, so the
     // menu only ever held one or two items and appeared or vanished per
@@ -2926,6 +2970,7 @@ function clRenderQueue(){
             (handoff?'<span class="cl-team-x">'+clEsc(r.team)+' \u2192 '+clEsc(r.for_team)+'</span>':'')+
           '</div>'+
           '<div class="cl-line2">'+
+            dirPill+
             (pretty?'<button class="cl-num" onclick="event.stopPropagation();clCopy(this,\''+clEsc(r.phone_e164)+'\')" title="Copy">'+
               clEsc(pretty)+'</button>':'<span class="cl-dash">no number</span>')+
             '<span class="cl-tag">'+clEsc(r.reason)+'</span>'+
