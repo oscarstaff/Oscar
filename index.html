@@ -6967,8 +6967,8 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
             </div>
             <svg class="hub-card-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7"/><polyline points="7 7 17 7 17 17"/></svg>
           </a>
-          <!-- Arena Doubles — VGC team/battle tool, everyone has access -->
-          <a class="hub-card" href="https://oscarstaff.github.io/Oscar/vgc.html" target="_blank" rel="noopener noreferrer">
+          <!-- Arena Doubles — VGC battle tool (access-gated) -->
+          <a class="hub-card" id="hubcard-vgc" style="display:none;cursor:pointer;" onclick="openGatedApp(event,'vgc','https://oscarstaff.github.io/Oscar/vgc.html')">
             <div class="hub-card-icon hub-icon-vgc">
               <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="3" y1="12" x2="21" y2="12"/><circle cx="12" cy="12" r="3" fill="currentColor" stroke="none"/></svg>
             </div>
@@ -10255,12 +10255,12 @@ async function loadHubAccess(){
   // whole hub down with it.
   try{
     const rows=await sbGet('app_access','?select=app,staff_name');
-    const _c={formcraft:[],slip:[],dialtrac:[],borekade:[],shiftops:[]};
+    const _c={formcraft:[],slip:[],dialtrac:[],borekade:[],shiftops:[],vgc:[]};
     (rows||[]).forEach(r=>{ if(_c[r.app]) _c[r.app].push(r.staff_name); });
     window._accessCache=_c;
   }catch(e){ console.warn('loadHubAccess',e); }
   // Show/hide cards for current user
-  const _ac = window._accessCache || { formcraft:[], slip:[], dialtrac:[], borekade:[], shiftops:[] };
+  const _ac = window._accessCache || { formcraft:[], slip:[], dialtrac:[], borekade:[], shiftops:[], vgc:[] };
   const fc=document.getElementById('hubcard-formcraft');
   const sl=document.getElementById('hubcard-slip');
   if(fc) fc.style.display=(_ac.formcraft||[]).includes(me)?'':'none';
@@ -10269,6 +10269,8 @@ async function loadHubAccess(){
   if(so) so.style.display=(_ac.shiftops||[]).includes(me)?'':'none';
   const bk=document.getElementById('hubcard-borekade');
   if(bk) bk.style.display=(_ac.borekade||[]).includes(me)?'':'none';
+  const vg=document.getElementById('hubcard-vgc');
+  if(vg) vg.style.display=(_ac.vgc||[]).includes(me)?'':'none';
   // Call Log gate is its own function so it can run at login without
   // waiting for the user to open Nodes.
   gateCallLog();
