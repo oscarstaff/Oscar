@@ -1,7 +1,59 @@
+<!doctype html>
+<html lang="en">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta charset="utf-8">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Rubik:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <title>Arena Doubles</title>
+<div id="__gate" style="position:fixed;inset:0;z-index:99999;background:linear-gradient(135deg,#0f1117,#1a1d27);display:flex;align-items:center;justify-content:center;font-family:system-ui,sans-serif;">
+  <div style="background:#1e2230;border:1px solid #2e3344;border-radius:18px;padding:40px 36px;width:min(380px,90vw);text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.5);">
+    <div id="__gateLock" style="font-size:42px;margin-bottom:14px;cursor:default;user-select:none;">🔒</div>
+    <div style="font-size:20px;font-weight:700;color:#fff;margin-bottom:8px;">Arena Doubles</div>
+    <div id="__gateMsg" style="font-size:13.5px;color:#8b94a8;line-height:1.5;">Checking access…</div>
+  </div>
+</div>
+<script>
+(function(){
+  var APP='vgc';
+  var SECRET='oscars_nexus_gate_v1_8f3a2c91';
+  var SB='https://jcfgldqrdbfkgbixszds.supabase.co';
+  var KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpjZmdsZHFyZGJma2diaXhzemRzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1Nzc3NzEsImV4cCI6MjA5MDE1Mzc3MX0.Wj8cCpnlsoZOPj5sKWeEdfvgjG4Nc-UuTTYgbcrPfeI';
+  window.NEXUS_SB=SB; window.NEXUS_KEY=KEY;
+  function fail(m){var el=document.getElementById('__gateMsg');if(el){el.innerHTML=m+'<br><br><span style=\"color:#6b7585;font-size:12px;\">Open this app from the Nodes page in Nexus.</span>';}}
+  function pass(){var g=document.getElementById('__gate');if(g)g.remove();}
+  async function hmacHex(secret,msg){var enc=new TextEncoder();var k=await crypto.subtle.importKey('raw',enc.encode(secret),{name:'HMAC',hash:'SHA-256'},false,['verify','sign']);var s=await crypto.subtle.sign('HMAC',k,enc.encode(msg));return Array.from(new Uint8Array(s)).map(x=>x.toString(16).padStart(2,'0')).join('');}
+  if(sessionStorage.getItem('ngate_'+APP)==='1'){ window.NEXUS_USER=window.NEXUS_USER||sessionStorage.getItem('ngate_user_'+APP)||''; if(window.NEXUS_ADMIN!==true){window.NEXUS_ADMIN=sessionStorage.getItem('ngate_admin_'+APP)==='1';} pass();return;}
+  (async function(){
+    try{
+      var hash=location.hash||'';
+      if(/[#&?]debug=1/.test(hash)||/[#&?]debug=1/.test(location.search)){window.FC_DEBUG=true;}
+      var m=hash.match(/t=([^&]+)/);
+      if(!m){fail('No access token.');return;}
+      var token=decodeURIComponent(m[1]);
+      var parts=token.split('.');
+      if(parts.length!==2){fail('Invalid token.');return;}
+      var b64=parts[0], sig=parts[1];
+      var want=await hmacHex(SECRET,b64);
+      if(want!==sig){fail('Token signature invalid.');return;}
+      var payload=JSON.parse(decodeURIComponent(escape(atob(b64))));
+      if(payload.app!==APP){fail('Token is for a different app.');return;}
+      if(Date.now()>payload.exp){fail('Token expired — relaunch from Nexus.');return;}
+      var name=payload.name||'';
+      window.NEXUS_USER=name;
+      window.NEXUS_ADMIN=(payload.is_admin===true);
+      var r=await fetch(SB+'/rest/v1/app_access?app=eq.'+APP+'&staff_name=eq.'+encodeURIComponent(name)+'&select=staff_name',{headers:{apikey:KEY,Authorization:'Bearer '+KEY}});
+      var rows=r.ok?await r.json():[];
+      if(!rows.length){fail('You no longer have access to this app.');return;}
+      sessionStorage.setItem('ngate_'+APP,'1');
+      try{sessionStorage.setItem('ngate_user_'+APP,name);}catch(e){}
+      try{sessionStorage.setItem('ngate_admin_'+APP,(payload.is_admin===true)?'1':'0');}catch(e){}
+      try{history.replaceState(null,'',location.pathname+location.search);}catch(e){}
+      pass();
+    }catch(e){ fail('Access check failed.'); console.warn('gate',e); }
+  })();
+})();
+</script>
 <style>
 :root{
   --bg0:#080A10; --bg1:#0D131E; --bg2:#111927;
@@ -129,16 +181,16 @@ h1,h2,h3,h4{margin:0;font-family:var(--dispf);font-weight:700;letter-spacing:.01
 
 /* ---------- ev mini bars ---------- */
 .evmini{display:grid;grid-template-columns:repeat(6,1fr);gap:4px;margin-top:9px}
-.evmini .b{height:26px;background:var(--panel2);border-radius:5px;position:relative;overflow:hidden;border:1px solid var(--line)}
-.evmini .b i{position:absolute;left:0;right:0;bottom:0;background:linear-gradient(180deg,var(--cyan),var(--cyan-deep));display:block}
-.evmini .b span{position:absolute;left:0;right:0;bottom:2px;text-align:center;font-family:var(--monof);font-size:8px;color:var(--txt);font-weight:700}
-.evmini .b em{position:absolute;left:0;right:0;top:2px;text-align:center;font-family:var(--monof);font-size:7.5px;color:var(--txt-mute);font-style:normal}
+.evmini .b{height:34px;background:var(--panel2);border-radius:5px;position:relative;overflow:hidden;border:1px solid var(--line)}
+.evmini .b i{position:absolute;left:0;right:0;bottom:0;background:linear-gradient(180deg,rgba(47,227,196,.55),rgba(20,140,120,.55));display:block}
+.evmini .b span{position:absolute;left:0;right:0;bottom:3px;text-align:center;font-family:var(--monof);font-size:11px;color:#fff;font-weight:800;text-shadow:0 1px 2px rgba(0,0,0,.7)}
+.evmini .b em{position:absolute;left:0;right:0;top:3px;text-align:center;font-family:var(--monof);font-size:9.5px;color:#e6edf5;font-style:normal;font-weight:700;text-shadow:0 1px 2px rgba(0,0,0,.7)}
 
 /* ---------- modal ---------- */
 .mbg{position:fixed;inset:0;background:rgba(4,7,12,.8);backdrop-filter:blur(7px);display:flex;align-items:center;justify-content:center;z-index:200;padding:16px}
 .modal{width:min(880px,100%);max-height:92vh;overflow-y:auto;background:var(--panel);border:1px solid var(--line2);
   border-radius:18px;padding:24px;box-shadow:var(--shadow)}
-.modal.wide{width:min(960px,100%)}
+.modal.wide{width:min(1180px,100%)}
 .modal h3{font-size:24px}
 .modal .msub{color:var(--txt-dim);font-size:14px;line-height:1.5;margin:4px 0 16px}
 .field{margin-bottom:14px}
@@ -417,10 +469,18 @@ h1,h2,h3,h4{margin:0;font-family:var(--dispf);font-weight:700;letter-spacing:.01
 /* ===================== POKÉMON SHOWDOWN-STYLE BATTLE ===================== */
 .sd-stage{position:relative;padding:16px 14px 20px;min-height:340px;overflow:hidden;
   background:linear-gradient(180deg,#7fbfe6 0%,#a4d4ea 30%,#cbe6b4 44%,#93cf7f 58%,#74b866 100%)}
-.bg-scene{position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-events:none}
+.bg-scene{position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-events:none;transition:filter .8s ease}
+.bg-sun{transition:opacity .8s ease}
+.sd-stage[data-wx="rain"] .bg-scene{filter:brightness(.62) saturate(.7) hue-rotate(-12deg)}
+.sd-stage[data-wx="rain"] .bg-sun,.sd-stage[data-wx="sand"] .bg-sun,.sd-stage[data-wx="snow"] .bg-sun{opacity:0}
+.sd-stage[data-wx="sand"] .bg-scene{filter:sepia(.55) saturate(1.25) brightness(.9) hue-rotate(-8deg)}
+.sd-stage[data-wx="snow"] .bg-scene{filter:saturate(.35) brightness(1.08) hue-rotate(160deg)}
+.sd-stage[data-wx="sun"] .bg-scene{filter:saturate(1.25) brightness(1.07)}
+.sd-stage[data-tr="1"]::after{content:'';position:absolute;inset:0;z-index:1;pointer-events:none;background-image:linear-gradient(rgba(170,110,255,.16) 1px,transparent 1px),linear-gradient(90deg,rgba(170,110,255,.16) 1px,transparent 1px);background-size:34px 34px;box-shadow:inset 0 0 70px rgba(140,70,255,.35);animation:trpulse 3.2s ease-in-out infinite}
+@keyframes trpulse{0%,100%{opacity:.75}50%{opacity:1}}
 .sd-stage::before{content:'';position:absolute;left:-10%;right:-10%;top:40%;height:60%;background:radial-gradient(ellipse at 50% 0,rgba(255,255,255,.22),transparent 60%);pointer-events:none;z-index:1}
 .sd-stage.targeting .sd-side.allies{filter:brightness(.85)}
-.sd-side{display:grid;grid-template-columns:1fr 1fr;position:relative;z-index:2;gap:2%}
+.sd-side{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);position:relative;z-index:2;gap:2%}
 .sd-side.foes{padding:0 6% 0 14%}
 .sd-side.allies{padding:6px 14% 0 4%}
 .sd-side.foes .sd-mon:nth-child(2){transform:translateY(-16px)}
@@ -433,20 +493,20 @@ h1,h2,h3,h4{margin:0;font-family:var(--dispf);font-weight:700;letter-spacing:.01
 @keyframes reticle{0%,100%{opacity:.55}50%{opacity:1}}
 .sd-mon.acting .sd-spr{filter:drop-shadow(0 0 7px var(--cyan)) drop-shadow(0 5px 5px rgba(0,0,0,.4))}
 
-.statbar{width:min(215px,94%);background:rgba(248,250,252,.94);border:1px solid rgba(0,0,0,.28);border-radius:9px;
+.statbar{width:min(250px,96%);min-width:0;box-sizing:border-box;background:rgba(248,250,252,.94);border:1px solid rgba(0,0,0,.28);border-radius:9px;
   padding:4px 9px 5px;box-shadow:0 3px 7px rgba(0,0,0,.3);color:#151c28;margin-bottom:5px;z-index:3}
 .statbar .sb-top{display:flex;align-items:center;gap:5px}
-.sb-name{font-family:var(--dispf);font-weight:700;font-size:13.5px;color:#0e1420;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.sb-lv{margin-left:auto;font-family:var(--monof);font-size:10px;color:#5a6472;font-weight:700}
+.sb-name{font-family:var(--dispf);font-weight:700;font-size:15px;color:#0e1420;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sb-lv{margin-left:auto;font-family:var(--monof);font-size:11px;color:#5a6472;font-weight:700}
 .sb-tera{color:var(--tera);font-size:12px}
-.sb-track{height:7px;background:#2f3540;border-radius:4px;overflow:hidden;margin:3px 0}
+.sb-track{height:9px;background:#2f3540;border-radius:4px;overflow:hidden;margin:3px 0}
 .sb-fill{display:block;height:100%;border-radius:4px;transition:width 1.15s cubic-bezier(.35,0,.2,1),background-color .3s}
 .sb-bot{display:flex;align-items:center;justify-content:space-between;gap:6px}
-.sb-num{font-family:var(--monof);font-size:10px;font-weight:700;color:#2a3140}
+.sb-num{font-family:var(--monof);font-size:12.5px;font-weight:700;color:#2a3140}
 .sb-badges{display:flex;gap:3px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
-.sb-type{font-size:8px;font-weight:800;color:#fff;padding:1px 4px;border-radius:3px;letter-spacing:.02em}
-.sb-st{font-family:var(--monof);font-size:8.5px;font-weight:700;padding:1px 4px;border-radius:3px}
-.sb-stg{font-family:var(--monof);font-size:8px;font-weight:700;padding:1px 3px;border-radius:3px}
+.sb-type{font-size:10px;font-weight:800;color:#fff;padding:1px 5px;border-radius:3px;letter-spacing:.02em}
+.sb-st{font-family:var(--monof);font-size:10.5px;font-weight:700;padding:1px 4px;border-radius:3px}
+.sb-stg{font-family:var(--monof);font-size:10.5px;font-weight:700;padding:1px 4px;border-radius:3px}
 .sb-stg.up{background:#8ee6a0;color:#123}.sb-stg.dn{background:#f2a6a0;color:#311}
 
 .sd-slot{position:relative;display:flex;align-items:flex-end;justify-content:center;height:122px;width:100%}
@@ -500,6 +560,7 @@ h1,h2,h3,h4{margin:0;font-family:var(--dispf);font-weight:700;letter-spacing:.01
 .sd-ex:disabled{opacity:.4}
 .sd-targets{display:flex;gap:10px;flex-wrap:wrap}
 .sd-tgt{display:flex;flex-direction:column;align-items:center;gap:4px;padding:9px 16px;border-radius:12px;background:var(--panel);border:1px solid var(--gold);color:var(--txt);font-weight:700;font-size:12.5px}
+.sd-tgt.ally{border-color:var(--cyan);background:rgba(47,227,196,.08)}
 .sd-tgt img{width:54px;height:54px;image-rendering:pixelated}
 .sd-tgt:hover{background:rgba(255,200,71,.12);transform:translateY(-2px)}
 .sd-back{margin-top:10px;color:var(--txt-dim);font-weight:700;text-decoration:underline;font-size:13px}
@@ -533,7 +594,8 @@ h1,h2,h3,h4{margin:0;font-family:var(--dispf);font-weight:700;letter-spacing:.01
 .turn-banner{position:absolute;left:50%;top:12px;transform:translateX(-50%);font-family:var(--dispf);font-weight:700;letter-spacing:.08em;font-size:15px;color:var(--gold);background:rgba(10,14,22,.82);border:1px solid rgba(255,200,71,.5);border-radius:999px;padding:6px 18px;z-index:55;pointer-events:none;animation:tban 1.4s ease forwards;text-transform:uppercase}
 @keyframes tban{0%{opacity:0;transform:translateX(-50%) translateY(-8px)}15%{opacity:1;transform:translateX(-50%) translateY(0)}80%{opacity:1}100%{opacity:0;transform:translateX(-50%) translateY(-6px)}}
 .wx{position:absolute;inset:0;z-index:1;pointer-events:none;overflow:hidden}
-.wx.w-rain::before{content:'';position:absolute;inset:-30%;background-image:repeating-linear-gradient(108deg,rgba(190,215,255,.45) 0 1px,transparent 1px 10px);animation:wxfall .45s linear infinite;opacity:.55}
+.wx.w-rain{background:rgba(20,40,80,.16)}
+.wx.w-rain::before{content:'';position:absolute;inset:-30%;background-image:repeating-linear-gradient(108deg,rgba(210,228,255,.7) 0 1.5px,transparent 1.5px 11px);animation:wxfall .45s linear infinite;opacity:.55}
 .wx.w-sand{background:rgba(200,168,104,.2)}
 .wx.w-sand::before{content:'';position:absolute;inset:-30%;background-image:repeating-linear-gradient(100deg,rgba(214,182,120,.3) 0 2px,transparent 2px 11px);animation:wxfall .7s linear infinite}
 .wx.w-sun{background:radial-gradient(circle at 72% 6%,rgba(255,224,130,.4),transparent 55%)}
@@ -558,12 +620,12 @@ h1,h2,h3,h4{margin:0;font-family:var(--dispf);font-weight:700;letter-spacing:.01
 .tera-gem.on{opacity:1;font-size:13px;animation:gemPulse 1.4s infinite;text-shadow:0 0 8px var(--tg),0 0 16px var(--tg)}
 @keyframes gemPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.22)}}
 .statbar.tera-on{box-shadow:0 3px 7px rgba(0,0,0,.3),0 0 0 2px var(--tg),0 0 14px -2px var(--tg)}
-.sb-spe{font-family:var(--monof);font-size:8.5px;font-weight:700;padding:1px 4px;border-radius:3px;background:#dfe6ef;color:#2a3140}
+.sb-spe{font-family:var(--monof);font-size:10.5px;font-weight:700;padding:1px 4px;border-radius:3px;background:#dfe6ef;color:#2a3140}
 .sb-spe.fast{background:#4ec36a;color:#06240f}
 .sb-spe.mid{background:#f0c040;color:#3a2c00}
 .sb-spe.slow{background:#e97b7b;color:#3a0d0d}
 .sb-item-row{margin-top:3px;text-align:right;line-height:1}
-.sb-item{font-family:var(--monof);font-size:9.5px;font-weight:700;color:#3a4350;background:#eef2f7;border:1px solid #d7dee7;border-radius:4px;padding:1px 6px}
+.sb-item{display:inline-block;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;vertical-align:bottom;font-family:var(--monof);font-size:11px;font-weight:700;color:#3a4350;background:#eef2f7;border:1px solid #d7dee7;border-radius:4px;padding:1px 6px}
 .party{display:flex;gap:5px;position:relative;z-index:3;padding:0 6px}
 .party.foe{justify-content:flex-end;margin-bottom:3px}
 .party.ally{justify-content:flex-start;margin-top:5px}
@@ -630,7 +692,7 @@ h1,h2,h3,h4{margin:0;font-family:var(--dispf);font-weight:700;letter-spacing:.01
 /* ===== scouting report, target damage, move info ===== */
 .sd-mon.scoutable{cursor:help}
 .sd-mon.scoutable:hover .statbar{box-shadow:0 3px 7px rgba(0,0,0,.3),0 0 0 2px var(--blue)}
-.sb-prot{font-size:9px;padding:1px 3px;border-radius:3px;background:#cfe0f5;color:#1d3c63}
+.sb-prot{font-size:11px;padding:1px 3px;border-radius:3px;background:#cfe0f5;color:#1d3c63}
 .sc-top{display:flex;align-items:center;gap:14px;margin-bottom:14px}
 .sc-spr{width:76px;height:76px;image-rendering:pixelated;filter:drop-shadow(0 4px 5px rgba(0,0,0,.4))}
 .sc-facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:9px;margin-bottom:10px}
@@ -671,6 +733,55 @@ h1,h2,h3,h4{margin:0;font-family:var(--dispf);font-weight:700;letter-spacing:.01
   .who{flex-direction:column}
   .roster{grid-template-columns:1fr}
 }
+
+/* team preview v2 */
+.pick-grid.pv-grid{grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+.pick.pv2{display:flex;flex-direction:column;align-items:stretch;text-align:left;gap:10px;padding:14px}
+.pv-head{display:flex;align-items:center;gap:12px}
+.pv-head img{width:76px;height:76px;flex:none}
+.pv-id{display:flex;flex-direction:column;gap:5px;min-width:0}
+.pv-nm{font-family:var(--dispf);font-size:17px;font-weight:800;color:var(--txt);line-height:1.1}
+.pv-types{display:flex;gap:4px;flex-wrap:wrap}
+.pv-ty{font-size:10.5px;font-weight:800;color:#fff;padding:2px 7px;border-radius:4px;text-transform:uppercase;letter-spacing:.03em}
+.pv-spe{font-family:var(--monof);font-size:11.5px;color:var(--txt-dim);font-weight:700}
+.pv-rows{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;font-size:12.5px;align-items:center}
+.pv-rows b{font-family:var(--monof);font-size:10.5px;color:var(--txt-mute);text-transform:uppercase;letter-spacing:.06em;font-weight:700}
+.pv-rows span{color:var(--txt);font-weight:700}
+.pv-rows .pv-item{color:var(--gold)}
+.pv-tera{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:800;color:#fff;padding:2px 9px;border-radius:999px;text-transform:uppercase;letter-spacing:.04em;width:max-content}
+.pick.pv2 .bp-moves{margin-top:0}
+.pick.pv2 .bp-mv{font-size:12px;padding:6px 8px;background:var(--panel)}
+.pick.pv2 .ob{top:10px;right:10px;left:auto}
+.pv-count{font-family:var(--monof);font-size:13px;color:var(--txt-dim);font-weight:700}
+.pv-count.full{color:var(--cyan)}
+.pick.pv2 span{margin-top:0}
+.pick.pv2 .pv-nm{display:block;font-size:18px;font-weight:800}
+.pick.pv2 .pv-types{display:flex;flex-direction:row;gap:5px}
+.pick.pv2 .pv-types .pv-ty{display:inline-block;font-size:10.5px}
+.pick.pv2 .pv-spe{display:block;font-size:11.5px;font-weight:700}
+.pick.pv2 .pv-rows span{display:inline;font-size:13px}
+.pick.pv2 .pv-rows .pv-tera{display:inline-flex;font-size:11px}
+.pick.pv2 .bp-moves{display:grid}
+.pick.pv2 .bp-mv{display:block;font-size:12px}
+.pick.pv2 .ob{display:inline-block}
+@media (max-width:520px){.sd-side.foes{margin-top:26px}.top-actions{gap:6px;flex-wrap:wrap}.top-actions .tbtn{padding:7px 10px;font-size:12px}.pick-grid.pv-grid{grid-template-columns:1fr}.sb-lv{display:none}.statbar{width:98%}.sb-name{font-size:13.5px}}
+.sb-item.rev{background:#fff4e0;border-color:#f0c98a;color:#6a4300}
+.sc-rev{margin-top:12px;padding:12px 14px;border-radius:12px;background:var(--panel2);border:1px solid var(--line)}
+.sc-rev-h{font-family:var(--monof);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);font-weight:700;margin-bottom:6px}
+.sc-rev .sc-it{color:var(--gold)}
+.sc-mvs{display:flex;flex-wrap:wrap;gap:5px}
+.sc-mv{font-family:var(--monof);font-size:12px;font-weight:700;color:var(--txt);background:var(--panel);border-left:3px solid var(--mc);border-radius:4px;padding:4px 8px}
+.ov-rec{font-family:var(--monof);font-size:13px;color:var(--gold);font-weight:700;margin:4px 0 10px}
+.home-rec{display:inline-block;margin-left:10px;font-family:var(--monof);font-size:12px;font-weight:700;color:var(--gold);vertical-align:middle}
+.ov-reveal{text-align:left;margin:6px 0 14px;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:10px 14px}
+.ov-reveal summary{cursor:pointer;font-weight:700;color:var(--txt-dim)}
+.ov-rv-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:8px;margin-top:10px}
+.ov-rv{display:flex;gap:8px;align-items:flex-start;background:var(--panel);border-radius:10px;padding:8px}
+.ov-rv.benched{opacity:.55}
+.ov-rv img{width:48px;height:48px;image-rendering:pixelated}
+.ov-rv b{font-size:13px}.ov-rv em{font-size:11px;color:var(--txt-mute)}
+.ov-rv span{display:block;font-family:var(--monof);font-size:11px;color:var(--txt-dim);margin-top:2px}
+.ov-rv .ov-mv{color:var(--txt)}
 </style>
 
 <div class="app" id="app"></div>
@@ -760,7 +871,7 @@ const MOVES_DB = {
   bulletPunch:{name:'Bullet Punch',type:'steel',cat:'physical',pow:40,pr:1,contact:true,punch:true},
   machPunch:{name:'Mach Punch',type:'fighting',cat:'physical',pow:40,pr:1,contact:true,punch:true},
   jetPunch:{name:'Jet Punch',type:'water',cat:'physical',pow:60,pr:1,contact:true,punch:true},
-  suckerPunch:{name:'Sucker Punch',type:'dark',cat:'physical',pow:70,pr:1,contact:true},
+  suckerPunch:{name:'Sucker Punch',type:'dark',cat:'physical',pow:70,pr:1,contact:true,sucker:true},
   grassyGlide:{name:'Grassy Glide',type:'grass',cat:'physical',pow:55,contact:true,grassyPriority:true},
   iceShard:{name:'Ice Shard',type:'ice',cat:'physical',pow:40,pr:1},
   shadowSneak:{name:'Shadow Sneak',type:'ghost',cat:'physical',pow:40,pr:1,contact:true},
@@ -776,8 +887,8 @@ const MOVES_DB = {
   facade:{name:'Facade',type:'normal',cat:'physical',pow:70,contact:true,facade:true},
   return_:{name:'Return',type:'normal',cat:'physical',pow:102,contact:true},
   teraBlast:{name:'Tera Blast',type:'normal',cat:'special',pow:80,teraBlast:true},
-  tripleAxel:{name:'Triple Axel',type:'ice',cat:'physical',pow:20,contact:true,multi:3,acc:90},
-  populationBomb:{name:'Population Bomb',type:'normal',cat:'physical',pow:20,contact:true,multi:10,acc:90},
+  tripleAxel:{name:'Triple Axel',type:'ice',cat:'physical',pow:20,contact:true,multi:3,acc:90,perHitAcc:true,escalate:true},
+  populationBomb:{name:'Population Bomb',type:'normal',cat:'physical',pow:20,contact:true,multi:10,acc:90,perHitAcc:true},
   // --- fire ---
   flareBlitz:{name:'Flare Blitz',type:'fire',cat:'physical',pow:120,contact:true,recoil:.33,thaw:true,sec:{chance:.1,status:'BRN'}},
   firePunch:{name:'Fire Punch',type:'fire',cat:'physical',pow:75,contact:true,punch:true,sec:{chance:.1,status:'BRN'}},
@@ -894,7 +1005,7 @@ const MOVES_DB = {
   dragonPulse:{name:'Dragon Pulse',type:'dragon',cat:'special',pow:85},
   dragonClaw:{name:'Dragon Claw',type:'dragon',cat:'physical',pow:80,contact:true},
   outrage:{name:'Outrage',type:'dragon',cat:'physical',pow:120,contact:true,locking:true},
-  scaleShot:{name:'Scale Shot',type:'dragon',cat:'physical',pow:25,multi:3,selfBoost:{def:-1,spe:1}},
+  scaleShot:{name:'Scale Shot',type:'dragon',cat:'physical',pow:25,multi:3,varMulti:true,selfBoost:{def:-1,spe:1}},
   glaiveRush:{name:'Glaive Rush',type:'dragon',cat:'physical',pow:120,contact:true},
   clangingScales:{name:'Clanging Scales',type:'dragon',cat:'special',pow:110,sound:true,selfBoost:{def:-1}},
   // --- dark ---
@@ -911,7 +1022,7 @@ const MOVES_DB = {
   heavySlam:{name:'Heavy Slam',type:'steel',cat:'physical',pow:100,contact:true},
   gigatonHammer:{name:'Gigaton Hammer',type:'steel',cat:'physical',pow:160,contact:true,noConsec:true},
   ironDefense:{name:'Iron Defense',type:'steel',cat:'status',statusMove:'setup',selfBoost:{def:2}},
-  bulletSeed:{name:'Bullet Seed',type:'grass',cat:'physical',pow:25,multi:3},
+  bulletSeed:{name:'Bullet Seed',type:'grass',cat:'physical',pow:25,multi:3,varMulti:true},
   flashCannon:{name:'Flash Cannon',type:'steel',cat:'special',pow:80,sec:{chance:.1,stat:'spd',stg:-1}},
   // --- fairy ---
   moonblast:{name:'Moonblast',type:'fairy',cat:'special',pow:95,sec:{chance:.3,stat:'spa',stg:-1}},
@@ -968,9 +1079,9 @@ const MOVES_DB = {
   memento:{name:'Memento',type:'dark',cat:'status',acc:100,statusMove:'partingshot',mementoDrop:2},
   haze:{name:'Haze',type:'ice',cat:'status',statusMove:'haze'},
   substitute:{name:'Substitute',type:'normal',cat:'status',statusMove:'substitute'},
-  trick:{name:'Trick',type:'psychic',cat:'status',statusMove:'nothing'},
+  trick:{name:'Trick',type:'psychic',cat:'status',statusMove:'trick'},
   imprison:{name:'Imprison',type:'psychic',cat:'status',statusMove:'nothing'},
-  allySwitch:{name:'Ally Switch',type:'psychic',cat:'status',pr:2,statusMove:'nothing'}
+  allySwitch:{name:'Ally Switch',type:'psychic',cat:'status',pr:2,statusMove:'allyswitch'}
 };
 
 /* ---- move fetch/cache for anything not curated ---- */
@@ -1320,7 +1431,7 @@ function resetMon(m){
   m.protect=false; m.protectStreak=0; m.flinched=false; m.taunt=0; m.encore=0;
   m.isTera=false; m.turnsActive=0; m.helpingHand=false; m.choiceLock=null; m.usedItem=false; m.lastMoveId=null;
   m.types=[...m.origTypes];
-  m._proteanUsed=false; m._disguiseBusted=false;
+  m._proteanUsed=false; m._disguiseBusted=false; m._charging=null; m._rev=null; m._kos=0;
   // revert Palafin to Zero form for a fresh battle
   if(m._heroed){ m._heroed=false; m.base=POKEDEX[m.key].base; m.stats=computeStats(m.base,m.evs,m.ivs,m.nature); m.maxHp=m.stats.hp; m.hp=m.maxHp; m.name=POKEDEX[m.key].name; }
   m.moves.forEach(x=>x.pp=x.maxPp);
@@ -1332,6 +1443,7 @@ function resetMon(m){
 function sideOf(m){ return playerTeam.includes(m) ? 'p' : 'a'; }
 function oppSide(s){ return s==='p'?'a':'p'; }
 function activeMons(side){ const T=side==='p'?playerTeam:aiTeam, A=side==='p'?pActive:aActive; return A.map(i=>T[i]).filter(Boolean); }
+function curWeather(){ return allActive().some(m=>m&&m.hp>0&&(m.ability==='Air Lock'||m.ability==='Cloud Nine')) ? 'clear' : weather; }
 function allActive(){ return [...activeMons('p'), ...activeMons('a')]; }
 function ally(m){ const s=sideOf(m); return activeMons(s).find(x=>x!==m); }
 function hasAllyAbility(m, ab){ const a=ally(m); return a && a.hp>0 && a.ability===ab; }
@@ -1352,10 +1464,10 @@ function getStat(u, k){
   if((k==='def'||k==='spd') && u.item==='Eviolite') v=Math.floor(v*1.5);
   if(k==='atk' && (u.ability==='Huge Power'||u.ability==='Pure Power')) v*=2;
   if(k==='atk' && u.ability==='Guts' && u.status) v=Math.floor(v*1.5);
-  if(k==='atk' && u.ability==='Orichalcum Pulse' && weather==='sun') v=Math.floor(v*1.3333);
+  if(k==='atk' && u.ability==='Orichalcum Pulse' && curWeather()==='sun') v=Math.floor(v*1.3333);
   if(k==='spa' && u.ability==='Hadron Engine' && terrain==='electric') v=Math.floor(v*1.3333);
-  if(k==='spa' && u.ability==='Solar Power' && weather==='sun') v=Math.floor(v*1.5);
-  if((u.ability==='Protosynthesis' && (weather==='sun'||u.item==='Booster Energy')) ||
+  if(k==='spa' && u.ability==='Solar Power' && curWeather()==='sun') v=Math.floor(v*1.5);
+  if((u.ability==='Protosynthesis' && (curWeather()==='sun'||u.item==='Booster Energy')) ||
      (u.ability==='Quark Drive' && (terrain==='electric'||u.item==='Booster Energy'))){
     if(k===u.boostStat) v=Math.floor(v*(k==='spe'?1.5:1.3));
   }
@@ -1364,10 +1476,10 @@ function getStat(u, k){
   if(k==='spa' && ruinActive('Vessel of Ruin',u)) v=Math.floor(v*0.75);
   if(k==='spd' && ruinActive('Beads of Ruin',u)) v=Math.floor(v*0.75);
   if(k==='spe'){
-    if(u.ability==='Chlorophyll'&&weather==='sun')v*=2;
-    if(u.ability==='Swift Swim'&&weather==='rain')v*=2;
-    if(u.ability==='Sand Rush'&&weather==='sand')v*=2;
-    if(u.ability==='Slush Rush'&&weather==='snow')v*=2;
+    if(u.ability==='Chlorophyll'&&curWeather()==='sun')v*=2;
+    if(u.ability==='Swift Swim'&&curWeather()==='rain')v*=2;
+    if(u.ability==='Sand Rush'&&curWeather()==='sand')v*=2;
+    if(u.ability==='Slush Rush'&&curWeather()==='snow')v*=2;
   }
   return v;
 }
@@ -1385,10 +1497,13 @@ function statIgnoringStage(m, k){
 /* ============================================================
    TYPE EFFECTIVENESS + DAMAGE
    ============================================================ */
+// items that can't be knocked off / tricked away (form-defining)
+function canLoseItem(m){ return !!(m && m.item && m.item!=='No Item' && !m.usedItem && !/Mask|Rusted/.test(m.item)); }
 // -ate abilities & Liquid Voice: change a move's type before damage/effectiveness are figured
 function effectiveMoveType(move, attacker){
   const ab=attacker.ability;
   // Ivy Cudgel takes its type from Ogerpon's held mask
+  if(move.teraBlast && attacker.isTera) return attacker.teraType;
   if(move.maskMove){ return {'Wellspring Mask':'water','Hearthflame Mask':'fire','Cornerstone Mask':'rock','Teal Mask':'grass'}[attacker.item] || 'grass'; }
   if(ab==='Liquid Voice' && move.sound) return 'water';
   if(move.type==='normal'){
@@ -1422,8 +1537,15 @@ function damageRoll(attacker, defender, move, o){
   const _ateBoost=ateBoosted(move,attacker);
   const _et=effectiveMoveType(move,attacker);
   if(_et!==move.type) move={...move,type:_et};
+  // Tera Blast becomes physical when the user's Attack is higher
+  if(move.teraBlast && attacker.isTera && getStat(attacker,'atk')>getStat(attacker,'spa')) move={...move,cat:'physical'};
   let power=move.pow;
   if(_ateBoost) power=Math.floor(power*1.2);
+  if(move.escalate) power=move.pow*((o.hitIndex||0)+1);                       // Triple Axel 20/40/60
+  if(move.storedPower){ let b=0; for(const k in attacker.stages){ if(attacker.stages[k]>0) b+=attacker.stages[k]; } power=20+20*b; }
+  if(move.facade && attacker.status && attacker.status!=='SLP') power*=2;       // Facade 140 when statused
+  if(move.knock && canLoseItem(defender)) power=Math.floor(power*1.5);          // Knock Off 97.5 vs a removable item
+  if(attacker.flashFire && move.type==='fire') power=Math.floor(power*1.5);
   if(move.hpScaled) power=Math.max(1,Math.floor(power*attacker.hp/attacker.maxHp));
   if(move.acrobatics && (attacker.item==='No Item'||attacker.usedItem)) power*=2;
   if(attacker.ability==='Technician' && power<=60) power=Math.floor(power*1.5);
@@ -1450,18 +1572,19 @@ function damageRoll(attacker, defender, move, o){
   let base=Math.floor(Math.floor(Math.floor((2*LEVEL/5+2)*power*A/D)/50)+2);
   let mod=1;
   if(spread) mod*=0.75;
-  if(weather==='sun'){ if(move.type==='fire')mod*=1.5; if(move.type==='water')mod*=0.5; }
-  if(weather==='rain'){ if(move.type==='water')mod*=1.5; if(move.type==='fire')mod*=0.5; }
+  if(curWeather()==='sun'){ if(move.type==='fire')mod*=1.5; if(move.type==='water')mod*=0.5; }
+  if(curWeather()==='rain'){ if(move.type==='water')mod*=1.5; if(move.type==='fire')mod*=0.5; }
   if(crit) mod*=1.5;
   mod*=roll;
   let stab=1;
-  if(attacker.types.includes(move.type)) stab=1.5;
+  const _hasStab = attacker.types.includes(move.type) || (attacker.isTera && attacker.origTypes.includes(move.type));
+  if(_hasStab) stab=1.5;
   if(attacker.isTera && move.type===attacker.teraType && attacker.origTypes.includes(move.type)) stab=2;
-  if(attacker.ability==='Adaptability' && attacker.types.includes(move.type)) stab=Math.max(stab,2);
+  if(attacker.ability==='Adaptability' && _hasStab) stab = (stab===2 ? 2.25 : 2);
   mod*=stab;
   const eff=effMult(move,attacker,defender);
   mod*=eff;
-  if(attacker.status==='BRN'&&move.cat==='physical'&&attacker.ability!=='Guts') mod*=0.5;
+  if(attacker.status==='BRN'&&move.cat==='physical'&&attacker.ability!=='Guts'&&!move.facade) mod*=0.5;
   if(defender.ability==='Multiscale'&&defender.hp===defender.maxHp && attacker.ability!=='Mold Breaker') mod*=0.5;
   if(defender.ability==='Thick Fat'&&(move.type==='fire'||move.type==='ice')) mod*=0.5;
   if(defender.ability==='Ice Scales'&&move.cat==='special') mod*=0.5;
@@ -1503,10 +1626,10 @@ function statusBlocked(target, status, attacker, powder){
   if(powder && (target.types.includes('grass')||target.item==='Safety Goggles'||target.ability==='Overcoat')) return true;
   if(terrain==='misty' && grounded(target)) return true;
   if((status==='SLP') && terrain==='electric' && grounded(target)) return true;
-  if(status==='BRN' && (target.types.includes('fire')||target.ability==='Water Veil')) return true;
+  if(status==='BRN' && (target.types.includes('fire')||target.ability==='Water Veil'||target.ability==='Thermal Exchange')) return true;
   if(status==='PAR' && target.types.includes('electric')) return true;
   if((status==='PSN'||status==='TOX') && (target.types.includes('poison')||target.types.includes('steel')) && (!attacker||attacker.ability!=='Corrosion')) return true;
-  if(status==='FRZ' && (target.types.includes('ice')||weather==='sun')) return true;
+  if(status==='FRZ' && (target.types.includes('ice')||curWeather()==='sun')) return true;
   if(target.ability==='Limber' && status==='PAR') return true;
   if((target.ability==='Insomnia'||target.ability==='Vital Spirit'||target.ability==='Sweet Veil') && status==='SLP') return true;
   return false;
@@ -1548,13 +1671,15 @@ function triggerEntry(m){
   const foes = activeMons(oppSide(sideOf(m)));
   if(m.ability==='Intimidate'){ logMsg(`${m.name}'s Intimidate cuts foes' Attack!`,'i'); foes.forEach(f=>{ if(f&&f.hp>0 && !['Inner Focus','Own Tempo','Oblivious','Scrappy','Clear Body','White Smoke','Full Metal Body'].includes(f.ability) && f.item!=='Clear Amulet') tryBoost(f,{atk:-1},m,true); }); }
   const wmap={Drought:'sun',Drizzle:'rain','Sand Stream':'sand','Snow Warning':'snow','Orichalcum Pulse':'sun'};
-  if(wmap[m.ability]) setWeather(wmap[m.ability],5);
+  if(wmap[m.ability]){ if(weather!==wmap[m.ability]) logMsg(`[${m.name}'s ${m.ability}]`,'i'); setWeather(wmap[m.ability],5); }
   const tmap={'Grassy Surge':'grassy','Electric Surge':'electric','Psychic Surge':'psychic','Misty Surge':'misty','Hadron Engine':'electric'};
-  if(tmap[m.ability]) setTerrain(tmap[m.ability],5);
+  if(tmap[m.ability]){ if(terrain!==tmap[m.ability]) logMsg(`[${m.name}'s ${m.ability}]`,'i'); setTerrain(tmap[m.ability],5); }
+  if(m.ability==='Air Lock'||m.ability==='Cloud Nine'){ if(weather!=='clear') logMsg(`${m.name}'s ${m.ability}: the effects of the weather disappeared.`,'i'); }
+  if(m.ability==='Hospitality'){ const a=ally(m); if(a&&a.hp>0&&a.hp<a.maxHp){ const b=a.hp; a.hp=Math.min(a.maxHp,a.hp+Math.floor(a.maxHp/4)); logMsg(`☕ ${m.name}'s Hospitality restored ${a.name}'s HP! (+${a.hp-b})`,'i'); } }
   if(m.ability==='Intrepid Sword') tryBoost(m,{atk:1},m,true);
   if(m.ability==='Dauntless Shield') tryBoost(m,{def:1},m,true);
   if(m.ability==='Download'){ const foe=foes.find(f=>f&&f.hp>0); if(foe){ if(getStat(foe,'def')<=getStat(foe,'spd')) tryBoost(m,{atk:1},m,true); else tryBoost(m,{spa:1},m,true); } }
-  if((m.ability==='Protosynthesis'&&(weather==='sun'||m.item==='Booster Energy'))||(m.ability==='Quark Drive'&&(terrain==='electric'||m.item==='Booster Energy'))){ logMsg(`${m.name}'s ${m.ability} boosted its ${STAT_LABEL[m.boostStat]}!`,'i'); }
+  if((m.ability==='Protosynthesis'&&(curWeather()==='sun'||m.item==='Booster Energy'))||(m.ability==='Quark Drive'&&(terrain==='electric'||m.item==='Booster Energy'))){ const _be=(m.item==='Booster Energy' && !((m.ability==='Protosynthesis'&&curWeather()==='sun')||(m.ability==='Quark Drive'&&terrain==='electric'))); logMsg(`${m.name}'s ${m.ability} boosted its ${STAT_LABEL[m.boostStat]}!${_be?' (Booster Energy)':''}`,'i'); }
 }
 
 /* ============================================================
@@ -1573,7 +1698,11 @@ function getPriority(act){
 function orderActions(){
   const actions=[];
   [0,1].forEach(slot=>{ if(pendingActions[slot]) actions.push({side:'p',slot,unit:playerTeam[pActive[slot]],action:pendingActions[slot]}); });
-  [0,1].forEach(slot=>{ const u=aiTeam[aActive[slot]]; if(u&&u.hp>0){ const a=aiChoose(u,slot); if(a) actions.push({side:'a',slot,unit:u,action:a}); } });
+  aiPlan=null;
+  let aiActs={};
+  [0,1].forEach(slot=>{ const u=aiTeam[aActive[slot]]; if(u&&u.hp>0){ const a=aiChoose(u,slot); if(a) aiActs[slot]=a; } });
+  try{ aiActs=aiLookahead(aiActs); }catch(e){ /* fall back to the heuristic choice */ }
+  [0,1].forEach(slot=>{ const u=aiTeam[aActive[slot]]; if(u&&u.hp>0&&aiActs[slot]) actions.push({side:'a',slot,unit:u,action:aiActs[slot]}); });
   actions.sort((a,b)=>{
     const pa=getPriority(a), pb=getPriority(b);
     if(pa!==pb) return pb-pa;
@@ -1590,12 +1719,56 @@ function foeBestDamageVs(foe, target){
   foe.moves.forEach(mv=>{ if(mv.cat==='status'||!mv.pow||mv.pp<=0) return; const r=damageRange(foe,target,mv,false); if(r.max>mx){ mx=r.max; koMove=mv; } });
   return {dmg:mx, ko:mx>=target.hp};
 }
+// ---------------- AI helpers ----------------
+let aiPlan=null;   // per-turn coordination between the two rival Pokémon
+function aiSpd(m){ return getStat(m,'spe')*(tailwind[sideOf(m)]?2:1); }
+function aiFaster(a,b){ const sa=aiSpd(a), sb=aiSpd(b); return trickRoom ? sa<sb : sa>sb; }
+function aiImmune(f, mv, u){
+  if(u.ability==='Mold Breaker') return false;
+  const t=effectiveMoveType(mv,u), ab=f.ability;
+  if(t==='ground' && (ab==='Levitate'||ab==='Earth Eater'||f.item==='Air Balloon')) return true;
+  if(t==='water' && ['Water Absorb','Storm Drain','Dry Skin'].includes(ab)) return true;
+  if(t==='electric' && ['Volt Absorb','Lightning Rod','Motor Drive'].includes(ab)) return true;
+  if(t==='fire' && ['Flash Fire','Well-Baked Body'].includes(ab)) return true;
+  if(t==='grass' && ab==='Sap Sipper') return true;
+  return false;
+}
+function aiPriorityBlocked(u, mv, f){
+  if(movePriority(u,mv)<=0 || u.ability==='Mold Breaker') return false;
+  if(terrain==='psychic' && grounded(f)) return true;
+  return activeMons('p').some(x=>x&&x.hp>0&&['Armor Tail','Queenly Majesty','Dazzling'].includes(x.ability));
+}
+function aiStatusFits(u, mv, f){
+  if(!f||f.hp<=0||f.status) return false;
+  if(f.ability==='Good as Gold'&&u.ability!=='Mold Breaker') return false;
+  if(u.ability==='Prankster'&&f.types.includes('dark')) return false;
+  if(mv.powder && (f.types.includes('grass')||f.item==='Safety Goggles'||f.ability==='Overcoat')) return false;
+  const st=mv.infStatus;
+  if(st==='SLP' && ((terrain==='electric'||terrain==='misty')&&grounded(f) || ['Insomnia','Vital Spirit','Sweet Veil','Purifying Salt'].includes(f.ability))) return false;
+  if(st==='PAR' && (f.types.includes('electric') || (mv.type==='electric'&&f.types.includes('ground')) || f.ability==='Limber')) return false;
+  if(st==='BRN' && (f.types.includes('fire')||['Water Veil','Thermal Exchange'].includes(f.ability))) return false;
+  if((st==='PSN'||st==='TOX') && (f.types.includes('poison')||f.types.includes('steel'))) return false;
+  if(terrain==='misty'&&grounded(f)) return false;
+  return true;
+}
+function aiThreat(f, onto){ let mx=0; onto.forEach(a=>{ if(a&&a.hp>0){ const t=foeBestDamageVs(f,a); mx=Math.max(mx,Math.min(1,t.dmg/a.hp)); } }); return mx; }
+
 function aiChoose(u, slot){
-  const foes=activeMons('p'), allies=activeMons('a');
-  const benchAvail=aBring.filter(i=>!aActive.includes(i)&&aiTeam[i].hp>0);
+  if(!aiPlan) aiPlan={dmg:new Map(), taken:new Set(), fakeOut:new Set(), tera:false};
+  const foes=activeMons('p').filter(f=>f&&f.hp>0), allies=activeMons('a');
+  const partner=allies.find(x=>x&&x!==u&&x.hp>0);
+  const benchAvail=aBring.filter(i=>!aActive.includes(i)&&aiTeam[i].hp>0&&!aiPlan.taken.has(i));
   const choiceLocked = CHOICE_ITEMS.includes(u.item)&&u.choiceLock!=null&&u.moves[u.choiceLock]&&u.moves[u.choiceLock].pp>0;
 
-  // ---- offense: score this Pokémon's moves ----
+  // --- how dangerous is the board for me and my partner? ---
+  let incoming=0, fastKO=false;
+  foes.forEach(f=>{ const t=foeBestDamageVs(f,u); if(t.dmg>incoming) incoming=t.dmg; if(t.dmg>=u.hp && aiFaster(f,u)) fastKO=true; });
+  const threatened = incoming>=u.hp;
+  let partnerThreatened=false; if(partner) foes.forEach(f=>{ if(foeBestDamageVs(f,partner).dmg>=partner.hp) partnerThreatened=true; });
+  const mySpeedAvg = allies.filter(x=>x&&x.hp>0).reduce((a,m)=>a+getStat(m,'spe'),0)/Math.max(1,allies.filter(x=>x&&x.hp>0).length);
+  const foeSpeedAvg = foes.reduce((a,m)=>a+getStat(m,'spe'),0)/Math.max(1,foes.length);
+
+  // --- legal moves ---
   let candidates=[];
   u.moves.forEach((mv,mi)=>{
     if(mv.pp<=0) return;
@@ -1603,83 +1776,247 @@ function aiChoose(u, slot){
     if(u.taunt>0&&mv.cat==='status') return;
     if(u.item==='Assault Vest'&&mv.cat==='status') return;
     if(choiceLocked&&mi!==u.choiceLock) return;
+    if(u.encore>0 && u.lastMoveId && mv.id!==u.lastMoveId) return;
+    if(u._charging && mv.id!==u._charging) return;
+    if(mv.noConsec && u.lastMoveId===mv.id) return;
     candidates.push([mv,mi]);
   });
   if(!candidates.length) candidates=[[u.moves[0],0]];
-  let best=null, bestScore=-1, bestTarget='p0', canKO=false;
+
+  // value of dealing damage to one foe (as % of its HP, capped by what's left after my partner's planned hit)
+  const hitValue=(mv,f,spreadHit)=>{
+    if(aiImmune(f,mv,u) || aiPriorityBlocked(u,mv,f)) return null;
+    const r=damageRange(u,f,mv,spreadHit); if(r.max<=0) return null;
+    const planned=aiPlan.dmg.get(f)||0;
+    const avg=(r.min+r.max)/2;
+    if(planned>=f.hp) return {v:6+avg/f.maxHp*6, avg, ko:false};   // partner already expects to KO it — only a backup hit
+    const left=f.hp-planned, used=Math.min(avg,left);
+    let v=used/f.maxHp*100;
+    if(r.min>=left) v+=60; else if(r.max>=left) v+=30*((r.max-left)/Math.max(1,r.max-r.min));
+    v*= 1 + 0.4*aiThreat(f,allies);                     // prioritise whoever threatens us most
+    if(movePriority(u,mv)>0 && r.max>=left && aiFaster(f,u)) v+=25;  // priority to pick off a faster foe
+    if(mv.sucker) v*=0.8;                                   // Sucker Punch can be played around
+    return {v, avg, ko:r.max>=left};
+  };
+
+  let best=null, bestScore=-1e9, bestTarget='p0', canKO=false, bestAvg=0, bestFoe=null;
+  const opts=[]; u._aiOpts=opts; u._aiBench=null;
+  const consider=(score,mi,target,ko,avg,foe)=>{ score+=Math.random()*4; opts.push({score,mi,target}); if(score>bestScore){ bestScore=score; best=mi; bestTarget=target; canKO=!!ko; bestAvg=avg||0; bestFoe=foe||null; } };
+
   candidates.forEach(([mv,mi])=>{
     if(mv.cat==='status'){
-      let s=8;
-      if(mv.statusMove==='protect'){ s = u.hp<u.maxHp*0.4?26:6; if(u.protectStreak>0)s-=22; }
-      else if(mv.statusMove==='setup'){ s = u.turnsActive===0?24:9; }
-      else if(mv.statusMove==='tailwind'){ s = tailwind.a?0:32; }
-      else if(mv.statusMove==='trickroom'){ s = trickRoom?0:24; }
-      else if(mv.statusMove==='inflict'){ s= foes.some(f=>f&&f.hp>0&&!f.status)?21:2; }
-      else if(mv.statusMove==='weather'||mv.statusMove==='terrain'){ s=18; }
-      else if(mv.statusMove==='heal'){ s = u.hp<u.maxHp*0.5?26:1; }
-      else if(mv.statusMove==='redirect'){ s=15; }
-      else if(mv.statusMove==='screen'){ s= (u.turnsActive===0?18:8); }
-      else s=12;
-      if(s>bestScore){ bestScore=s; best=mi; bestTarget='all'; }
-    } else {
-      foes.forEach((f,fi)=>{
-        if(!f||f.hp<=0) return;
-        const spread=!!(mv.spread||mv.spreadAll);
-        const rng=damageRange(u,f,mv,spread);
-        if(rng.max<=0) return; // immune / no effect — never pick
-        let score=(rng.min+rng.max)/2;
-        const kos=rng.min>=f.hp; // guaranteed KO
-        if(kos){ score*=2.0; }
-        else if(rng.max>=f.hp){ score*=1.5; } // roll to KO
-        if(spread) score*=1.35;
-        score += (mv.pr||0)*4;
-        if(score>bestScore){ bestScore=score; best=mi; bestTarget='p'+fi; canKO=kos||rng.max>=f.hp; }
-      });
+      const sm=mv.statusMove; let s=6, tgt='all';
+      if(sm==='protect'){ s = threatened ? (canKOAny()?28:44) : 4; if(foes.some(f=>f.turnsActive===0&&f.moves.some(m=>m.fakeout))) s=Math.max(s,26); if(u.protectStreak>0) s-=45; }
+      else if(sm==='redirect'){ s = partnerThreatened?46:(partner?12:0); }
+      else if(sm==='helpinghand'){ s = partner&&partner.moves.some(m=>m.cat!=='status')?18:0; }
+      else if(sm==='tailwind'){ s = (tailwind.a||trickRoom)?0:(mySpeedAvg<=foeSpeedAvg*1.15?40:18); }
+      else if(sm==='trickroom'){ s = trickRoom?0:(mySpeedAvg<foeSpeedAvg?44:2); }
+      else if(sm==='setup'){ s = (!threatened && (u.stages.atk||0)+(u.stages.spa||0)<2)?28:4; }
+      else if(sm==='heal'){ s = u.hp<u.maxHp*0.5?32:0; }
+      else if(sm==='screen'){ s = screens.a[mv.screen]?0:20; }
+      else if(sm==='weather'){ s = curWeather()===mv.weather?0:22; }
+      else if(sm==='terrain'){ s = terrain===mv.terrain?0:20; }
+      else if(sm==='partingshot'){ s = threatened?30:10; }
+      else if(sm==='inflict'){
+        let bf=null,bv=-1; foes.forEach((f,fi)=>{ if(!aiStatusFits(u,mv,f)) return; const off=Math.max(getStat(f,'atk'),getStat(f,'spa'));
+          let v= mv.infStatus==='SLP'?44 : mv.infStatus==='BRN'?(getStat(f,'atk')>getStat(f,'spa')?32:6) : mv.infStatus==='PAR'?(aiFaster(f,u)?26:10) : mv.infStatus==='TOX'?14 : 12;
+          v+=off/40; if(v>bv){bv=v;bf=fi;} });
+        s = bf==null?0:bv; tgt = bf==null?'all':'p'+activeIndex('p',foes[bf]);
+      }
+      else if(sm==='taunt'){
+        let bf=null,bv=0; foes.forEach(f=>{ if(u.ability==='Prankster'&&f.types.includes('dark')) return; if(f.ability==='Good as Gold') return;
+          const key=f.moves.filter(m=>['trickroom','tailwind','setup','redirect','inflict','heal'].includes(m.statusMove)).length; const v=key?14+key*8:4; if(v>bv){bv=v;bf=f;} });
+        s=bv; if(bf) tgt='p'+activeIndex('p',bf);
+      }
+      else if(sm==='encore'){
+        let bf=null,bv=0; foes.forEach(f=>{ const lm=f.moves.find(m=>m.id===f.lastMoveId); if(!lm) return; const v=lm.cat==='status'?34:6; if(v>bv){bv=v;bf=f;} });
+        s=bv; if(bf) tgt='p'+activeIndex('p',bf);
+      }
+      else if(sm==='ally'){ s = partner?14:0; }
+      else if(sm==='sap'){ s=20; tgt='p'+activeIndex('p',foes.slice().sort((a,b)=>getStat(b,'atk')-getStat(a,'atk'))[0]); }
+      else if(sm==='trick'){ s = CHOICE_ITEMS.includes(u.item)?24:6; tgt='p'+activeIndex('p',foes[0]); }
+      else if(sm==='allyswitch'){ s = partnerThreatened?18:3; }
+      consider(s,mi,tgt);
+      return;
     }
+    // Pollen Puff can heal a hurt partner
+    if(mv.id==='pollenPuff' && partner && partner.hp<partner.maxHp*0.5){ consider(34,mi,'a'+activeIndex('a',partner)); }
+    // Fake Out: flinch the biggest threat on turn one
+    if(mv.fakeout){
+      foes.forEach(f=>{ if(aiPlan.fakeOut.has(f)||aiImmune(f,mv,u)||aiPriorityBlocked(u,mv,f)) return; if(f.types.includes('ghost')||f.ability==='Inner Focus'||f.item==='Covert Cloak') return;
+        const hv=hitValue(mv,f,false); consider(58+aiThreat(f,allies)*30+(hv?hv.v*0.3:0),mi,'p'+activeIndex('p',f),hv&&hv.ko,hv?hv.avg:0,f); });
+      return;
+    }
+    const spread=!!(mv.spread||mv.spreadAll);
+    if(spread){
+      const two=foes.length>1; let tot=0, anyKO=false;
+      foes.forEach(f=>{ const hv=hitValue(mv,f,two); if(hv){ tot+=hv.v; if(hv.ko) anyKO=true; } });
+      if(mv.spreadAll && partner){   // Earthquake & co. also hit my partner
+        const pImm = !grounded(partner) && effectiveMoveType(mv,u)==='ground' || aiImmune(partner,mv,u) || effMult(mv,u,partner)===0 || partner.protect;
+        if(!pImm){ const r=damageRange(u,partner,mv,true); tot -= (r.max>=partner.hp?220:(r.max/partner.maxHp*100*1.3)); }
+      }
+      if(tot>0) consider(tot*1.05,mi,'all',anyKO);
+      return;
+    }
+    foes.forEach(f=>{ const hv=hitValue(mv,f,false); if(!hv) return; let v=hv.v; if(fastKO&&!hv.ko) v*=0.6; consider(v,mi,'p'+activeIndex('p',f),hv.ko,hv.avg,f); });
   });
-  if(best==null){ best=0; bestTarget='p0'; }
+  function canKOAny(){ return candidates.some(([mv])=>mv.cat!=='status' && foes.some(f=>{ if(aiImmune(f,mv,u)) return false; return damageRange(u,f,mv,false).min>=f.hp; })); }
+  if(best==null){ best=candidates[0][1]; bestTarget='p'+activeIndex('p',foes[0]); }
 
-  // ---- defense: am I about to be knocked out? ----
-  let incoming=0; foes.forEach(f=>{ if(f&&f.hp>0){ const t=foeBestDamageVs(f,u); if(t.dmg>incoming) incoming=t.dmg; } });
-  const threatened = incoming>=u.hp;
-
-  // ---- switch reasoning ----
-  const canSwitch = benchAvail.length>0 && !(u.moves[best]&&u.moves[best].fakeout&&u.turnsActive===0);
+  // --- switching: pivot out of a losing position ---
+  const canSwitch = benchAvail.length>0 && !(u.moves[best]&&u.moves[best].fakeout&&u.turnsActive===0) && !u._charging;
+  const lockedBad = choiceLocked && bestScore<12;           // locked into something that does nothing useful
   if(canSwitch){
-    // rate every bench option by how well it survives and threatens the current foes
     let bestIdx=null, bestVal=-1e9;
     benchAvail.forEach(i=>{
       const b=aiTeam[i];
-      let inc=0; foes.forEach(f=>{ if(f&&f.hp>0){ const t=foeBestDamageVs(f,b); if(t.dmg>inc) inc=t.dmg; } });
-      const survives = inc < b.hp;
-      // offense the switch-in brings
+      let inc=0; foes.forEach(f=>{ const t=foeBestDamageVs(f,b); if(t.dmg>inc) inc=t.dmg; });
       let off=0, offKO=false;
-      foes.forEach(f=>{ if(f&&f.hp>0){ b.moves.forEach(mv=>{ if(mv.cat==='status'||!mv.pow) return; const r=damageRange(b,f,mv,!!(mv.spread||mv.spreadAll)); if(r.max>off)off=r.max; if(r.min>=f.hp)offKO=true; }); } });
-      let val = (survives?60:0) - (inc/b.maxHp)*60 + (off/Math.max(1,(foes[0]&&foes[0].maxHp)||100))*30 + (offKO?25:0);
+      foes.forEach(f=>{ b.moves.forEach(mv=>{ if(mv.cat==='status'||!mv.pow||aiImmune(f,mv,b)) return; const r=damageRange(b,f,mv,false); off=Math.max(off,r.max/f.maxHp); if(r.min>=f.hp) offKO=true; }); });
+      const val=(inc<b.hp?60:0) - (inc/b.maxHp)*60 + off*35 + (offKO?25:0);
       if(val>bestVal){ bestVal=val; bestIdx=i; }
     });
-    // how good is staying in?
-    let stayInc=incoming/Math.max(1,u.maxHp);
-    let stayVal = (threatened?0:60) - stayInc*60 + (canKO?40:0);
+    u._aiBench=bestIdx;
+    const stayVal=(threatened?0:60) - (incoming/Math.max(1,u.maxHp))*60 + (canKO?40:0);
     if(bestIdx!=null){
-      let doSwitch=false;
-      if(u.hp<u.maxHp*0.28 && !canKO && bestVal>stayVal) doSwitch=Math.random()<0.7;
-      else if(threatened && !canKO && bestVal>stayVal+25) doSwitch=Math.random()<0.6; // bad matchup: pivot to a better answer
-      else if(!threatened && bestVal>stayVal+55) doSwitch=Math.random()<0.3; // clearly superior matchup waiting
-      if(doSwitch) return {type:'switch',index:bestIdx};
+      let go=false;
+      if(lockedBad) go=bestVal>stayVal-10;
+      else if(u.hp<u.maxHp*0.28 && !canKO && bestVal>stayVal) go=Math.random()<0.7;
+      else if(threatened && !canKO && bestVal>stayVal+25) go=Math.random()<0.6;
+      else if(!threatened && bestVal>stayVal+55) go=Math.random()<0.3;
+      if(go){ aiPlan.taken.add(bestIdx); return {type:'switch',index:bestIdx}; }
     }
   }
 
-  // ---- Tera: commit it when it matters, not at random ----
+  // --- record the plan so my partner doesn't overkill the same target ---
+  const chosen=u.moves[best];
+  if(chosen){
+    if(chosen.fakeout && bestFoe) aiPlan.fakeOut.add(bestFoe);
+    if(chosen.cat!=='status'){
+      if(chosen.spread||chosen.spreadAll) foes.forEach(f=>{ if(!aiImmune(f,chosen,u)){ const r=damageRange(u,f,chosen,foes.length>1); aiPlan.dmg.set(f,(aiPlan.dmg.get(f)||0)+(r.min+r.max)/2); } });
+      else if(bestFoe) aiPlan.dmg.set(bestFoe,(aiPlan.dmg.get(bestFoe)||0)+bestAvg);
+    }
+  }
+
+  // --- Tera: defensively when it resists the threat, offensively to secure a KO ---
   let wantTera=false;
-  if(!teraUsed.a && !u.isTera){
-    if(canKO) wantTera=Math.random()<0.45;
-    else if(threatened) wantTera=Math.random()<0.6;
-    else wantTera=Math.random()<0.12;
+  if(!teraUsed.a && !u.isTera && !aiPlan.tera){
+    let resists=false;
+    if(threatened){ foes.forEach(f=>{ f.moves.forEach(mv=>{ if(mv.cat==='status'||!mv.pow) return; const t=effectiveMoveType(mv,f); const m=(TYPE_CHART[t]||{})[u.teraType]; if(m!==undefined&&m<1) resists=true; }); }); }
+    if(threatened && resists) wantTera=Math.random()<0.75;
+    else if(chosen && chosen.cat!=='status' && effectiveMoveType(chosen,u)===u.teraType && !canKO) wantTera=Math.random()<0.45;
+    else if(canKO) wantTera=Math.random()<0.2;
+    else wantTera=Math.random()<0.06;
+    if(wantTera) aiPlan.tera=true;
   }
   return {type:'move', move:best, target:bestTarget, tera:wantTera};
 }
-
+// ---------------- 1-turn lookahead ----------------
+// Predict what each of the player's Pokémon will most likely do (public info: their moves, the board).
+function aiPredictFoe(p){
+  const mine=activeMons('a').filter(m=>m&&m.hp>0); let best=null, bv=-1;
+  p.moves.forEach((mv,mi)=>{
+    if(mv.pp<=0||mv.cat==='status'||!mv.pow) return;
+    if(mv.fakeout && p.turnsActive>0) return;
+    if(CHOICE_ITEMS.includes(p.item)&&p.choiceLock!=null&&p.choiceLock!==mi) return;
+    const spread=!!(mv.spread||mv.spreadAll);
+    if(mv.fakeout){ mine.forEach(m=>{ if(m.types.includes('ghost')) return; const v=0.55; if(v>bv){bv=v;best={mi,target:m};} }); return; }
+    if(spread){ let v=0; mine.forEach(m=>{ if(aiImmune(m,mv,p)) return; const r=damageRange(p,m,mv,mine.length>1); v+=Math.min(1,(r.min+r.max)/2/m.hp)+((r.min+r.max)/2>=m.hp?0.5:0); }); if(v>bv){bv=v;best={mi,target:'all'};} return; }
+    mine.forEach(m=>{ if(aiImmune(m,mv,p)) return; const r=damageRange(p,m,mv,false); const v=Math.min(1,(r.min+r.max)/2/m.hp)+((r.min+r.max)/2>=m.hp?0.5:0); if(v>bv){bv=v;best={mi,target:m};} });
+  });
+  return best;
+}
+// Simulate one turn with expected damage and score it from the rival's point of view.
+function aiSimulate(plans){
+  const hp=new Map(), prot=new Set(), cantMove=new Set(), hh=new Set(), redir={p:null,a:null}; let bonus=0;
+  const actives=[...activeMons('p'),...activeMons('a')].filter(m=>m&&m.hp>0);
+  actives.forEach(m=>hp.set(m,m.hp));
+  // switches happen first: the incoming Pokémon takes whatever was aimed at that slot
+  const slotMon={p:[0,1].map(s=>playerTeam[pActive[s]]), a:[0,1].map(s=>aiTeam[aActive[s]])};
+  plans.filter(x=>x.kind==='switch').forEach(x=>{ const inc=aiTeam[x.index]; slotMon.a[x.slot]=inc; hp.set(inc,inc.hp); });
+  const alive=m=>m&&(hp.get(m)||0)>0;
+  const order=plans.filter(x=>x.kind==='move').map(x=>({...x,pr:movePriority(x.unit,x.mv),spd:aiSpd(x.unit)}));
+  order.sort((a,b)=> b.pr-a.pr || (trickRoom? a.spd-b.spd : b.spd-a.spd));
+  const foeSideOf=side=>side==='a'?'p':'a';
+  for(const x of order){
+    const u=x.unit; if(!alive(u)||cantMove.has(u)) continue;
+    const mv=x.mv, side=x.side, os=foeSideOf(side);
+    if(mv.cat==='status'){
+      const sm=mv.statusMove, sign=side==='a'?1:-1;
+      if(sm==='protect'){ if(!(u.protectStreak>0)) prot.add(u); continue; }
+      if(sm==='redirect'){ redir[side]={mon:u,powder:!!mv.powder}; continue; }
+      if(sm==='helpinghand'){ const pt=slotMon[side].find(m=>m&&m!==u&&alive(m)); if(pt) hh.add(pt); continue; }
+      if(sm==='heal'){ hp.set(u,Math.min(u.maxHp,hp.get(u)+u.maxHp*(mv.heal||0.5))); continue; }
+      if(sm==='tailwind'){ const my=slotMon[side].filter(alive), th=slotMon[os].filter(alive); const slower=my.reduce((a,m)=>a+getStat(m,'spe'),0)/Math.max(1,my.length) <= th.reduce((a,m)=>a+getStat(m,'spe'),0)/Math.max(1,th.length)*1.15; if(!tailwind[side]&&!trickRoom&&slower) bonus+=sign*0.45; continue; }
+      if(sm==='trickroom'){ const my=slotMon[side].filter(alive), th=slotMon[os].filter(alive); const slower=my.reduce((a,m)=>a+getStat(m,'spe'),0) < th.reduce((a,m)=>a+getStat(m,'spe'),0); if(!trickRoom&&slower) bonus+=sign*0.55; else if(trickRoom) bonus-=sign*0.4; continue; }
+      if(sm==='inflict'){ const t=x.target&&x.target!=='all'?x.target:slotMon[os].find(alive); if(t&&alive(t)&&!prot.has(t)&&aiStatusFits(u,mv,t)){ if(mv.infStatus==='SLP'){ cantMove.add(t); bonus+=sign*0.45; } else if(mv.infStatus==='PAR') bonus+=sign*0.18; else if(mv.infStatus==='BRN') bonus+=sign*(getStat(t,'atk')>getStat(t,'spa')?0.3:0.08); else bonus+=sign*0.12; } continue; }
+      if(sm==='setup'){ bonus+=sign*0.22; continue; }
+      if(sm==='screen'){ if(!screens[side][mv.screen]) bonus+=sign*0.3; continue; }
+      if(sm==='taunt'||sm==='encore'){ const t=x.target&&x.target!=='all'?x.target:null; if(t&&t.moves.some(m=>m.cat==='status')) bonus+=sign*0.15; continue; }
+      if(sm==='partingshot'){ bonus+=sign*0.15; continue; }
+      bonus+=sign*0.03; continue;
+    }
+    // damaging move: work out who it actually hits
+    let targets=[];
+    if(mv.spreadAll) targets=[...slotMon[os],...slotMon[side].filter(m=>m!==u)].filter(alive);
+    else if(mv.spread) targets=slotMon[os].filter(alive);
+    else {
+      let t=(x.target&&x.target!=='all')?x.target:slotMon[os].find(alive);
+      const rd=redir[os]; if(rd&&alive(rd.mon)&&!(rd.powder&&(u.types.includes('grass')||u.item==='Safety Goggles'))&&u.ability!=='Stalwart'&&u.ability!=='Propeller Tail') t=rd.mon;
+      if(t&&!alive(t)){ t=slotMon[os].find(alive); }
+      if(t) targets=[t];
+    }
+    const nT=targets.length;
+    targets.forEach(t=>{
+      if(prot.has(t) && !(u.ability==='Unseen Fist'&&mv.contact)) return;
+      if(aiImmune(t,mv,u) || effMult(mv,u,t)===0) return;
+      if(mv.sucker){ const tp=plans.find(q=>q.unit===t); if(!tp||tp.kind!=='move'||tp.mv.cat==='status') return; }
+      if(terrain==='psychic'&&grounded(t)&&x.pr>0&&sideOf(t)!==side) return;
+      const r=damageRange(u,t,mv,nT>1); let d=(r.min+r.max)/2*((mv.acc||100)/100);
+      if(hh.has(u)) d*=1.5;
+      hp.set(t,Math.max(0,hp.get(t)-d));
+      if(mv.fakeout) cantMove.add(t);
+      if(mv.recoil) hp.set(u,Math.max(0,hp.get(u)-d*mv.recoil));
+    });
+    if(u.item==='Life Orb') hp.set(u,Math.max(0,hp.get(u)-u.maxHp*0.1));
+  }
+  // score: damage and KOs dealt minus damage and KOs taken (switch-ins count too)
+  let v=bonus;
+  hp.forEach((h,m)=>{ const side=sideOf(m); const lost=(m.hp-h)/m.maxHp, ko=(h<=0&&m.hp>0)?0.7:0; v+= side==='p' ? (lost+ko) : -(lost+ko); });
+  return v;
+}
+function aiLookahead(acts){
+  const slots=[0,1].filter(s=>{ const u=aiTeam[aActive[s]]; return u&&u.hp>0&&acts[s]; });
+  if(!slots.length) return acts;
+  const foePlans=[];
+  [0,1].forEach(s=>{ const p=playerTeam[pActive[s]]; if(!p||p.hp<=0) return; const g=aiPredictFoe(p); if(g) foePlans.push({kind:'move',unit:p,side:'p',slot:s,mv:p.moves[g.mi],target:g.target==='all'?'all':g.target}); });
+  const toTarget=(t)=>{ if(!t||t==='all') return 'all'; const side=t[0], sl=+t[1]; return side==='p'?playerTeam[pActive[sl]]:aiTeam[aActive[sl]]; };
+  const cands=slots.map(s=>{
+    const u=aiTeam[aActive[s]], list=[], seen=new Set();
+    const add=(a)=>{ const k=a.type==='switch'?'sw'+a.index:a.move+'|'+a.target; if(seen.has(k)) return; seen.add(k); list.push(a); };
+    add(acts[s]);
+    (u._aiOpts||[]).slice().sort((a,b)=>b.score-a.score).slice(0,6).forEach(o=>add({type:'move',move:o.mi,target:o.target,tera:false}));
+    if(u._aiBench!=null) add({type:'switch',index:u._aiBench});
+    return {s,u,list};
+  });
+  const planOf=(c,a)=> a.type==='switch' ? {kind:'switch',unit:c.u,side:'a',slot:c.s,index:a.index} : {kind:'move',unit:c.u,side:'a',slot:c.s,mv:c.u.moves[a.move],target:toTarget(a.target)};
+  let best=null, bv=-1e9;
+  const A=cands[0], B=cands[1];
+  (A?A.list:[null]).forEach(a=>{ (B?B.list:[null]).forEach(b=>{
+    if(a&&b&&a.type==='switch'&&b.type==='switch'&&a.index===b.index) return;
+    const plans=[...foePlans]; if(a) plans.push(planOf(A,a)); if(b) plans.push(planOf(B,b));
+    let v=aiSimulate(plans);
+    // keep a little of the heuristic's judgement (it knows about longer-term things like switching into a better matchup)
+    if(a&&a===A.list[0]) v+=0.04; if(b&&B&&b===B.list[0]) v+=0.04;
+    if(v>bv){ bv=v; best=[a,b]; }
+  }); });
+  if(!best) return acts;
+  const out={...acts};
+  if(A){ const a=best[0]; out[A.s]= a.type==='move' ? {...a, tera: (acts[A.s].type==='move'&&acts[A.s].move===a.move)?acts[A.s].tera:false} : a; }
+  if(B){ const b=best[1]; out[B.s]= b.type==='move' ? {...b, tera: (acts[B.s].type==='move'&&acts[B.s].move===b.move)?acts[B.s].tera:false} : b; }
+  return out;
+}
+function activeIndex(side, mon){ const T=side==='p'?playerTeam:aiTeam, A=side==='p'?pActive:aActive; const i=A.indexOf(T.indexOf(mon)); return i<0?0:i; }
 
 /* ============================================================
    EXECUTE
@@ -1687,13 +2024,20 @@ function aiChoose(u, slot){
 async function executeTurn(){
   redirect={p:null,a:null};
   const queue=orderActions();
+  currentQueue=queue;
   for(const act of queue){
-    if(act.unit.hp<=0) continue;
+    if(act.unit.hp<=0){ act.done=true; continue; }
     await performAction(act);
+    act.done=true;
     if(checkGameOver()) return;
     await sleep(220);
   }
   await endTurn();
+}
+function statusTargets(act, m){
+  const ts=resolveTargets(act,m), u=act.unit;
+  if(u.ability!=='Prankster') return ts;
+  return ts.filter(t=>{ if(sideOf(t)!==act.side && t.types.includes('dark')){ logMsg(`It doesn't affect ${t.name}... (Dark types ignore Prankster moves)`,'s'); return false; } return true; });
 }
 function resolveTargets(act, move){
   const side=act.side, opp=oppSide(side);
@@ -1702,8 +2046,10 @@ function resolveTargets(act, move){
   if(move.statusMove==='ally'||move.target==='ally'){ const a=ally(act.unit); return a?[a]:[]; }
   // single target
   const rd=redirect[opp];
-  if(rd && rd.hp>0 && (!move.pr||move.pr<=0) && act.unit.ability!=='Stalwart' && act.unit.ability!=='Propeller Tail'){ return [rd]; }
   const tId=act.action.target;
+  const aimsAtFoe = !tId || tId==='all' || tId[0]===opp;
+  const powderImmune = rd && rd._redirPowder && (act.unit.types.includes('grass')||act.unit.item==='Safety Goggles'||act.unit.ability==='Overcoat');
+  if(rd && rd.hp>0 && aimsAtFoe && !powderImmune && act.unit.ability!=='Stalwart' && act.unit.ability!=='Propeller Tail'){ return [rd]; }
   if(tId && tId!=='all'){ const ts=tId[0], tsl=parseInt(tId[1])||0; const T=ts==='p'?playerTeam:aiTeam, A=ts==='p'?pActive:aActive; const t=T[A[tsl]]; if(t&&t.hp>0) return [t]; }
   const dflt=activeMons(opp).find(t=>t&&t.hp>0); return dflt?[dflt]:[];
 }
@@ -1724,9 +2070,15 @@ async function performAction(act){
     u.isTera=true; u.types=[u.teraType]; teraUsed[side]=true; sfx.tera();
     logMsg(`💎 ${u.name} Terastallized to ${u.teraType.toUpperCase()}!`,'t'); updateBattleUI(); await sleep(350);
   }
+  // Encore forces the last move used; a charged move fires automatically the next turn
+  if(u.encore>0 && u.lastMoveId){ const ei=u.moves.findIndex(x=>x.id===u.lastMoveId); if(ei>=0) act.action.move=ei; }
+  if(u._charging){ const ci=u.moves.findIndex(x=>x.id===u._charging); if(ci>=0) act.action.move=ci; }
   const m=u.moves[act.action.move]; if(!m) return;
+  const _firingCharged = !!(u._charging && u._charging===m.id);
+  if(m.statusMove!=='protect') u.protectStreak=0;       // Protect's penalty only stacks on consecutive uses
   if(u.taunt>0 && m.cat==='status'){ logMsg(`🚫 ${u.name} can't use ${m.name} — it's Taunted!`,'s'); return; }
-  m.pp=Math.max(0,m.pp-1);
+  if(m.noConsec && u.lastMoveId===m.id && !_firingCharged){ logMsg(`${u.name} can't use ${m.name} twice in a row!`,'s'); u.lastMoveId=null; return; }
+  if(!_firingCharged) m.pp=Math.max(0,m.pp-1);
   if(CHOICE_ITEMS.includes(u.item)) u.choiceLock=act.action.move;
   u.lastMoveId=m.id;
   // Protean / Libero: become the move's type, once per switch-in
@@ -1735,6 +2087,19 @@ async function performAction(act){
     if(!(u.types.length===1 && u.types[0]===pt)){ u.types=[pt]; logMsg(`${u.name}'s ${u.ability} made it the ${pt.toUpperCase()} type!`,'i'); }
     u._proteanUsed=true;
   }
+  // Electro Shot / Meteor Beam: charge turn (raises Sp. Atk) unless rain / Power Herb lets it fire at once
+  if(m.charge && !_firingCharged){
+    tryBoost(u,m.selfBoost||{},u,true);
+    const rainShot = (m.charge==='rainSun' && curWeather()==='rain');
+    if(rainShot || u.item==='Power Herb'){
+      if(!rainShot){ logMsg(`${u.name} became fully charged due to its Power Herb!`,'i'); u.item='No Item'; u.usedItem=true; }
+      else logMsg(`${u.name} absorbed the rain and fired at once! (Sp. Atk rose)`,'i');
+    } else {
+      u._charging=m.id; revealMove(u,m); logMsg(`⚡ ${u.name} is gathering power for ${m.name}! (Sp. Atk rose)`,'i'); updateBattleUI(); return;
+    }
+  }
+  if(_firingCharged) u._charging=null;
+  revealMove(u,m);
   logMsg(`${u.name} used ${m.name}!`, side==='p'?'p':'e');
   // Throat Spray: using a sound move raises the holder's Sp. Atk, then it's consumed
   if(m.sound && u.item==='Throat Spray' && u.hp>0){ tryBoost(u,{spa:1},u,true); logMsg(`${u.name}'s Throat Spray sharply tuned its Sp. Atk!`,'i'); u.item='No Item'; u.usedItem=true; }
@@ -1753,34 +2118,44 @@ async function performAction(act){
     if(sm==='weather'){ setWeather(m.weather,5); if(m.pivot) await aiOrPlayerPivot(act); updateBattleUI(); return; }
     if(sm==='terrain'){ setTerrain(m.terrain,5); updateBattleUI(); return; }
     if(sm==='screen'){ const t=(u.item==='Light Clay')?8:5; screens[side][m.screen]=t; if(m.screen==='auroraveil'&&weather!=='snow'){ screens[side][m.screen]=0; logMsg(`${m.name} failed — no snow!`,'s'); } else logMsg(`${m.name} raised a barrier!`,'i'); updateBattleUI(); return; }
-    if(sm==='redirect'){ redirect[side]=u; logMsg(`${u.name} became the center of attention!`,'i'); return; }
+    if(sm==='redirect'){ redirect[side]=u; u._redirPowder=!!m.powder; logMsg(`${u.name} became the center of attention!`,'i'); return; }
     if(sm==='helpinghand'){ const a=ally(u); if(a){ a.helpingHand=true; logMsg(`${u.name} is ready to help ${a.name}!`,'i'); } return; }
     if(sm==='heal'){ if(m.name==='Aromatherapy'){ activeMons(side).forEach(x=>{ if(x){x.status=null;x.toxicN=0;} }); logMsg(`A soothing aroma cured the team's status!`,'i'); return; } const before=u.hp; u.hp=Math.min(u.maxHp,u.hp+Math.floor(u.maxHp*(m.heal||0.5))); if(m.name==='Roost') u._roost=true; logMsg(`${u.name} restored ${u.hp-before} HP!`,'i'); updateBattleUI(); return; }
-    if(sm==='sap'){ const foe=resolveTargets(act,m)[0]; if(foe){ const heal=Math.floor(getStat(foe,'atk')/2); u.hp=Math.min(u.maxHp,u.hp+heal); tryBoost(foe,{atk:-1},u); logMsg(`${u.name} sapped ${foe.name}'s strength! (+${heal} HP)`,'i'); updateBattleUI(); } return; }
+    if(sm==='sap'){ const foe=statusTargets(act,m)[0]; if(foe){ const heal=Math.floor(getStat(foe,'atk')/2); u.hp=Math.min(u.maxHp,u.hp+heal); tryBoost(foe,{atk:-1},u); logMsg(`${u.name} sapped ${foe.name}'s strength! (+${heal} HP)`,'i'); updateBattleUI(); } return; }
     if(sm==='ally'){ const a=ally(u); if(a){ tryBoost(a,m.allyBoost||{},u); logMsg(`${u.name} boosted ${a.name}!`,'i'); updateBattleUI(); } return; }
     if(sm==='haze'){ allActive().forEach(x=>{ if(x) x.stages={atk:0,def:0,spa:0,spd:0,spe:0,acc:0,eva:0}; }); logMsg(`All stat changes were eliminated!`,'i'); updateBattleUI(); return; }
-    if(sm==='taunt'){ resolveTargets(act,m).forEach(t=>{ if(t.ability==='Good as Gold'&&u.ability!=='Mold Breaker'){ logMsg(`${t.name}'s Good as Gold blocks it!`,'i'); return; } if(t.item==='Mental Herb'){ logMsg(`${t.name}'s Mental Herb resisted!`,'i'); t.item='No Item'; return; } t.taunt=3; logMsg(`🤬 ${t.name} fell for the Taunt!`,'s'); }); updateBattleUI(); return; }
-    if(sm==='encore'){ resolveTargets(act,m).forEach(t=>{ if(t.lastMoveId){ t.encore=3; logMsg(`${t.name} received an Encore!`,'s'); } }); return; }
-    if(sm==='inflict'){ const powder=m.powder; resolveTargets(act,m).forEach(t=>{ if(t.ability==='Good as Gold'&&u.ability!=='Mold Breaker'){ logMsg(`${t.name}'s Good as Gold blocks it!`,'i'); return; } if(effMult({type:m.type},u,t)===0 && (m.infStatus==='PAR')){ logMsg(`It doesn't affect ${t.name}...`,'s'); return; } if(m.acc&&Math.random()*100>m.acc){ logMsg(`${m.name} missed!`,'s'); return; } inflictStatus(t,m.infStatus,u,powder); }); updateBattleUI(); return; }
-    if(sm==='partingshot'){ resolveTargets(act,m).forEach(t=>{ tryBoost(t, m.mementoDrop?{atk:-2,spa:-2}:{atk:-1,spa:-1}, u); }); if(m.mementoDrop){ u.hp=0; logMsg(`${u.name} fainted, weakening the foe!`,'e'); onFaint(u); } else await aiOrPlayerPivot(act); updateBattleUI(); return; }
+    if(sm==='taunt'){ statusTargets(act,m).forEach(t=>{ if(t.ability==='Good as Gold'&&u.ability!=='Mold Breaker'){ logMsg(`${t.name}'s Good as Gold blocks it!`,'i'); return; } if(t.item==='Mental Herb'){ logMsg(`${t.name}'s Mental Herb resisted!`,'i'); t.item='No Item'; return; } t.taunt=3; logMsg(`🤬 ${t.name} fell for the Taunt!`,'s'); }); updateBattleUI(); return; }
+    if(sm==='encore'){ statusTargets(act,m).forEach(t=>{ if(t.lastMoveId){ t.encore=3; logMsg(`${t.name} received an Encore!`,'s'); } }); return; }
+    if(sm==='inflict'){ const powder=m.powder; statusTargets(act,m).forEach(t=>{ if(t.ability==='Good as Gold'&&u.ability!=='Mold Breaker'){ logMsg(`${t.name}'s Good as Gold blocks it!`,'i'); return; } if(effMult({type:m.type},u,t)===0 && (m.infStatus==='PAR')){ logMsg(`It doesn't affect ${t.name}...`,'s'); return; } if(m.acc&&Math.random()*100>m.acc){ logMsg(`${m.name} missed!`,'s'); return; } inflictStatus(t,m.infStatus,u,powder); }); updateBattleUI(); return; }
+    if(sm==='partingshot'){ statusTargets(act,m).forEach(t=>{ tryBoost(t, m.mementoDrop?{atk:-2,spa:-2}:{atk:-1,spa:-1}, u); }); if(m.mementoDrop){ u.hp=0; logMsg(`${u.name} fainted, weakening the foe!`,'e'); onFaint(u); } else await aiOrPlayerPivot(act); updateBattleUI(); return; }
     if(sm==='substitute'){ if(u.hp>u.maxHp/4){ u.hp-=Math.floor(u.maxHp/4); u.sub=Math.floor(u.maxHp/4); logMsg(`${u.name} made a substitute!`,'i'); } else logMsg(`Not enough HP for a substitute!`,'s'); updateBattleUI(); return; }
+    if(sm==='trick'){ const t=statusTargets(act,m)[0]; const movable=x=>!/Mask|Rusted/.test(x.item||''); const has=x=>x.item&&x.item!=='No Item';
+      if(t && movable(u) && movable(t) && (has(u)||has(t))){ const it=u.item; u.item=t.item; t.item=it; u.choiceLock=null; t.choiceLock=null; logMsg(`${u.name} swapped items with ${t.name}! ${u.name} got ${u.item}; ${t.name} got ${t.item}.`,'i'); }
+      else logMsg(`But it failed!`,'s'); updateBattleUI(); return; }
+    if(sm==='allyswitch'){ const A=side==='p'?pActive:aActive, T=side==='p'?playerTeam:aiTeam; const o=act.slot===0?1:0; const partner=T[A[o]];
+      if(partner && partner.hp>0){ const tmp=A[0]; A[0]=A[1]; A[1]=tmp; currentQueue.forEach(q=>{ if(q.side===side){ if(q.unit===u) q.slot=o; else if(q.unit===partner) q.slot=act.slot; } }); logMsg(`↔ ${u.name} and ${partner.name} switched places!`,'i'); }
+      else logMsg(`But it failed!`,'s'); updateBattleUI(); return; }
     logMsg(`${u.name}'s ${m.name} had no effect here.`,'i'); return;
   }
 
   // ---- DAMAGING MOVES ----
-  const targets=resolveTargets(act,m);
+  // Expanding Force: 1.5x and hits both foes in Psychic Terrain
+  const mv=(m.expandingForce && terrain==='psychic' && grounded(u)) ? {...m, spread:true, pow:Math.floor(m.pow*1.5)} : m;
+  const targets=resolveTargets(act,mv);
   if(!targets.length){ logMsg(`But there was no target...`,'s'); return; }
-  const isSpread=(m.spread||m.spreadAll)&&targets.length>1;
+  // Pollen Puff aimed at an ally heals it instead of hurting it
+  if(m.id==='pollenPuff' && sideOf(targets[0])===side){ const t=targets[0]; if(t.hp<t.maxHp){ const before=t.hp; t.hp=Math.min(t.maxHp,t.hp+Math.floor(t.maxHp/2)); logMsg(`🌼 ${t.name} was healed by the pollen! (+${t.hp-before})`,'i'); } else logMsg(`But it failed! (${t.name} is at full HP)`,'s'); updateBattleUI(); return; }
+  const isSpread=(mv.spread||mv.spreadAll)&&targets.length>1;
   let anyHit=false, koCount=0;
   for(const target of targets){
-    const res=await applyMoveImpact(u,target,m,side,isSpread);
+    const res=await applyMoveImpact(u,target,mv,side,isSpread);
     if(res.hit) anyHit=true;
     if(res.ko) koCount++;
   }
   // move drawbacks
   if(anyHit){
     if(u.item==='Life Orb' && u.hp>0){ const r=Math.max(1,Math.floor(u.maxHp*0.1)); u.hp=Math.max(0,u.hp-r); logMsg(`${u.name} was hurt by its Life Orb!`,'e'); if(u.hp<=0) onFaint(u); }
-    if(m.selfBoost){ tryBoost(u,m.selfBoost,u); logMsg(`${u.name}'s stats shifted!`, 'i'); }
+    if(m.selfBoost && !m.charge){ tryBoost(u,m.selfBoost,u); logMsg(`${u.name}'s stats shifted!`, 'i'); }
     if(m.pivot && side==='p') { /* handled after */ }
   }
   if(koCount>0 && u.hp>0){
@@ -1793,10 +2168,57 @@ async function performAction(act){
   updateBattleUI();
 }
 
+// ---------- revealed information (what the player has seen of each rival Pokémon) ----------
+function revInit(m){ if(!m._rev) m._rev={moves:[], ability:null, item:null, itemGone:false}; return m._rev; }
+function revealMove(m, mv){ if(!m||sideOf(m)!=='a'||!mv) return; const r=revInit(m); if(!r.moves.includes(mv.id)) r.moves.push(mv.id); }
+// what the player currently knows about a rival's item: the revealed name, marked used/lost once it's gone
+function revItemText(m){ const r=m._rev; if(!r||!r.item) return null; if(m.item===r.item) return r.item; if(m.item==='No Item') return r.item+' (used)'; return m.item; }
+function revealFromLog(msg){
+  if(!msg||!aiTeam) return;
+  aiTeam.forEach(m=>{
+    if(!m||!msg.includes(m.name)) return;
+    const r=revInit(m);
+    if(m.ability && msg.includes(m.ability)) r.ability=m.ability;
+    const cur=m.item, orig=m._origItem||cur;
+    if(cur && cur!=='No Item' && msg.includes(cur)) r.item=cur;
+    else if(orig && orig!=='No Item' && msg.includes(orig)) r.item=orig;
+  });
+}
+function rollHits(move, u){
+  if(!move.multi) return 1;
+  if(move.varMulti){                       // 2–5 hit moves: 35/35/15/15
+    if(u.ability==='Skill Link') return 5;
+    if(u.item==='Loaded Dice') return Math.random()<0.5?4:5;
+    const r=Math.random(); return r<0.35?2:r<0.70?3:r<0.85?4:5;
+  }
+  if(move.perHitAcc && u.item==='Loaded Dice' && move.multi>=10) return 4+Math.floor(Math.random()*7); // Pop Bomb 4–10
+  return Array.isArray(move.multi)?move.multi[1]:move.multi;
+}
+function movePriority(u, move){
+  let p=move.pr||0;
+  if(u.ability==='Prankster'&&move.cat==='status') p+=1;
+  if(u.ability==='Gale Wings'&&move.type==='flying'&&u.hp===u.maxHp) p+=1;
+  if(move.grassyPriority&&terrain==='grassy'&&grounded(u)) p+=1;
+  return p;
+}
+// the current turn's queued actions, so Sucker Punch can read what its target chose
+let currentQueue=[];
+function suckerWorks(target){
+  const a=currentQueue.find(x=>x.unit===target);
+  if(!a || a.done || !a.action || a.action.type!=='move') return false;
+  const mv=target.moves[a.action.move];
+  return !!(mv && mv.cat!=='status');
+}
 async function applyMoveImpact(attacker, defender, move, side, isSpread){
   const dside=oppSide(side)==='p'?sideOf(defender):sideOf(defender);
   const ds=sideOf(defender);
   const slotIdx=(ds==='p'?pActive:aActive).indexOf((ds==='p'?playerTeam:aiTeam).indexOf(defender));
+  // Sucker Punch fails unless the target is about to use a damaging move
+  if(move.sucker && !suckerWorks(defender)){ logMsg(`But it failed! (${defender.name} wasn't about to attack)`,'s'); return {hit:false}; }
+  // Poltergeist fails against a target holding no item
+  if(move.needsItem && (!defender.item || defender.item==='No Item')){ logMsg(`But it failed! (${defender.name} has no item)`,'s'); return {hit:false}; }
+  // Psychic Terrain shields grounded Pokémon from the opponent's priority moves
+  if(terrain==='psychic' && grounded(defender) && sideOf(defender)!==sideOf(attacker) && movePriority(attacker,move)>0){ logMsg(`${defender.name} is protected by the Psychic Terrain!`,'i'); return {hit:false}; }
   // protect
   if((defender.protect||defender.wideGuard) && !(attacker.ability==='Unseen Fist'&&move.contact)){
     if(defender.wideGuard && (move.spread||move.spreadAll)){ logMsg(`${defender.name} blocked it with Wide Guard!`,'s'); return {hit:false}; }
@@ -1817,14 +2239,15 @@ async function applyMoveImpact(attacker, defender, move, side, isSpread){
   const accMod=stageMult(attacker.stages.acc||0)/stageMult(defender.stages.eva||0);
   if(!(move.noMiss) && Math.random()*100 > acc*accMod){ logMsg(`💨 ${attacker.name}'s ${move.name} missed!`,'s'); return {hit:false}; }
 
-  let hits = move.multi ? (Array.isArray(move.multi)?move.multi[1]:move.multi) : 1;
-  if(move.multi && attacker.item==='Loaded Dice') hits=Math.max(hits, 4>hits?hits:hits);
-  let connected=false, totalKO=false;
+  let hits = rollHits(move, attacker);
+  let connected=false, totalKO=false, dealt=0, landed=0;
   for(let h=0; h<hits; h++){
     if(defender.hp<=0||attacker.hp<=0) break;
+    // Triple Axel / Population Bomb roll accuracy on every hit after the first (Loaded Dice skips it)
+    if(h>0 && move.perHitAcc && attacker.item!=='Loaded Dice' && Math.random()*100 > acc*accMod) break;
     const isCrit = move.alwaysCrit || Math.random() < (move.highCrit?0.125:0.0417) || attacker.ability==='Merciless';
     const roll=0.85+Math.random()*0.15;
-    let {dmg,eff}=damageRoll(attacker,defender,move,{spread:isSpread,crit:isCrit,roll});
+    let {dmg,eff}=damageRoll(attacker,defender,move,{spread:isSpread,crit:isCrit,roll,hitIndex:h});
     connected=true;
     // Disguise: the first damaging hit is blocked; Mimikyu loses 1/8 of its max HP instead
     if(defender.ability==='Disguise' && !defender._disguiseBusted && attacker.ability!=='Mold Breaker'){
@@ -1849,7 +2272,7 @@ async function applyMoveImpact(attacker, defender, move, side, isSpread){
     sfx.hit(isCrit, eff>=2);
     const el=document.getElementById(`slot-${ds}${slotIdx}`), flash=document.getElementById(`flash-${ds}${slotIdx}`);
     if(el){ el.classList.add('anim-hurt'); if(flash){ flash.style.backgroundColor=TYPE_COLORS[move.type]||'#fff'; flash.classList.add('active'); } showDamagePopup(el,dmg,isCrit); }
-    defender.hp=Math.max(0,defender.hp-dmg);
+    const _hpBefore=defender.hp; defender.hp=Math.max(0,defender.hp-dmg); dealt+=(_hpBefore-defender.hp); landed++;
     const effTxt = eff>=2?' A critical weakness! Super effective!' : eff>1?' Super effective!' : (eff>0&&eff<1)?' Not very effective...' : '';
     logMsg(`${defender.name} took ${dmg} damage.${isCrit?' (Crit!)':''}${effTxt}`, eff>1?'s':'e');
     if(survive==='sash') logMsg(`🎗 ${defender.name} hung on using its Focus Sash! (Sash consumed)`,'i'); else if(survive==='sturdy') logMsg(`🪨 ${defender.name} endured the hit with Sturdy!`,'i');
@@ -1861,9 +2284,10 @@ async function applyMoveImpact(attacker, defender, move, side, isSpread){
     if(defender.hp<=0){ break; }
   }
   if(!connected) return {hit:false};
+  if(move.multi && landed>1) logMsg(`The Pokémon was hit ${landed} times!`,'i');
   const dmgDealtEff=effMult(move,attacker,defender);
   // recoil
-  if(move.recoil && attacker.hp>0 && attacker.ability!=='Rock Head'){ const r=Math.max(1,Math.floor((defender.maxHp*0)+ (Math.floor(defender.maxHp)*0))); const rec=Math.max(1,Math.floor(attacker.maxHp*move.recoil)); attacker.hp=Math.max(0,attacker.hp-rec); logMsg(`${attacker.name} is hit with recoil! (-${rec})`,'e'); }
+  if(move.recoil && attacker.hp>0 && attacker.ability!=='Rock Head' && dealt>0){ const rec=Math.max(1,Math.floor(dealt*move.recoil)); attacker.hp=Math.max(0,attacker.hp-rec); logMsg(`${attacker.name} is hit with recoil! (-${rec})`,'e'); if(attacker.hp<=0) onFaint(attacker); }
   // contact effects on attacker (defender's ability/item), only if defender still meaningful
   if(move.contact && attacker.hp>0){
     if(['Rough Skin','Iron Barbs'].includes(defender.ability)){ const r=Math.floor(attacker.maxHp/8); attacker.hp=Math.max(0,attacker.hp-r); logMsg(`${attacker.name} was hurt by ${defender.ability}! (-${r})`,'e'); }
@@ -1876,7 +2300,8 @@ async function applyMoveImpact(attacker, defender, move, side, isSpread){
     }
   }
   // knock off removes item
-  if(move.knock && defender.hp>0 && defender.item && defender.item!=='No Item' && !defender.usedItem){ logMsg(`${attacker.name} knocked off ${defender.name}'s ${defender.item}!`,'i'); defender.item='No Item'; }
+  if(move.knock && defender.hp>0 && canLoseItem(defender)){ logMsg(`${attacker.name} knocked off ${defender.name}'s ${defender.item}!`,'i'); defender.item='No Item'; }
+  if(move.clearTerrain && terrain!=='none'){ terrain='none'; terrainT=0; logMsg(`The terrain was cleared away!`,'i'); }
   // secondary effects (blocked by Covert Cloak / Shield Dust / Sheer Force)
   if(defender.hp>0 && move.sec && defender.ability!=='Shield Dust' && defender.item!=='Covert Cloak' && attacker.ability!=='Sheer Force'){
     if(Math.random()<move.sec.chance){
@@ -1890,13 +2315,16 @@ async function applyMoveImpact(attacker, defender, move, side, isSpread){
   if(defender.hp>0){
     if(dmgDealtEff>1 && defender.item==='Weakness Policy'){ tryBoost(defender,{atk:2,spa:2},defender,true); logMsg(`${defender.name}'s Weakness Policy activated!`,'i'); defender.item='No Item'; defender.usedItem=true; }
     if(defender.ability==='Stamina'){ tryBoost(defender,{def:1},defender,true); }
+    if(defender.ability==='Thermal Exchange' && move.type==='fire'){ tryBoost(defender,{atk:1},defender,true); logMsg(`${defender.name}'s Thermal Exchange raised its Attack!`,'i'); }
     if(defender.ability==='Anger Point'&&false){}
   }
   // super boost drawback (collision course lowers nothing) ; electro drift none
+  const _mt=effectiveMoveType(move,attacker);
+  if(defender.hp>0 && dmgDealtEff>1 && ITEM_RESIST_BERRY[defender.item]===_mt){ logMsg(`${defender.name}'s ${defender.item} weakened the damage!`,'i'); defender.item='No Item'; defender.usedItem=true; }
   // sitrus / berry after damage
   postDamageBerries(defender);
   let ko=false;
-  if(defender.hp<=0){ onFaint(defender); ko=true; }
+  if(defender.hp<=0){ onFaint(defender); ko=true; attacker._kos=(attacker._kos||0)+1; }
   return {hit:true, ko};
 }
 function absorbCheck(defender, move, attacker){
@@ -1933,7 +2361,7 @@ function doSwitch(side, slot, newIdx){
   }
   const out=T[A[slot]];
   if(out && out.ability==='Regenerator' && out.hp>0 && out.hp<out.maxHp){ out.hp=Math.min(out.maxHp,out.hp+Math.floor(out.maxHp/3)); logMsg(`${out.name}'s Regenerator restored HP as it left!`,'i'); }
-  if(out){ out.choiceLock=null; out.helpingHand=false; out._proteanUsed=false; out._disguiseBusted=false; if(out.hp>0){ out.stages={atk:0,def:0,spa:0,spd:0,spe:0,acc:0,eva:0}; out.isTera=out.isTera; out.turnsActive=0; out.taunt=0; out.encore=0; out.confuse=0; } }
+  if(out){ out.choiceLock=null; out.helpingHand=false; out._proteanUsed=false; out._disguiseBusted=false; out._charging=null; if(out.hp>0){ out.stages={atk:0,def:0,spa:0,spd:0,spe:0,acc:0,eva:0}; out.isTera=out.isTera; out.turnsActive=0; out.taunt=0; out.encore=0; out.confuse=0; } }
   // Zero to Hero: Palafin transforms into Hero form the first time it leaves the field
   if(out && out.ability==='Zero to Hero' && !out._heroed){ const hb=POKEDEX[out.key]&&POKEDEX[out.key].heroBase; if(hb){ out._heroed=true; out.base=hb; const ns=computeStats(hb,out.evs,out.ivs,out.nature); const ratio=out.hp/out.maxHp; out.stats=ns; out.maxHp=ns.hp; out.hp=Math.max(1,Math.round(ns.hp*ratio)); out.name='Palafin-Hero'; logMsg(`⚡ Palafin's Zero to Hero transformed it into its Hero form!`,'i'); } }
   A[slot]=newIdx; const inc=T[newIdx]; inc.turnsActive=0; inc.choiceLock=null;
@@ -1954,14 +2382,14 @@ async function endTurn(){
   // speed boost & end-of-turn
   const order=allActive().slice().sort((a,b)=>getStat(b,'spe')-getStat(a,'spe'));
   // weather residual
-  if(weather==='sand'){ order.forEach(m=>{ if(m.hp>0 && !m.types.includes('rock')&&!m.types.includes('ground')&&!m.types.includes('steel')&&m.item!=='Safety Goggles'&&!['Sand Force','Sand Rush','Sand Veil','Overcoat','Magic Guard'].includes(m.ability)){ const d=Math.max(1,Math.floor(m.maxHp/16)); m.hp=Math.max(0,m.hp-d); } }); }
+  if(curWeather()==='sand'){ order.forEach(m=>{ if(m.hp>0 && !m.types.includes('rock')&&!m.types.includes('ground')&&!m.types.includes('steel')&&m.item!=='Safety Goggles'&&!['Sand Force','Sand Rush','Sand Veil','Overcoat','Magic Guard'].includes(m.ability)){ const d=Math.max(1,Math.floor(m.maxHp/16)); m.hp=Math.max(0,m.hp-d); } }); }
   order.forEach(m=>{
     if(m.hp<=0) return;
     if(m._roost){ m._roost=false; }
     // terrain heal
     if(terrain==='grassy'&&grounded(m)&&m.hp<m.maxHp){ m.hp=Math.min(m.maxHp,m.hp+Math.floor(m.maxHp/16)); }
     // leftovers
-    if(m.item==='Leftovers'&&m.hp<m.maxHp){ m.hp=Math.min(m.maxHp,m.hp+Math.floor(m.maxHp/16)); }
+    if(m.item==='Leftovers'&&m.hp<m.maxHp){ m.hp=Math.min(m.maxHp,m.hp+Math.floor(m.maxHp/16)); logMsg(`${m.name} restored a little HP using its Leftovers!`,'i'); }
     // status
     if(m.ability!=='Magic Guard'){
       if(m.status==='BRN'){ m.hp=Math.max(0,m.hp-Math.floor(m.maxHp/16)); }
@@ -1969,7 +2397,7 @@ async function endTurn(){
       else if(m.status==='TOX'){ m.hp=Math.max(0,m.hp-Math.floor(m.maxHp*m.toxicN/16)); m.toxicN=Math.min(15,m.toxicN+1); }
     }
     if(m.item==='Flame Orb' && !m.status && !m.types.includes('fire') && m.ability!=='Water Veil' && m.ability!=='Water Bubble'){ m.status='BRN'; logMsg(`${m.name} was burned by its Flame Orb!`,'e'); }
-    if(m.ability==='Solar Power'&&weather==='sun'){ m.hp=Math.max(0,m.hp-Math.floor(m.maxHp/8)); }
+    if(m.ability==='Solar Power'&&curWeather()==='sun'){ m.hp=Math.max(0,m.hp-Math.floor(m.maxHp/8)); }
     if(m.ability==='Speed Boost'&&m.turnsActive>0){ tryBoost(m,{spe:1},m,true); }
     if(m.status==='FRZ'&&Math.random()<0.2){ m.status=null; }
     m.turnsActive++;
@@ -2121,7 +2549,13 @@ function openScout(fslot){
     <div class="sc-line"><span>Stat changes</span><div>${stg}</div></div>
     <div class="sc-line"><span>Takes more from</span><div>${weak}</div></div>
     <div class="sc-line"><span>Resists</span><div>${resist}</div></div>
-    <p class="sc-note">Its ability, held item and Tera type stay hidden until it reveals them — read the battle, not a calculator.</p>
+    ${(()=>{const r=f._rev||{moves:[]};const mv=(r.moves||[]).map(id=>{const x=f.moves.find(q=>q.id===id);if(!x)return '';const t=effectiveMoveType(x,f);return `<span class="sc-mv" style="--mc:${TYPE_COLORS[t]}">${x.name}</span>`;}).join('');
+      return `<div class="sc-rev"><div class="sc-rev-h">Revealed so far</div>
+      <div class="sc-line"><span>Ability</span><div>${r.ability?`<b>${r.ability}</b>`:'<span class="sc-none">not seen yet</span>'}</div></div>
+      <div class="sc-line"><span>Item</span><div>${revItemText(f)?`<b class="sc-it">${revItemText(f)}</b>`:'<span class="sc-none">not seen yet</span>'}</div></div>
+      <div class="sc-line"><span>Tera</span><div>${f.isTera?`<span class="pv-tera" style="background:${TYPE_COLORS[f.teraType]}">◆ ${f.teraType}</span>`:(teraUsed.a?'<span class="sc-none">rival used Tera on another Pokémon</span>':'<span class="sc-none">hidden until it Terastallizes</span>')}</div></div>
+      <div class="sc-line"><span>Moves (${(r.moves||[]).length}/4)</span><div class="sc-mvs">${mv||'<span class="sc-none">none used yet</span>'}</div></div></div>`;})()}
+    <p class="sc-note">Everything above was learned by watching the battle. Anything not shown is still hidden.</p>
     <div class="mact"><button class="btn ghost" onclick="el('scout-modal').remove()">Close</button></div>
   </div></div>`);
 }
@@ -2178,7 +2612,7 @@ function renderHome(){
     </div>
     <div class="screen">
       <div class="hero">
-        <div class="eyebrow">Doubles · Lv 50 · Bring 4</div>
+        <div class="eyebrow">Doubles · Lv 50 · Bring 4</div>${recText()?`<span class="home-rec">${recText()}</span>`:''}
         <h1>Build a team. Read the field. Win the double.</h1>
         <p>Draft from a curated roster of live threats or scout any Pokémon from the Pokédex, tune every set, then battle 2‑on‑2. Picking moves is a tap; picking a target is a tap on the Pokémon you want to hit.</p>
         <div class="scout">
@@ -2191,7 +2625,7 @@ function renderHome(){
           <button class="btn ghost" onclick="saveCurrentTeam();sfx.click()">Save team</button>
           <button class="btn ghost" onclick="shuffleOpponent();sfx.click()">🎲 New opponent</button>
         </div>
-        <p style="margin:14px 0 0;font-size:12.5px;color:var(--txt-mute)">⚡ <b style="color:var(--txt-dim)">Random Doubles</b> rolls a fresh 4‑Pokémon team for you and the rival and drops you straight into battle — no team‑building.</p>
+        <p style="margin:14px 0 0;font-size:12.5px;color:var(--txt-mute)">⚡ <b style="color:var(--txt-dim)">Random Doubles</b> deals you and the rival six random Pokémon on their real competitive sets — you see your whole team, then pick four.</p>
       </div>
       <div class="sec-head"><h2>Your roster</h2><span class="count" id="roster-count"></span></div>
       <div class="roster" id="roster"></div>
@@ -2500,23 +2934,26 @@ async function startTeamPreview(){
 function openPreview(){
   document.querySelectorAll('#preview-modal').forEach(x=>x.remove());
   const need=Math.min(4,playerTeam.length);
-  const pvCard=(m,i)=>`<div class="pick pv" id="pv-${i}" onclick="toggleBring(${i})" title="${m.name} — ${m.ability} @ ${m.item} · Tera ${m.teraType}">
+  const tyChip=t=>`<span class="pv-ty" style="background:${TYPE_COLORS[t]}">${t}</span>`;
+  const pvCard=(m,i)=>{
+    const spe=computeStats(POKEDEX[m.key].base,m.evs,m.ivs,m.nature).spe;
+    const lock=CHOICE_ITEMS.includes(m.item)?' 🔒':'';
+    return `<div class="pick pv pv2" id="pv-${i}" onclick="toggleBring(${i})" title="Tap to bring ${m.name}">
       <span class="ob" id="ob-${i}" style="display:none"></span>
-      <img src="${spriteFront(m)}" onerror="spriteFallback(this)">
-      <span class="bp-nm">${m.name} ${teraGem(m.teraType,false,'Tera type: '+m.teraType)}</span>
-      <span class="bp-meta">${m.origTypes.map(t=>t.slice(0,3).toUpperCase()).join('/')} · ⚡${computeStats(POKEDEX[m.key].base,m.evs,m.ivs,m.nature).spe}</span>
-      <span class="bp-item">${m.ability}${CHOICE_ITEMS.includes(m.item)?' 🔒':''} · @${m.item}</span>
-      <span class="bp-moves">${m.moves.map(mv=>{const dt=effectiveMoveType(mv,m);return `<span class="bp-mv" style="--mc:${TYPE_COLORS[dt]}" title="${mv.name} — ${dt}${mv.pow?' · '+mv.pow+' pow':''}${mv.cat==='status'?' · status':''}">${mv.name}</span>`;}).join('')}</span></div>`;
+      <div class="pv-head"><img src="${spriteFront(m)}" onerror="spriteFallback(this)"><div class="pv-id"><span class="pv-nm">${m.name}</span><span class="pv-types">${m.origTypes.map(tyChip).join('')}</span><span class="pv-spe">⚡ ${spe} Speed · ${m.nature}</span></div></div>
+      <div class="pv-rows"><b>Ability</b><span title="${(ABILITIES_DB[m.ability]||"")||''}">${m.ability}</span><b>Item</b><span class="pv-item" title="${ITEM_DESC[m.item]||''}">${m.item}${lock}</span><b>Tera</b><span><span class="pv-tera" style="background:${TYPE_COLORS[m.teraType]}">◆ ${m.teraType}</span></span></div>
+      <span class="bp-moves">${m.moves.map(mv=>{const dt=effectiveMoveType(mv,m);return `<span class="bp-mv" style="--mc:${TYPE_COLORS[dt]}" title="${mv.name} — ${dt}${mv.pow?' · '+mv.pow+' power':''}${mv.cat==='status'?' · status':' · '+mv.cat}">${mv.name}</span>`;}).join('')}</span></div>`;
+  };
   document.body.insertAdjacentHTML('beforeend',`<div class="mbg" id="preview-modal"><div class="modal wide"><div class="eyebrow">Team preview${gameMode==='random'?' · Random Battle':''}</div><h3>Choose your four</h3><p class="msub">Tap ${need} in the order they enter — the first two lead. Each card shows its ability, held item (@), Tera type ◆ and its four moves. 🔒 marks a Choice item that locks into one move.</p>
-    <div class="pick-grid">${playerTeam.map((m,i)=>pvCard(m,i)).join('')}</div>
+    <div class="pick-grid pv-grid">${playerTeam.map((m,i)=>pvCard(m,i)).join('')}</div>
     <p class="msub" style="margin:10px 0 8px">The rival brings <b style="color:var(--red)">4 of these ${aiTeam.length}</b> — you won't know their items, spreads or which four until they're on the field.</p>
     <div class="pick-grid">${aiTeam.map(m=>`<div class="pick static" title="${m.name} — ${m.origTypes.join('/')} · item hidden"><img src="${spriteFront(m)}" onerror="spriteFallback(this)"><span class="bp-nm">${m.name}</span><span class="bp-meta">${m.origTypes.map(t=>t.slice(0,3).toUpperCase()).join('/')}</span></div>`).join('')}</div>
-    <div class="mact"><button class="btn primary" id="start-btn" disabled onclick="confirmStart()">Confirm & battle →</button></div>
+    <div class="mact" style="align-items:center"><button class="btn primary" id="start-btn" disabled onclick="confirmStart()">Confirm & battle →</button><span class="pv-count" id="pv-count">0 / ${need} chosen</span></div>
   </div></div>`);
 }
 function toggleBring(i){sfx.click();const p=pBring.indexOf(i);if(p!==-1)pBring.splice(p,1);else if(pBring.length<4)pBring.push(i);
   playerTeam.forEach((_,j)=>{const e=el('pv-'+j),b=el('ob-'+j);if(!e)return;const o=pBring.indexOf(j);const on=o!==-1;e.classList.toggle('on',on);if(b){if(on){b.style.display='';b.textContent=o<2?`LEAD ${o+1}`:`BENCH`;b.classList.toggle('bench',o>=2);}else b.style.display='none';}});
-  const btn=el('start-btn');if(btn)btn.disabled=pBring.length!==Math.min(4,playerTeam.length);}
+  const need=Math.min(4,playerTeam.length);const btn=el('start-btn');if(btn)btn.disabled=pBring.length!==need;const pc=el('pv-count');if(pc){pc.textContent=`${pBring.length} / ${need} chosen`+(pBring.length===need?' — ready!':'');pc.classList.toggle('full',pBring.length===need);}}
 function showLoading(text){const d=document.createElement('div');d.className='mbg';d.innerHTML=`<div class="modal" style="text-align:center"><h3>${text||'Entering the arena…'}</h3><p class="msub">Loading Pokémon artwork…</p></div>`;document.body.appendChild(d);return d;}
 function confirmStart(){
   el('preview-modal')?.remove();
@@ -2564,7 +3001,7 @@ function renderBattle(){
           <linearGradient id="bgH2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#86cb71"/><stop offset="1" stop-color="#70bd5e"/></linearGradient>
           <linearGradient id="bgH3" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6cba5b"/><stop offset="1" stop-color="#57a84d"/></linearGradient>
         </defs>
-        <circle cx="332" cy="30" r="62" fill="url(#bgSun)"/>
+        <circle class="bg-sun" cx="332" cy="30" r="62" fill="url(#bgSun)"/>
         <g fill="#ffffff" opacity="0.8">
           <ellipse cx="74" cy="42" rx="34" ry="12"/><ellipse cx="104" cy="48" rx="24" ry="10"/>
           <ellipse cx="238" cy="30" rx="28" ry="11"/><ellipse cx="266" cy="36" rx="20" ry="8"/>
@@ -2600,8 +3037,9 @@ function monCard(side,slot){
   const teraB=showTera?teraGem(m.teraType,m.isTera):'';
   const speB=isAlly?speedChip(m):'';
   const protB=(!isAlly&&m.protectStreak>0)?`<span class="sb-prot" title="Used Protect last turn — it is less likely to work again">🛡</span>`:'';
+  const rv=(!isAlly&&m._rev&&(m._rev.ability||m._rev.item))?`<span class="sb-item rev" title="Revealed in battle">${m._rev.ability||'?'} · @${revItemText(m)||'?'}</span>`:'';
   const itemB=isAlly?`<span class="sb-item" title="Ability: ${m.ability} · Held item: ${m.item}">${m.ability}${m.item&&m.item!=='No Item'?' · @'+m.item:''}</span>`:'';
-  const stgs=Object.entries(m.stages).filter(([k,v])=>v!==0&&['atk','def','spa','spd','spe'].includes(k)).map(([k,v])=>`<span class="sb-stg ${v>0?'up':'dn'}" title="${STAT_LABEL[k]} ${v>0?'+':''}${v}">${v>0?'+':''}${v}${k[0].toUpperCase()}</span>`).join('');
+  const stgs=Object.entries(m.stages).filter(([k,v])=>v!==0&&['atk','def','spa','spd','spe'].includes(k)).map(([k,v])=>`<span class="sb-stg ${v>0?'up':'dn'}" title="${STAT_LABEL[k]} ${v>0?'+':''}${v}">${v>0?'+':''}${v} ${STAT_LABEL[k]}</span>`).join('');
   const scoutable=!isAlly&&!targetMode&&m.hp>0;
   const clickAttr=targetable?`onclick="fieldTap('a',${slot})"`:(scoutable?`onclick="openScout(${slot})" title="Tap for a scouting report"`:'');
   return `<div class="sd-mon ${cls} ${m.hp<=0?'fainted':''} ${acting?'acting':''} ${targetable?'targetable':''} ${scoutable?'scoutable':''} ${queued?'queued':''} ${m.isTera?'is-tera':''}" id="slot-${side}${slot}" ${clickAttr}>
@@ -2609,7 +3047,7 @@ function monCard(side,slot){
       <div class="sb-top"><span class="sb-name">${m.name}</span>${teraB}<span class="sb-lv">L50</span></div>
       <div class="sb-track"><i class="sb-fill" id="hpfill-${side}${slot}" style="width:${pct}%;background:${hpcol}"></i></div>
       <div class="sb-bot"><span class="sb-num">${Math.round(pct)}%</span><span class="sb-badges">${speB}${protB}${statusB}${m.types.map(t=>`<span class="sb-type" style="background:${TYPE_COLORS[t]}">${t.slice(0,3).toUpperCase()}</span>`).join('')}${stgs}</span></div>
-      ${itemB?`<div class="sb-item-row">${itemB}</div>`:''}
+      ${itemB?`<div class="sb-item-row">${itemB}</div>`:''}${rv?`<div class="sb-item-row">${rv}</div>`:''}
     </div>
     <div class="sd-slot">
       <div class="flash" id="flash-${side}${slot}"></div>
@@ -2631,7 +3069,7 @@ function renderFieldStrip(){
   const s=el('field-strip');if(!s)return;const c=[];
   // active field conditions come FIRST so they're always visible
   const WI={sun:'☀',rain:'🌧',sand:'🌪',snow:'❄'};
-  if(weather!=='clear')c.push(`<div class="fchip on" title="Weather — ${weatherT||'?'} turn(s) left">${WI[weather]||'☁'} ${cap(weather)} · ${weatherT||'?'}</div>`);
+  if(weather!=='clear')c.push(`<div class="fchip on" title="Weather — ${weatherT||'?'} turn(s) left${curWeather()!==weather?' (suppressed by Air Lock)':''}">${WI[weather]||'☁'} ${cap(weather)} · ${weatherT||'?'}${curWeather()!==weather?' · negated':''}</div>`);
   if(terrain!=='none')c.push(`<div class="fchip on" title="Terrain — ${terrainT||'?'} turn(s) left">▲ ${cap(terrain)} Terrain · ${terrainT||'?'}</div>`);
   if(trickRoom)c.push(`<div class="fchip on" title="Speed order is reversed — ${trickRoom} turn(s) left">🔄 Trick Room · ${trickRoom}</div>`);
   if(tailwind.p)c.push(`<div class="fchip you" title="Your side's Speed is doubled — ${tailwind.p} turn(s) left">➤ Your Tailwind · ${tailwind.p}</div>`);
@@ -2650,7 +3088,8 @@ function updateBattleUI(){
   [['a',0],['a',1],['p',0],['p',1]].forEach(([s,sl])=>animateHp(s,sl));
   renderParty('p');renderParty('a');
   const st=el('stage');if(st)st.classList.toggle('targeting',!!targetMode);
-  const wx=el('wx');if(wx)wx.className='wx '+(weather!=='clear'?'w-'+weather:'')+' '+(terrain!=='none'?'t-'+terrain:'');
+  const wx=el('wx');if(wx)wx.className='wx '+(curWeather()!=='clear'?'w-'+curWeather():'')+' '+(terrain!=='none'?'t-'+terrain:'');
+  if(st){st.dataset.wx=curWeather();st.dataset.tr=trickRoom?'1':'0';}
   if(el('ann-turn'))el('ann-turn').textContent='T'+turn;
   renderFieldStrip();renderControls();
 }
@@ -2673,7 +3112,7 @@ function renderControls(){
   else if(!allChosen()){const nx=[0,1].find(s=>needsAction(s)&&!actionReady(s));if(nx!=null)cmdStep=nx;}
   const chips=`<div class="sd-chips">${[0,1].filter(needsAction).map(s=>{
       const m=playerTeam[pActive[s]],pa=pendingActions[s],ready=actionReady(s);
-      let t=ready?(pa.type==='switch'?'⇄ '+playerTeam[pa.index].name:m.moves[pa.move].name+(pa.target&&pa.target!=='all'?' ▸ '+foeName(pa.target):'')):((targetMode&&targetMode.slot===s)?'pick a target…':'choosing…');
+      let t=ready?(pa.type==='switch'?'⇄ '+playerTeam[pa.index].name:m.moves[pa.move].name+(pa.target&&pa.target!=='all'?' ▸ '+(pa.target[0]==='p'?playerTeam[pActive[+pa.target[1]]].name+' (ally)':foeName(pa.target)):'')):((targetMode&&targetMode.slot===s)?'pick a target…':'choosing…');
       const cur=targetMode?targetMode.slot===s:cmdStep===s;
       return `<button class="sd-chip ${ready?'set':''} ${cur?'cur':''}" onclick="editStep(${s})"><img src="${spriteFront(m)}"><span class="sc-i"><b>${m.name}</b><em>${t}</em></span>${ready?'<span class="sc-k">✎</span>':''}</button>`;
     }).join('')}</div>`;
@@ -2684,6 +3123,7 @@ function renderControls(){
       <div class="sd-targets">${foes.map(fi=>{const f=aiTeam[aActive[fi]];
         const hp=Math.round(f.hp/f.maxHp*100);
         return `<button class="sd-tgt" onclick="pickTarget(${fi})" title="${f.name} — ${hp}% HP · ${f.types.join('/')}"><img src="${spriteFront(f)}"><span class="tgt-n">${f.name}</span><span class="tgt-hp">${hp}% HP · ${f.types.map(t=>t.slice(0,3).toUpperCase()).join('/')}</span></button>`;}).join('')}</div>
+      ${(canTargetAlly(tmv)&&allyAlive(s))?(()=>{const a=playerTeam[pActive[s===0?1:0]];const hp=Math.round(a.hp/a.maxHp*100);return `<div class="sd-targets"><button class="sd-tgt ally" onclick="pickAlly()" title="Heal ${a.name} for half its HP"><img src="${spriteFront(a)}"><span class="tgt-n">🌼 ${a.name} (ally)</span><span class="tgt-hp">${hp}% HP · heals 50%</span></button></div>`;})():''}
       <button class="sd-back" onclick="cancelTarget()">← back to moves</button></div>`;
   }else if(allChosen()){
     body=`<div class="sd-panel"><button class="sd-go" onclick="confirmTurn()">▶ GO</button><div class="sd-hint">Both locked in — tap a Pokémon above to change.</div></div>`;
@@ -2691,7 +3131,7 @@ function renderControls(){
     const s=cmdStep,m=playerTeam[pActive[s]];
     const choiceLock=CHOICE_ITEMS.includes(m.item)&&m.choiceLock!=null;
     const moves=m.moves.map((mv,i)=>{
-      const why=mv.pp<=0?'No PP left':(m.taunt>0&&mv.cat==='status')?'Taunted — status moves blocked':(m.item==='Assault Vest'&&mv.cat==='status')?'Assault Vest blocks status moves':(mv.fakeout&&m.turnsActive>0)?'Only works on the turn it switches in':(choiceLock&&i!==m.choiceLock)?`Locked into ${m.moves[m.choiceLock].name} by ${m.item}`:'';
+      const why=mv.pp<=0?'No PP left':(m.taunt>0&&mv.cat==='status')?'Taunted — status moves blocked':(m.item==='Assault Vest'&&mv.cat==='status')?'Assault Vest blocks status moves':(mv.fakeout&&m.turnsActive>0)?'Only works on the turn it switches in':(choiceLock&&i!==m.choiceLock)?`Locked into ${m.moves[m.choiceLock].name} by ${m.item}`:(m._charging&&mv.id!==m._charging)?`Charging ${(m.moves.find(x=>x.id===m._charging)||{}).name} — it fires this turn`:(m.encore>0&&m.lastMoveId&&mv.id!==m.lastMoveId)?`Encored into ${(m.moves.find(x=>x.id===m.lastMoveId)||{}).name}`:(mv.noConsec&&m.lastMoveId===mv.id)?`${mv.name} can't be used twice in a row`:'';
       const dis=!!why;
       const sp=!!(mv.spread||mv.spreadAll);
       const dtype=effectiveMoveType(mv,m); const tc=TYPE_COLORS[dtype];
@@ -2729,12 +3169,16 @@ function chooseMove(slot,i){
   const m=playerTeam[pActive[slot]],mv=m.moves[i],wasTera=teraIntent[slot];
   if(needsTarget(mv)){
     const foes=aliveFoeSlots();
-    if(foes.length<=1){pendingActions[slot]={type:'move',move:i,target:'a'+(foes[0]??0),tera:wasTera};targetMode=null;advanceStep();}
+    const allyOk=canTargetAlly(mv)&&allyAlive(slot);
+    if(foes.length<=1&&!allyOk){pendingActions[slot]={type:'move',move:i,target:'a'+(foes[0]??0),tera:wasTera};targetMode=null;advanceStep();}
     else{pendingActions[slot]={type:'move',move:i,target:null,tera:wasTera};targetMode={slot,move:i};}
   }else{pendingActions[slot]={type:'move',move:i,target:'all',tera:wasTera};targetMode=null;advanceStep();}
   updateBattleUI();
 }
-function fieldTap(side,slot){if(targetMode&&side==='a')pickTarget(slot);}
+function canTargetAlly(mv){return mv&&mv.id==='pollenPuff';}
+function allyAlive(slot){const o=slot===0?1:0;const a=playerTeam[pActive[o]];return !!(a&&a.hp>0);}
+function pickAlly(){if(!targetMode)return;sfx.click();const s=targetMode.slot;pendingActions[s].target='p'+(s===0?1:0);targetMode=null;advanceStep();updateBattleUI();}
+function fieldTap(side,slot){if(targetMode&&side==='a')pickTarget(slot);else if(targetMode&&side==='p'&&slot!==targetMode.slot&&canTargetAlly(playerTeam[pActive[targetMode.slot]].moves[targetMode.move]))pickAlly();}
 function pickTarget(foeSlot){if(!targetMode)return;sfx.click();const s=targetMode.slot;pendingActions[s].target='a'+foeSlot;targetMode=null;advanceStep();updateBattleUI();}
 function cancelTarget(){if(!targetMode)return;const s=targetMode.slot;pendingActions[s]=null;cmdStep=s;targetMode=null;updateBattleUI();}
 function toggleTera(slot){if(locked||teraUsed.p)return;sfx.click();teraIntent[slot]=!teraIntent[slot];if(teraIntent[slot]){const o=slot===0?1:0;teraIntent[o]=false;}if(pendingActions[slot]&&pendingActions[slot].type==='move')pendingActions[slot].tera=teraIntent[slot];updateBattleUI();}
@@ -2753,7 +3197,7 @@ function confirmTurn(){if(!allChosen()||locked)return;sfx.click();[0,1].forEach(
 /* ============================================================
    LOG / POPUPS / FAINT / GAME OVER
    ============================================================ */
-function logMsg(msg,cls='p'){battleLog.push({msg,cls});renderAnnFeed();fxFromMessage(msg,cls);}
+function logMsg(msg,cls='p'){try{revealFromLog(msg);}catch(e){}battleLog.push({msg,cls});renderAnnFeed();fxFromMessage(msg,cls);}
 function renderAnnFeed(){const f=el('ann-feed');if(!f)return;const last=battleLog.slice(-3);f.innerHTML=last.map((l,i)=>`<div class="aln ${l.cls} ${i===last.length-1?'cur':''}">${l.msg}</div>`).join('');}
 function fxFromMessage(msg,cls){
   if(cls==='turn'&&/turn/i.test(msg)){showTurnBanner(msg);return;}
@@ -2797,9 +3241,15 @@ async function handleFaintReplacements(){
   pendingActions={0:null,1:null};teraIntent={0:false,1:false};targetMode=null;activeMenu=null;commandFocus=aliveSlot();locked=false;turn++;
   logMsg(`— Turn ${turn} —`,'turn');updateBattleUI();
 }
-function rematch(){el('over-modal')?.remove();if(gameMode==='random')startRandomDoubles();else startTeamPreview();}
+function recLoad(){try{const r=JSON.parse(localStorage.getItem('arena_record_v1')||'null');if(r&&typeof r.w==='number')return r;}catch(e){}return {w:0,l:0,streak:0,best:0};}
+function recSave(r){try{localStorage.setItem('arena_record_v1',JSON.stringify(r));}catch(e){}}
+function recAdd(win){const r=recLoad();if(win){r.w++;r.streak=r.streak>0?r.streak+1:1;}else{r.l++;r.streak=r.streak<0?r.streak-1:-1;}r.best=Math.max(r.best||0,r.streak);recSave(r);return r;}
+function recText(r){r=r||recLoad();if(!r.w&&!r.l)return '';const st=r.streak>1?` · 🔥 ${r.streak} win streak`:r.streak<-1?` · ${-r.streak} losses in a row`:'';return `Record ${r.w}–${r.l}${st}`;}
+// same teams again: random battles go back to team preview with the same twelve Pokémon
+function rematch(){el('over-modal')?.remove();pBring=[];aBring=aiChooseBring();if(gameMode==='random')openPreview();else startTeamPreview();}
 function showGameOver(win){
   win?sfx.win():sfx.lose();
+  const rec=recAdd(win);
   const acc=win?'var(--hp-hi)':'var(--red)';
   const mine=pBring.filter(i=>playerTeam[i].hp>0),theirs=aBring.filter(i=>aiTeam[i].hp>0);
   const survivors=mine.map(i=>`<span class="ov-s" title="${playerTeam[i].name} — ${Math.round(playerTeam[i].hp/playerTeam[i].maxHp*100)}%"><img src="${spriteFront(playerTeam[i])}" onerror="spriteFallback(this)"></span>`).join('')||'<em style="color:var(--txt-mute);font-size:12px">none</em>';
@@ -2809,6 +3259,11 @@ function showGameOver(win){
     <p class="msub" style="margin:10px 0 16px">${win?'You read the field and took the double. Nicely done.':'The rival edged it out — run it back.'}</p>
     <div class="ov-stats"><span><b>${turn}</b> turns</span><span><b>${mine.length}</b> of yours standing</span><span><b>${theirs.length}</b> of theirs</span></div>
     <div class="ov-surv"><span class="ov-lb">Survivors</span>${survivors}</div>
+    ${(()=>{const myKO=pBring.reduce((a,i)=>a+(playerTeam[i]._kos||0),0),thKO=aBring.reduce((a,i)=>a+(aiTeam[i]._kos||0),0);
+      const mvp=pBring.map(i=>playerTeam[i]).sort((a,b)=>(b._kos||0)-(a._kos||0))[0];
+      return `<div class="ov-stats"><span><b>${myKO}</b> KOs by you</span><span><b>${thKO}</b> KOs by the rival</span>${mvp&&mvp._kos?`<span>MVP <b>${mvp.name}</b> (${mvp._kos} KO${mvp._kos>1?'s':''})</span>`:''}</div>
+      <div class="ov-rec">${recText(rec)}</div>`;})()}
+    <details class="ov-reveal"><summary>What the rival was running</summary><div class="ov-rv-grid">${aiTeam.map((m,i)=>`<div class="ov-rv ${aBring.includes(i)?'':'benched'}"><img src="${spriteFront(m)}" onerror="spriteFallback(this)"><div><b>${m.name}</b>${aBring.includes(i)?'':' <em>(not brought)</em>'}<span>${m.ability} · @${m._origItem||m.item}</span><span>Tera ${m.teraType} · ${m.nature}</span><span class="ov-mv">${m.moves.map(x=>x.name).join(' · ')}</span></div></div>`).join('')}</div></details>
     <div class="mact" style="justify-content:center">
       <button class="btn primary" onclick="rematch()">↻ Rematch (same teams)</button>
       <button class="btn rose" onclick="el('over-modal').remove();startRandomDoubles()">⚡ Random battle</button>
@@ -2850,3 +3305,4 @@ aiTeam=defaultTeam(['tornadus','gholdengo','ogerpon_h','chien_pao','kingambit','
 renderHome();
 
 </script>
+</html>
