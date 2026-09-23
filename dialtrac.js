@@ -2307,6 +2307,15 @@ async function clLoadQueue(){
       _q += '&created_at=gte.'+_since.toISOString()+'&limit=5000';
     }
     _clQueue = await sbGet('call_log', _q);
+    // Keep an active search's older results through the reload, then
+    // re-run it in the background so their status stays current.
+    const _sq=((document.getElementById('clSearch')||{}).value||'').trim();
+    if(_sq.length>=2 && window._clAllTimeHits.length){
+      const have=new Set(_clQueue.map(r=>r.id));
+      window._clAllTimeHits.forEach(h=>{ if(!have.has(h.id)) _clQueue.push(h); });
+      _clAllTimeLast='';
+      clSearchAllTime();
+    }
   }catch(e){
     console.warn('clLoadQueue',e);
     if(body) body.innerHTML='';
@@ -2729,11 +2738,14 @@ async function clMarkCalledBack(id){
 // quietly queries the server across ALL time and merges the hits in, so old
 // callers surface without the person needing a date range or History view.
 let _clAllTimeTimer=null, _clAllTimeLast='';
+// Rows merged in by the all-time search. Kept separately so a queue reload
+// (live update / 60s refresh) can put them back instead of wiping them.
+window._clAllTimeHits = window._clAllTimeHits || [];
 function clSearchAllTime(){
   const el=document.getElementById('clSearch');
   const q=((el&&el.value)||'').trim();
   if(_clAllTimeTimer){ clearTimeout(_clAllTimeTimer); _clAllTimeTimer=null; }
-  if(q.length<2){ _clAllTimeLast=''; return; }        // too short to be useful
+  if(q.length<2){ _clAllTimeLast=''; window._clAllTimeHits=[]; return; }   // too short / cleared
   if(q===_clAllTimeLast) return;                       // already fetched this
   _clAllTimeTimer=setTimeout(async ()=>{
     _clAllTimeTimer=null;
@@ -2761,11 +2773,17 @@ function clSearchAllTime(){
       if(!hits || !hits.length) return;
       // Merge any rows we don't already have, then re-render if the search
       // box still holds the same query.
-      const have=new Set(_clQueue.map(r=>r.id));
-      let added=0;
-      hits.forEach(h=>{ if(!have.has(h.id)){ _clQueue.push(h); added++; } });
       const cur=((document.getElementById('clSearch')||{}).value||'').trim();
-      if(added && cur===q){ clRenderQueue(); }
+      if(cur!==q) return;                  // query changed while fetching
+      window._clAllTimeHits = hits;
+      // Merge: add missing rows, refresh existing copies (status may have changed).
+      const idx=new Map(_clQueue.map((r,i)=>[r.id,i]));
+      let changed=0;
+      hits.forEach(h=>{
+        if(idx.has(h.id)){ _clQueue[idx.get(h.id)]=h; changed++; }
+        else { _clQueue.push(h); changed++; }
+      });
+      if(changed){ clRenderQueue(); clRefreshOpenCount(); }
     }catch(e){ console.warn('clSearchAllTime',e); }
   }, 400);
 }
