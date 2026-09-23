@@ -7752,6 +7752,9 @@ function getAuthClient(){
         _authClient.onAuthStateChange(function(event, session){
           if(event === 'TOKEN_REFRESHED' && session){
             window._sbAuthToken = session.access_token || window._sbAuthToken;
+            // Keep the realtime socket on the fresh token, or live updates stop
+            // silently when the old one expires (~1h into the session).
+            try{ if(typeof _realtimeClient!=='undefined' && _realtimeClient && _realtimeClient.realtime && _realtimeClient.realtime.setAuth) _realtimeClient.realtime.setAuth(session.access_token); }catch(e){}
             return;
           }
           if(event === 'SIGNED_OUT' || (event === 'TOKEN_REFRESHED' && !session)){
@@ -25233,6 +25236,12 @@ function showToast(msg, variant){
 
 // ── AUTO REFRESH ──
 let _autoRefreshTimer = null;
+// Coming back to the tab (after lunch, laptop sleep, network change): pull the
+// Call Log straight away instead of waiting for the next event or poll.
+document.addEventListener('visibilitychange', function(){
+  if(document.hidden) return;
+  if(typeof clScheduleQueueRefresh === 'function'){ window._clQueueDirty = true; clScheduleQueueRefresh(); }
+});
 function startAutoRefresh(){
   stopAutoRefresh();
   _autoRefreshTimer = setInterval(function(){
@@ -25246,6 +25255,11 @@ function startAutoRefresh(){
     if(!active) return;
     if(active.id === 'page-home'){ loadHomeAnnPreview(); }
     if(active.id === 'page-announcements') loadAnnouncements();
+    // Call Log fallback: realtime is primary, this catches anything missed
+    // after sleep/network drops. Goes through the same guarded refresh.
+    if(active.id === 'page-calllog' && typeof clScheduleQueueRefresh === 'function'){
+      window._clQueueDirty = true; clScheduleQueueRefresh();
+    }
   }, 60000); // every 60 seconds
 }
 function stopAutoRefresh(){
@@ -25497,6 +25511,12 @@ async function initRealtime(){
   }
   try{
     _realtimeClient = window.supabase.createClient(SB, KEY);
+    // Authenticate the socket as the signed-in user BEFORE any channel joins.
+    // call_log (and other RLS tables) only stream changes to connections that
+    // are allowed to read the rows; an anon socket silently receives nothing.
+    // refreshSbAuthToken() runs at login, before this client exists, so its
+    // own setAuth call is skipped — apply the token here.
+    try{ if(_realtimeClient.realtime && _realtimeClient.realtime.setAuth) _realtimeClient.realtime.setAuth(window._sbAuthToken || KEY); }catch(e){}
     setupRealtimeChannels();
   }catch(e){ console.error('[Realtime] init failed:', e); }
 }
@@ -26671,7 +26691,7 @@ input:focus{
 </style>
 
 <!-- DialTRAC (Call Log tab) — extracted module. Bump ?v= on each deploy. -->
-<script src="dialtrac.js?v=28"></script>
+<script src="dialtrac.js?v=29"></script>
 <script src="quizreview.js?v=2"></script>
 <script src="teamhours.js?v=2"></script>
 <script src="availlock.js?v=8"></script>

@@ -3443,8 +3443,15 @@ function clScheduleQueueRefresh(){
     const page = document.getElementById('page-calllog');
     if(!page || !page.classList.contains('active')) return;   // stays dirty
 
+    // Hold only while someone is genuinely mid-entry: cursor in the form AND
+    // something typed. The name box is auto-focused when the tab opens, so
+    // "focused" alone held updates back on an empty form indefinitely.
     const pane = document.getElementById('clPaneForm');
-    if(pane && pane.contains(document.activeElement)) return;  // mid-entry
+    if(pane && pane.contains(document.activeElement)){
+      const typed = Array.from(pane.querySelectorAll('input:not([type=checkbox]):not([type=radio]):not([type=hidden]),textarea'))
+        .some(function(el){ return (el.value||'').trim() !== ''; });
+      if(typed) return;   // stays dirty; applied on focus-out
+    }
 
     _clQueueDirty = false;
     clLoadQueue();
