@@ -6033,7 +6033,7 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
       </div>
 
       <!-- CALL LOG — access-gated (dialtrac) -->
-      <div class="nav-item" id="nav-calllog" data-tab="calllog" onclick="goTo('calllog')" style="display:none;">
+      <div class="nav-item" id="nav-calllog" data-tab="calllog" onclick="goTo('calllog')">
         <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z"/></svg>
         Call Log
       </div>
@@ -10293,28 +10293,11 @@ async function loadHubAccess(){
  * without anyone having to visit Nodes first.
  */
 async function gateCallLog(){
+  // Call Log is a core tab for everyone (like Home) — no access gate.
   try{
-    let team = (typeof myTeam !== 'undefined' && myTeam) ? myTeam : '';
-    if(!team){
-      const creds = await sbGet('staff_credentials','?staff_name=eq.'+encodeURIComponent(me)+'&select=team');
-      team = (creds.length && creds[0] && creds[0].team) ? creds[0].team : '';
-      try{ if(team) myTeam = team; }catch(e){}
-    }
-    let granted = false;
-    if(window._accessCache && window._accessCache.dialtrac && window._accessCache.dialtrac.length){
-      granted = window._accessCache.dialtrac.includes(me);
-    }else if(team !== 'Enrolment'){
-      // Access lists aren't loaded yet (Nodes not visited) — check directly
-      // so non-Enrolment staff with individual access aren't left waiting.
-      try{
-        const g = await sbGet('app_access','?app=eq.dialtrac&staff_name=eq.'+encodeURIComponent(me)+'&select=staff_name');
-        granted = !!(g && g.length);
-      }catch(e){}
-    }
-    const canCallLog = (team === 'Enrolment') || granted;
     const clNav=document.getElementById('nav-calllog');
-    if(clNav) clNav.style.display = canCallLog ? '' : 'none';
-    window._canCallLog = canCallLog;
+    if(clNav) clNav.style.display = '';
+    window._canCallLog = true;
   }catch(e){ console.warn('gateCallLog',e); }
 }
 function loadMe(){const n=sessionStorage.getItem("ou");if(n){me=n;return true;}return false;}
@@ -10362,10 +10345,10 @@ async function openAccessManager(){
   // refresh access from server
   try{
     const rows=await sbGet('app_access','?select=app,staff_name');
-    _accessCache={formcraft:[],slip:[],dialtrac:[],shiftops:[]};
+    _accessCache={formcraft:[],slip:[],shiftops:[]};
     (rows||[]).forEach(r=>{ if(_accessCache[r.app]) _accessCache[r.app].push(r.staff_name); });
   }catch(e){}
-  _accessWorking={formcraft:new Set(_accessCache.formcraft),slip:new Set(_accessCache.slip),dialtrac:new Set(_accessCache.dialtrac),shiftops:new Set(_accessCache.shiftops)};
+  _accessWorking={formcraft:new Set(_accessCache.formcraft),slip:new Set(_accessCache.slip),shiftops:new Set(_accessCache.shiftops)};
   // load team buttons
   await buildTeamButtons();
   switchAccessApp('formcraft');
@@ -10373,7 +10356,7 @@ async function openAccessManager(){
 function closeAccessManager(){ document.getElementById('accessModal').style.display='none'; }
 async function saveAccessChanges(){
   // Diff working set vs cache, apply inserts + deletes
-  for(const app of ['formcraft','slip','dialtrac','shiftops']){
+  for(const app of ['formcraft','slip','shiftops']){
     const before=new Set(_accessCache[app]);
     const after=_accessWorking[app];
     // inserts
@@ -26691,7 +26674,7 @@ input:focus{
 </style>
 
 <!-- DialTRAC (Call Log tab) — extracted module. Bump ?v= on each deploy. -->
-<script src="dialtrac.js?v=30"></script>
+<script src="dialtrac.js?v=31"></script>
 <script src="quizreview.js?v=2"></script>
 <script src="teamhours.js?v=2"></script>
 <script src="availlock.js?v=8"></script>

@@ -2463,7 +2463,6 @@ button, .btn { white-space: nowrap; }
       <div id="staffAccessChecks" style="display:flex;flex-direction:column;gap:9px;margin-bottom:18px;">
         <label class="sa-acc-row"><input type="checkbox" id="saAccess_formcraft"><span class="sa-acc-label">FormCraft</span><span class="sa-acc-desc">PDF form filler</span></label>
         <label class="sa-acc-row"><input type="checkbox" id="saAccess_slip"><span class="sa-acc-label">Slip</span><span class="sa-acc-desc">Tax invoices</span></label>
-        <label class="sa-acc-row"><input type="checkbox" id="saAccess_dialtrac"><span class="sa-acc-label">Call Logger</span><span class="sa-acc-desc">Call logging</span></label>
         <label class="sa-acc-row"><input type="checkbox" id="saAccess_borekade"><span class="sa-acc-label">Bore-KADE</span><span class="sa-acc-desc">Arcade</span></label>
       </div>
 
@@ -6853,7 +6852,7 @@ async function loadStaffAccess(s){
     }catch(e){ console.warn('loadStaffAccess admin flag', e); }
   }
   // app access — read this person's rows from app_access
-  ['formcraft','slip','dialtrac','borekade','shiftops'].forEach(a=>{ const b=document.getElementById('saAccess_'+a); if(b) b.checked=false; });
+  ['formcraft','slip','borekade','shiftops'].forEach(a=>{ const b=document.getElementById('saAccess_'+a); if(b) b.checked=false; });
   try{
     const rows = await aaGet('app_access?select=app&staff_name=eq.'+encodeURIComponent(full));
     (rows||[]).forEach(r=>{ const b=document.getElementById('saAccess_'+r.app); if(b) b.checked=true; });
@@ -6885,7 +6884,7 @@ async function saveStaffAccess(fullName){
   const isAdmin = !!(document.getElementById('saAccess_admin')||{}).checked;
   // app_access for the 3 apps. Admin ALWAYS gets ShiftOps access, even if the
   // ShiftOps box is unticked — admin rights require it.
-  for(const app of ['formcraft','slip','dialtrac','borekade','shiftops']){
+  for(const app of ['formcraft','slip','borekade','shiftops']){
     let want = (document.getElementById('saAccess_'+app)||{}).checked;
     if(app==='shiftops' && isAdmin) want = true;
     if(want){
@@ -8657,13 +8656,21 @@ function saveLeaveEdit(){
     staff.forEach(st => { if(!shifts[st.id]) shifts[st.id] = {}; });
   }
 
-  // Push to supabase if from web
+  // Push to supabase if from web. The fetch interceptor refreshes the auth
+  // token for this write; we still confirm it landed so a failure isn't silent.
   if(r.supabaseId){
-    fetch(
-      `${SUPABASE_URL}/rest/v1/leave_submissions?id=eq.${r.supabaseId}`,
-      {method:'PATCH', headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`,'Content-Type':'application/json','Prefer':'return=minimal'},
-       body: JSON.stringify({from_date: newFrom, to_date: newTo, reason: newReason, reason_type: newReasonType})}
-    ).catch(e =>console.warn('Supabase update failed:', e));
+    (async function(){
+      try{
+        const resp = await fetch(
+          `${SUPABASE_URL}/rest/v1/leave_submissions?id=eq.${r.supabaseId}`,
+          {method:'PATCH', headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`,'Content-Type':'application/json','Prefer':'return=minimal'},
+           body: JSON.stringify({from_date: newFrom, to_date: newTo, reason: newReason, reason_type: newReasonType})});
+        if(!resp.ok){
+          console.warn('Leave update rejected:', resp.status);
+          showToast(resp.status===401||resp.status===403 ? 'Session expired — sign in again; change not saved' : 'Leave change may not have saved ('+resp.status+')');
+        }
+      }catch(e){ console.warn('Supabase update failed:', e); showToast('Leave change may not have saved — check connection'); }
+    })();
   }
 
   // Reset modal back to "add" mode for next time
@@ -9495,12 +9502,31 @@ async function _soFreshTok(){
     try{
       const url = (typeof input === 'string') ? input : (input && input.url) || '';
       const tok = _soTok();
-      if(tok && url.indexOf('/rest/v1/') >= 0 && url.indexOf(SUPABASE_URL) >= 0){
-        init = init || {};
-        const h = new Headers((init && init.headers) || (typeof input!=='string' && input.headers) || {});
-        h.set('Authorization', 'Bearer ' + tok);
-        if(!h.has('apikey')) h.set('apikey', SUPABASE_KEY);
-        init.headers = h;
+      if(url.indexOf('/rest/v1/') >= 0 && url.indexOf(SUPABASE_URL) >= 0){
+        const _m = ((init && init.method) || 'GET').toUpperCase();
+        const _isWrite = (_m === 'POST' || _m === 'PATCH' || _m === 'PUT' || _m === 'DELETE');
+        if(_isWrite){
+          // Writes hit RLS: an aged-out token silently downgrades to anon and the
+          // row is rejected (this is why leave reasons "didn't stick"). Refresh
+          // first, then send with a live token.
+          return (async function(){
+            let ftok = tok;
+            try{ ftok = await _soFreshTok(); }catch(e){}
+            init = init || {};
+            const h = new Headers((init && init.headers) || (typeof input!=='string' && input.headers) || {});
+            if(ftok) h.set('Authorization', 'Bearer ' + ftok);
+            if(!h.has('apikey')) h.set('apikey', SUPABASE_KEY);
+            init.headers = h;
+            return _origFetch(input, init);
+          })();
+        }
+        if(tok){
+          init = init || {};
+          const h = new Headers((init && init.headers) || (typeof input!=='string' && input.headers) || {});
+          h.set('Authorization', 'Bearer ' + tok);
+          if(!h.has('apikey')) h.set('apikey', SUPABASE_KEY);
+          init.headers = h;
+        }
       }
       // Apps Script relay: attach the admin's Supabase login token so the relay
       // can verify they're an admin (needed for adminSetPw / offboardStaff /
@@ -9797,7 +9823,7 @@ async function openAccessAdmin(){
 }
 function aaSwitch(app){
   aaCurrent=app;
-  ['formcraft','slip','dialtrac','borekade','shiftops','admin'].forEach(a=>{
+  ['formcraft','slip','borekade','shiftops','admin'].forEach(a=>{
     const t=document.getElementById('aatab-'+a);
     if(t)t.className='aa-tab'+(a===app?' aa-active':'');
   });
@@ -9847,7 +9873,7 @@ async function aaSave(){
   const jobs=[];
 
   // ── app_access: formcraft, slip, dialtrac, borekade, shiftops ──
-  for(const app of ['formcraft','slip','dialtrac','borekade','shiftops']){
+  for(const app of ['formcraft','slip','borekade','shiftops']){
     const add=[...aaWork[app]].filter(n=>!aaOrig[app].has(n));
     const del=[...aaOrig[app]].filter(n=>!aaWork[app].has(n));
     add.forEach(n=>jobs.push(
