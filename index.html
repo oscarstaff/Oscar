@@ -5505,6 +5505,7 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
      <div class="nx-sk" data-sk="kind" data-n="n"></div>, filled on load.
      Kinds: list (avatar + 2 lines), cards, table, lines, inline. -->
 <style>
+#clockBtn.cc-syncing{opacity:.55;cursor:progress;}
 .nx-sk-wrap{display:flex;flex-direction:column;gap:10px;width:100%;text-align:left;}
 .nx-sk-wrap .skel{display:block;}
 .nx-sk-row{display:flex;align-items:center;gap:11px;padding:6px 2px;}
@@ -5602,7 +5603,7 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
         <div class="nbk-bar nbk-cardhd"></div>
         <div class="nbk-row"></div><div class="nbk-row"></div><div class="nbk-row"></div>
       </div>
-      <div class="nbk-foot">Loading Nexus… please wait before clocking in or out</div>
+      <div class="nbk-foot">Loading Nexus…</div>
     </div>
   </div>
 </div>
@@ -5675,7 +5676,10 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
 // app runs can never strand anyone on the loading screen.
 (function(){
   var shownAt = Date.now();
-  var MIN_MS = 5000, MAX_MS = 15000;
+  // No artificial floor: the full-screen skeleton only covers the moment
+  // before the app shell paints. Each tab/section shows its own skeleton
+  // while its data loads (nxSkel), so holding this one longer just hid them.
+  var MIN_MS = 0, MAX_MS = 15000;
   var appReady = false, lifted = false;
   function doLift(){
     if(lifted) return; lifted = true;
@@ -8923,17 +8927,16 @@ async function enterHub(){
   document.getElementById("leaveTo").value=today;
   buildAvailForm();
   showSchedTab('leave'); // default schedule sub-tab
-  showNexusBoot();   // ensure skeleton is up for the boot below (re-shows after login)
+  // Shell is painted — hand over to the per-section skeletons now rather than
+  // holding a full-screen one until every fetch below finishes.
+  requestAnimationFrame(function(){ hideNexusBoot(); });
   startBackgroundLocation();ensureStaffSettingsRow();loadStaffTheme();Promise.all([loadHomeData(),loadNotifications(),loadLeaveHistory(),refreshAnnBadge(),loadWhatsNew(),loadHomeCalendar(),loadHomeAttention(),renderTodayChip(),maybeShowOnboarding(),checkFeedbackInvites(),checkNewNotifications(),loadAnnReads(),loadClockState(),loadAllClockLogs()]).then(function(){
-    // Data ready → lift the skeleton. (The version check runs on its own timer
-    // a few seconds later; it must NOT be part of the boot gate, or a detected
-    // update would reload the page mid-boot and replay the intro+skeleton — the
-    // "it loads twice" bug.)
-    hideNexusBoot();
+    // Data ready. (The full-screen skeleton already lifted when the shell
+    // painted. The version check stays off this path — see "loads twice".)
     setTimeout(function(){
       maybeShowTour();
     }, 300);
-  }).catch(function(){ hideNexusBoot(); });   // never strand the skeleton on a failed load
+  }).catch(function(e){ console.warn('boot data', e); });
   if(typeof applySavedTextColor === 'function') applySavedTextColor();
   loadGlobalGeofence(); // pull global geofence value at startup
   setTimeout(rtUpgradeAll, 200);
@@ -15357,6 +15360,7 @@ setInterval(function(){ retryClockQueueSafely('interval'); }, 60000);
 async function loadClockState(){
   if(!me) return;
   window._clockSyncing = true;   // block clock taps until state is confirmed fresh
+  try{ const _cb=document.getElementById('clockBtn'); if(_cb) _cb.classList.add('cc-syncing'); }catch(e){}
   applyGpsLock();
   // INSTANT render from cached state — avoids "disappears" flash on refresh
   try{
@@ -15419,11 +15423,13 @@ async function loadClockState(){
     // Forgot to clock out? Force clock-out at 8:00pm of the clock-in date.
     await maybeAutoClockOut8pm();
     window._clockSyncing = false;   // state confirmed — taps allowed now
+    try{ const _cb=document.getElementById('clockBtn'); if(_cb) _cb.classList.remove('cc-syncing'); }catch(e){}
   }catch(e){
     console.warn('loadClock:',e);
     // Only fall to 'out' if NO cached state was used
     if(_clockState === null){ _clockState='out'; renderClockCard(); }
     window._clockSyncing = false;   // don't lock the button on a fetch error
+    try{ const _cb=document.getElementById('clockBtn'); if(_cb) _cb.classList.remove('cc-syncing'); }catch(e){}
   }
 }
 
@@ -26737,7 +26743,7 @@ input:focus{
 </style>
 
 <!-- DialTRAC (Call Log tab) — extracted module. Bump ?v= on each deploy. -->
-<script src="dialtrac.js?v=34"></script>
+<script src="dialtrac.js?v=35"></script>
 <script src="quizreview.js?v=2"></script>
 <script src="teamhours.js?v=2"></script>
 <script src="availlock.js?v=8"></script>
