@@ -1544,6 +1544,7 @@ function clClearForm(){
     const el=document.getElementById(id);
     if(el){ el.value=''; el.classList.remove('error'); }
   });
+  clSyncReasonHint();   // box was emptied in code — clear the "N words" hint
   _clSelContact=null; clRenderSelContact();
   const _sg=document.getElementById('clContactSugg'); if(_sg){ _sg.style.display='none'; _sg.innerHTML=''; }
   document.querySelectorAll('#clQuick button').forEach(b=>b.classList.remove('on'));
@@ -1942,6 +1943,11 @@ function clSplitReason(reason, note){
   };
 }
 /** Live hint under a reason box once it runs past the limit. */
+/** Re-sync the new-call form's hint after the box is filled or cleared in code
+ *  (programmatic .value changes don't fire input events). */
+function clSyncReasonHint(){
+  clReasonHint(document.getElementById('clReason'), document.getElementById('clReasonHint'));
+}
 function clReasonHint(inputEl, hintEl){
   if(!inputEl||!hintEl) return;
   const n=String(inputEl.value||'').trim().split(/\s+/).filter(Boolean).length;
@@ -2472,6 +2478,7 @@ function clQuickReason(v){
   if(!el) return;
   el.value=v;
   el.classList.remove('error');
+  clSyncReasonHint();
   document.querySelectorAll('#clQuick button').forEach(b=>
     b.classList.toggle('on', b.textContent.trim()===v));
   if(typeof clUpdatePlcFields==='function') clUpdatePlcFields();  // reason changed
@@ -3158,6 +3165,7 @@ function clPullToForm(id){
   set('clName', r.caller_name==='N/A' ? '' : r.caller_name);
   set('clPhone', clFmtPhone(r.phone_e164) || r.phone_e164);
   set('clReason', r.reason);
+  clSyncReasonHint();
   set('clNote','');
 
   // Inherit the owning team, not the relogger's. Someone from Processing
