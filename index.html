@@ -19920,7 +19920,7 @@ window.loadGlowData = window.loadGlowData || async function(force){
       const sk=await sbGet('staff_credentials','?select=staff_name,name_skin,nickname&limit=500')||[];
       sk.forEach(function(r){
         if(r.staff_name){
-          skins[r.staff_name]=r.name_skin||'gold';
+          skins[r.staff_name]=r.name_skin||null;   // null = never picked → tier default
           if(r.nickname && r.nickname.trim()) nicks[r.staff_name]=r.nickname.trim();
         }
       });
@@ -19946,15 +19946,22 @@ window.hasEarnedGlow = window.hasEarnedGlow || function(name){
 };
 // Skins a given person is allowed to use: the 8 standard skins for any earner,
 // plus elite skins they've unlocked (darkemerald at 1000 calls).
+// Each path unlocks only its own skins: the 8 standard colours belong to the
+// perfect-fortnight glow; Dark Emerald belongs to 1000 calls. Someone with
+// only 1000 calls gets Dark Emerald alone; someone with both gets all.
 window.allowedSkinsFor = window.allowedSkinsFor || function(name){
-  const list = (window.GLOW_SKINS||[]).slice();
+  const list = [];
+  if(window._earnedGlow && name && window._earnedGlow.has(name)) list.push.apply(list, (window.GLOW_SKINS||[]));
   if(window.isEliteCaller(name)) list.push.apply(list, (window.ELITE_SKINS||[]));
   return list;
 };
 window.glowSkinFor = window.glowSkinFor || function(name){
   const s = window._nameSkins && window._nameSkins[name];
   const allowed = window.allowedSkinsFor(name);
-  return (s && allowed.indexOf(s)>=0) ? s : 'gold';
+  if(s && allowed.indexOf(s)>=0) return s;
+  // Never picked (null) → the tier default: reaching 1000 calls auto-equips
+  // Dark Emerald. Anyone who picks a skin keeps it, Gold included.
+  return window.isEliteCaller(name) ? 'darkemerald' : 'gold';
 };
 
 // ── Inline achievement badges (shown right after a name) ──────────────
@@ -26743,7 +26750,7 @@ input:focus{
 </style>
 
 <!-- DialTRAC (Call Log tab) — extracted module. Bump ?v= on each deploy. -->
-<script src="dialtrac.js?v=35"></script>
+<script src="dialtrac.js?v=37"></script>
 <script src="quizreview.js?v=2"></script>
 <script src="teamhours.js?v=2"></script>
 <script src="availlock.js?v=8"></script>
