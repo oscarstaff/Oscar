@@ -1953,7 +1953,7 @@ function clReasonHint(inputEl, hintEl){
   const n=String(inputEl.value||'').trim().split(/\s+/).filter(Boolean).length;
   const over=n-CL_REASON_MAX_WORDS;
   hintEl.textContent = over>0
-    ? n+' words · the last '+over+' will move to Note when you save'
+    ? 'Reason is limited to 8 words. Anything after that goes into Note when you save.'
     : '';
 }
 
