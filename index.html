@@ -12454,18 +12454,14 @@ function buildAchievementBadges(p){
       sub:   elite ? 'Elite glow — 1000 calls logged' : (skinLabel+' glow earned')
     });
   }
-  // Call milestone — HIGHEST tier only, glowy flowing, tier-coloured.
+  // Call milestones — one badge per tier reached, lowest first.
   const top=Number(p.call_milestone)||0;
-  if(top>0){
-    const tierCls = top>=1000 ? 'flow flow-emerald' : (top>=500 ? 'flow flow-gold' : 'flow flow-blue');
-    const tierSub = top>=1000 ? 'Elite — The Call-Handler' : (top>=500 ? 'Gold — consistent dedication' : 'Call volume milestone');
-    badges.push({
-      cls:tierCls,
-      inner:_ACH_ICONS.phone,
-      title:top+' Calls Logged',
-      sub:tierSub
-    });
-  }
+  [{t:100,  cls:'flow flow-blue',    sub:'Call volume milestone'},
+   {t:500,  cls:'flow flow-gold',    sub:'Gold — consistent dedication'},
+   {t:1000, cls:'flow flow-emerald', sub:'Elite — The Call-Handler'}].forEach(function(k){
+    if(top<k.t) return;
+    badges.push({ cls:k.cls, inner:_ACH_ICONS.phone, title:k.t+' Calls Logged', sub:k.sub });
+  });
   // Punctuality tier — solid, current fortnight.
   if(p.punct && p.punct.tier){
     const isGold=p.punct.tier==='gold';
@@ -12546,15 +12542,16 @@ function buildAchievementsRows(p){
     rows.push(_achRow(chip, elite?'The Call-Handler':'Perfect Fortnight',
       elite?'Elite glow — 1000 calls logged':(skinLabel+' glow earned'),'#fffdf5','#f6e9c8'));
   }
+  // Call milestones — one row per tier reached (100, 500, 1000), lowest first.
   const top=Number(p.call_milestone)||0;
-  if(top>0){
-    const sub = top>=1000?'Elite — The Call-Handler':(top>=500?'Gold — consistent dedication':'Call volume milestone');
-    const fill = top>=1000?'#047857':(top>=500?'#b8860b':'#2563eb');
-    const bg   = top>=1000?'#ecfdf5':(top>=500?'#fffbeb':'#eff6ff');
-    const bd   = top>=1000?'#a7f3d0':(top>=500?'#fde68a':'#dbeafe');
+  [{t:100, sub:'Call volume milestone',        fill:'#2563eb', bg:'#eff6ff', bd:'#dbeafe'},
+   {t:500, sub:'Gold — consistent dedication', fill:'#b8860b', bg:'#fffbeb', bd:'#fde68a'},
+   {t:1000,sub:'Elite — The Call-Handler',     fill:'#047857', bg:'#ecfdf5', bd:'#a7f3d0'}].forEach(function(k){
+    if(top<k.t) return;
+    const fill=k.fill;
     const phone='<svg width="18" height="18" viewBox="0 0 20 20" fill="'+fill+'" style="flex-shrink:0;"><path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z"/></svg>';
-    rows.push(_achRow(phone, top+' Calls Logged', sub, bg, bd));
-  }
+    rows.push(_achRow(phone, k.t+' Calls Logged', k.sub, k.bg, k.bd));
+  });
   if(p.punct && p.punct.tier){
     const isGold=p.punct.tier==='gold';
     const fill=isGold?'#efa927':'#c2c1ba', ring=isGold?'#633806':'#4a4a46';
@@ -19994,15 +19991,18 @@ window.achBadgesInline = function(name, opts){
   opts=opts||{};
   const gap=opts.gap||4, sz=opts.size||14;
   const out=[];
-  // Call milestone — highest tier only; icon glows in tier colours.
+  // Call milestones — one badge per tier reached (100, 500, 1000), each in
+  // its own colour, so a 1000-caller shows all three.
   const cm=(window._callMsMap && window._callMsMap[name])||0;
-  if(cm>0){
-    let stops, tip;
-    if(cm>=1000){ stops='<stop offset="0%" stop-color="#022c22"/><stop offset="35%" stop-color="#047857"/><stop offset="60%" stop-color="#34d399"/><stop offset="100%" stop-color="#022c22"/>'; tip='1000 calls logged — The Call-Handler'; }
-    else if(cm>=500){ stops='<stop offset="0%" stop-color="#78350f"/><stop offset="35%" stop-color="#d4a017"/><stop offset="55%" stop-color="#fff2c2"/><stop offset="100%" stop-color="#78350f"/>'; tip='500 calls logged'; }
-    else { stops='<stop offset="0%" stop-color="#1e40af"/><stop offset="40%" stop-color="#3b82f6"/><stop offset="60%" stop-color="#93c5fd"/><stop offset="100%" stop-color="#1e40af"/>'; tip='100 calls logged'; }
-    out.push('<span title="'+tip+'" style="display:inline-flex;align-items:center;">'+window.achFlowIcon(window.ACH_BADGE_ICONS.phone, stops, tip, sz)+'</span>');
-  }
+  const _cmTiers=[
+    {t:100, stops:'<stop offset="0%" stop-color="#1e40af"/><stop offset="40%" stop-color="#3b82f6"/><stop offset="60%" stop-color="#93c5fd"/><stop offset="100%" stop-color="#1e40af"/>', tip:'100 calls logged'},
+    {t:500, stops:'<stop offset="0%" stop-color="#78350f"/><stop offset="35%" stop-color="#d4a017"/><stop offset="55%" stop-color="#fff2c2"/><stop offset="100%" stop-color="#78350f"/>', tip:'500 calls logged'},
+    {t:1000, stops:'<stop offset="0%" stop-color="#022c22"/><stop offset="35%" stop-color="#047857"/><stop offset="60%" stop-color="#34d399"/><stop offset="100%" stop-color="#022c22"/>', tip:'1000 calls logged — The Call-Handler'}
+  ];
+  _cmTiers.forEach(function(k){
+    if(cm<k.t) return;
+    out.push('<span title="'+k.tip+'" style="display:inline-flex;align-items:center;">'+window.achFlowIcon(window.ACH_BADGE_ICONS.phone, k.stops, k.tip, sz)+'</span>');
+  });
   // Training — solid green cap with the count beside it. Skipped when
   // opts.noTraining is set (e.g. the call log shows call badges only).
   const tc=(window._trainCtMap && window._trainCtMap[name])||0;
@@ -26750,7 +26750,7 @@ input:focus{
 </style>
 
 <!-- DialTRAC (Call Log tab) — extracted module. Bump ?v= on each deploy. -->
-<script src="dialtrac.js?v=37"></script>
+<script src="dialtrac.js?v=39"></script>
 <script src="quizreview.js?v=2"></script>
 <script src="teamhours.js?v=2"></script>
 <script src="availlock.js?v=8"></script>
