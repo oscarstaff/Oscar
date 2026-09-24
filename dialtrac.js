@@ -272,6 +272,8 @@
 .cl-label{display:block;font-size:11.5px;font-weight:600;margin-bottom:7px;
   color:var(--m-ink-2);letter-spacing:.01em;}
 .cl-req{color:#dc2626;}
+.cl-rs-hint{font-size:11px;font-weight:600;color:#b45309;margin-top:5px;min-height:0;}
+.cl-rs-hint:empty{display:none;}
 .cl-req.cl-req-opt{color:#94a3b8;font-weight:400;font-size:.85em;}
 .cl-hint{font-size:11px;color:var(--m-ink-3);margin-top:5px;min-height:14px;
   line-height:1.35;transition:color var(--cl-t) var(--cl-ease);}
@@ -1074,7 +1076,9 @@ textarea.cl-edit-in{min-height:52px;resize:vertical;line-height:1.45;}
 
             <div class="cl-field">
               <label class="cl-label" for="clReason">Reason <span class="cl-req">*</span></label>
-              <input id="clReason" class="cl-in" type="text" placeholder="What was it about?" autocomplete="off" list="clReasonList" />
+              <input id="clReason" class="cl-in" type="text" placeholder="What was it about?" autocomplete="off" list="clReasonList"
+                     oninput="clReasonHint(this, document.getElementById('clReasonHint'))" />
+              <div class="cl-rs-hint" id="clReasonHint" aria-live="polite"></div>
               <datalist id="clReasonList">
                 <option value="New enquiry"></option>
                 <option value="Checklist / documents"></option>
@@ -1921,13 +1925,41 @@ function clSetDir(d){
   if(outB) outB.classList.toggle('active', window._clDir==='out');
 }
 
+// ── Reason word limit ──────────────────────────────────────────────
+// Reason is a short label (it shows as a chip on the card); anything past
+// CL_REASON_MAX_WORDS moves to the front of the Note on save, so nothing
+// typed is ever lost.
+const CL_REASON_MAX_WORDS = 8;
+function clSplitReason(reason, note){
+  const words=String(reason||'').trim().split(/\s+/).filter(Boolean);
+  note=String(note||'').trim();
+  if(words.length<=CL_REASON_MAX_WORDS) return { reason:words.join(' '), note:note, moved:0 };
+  const extra=words.slice(CL_REASON_MAX_WORDS).join(' ');
+  return {
+    reason: words.slice(0,CL_REASON_MAX_WORDS).join(' '),
+    note:   note ? (extra+'\n'+note) : extra,
+    moved:  words.length-CL_REASON_MAX_WORDS
+  };
+}
+/** Live hint under a reason box once it runs past the limit. */
+function clReasonHint(inputEl, hintEl){
+  if(!inputEl||!hintEl) return;
+  const n=String(inputEl.value||'').trim().split(/\s+/).filter(Boolean).length;
+  const over=n-CL_REASON_MAX_WORDS;
+  hintEl.textContent = over>0
+    ? n+' words · the last '+over+' will move to Note when you save'
+    : '';
+}
+
 async function clSaveCall(){
   const nameEl=document.getElementById('clName');
   const reasonEl=document.getElementById('clReason');
   const name=(nameEl.value||'').trim();
-  const reason=(reasonEl.value||'').trim();
+  let reason=(reasonEl.value||'').trim();
   const phone=clToE164(document.getElementById('clPhone').value);
-  const note=(document.getElementById('clNote').value||'').trim();
+  let note=(document.getElementById('clNote').value||'').trim();
+  // Cap Reason at 8 words; the overflow leads the Note.
+  { const _sp=clSplitReason(reason, note); reason=_sp.reason; note=_sp.note; }
 
   let bad=false;
   nameEl.classList.toggle('error', !name);   if(!name) bad=true;
@@ -2509,7 +2541,8 @@ function clEditRow(id){
       '<div class="cl-edit-f"><span class="cl-edit-lbl">Number</span>'+
         '<input class="cl-edit-in" id="ced-phone-'+id+'" type="tel" value="'+clEsc(phonePretty)+'" /></div>'+
       '<div class="cl-edit-f full"><span class="cl-edit-lbl">Reason</span>'+
-        '<input class="cl-edit-in" id="ced-reason-'+id+'" type="text" value="'+clEsc(r.reason||'')+'" oninput="clEditReasonChanged(\''+id+'\')" /></div>'+
+        '<input class="cl-edit-in" id="ced-reason-'+id+'" type="text" value="'+clEsc(r.reason||'')+'" oninput="clEditReasonChanged(\''+id+'\')" />'+
+        '<div class="cl-rs-hint" id="ced-rs-hint-'+id+'" aria-live="polite"></div></div>'+
       '<div class="cl-edit-f full" id="ced-note-wrap-'+id+'"><span class="cl-edit-lbl">Note</span>'+
         '<textarea class="cl-edit-in" id="ced-note-'+id+'">'+clEsc(r.note||'')+'</textarea></div>'+
       (/^placement$/i.test(((r.for_team||r.team||'')).trim())
@@ -2552,6 +2585,7 @@ function clEditRow(id){
 // was rendered).
 function clEditReasonChanged(id){
   const rs=document.getElementById('ced-reason-'+id);
+  clReasonHint(rs, document.getElementById('ced-rs-hint-'+id));
   const chkWrap=document.getElementById('ced-plc-chk-wrap-'+id);
   if(!chkWrap) return;   // not a Placement call — nothing to toggle
   const noteWrap=document.getElementById('ced-note-wrap-'+id);
@@ -2597,8 +2631,9 @@ async function clEditSave(id){
   if(!nmEl||!phEl||!rsEl||!ntEl) return;
 
   const name=(nmEl.value||'').trim();
-  const reason=(rsEl.value||'').trim();
-  const note=(ntEl.value||'').trim();
+  let reason=(rsEl.value||'').trim();
+  let note=(ntEl.value||'').trim();
+  { const _sp=clSplitReason(reason, note); reason=_sp.reason; note=_sp.note; }
   const phone=clToE164(phEl.value);
 
   nmEl.classList.toggle('err', !name);
