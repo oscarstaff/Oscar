@@ -2491,6 +2491,11 @@ function clEditRow(id){
   if(!box) return;
   if(box.classList.contains('on')){ clEditCancel(id); return; }  // toggle off
   const phonePretty=clFmtPhone(r.phone_e164)||r.phone_e164||'';
+  const _dirNow=(r.direction==='out')?'out':'in';
+  box.dataset.dir=_dirNow;
+  // A row someone else genuinely rang back keeps that record — reopening it
+  // would erase who called back. Handled-on-the-spot rows stay toggleable.
+  const _cbLocked=!!r.resolved_at && r.resolved_by!==r.logged_by;
   box.innerHTML=
     '<div class="cl-edit-grid">'+
       '<div class="cl-edit-f"><span class="cl-edit-lbl">Caller</span>'+
@@ -2513,6 +2518,17 @@ function clEditRow(id){
               'placeholder="e.g. offered Aubrey Downer — SAKS; denied, wants after 3 weeks">'+
               clEsc(r.plc_remarks||'')+'</textarea></div>'
         : '')+
+      '<div class="cl-edit-f"><span class="cl-edit-lbl">Direction</span>'+
+        '<div class="cl-dir" role="group" aria-label="Call direction">'+
+          '<button type="button" class="cl-dir-btn'+(_dirNow==='in'?' active':'')+'" id="ced-dir-in-'+id+'" '+
+            'onclick="event.stopPropagation();clEditSetDir(\''+id+'\',\'in\')">Incoming</button>'+
+          '<button type="button" class="cl-dir-btn'+(_dirNow==='out'?' active':'')+'" id="ced-dir-out-'+id+'" '+
+            'onclick="event.stopPropagation();clEditSetDir(\''+id+'\',\'out\')">Outgoing</button>'+
+        '</div></div>'+
+      '<div class="cl-edit-f"><span class="cl-edit-lbl">Status</span>'+
+        '<label class="cl-edit-plc-chk"'+(_cbLocked?' title="Already called back by '+clEsc(r.resolved_by||'')+' — use Relog for a new follow-up" style="opacity:.55;cursor:not-allowed;"':'')+'>'+
+          '<input type="checkbox" id="ced-cb-'+id+'"'+(!r.resolved_at?' checked':'')+(_cbLocked?' disabled':'')+' />'+
+          '<span>Needs a call back</span></label></div>'+
     '</div>'+
     '<div class="cl-edit-act">'+
       '<button class="cl-edit-btn" onclick="event.stopPropagation();clEditCancel(\''+id+'\')">Cancel</button>'+
@@ -2545,6 +2561,16 @@ function clEditReasonChanged(id){
 function clEditCancel(id){
   const box=document.getElementById('cledit-'+id);
   if(box){ box.classList.remove('on'); box.innerHTML=''; }
+  clFlushHeldRefresh();
+}
+
+function clEditSetDir(id,d){
+  const box=document.getElementById('cledit-'+id);
+  if(!box) return;
+  box.dataset.dir=(d==='out')?'out':'in';
+  const a=document.getElementById('ced-dir-in-'+id), b=document.getElementById('ced-dir-out-'+id);
+  if(a) a.classList.toggle('active', box.dataset.dir==='in');
+  if(b) b.classList.toggle('active', box.dataset.dir==='out');
 }
 
 // Show/hide the remarks box in the editor when "Placement offered" is toggled.
@@ -2595,6 +2621,20 @@ async function clEditSave(id){
   const _patch={caller_name:name, phone_e164:phone, reason:reason,
     note: _onOfferPath ? null : (note||null),
     edited_at:new Date().toISOString()};
+  // Direction + callback state.
+  const _box=document.getElementById('cledit-'+id);
+  if(_box && _box.dataset.dir) _patch.direction=(_box.dataset.dir==='out')?'out':'in';
+  const cbEl=document.getElementById('ced-cb-'+id);
+  if(cbEl && !cbEl.disabled){
+    const wantOpen=!!cbEl.checked, isOpen=!r.resolved_at;
+    if(wantOpen && !isOpen){
+      _patch.resolved_at=null; _patch.resolved_by=null;
+    }else if(!wantOpen && isOpen){
+      // Handled on the spot: stamped at the call's own time by its logger,
+      // so the card reads "Handled", not "Called back".
+      _patch.resolved_at=r.created_at; _patch.resolved_by=r.logged_by;
+    }
+  }
   if(plcEl){
     // Only the offer path can set these; off-path clears them so a reason edit
     // that removes "offer" doesn't leave an orphaned placement flag.
@@ -3033,6 +3073,7 @@ function clRenderQueue(){
       '<div class="cl-edit" id="cledit-'+r.id+'"></div>'+
     '</article>';
   }).join('');
+  clRestoreStacks();
 }
 
 /**
@@ -3471,9 +3512,19 @@ function clScheduleQueueRefresh(){
       if(typed) return;   // stays dirty; applied on focus-out
     }
 
+    // Hold while a card's inline editor is open. A re-render rebuilds every
+    // card, which silently wiped the editor mid-edit whenever a colleague
+    // logged a call. Stays dirty; clEditCancel/clEditSave flush it.
+    if(document.querySelector('#clQueueBody .cl-edit.on')) return;
+
     _clQueueDirty = false;
     clLoadQueue();
   }, 2500);
+}
+
+/** Apply a live refresh that was held back while an editor was open. */
+function clFlushHeldRefresh(){
+  if(window._clQueueDirty) clScheduleQueueRefresh();
 }
 
 
@@ -3484,6 +3535,21 @@ function clToggleStack(id){
   if(!el) return;
   const on=el.classList.toggle('on');
   if(b) b.classList.toggle('on',on);
+  // Remember it so a live refresh doesn't snap it shut 2-3s later.
+  window._clOpenStacks = window._clOpenStacks || new Set();
+  if(on) window._clOpenStacks.add(id); else window._clOpenStacks.delete(id);
+}
+window._clOpenStacks = window._clOpenStacks || new Set();
+/** Re-open any stacks the person had expanded before a re-render. */
+function clRestoreStacks(){
+  if(!window._clOpenStacks) return;
+  window._clOpenStacks.forEach(function(id){
+    const el=document.getElementById('clstk-'+id);
+    if(!el){ return; }            // card gone from this view — keep the memory
+    el.classList.add('on');
+    const b=document.getElementById('clatt-'+id);
+    if(b) b.classList.add('on');
+  });
 }
 
 /* ── Caller history card ──────────────────────────────────────────
