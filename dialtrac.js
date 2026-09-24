@@ -551,6 +551,12 @@ select.cl-in{appearance:none;-webkit-appearance:none;cursor:pointer;padding-righ
 .cl-edit{display:none;margin-top:10px;padding:16px;border-radius:11px;
   background:var(--m-card-2);border:1px solid var(--accent-bd,var(--m-border));}
 .cl-edit.on{display:block;}
+/* The card is a flex row (main | actions). Let the editor wrap onto its own
+   full-width line underneath instead of squeezing in as a third column. */
+.cl-card:has(.cl-edit.on){flex-wrap:wrap;}
+.cl-card .cl-edit.on{flex:0 0 100%;width:100%;box-sizing:border-box;margin-top:4px;}
+.cl-edit .cl-dir{width:100%;box-sizing:border-box;}
+.cl-edit .cl-edit-plc-chk{white-space:nowrap;min-height:38px;box-sizing:border-box;}
 .cl-edit-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;}
 .cl-edit-f{display:flex;flex-direction:column;gap:4px;}
 .cl-edit-f.full{grid-column:1 / -1;}
