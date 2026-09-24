@@ -5499,6 +5499,63 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
      its version. Stays a MINIMUM of 5s (so nobody taps a half-loaded page), lifts
      once version-check + data are done, and is HARD-CAPPED at 15s so it can never
      hang (a failed version fetch / crash still lets people in). -->
+<!-- ── NEXUS SKELETON KIT ─────────────────────────────────────────────────
+     One shared set of shimmer placeholders for every tab. JS calls
+     nxSkel(kind, n) to get HTML; static markup uses
+     <div class="nx-sk" data-sk="kind" data-n="n"></div>, filled on load.
+     Kinds: list (avatar + 2 lines), cards, table, lines, inline. -->
+<style>
+.nx-sk-wrap{display:flex;flex-direction:column;gap:10px;width:100%;text-align:left;}
+.nx-sk-wrap .skel{display:block;}
+.nx-sk-row{display:flex;align-items:center;gap:11px;padding:6px 2px;}
+.nx-sk-row .nx-sk-ava{width:32px;height:32px;border-radius:50%;flex-shrink:0;}
+.nx-sk-row .nx-sk-lines{flex:1;display:flex;flex-direction:column;gap:7px;min-width:0;}
+.nx-sk-card{padding:14px 16px;border-radius:12px;border:1px solid var(--ui-line,#e2e8f0);
+  background:var(--ui-surface,#fff);display:flex;flex-direction:column;gap:9px;}
+.nx-sk-tr{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:12px;padding:8px 0;
+  border-bottom:1px solid var(--ui-line-soft,#f1f5f9);}
+.nx-sk-tr:first-child .skel{opacity:.7;}
+:is([data-theme="dark"],[data-theme="midnight"],[data-theme="renaissance"]) .nx-sk-card{background:#1a2436;border-color:#2d3f55;}
+:is([data-theme="dark"],[data-theme="midnight"],[data-theme="renaissance"]) .nx-sk-tr{border-color:#2d3f55;}
+@media(prefers-reduced-motion:reduce){ .nx-sk-wrap .skel,.skel{animation:none !important;} }
+</style>
+<script>
+(function(){
+  // Widths vary per row so the placeholder reads as content, not a barcode.
+  var W=[92,68,80,56,74,62,86,70];
+  function bar(w,h,extra){ return '<span class="skel" style="width:'+w+'%;height:'+(h||11)+'px;'+(extra||'')+'"></span>'; }
+  window.nxSkel=function(kind,n){
+    n=Math.max(1,Math.min(12,parseInt(n,10)||3));
+    var i,h='';
+    switch(kind){
+      case 'inline':
+        return '<span class="skel" style="width:90px;height:10px;display:inline-block;" aria-hidden="true"></span>';
+      case 'cards':
+        for(i=0;i<n;i++) h+='<div class="nx-sk-card">'+bar(W[i%8]*0.6,14)+bar(W[(i+3)%8])+bar(30,10,'margin-top:3px;')+'</div>';
+        break;
+      case 'table':
+        for(i=0;i<n;i++) h+='<div class="nx-sk-tr">'+bar(W[i%8],11)+bar(70,11)+bar(55,11)+bar(60,11)+'</div>';
+        break;
+      case 'lines':
+        for(i=0;i<n;i++) h+=bar(W[(i*3)%8],11);
+        break;
+      default: // list
+        for(i=0;i<n;i++) h+='<div class="nx-sk-row"><span class="skel nx-sk-ava"></span><div class="nx-sk-lines">'+
+          bar(W[i%8]*0.55,11)+bar(W[(i+4)%8]*0.85,9)+'</div></div>';
+    }
+    return '<div class="nx-sk-wrap" role="status" aria-label="Loading">'+h+'</div>';
+  };
+  // Fill static placeholders. Safe to call repeatedly.
+  window.nxSkelHydrate=function(root){
+    (root||document).querySelectorAll('.nx-sk:not([data-done])').forEach(function(el){
+      el.setAttribute('data-done','1');
+      el.innerHTML=window.nxSkel(el.getAttribute('data-sk'),el.getAttribute('data-n'));
+    });
+  };
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',function(){ window.nxSkelHydrate(); });
+  else window.nxSkelHydrate();
+})();
+</script>
 <div id="nexusBootOverlay">
   <!-- Desktop: ghost left sidebar (hidden on mobile) -->
   <div class="nbk-side">
@@ -5952,7 +6009,7 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
       </button>
       <div class="notif-drop" id="mhNotifDrop" style="right:8px;left:auto;">
         <div class="notif-drop-header">Notifications</div>
-        <div id="mhNotifDropList"><div class="notif-drop-empty" style="color:var(--ui-ink-3,#64748b);padding:30px 16px;text-align:center;">Loading notifications...</div></div>
+        <div id="mhNotifDropList"><div class="notif-drop-empty" style="color:var(--ui-ink-3,#64748b);padding:30px 16px;text-align:center;"><div class="nx-sk" data-sk="list" data-n="4" aria-hidden="true"></div></div></div>
       </div>
     </div>
   </div>
@@ -5975,7 +6032,7 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
         </button>
         <div class="notif-drop" id="notifDrop">
           <div class="notif-drop-header">Notifications</div>
-          <div id="notifDropList"><div class="notif-drop-empty" style="color:var(--ui-ink-3,#64748b);padding:30px 16px;text-align:center;">Loading notifications...</div></div>
+          <div id="notifDropList"><div class="notif-drop-empty" style="color:var(--ui-ink-3,#64748b);padding:30px 16px;text-align:center;"><div class="nx-sk" data-sk="list" data-n="4" aria-hidden="true"></div></div></div>
         </div>
       </div>
     </div>
@@ -6071,7 +6128,7 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
               <div class="cc-lbl">Time clock</div>
               <div id="nepaliDateBadge" class="cc-npd"></div>
             </div>
-            <div id="clockStatus" class="cc-status">Loading...</div>
+            <div id="clockStatus" class="cc-status"><span class="skel" style="width:140px;height:20px;border-radius:8px;" aria-label="Loading"></span></div>
             <div id="clockSubStatus" class="cc-sub"></div>
           </div>
           <div class="cc-head-right">
@@ -6151,7 +6208,7 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
           <div class="card-title">Upcoming events</div>
           <button onclick="goTo('calendar')" style="background:none;border:none;color:#3b82f6;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">Calendar →</button>
         </div>
-        <div id="homeCalList"><div style="padding:18px;text-align:center;color:var(--ui-ink-4,#94a3b8);font-size:12px;">Loading...</div></div>
+        <div id="homeCalList"><div style="padding:18px;text-align:center;color:var(--ui-ink-4,#94a3b8);font-size:12px;"><div class="nx-sk" data-sk="list" data-n="3" aria-hidden="true"></div></div></div>
       </div>
 
       <!-- Onboarding card — compact strip style -->
@@ -6185,7 +6242,7 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
       <!-- Full feed -->
       <div class="card" style="padding:8px 6px;">
         <div style="font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--ui-ink-4,#94a3b8);margin:8px 10px 4px;">Recent activity</div>
-        <div id="achFeedList"><div style="text-align:center;color:var(--ui-ink-4,#94a3b8);padding:28px;font-size:13px;">Loading…</div></div>
+        <div id="achFeedList"><div style="text-align:center;color:var(--ui-ink-4,#94a3b8);padding:28px;font-size:13px;"><div class="nx-sk" data-sk="list" data-n="4" aria-hidden="true"></div></div></div>
       </div>
     </div>
 
@@ -6372,7 +6429,7 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
       </div>
 
       <!-- List -->
-      <div id="taskList"><div style="color:var(--ui-ink-4,#94a3b8);font-size:13px;">Loading...</div></div>
+      <div id="taskList"><div style="color:var(--ui-ink-4,#94a3b8);font-size:13px;"><div class="nx-sk" data-sk="lines" data-n="3" aria-hidden="true"></div></div></div>
     </div>
 
     <!-- CALENDAR: Full month view -->
@@ -6395,12 +6452,12 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
             <button class="kudos-tab" data-kf="mine" onclick="kudosSetFilter('mine',this)">For me</button>
             <button class="kudos-tab" data-kf="sent" onclick="kudosSetFilter('sent',this)">I sent</button>
           </div>
-          <div id="kudosFeed"><div class="kudos-loading">Loading the wall…</div></div>
+          <div id="kudosFeed"><div class="kudos-loading"><div class="nx-sk" data-sk="cards" data-n="3" aria-hidden="true"></div></div></div>
         </div>
         <div class="kudos-side-col">
           <div class="kudos-board">
             <div class="kudos-board-title"><i class="fa-solid fa-trophy"></i> Top this month</div>
-            <div id="kudosLeaderboard"><div class="kudos-loading">…</div></div>
+            <div id="kudosLeaderboard"><div class="kudos-loading"><div class="nx-sk" data-sk="list" data-n="4" aria-hidden="true"></div></div></div>
           </div>
           <div class="kudos-board kudos-stats">
             <div class="kudos-board-title"><i class="fa-solid fa-chart-simple"></i> Your kudos</div>
@@ -6607,7 +6664,7 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
         <!-- Admin: all staff availability grid -->
         <div id="adminAvailSection" style="display:none;margin-top:20px;">
           <div style="font-size:11px;font-weight:700;color:var(--ui-ink-4,#94a3b8);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;">All staff availability</div>
-          <div id="adminContent"><div style="color:var(--ui-ink-4,#94a3b8);text-align:center;padding:24px;font-size:13px;">Loading...</div></div>
+          <div id="adminContent"><div style="color:var(--ui-ink-4,#94a3b8);text-align:center;padding:24px;font-size:13px;"><div class="nx-sk" data-sk="table" data-n="6" aria-hidden="true"></div></div></div>
         </div>
       </div>
 
@@ -6691,7 +6748,7 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
         <button onclick="markAllNotifsRead()" style="background:none;border:1px solid var(--ui-line,#e2e8f0);border-radius:8px;padding:7px 14px;font-size:12px;font-weight:600;color:var(--ui-ink-2b,#475569);cursor:pointer;font-family:inherit;">Mark all read</button>
       </div>
       <div id="notifsPageList" style="margin-top:8px;">
-        <div style="padding:40px 16px;text-align:center;color:var(--ui-ink-4,#94a3b8);font-size:13px;">Loading...</div>
+        <div style="padding:40px 16px;text-align:center;color:var(--ui-ink-4,#94a3b8);font-size:13px;"><div class="nx-sk" data-sk="list" data-n="6" aria-hidden="true"></div></div>
       </div>
     </div>
 
@@ -6713,14 +6770,14 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
             <button onclick="runHoursReport()" class="btn btn-green" style="padding:9px 16px;font-size:12px;">Run</button>
           </div>
         </div>
-        <div id="hoursReportResults" class="card" style="padding:16px;">Loading...</div>
+        <div id="hoursReportResults" class="card" style="padding:16px;"><div class="nx-sk" data-sk="table" data-n="5" aria-hidden="true"></div></div>
         <div class="card" id="fortReportCard" style="margin-bottom:14px;margin-top:14px;padding:16px;">
           <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:4px;">
             <div class="card-title" style="margin:0;">Fortnight report</div>
             <button id="fortReplayBtn" onclick="openFortReport()" style="padding:8px 14px;border:none;border-radius:8px;background:var(--accent);color:#fff;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;">View slideshow ›</button>
           </div>
           <div id="fortStreakMount" style="margin-top:10px;"></div>
-          <div id="fortLeaderboardMount" style="margin-top:10px;"><div style="font-size:12px;color:var(--ui-ink-4,#94a3b8);">Loading…</div></div>
+          <div id="fortLeaderboardMount" style="margin-top:10px;"><div style="font-size:12px;color:var(--ui-ink-4,#94a3b8);"><div class="nx-sk" data-sk="list" data-n="4" aria-hidden="true"></div></div></div>
         </div>
       </div>
       <div id="rsec-manager" style="display:none;">
@@ -6737,7 +6794,7 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
         </div>
         <div class="card" style="margin-bottom:14px;">
           <div class="card-title" style="margin-bottom:10px;">Extra break requests</div>
-          <div id="ebrAdminList" style="margin:-6px -6px 0;"><div style="padding:14px;color:var(--ui-ink-4,#94a3b8);font-size:13px;">Loading...</div></div>
+          <div id="ebrAdminList" style="margin:-6px -6px 0;"><div style="padding:14px;color:var(--ui-ink-4,#94a3b8);font-size:13px;"><div class="nx-sk" data-sk="list" data-n="3" aria-hidden="true"></div></div></div>
         </div>
         <div class="card" style="margin-bottom:14px;">
           <div class="card-title" style="margin-bottom:12px;">Edit any staff member's punches</div>
@@ -6776,7 +6833,7 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
         <!-- Staff: this week's entries (shown first — overview before the form) -->
         <div class="card" id="trMyWeekCard" style="margin-bottom:14px;padding:16px;">
           <div class="card-title" style="margin-bottom:10px;">Your week so far</div>
-          <div id="trMyWeek"><div style="font-size:12px;color:var(--ui-ink-4,#94a3b8);">Loading…</div></div>
+          <div id="trMyWeek"><div style="font-size:12px;color:var(--ui-ink-4,#94a3b8);"><div class="nx-sk" data-sk="lines" data-n="3" aria-hidden="true"></div></div></div>
         </div>
 
         <div class="card" id="trEntryCard" style="margin-bottom:14px;padding:16px;">
@@ -6787,7 +6844,7 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
           <div style="font-size:11.5px;color:var(--ui-ink-3,#64748b);margin:2px 0 14px;max-width:60ch;">Log your work for the day. You can update it any time during the week; the totals roll up into the weekly report.</div>
 
           <div id="trMetricFields" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:14px;">
-            <div style="font-size:12px;color:var(--ui-ink-4,#94a3b8);">Loading metrics…</div>
+            <div style="font-size:12px;color:var(--ui-ink-4,#94a3b8);"><div class="nx-sk" data-sk="lines" data-n="2" aria-hidden="true"></div></div>
           </div>
           <div style="margin-bottom:12px;">
             <label class="tr-lbl">Today's tasks <span style="color:var(--ui-ink-4,#94a3b8);font-weight:500;">(one per line — these appear in the weekly checklist)</span></label>
@@ -6805,7 +6862,7 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
         <div class="card" id="trMetricAdminCard" style="margin-bottom:14px;padding:16px;display:none;">
           <div class="card-title" style="margin-bottom:4px;">Manage metrics</div>
           <div style="font-size:11.5px;color:var(--ui-ink-3,#64748b);margin-bottom:12px;max-width:60ch;">Add, rename, reorder, or archive the metrics your team logs each day. Archiving hides a metric from the form and future reports but keeps past data. Calls are counted automatically and aren't listed here.</div>
-          <div id="trMetricList"><div style="font-size:12px;color:var(--ui-ink-4,#94a3b8);">Loading…</div></div>
+          <div id="trMetricList"><div style="font-size:12px;color:var(--ui-ink-4,#94a3b8);"><div class="nx-sk" data-sk="list" data-n="4" aria-hidden="true"></div></div></div>
           <div style="display:flex;gap:8px;align-items:center;margin-top:12px;flex-wrap:wrap;">
             <input type="text" id="trNewMetric" placeholder="New metric name (e.g. Certificates Sent)" maxlength="40" style="flex:1;min-width:180px;border:1.5px solid var(--ui-line,#e2e8f0);border-radius:8px;padding:8px 12px;font-size:13px;font-family:inherit;outline:none;" onkeydown="if(event.key==='Enter')trAddMetric()">
             <button onclick="trAddMetric()" class="btn btn-green" style="padding:9px 16px;font-size:12px;">Add metric</button>
@@ -6898,7 +6955,7 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
   </div>
 
   <div id="trainingList">
-    <div style="padding:40px 16px;text-align:center;color:var(--ui-ink-4,#94a3b8);font-size:13px;">Loading your training items...</div>
+    <div style="padding:40px 16px;text-align:center;color:var(--ui-ink-4,#94a3b8);font-size:13px;"><div class="nx-sk" data-sk="cards" data-n="3" aria-hidden="true"></div></div>
   </div>
 </div>
 
@@ -9203,7 +9260,7 @@ function showProfileSection(sec){
 async function loadAdminAvailGrid(){
   const el=document.getElementById("adminContent");
   if(!el)return;
-  el.innerHTML='<div style="color:var(--ui-ink-4,#94a3b8);font-size:13px;text-align:center;padding:16px;">Loading...</div>';
+  el.innerHTML='<div style="color:var(--ui-ink-4,#94a3b8);font-size:13px;text-align:center;padding:16px;">'+nxSkel('table',6)+'</div>';
   let availRows=[];
   try{const r=await fetch(SB+"/rest/v1/staff_availability?select=*",{headers:{"apikey":KEY,"Authorization":"Bearer "+KEY}});if(r.ok)availRows=await r.json();}catch(e){console.warn(e);}
   const typeCol={all:"var(--accent)",no:"#dc2626",custom:"#0ea5e9"};
@@ -12333,7 +12390,7 @@ function closeProfilePage(){
 
 async function openStaffDirectory(){
   document.getElementById('staffDirectoryOverlay').style.display='flex';
-  document.getElementById('staffDirList').innerHTML='<div style="text-align:center;color:var(--ui-ink-4,#94a3b8);padding:32px;font-size:13px;">Loading...</div>';
+  document.getElementById('staffDirList').innerHTML='<div style="text-align:center;color:var(--ui-ink-4,#94a3b8);padding:32px;font-size:13px;">'+nxSkel('list',6)+'</div>';
   // Show bulk-access bar for admins
   const _bb = document.getElementById('sdQuizBulkBar');
   if(_bb) _bb.style.display = "none"; // Bulk bar removed — per-quiz controls now
@@ -12959,6 +13016,8 @@ function toggleSection(id){
 }
 
 async function loadProfilePage(){
+  // Name is filled after an await below — hold its place until then.
+  try{ const _pn=document.getElementById("profName"); if(_pn && !_pn.textContent.trim()) _pn.innerHTML=nxSkel('inline'); }catch(e){}
   // Set avatar and name
   const ava=me.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase();
   try{ await loadGlowData(); }catch(e){}
@@ -16574,7 +16633,7 @@ async function openReportsModal(){
       '<div style="flex:1;min-width:130px;"><label style="font-size:11px;font-weight:600;color:var(--ui-ink-3,#64748b);">To</label><input type="date" id="reportEnd" value="'+fmt(today)+'" style="width:100%;border:1.5px solid var(--ui-line,#e2e8f0);border-radius:8px;padding:8px 12px;font-size:13px;font-family:inherit;outline:none;margin-top:3px;"></div>'+
       '<button onclick="runReport()" class="btn btn-green" style="padding:9px 16px;font-size:12px;">Run</button>'+
     '</div>'+
-    '<div id="reportResults" style="padding:16px 18px;max-height:55dvh;overflow-y:auto;">Loading...</div>'+
+    '<div id="reportResults" style="padding:16px 18px;max-height:55dvh;overflow-y:auto;">'+nxSkel('table',5)+'</div>'+
   '</div>';
   bd.style.display='flex';
   setTimeout(runReport, 50);
@@ -16587,7 +16646,7 @@ async function runReport(){
   if(!startStr || !endStr){ el.innerHTML = '<div style="color:#dc2626;">Pick both dates.</div>'; return; }
   const start = new Date(startStr+'T00:00:00');
   const end = new Date(endStr+'T23:59:59');
-  el.innerHTML = '<div style="color:var(--ui-ink-4,#94a3b8);text-align:center;padding:20px;">Loading...</div>';
+  el.innerHTML = '<div style="color:var(--ui-ink-4,#94a3b8);text-align:center;padding:20px;">'+nxSkel('table',5)+'</div>';
   // Determine target staff
   const targetStaff = _reportTargetStaff || me;
   // Fetch logs for target (could be self or other when admin)
@@ -17563,7 +17622,7 @@ function openExtraBreakRequest(){
     // like the request vanished. Loads after the modal renders.
     '<div id="ebrHistory" style="border-top:1px solid var(--ui-line-soft,#f1f5f9);padding:14px 18px;max-height:210px;overflow-y:auto;">'+
       '<div style="font-size:11px;font-weight:700;color:var(--ui-ink-3,#64748b);text-transform:uppercase;letter-spacing:.04em;margin-bottom:10px;">Your recent requests</div>'+
-      '<div id="ebrHistoryBody" style="font-size:12.5px;color:var(--ui-ink-4,#94a3b8);">Loading…</div>'+
+      '<div id="ebrHistoryBody" style="font-size:12.5px;color:var(--ui-ink-4,#94a3b8);">'+nxSkel('lines',3)+'</div>'+
     '</div>'+
   '</div>';
   bd.style.display = 'flex';
@@ -17847,7 +17906,7 @@ async function showDiscReaders(id){
     document.body.appendChild(bd);
     bd.addEventListener('click', function(e){ if(e.target===bd) bd.style.display='none'; });
   }
-  bd.innerHTML = '<div style="background:var(--ui-surface,#fff);border-radius:14px;width:100%;max-width:420px;max-height:70dvh;display:flex;flex-direction:column;overflow:hidden;" onclick="event.stopPropagation()"><div style="padding:14px 18px;border-bottom:1px solid var(--ui-line-soft,#f1f5f9);display:flex;justify-content:space-between;align-items:center;"><div><div style="font-size:13px;font-weight:700;color:var(--ui-ink,#0f172a);">Read by</div><div style="font-size:11.5px;color:var(--ui-ink-3,#64748b);margin-top:2px;">'+esc(disc.title)+'</div></div><button onclick="document.getElementById(\'discReadersBack\').style.display=\'none\'" style="background:none;border:none;font-size:22px;color:var(--ui-ink-4,#94a3b8);cursor:pointer;">×</button></div><div id="discReadersList" style="padding:12px 18px;overflow-y:auto;">Loading...</div></div>';
+  bd.innerHTML = '<div style="background:var(--ui-surface,#fff);border-radius:14px;width:100%;max-width:420px;max-height:70dvh;display:flex;flex-direction:column;overflow:hidden;" onclick="event.stopPropagation()"><div style="padding:14px 18px;border-bottom:1px solid var(--ui-line-soft,#f1f5f9);display:flex;justify-content:space-between;align-items:center;"><div><div style="font-size:13px;font-weight:700;color:var(--ui-ink,#0f172a);">Read by</div><div style="font-size:11.5px;color:var(--ui-ink-3,#64748b);margin-top:2px;">'+esc(disc.title)+'</div></div><button onclick="document.getElementById(\'discReadersBack\').style.display=\'none\'" style="background:none;border:none;font-size:22px;color:var(--ui-ink-4,#94a3b8);cursor:pointer;">×</button></div><div id="discReadersList" style="padding:12px 18px;overflow-y:auto;">'+nxSkel('list',4)+'</div></div>';
   bd.style.display = 'flex';
   try{
     const reads = [];
@@ -18190,7 +18249,7 @@ async function trRenderMyWeek(){
   var sun = _trAddDays(mon, TR_WEEK_DAYS-1);  // Saturday
   var thisMon = _trMonday(_trToday());
   var isCurrentWeek = (mon === thisMon);
-  mount.innerHTML = '<div style="font-size:12px;color:var(--ui-ink-4,#94a3b8);">Loading…</div>';
+  mount.innerHTML = '<div style="font-size:12px;color:var(--ui-ink-4,#94a3b8);">'+nxSkel('lines',3)+'</div>';
   try{
     var url = SB + '/rest/v1/processing_reports?staff_name=eq.' + encodeURIComponent(me) +
               '&report_date=gte.' + mon + '&report_date=lte.' + sun + '&order=report_date.asc';
@@ -18607,7 +18666,7 @@ async function runHoursReport(){
   const endStr = document.getElementById('reportPageEnd').value;
   const el = document.getElementById('hoursReportResults');
   if(!startStr || !endStr){ el.innerHTML = '<div style="color:#dc2626;">Pick both dates.</div>'; return; }
-  el.innerHTML = '<div style="color:var(--ui-ink-4,#94a3b8);text-align:center;padding:20px;">Loading...</div>';
+  el.innerHTML = '<div style="color:var(--ui-ink-4,#94a3b8);text-align:center;padding:20px;">'+nxSkel('table',5)+'</div>';
   await renderHoursTable(me, startStr, endStr, el, false);
 }
 
@@ -18618,7 +18677,7 @@ async function runManagerReport(){
   const el = document.getElementById('mgrReportResults');
   if(!staff){ el.innerHTML = '<div style="color:var(--ui-ink-4,#94a3b8);text-align:center;padding:20px;">Pick a staff member to view their punches.</div>'; return; }
   if(!startStr || !endStr){ el.innerHTML = '<div style="color:#dc2626;">Pick both dates.</div>'; return; }
-  el.innerHTML = '<div style="color:var(--ui-ink-4,#94a3b8);text-align:center;padding:20px;">Loading...</div>';
+  el.innerHTML = '<div style="color:var(--ui-ink-4,#94a3b8);text-align:center;padding:20px;">'+nxSkel('table',5)+'</div>';
   await renderHoursTable(staff, startStr, endStr, el, true);
 }
 
@@ -18922,7 +18981,7 @@ async function debugClockLog(){
   const staff = document.getElementById('mgrStaffSel').value || me;
   const startStr = document.getElementById('mgrStart').value || new Date().toISOString().split('T')[0];
   const endStr = document.getElementById('mgrEnd').value || new Date().toISOString().split('T')[0];
-  out.innerHTML = '<div style="color:var(--ui-ink-4,#94a3b8);">Loading...</div>';
+  out.innerHTML = '<div style="color:var(--ui-ink-4,#94a3b8);">'+nxSkel('lines',3)+'</div>';
   try{
     const rows = await sbGet('clock_log','?staff_name=eq.'+encodeURIComponent(staff)+'&order=ts.desc&limit=50');
     if(!rows.length){ out.innerHTML = '<div>No clock_log rows for '+staff+'.</div>'; return; }
@@ -20420,7 +20479,7 @@ async function loadFortLeaderboard(){
   const fw=_lastFortnight();
   if(!fw || !_fortReportShowable(fw)){ if(card) card.style.display='none'; return; }
   if(card) card.style.display='';
-  mount.innerHTML='<div style="font-size:12px;color:var(--ui-ink-4,#94a3b8);">Loading…</div>';
+  mount.innerHTML='<div style="font-size:12px;color:var(--ui-ink-4,#94a3b8);">'+nxSkel('list',4)+'</div>';
 
   // Personal work streak (private — this card is only shown to the viewer).
   const streakEl=document.getElementById('fortStreakMount');
@@ -21809,7 +21868,7 @@ function _filterPublished(rows, pub){
 async function loadMyRoster(){
   const host=document.getElementById('myRosterList');
   if(!host) return;
-  host.innerHTML='<div style="padding:26px 0;text-align:center;color:var(--ui-ink-4,#94a3b8);font-size:13px;">Loading…</div>';
+  host.innerHTML='<div style="padding:26px 0;text-align:center;color:var(--ui-ink-4,#94a3b8);font-size:13px;">'+nxSkel('cards',3)+'</div>';
   try{
     const today=new Date(); today.setHours(0,0,0,0);
     const iso=today.getFullYear()+'-'+String(today.getMonth()+1).padStart(2,'0')+'-'+String(today.getDate()).padStart(2,'0');
@@ -21925,7 +21984,7 @@ async function askReleaseShift(shiftId, btn){
 async function loadShiftPickup(){
   const host=document.getElementById('pickupList');
   if(!host) return;
-  host.innerHTML='<div style="padding:26px 0;text-align:center;color:var(--ui-ink-4,#94a3b8);font-size:13px;">Loading…</div>';
+  host.innerHTML='<div style="padding:26px 0;text-align:center;color:var(--ui-ink-4,#94a3b8);font-size:13px;">'+nxSkel('cards',3)+'</div>';
   try{
     // Resolve the team FRESH every time. myTeam is only populated as a side
     // effect of opening the Documents page, so relying on it meant this tab
@@ -22047,6 +22106,7 @@ async function claimShift(shiftId, btn){
 
 async function loadLeaveHistory(){
   const el=document.getElementById("leaveHistory");
+  if(el && !el.children.length) el.innerHTML=nxSkel('cards',3);
   try{
     const rows=await sbGet("leave_submissions","?staff_name=eq."+encodeURIComponent(me)+"&order=submitted_at.desc");
     // ── Summary strip ──
@@ -22510,13 +22570,16 @@ document.fonts.ready.then(function(){
       }else{
         try{ sessionStorage.removeItem('ou'); }catch(e){}
         document.getElementById('authLayer').style.display='flex';
+        // showAuth lifts the boot skeleton. Without it the skeleton stayed on
+        // top of the login page until its 15s hard cap.
+        showAuth('login');
       }
     }, 280);
   } else {
     (async function(){
       if(await checkResetLink()){ return; }
       if(await restoreAuthSession() || (!AUTH_ONLY_MODE && loadMe())){enterHub();}
-      else{try{ sessionStorage.removeItem('ou'); }catch(e){} document.getElementById('authLayer').style.display='flex';}
+      else{try{ sessionStorage.removeItem('ou'); }catch(e){} document.getElementById('authLayer').style.display='flex'; showAuth('login');}
     })();
   }
 });
@@ -23161,7 +23224,7 @@ function lrnRenderList(){
 async function renderMyTraining(){
   const el = document.getElementById('trainingList');
   if(!el || !me) return;
-  el.innerHTML = '<div style="padding:40px 16px;text-align:center;color:var(--ui-ink-4,#94a3b8);font-size:13px;">Loading...</div>';
+  el.innerHTML = '<div style="padding:40px 16px;text-align:center;color:var(--ui-ink-4,#94a3b8);font-size:13px;">'+nxSkel('cards',3)+'</div>';
   
   try{
     // Parallel fetch of everything we need
@@ -23325,7 +23388,7 @@ async function openQuizAdminPanel(quizId, quizTitleOverride){
     bd.onclick = function(e){ if(e.target===bd) bd.remove(); };
     document.body.appendChild(bd);
   }
-  bd.innerHTML = '<div style="background:var(--ui-surface,#fff);border-radius:16px;width:100%;max-width:680px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 24px 60px rgba(15,23,42,.3);overflow:hidden;" onclick="event.stopPropagation()"><div id="qapBody" style="padding:20px;overflow-y:auto;flex:1;">Loading...</div></div>';
+  bd.innerHTML = '<div style="background:var(--ui-surface,#fff);border-radius:16px;width:100%;max-width:680px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 24px 60px rgba(15,23,42,.3);overflow:hidden;" onclick="event.stopPropagation()"><div id="qapBody" style="padding:20px;overflow-y:auto;flex:1;">'+nxSkel('lines',5)+'</div></div>';
   
   try{
     // Resolve quiz info — could be standard or custom
@@ -24094,7 +24157,7 @@ async function viewCustomQuizResults(quizId, quizTitle){
     bd.onclick = function(e){ if(e.target===bd){ bd.remove(); }};
     document.body.appendChild(bd);
   }
-  bd.innerHTML = '<div style="background:var(--ui-surface,#fff);border-radius:14px;width:100%;max-width:520px;max-height:80vh;display:flex;flex-direction:column;overflow:hidden;" onclick="event.stopPropagation()"><div style="padding:14px 18px;border-bottom:1px solid var(--ui-line-soft,#f1f5f9);"><div style="font-size:14px;font-weight:700;color:var(--ui-ink,#0f172a);">Results — '+quizTitle.replace(/</g,'&lt;')+'</div></div><div id="qrBody" style="padding:18px;overflow-y:auto;flex:1;">Loading...</div></div>';
+  bd.innerHTML = '<div style="background:var(--ui-surface,#fff);border-radius:14px;width:100%;max-width:520px;max-height:80vh;display:flex;flex-direction:column;overflow:hidden;" onclick="event.stopPropagation()"><div style="padding:14px 18px;border-bottom:1px solid var(--ui-line-soft,#f1f5f9);"><div style="font-size:14px;font-weight:700;color:var(--ui-ink,#0f172a);">Results — '+quizTitle.replace(/</g,'&lt;')+'</div></div><div id="qrBody" style="padding:18px;overflow-y:auto;flex:1;">'+nxSkel('list',4)+'</div></div>';
   try{
     const results = await sbGet('custom_quiz_results', '?quiz_id=eq.'+quizId+'&order=created_at.desc');
     let html = '';
@@ -24247,7 +24310,7 @@ async function viewQuizAttemptDetail(staffName, resultId, quizId){
     bd.onclick = function(e){ if(e.target===bd) bd.remove(); };
     document.body.appendChild(bd);
   }
-  bd.innerHTML = '<div style="background:var(--ui-surface,#fff);border-radius:16px;width:100%;max-width:680px;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 24px 60px rgba(15,23,42,.3);overflow:hidden;" onclick="event.stopPropagation()"><div style="padding:14px 18px;border-bottom:1px solid var(--ui-line-soft,#f1f5f9);display:flex;justify-content:space-between;align-items:center;"><div><div style="font-size:14px;font-weight:700;color:var(--ui-ink,#0f172a);">Quiz Review — '+staffName+'</div><div style="font-size:11px;color:var(--ui-ink-3,#64748b);margin-top:2px;">Loading...</div></div><button onclick="document.getElementById(\'quizDetailBack\').remove()" style="background:none;border:none;font-size:22px;color:var(--ui-ink-4,#94a3b8);cursor:pointer;line-height:1;padding:4px 10px;">×</button></div><div id="qdBody" style="padding:18px;overflow-y:auto;flex:1;">Loading...</div></div>';
+  bd.innerHTML = '<div style="background:var(--ui-surface,#fff);border-radius:16px;width:100%;max-width:680px;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 24px 60px rgba(15,23,42,.3);overflow:hidden;" onclick="event.stopPropagation()"><div style="padding:14px 18px;border-bottom:1px solid var(--ui-line-soft,#f1f5f9);display:flex;justify-content:space-between;align-items:center;"><div><div style="font-size:14px;font-weight:700;color:var(--ui-ink,#0f172a);">Quiz Review — '+staffName+'</div><div style="font-size:11px;color:var(--ui-ink-3,#64748b);margin-top:2px;">'+nxSkel('inline',1)+'</div></div><button onclick="document.getElementById(\'quizDetailBack\').remove()" style="background:none;border:none;font-size:22px;color:var(--ui-ink-4,#94a3b8);cursor:pointer;line-height:1;padding:4px 10px;">×</button></div><div id="qdBody" style="padding:18px;overflow-y:auto;flex:1;">'+nxSkel('lines',5)+'</div></div>';
   
   try{
     let r, questions;
@@ -24907,7 +24970,7 @@ function handleMobileBell(e){
       '<span>Notifications</span>'+
       '<button onclick="document.getElementById(\'mhNotifModal\') && (document.getElementById(\'mhNotifModal\').remove(), document.getElementById(\'mhNotifDropList_orig\') && (document.getElementById(\'mhNotifDropList_orig\').id=\'mhNotifDropList\'))" style="background:none;border:none;font-size:20px;line-height:1;color:var(--ui-ink-4,#94a3b8);cursor:pointer;padding:0 4px;">×</button>'+
     '</div>'+
-    '<div id="mhNotifDropList"><div class="notif-drop-empty" style="color:var(--ui-ink-3,#64748b);padding:30px 16px;text-align:center;">Loading notifications...</div></div>'+
+    '<div id="mhNotifDropList"><div class="notif-drop-empty" style="color:var(--ui-ink-3,#64748b);padding:30px 16px;text-align:center;">'+nxSkel('list',4)+'</div></div>'+
   '</div>';
   document.body.appendChild(overlay);
   // Restore original ID when overlay is removed (outside click)
@@ -25023,7 +25086,7 @@ async function loadNotifDrop(dropId){
   // Fall back to legacy data sources
   if(typeof checkTaskReminders==='function') checkTaskReminders();
   if(!el) return;
-  el.innerHTML='<div class="notif-drop-empty" style="color:var(--ui-ink-3,#64748b);padding:30px 16px;text-align:center;">Loading notifications...</div>';
+  el.innerHTML='<div class="notif-drop-empty" style="color:var(--ui-ink-3,#64748b);padding:30px 16px;text-align:center;">'+nxSkel('list',4)+'</div>';
   try{
     // Re-read me at query moment to avoid stale captures
     const _currentMe = me || sessionStorage.getItem('ou') || window.me;
@@ -26674,7 +26737,7 @@ input:focus{
 </style>
 
 <!-- DialTRAC (Call Log tab) — extracted module. Bump ?v= on each deploy. -->
-<script src="dialtrac.js?v=33"></script>
+<script src="dialtrac.js?v=34"></script>
 <script src="quizreview.js?v=2"></script>
 <script src="teamhours.js?v=2"></script>
 <script src="availlock.js?v=8"></script>
