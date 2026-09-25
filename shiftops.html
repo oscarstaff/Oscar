@@ -6994,9 +6994,13 @@ async function loadStaffAccess(s){
   if(adminBox){
     adminBox.checked = !!s.isHubAdmin; // optimistic, corrected below
     try{
-      const arows = await aaGet('staff_settings?select=is_hub_admin&name=eq.'+encodeURIComponent(full));
-      if(arows && arows.length){ adminBox.checked = arows[0].is_hub_admin === true; }
-    }catch(e){ console.warn('loadStaffAccess admin flag', e); }
+      const arows = await aaGet('staff_settings?select=is_hub_admin,is_shift_admin&name=eq.'+encodeURIComponent(full));
+      if(arows && arows.length){
+        adminBox.checked = arows[0].is_hub_admin === true;
+        // Remember the lead flag so the Team Lead box below can reflect it.
+        window._saLeadFlag = arows[0].is_shift_admin === true;
+      } else { window._saLeadFlag = false; }
+    }catch(e){ console.warn('loadStaffAccess admin flag', e); window._saLeadFlag = false; }
   }
   // app access — read this person's rows from app_access
   ['formcraft','slip','borekade','shiftops'].forEach(a=>{ const b=document.getElementById('saAccess_'+a); if(b) b.checked=false; });
@@ -7004,6 +7008,9 @@ async function loadStaffAccess(s){
     const rows = await aaGet('app_access?select=app&staff_name=eq.'+encodeURIComponent(full));
     (rows||[]).forEach(r=>{ const b=document.getElementById('saAccess_'+r.app); if(b) b.checked=true; });
   }catch(e){ console.warn('loadStaffAccess', e); }
+  // Team Lead box reflects is_shift_admin (the flag both apps now use), not just
+  // the raw app_access row — a lead may predate this and lack one or the other.
+  { const so=document.getElementById('saAccess_shiftops'); if(so && window._saLeadFlag) so.checked=true; }
   // if admin, shiftops is implied + locked on
   if(adminBox && adminBox.checked){ onStaffAdminToggle(adminBox); }
   else{ const so=document.getElementById('saAccess_shiftops'); if(so){ so.disabled=false; so.parentElement.style.opacity='1'; } }
@@ -7029,6 +7036,11 @@ async function saveStaffAccess(fullName){
   const HJ={...H,'Content-Type':'application/json'};
   const jobs=[];
   const isAdmin = !!(document.getElementById('saAccess_admin')||{}).checked;
+  // Team Lead checkbox = ShiftOps read-only lead access. It also drives the
+  // Nexus Team Report, which keys leads off staff_settings.is_shift_admin — so
+  // ticking Team Lead must set that flag, not just app_access. Admins are always
+  // leads too (is_shift_admin follows is_hub_admin).
+  const wantLead = isAdmin || !!(document.getElementById('saAccess_shiftops')||{}).checked;
   // app_access for the 3 apps. Admin ALWAYS gets ShiftOps access, even if the
   // ShiftOps box is unticked — admin rights require it.
   for(const app of ['formcraft','slip','borekade','shiftops']){
@@ -7040,7 +7052,8 @@ async function saveStaffAccess(fullName){
       jobs.push(fetch(AA_SB+'/rest/v1/app_access?app=eq.'+encodeURIComponent(app)+'&staff_name=eq.'+encodeURIComponent(fullName),{method:'DELETE',headers:H}));
     }
   }
-  // admin flag ->both is_hub_admin + is_shift_admin.
+  // admin flag → is_hub_admin; lead flag → is_shift_admin (set by the Team Lead
+  // box, and always true for admins).
   // NOTE: a plain POST upsert 409s for anyone who already has a staff_settings
   // row (the merge-duplicates upsert doesn't resolve to an UPDATE, it tries to
   // INSERT and hits unique(name)). Every existing staffer has a row, so admin
@@ -7050,7 +7063,7 @@ async function saveStaffAccess(fullName){
     const patchUrl = AA_SB+'/rest/v1/staff_settings?name=eq.'+encodeURIComponent(fullName);
     const pr = await fetch(patchUrl,{method:'PATCH',
       headers:{...HJ,'Prefer':'return=representation'},
-      body:JSON.stringify({is_hub_admin:isAdmin,is_shift_admin:isAdmin})});
+      body:JSON.stringify({is_hub_admin:isAdmin,is_shift_admin:wantLead})});
     if(pr.ok){
       const rows = await pr.json().catch(()=>[]);
       if(rows && rows.length) return;           // updated existing row
@@ -7060,7 +7073,7 @@ async function saveStaffAccess(fullName){
     // No row to update → insert one.
     const ir = await fetch(AA_SB+'/rest/v1/staff_settings',{method:'POST',
       headers:{...HJ,'Prefer':'return=minimal'},
-      body:JSON.stringify({name:fullName,is_hub_admin:isAdmin,is_shift_admin:isAdmin})});
+      body:JSON.stringify({name:fullName,is_hub_admin:isAdmin,is_shift_admin:wantLead})});
     if(!ir.ok){ _adminWriteFailed = 'HTTP '+ir.status+' '+(await ir.text().catch(()=>'')); }
     else { _adminWriteFailed = null; }   // insert succeeded, clear the patch note
   })());

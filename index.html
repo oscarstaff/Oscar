@@ -6833,6 +6833,16 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
       <!-- TEAM REPORT (Processing team only; report generator is admin-only) -->
       <div id="rsec-teamreport" style="display:none;">
 
+        <!-- Admin: switch which team's report to view -->
+        <div id="trTeamPicker" class="card" style="margin-bottom:14px;padding:12px 16px;display:none;"></div>
+
+        <!-- Placement: lead-authored weekly sections 1–4 -->
+        <div class="card" id="trPlacementCard" style="margin-bottom:14px;padding:16px;display:none;">
+          <div class="card-title" style="margin-bottom:4px;">Weekly report sections (lead)</div>
+          <div style="font-size:11.5px;color:var(--ui-ink-3,#64748b);margin-bottom:12px;max-width:70ch;">Student numbers and issue tables for the week selected below. Section 5 (the daily task grid) is built automatically from each member's daily log.</div>
+          <div id="trPlacementBody"></div>
+        </div>
+
         <!-- Staff daily entry -->
         <!-- Staff: this week's entries (shown first — overview before the form) -->
         <div class="card" id="trMyWeekCard" style="margin-bottom:14px;padding:16px;">
@@ -6874,10 +6884,11 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
           <div id="trMetricMsg" style="font-size:12px;margin-top:8px;"></div>
         </div>
 
-        <!-- Admin: generate the weekly report -->
+        <!-- Admin/lead: generate the weekly report -->
         <div class="card" id="trAdminCard" style="margin-bottom:14px;padding:16px;display:none;">
           <div class="card-title" style="margin-bottom:4px;">Generate weekly report</div>
-          <div style="font-size:11.5px;color:var(--ui-ink-3,#64748b);margin-bottom:12px;max-width:60ch;">Pick any date in the week you want; the report covers that Monday–Sunday for the whole Processing team.</div>
+          <div style="font-size:11.5px;color:var(--ui-ink-3,#64748b);margin-bottom:12px;max-width:60ch;">Pick any date in the week; the report covers that Monday–Saturday for the whole team.</div>
+          <div id="trThemePicker" style="margin-bottom:12px;display:none;"></div>
           <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;">
             <div style="flex:1;min-width:150px;"><label style="font-size:11px;font-weight:600;color:var(--ui-ink-3,#64748b);">Week of</label><input type="date" id="trWeekPick" style="width:100%;border:1.5px solid var(--ui-line,#e2e8f0);border-radius:8px;padding:8px 12px;font-size:13px;font-family:inherit;outline:none;margin-top:3px;"></div>
             <button onclick="trGenerateReport()" class="btn btn-green" style="padding:9px 16px;font-size:12px;">Generate</button>
@@ -6893,6 +6904,14 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
     </div>
 
     <style>
+.pl-sec{margin-bottom:18px;}
+.pl-h{font-size:13px;font-weight:800;color:var(--ui-ink,#0f172a);margin-bottom:8px;}
+.pl-grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
+@media(max-width:640px){ .pl-grid3{grid-template-columns:1fr;} }
+.tr-addrow{margin-top:8px;background:var(--ui-surface-2,#f1f5f9);border:1px solid var(--ui-line,#e2e8f0);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;color:var(--ui-ink-2b,#475569);}
+.tr-addrow:hover{border-color:var(--accent);color:var(--accent);}
+.tr-x{background:none;border:none;color:#cbd5e1;font-size:18px;line-height:1;cursor:pointer;padding:0 4px;}
+.tr-x:hover{color:#dc2626;}
 .tr-lbl{display:block;font-size:11px;font-weight:600;color:var(--ui-ink-3,#64748b);margin-bottom:5px;}
 .tr-num{width:100%;box-sizing:border-box;border:1.5px solid var(--ui-line,#e2e8f0);border-radius:8px;padding:9px 12px;font-size:14px;font-family:inherit;outline:none;}
 .tr-num:focus{border-color:var(--accent);}
@@ -18022,19 +18041,45 @@ function showReportsTab(tab){
 // day; only admins additionally see the "Generate weekly report" card.
 function _isProcessing(){ return String(myTeam||'').trim().toLowerCase() === 'processing'; }
 
+// ── Multi-team Team Report helpers ─────────────────────────────────────────
+// The report opened up from Processing-only to every team. Each team has a
+// "shape" that decides which entry fields and report sections show:
+//   metrics  → Processing: metric grid + tasks + notes
+//   log      → Enrolment/Evershine: tasks + notes only
+//   placement→ Placement: tasks + notes, plus lead-authored weekly sections
+var TR_SHAPES = { processing:'metrics', enrolment:'log', evershine:'log', placement:'placement' };
+function _teamKey(t){ return String(t||'').trim().toLowerCase(); }
+// The team whose report is being viewed. Admins can switch via the picker
+// (_trViewTeam); everyone else is pinned to their own team.
+var _trViewTeam = null;
+function trActiveTeam(){
+  if(myIsAdmin && _trViewTeam) return _trViewTeam;
+  return myTeam || 'Processing';
+}
+function trShape(team){ return TR_SHAPES[_teamKey(team||trActiveTeam())] || 'log'; }
+// Am I the lead of the team I'm viewing? Leads get their team's manager view
+// and, for Placement, the weekly-sections editor. myIsShiftAdmin is loaded in
+// loadMySettings from staff_settings.is_shift_admin.
+function trIsLead(){
+  if(myIsAdmin) return true;
+  return (typeof myIsShiftAdmin!=='undefined' && myIsShiftAdmin===true)
+    && _teamKey(myTeam)===_teamKey(trActiveTeam());
+}
+// Anyone on the active team may enter their own daily tasks.
+function trCanEnter(){ return myIsAdmin || _teamKey(myTeam)===_teamKey(trActiveTeam()); }
+
 function initReportsPage(){
   // Show admin discussion options + tab if admin
   const adminOpts = document.getElementById('discAdminOptions');
   if(adminOpts) adminOpts.style.display = myIsAdmin ? '' : 'none';
   const mgrBtn = document.getElementById('rtab-manager');
   if(mgrBtn) mgrBtn.style.display = myIsAdmin ? '' : 'none';
-  // Team Report subtab: visible only to Processing staff (or admins, who may
-  // be on any team but should still be able to generate the report).
+  // Team Report subtab: every team now has a report, so any staff member sees
+  // it for their own team; admins see it too (and can switch teams inside).
   const trBtn = document.getElementById('rtab-teamreport');
-  if(trBtn) trBtn.style.display = (_isProcessing() || myIsAdmin) ? '' : 'none';
+  if(trBtn) trBtn.style.display = (myTeam || myIsAdmin) ? '' : 'none';
   // myTeam loads asynchronously and may not be set yet on first open — if it's
-  // missing, fetch it, then re-apply the Team Report gating so non-admin
-  // Processing staff see the tab too.
+  // missing, fetch it, then re-apply the Team Report gating.
   if(!myTeam && (window.me || me)){
     (async function(){
       try{
@@ -18042,7 +18087,7 @@ function initReportsPage(){
         myTeam = (creds.length && creds[0] && creds[0].team) ? creds[0].team : myTeam;
       }catch(e){}
       const b = document.getElementById('rtab-teamreport');
-      if(b) b.style.display = (_isProcessing() || myIsAdmin) ? '' : 'none';
+      if(b) b.style.display = (myTeam || myIsAdmin) ? '' : 'none';
     })();
   }
   // Default dates: last fortnight
@@ -18070,7 +18115,6 @@ function initReportsPage(){
 // Metrics are defined in the processing_metrics table (admin-editable) and
 // each day's values live in processing_reports.metrics (jsonb). Calls are
 // counted separately from call_log and are not part of this list.
-var TR_TEAM = 'Processing';
 // Work week is Monday–Saturday (6 days). Sunday is not a work day; a Sunday
 // pick rolls back into the preceding Mon–Sat week (via _trMonday).
 var TR_WEEK_DAYS = 6;
@@ -18111,7 +18155,7 @@ function _trFieldId(key){ return 'trm_' + key; }
 // and _trMetricsAll (everything).
 async function trLoadMetrics(){
   try{
-    var url = SB + '/rest/v1/processing_metrics?team=eq.' + encodeURIComponent(TR_TEAM) + '&order=sort_order.asc';
+    var url = SB + '/rest/v1/processing_metrics?team=eq.' + encodeURIComponent(trActiveTeam()) + '&order=sort_order.asc';
     var r = await fetch(url, { headers:_trHeaders() });
     var rows = await r.json();
     _trMetricsAll = Array.isArray(rows) ? rows : [];
@@ -18136,16 +18180,32 @@ function trRenderMetricFields(){
 
 var _trInited = false;
 async function initTeamReport(){
+  var team = trActiveTeam();
+  var shape = trShape(team);
+
+  // Admin team picker + per-team theme picker live in the admin card region.
+  trRenderTeamPicker();
+
   var adminCard   = document.getElementById('trAdminCard');
   var metricAdmin = document.getElementById('trMetricAdminCard');
-  if(adminCard)   adminCard.style.display   = myIsAdmin ? '' : 'none';
-  if(metricAdmin) metricAdmin.style.display = myIsAdmin ? '' : 'none';
+  if(adminCard)   adminCard.style.display   = trIsLead() ? '' : 'none';
+  // Metrics manager only makes sense for a metrics-shape team.
+  if(metricAdmin) metricAdmin.style.display = (myIsAdmin && shape==='metrics') ? '' : 'none';
 
   var entryCard = document.getElementById('trEntryCard');
   var weekCard  = document.getElementById('trMyWeekCard');
-  var showEntry = _isProcessing();
+  var showEntry = trCanEnter();
   if(entryCard) entryCard.style.display = showEntry ? '' : 'none';
   if(weekCard)  weekCard.style.display  = showEntry ? '' : 'none';
+
+  // Metric inputs only for a metrics-shape team; hide the block otherwise.
+  var metricFields = document.getElementById('trMetricFields');
+  if(metricFields) metricFields.style.display = (shape==='metrics') ? '' : 'none';
+
+  // Placement: lead-authored weekly sections editor.
+  trRenderPlacementSections();
+  // Theme picker (lead/admin, saved per team).
+  trRenderThemePicker();
 
   if(!_trInited){
     _trInited = true;
@@ -18153,9 +18213,9 @@ async function initTeamReport(){
     var wEl = document.getElementById('trWeekPick'); if(wEl && !wEl.value) wEl.value = _trToday();
   }
 
-  await trLoadMetrics();
-  if(myIsAdmin) trRenderMetricAdmin();
-  if(showEntry){ trRenderMetricFields(); await trLoadDay(); trRenderMyWeek(); }
+  await trLoadTheme(team);
+  if(shape==='metrics'){ await trLoadMetrics(); if(myIsAdmin) trRenderMetricAdmin(); }
+  if(showEntry){ if(shape==='metrics') trRenderMetricFields(); await trLoadDay(); trRenderMyWeek(); }
 }
 
 // Snapshot for unsaved-change detection.
@@ -18179,7 +18239,7 @@ function trDateChanged(){
 }
 
 async function trLoadDay(){
-  if(!_isProcessing()) return;
+  if(!trCanEnter()) return;
   var date = document.getElementById('trDate').value || _trToday();
   var msg=document.getElementById('trSaveMsg'); if(msg) msg.textContent='';
   try{
@@ -18200,7 +18260,7 @@ async function trLoadDay(){
 }
 
 async function trSaveDay(btnEl){
-  if(!_isProcessing()) return;
+  if(!trCanEnter()) return;
   var date = document.getElementById('trDate').value || _trToday();
   var btn = btnEl || document.getElementById('trSaveBtn'); var msg = document.getElementById('trSaveMsg');
   btn.disabled = true; var orig = btn.textContent; btn.textContent = 'Saving…'; if(msg) msg.textContent='';
@@ -18329,7 +18389,7 @@ function trWeekToday(){ _trWeekOffset = 0; trRenderMyWeek(); }
 // Respects the same unsaved-changes guard as the date picker, then loads the
 // day and brings the form into view.
 async function trEditDay(date){
-  if(!_isProcessing()) return;
+  if(!trCanEnter()) return;
   if(_trIsDirty()){
     var ok = confirm("You have unsaved changes for " + (_trLoadedDate||'this day') + ".\n\nSwitch day and discard them? (Cancel, then click \u201CSave\u201D first to keep them.)");
     if(!ok) return;
@@ -18430,11 +18490,11 @@ async function trAddMetric(){
     var r = await fetch(SB + '/rest/v1/processing_metrics', {
       method:'POST',
       headers: Object.assign({ 'Prefer':'return=minimal' }, _trHeaders()),
-      body: JSON.stringify({ team:TR_TEAM, metric_key:key, label:label, sort_order:maxOrder+1 })
+      body: JSON.stringify({ team:trActiveTeam(), metric_key:key, label:label, sort_order:maxOrder+1 })
     });
     if(!r.ok){ _trMetricMsg('Could not add metric.', false); return; }
     input.value='';
-    await trLoadMetrics(); trRenderMetricAdmin(); if(_isProcessing()) trRenderMetricFields();
+    await trLoadMetrics(); trRenderMetricAdmin(); if(trShape()==="metrics") trRenderMetricFields();
     _trMetricMsg('Metric added.', true);
   }catch(e){ _trMetricMsg('Network error.', false); }
 }
@@ -18447,12 +18507,12 @@ async function trRenameMetric(key){
   if(nl===null) return;
   nl = nl.trim(); if(!nl){ _trMetricMsg('Name cannot be empty.', false); return; }
   try{
-    var r = await fetch(SB + '/rest/v1/processing_metrics?team=eq.'+encodeURIComponent(TR_TEAM)+'&metric_key=eq.'+encodeURIComponent(key), {
+    var r = await fetch(SB + '/rest/v1/processing_metrics?team=eq.'+encodeURIComponent(trActiveTeam())+'&metric_key=eq.'+encodeURIComponent(key), {
       method:'PATCH', headers: Object.assign({ 'Prefer':'return=minimal' }, _trHeaders()),
       body: JSON.stringify({ label:nl })
     });
     if(!r.ok){ _trMetricMsg('Rename failed.', false); return; }
-    await trLoadMetrics(); trRenderMetricAdmin(); if(_isProcessing()) trRenderMetricFields();
+    await trLoadMetrics(); trRenderMetricAdmin(); if(trShape()==="metrics") trRenderMetricFields();
     _trMetricMsg('Renamed.', true);
   }catch(e){ _trMetricMsg('Network error.', false); }
 }
@@ -18461,12 +18521,12 @@ async function trArchiveMetric(key, archived){
   if(!myIsAdmin) return;
   if(archived && !confirm('Archive this metric? Staff will stop logging it and it will drop out of future reports. Past data is kept.')) return;
   try{
-    var r = await fetch(SB + '/rest/v1/processing_metrics?team=eq.'+encodeURIComponent(TR_TEAM)+'&metric_key=eq.'+encodeURIComponent(key), {
+    var r = await fetch(SB + '/rest/v1/processing_metrics?team=eq.'+encodeURIComponent(trActiveTeam())+'&metric_key=eq.'+encodeURIComponent(key), {
       method:'PATCH', headers: Object.assign({ 'Prefer':'return=minimal' }, _trHeaders()),
       body: JSON.stringify({ archived: !!archived })
     });
     if(!r.ok){ _trMetricMsg('Update failed.', false); return; }
-    await trLoadMetrics(); trRenderMetricAdmin(); if(_isProcessing()){ trRenderMetricFields(); trLoadDay(); }
+    await trLoadMetrics(); trRenderMetricAdmin(); if(trShape()==="metrics"){ trRenderMetricFields(); trLoadDay(); }
     _trMetricMsg(archived?'Archived.':'Restored.', true);
   }catch(e){ _trMetricMsg('Network error.', false); }
 }
@@ -18480,17 +18540,18 @@ async function trMoveMetric(key, dir){
   var a = active[idx], b = active[swap];
   try{
     // swap their sort_order values
-    await fetch(SB + '/rest/v1/processing_metrics?team=eq.'+encodeURIComponent(TR_TEAM)+'&metric_key=eq.'+encodeURIComponent(a.metric_key), {
+    await fetch(SB + '/rest/v1/processing_metrics?team=eq.'+encodeURIComponent(trActiveTeam())+'&metric_key=eq.'+encodeURIComponent(a.metric_key), {
       method:'PATCH', headers: Object.assign({ 'Prefer':'return=minimal' }, _trHeaders()), body: JSON.stringify({ sort_order: b.sort_order }) });
-    await fetch(SB + '/rest/v1/processing_metrics?team=eq.'+encodeURIComponent(TR_TEAM)+'&metric_key=eq.'+encodeURIComponent(b.metric_key), {
+    await fetch(SB + '/rest/v1/processing_metrics?team=eq.'+encodeURIComponent(trActiveTeam())+'&metric_key=eq.'+encodeURIComponent(b.metric_key), {
       method:'PATCH', headers: Object.assign({ 'Prefer':'return=minimal' }, _trHeaders()), body: JSON.stringify({ sort_order: a.sort_order }) });
-    await trLoadMetrics(); trRenderMetricAdmin(); if(_isProcessing()) trRenderMetricFields();
+    await trLoadMetrics(); trRenderMetricAdmin(); if(trShape()==="metrics") trRenderMetricFields();
   }catch(e){ _trMetricMsg('Reorder failed.', false); }
 }
 
-// ── Admin: generate the whole-team weekly report ──
+// ── Admin/lead: generate the whole-team weekly report ──
 async function trGenerateReport(){
-  if(!myIsAdmin) return;
+  if(!trIsLead()) return;
+  if(trShape(trActiveTeam())==='placement'){ return trGeneratePlacementReport(); }
   var out = document.getElementById('trReportOut');
   var pick = document.getElementById('trWeekPick').value || _trToday();
   var mon = _trMonday(pick), sun = _trAddDays(mon,TR_WEEK_DAYS-1);  // Sat
@@ -18498,7 +18559,7 @@ async function trGenerateReport(){
   document.getElementById('trPrintBtn').style.display = 'none';
   try{
     if(!_trMetrics.length) await trLoadMetrics();
-    var teamResp = await fetch(SB + '/rest/v1/staff_credentials?team=eq.'+encodeURIComponent(TR_TEAM)+'&select=staff_name&order=staff_name.asc', { headers:_trHeaders() });
+    var teamResp = await fetch(SB + '/rest/v1/staff_credentials?team=eq.'+encodeURIComponent(trActiveTeam())+'&select=staff_name&order=staff_name.asc', { headers:_trHeaders() });
     var teamRows = await teamResp.json();
     var team = (Array.isArray(teamRows)?teamRows:[]).map(function(x){ return x.staff_name; }).filter(Boolean);
 
@@ -18519,7 +18580,7 @@ async function trGenerateReport(){
     reps.forEach(function(r){ (byStaff[r.staff_name]=byStaff[r.staff_name]||[]).push(r); });
     team.forEach(function(n){ if(!byStaff[n]) byStaff[n]=[]; });
     var names = Object.keys(byStaff).sort();
-    if(!names.length){ out.innerHTML = '<div style="font-size:13px;color:var(--ui-ink-4,#94a3b8);">No '+TR_TEAM+' staff found.</div>'; return; }
+    if(!names.length){ out.innerHTML = '<div style="font-size:13px;color:var(--ui-ink-4,#94a3b8);">No '+trActiveTeam()+' staff found.</div>'; return; }
 
     var mkeys = _trMetrics.map(function(m){return m.metric_key;});
     var mlabels = _trMetrics.map(function(m){return m.label;});
@@ -18530,7 +18591,7 @@ async function trGenerateReport(){
     var grand={calls:0}; mkeys.forEach(function(k){ grand[k]=0; });
 
     var html = '<div id="trPrintable">';
-    html += '<div style="margin-bottom:14px;"><div style="font-size:16px;font-weight:800;color:var(--ui-ink,#0f172a);">'+TR_TEAM+' — Weekly Report</div>'+
+    html += '<div style="margin-bottom:14px;"><div style="font-size:16px;font-weight:800;color:var(--ui-ink,#0f172a);">'+trActiveTeam()+' — Weekly Report</div>'+
             '<div style="font-size:12.5px;color:var(--ui-ink-3,#64748b);">Week of '+_trFmtDay(mon)+' – '+_trFmtDay(sun)+'</div></div>';
 
     names.forEach(function(name){
@@ -18577,23 +18638,310 @@ async function trGenerateReport(){
   }catch(e){ out.innerHTML = '<div style="font-size:13px;color:#dc2626;">Could not generate the report.</div>'; }
 }
 
+// ══════════════════════════════════════════════════════════════════════════
+// MULTI-TEAM: team picker · PDF themes · Placement weekly sections
+// ══════════════════════════════════════════════════════════════════════════
+
+// PDF design themes — layout is identical across them; only the header band,
+// accent and zebra colour change. Team leads pick one per team.
+var TR_THEMES = {
+  navy:     { name:'Navy',     head:[30,58,95],   accent:[37,99,235],  zebra:[240,244,250], total:[219,234,254], line:[210,220,235] },
+  emerald:  { name:'Emerald',  head:[6,95,70],    accent:[5,150,105],  zebra:[240,250,246], total:[209,250,229], line:[210,228,222] },
+  slate:    { name:'Slate',    head:[51,65,85],   accent:[71,85,105],  zebra:[244,247,250], total:[226,232,240], line:[214,222,232] },
+  burgundy: { name:'Burgundy', head:[112,26,46],  accent:[159,18,57],  zebra:[250,242,244], total:[251,223,231], line:[232,214,220] },
+  graphite: { name:'Graphite', head:[38,38,42],   accent:[82,82,91],   zebra:[245,245,246], total:[228,228,231], line:[220,220,224] },
+  teal:     { name:'Teal',     head:[17,75,85],   accent:[13,148,136], zebra:[240,249,249], total:[204,242,241], line:[208,228,228] }
+};
+var _trTheme = 'navy';
+var _trThemeByTeam = {};
+function _trPal(){ return TR_THEMES[_trTheme] || TR_THEMES.navy; }
+
+async function trLoadTheme(team){
+  team = team || trActiveTeam();
+  try{
+    var r = await fetch(SB + '/rest/v1/team_report_prefs?team=eq.'+encodeURIComponent(team)+'&select=pdf_theme&limit=1', { headers:_trHeaders() });
+    var rows = await r.json();
+    _trTheme = (Array.isArray(rows) && rows.length && TR_THEMES[rows[0].pdf_theme]) ? rows[0].pdf_theme : 'navy';
+  }catch(e){ _trTheme = 'navy'; }
+  _trThemeByTeam[_teamKey(team)] = _trTheme;
+  var sel = document.getElementById('trThemeSel'); if(sel) sel.value = _trTheme;
+  return _trTheme;
+}
+async function trSaveTheme(sel){
+  if(!trIsLead()) return;
+  var theme = (sel && sel.value) ? sel.value : 'navy';
+  if(!TR_THEMES[theme]) theme='navy';
+  var team = trActiveTeam();
+  var msg = document.getElementById('trThemeMsg');
+  try{
+    var r = await fetch(SB + '/rest/v1/team_report_prefs?on_conflict=team', {
+      method:'POST',
+      headers: Object.assign({ 'Prefer':'resolution=merge-duplicates,return=minimal' }, _trHeaders()),
+      body: JSON.stringify({ team:team, pdf_theme:theme, updated_by:(window.me||me||''), updated_at:new Date().toISOString() })
+    });
+    if(!r.ok) throw new Error(r.status);
+    _trTheme = theme; _trThemeByTeam[_teamKey(team)] = theme;
+    if(msg){ msg.textContent='Saved'; msg.style.color='var(--ui-success,#0e8a5f)'; setTimeout(function(){ msg.textContent=''; },1500); }
+  }catch(e){ if(msg){ msg.textContent='Could not save'; msg.style.color='#dc2626'; } }
+}
+
+function trRenderTeamPicker(){
+  var host = document.getElementById('trTeamPicker');
+  if(!host) return;
+  if(!myIsAdmin){ host.style.display='none'; return; }
+  host.style.display='';
+  var teams = ['Processing','Enrolment','Placement','Evershine','Accounts','Education'];
+  if(!_trViewTeam) _trViewTeam = trActiveTeam();
+  host.innerHTML = '<label class="tr-lbl" style="margin-right:8px;">Viewing team</label>'+
+    '<select id="trTeamSel" class="tr-num" style="width:auto;min-width:150px;" onchange="trSwitchTeam(this.value)">'+
+    teams.map(function(t){ return '<option value="'+t+'"'+(_teamKey(t)===_teamKey(_trViewTeam)?' selected':'')+'>'+_trEsc(t)+'</option>'; }).join('')+
+    '</select>';
+}
+async function trSwitchTeam(t){
+  _trViewTeam = t; _trInited = false;
+  var out = document.getElementById('trReportOut'); if(out) out.innerHTML='';
+  var pb = document.getElementById('trPrintBtn'); if(pb) pb.style.display='none';
+  await initTeamReport();
+}
+
+function trRenderThemePicker(){
+  var host = document.getElementById('trThemePicker');
+  if(!host) return;
+  if(!trIsLead()){ host.style.display='none'; return; }
+  host.style.display='';
+  host.innerHTML = '<label class="tr-lbl" style="margin-right:8px;">Report design</label>'+
+    '<select id="trThemeSel" class="tr-num" style="width:auto;min-width:140px;" onchange="trSaveTheme(this)">'+
+    Object.keys(TR_THEMES).map(function(k){ return '<option value="'+k+'"'+(k===_trTheme?' selected':'')+'>'+TR_THEMES[k].name+'</option>'; }).join('')+
+    '</select> <span id="trThemeMsg" style="font-size:12px;margin-left:8px;"></span>'+
+    '<div style="font-size:11.5px;color:var(--ui-ink-4,#94a3b8);margin-top:5px;">Applies to the exported PDF. Same layout, different look.</div>';
+}
+
+// ── Placement weekly sections (lead-authored) ──
+var _plWeek = null;
+function _plMonday(){ return _trMonday((document.getElementById('trWeekPick') && document.getElementById('trWeekPick').value) || _trToday()); }
+
+function trRenderPlacementSections(){
+  var host = document.getElementById('trPlacementCard');
+  if(!host) return;
+  if(trShape(trActiveTeam())!=='placement' || !trIsLead()){ host.style.display='none'; return; }
+  host.style.display='';
+  trLoadPlacementWeek();
+}
+async function trLoadPlacementWeek(){
+  var host = document.getElementById('trPlacementBody');
+  if(!host) return;
+  var mon = _plMonday();
+  try{
+    var r = await fetch(SB + '/rest/v1/placement_weekly?team=eq.'+encodeURIComponent(trActiveTeam())+'&week_start=eq.'+mon+'&limit=1', { headers:_trHeaders() });
+    var rows = await r.json();
+    _plWeek = (Array.isArray(rows) && rows.length) ? rows[0] : { students:{}, cancellations:[], facility_issues:[], student_issues:[] };
+  }catch(e){ _plWeek = { students:{}, cancellations:[], facility_issues:[], student_issues:[] }; }
+  trRenderPlacementForm();
+}
+function _plRowsHtml(arr, cols, key){
+  arr = Array.isArray(arr)?arr:[];
+  var head = '<tr>'+cols.map(function(c){return '<th>'+c.label+'</th>';}).join('')+'<th></th></tr>';
+  var body = arr.map(function(row,i){
+    return '<tr>'+cols.map(function(c){
+      return '<td><input class="tr-num" style="width:100%;min-width:90px;" data-pl="'+key+'" data-i="'+i+'" data-f="'+c.f+'" value="'+_trEsc(row[c.f]||'')+'"></td>';
+    }).join('')+'<td><button class="tr-x" title="Remove row" onclick="plDelRow(\''+key+'\','+i+')">×</button></td></tr>';
+  }).join('');
+  if(!arr.length) body = '<tr><td colspan="'+(cols.length+1)+'" style="color:var(--ui-ink-4,#94a3b8);font-size:12px;">None — click Add row to log one.</td></tr>';
+  return '<div style="overflow-x:auto;"><table class="tr-table"><thead>'+head+'</thead><tbody>'+body+'</tbody></table></div>'+
+    '<button class="tr-addrow" onclick="plAddRow(\''+key+'\')">+ Add row</button>';
+}
+function trRenderPlacementForm(){
+  var host = document.getElementById('trPlacementBody');
+  if(!host) return;
+  var s = _plWeek.students||{};
+  host.innerHTML =
+    '<div class="pl-sec"><div class="pl-h">1 · Placement students (commenced this week)</div>'+
+      '<div class="pl-grid3">'+
+        '<div><label class="tr-lbl">Total</label><input type="number" min="0" class="tr-num" id="pl_total" value="'+_trEsc(s.total!=null?s.total:'')+'"></div>'+
+        '<div><label class="tr-lbl">Within Sydney/NSW</label><input type="number" min="0" class="tr-num" id="pl_within" value="'+_trEsc(s.within_nsw!=null?s.within_nsw:'')+'"></div>'+
+        '<div><label class="tr-lbl">Outside NSW / Regional</label><input type="number" min="0" class="tr-num" id="pl_outside" value="'+_trEsc(s.outside_nsw!=null?s.outside_nsw:'')+'"></div>'+
+      '</div></div>'+
+    '<div class="pl-sec"><div class="pl-h">2 · Placement cancellations</div>'+
+      _plRowsHtml(_plWeek.cancellations, [{label:'Student',f:'student'},{label:'Facility',f:'facility'},{label:'Reason',f:'reason'},{label:'Action taken',f:'action'}], 'cancellations')+'</div>'+
+    '<div class="pl-sec"><div class="pl-h">3 · Facility issues</div>'+
+      _plRowsHtml(_plWeek.facility_issues, [{label:'Facility',f:'facility'},{label:'Issue',f:'issue'},{label:'Status',f:'status'}], 'facility_issues')+'</div>'+
+    '<div class="pl-sec"><div class="pl-h">4 · Student issues</div>'+
+      _plRowsHtml(_plWeek.student_issues, [{label:'Student',f:'student'},{label:'Issue',f:'issue'},{label:'Current status',f:'status'}], 'student_issues')+'</div>'+
+    '<div style="display:flex;align-items:center;gap:12px;margin-top:6px;">'+
+      '<button class="btn-primary" style="padding:8px 16px;" onclick="plSaveWeek(this)">Save weekly sections</button>'+
+      '<span id="plSaveMsg" style="font-size:12px;"></span></div>';
+}
+function _plHarvest(){
+  ['cancellations','facility_issues','student_issues'].forEach(function(key){
+    (document.querySelectorAll('[data-pl="'+key+'"]')||[]).forEach(function(el){
+      var i=+el.getAttribute('data-i'), f=el.getAttribute('data-f');
+      _plWeek[key] = _plWeek[key]||[]; _plWeek[key][i] = _plWeek[key][i]||{}; _plWeek[key][i][f] = el.value;
+    });
+  });
+  var t=document.getElementById('pl_total'), w=document.getElementById('pl_within'), o=document.getElementById('pl_outside');
+  _plWeek.students = { total:t&&t.value!==''?+t.value:null, within_nsw:w&&w.value!==''?+w.value:null, outside_nsw:o&&o.value!==''?+o.value:null };
+}
+function plAddRow(key){ _plHarvest(); _plWeek[key]=_plWeek[key]||[]; _plWeek[key].push({}); trRenderPlacementForm(); }
+function plDelRow(key,i){ _plHarvest(); _plWeek[key].splice(i,1); trRenderPlacementForm(); }
+async function plSaveWeek(btn){
+  if(!trIsLead()) return;
+  _plHarvest();
+  var msg=document.getElementById('plSaveMsg'); if(btn) btn.disabled=true;
+  var mon=_plMonday();
+  try{
+    var r = await fetch(SB + '/rest/v1/placement_weekly?on_conflict=team,week_start', {
+      method:'POST',
+      headers: Object.assign({ 'Prefer':'resolution=merge-duplicates,return=minimal' }, _trHeaders()),
+      body: JSON.stringify({ team:trActiveTeam(), week_start:mon, students:_plWeek.students||{}, cancellations:_plWeek.cancellations||[], facility_issues:_plWeek.facility_issues||[], student_issues:_plWeek.student_issues||[], updated_by:(window.me||me||''), updated_at:new Date().toISOString() })
+    });
+    if(!r.ok) throw new Error(r.status);
+    if(msg){ msg.textContent='Saved'; msg.style.color='var(--ui-success,#0e8a5f)'; setTimeout(function(){msg.textContent='';},1500); }
+  }catch(e){ if(msg){ msg.textContent='Could not save'; msg.style.color='#dc2626'; } }
+  if(btn) btn.disabled=false;
+}
+
+async function trGeneratePlacementReport(){
+  if(!trIsLead()) return;
+  var out = document.getElementById('trReportOut');
+  var pick = document.getElementById('trWeekPick').value || _trToday();
+  var mon = _trMonday(pick), sun = _trAddDays(mon,TR_WEEK_DAYS-1);
+  out.innerHTML = '<div style="color:var(--ui-ink-4,#94a3b8);font-size:13px;padding:12px 0;">Generating…</div>';
+  document.getElementById('trPrintBtn').style.display = 'none';
+  try{
+    var pr = await fetch(SB + '/rest/v1/placement_weekly?team=eq.'+encodeURIComponent(trActiveTeam())+'&week_start=eq.'+mon+'&limit=1', { headers:_trHeaders() });
+    var prRows = await pr.json();
+    var sec = (Array.isArray(prRows)&&prRows.length)?prRows[0]:{ students:{}, cancellations:[], facility_issues:[], student_issues:[] };
+    var teamResp = await fetch(SB + '/rest/v1/staff_credentials?team=eq.'+encodeURIComponent(trActiveTeam())+'&select=staff_name&order=staff_name.asc', { headers:_trHeaders() });
+    var teamRows = await teamResp.json();
+    var members = (Array.isArray(teamRows)?teamRows:[]).map(function(x){return x.staff_name;}).filter(Boolean);
+    var repResp = await fetch(SB + '/rest/v1/processing_reports?report_date=gte.'+mon+'&report_date=lte.'+sun+'&order=staff_name.asc,report_date.asc', { headers:_trHeaders() });
+    var reps = await repResp.json(); reps = Array.isArray(reps)?reps:[];
+    var weekDates=[]; for(var wi=0;wi<TR_WEEK_DAYS;wi++) weekDates.push(_trAddDays(mon,wi));
+    var byName={}; reps.forEach(function(r){ (byName[r.staff_name]=byName[r.staff_name]||{})[r.report_date]=r; });
+    members.forEach(function(n){ if(!byName[n]) byName[n]={}; });
+    function esc(x){ return _trEsc(x); }
+    function tbl(rows, cols, emptyLabel){
+      if(!rows || !rows.length) return '<div style="font-size:12.5px;color:var(--ui-ink-4,#94a3b8);margin:2px 0 6px;">'+emptyLabel+'</div>';
+      return '<div style="overflow-x:auto;"><table class="tr-table"><thead><tr>'+cols.map(function(c){return '<th>'+c.label+'</th>';}).join('')+'</tr></thead><tbody>'+
+        rows.map(function(r){ return '<tr>'+cols.map(function(c){return '<td>'+esc(r[c.f]||'')+'</td>';}).join('')+'</tr>'; }).join('')+'</tbody></table></div>';
+    }
+    var s=sec.students||{};
+    var html='<div id="trPrintable">';
+    html+='<div style="margin-bottom:14px;"><div style="font-size:16px;font-weight:800;color:var(--ui-ink,#0f172a);">Placement Team — Weekly Report</div>'+
+          '<div style="font-size:12.5px;color:var(--ui-ink-3,#64748b);">Week of '+_trFmtDay(mon)+' – '+_trFmtDay(sun)+'</div></div>';
+    html+='<div class="tr-person-h">1 · Placement students</div><div style="overflow-x:auto;"><table class="tr-table"><tbody>'+
+      '<tr><td>Total commenced</td><td class="num">'+(s.total!=null?s.total:'—')+'</td></tr>'+
+      '<tr><td>Within Sydney/NSW</td><td class="num">'+(s.within_nsw!=null?s.within_nsw:'—')+'</td></tr>'+
+      '<tr><td>Outside NSW / Regional</td><td class="num">'+(s.outside_nsw!=null?s.outside_nsw:'—')+'</td></tr></tbody></table></div>';
+    html+='<div class="tr-person-h">2 · Placement cancellations</div>'+tbl(sec.cancellations,[{label:'Student',f:'student'},{label:'Facility',f:'facility'},{label:'Reason',f:'reason'},{label:'Action taken',f:'action'}],'None this week.');
+    html+='<div class="tr-person-h">3 · Facility issues</div>'+tbl(sec.facility_issues,[{label:'Facility',f:'facility'},{label:'Issue',f:'issue'},{label:'Status',f:'status'}],'None this week.');
+    html+='<div class="tr-person-h">4 · Student issues</div>'+tbl(sec.student_issues,[{label:'Student',f:'student'},{label:'Issue',f:'issue'},{label:'Current status',f:'status'}],'None this week.');
+    var dayHeads = weekDates.map(function(d){ return _trFmtDay(d); });
+    html+='<div class="tr-person-h">5 · Team member daily task summary</div><div style="overflow-x:auto;"><table class="tr-table"><thead><tr><th>Member</th>'+dayHeads.map(function(h){return '<th>'+h+'</th>';}).join('')+'</tr></thead><tbody>';
+    var gridRows=[];
+    Object.keys(byName).sort().forEach(function(n){
+      var cells=weekDates.map(function(d){ var rr=byName[n][d]; return (rr&&rr.tasks&&rr.tasks.trim())?rr.tasks.trim():''; });
+      gridRows.push({ name:n, cells:cells });
+      html+='<tr><td style="font-weight:700;">'+esc(n)+'</td>'+cells.map(function(c){ return '<td>'+(c?esc(c):'<span style="color:#cbd5e1;">—</span>')+'</td>'; }).join('')+'</tr>';
+    });
+    html+='</tbody></table></div></div>';
+    out.innerHTML=html;
+    window._trReportData = { placement:true, mon:mon, sun:sun, weekDates:weekDates, dayHeads:dayHeads, sections:sec, grid:gridRows, preparedBy:(window.me||me||''), team:trActiveTeam() };
+    document.getElementById('trPrintBtn').style.display='';
+  }catch(e){ out.innerHTML='<div style="font-size:13px;color:#dc2626;">Could not generate the report.</div>'; }
+}
+
+// Placement PDF — sections 1–4 then the member×day grid, in the team's theme.
+function trDownloadPlacementPdf(D){
+  var JsPDF = (window.jspdf && window.jspdf.jsPDF) ? window.jspdf.jsPDF : window.jsPDF;
+  if(!JsPDF){ alert('PDF library not loaded. Please refresh and try again.'); return; }
+  var P=_trPal(), HEAD=P.head, ACC=P.accent, ZEBRA=P.zebra, LINE=P.line;
+  var INK=[15,23,42], MUTED=[100,116,139];
+  var doc = new JsPDF({ orientation:'portrait', unit:'mm', format:'a4' });
+  var PW=doc.internal.pageSize.getWidth(), PH=doc.internal.pageSize.getHeight(), M=14;
+  function fmtDay(dStr){ return new Date(dStr+'T00:00:00').toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short'}); }
+  function footer(){
+    doc.setFontSize(7.5); doc.setTextColor.apply(doc,MUTED); doc.setFont(undefined,'normal');
+    doc.text('Prepared by: '+(D.preparedBy||''), M, PH-8);
+    doc.text('Placement · Oscars Training Centre', PW/2, PH-8, {align:'center'});
+    doc.text('Page '+doc.internal.getNumberOfPages(), PW-M, PH-8, {align:'right'});
+  }
+  // Header band
+  doc.setFillColor.apply(doc,HEAD); doc.rect(0,0,PW,26,'F');
+  doc.setTextColor(255,255,255); doc.setFont(undefined,'bold'); doc.setFontSize(15);
+  doc.text('Weekly Placement Team Report', M, 12);
+  doc.setFont(undefined,'normal'); doc.setFontSize(9.5);
+  doc.text('Reporting period: '+fmtDay(D.mon)+' – '+fmtDay(D.sun), M, 19);
+  doc.text('Oscars Training Centre', PW-M, 12, {align:'right'});
+  var s=D.sections.students||{};
+  var y=34;
+  function secTitle(t){ doc.setTextColor.apply(doc,ACC); doc.setFont(undefined,'bold'); doc.setFontSize(11); doc.text(t, M, y); y+=2.5; doc.setDrawColor.apply(doc,ACC); doc.setLineWidth(0.5); doc.line(M,y,PW-M,y); y+=5; }
+  var tableOpts=function(head,body,colStyles){ return { startY:y, head:[head], body:body, theme:'grid',
+    styles:{ fontSize:8.6, cellPadding:2.2, textColor:INK, lineColor:LINE, lineWidth:0.15, valign:'top', overflow:'linebreak' },
+    headStyles:{ fillColor:HEAD, textColor:[255,255,255], fontStyle:'bold', fontSize:8.4 },
+    alternateRowStyles:{ fillColor:ZEBRA }, columnStyles:colStyles||{}, margin:{left:M,right:M} }; };
+
+  secTitle('1 · Placement students');
+  doc.autoTable(tableOpts(['Measure','Count'],[
+    ['Total commenced', s.total!=null?String(s.total):'—'],
+    ['Within Sydney/NSW', s.within_nsw!=null?String(s.within_nsw):'—'],
+    ['Outside NSW / Regional', s.outside_nsw!=null?String(s.outside_nsw):'—']
+  ], {0:{cellWidth:70,fontStyle:'bold'},1:{halign:'center'}}));
+  y=doc.lastAutoTable.finalY+8;
+
+  function rowsOrNone(title, rows, cols){
+    secTitle(title);
+    if(!rows || !rows.length){ doc.setTextColor.apply(doc,MUTED); doc.setFont(undefined,'italic'); doc.setFontSize(9); doc.text('None this week.', M, y); y+=8; doc.setFont(undefined,'normal'); return; }
+    doc.autoTable(tableOpts(cols.map(function(c){return c.label;}), rows.map(function(r){ return cols.map(function(c){ return r[c.f]||''; }); })));
+    y=doc.lastAutoTable.finalY+8;
+  }
+  rowsOrNone('2 · Placement cancellations', D.sections.cancellations, [{label:'Student',f:'student'},{label:'Facility',f:'facility'},{label:'Reason',f:'reason'},{label:'Action taken',f:'action'}]);
+  rowsOrNone('3 · Facility issues', D.sections.facility_issues, [{label:'Facility',f:'facility'},{label:'Issue',f:'issue'},{label:'Status',f:'status'}]);
+  rowsOrNone('4 · Student issues', D.sections.student_issues, [{label:'Student',f:'student'},{label:'Issue',f:'issue'},{label:'Current status',f:'status'}]);
+  footer();
+
+  // Section 5 — landscape grid on its own page
+  doc.addPage('a4','landscape');
+  var LW=doc.internal.pageSize.getWidth(), LH=doc.internal.pageSize.getHeight();
+  doc.setFillColor.apply(doc,HEAD); doc.rect(0,0,LW,20,'F');
+  doc.setTextColor(255,255,255); doc.setFont(undefined,'bold'); doc.setFontSize(13);
+  doc.text('5 · Team member daily task summary', M, 9);
+  doc.setFont(undefined,'normal'); doc.setFontSize(9);
+  doc.text(fmtDay(D.mon)+' – '+fmtDay(D.sun), M, 15.5);
+  var gHead=[['Member'].concat(D.dayHeads)];
+  var gBody=D.grid.map(function(p){ return [p.name].concat(p.cells.map(function(c){ return c?c:'—'; })); });
+  var usable=LW-2*M, cName=32, cDay=(usable-cName)/D.dayHeads.length;
+  var gCol={0:{cellWidth:cName,fontStyle:'bold'}}; for(var i=1;i<=D.dayHeads.length;i++) gCol[i]={cellWidth:cDay};
+  doc.autoTable({ startY:24, head:gHead, body:gBody, theme:'grid',
+    styles:{ fontSize:7.2, cellPadding:1.8, textColor:INK, lineColor:LINE, lineWidth:0.2, valign:'top', overflow:'linebreak' },
+    headStyles:{ fillColor:HEAD, textColor:[255,255,255], fontStyle:'bold', fontSize:7.4, halign:'center' },
+    columnStyles:gCol, alternateRowStyles:{ fillColor:ZEBRA }, margin:{left:M,right:M},
+    didParseCell:function(data){ if(data.section==='body' && data.cell.raw==='—'){ data.cell.styles.textColor=[203,213,225]; data.cell.styles.halign='center'; } }
+  });
+  doc.setFontSize(7.5); doc.setTextColor.apply(doc,MUTED);
+  doc.text('Task summary is compiled from each member\u2019s daily work log.', M, doc.lastAutoTable.finalY+6);
+  footer();
+  doc.save('Placement_Weekly_Report_'+D.mon+'.pdf');
+}
+
 function trDownloadPdf(){
   var D = window._trReportData;
   if(!D){ alert('Generate the report first.'); return; }
+  if(D.placement){ return trDownloadPlacementPdf(D); }
   var JsPDF = (window.jspdf && window.jspdf.jsPDF) ? window.jspdf.jsPDF : window.jsPDF;
   if(!JsPDF){ alert('PDF library not loaded. Please refresh and try again.'); return; }
   var doc = new JsPDF({ orientation:'landscape', unit:'mm', format:'a4' });
   var PW = doc.internal.pageSize.getWidth();
   var PH = doc.internal.pageSize.getHeight();
   var M = 12;
-  var GREEN=[5,150,105], HEAD=[6,95,70], INK=[15,23,42], MUTED=[100,116,139], LINE=[226,232,240], ZEBRA=[246,250,248];
+  var _P=_trPal(); var GREEN=_P.accent, HEAD=_P.head, INK=[15,23,42], MUTED=[100,116,139], LINE=_P.line, ZEBRA=_P.zebra;
   function fmtDay(dStr){ return new Date(dStr+'T00:00:00').toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short'}); }
   function rangeStr(){ return fmtDay(D.mon)+' – '+fmtDay(D.sun); }
   function footer(){
     var pageStr='Page '+doc.internal.getNumberOfPages();
     doc.setFontSize(7.5); doc.setTextColor.apply(doc, MUTED); doc.setFont(undefined,'normal');
     doc.text('Prepared by: '+(D.preparedBy||''), M, PH-7);
-    doc.text(TR_TEAM+' · Oscars Training Centre', PW/2, PH-7, {align:'center'});
+    doc.text(trActiveTeam()+' · Oscars Training Centre', PW/2, PH-7, {align:'center'});
     doc.text(pageStr, PW-M, PH-7, {align:'right'});
   }
 
@@ -18601,7 +18949,7 @@ function trDownloadPdf(){
   doc.setFont(undefined,'bold'); doc.setFontSize(15); doc.setTextColor.apply(doc, INK);
   doc.text('Oscars Training Centre — Weekly Performance Report', M, M+4);
   doc.setFont(undefined,'normal'); doc.setFontSize(9.5); doc.setTextColor.apply(doc, MUTED);
-  doc.text('Team Metrics: '+TR_TEAM+' · '+rangeStr(), M, M+10);
+  doc.text('Team Metrics: '+trActiveTeam()+' · '+rangeStr(), M, M+10);
 
   var headRow = ['Staff','Calls'].concat(D.metricLabels);
   var mBody = D.metrics.map(function(r){ return [r.name, r.calls].concat(D.metricKeys.map(function(k){ return r[k]||0; })); });
@@ -18615,7 +18963,7 @@ function trDownloadPdf(){
     styles:{ fontSize:9, cellPadding:2.4, textColor:INK, lineColor:LINE, lineWidth:0.15 },
     headStyles:{ fillColor:HEAD, textColor:[255,255,255], fontStyle:'bold', fontSize:8.5, halign:'center' },
     columnStyles: colStyles, alternateRowStyles:{ fillColor:ZEBRA }, margin:{ left:M, right:M },
-    didParseCell:function(data){ if(data.row.index===mBody.length-1){ data.cell.styles.fontStyle='bold'; data.cell.styles.fillColor=[236,253,245]; data.cell.styles.lineColor=GREEN; data.cell.styles.lineWidth=0.4; } }
+    didParseCell:function(data){ if(data.row.index===mBody.length-1){ data.cell.styles.fontStyle='bold'; data.cell.styles.fillColor=_P.total; data.cell.styles.lineColor=GREEN; data.cell.styles.lineWidth=0.4; } }
   });
   var afterY=doc.lastAutoTable.finalY+6;
   doc.setFontSize(7.5); doc.setTextColor.apply(doc, MUTED); doc.setFont(undefined,'normal');
@@ -18625,7 +18973,7 @@ function trDownloadPdf(){
   // PAGE 2 — task grid
   doc.addPage('a4','landscape');
   doc.setFont(undefined,'bold'); doc.setFontSize(15); doc.setTextColor.apply(doc, INK);
-  doc.text('Weekly Task Report: '+TR_TEAM, M, M+4);
+  doc.text('Weekly Task Report: '+trActiveTeam(), M, M+4);
   doc.setFont(undefined,'normal'); doc.setFontSize(9.5); doc.setTextColor.apply(doc, MUTED);
   doc.text(rangeStr(), M, M+10);
   var dayHeads = D.weekDates.map(function(d){ return fmtDay(d); });
@@ -18649,7 +18997,7 @@ function trDownloadPdf(){
   doc.text('Note: Tasks summarised here are arranged from records provided by staff in the daily work log.', M, afterY2);
   footer();
 
-  doc.save(TR_TEAM+'_Weekly_Report_'+D.mon+'.pdf');
+  doc.save(trActiveTeam()+'_Weekly_Report_'+D.mon+'.pdf');
 }
 
 function populateMgrStaff(){
@@ -22451,6 +22799,7 @@ async function markAllNotificationsRead(silent){
 // ── SETTINGS ──
 let myCanEditAvail=true;
 let myIsAdmin=false;
+let myIsShiftAdmin=false; // team-lead flag (staff_settings.is_shift_admin)
 let adminHasSetAvail=false; // true only if admin explicitly set a value in staff_settings
 
 async function loadMySettings(){
@@ -22458,6 +22807,7 @@ async function loadMySettings(){
     const rows=await sbGet("staff_settings","?name=eq."+encodeURIComponent(me));
     if(rows&&rows.length){
       myIsAdmin=rows[0].is_hub_admin===true;
+      myIsShiftAdmin=rows[0].is_shift_admin===true;
       myCanEditAvail=myIsAdmin?true:(rows[0].can_edit_avail!==false);
       adminHasSetAvail=true;
       // Now that admin status is known, refresh admin-only UI
