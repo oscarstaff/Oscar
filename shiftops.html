@@ -1189,6 +1189,8 @@ body.tl-readonly [onclick*="editStaff"],
 body.tl-readonly [onclick*="renameTeam"],
 body.tl-readonly [onclick*="openAddShift"],
 body.tl-readonly [onclick*="toggleToolsMenu"],
+body.tl-readonly [onclick*="fillFromPreviousWeek"],
+body.tl-readonly [onclick*="togglePublishWeek"],
 body.tl-readonly [onclick*="doExportPDF"]{
   display:none !important;
 }
@@ -3962,6 +3964,7 @@ function renderWeekTotal(){
 }
 
 async function togglePublishWeek(){
+  if(document.body.classList.contains('tl-readonly')) return;   // read-only leads can't edit
   if(_pubWeeks===null) return;
   const wk=_curWeekISO();
   const pub=_pubWeeks.has(wk);
@@ -4033,6 +4036,7 @@ async function togglePublishWeek(){
  * comes from leave_submissions.
  */
 async function fillFromPreviousWeek(){
+  if(document.body.classList.contains('tl-readonly')) return;   // read-only leads can't edit
   const target=new Date(currentWeekStart);
   const source=addDays(new Date(currentWeekStart),-7);
   const srcFrom=_isoDate(source), srcTo=_isoDate(addDays(new Date(source),6));
