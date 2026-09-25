@@ -1187,6 +1187,8 @@ body.tl-readonly [onclick*="removeTeam"],
 body.tl-readonly [onclick*="removeStaff"],
 body.tl-readonly [onclick*="editStaff"],
 body.tl-readonly [onclick*="renameTeam"],
+body.tl-readonly [onclick*="openAddShift"],
+body.tl-readonly [onclick*="toggleToolsMenu"],
 body.tl-readonly [onclick*="doExportPDF"]{
   display:none !important;
 }
@@ -1671,6 +1673,9 @@ body.tl-readonly .wk-tools{ display:none !important; }
 @keyframes dsPulse{ 0%,100%{ opacity:1; box-shadow:0 0 0 0 currentColor; } 50%{ opacity:.45; box-shadow:0 0 8px 1px currentColor; } }
 @media(prefers-reduced-motion:reduce){ .ds-warn .ds-lbl::after,.ds-gold .ds-lbl::after{ animation:none; } }
 @media(max-width:1100px){ .dash-strip{ grid-template-columns:repeat(3,1fr); } }
+/* Team leads see four tiles (no centre-wide Open shifts / Leave to action). */
+.dash-strip.strip-4{ grid-template-columns:repeat(4,1fr); }
+@media(max-width:1100px){ .dash-strip.strip-4{ grid-template-columns:repeat(2,1fr); } }
 
 /* ── "RIGHT NOW" COVERAGE METER ──────────────────────────────────────────
    One glance answer to "are we covered this morning?" — the count that
@@ -10362,8 +10367,12 @@ function renderDashStrip(c){
     tile(c.late,'Late','ds-warn',goRoster)+
     tile(c.notIn,'Not clocked in','ds-warn','')+
     tile(c.leave,'On leave','',goLeave)+
-    tile(c.open,'Open shifts','ds-gold',goRoster)+
-    tile(c.pending,'Leave to action','ds-gold',goLeave);
+    // Open shifts and Leave-to-action are centre-wide planning numbers a lead
+    // can't action and can't be scoped to one team, so they're admin-only.
+    (tlLocked ? '' :
+      tile(c.open,'Open shifts','ds-gold',goRoster)+
+      tile(c.pending,'Leave to action','ds-gold',goLeave));
+  el.classList.toggle('strip-4', tlLocked);
 }
 
 /* ── DASHBOARD: FIND A PERSON ─────────────────────────────────────────────
@@ -10391,6 +10400,9 @@ function dashFindRun(q){
     .map(function(r){ return _normName(r.staff_name||r.staffName||''); }));
 
   _dfMatches=(staff||[]).filter(function(s){
+    // Team leads can only pull up their own team.
+    if(typeof AM_TEAM_LEAD!=='undefined' && AM_TEAM_LEAD && MY_TEAM &&
+       String(s.team||'').trim().toLowerCase()!==String(MY_TEAM).trim().toLowerCase()) return false;
     const full=(s.first+' '+s.last).toLowerCase();
     return full.indexOf(q)>-1 || (s.team||'').toLowerCase().indexOf(q)>-1;
   }).slice(0,6);
@@ -10413,7 +10425,8 @@ function dashFindRun(q){
           (away?' · <b class="df-away">on leave today</b>':'')+'</span></span>'+
       '<span class="df-acts">'+
         '<button class="df-btn" onclick="dashFindGo(\'roster\',\''+_cdEsc(full)+'\')">Roster</button>'+
-        '<button class="df-btn" onclick="dashFindGo(\'leave\',\''+_cdEsc(full)+'\')">Leave</button>'+
+        (document.body.classList.contains('tl-readonly') ? '' :
+          '<button class="df-btn" onclick="dashFindGo(\'leave\',\''+_cdEsc(full)+'\')">Leave</button>')+
         '<button class="df-btn df-btn-go" onclick="dashFindOpenProfile('+s.id+')">Profile</button>'+
       '</span>'+
     '</div>';
@@ -10520,6 +10533,9 @@ async function _refreshOpenShiftCount(){
 }
 
 async function refreshMorningBoard(){
+  // Resolve role first so the very first board render is already team-scoped for
+  // a lead (it's latched, so this is a no-op once known).
+  try{ if(typeof computeTeamLeadState==='function') computeTeamLeadState(); }catch(e){}
   try{ await _refreshOpenShiftCount(); }catch(e){}
   const host = document.getElementById('morningBoard');
   if(!host) return;
@@ -10589,7 +10605,14 @@ async function refreshMorningBoard(){
 
   const inNow=[], lateList=[], leaveList=[], notInList=[], doneList=[];
 
+  // Team leads see their own team only, everywhere on the dashboard. Filtering
+  // here narrows the tiles, all four name lists, and the coverage meter in one
+  // place. Admins (MY_TEAM null) and the "not resolved" case see everyone.
+  const _tlMine = (typeof AM_TEAM_LEAD!=='undefined' && AM_TEAM_LEAD && MY_TEAM)
+    ? String(MY_TEAM).trim().toLowerCase() : null;
+
   staff.forEach(s=>{
+    if(_tlMine && String(s.team||'').trim().toLowerCase()!==_tlMine) return;
     const key = _normName(s.first+' '+s.last);
     const dayShifts = (_todayShifts[s.id]||{})[dayIdx] || [];
     const onLeave = dayShifts.some(x=>x.type==='leave');
