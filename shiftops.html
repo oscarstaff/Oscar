@@ -4,40 +4,49 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Oscars ShiftOprs — Employee Management</title>
+<script>
+/* Apply the saved theme before the page paints so there's no flash.
+   Default is dark (Command Deck); "light" restores the original Daylight theme. */
+(function(){ try{ var t=localStorage.getItem('so_theme');
+  if(t==='light') document.documentElement.setAttribute('data-theme','light'); }catch(e){} })();
+</script>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%235b5bd6'/><rect x='6.5' y='8' width='19' height='17' rx='2.5' fill='%23fff'/><path d='M6.5 12.5h19' stroke='%235b5bd6' stroke-width='1.6'/><path d='M11 6v4M21 6v4' stroke='%23fff' stroke-width='2' stroke-linecap='round'/><circle cx='16' cy='19' r='4.3' fill='%235b5bd6'/><path d='M16 16.6V19l1.7 1' stroke='%23fff' stroke-width='1.5' stroke-linecap='round' fill='none'/></svg>" />
 <style>
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600;700&display=swap');
 
 :root {
-  /* ══ DAYLIGHT — light & airy, soft greys, white cards ══ */
-  --bg: #f6f7f9;
-  --surface: #ffffff;
-  --surface2: #f1f3f6;
-  --surface3: #e7eaf0;
-  --border: #e3e6ec;
-  --border2: #cfd4dd;
+  /* ══ COMMAND DECK — dark ops room, glowing signal colours ══
+     Default theme. The old light theme lives under [data-theme="light"]
+     below and the toggle in the top bar switches between them. Every
+     surface routes through these tokens, so the two themes stay in sync. */
+  --bg: #0b111c;
+  --surface: #141c2b;
+  --surface2: #1b2536;
+  --surface3: #243247;
+  --border: #263247;
+  --border2: #33445e;
 
-  /* ── Brand — restrained indigo ── */
-  --accent: #5b5bd6;
-  --accent-dim: #eeeefb;
-  --accent-border: rgba(91,91,214,.35);
-  --accent2: #7b7be6;
-  --accent-text: #4338ca;
-  --accent-deep: #4646b8;
+  /* ── Brand — indigo, brightened to carry on dark ── */
+  --accent: #7c7cf0;
+  --accent-dim: #1c2440;
+  --accent-border: rgba(124,124,240,.5);
+  --accent2: #9a9af5;
+  --accent-text: #b9b9fb;
+  --accent-deep: #5b5bd6;
 
-  /* ── Semantic ── */
-  --warn: #d1354a;
-  --warn-dim: #fdedef;
-  --gold: #b4740a;
-  --gold-dim: #fdf4e3;
-  --success: #0e8a5f;
-  --success-dim: #e7f7f0;
+  /* ── Semantic — signal colours that glow ── */
+  --warn: #fb7185;
+  --warn-dim: #2a1620;
+  --gold: #fbbf24;
+  --gold-dim: #2a2109;
+  --success: #34d399;
+  --success-dim: #0d2620;
 
-  /* ── Text ── */
-  --text: #12141a;
-  --text-mid: #3d4451;
-  --text-dim: #646c7d;
-  --muted: #8b93a3;
+  /* ── Text — cool off-whites, never pure #fff ── */
+  --text: #eef2f9;
+  --text-mid: #b4c0d4;
+  --text-dim: #7e8da3;
+  --muted: #5f6b81;
 
   /* ── Type — restrained sans, mono for data ── */
   --sans: 'IBM Plex Sans', -apple-system, system-ui, sans-serif;
@@ -47,7 +56,49 @@
   /* ── Radii — tighter, console-like ── */
   --r4: 5px; --r6: 7px; --r8: 9px; --r10: 11px; --r12: 13px; --r16: 16px;
 
-  /* ── Shadows — true dark depth, no color cast ── */
+  /* ── Glows — signal colours cast light on this theme ── */
+  --glow-accent: 0 0 0 1px rgba(124,124,240,.25), 0 0 24px -6px rgba(124,124,240,.55);
+  --glow-success: 0 0 22px -6px rgba(52,211,153,.55);
+  --glow-warn: 0 0 22px -6px rgba(251,113,133,.6);
+  --glow-gold: 0 0 22px -6px rgba(251,191,36,.55);
+
+  /* ── Shadows — deep, cool cast for real elevation on dark ── */
+  --shadow-sm: 0 1px 2px rgba(0,0,0,.4);
+  --shadow-md: 0 2px 8px rgba(0,0,0,.4), 0 12px 28px -10px rgba(0,0,0,.6);
+  --shadow-lg: 0 10px 30px -10px rgba(0,0,0,.6), 0 30px 70px -24px rgba(0,0,0,.75);
+  --ring: 0 0 0 3px rgba(124,124,240,.35);
+}
+
+:root[data-theme="light"] {
+  /* ══ DAYLIGHT — the original light & airy theme ══ */
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --surface2: #f1f3f6;
+  --surface3: #e7eaf0;
+  --border: #e3e6ec;
+  --border2: #cfd4dd;
+
+  --accent: #5b5bd6;
+  --accent-dim: #eeeefb;
+  --accent-border: rgba(91,91,214,.35);
+  --accent2: #7b7be6;
+  --accent-text: #4338ca;
+  --accent-deep: #4646b8;
+
+  --warn: #d1354a;
+  --warn-dim: #fdedef;
+  --gold: #b4740a;
+  --gold-dim: #fdf4e3;
+  --success: #0e8a5f;
+  --success-dim: #e7f7f0;
+
+  --text: #12141a;
+  --text-mid: #3d4451;
+  --text-dim: #646c7d;
+  --muted: #8b93a3;
+
+  --glow-accent: none; --glow-success: none; --glow-warn: none; --glow-gold: none;
+
   --shadow-sm: 0 1px 2px rgba(16,24,40,.05);
   --shadow-md: 0 2px 6px rgba(16,24,40,.06), 0 8px 20px -6px rgba(16,24,40,.1);
   --shadow-lg: 0 8px 24px -8px rgba(16,24,40,.14), 0 24px 56px -20px rgba(16,24,40,.18);
@@ -55,10 +106,22 @@
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+/* Theme toggle — shows the icon for the theme you'd switch TO. */
+.theme-toggle{
+  width:34px; height:34px; flex-shrink:0; display:flex; align-items:center; justify-content:center;
+  background:var(--surface2); border:1px solid var(--border); border-radius:9px;
+  color:var(--text-mid); cursor:pointer; transition:all .14s;
+}
+.theme-toggle:hover{ color:var(--accent-text); border-color:var(--accent-border); background:var(--accent-dim); }
+.theme-toggle .tt-sun{ display:inline-flex; }
+.theme-toggle .tt-moon{ display:none; }
+:root[data-theme="light"] .theme-toggle .tt-sun{ display:none; }
+:root[data-theme="light"] .theme-toggle .tt-moon{ display:inline-flex; }
 html { height: 100%; }
 body {
   background:
-    radial-gradient(1100px 520px at 88% -12%, rgba(91,91,214,.05), transparent 55%),
+    radial-gradient(1200px 640px at 85% -14%, rgba(124,124,240,.14), transparent 58%),
+    radial-gradient(1000px 560px at 8% 108%, rgba(52,211,153,.06), transparent 60%),
     var(--bg);
   background-attachment: fixed;
   color: var(--text);
@@ -259,7 +322,7 @@ h1,h2,h3,.section-title,.modal-title{ font-family: var(--display); letter-spacin
 }
 .btn-primary:hover { box-shadow: 0 6px 18px rgba(79,57,246,.48); transform: translateY(-1px); filter: brightness(1.07); }
 .btn-warn { background: var(--warn-dim); color: var(--warn); border: 1px solid rgba(225,29,72,.24); }
-.btn-warn:hover { background: #ffdce4; }
+.btn-warn:hover { background: var(--warn-dim); filter: brightness(1.15); }
 .btn-save {
   background: var(--accent-dim);
   color: var(--accent-text);
@@ -431,12 +494,12 @@ h1,h2,h3,.section-title,.modal-title{ font-family: var(--display); letter-spacin
   border: 1px solid #c9dcfb;
 }
 .shift-leave {
-  background: #fdedef;
-  color: #b32338;
-  border: 1px solid #f6cdd4;
+  background: var(--warn-dim);
+  color: var(--warn);
+  border: 1px solid var(--accent-border);
   font-weight: 700;
 }
-.shift-conflict { outline: 2px solid rgba(209,53,74,.4); background: #fff6f7 !important; }
+.shift-conflict { outline: 2px solid var(--warn); background: var(--warn-dim) !important; }
 .hours-bar { margin-top: 3px; }
 .hours-bar-bg { background: var(--surface3); border-radius: 2px; height: 2px; overflow: hidden; width: 100%; max-width: 55px; }
 .hours-bar-fill { height: 100%; border-radius: 2px; background: var(--accent); transition: width .3s; }
@@ -520,7 +583,7 @@ h1,h2,h3,.section-title,.modal-title{ font-family: var(--display); letter-spacin
 }
 .avail-chip:hover { transform: scale(1.04); filter: brightness(1.15); }
 .avail-yes { background: #e7f7f0; color: #0e7a54; border: 1px solid #bde8d4; }
-.avail-no { background: #fdedef; color: var(--warn); border: 1px solid #f6cdd4; }
+.avail-no { background: var(--warn-dim); color: var(--warn); border: 1px solid var(--accent-border); }
 .avail-pref { background: #eaf1fe; color: #1e4fc4; border: 1px solid #c9dcfb; }
 .avail-unset { background: var(--surface2); color: var(--muted); border: 1px solid var(--border); }
 
@@ -1089,10 +1152,10 @@ select.form-input { cursor: pointer; }
 .lv-btn:hover{ transform:translateY(-1px); box-shadow:0 3px 8px -3px rgba(30,27,75,.25); }
 .lv-approve{ background:var(--success-dim); color:#0b6a49; border-color:#bde8d4; }
 .lv-approve:hover{ background:#d6f0e4; }
-.lv-decline{ background:var(--warn-dim); color:var(--warn); border-color:#f6cdd4; }
-.lv-decline:hover{ background:#fbdde1; }
+.lv-decline{ background:var(--warn-dim); color:var(--warn); border-color:var(--accent-border); }
+.lv-decline:hover{ background:var(--warn-dim); filter:brightness(1.15); }
 .lv-del{ padding:5px 9px; color:var(--muted); }
-.lv-del:hover{ color:var(--warn); border-color:#f6cdd4; }
+.lv-del:hover{ color:var(--warn); border-color:var(--accent-border); }
 .lv-section-hd{ font-family:var(--mono); font-size:9px; font-weight:800; letter-spacing:1.5px; text-transform:uppercase; margin:0 0 9px; display:flex; align-items:center; gap:6px; }
 [data-theme="dark"] .lv-card{ background:#16222f; border-color:#243446; }
 [data-theme="dark"] .lv-name{ color:#dde8f5; }
@@ -1227,7 +1290,7 @@ body.tl-readonly #tlPill{ display:inline-flex; }
 .roster-grid{ border:1px solid var(--border)!important; border-radius:10px!important; overflow:hidden; box-shadow:none!important; }
 .col-head{ background:var(--surface)!important; font-weight:600!important; font-size:10.5px!important; letter-spacing:.08em; }
 .grid-row:nth-child(even){ background:transparent; }
-.grid-row:hover{ background:#fafbfd; }
+.grid-row:hover{ background:var(--surface2); }
 
 /* modals/cards inherit tokens; kill leftover heavy radii */
 .stat-card{ display:none!important; } /* legacy cards, if any render path re-adds */
@@ -1493,17 +1556,21 @@ body.tl-readonly .wk-tools{ display:none !important; }
    Top of the page and bound to "/" because looking someone up is the most
    frequent HR action — more frequent than reading any of the counts below. */
 .dash-find{
-  display:flex; align-items:center; gap:9px;
-  background:var(--surface); border:1px solid var(--border);
-  border-radius:12px; padding:0 14px; margin-bottom:12px;
-  box-shadow:var(--shadow-sm); transition:border-color .13s, box-shadow .13s;
+  display:flex; align-items:center; gap:11px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.02), transparent 50%),
+    var(--surface);
+  border:1px solid var(--border);
+  border-radius:14px; padding:0 16px; margin-bottom:14px;
+  box-shadow:var(--shadow-sm); transition:border-color .16s, box-shadow .16s;
 }
-.dash-find:focus-within{ border-color:var(--accent); box-shadow:var(--ring); }
-.df-ico{ color:var(--muted); flex-shrink:0; }
+.dash-find:focus-within{ border-color:var(--accent); box-shadow:var(--ring), var(--glow-accent); }
+.dash-find:focus-within .df-ico{ color:var(--accent); }
+.df-ico{ color:var(--muted); flex-shrink:0; transition:color .16s; }
 #dashFind{
   flex:1; border:none; outline:none; background:none;
-  font-family:inherit; font-size:14px; color:var(--text);
-  padding:13px 0;
+  font-family:inherit; font-size:14.5px; color:var(--text);
+  padding:15px 0;
 }
 #dashFind::placeholder{ color:var(--muted); }
 .df-kbd{
@@ -1525,6 +1592,8 @@ body.tl-readonly .wk-tools{ display:none !important; }
 .df-meta{ font-size:11.5px; color:var(--text-dim); }
 .df-away{ color:var(--gold); font-weight:700; }
 .df-acts{ display:flex; gap:5px; flex-shrink:0; }
+.df-btn-go{ background:var(--accent,#16a34a); border-color:var(--accent,#16a34a); color:#fff; }
+.df-btn-go:hover{ filter:brightness(1.06); }
 .df-btn{
   border:1px solid var(--border); background:var(--surface2); color:var(--text-mid);
   border-radius:7px; padding:5px 11px; font-size:11px; font-weight:700;
@@ -1543,34 +1612,98 @@ body.tl-readonly .wk-tools{ display:none !important; }
 .dash-strip{
   display:grid;
   grid-template-columns:repeat(6,1fr);
-  gap:10px;
-  margin-bottom:14px;
+  gap:12px;
+  margin-bottom:16px;
 }
+/* Each tile is a console readout: a colour hairline lights the top edge, the
+   number carries the signal colour and a soft glow, and anything needing
+   attention gets a live pulse. On light theme the glows resolve to nothing. */
 .ds-tile{
-  display:flex; flex-direction:column; align-items:flex-start; gap:2px;
-  background:var(--surface); border:1px solid var(--border);
-  border-radius:12px; padding:13px 15px;
+  position:relative; overflow:hidden;
+  display:flex; flex-direction:column; align-items:flex-start; gap:3px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.02), transparent 40%),
+    var(--surface);
+  border:1px solid var(--border);
+  border-radius:14px; padding:16px 17px 15px;
   font-family:inherit; text-align:left;
-  cursor:pointer; transition:border-color .13s, box-shadow .13s, transform .13s;
+  cursor:pointer; transition:border-color .16s, box-shadow .16s, transform .16s;
   box-shadow:var(--shadow-sm);
 }
-.ds-tile:hover{ border-color:var(--border2); box-shadow:var(--shadow-md); transform:translateY(-1px); }
+.ds-tile::before{
+  content:''; position:absolute; left:0; right:0; top:0; height:2px;
+  background:var(--accent);
+  opacity:.5; transition:opacity .16s;
+}
+.ds-tile:hover{ border-color:var(--border2); box-shadow:var(--shadow-md); transform:translateY(-2px); }
+.ds-tile:hover::before{ opacity:1; }
 .ds-tile:not([onclick]){ cursor:default; }
 .ds-tile:not([onclick]):hover{ transform:none; box-shadow:var(--shadow-sm); border-color:var(--border); }
 .ds-num{
-  font-family:var(--mono); font-size:26px; font-weight:800;
-  letter-spacing:-.02em; color:var(--text); line-height:1.05;
+  font-family:var(--mono); font-size:34px; font-weight:800;
+  letter-spacing:-.03em; color:var(--text); line-height:1.02;
   font-variant-numeric:tabular-nums;
 }
 .ds-lbl{
-  font-size:10.5px; font-weight:700; letter-spacing:.04em;
+  font-size:10.5px; font-weight:700; letter-spacing:.06em;
   text-transform:uppercase; color:var(--text-dim); white-space:nowrap;
 }
-.ds-warn .ds-num{ color:var(--warn); }
-.ds-gold .ds-num{ color:var(--gold); }
-/* A zero is good news on this board — state it quietly rather than in alarm colours. */
-.ds-zero .ds-num{ color:var(--muted); font-weight:700; }
+/* Signal states — hairline, number colour, and glow all tuned per state. */
+.ds-warn::before{ background:var(--warn); }
+.ds-warn .ds-num{ color:var(--warn); text-shadow:var(--glow-warn); }
+.ds-warn{ box-shadow:var(--shadow-sm), var(--glow-warn); }
+.ds-gold::before{ background:var(--gold); }
+.ds-gold .ds-num{ color:var(--gold); text-shadow:var(--glow-gold); }
+.ds-gold{ box-shadow:var(--shadow-sm), var(--glow-gold); }
+/* A zero is good news on this board — state it quietly, no alarm colour, no glow. */
+.ds-zero::before{ background:var(--border2); opacity:.4; }
+.ds-zero .ds-num{ color:var(--muted); font-weight:700; text-shadow:none; }
+.ds-zero{ box-shadow:var(--shadow-sm); }
+/* Live pulse dot on a non-zero attention tile. */
+.ds-warn:not(.ds-zero) .ds-lbl::after,
+.ds-gold:not(.ds-zero) .ds-lbl::after{
+  content:''; display:inline-block; width:6px; height:6px; margin-left:7px;
+  border-radius:50%; background:currentColor; vertical-align:middle;
+  animation:dsPulse 2s ease-in-out infinite;
+}
+.ds-warn:not(.ds-zero) .ds-lbl{ color:var(--warn); }
+.ds-gold:not(.ds-zero) .ds-lbl{ color:var(--gold); }
+@keyframes dsPulse{ 0%,100%{ opacity:1; box-shadow:0 0 0 0 currentColor; } 50%{ opacity:.45; box-shadow:0 0 8px 1px currentColor; } }
+@media(prefers-reduced-motion:reduce){ .ds-warn .ds-lbl::after,.ds-gold .ds-lbl::after{ animation:none; } }
 @media(max-width:1100px){ .dash-strip{ grid-template-columns:repeat(3,1fr); } }
+
+/* ── "RIGHT NOW" COVERAGE METER ──────────────────────────────────────────
+   One glance answer to "are we covered this morning?" — the count that
+   matters most in an aged-care roster, shown as a glowing fill. */
+.coverage{
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.02), transparent 45%),
+    var(--surface);
+  border:1px solid var(--border); border-radius:14px;
+  padding:15px 18px 16px; margin-bottom:16px; box-shadow:var(--shadow-sm);
+}
+.cov-top{ display:flex; align-items:baseline; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+.cov-h{ font-size:12px; font-weight:800; letter-spacing:.05em; text-transform:uppercase; color:var(--text-dim); }
+.cov-count{ font-size:13px; color:var(--text-mid); }
+.cov-count b{ font-family:var(--mono); font-size:16px; font-weight:800; color:var(--text); }
+.cov-gap{ color:var(--warn); font-weight:700; }
+.cov-track{
+  height:10px; border-radius:99px; margin:11px 0 8px;
+  background:var(--surface3); overflow:hidden; position:relative;
+}
+.cov-fill{
+  height:100%; border-radius:99px; transition:width .6s cubic-bezier(.2,.8,.2,1);
+  background:linear-gradient(90deg, var(--success), #6ee7b7);
+  box-shadow:var(--glow-success);
+}
+.cov-warn .cov-fill{ background:linear-gradient(90deg, var(--gold), #fcd34d); box-shadow:var(--glow-gold); }
+.cov-miss .cov-fill{ background:linear-gradient(90deg, var(--warn), #fda4af); box-shadow:var(--glow-warn); }
+.cov-foot{ display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.cov-pct{ font-family:var(--mono); font-size:11.5px; font-weight:700; color:var(--text-dim); }
+.cov-warn .cov-pct{ color:var(--gold); }
+.cov-miss .cov-pct{ color:var(--warn); }
+.cov-note{ font-size:11px; color:var(--muted); }
+@media(prefers-reduced-motion:reduce){ .cov-fill{ transition:none; } }
 @media(max-width:640px){  .dash-strip{ grid-template-columns:repeat(2,1fr); } }
 
 /* The dashboard is a wall display, not a document — let it use the screen.
@@ -2086,6 +2219,10 @@ button, .btn { white-space: nowrap; }
     <div class="appbar-week" id="topbarWeek" style="display:none"></div>
     <div class="appbar-actions">
       <div id="topbarWhoami"></div>
+      <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" title="Switch theme" aria-label="Switch theme">
+        <svg class="tt-moon" width="15" height="15" viewBox="0 0 20 20" fill="currentColor"><path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"/></svg>
+        <svg class="tt-sun" width="15" height="15" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clip-rule="evenodd"/></svg>
+      </button>
       <div class="save-status" id="saveStatus"><div class="dot"></div><span id="saveLabel">loading…</span></div>
       <button class="btn btn-save" onclick="withBtnLoading(this,saveData)">Save</button>
       <button class="btn btn-ghost" onclick="openAddShift()">+ Shift</button>
@@ -2174,6 +2311,7 @@ button, .btn { white-space: nowrap; }
         <!-- At-a-glance strip. Each tile is a question asked before 9am, and
              each one clicks through to the screen that answers it. -->
         <div class="dash-strip" id="dashStrip"></div>
+        <div class="coverage" id="coverage" hidden></div>
         <div class="morning-board" id="morningBoard"></div>
       </div>
 
@@ -10276,7 +10414,7 @@ function dashFindRun(q){
       '<span class="df-acts">'+
         '<button class="df-btn" onclick="dashFindGo(\'roster\',\''+_cdEsc(full)+'\')">Roster</button>'+
         '<button class="df-btn" onclick="dashFindGo(\'leave\',\''+_cdEsc(full)+'\')">Leave</button>'+
-        '<button class="df-btn" onclick="dashFindGo(\'staff\',\''+_cdEsc(full)+'\')">Profile</button>'+
+        '<button class="df-btn df-btn-go" onclick="dashFindOpenProfile('+s.id+')">Profile</button>'+
       '</span>'+
     '</div>';
   }).join('');
@@ -10287,9 +10425,40 @@ function dashFindRun(q){
 function dashFindKey(e){
   if(e.key==='Escape'){ e.target.value=''; dashFindRun(''); e.target.blur(); return; }
   if(e.key==='Enter' && _dfMatches.length){
-    const s=_dfMatches[0];
-    dashFindGo('roster',(s.first+' '+s.last).trim());
+    dashFindOpenProfile(_dfMatches[0].id);
   }
+}
+
+/** "Right now" coverage meter — present vs expected, as a glowing bar.
+ *  present includes anyone clocked in (on-time or late); absent = expected,
+ *  no punch. When nobody is expected yet (early morning, weekend) it hides. */
+function renderCoverage(present, absent, late){
+  const el=document.getElementById('coverage'); if(!el) return;
+  const expected=present+absent;
+  if(expected<=0){ el.hidden=true; el.innerHTML=''; return; }
+  el.hidden=false;
+  const pct=Math.round((present/expected)*100);
+  // Full house is emerald; a gap is amber; a big gap glows rose.
+  const state = absent===0 ? 'ok' : (pct>=80 ? 'ok' : (pct>=60 ? 'warn' : 'miss'));
+  const lateBit = late>0 ? '<span class="cov-note">'+late+' clocked in late</span>' : '';
+  el.className='coverage cov-'+state;
+  el.innerHTML=
+    '<div class="cov-top">'+
+      '<span class="cov-h">On shift right now</span>'+
+      '<span class="cov-count"><b>'+present+'</b> of '+expected+' expected'+
+        (absent>0?' · <span class="cov-gap">'+absent+' not in</span>':'')+'</span>'+
+    '</div>'+
+    '<div class="cov-track"><div class="cov-fill" style="width:'+pct+'%"></div></div>'+
+    '<div class="cov-foot"><span class="cov-pct">'+pct+'% covered</span>'+lateBit+'</div>';
+}
+
+/** Enter / the Profile button: open the employee profile overlay directly. */
+function dashFindOpenProfile(id){
+  const inp=document.getElementById('dashFind'); if(inp) inp.value='';
+  const box=document.getElementById('dashFindResults');
+  if(box){ box.innerHTML=''; box.classList.remove('show'); }
+  _dfMatches=[];
+  if(typeof openEmpProfile==='function') openEmpProfile(id);
 }
 
 /** Jump to the screen, already filtered to that person. */
@@ -10316,6 +10485,15 @@ function dashFindGo(where, name){
   if(inp) inp.value='';
   const box=document.getElementById('dashFindResults');
   if(box){ box.innerHTML=''; box.classList.remove('show'); }
+}
+
+/** Switch between the dark Command Deck and the light Daylight theme. */
+function toggleTheme(){
+  const root=document.documentElement;
+  const goLight = root.getAttribute('data-theme')!=='light';
+  if(goLight) root.setAttribute('data-theme','light');
+  else root.removeAttribute('data-theme');
+  try{ localStorage.setItem('so_theme', goLight?'light':'dark'); }catch(e){}
 }
 
 // "/" focuses the finder from anywhere on the Dashboard.
@@ -10474,6 +10652,13 @@ async function refreshMorningBoard(){
       pending: (leaveRequests||[]).filter(function(r){return r.status==='pending';}).length
     });
   }catch(e){ console.warn('dash strip', e); }
+
+  // "Right now" coverage: of everyone expected on shift today, how many are
+  // actually clocked in. inNow already includes people who clocked in late, so
+  // this reads as attendance, not punctuality. Absent = expected but no punch.
+  try{
+    renderCoverage(inNow.length, notInList.length, lateList.length);
+  }catch(e){ console.warn('coverage', e); }
 
   const anyone = lateList.length||notInList.length||inNow.length||leaveList.length||doneList.length;
   host.innerHTML = `
