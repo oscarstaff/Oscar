@@ -7105,6 +7105,7 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
             <input type="file" id="profAvaFile" accept="image/*" style="display:none;" onchange="uploadMyAvatar(event)">
             <div>
               <div style="display:flex;align-items:baseline;gap:6px;flex-wrap:wrap;"><div style="font-size:15px;font-weight:700;color:var(--ui-ink,#0f172a);" id="profName"></div><span id="profNamePronouns" style="font-size:12px;color:var(--ui-ink-4,#94a3b8);font-weight:500;display:none;"></span></div>
+              <div id="profNick" style="display:none;font-size:12px;color:var(--ui-ink-3,#64748b);margin-top:2px;font-weight:500;"></div>
               <div style="font-size:12px;color:var(--ui-ink-4,#94a3b8);margin-top:2px;" id="profRole">Staff</div>
               <div id="profTeam" style="display:none;font-size:12px;color:var(--ui-ink-3,#64748b);margin-top:2px;font-weight:500;"></div>
             </div>
@@ -8946,7 +8947,7 @@ async function enterHub(){
   const _el_mhName=document.getElementById("mhName");if(_el_mhName)_el_mhName.textContent=_dispFirst;
   const _el_mhNameInline=document.getElementById("mhNameInline");if(_el_mhNameInline)_el_mhNameInline.textContent=_dispFirst;
   // My Profile card: nickname text, glowing if earned.
-  const profNameEl=document.getElementById("profName");if(profNameEl)profNameEl.innerHTML=renderStaffName(me, esc, _disp)+(window.achBadgesInline?window.achBadgesInline(me):"");
+  const profNameEl=document.getElementById("profName");if(profNameEl)profNameEl.innerHTML=renderStaffName(me, esc, _disp)+(window.achBadgesInline?window.achBadgesInline(me):""); if(window.paintMyNickLine)window.paintMyNickLine();
   const hr=new Date().getHours();
   const _el_homeGreeting=document.getElementById("homeGreeting");if(_el_homeGreeting)_el_homeGreeting.textContent=(hr<12?"Good morning":hr<17?"Good afternoon":"Good evening")+", "+first;
   const _el_homeWeekSub=document.getElementById("homeWeekSub");if(_el_homeWeekSub)_el_homeWeekSub.textContent=wkL(weekStart);
@@ -12377,8 +12378,8 @@ async function openProfilePage(name){
   // Name + inline badges. Profile page shows the REAL name (glowing if earned),
   // with the nickname in parentheses when the person has one — this is the one
   // place both are shown, so a nickname elsewhere can always be traced here.
-  const _nick=(window.displayNameFor?window.displayNameFor(name):name);
-  const _hasNick=_nick && _nick!==name;
+  const _nick=(window.nicknameFor?window.nicknameFor(name):null);
+  const _hasNick=!!_nick;
   const _nameHtml=renderStaffName(name, esc, name)   // force REAL name as shown text
     + (_hasNick ? '<span style="font-size:15px;font-weight:600;color:var(--ui-ink-4,#94a3b8);margin-left:6px;">('+esc(_nick)+')</span>' : '');
   document.getElementById('pvName').innerHTML=_nameHtml+(window.achBadgesInline?window.achBadgesInline(name,{size:16}):'');
@@ -12779,12 +12780,13 @@ async function saveMyNickname(){
     return;
   }
   window._myNickname=nick||null;
+  if(window._nickNames){ if(nick) window._nickNames[me]=nick; else delete window._nickNames[me]; }
   const disp=(window.myDisplayName?window.myDisplayName():me);
   const first=disp.split(' ')[0];
   const set=function(id,val){ const e=document.getElementById(id); if(e) e.textContent=val; };
   set('sbName',disp); set('mhName',first); set('mhNameInline',first);
   // Profile card keeps the glow (if earned), with the new nickname text.
-  const pn=document.getElementById('profName'); if(pn) pn.innerHTML=renderStaffName(me, esc, disp)+(window.achBadgesInline?window.achBadgesInline(me):'');
+  const pn=document.getElementById('profName'); if(pn) pn.innerHTML=renderStaffName(me, esc, disp)+(window.achBadgesInline?window.achBadgesInline(me):''); if(window.paintMyNickLine)window.paintMyNickLine();
   try{
     await fetch(SB+"/rest/v1/staff_credentials?staff_name=eq."+encodeURIComponent(me),{
       method:"PATCH",
@@ -12827,7 +12829,7 @@ async function pickMySkin(skin){
   renderMySkinPicker();
   // Live-update own glowing name on the profile card.
   const disp=(window.myDisplayName?window.myDisplayName():me);
-  const pn=document.getElementById('profName'); if(pn) pn.innerHTML=renderStaffName(me, esc, disp)+(window.achBadgesInline?window.achBadgesInline(me):'');
+  const pn=document.getElementById('profName'); if(pn) pn.innerHTML=renderStaffName(me, esc, disp)+(window.achBadgesInline?window.achBadgesInline(me):''); if(window.paintMyNickLine)window.paintMyNickLine();
   try{
     await fetch(SB+"/rest/v1/staff_credentials?staff_name=eq."+encodeURIComponent(me),{
       method:"PATCH",
@@ -13063,7 +13065,7 @@ async function loadProfilePage(){
   const _pWrap=document.getElementById("profAvaWrap");
   if(_pImg){ if(profAvaEl)profAvaEl.textContent=''; if(_pWrap)_pWrap.style.backgroundImage='url('+_pImg+')'; }
   else { if(profAvaEl)profAvaEl.textContent=ava; if(_pWrap)_pWrap.style.backgroundImage=''; }
-  const profNameEl=document.getElementById("profName");if(profNameEl)profNameEl.innerHTML=renderStaffName(me, esc, (window.myDisplayName?window.myDisplayName():me))+(window.achBadgesInline?window.achBadgesInline(me):"");
+  const profNameEl=document.getElementById("profName");if(profNameEl)profNameEl.innerHTML=renderStaffName(me, esc, (window.myDisplayName?window.myDisplayName():me))+(window.achBadgesInline?window.achBadgesInline(me):""); if(window.paintMyNickLine)window.paintMyNickLine();
   const profRoleEl=document.getElementById("profRole");if(profRoleEl)profRoleEl.textContent=myIsAdmin?"Admin":"Staff";
   fillMyNickname();
   fillMyBio();
@@ -20543,8 +20545,15 @@ window.adminIcon = window.adminIcon || function(size){
     '</svg>';
 };
 window.displayNameFor = window.displayNameFor || function(name){
+  // Real name is primary everywhere (sidebar, call log, directory, reports).
+  // The nickname is secondary and shown only on the person's profile — see
+  // nicknameFor() and the profile header.
+  return name;
+};
+// The person's nickname, if they've set one (secondary, profile-only).
+window.nicknameFor = window.nicknameFor || function(name){
   const n = window._nickNames && window._nickNames[name];
-  return (n && n.trim()) ? n.trim() : name;
+  return (n && n.trim()) ? n.trim() : null;
 };
 window.renderStaffName = window.renderStaffName || function(name, escFn, plainOverride){
   const e = (escFn||function(s){return s;});
@@ -20580,7 +20589,16 @@ window.loadMyNickname = window.loadMyNickname || async function(){
   return window._myNickname;
 };
 window.myDisplayName = window.myDisplayName || function(){
-  return (window._myNickname && window._myNickname.trim()) ? window._myNickname.trim() : me;
+  // Real name is primary. The nickname is secondary (shown under it on My
+  // Profile) — window._myNickname still holds it.
+  return me;
+};
+// Fill the secondary nickname line on My Profile ("Goes by …"). Hidden if none.
+window.paintMyNickLine = window.paintMyNickLine || function(){
+  const el=document.getElementById('profNick'); if(!el) return;
+  const nk=(window._myNickname && window._myNickname.trim()) ? window._myNickname.trim() : '';
+  if(nk){ el.textContent='Goes by "'+nk+'"'; el.style.display='block'; }
+  else { el.textContent=''; el.style.display='none'; }
 };
 
 
