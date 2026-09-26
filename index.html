@@ -18577,7 +18577,10 @@ async function trGenerateReport(){
     }catch(e){}
 
     var byStaff = {};
-    reps.forEach(function(r){ (byStaff[r.staff_name]=byStaff[r.staff_name]||[]).push(r); });
+    // Only this team's members — processing_reports has no team column, so an
+    // unfiltered merge would pull in anyone who filed a report that week.
+    var _teamSet = {}; team.forEach(function(n){ _teamSet[n]=true; });
+    reps.forEach(function(r){ if(_teamSet[r.staff_name]) (byStaff[r.staff_name]=byStaff[r.staff_name]||[]).push(r); });
     team.forEach(function(n){ if(!byStaff[n]) byStaff[n]=[]; });
     var names = Object.keys(byStaff).sort();
     if(!names.length){ out.innerHTML = '<div style="font-size:13px;color:var(--ui-ink-4,#94a3b8);">No '+trActiveTeam()+' staff found.</div>'; return; }
@@ -18645,12 +18648,19 @@ async function trGenerateReport(){
 // PDF design themes — layout is identical across them; only the header band,
 // accent and zebra colour change. Team leads pick one per team.
 var TR_THEMES = {
-  navy:     { name:'Navy',     head:[30,58,95],   accent:[37,99,235],  zebra:[240,244,250], total:[219,234,254], line:[210,220,235] },
-  emerald:  { name:'Emerald',  head:[6,95,70],    accent:[5,150,105],  zebra:[240,250,246], total:[209,250,229], line:[210,228,222] },
-  slate:    { name:'Slate',    head:[51,65,85],   accent:[71,85,105],  zebra:[244,247,250], total:[226,232,240], line:[214,222,232] },
-  burgundy: { name:'Burgundy', head:[112,26,46],  accent:[159,18,57],  zebra:[250,242,244], total:[251,223,231], line:[232,214,220] },
-  graphite: { name:'Graphite', head:[38,38,42],   accent:[82,82,91],   zebra:[245,245,246], total:[228,228,231], line:[220,220,224] },
-  teal:     { name:'Teal',     head:[17,75,85],   accent:[13,148,136], zebra:[240,249,249], total:[204,242,241], line:[208,228,228] }
+  // ── Formal ──
+  navy:     { name:'Navy',     cat:'Formal', head:[30,58,95],   accent:[37,99,235],  zebra:[240,244,250], total:[219,234,254], line:[210,220,235] },
+  emerald:  { name:'Emerald',  cat:'Formal', head:[6,95,70],    accent:[5,150,105],  zebra:[240,250,246], total:[209,250,229], line:[210,228,222] },
+  slate:    { name:'Slate',    cat:'Formal', head:[40,52,71],   accent:[51,65,85],   zebra:[243,246,250], total:[214,222,235], line:[206,214,226] },
+  burgundy: { name:'Burgundy', cat:'Formal', head:[112,26,46],  accent:[159,18,57],  zebra:[250,242,244], total:[251,223,231], line:[232,214,220] },
+  graphite: { name:'Graphite', cat:'Formal', head:[28,28,32],   accent:[63,63,70],   zebra:[244,244,246], total:[224,224,228], line:[214,214,219] },
+  teal:     { name:'Teal',     cat:'Formal', head:[17,75,85],   accent:[13,148,136], zebra:[240,249,249], total:[204,242,241], line:[208,228,228] },
+  // ── Casual (softer, less corporate) ──
+  sunset:   { name:'Sunset',   cat:'Casual', head:[194,65,12],  accent:[234,88,12],  zebra:[255,247,237], total:[254,230,206], line:[246,220,198] },
+  grape:    { name:'Grape',    cat:'Casual', head:[91,33,132],  accent:[147,51,187], zebra:[250,245,255], total:[240,224,250], line:[232,214,244] },
+  sky:      { name:'Sky',      cat:'Casual', head:[7,89,133],   accent:[14,165,233], zebra:[240,249,255], total:[207,232,250], line:[204,226,242] },
+  rose:     { name:'Rose',     cat:'Casual', head:[159,45,90],  accent:[225,70,140], zebra:[253,242,248], total:[250,222,236], line:[244,214,228] },
+  forest:   { name:'Forest',   cat:'Casual', head:[22,101,52],  accent:[34,160,84],  zebra:[240,250,242], total:[209,244,218], line:[210,232,216] }
 };
 var _trTheme = 'navy';
 var _trThemeByTeam = {};
@@ -18709,11 +18719,33 @@ function trRenderThemePicker(){
   if(!host) return;
   if(!trIsLead()){ host.style.display='none'; return; }
   host.style.display='';
-  host.innerHTML = '<label class="tr-lbl" style="margin-right:8px;">Report design</label>'+
-    '<select id="trThemeSel" class="tr-num" style="width:auto;min-width:140px;" onchange="trSaveTheme(this)">'+
-    Object.keys(TR_THEMES).map(function(k){ return '<option value="'+k+'"'+(k===_trTheme?' selected':'')+'>'+TR_THEMES[k].name+'</option>'; }).join('')+
-    '</select> <span id="trThemeMsg" style="font-size:12px;margin-left:8px;"></span>'+
-    '<div style="font-size:11.5px;color:var(--ui-ink-4,#94a3b8);margin-top:5px;">Applies to the exported PDF. Same layout, different look.</div>';
+  function rgb(a){ return 'rgb('+a[0]+','+a[1]+','+a[2]+')'; }
+  var groups = { Formal:[], Casual:[] };
+  Object.keys(TR_THEMES).forEach(function(k){ (groups[TR_THEMES[k].cat]||groups.Formal).push(k); });
+  function optgroup(cat){
+    return '<optgroup label="'+cat+'">'+groups[cat].map(function(k){
+      return '<option value="'+k+'"'+(k===_trTheme?' selected':'')+'>'+TR_THEMES[k].name+'</option>';
+    }).join('')+'</optgroup>';
+  }
+  host.innerHTML =
+    '<label class="tr-lbl" style="margin-right:8px;">Report design</label>'+
+    '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">'+
+      '<select id="trThemeSel" class="tr-num" style="width:auto;min-width:150px;" onchange="trSaveTheme(this);trThemeSwatch();">'+
+        optgroup('Formal')+optgroup('Casual')+
+      '</select>'+
+      '<span id="trThemeSwatch" style="display:inline-flex;border:1px solid var(--ui-line,#e2e8f0);border-radius:7px;overflow:hidden;height:26px;"></span>'+
+      '<span id="trThemeMsg" style="font-size:12px;"></span>'+
+    '</div>'+
+    '<div style="font-size:11.5px;color:var(--ui-ink-4,#94a3b8);margin-top:5px;">Applies to the exported PDF. Same layout, different look. Swatch shows the header, accent and row shading.</div>';
+  trThemeSwatch();
+}
+// On-screen preview of the selected theme's three key colours.
+function trThemeSwatch(){
+  var box=document.getElementById('trThemeSwatch'); if(!box) return;
+  var sel=document.getElementById('trThemeSel');
+  var P=TR_THEMES[(sel&&sel.value)||_trTheme]||TR_THEMES.navy;
+  function cell(a,label){ return '<span title="'+label+'" style="width:34px;height:100%;display:inline-block;background:rgb('+a[0]+','+a[1]+','+a[2]+');"></span>'; }
+  box.innerHTML = cell(P.head,'Header')+cell(P.accent,'Accent')+cell(P.total,'Row shading');
 }
 
 // ── Placement weekly sections (lead-authored) ──
@@ -18817,7 +18849,9 @@ async function trGeneratePlacementReport(){
     var repResp = await fetch(SB + '/rest/v1/processing_reports?report_date=gte.'+mon+'&report_date=lte.'+sun+'&order=staff_name.asc,report_date.asc', { headers:_trHeaders() });
     var reps = await repResp.json(); reps = Array.isArray(reps)?reps:[];
     var weekDates=[]; for(var wi=0;wi<TR_WEEK_DAYS;wi++) weekDates.push(_trAddDays(mon,wi));
-    var byName={}; reps.forEach(function(r){ (byName[r.staff_name]=byName[r.staff_name]||{})[r.report_date]=r; });
+    // Placement members only — same reason as above (no team column on reports).
+    var _memSet={}; members.forEach(function(n){ _memSet[n]=true; });
+    var byName={}; reps.forEach(function(r){ if(_memSet[r.staff_name]) (byName[r.staff_name]=byName[r.staff_name]||{})[r.report_date]=r; });
     members.forEach(function(n){ if(!byName[n]) byName[n]={}; });
     function esc(x){ return _trEsc(x); }
     function tbl(rows, cols, emptyLabel){
