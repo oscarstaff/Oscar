@@ -18213,7 +18213,6 @@ async function initTeamReport(){
     var wEl = document.getElementById('trWeekPick'); if(wEl && !wEl.value) wEl.value = _trToday();
   }
 
-  await trLoadTheme(team);
   if(shape==='metrics'){ await trLoadMetrics(); if(myIsAdmin) trRenderMetricAdmin(); }
   if(showEntry){ if(shape==='metrics') trRenderMetricFields(); await trLoadDay(); trRenderMyWeek(); }
 }
@@ -18647,53 +18646,18 @@ async function trGenerateReport(){
 
 // PDF design themes — layout is identical across them; only the header band,
 // accent and zebra colour change. Team leads pick one per team.
-var TR_THEMES = {
-  // ── Formal ──
-  navy:     { name:'Navy',     cat:'Formal', head:[30,58,95],   accent:[37,99,235],  zebra:[240,244,250], total:[219,234,254], line:[210,220,235] },
-  emerald:  { name:'Emerald',  cat:'Formal', head:[6,95,70],    accent:[5,150,105],  zebra:[240,250,246], total:[209,250,229], line:[210,228,222] },
-  slate:    { name:'Slate',    cat:'Formal', head:[40,52,71],   accent:[51,65,85],   zebra:[243,246,250], total:[214,222,235], line:[206,214,226] },
-  burgundy: { name:'Burgundy', cat:'Formal', head:[112,26,46],  accent:[159,18,57],  zebra:[250,242,244], total:[251,223,231], line:[232,214,220] },
-  graphite: { name:'Graphite', cat:'Formal', head:[28,28,32],   accent:[63,63,70],   zebra:[244,244,246], total:[224,224,228], line:[214,214,219] },
-  teal:     { name:'Teal',     cat:'Formal', head:[17,75,85],   accent:[13,148,136], zebra:[240,249,249], total:[204,242,241], line:[208,228,228] },
-  // ── Casual (softer, less corporate) ──
-  sunset:   { name:'Sunset',   cat:'Casual', head:[194,65,12],  accent:[234,88,12],  zebra:[255,247,237], total:[254,230,206], line:[246,220,198] },
-  grape:    { name:'Grape',    cat:'Casual', head:[91,33,132],  accent:[147,51,187], zebra:[250,245,255], total:[240,224,250], line:[232,214,244] },
-  sky:      { name:'Sky',      cat:'Casual', head:[7,89,133],   accent:[14,165,233], zebra:[240,249,255], total:[207,232,250], line:[204,226,242] },
-  rose:     { name:'Rose',     cat:'Casual', head:[159,45,90],  accent:[225,70,140], zebra:[253,242,248], total:[250,222,236], line:[244,214,228] },
-  forest:   { name:'Forest',   cat:'Casual', head:[22,101,52],  accent:[34,160,84],  zebra:[240,250,242], total:[209,244,218], line:[210,232,216] }
+// Each team has a fixed report colour (no per-lead picker). head = header band,
+// accent = section rules/accents, zebra/total/line = table shading.
+var TR_TEAM_COLORS = {
+  placement:  { head:[71,85,105],   accent:[100,116,139], zebra:[243,245,248], total:[224,228,234], line:[210,216,224] }, // gray
+  evershine:  { head:[7,89,133],    accent:[14,165,233],  zebra:[240,249,255], total:[207,232,250], line:[204,226,242] }, // sky blue
+  processing: { head:[6,95,70],     accent:[5,150,105],   zebra:[240,250,246], total:[209,250,229], line:[210,228,222] }, // green
+  enrolment:  { head:[49,46,129],   accent:[79,70,229],   zebra:[243,243,255], total:[224,222,252], line:[214,214,240] }, // velvet blue
+  accounts:   { head:[146,64,14],   accent:[217,119,6],   zebra:[255,248,237], total:[253,230,201], line:[246,222,195] }, // amber
+  education:  { head:[17,75,85],    accent:[13,148,136],  zebra:[240,249,249], total:[204,242,241], line:[208,228,228] }  // teal
 };
-var _trTheme = 'navy';
-var _trThemeByTeam = {};
-function _trPal(){ return TR_THEMES[_trTheme] || TR_THEMES.navy; }
-
-async function trLoadTheme(team){
-  team = team || trActiveTeam();
-  try{
-    var r = await fetch(SB + '/rest/v1/team_report_prefs?team=eq.'+encodeURIComponent(team)+'&select=pdf_theme&limit=1', { headers:_trHeaders() });
-    var rows = await r.json();
-    _trTheme = (Array.isArray(rows) && rows.length && TR_THEMES[rows[0].pdf_theme]) ? rows[0].pdf_theme : 'navy';
-  }catch(e){ _trTheme = 'navy'; }
-  _trThemeByTeam[_teamKey(team)] = _trTheme;
-  var sel = document.getElementById('trThemeSel'); if(sel) sel.value = _trTheme;
-  return _trTheme;
-}
-async function trSaveTheme(sel){
-  if(!trIsLead()) return;
-  var theme = (sel && sel.value) ? sel.value : 'navy';
-  if(!TR_THEMES[theme]) theme='navy';
-  var team = trActiveTeam();
-  var msg = document.getElementById('trThemeMsg');
-  try{
-    var r = await fetch(SB + '/rest/v1/team_report_prefs?on_conflict=team', {
-      method:'POST',
-      headers: Object.assign({ 'Prefer':'resolution=merge-duplicates,return=minimal' }, _trHeaders()),
-      body: JSON.stringify({ team:team, pdf_theme:theme, updated_by:(window.me||me||''), updated_at:new Date().toISOString() })
-    });
-    if(!r.ok) throw new Error(r.status);
-    _trTheme = theme; _trThemeByTeam[_teamKey(team)] = theme;
-    if(msg){ msg.textContent='Saved'; msg.style.color='var(--ui-success,#0e8a5f)'; setTimeout(function(){ msg.textContent=''; },1500); }
-  }catch(e){ if(msg){ msg.textContent='Could not save'; msg.style.color='#dc2626'; } }
-}
+var _DEF_COLORS = { head:[30,58,95], accent:[37,99,235], zebra:[240,244,250], total:[219,234,254], line:[210,220,235] };
+function _trPal(){ return TR_TEAM_COLORS[_teamKey(trActiveTeam())] || _DEF_COLORS; }
 
 function trRenderTeamPicker(){
   var host = document.getElementById('trTeamPicker');
@@ -18715,37 +18679,9 @@ async function trSwitchTeam(t){
 }
 
 function trRenderThemePicker(){
+  // Report colour is fixed per team now — no picker. Hide the container.
   var host = document.getElementById('trThemePicker');
-  if(!host) return;
-  if(!trIsLead()){ host.style.display='none'; return; }
-  host.style.display='';
-  function rgb(a){ return 'rgb('+a[0]+','+a[1]+','+a[2]+')'; }
-  var groups = { Formal:[], Casual:[] };
-  Object.keys(TR_THEMES).forEach(function(k){ (groups[TR_THEMES[k].cat]||groups.Formal).push(k); });
-  function optgroup(cat){
-    return '<optgroup label="'+cat+'">'+groups[cat].map(function(k){
-      return '<option value="'+k+'"'+(k===_trTheme?' selected':'')+'>'+TR_THEMES[k].name+'</option>';
-    }).join('')+'</optgroup>';
-  }
-  host.innerHTML =
-    '<label class="tr-lbl" style="margin-right:8px;">Report design</label>'+
-    '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">'+
-      '<select id="trThemeSel" class="tr-num" style="width:auto;min-width:150px;" onchange="trSaveTheme(this);trThemeSwatch();">'+
-        optgroup('Formal')+optgroup('Casual')+
-      '</select>'+
-      '<span id="trThemeSwatch" style="display:inline-flex;border:1px solid var(--ui-line,#e2e8f0);border-radius:7px;overflow:hidden;height:26px;"></span>'+
-      '<span id="trThemeMsg" style="font-size:12px;"></span>'+
-    '</div>'+
-    '<div style="font-size:11.5px;color:var(--ui-ink-4,#94a3b8);margin-top:5px;">Applies to the exported PDF. Same layout, different look. Swatch shows the header, accent and row shading.</div>';
-  trThemeSwatch();
-}
-// On-screen preview of the selected theme's three key colours.
-function trThemeSwatch(){
-  var box=document.getElementById('trThemeSwatch'); if(!box) return;
-  var sel=document.getElementById('trThemeSel');
-  var P=TR_THEMES[(sel&&sel.value)||_trTheme]||TR_THEMES.navy;
-  function cell(a,label){ return '<span title="'+label+'" style="width:34px;height:100%;display:inline-block;background:rgb('+a[0]+','+a[1]+','+a[2]+');"></span>'; }
-  box.innerHTML = cell(P.head,'Header')+cell(P.accent,'Accent')+cell(P.total,'Row shading');
+  if(host){ host.style.display='none'; host.innerHTML=''; }
 }
 
 // ── Placement weekly sections (lead-authored) ──
