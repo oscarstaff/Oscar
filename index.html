@@ -8129,6 +8129,30 @@ async function fetchDriveDocBase64(driveId){
   if(!j.ok) throw new Error(j.error || 'Drive fetch failed');
   return j; // {ok, name, mime, base64}
 }
+// Like openPrivateDoc, but hands the person a downloadable file instead of
+// opening it in a Drive tab. Used from the quiz dialog's document link.
+async function downloadPrivateDoc(url, title){
+  const id = _driveIdFromUrl(url);
+  if(!id){ // non-Drive url — force a download rather than a tab
+    const a=document.createElement('a'); a.href=url; a.download=(title||'document'); a.rel='noopener';
+    document.body.appendChild(a); a.click(); a.remove(); return;
+  }
+  try{
+    showToast && showToast('Downloading '+(title||'document')+'…','info');
+    const j = await fetchDriveDocBase64(id);
+    const bytes = Uint8Array.from(atob(j.base64), c=>c.charCodeAt(0));
+    const blob = new Blob([bytes], {type: j.mime || 'application/octet-stream'});
+    const blobUrl = URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=blobUrl;
+    // Prefer the real filename from Drive; fall back to the title.
+    a.download = j.name || (title||'document');
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(blobUrl), 60000);
+  }catch(e){
+    showToast && showToast('Could not download: '+e.message,'error');
+  }
+}
 // Open a private Drive doc by streaming its bytes through Apps Script into a blob.
 async function openPrivateDoc(url, title){
   const id = _driveIdFromUrl(url);
@@ -23560,10 +23584,10 @@ function lrnRenderList(){
 
     let docBlock='';
     if(t.documentUrl){
-      docBlock='<a href="'+t.documentUrl+'" target="_blank" rel="noopener" class="lrn-doc">'+
+      docBlock='<a href="#" onclick="event.preventDefault();downloadPrivateDoc(\''+String(t.documentUrl).replace(/'/g,"\\'")+'\',\''+esc(t.documentTitle||'document').replace(/'/g,"\\'")+'\')" rel="noopener" class="lrn-doc">'+
         '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>'+
-        '<div style="flex:1;min-width:0;"><div class="lrn-doc-t">'+esc(t.documentTitle)+'</div><div class="lrn-doc-s">Read before taking the quiz</div></div>'+
-        '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><polyline points="9 18 15 12 9 6"/></svg>'+
+        '<div style="flex:1;min-width:0;"><div class="lrn-doc-t">'+esc(t.documentTitle)+'</div><div class="lrn-doc-s">Tap to download, then read before the quiz</div></div>'+
+        '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>'+
       '</a>';
     }
 
