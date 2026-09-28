@@ -6842,6 +6842,17 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
           </div>
           <div id="thResults" style="margin-top:14px;"></div>
         </div>
+        <!-- Short-shift break answers (clock-outs of 5h or less) -->
+        <div class="card" id="bcCard" style="margin-bottom:14px;">
+          <div class="card-title" style="margin-bottom:4px;">Short-shift break answers</div>
+          <div style="font-size:11.5px;color:var(--ui-ink-3,#64748b);margin-bottom:12px;max-width:62ch;">When someone clocks out after 5 hours or less, Nexus asks whether they took a 30-minute break. Nothing is deducted automatically; people who said yes are listed here so you can adjust their punch if needed.</div>
+          <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;">
+            <div style="flex:1;min-width:130px;"><label style="font-size:11px;font-weight:600;color:var(--ui-ink-3,#64748b);">From</label><input type="date" id="bcStart" style="width:100%;border:1.5px solid var(--ui-line,#e2e8f0);border-radius:8px;padding:8px 12px;font-size:13px;font-family:inherit;outline:none;margin-top:3px;"></div>
+            <div style="flex:1;min-width:130px;"><label style="font-size:11px;font-weight:600;color:var(--ui-ink-3,#64748b);">To</label><input type="date" id="bcEnd" style="width:100%;border:1.5px solid var(--ui-line,#e2e8f0);border-radius:8px;padding:8px 12px;font-size:13px;font-family:inherit;outline:none;margin-top:3px;"></div>
+            <button onclick="nxBreakCheckLoad()" class="btn btn-green" style="padding:9px 16px;font-size:12px;">Run</button>
+          </div>
+          <div id="bcResults" style="margin-top:14px;"></div>
+        </div>
         <div class="card" style="margin-bottom:14px;">
           <div class="card-title" style="margin-bottom:10px;">Extra break requests</div>
           <div id="ebrAdminList" style="margin:-6px -6px 0;"><div style="padding:14px;color:var(--ui-ink-4,#94a3b8);font-size:13px;"><div class="nx-sk" data-sk="list" data-n="3" aria-hidden="true"></div></div></div>
@@ -16492,6 +16503,7 @@ async function toggleClock(){
   // and if they go ahead, file a notice for hub admins. Any error here just
   // falls through to a normal clock-in.
   let _earlyNotice = null;
+  let _breakNote = null;   // short-shift break answer, saved in the clock-out row's notes
   if(next === 'in' && typeof nxEarlyClockCheck === 'function'){
     try{ _earlyNotice = await nxEarlyClockCheck(); }catch(e){ _earlyNotice = null; }
     if(_earlyNotice === false){ window._lastClockToggle = 0; window._lastClockAnyToggle = 0; return; }
@@ -16524,7 +16536,18 @@ async function toggleClock(){
       }
     }catch(e){ /* network blip — fall through, don't hard-block a genuine clock-out */ }
 
-    const ok = await clockOutConfirm();
+    // Short shift (5h or less, no automatic break): ask about a 30-minute break
+    // instead of the plain confirm. Either answer clocks out; Cancel doesn't.
+    let ok;
+    let _short = null;
+    try{ _short = (typeof nxShortShiftInfo === 'function') ? await nxShortShiftInfo() : null; }catch(e){ _short = null; }
+    if(_short && typeof nxBreakQuestion === 'function'){
+      const _ans = await nxBreakQuestion(_short);
+      ok = !!_ans;
+      if(_ans) _breakNote = 'break-check: ' + _ans + ' (' + _short.label + ' worked)';
+    } else {
+      ok = await clockOutConfirm();
+    }
     if(!ok){
       // user cancelled — reset debounce so they can act again immediately
       window._lastClockToggle = 0;
@@ -16624,6 +16647,10 @@ async function toggleClock(){
     showToast(next==='in' ? 'Clocking in…' : 'Clocking out…');
     applyGpsLock();
 
+    // The punch row; a short-shift break answer rides along in notes (never
+    // changes hours — admins review it in Timesheet Manager).
+    const _punchRow = { staff_name: me, action: next, ts: realTs };
+    if(next === 'out' && _breakNote) _punchRow.notes = _breakNote;
     // Early clock-in they chose to go ahead with → tell the admins (queued if offline).
     if(_earlyNotice && next === 'in' && typeof nxEarlyFileNotice === 'function'){
       try{ nxEarlyFileNotice(Object.assign({}, _earlyNotice, { clock_ts: realTs })); }catch(_){}
@@ -16632,7 +16659,7 @@ async function toggleClock(){
     // A fetch only "fails" on a dropped connection; a rejected save (login
     // timed out, permission error, server error) still comes back "ok:false".
     // We must check that, or a rejected punch looks like success and is lost.
-    sbPost('clock_log', {staff_name: me, action: next, ts: realTs})
+    sbPost('clock_log', _punchRow)
       .then(function(res){
         if(res && res.ok === false){ throw new Error('HTTP '+res.status); }
         // Confirmed saved — NOW show success and clear any pending flag.
@@ -16658,7 +16685,7 @@ async function toggleClock(){
         // Queue the retry (the flusher clears _clockPending when it lands).
         try{
           const q = JSON.parse(localStorage.getItem('clock_supabase_queue') || '[]');
-          q.push({payload: {staff_name: me, action: next, ts: realTs}, queuedAt: Date.now()});
+          q.push({payload: Object.assign({}, _punchRow), queuedAt: Date.now()});
           localStorage.setItem('clock_supabase_queue', JSON.stringify(q.slice(-20)));
         }catch(_){}
       });
@@ -28435,6 +28462,32 @@ input[type="date"].f-input{ width:100%; }
   .tr-gen-actions .btn{ flex:1 1 0; min-height:48px; }
 }
 
+/* ── 10. Short-shift break question + review card ─────────────── */
+.bc-card{
+  width:100%; max-width:400px; padding:22px 22px 16px;
+  background:var(--m-card); color:var(--m-ink); border-radius:var(--nx-r-lg);
+  font-family:var(--nx-font-ui); outline:none;
+}
+.bc-ic{ width:44px; height:44px; border-radius:12px; display:flex; align-items:center; justify-content:center;
+  margin-bottom:14px; background:var(--accent-dim); color:var(--accent-text); }
+.bc-title{ font-size:19px; font-weight:700; letter-spacing:-.02em; line-height:1.25; margin-bottom:8px; }
+.bc-sub{ font-size:14px; line-height:1.5; color:var(--m-ink-2); margin-bottom:18px; }
+.bc-sub b{ color:var(--m-ink); font-variant-numeric:tabular-nums; }
+.bc-actions{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.bc-actions .btn{ min-height:48px; width:100%; font-size:14.5px; }
+.bc-foot{ margin-top:12px; font-size:12.5px; color:var(--m-ink-3); text-align:center; }
+.bc-cancel{ border:0; background:none; padding:6px 4px; font:inherit; font-weight:600; color:var(--accent-text); cursor:pointer; }
+.bc-cancel:hover{ text-decoration:underline; text-underline-offset:3px; }
+.bc-chips{ display:flex; gap:6px; flex-wrap:wrap; margin-bottom:12px; }
+.bc-empty{ padding:14px 2px; font-size:13.5px; color:var(--m-ink-3); }
+.bc-table td,.bc-table th{ white-space:nowrap; }
+@media(max-width:700px){ .bc-table td:nth-child(2){ white-space:normal; min-width:96px; } .bc-table td,.bc-table th{ padding:8px 6px; } }
+.bc-pill{ display:inline-block; padding:2px 10px; border-radius:var(--nx-r-pill); font-size:12px; font-weight:600; }
+.bc-yes{ background:color-mix(in srgb,#f59e0b 16%,var(--m-card)); color:#8a5300; }
+.bc-no{ background:var(--m-card-2); color:var(--m-ink-2); }
+:is([data-theme="dark"],[data-theme="midnight"],[data-theme="renaissance"]) .bc-yes{ color:#f5b547; }
+[data-theme="win95"] .bc-card{ border-radius:0; }
+
 @keyframes nxSheetUp{ from{ transform:translateY(24px); opacity:.6; } to{ transform:none; opacity:1; } }
 @media(prefers-reduced-motion:reduce){ .nx-modal-scrim > div:first-child{ animation:none !important; } }
 </style>
@@ -29370,6 +29423,133 @@ if(typeof initTeamReport==='function'){
   }
   window.nxClockRingRefresh=function(){ loadRoster(); loadOnShift(); };
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',init); else init();
+})();
+</script>
+<script id="nexus-short-shift-break">
+/* ════════════════════════════════════════════════════════════════
+   SHORT-SHIFT BREAK CHECK
+   Clocking out after a shift of 5 hours or less (no automatic break applies)
+   asks "Did you take a 30-minute break?". The answer is saved in the
+   clock-out row's notes ("break-check: yes|no (4h 15m worked)") so admins can
+   review it in Timesheet Manager. Nothing is deducted either way — a "yes"
+   is only flagged for review; no break is ever added automatically.
+   ════════════════════════════════════════════════════════════════ */
+const NX_BC_MAX_MIN = 300;   // 5h or less → ask (the automatic 0.5h break only applies over 5h)
+const NX_BC_MIN_MIN = 30;    // under 30 min a 30-minute break isn't possible → don't ask
+
+function _nxBcDur(m){ m=Math.max(0,Math.round(m)); const h=Math.floor(m/60), r=m%60; return h ? h+'h'+(r?' '+r+'m':'') : r+'m'; }
+
+/* Worked minutes for the shift being clocked out, measured the way the
+   timesheet does (both ends rounded by flexClockTime). null → don't ask. */
+async function nxShortShiftInfo(){
+  let inTs=null;
+  try{
+    const last=await sbGet('clock_log','?staff_name=eq.'+encodeURIComponent(me)+'&order=ts.desc&limit=1');
+    if(last && last.length && last[0].action==='in') inTs=new Date(last[0].ts);
+  }catch(e){}
+  if(!inTs || isNaN(inTs)){ try{ if(_clockSinceTs) inTs=new Date(_clockSinceTs); }catch(e){} }
+  if(!inTs || isNaN(inTs)) return null;
+  const now=new Date();
+  const f=(typeof flexClockTime==='function') ? flexClockTime : function(d){ return new Date(d); };
+  const mins=Math.round((f(now)-f(inTs))/60000);
+  if(!(mins>=NX_BC_MIN_MIN && mins<=NX_BC_MAX_MIN)) return null;
+  return { minutes:mins, label:_nxBcDur(mins) };
+}
+
+/* Replaces the plain "Clock out now?" confirm for short shifts.
+   Resolves 'yes' | 'no' (both clock out) or null (cancel, stay clocked in). */
+function nxBreakQuestion(info){
+  return new Promise(function(resolve){
+    const back=document.createElement('div');
+    back.id='breakCheckBack';
+    back.style.cssText='position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;'+
+      'background:rgba(8,16,26,.6);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);';
+    back.innerHTML=
+      '<div class="bc-card" role="dialog" aria-modal="true" aria-labelledby="bcTitle">'+
+        '<div class="bc-ic" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9h13v5a5 5 0 01-5 5H9a5 5 0 01-5-5V9z"/><path d="M17 11h1.5a2.5 2.5 0 010 5H17"/><path d="M8 3v2M12 3v2"/></svg></div>'+
+        '<div class="bc-title" id="bcTitle">Did you take a 30-minute break?</div>'+
+        '<div class="bc-sub">You\u2019ve worked <b>'+info.label+'</b> today. Short shifts don\u2019t get an automatic break, so your answer goes to the admins to check. Nothing is taken off your hours.</div>'+
+        '<div class="bc-actions">'+
+          '<button type="button" class="btn btn-outline" id="bcNo">No break</button>'+
+          '<button type="button" class="btn btn-outline" id="bcYes">Yes, I took one</button>'+
+        '</div>'+
+        '<div class="bc-foot">Either answer clocks you out. <button type="button" class="bc-cancel" id="bcCancel">Cancel</button></div>'+
+      '</div>';
+    document.body.appendChild(back);
+    const card=back.firstElementChild; card.tabIndex=-1;
+    setTimeout(function(){ try{ card.focus({preventScroll:true}); }catch(e){} },50);
+    function done(v){ document.removeEventListener('keydown',onKey); back.remove(); resolve(v); }
+    function onKey(e){ if(e.key==='Escape') done(null); }
+    document.addEventListener('keydown',onKey);
+    back.addEventListener('click',function(e){ if(e.target===back) done(null); });
+    document.getElementById('bcYes').addEventListener('click',function(){ done('yes'); });
+    document.getElementById('bcNo').addEventListener('click',function(){ done('no'); });
+    document.getElementById('bcCancel').addEventListener('click',function(){ done(null); });
+  });
+}
+
+/* ── Timesheet Manager: review answers ───────────────────────────── */
+let _nxBcRows=[], _nxBcFilter='yes';
+function _nxBcParse(n){
+  const m=/^break-check:\s*(yes|no)\s*(?:\(([^)]*)\))?/i.exec(String(n||''));
+  return m ? { ans:m[1].toLowerCase(), worked:(m[2]||'').replace(/\s*worked\s*$/i,'') } : null;
+}
+async function nxBreakCheckLoad(){
+  const out=document.getElementById('bcResults'); if(!out) return;
+  const f=(document.getElementById('bcStart')||{}).value, t=(document.getElementById('bcEnd')||{}).value;
+  if(!f || !t){ out.innerHTML='<div class="bc-empty">Pick a date range.</div>'; return; }
+  const p=function(s){ const a=s.split('-'); return new Date(+a[0],+a[1]-1,+a[2]); };
+  const start=p(f), end=p(t); end.setDate(end.getDate()+1);
+  out.innerHTML='<div class="nx-sk" data-sk="list" data-n="3" aria-hidden="true"></div>';
+  let rows;
+  try{
+    rows=await sbGet('clock_log','?notes=like.'+encodeURIComponent('break-check:*')+'&ts=gte.'+encodeURIComponent(start.toISOString())+
+      '&ts=lt.'+encodeURIComponent(end.toISOString())+'&select=staff_name,ts,notes&order=ts.desc&limit=1000');
+  }catch(e){ rows=null; }
+  if(!Array.isArray(rows)){ out.innerHTML='<div class="bc-empty">Couldn\u2019t load answers. Try again.</div>'; return; }
+  _nxBcRows=rows.map(function(r){ const q=_nxBcParse(r.notes); return q ? { name:r.staff_name, ts:new Date(r.ts), ans:q.ans, worked:q.worked } : null; }).filter(Boolean);
+  nxBreakCheckRender();
+}
+function nxBreakCheckFilter(v){ _nxBcFilter=v; nxBreakCheckRender(); }
+function nxBreakCheckRender(){
+  const out=document.getElementById('bcResults'); if(!out) return;
+  const yes=_nxBcRows.filter(function(r){ return r.ans==='yes'; }).length, all=_nxBcRows.length;
+  const list=_nxBcFilter==='yes' ? _nxBcRows.filter(function(r){ return r.ans==='yes'; }) : _nxBcRows;
+  const e=function(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); };
+  const chips='<div class="bc-chips">'+
+    '<button type="button" class="hours-tab'+(_nxBcFilter==='yes'?' active':'')+'" onclick="nxBreakCheckFilter(\'yes\')">Said yes · '+yes+'</button>'+
+    '<button type="button" class="hours-tab'+(_nxBcFilter==='all'?' active':'')+'" onclick="nxBreakCheckFilter(\'all\')">All answers · '+all+'</button></div>';
+  if(!list.length){
+    out.innerHTML=chips+'<div class="bc-empty">'+(_nxBcFilter==='yes'
+      ? 'No one said they took a break on a short shift in this range.'
+      : 'No short-shift answers in this range.')+'</div>';
+    return;
+  }
+  out.innerHTML=chips+'<div style="overflow-x:auto"><table class="tr-table bc-table"><thead><tr><th>Staff</th><th>Clocked out</th><th class="num">Worked</th><th>Took a break?</th></tr></thead><tbody>'+
+    list.map(function(r){
+      const when=r.ts.toLocaleString('en-AU',{timeZone:'Australia/Sydney',weekday:'short',day:'numeric',month:'short',hour:'numeric',minute:'2-digit'});
+      return '<tr><td>'+e(r.name)+'</td><td>'+e(when)+'</td><td class="num">'+e(r.worked||'—')+'</td><td>'+
+        (r.ans==='yes' ? '<span class="bc-pill bc-yes">Yes · not deducted</span>' : '<span class="bc-pill bc-no">No</span>')+'</td></tr>';
+    }).join('')+'</tbody></table></div>';
+}
+(function(){
+  function mount(){
+    const f=document.getElementById('bcStart'), t=document.getElementById('bcEnd');
+    if(!f || !t) return;
+    if(!f.value || !t.value){
+      const r=(typeof nxFortCurrent==='function') ? nxFortCurrent() : null;
+      if(r){ if(!f.value) f.value=r.from; if(!t.value) t.value=r.to; }
+    }
+    if(typeof nxMountFortPicker==='function') nxMountFortPicker('bcStart','bcEnd','nxBreakCheckLoad');
+  }
+  if(typeof showReportsTab==='function'){
+    const _orig=showReportsTab;
+    showReportsTab=function(tab){
+      const out=_orig.apply(this,arguments);
+      if(tab==='manager'){ try{ mount(); nxBreakCheckLoad(); }catch(e){} }
+      return out;
+    };
+  }
 })();
 </script>
 </body>
