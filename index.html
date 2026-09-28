@@ -6145,8 +6145,6 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
               <div class="cc-lbl">Time clock</div>
               <div id="nepaliDateBadge" class="cc-npd"></div>
             </div>
-            <div id="clockStatus" class="cc-status"><span class="skel" style="width:140px;height:20px;border-radius:8px;" aria-label="Loading"></span></div>
-            <div id="clockSubStatus" class="cc-sub"></div>
           </div>
           <div class="cc-head-right">
             <div id="clockNow" class="cc-now"></div>
@@ -6156,9 +6154,43 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
               <button onclick="openExtraBreakRequest()" class="cc-btn3" aria-label="Request an extra break" title="Request an extra break">+ Extra break</button>
             </div>
           </div>
+          <!-- Shift progress: ring (rostered days) + status text -->
+          <div class="cc-body">
+            <div class="nx-ring" id="nxRing" hidden aria-hidden="true">
+              <svg viewBox="0 0 112 112" width="112" height="112">
+                <circle class="nx-ring-track" cx="56" cy="56" r="46"></circle>
+                <circle class="nx-ring-bar" id="nxRingBar" cx="56" cy="56" r="46" transform="rotate(-90 56 56)"></circle>
+              </svg>
+              <div class="nx-ring-mid"><div class="nx-ring-val" id="nxRingVal"></div><div class="nx-ring-lbl" id="nxRingLbl"></div></div>
+            </div>
+            <div class="cc-text">
+              <div id="clockStatus" class="cc-status"><span class="skel" style="width:140px;height:20px;border-radius:8px;" aria-label="Loading"></span></div>
+              <div id="clockSubStatus" class="cc-sub"></div>
+              <div class="nx-shift" id="nxShift" hidden>
+                <div class="nx-shift-lbl" id="nxShiftLbl"></div>
+                <div class="nx-shift-val" id="nxShiftVal"></div>
+                <div class="nx-shift-meta" id="nxShiftMeta"></div>
+              </div>
+            </div>
+          </div>
         </div>
-        <!-- Hours summary toggle -->
-        <div style="margin-top:14px;border-top:1px solid var(--ui-line-soft,#f1f5f9);padding-top:12px;">
+        <!-- Who else is on shift (tap for names) -->
+        <button type="button" class="nx-row" id="nxTeamRow" hidden aria-expanded="false" aria-controls="nxTeamList" onclick="nxToggleTeam()">
+          <svg class="nx-row-ic" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0113 0"/><path d="M16 4.5a3.5 3.5 0 010 7"/><path d="M18.5 20a6.5 6.5 0 00-3-5.5"/></svg>
+          <span class="nx-row-lbl" id="nxTeamLbl">On shift now</span>
+          <span class="nx-av-stack" id="nxTeamAv"></span>
+          <svg class="nx-row-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+        <div class="nx-team-list" id="nxTeamList" hidden></div>
+        <!-- Fortnight total; tap to show the full hours view -->
+        <button type="button" class="nx-row" id="nxFortRow" aria-expanded="false" aria-controls="ccHours" onclick="nxToggleHours()">
+          <svg class="nx-row-ic" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>
+          <span class="nx-row-lbl">This fortnight</span>
+          <span class="nx-row-val" id="nxFortVal"></span>
+          <svg class="nx-row-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+        <!-- Hours view (opened from "This fortnight") -->
+        <div id="ccHours" style="margin-top:14px;border-top:1px solid var(--ui-line-soft,#f1f5f9);padding-top:12px;">
           <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
             <button onclick="setHoursPeriod('today')" id="hp-today" class="hours-tab">Today</button>
             <button onclick="setHoursPeriod('week')" id="hp-week" class="hours-tab">This week</button>
@@ -6850,10 +6882,36 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
         <!-- Admin: switch which team's report to view -->
         <div id="trTeamPicker" class="card" style="margin-bottom:14px;padding:12px 16px;display:none;"></div>
 
+        <!-- Admin/lead: generate the weekly report. Kept first so it's never
+             buried below the daily log on long weeks. -->
+        <div class="card" id="trAdminCard" style="margin-bottom:14px;padding:16px;display:none;">
+          <div class="card-title" style="margin-bottom:4px;">Generate weekly report</div>
+          <div class="tr-gen-sub">Choose a week; the report covers Monday to Saturday for the whole team.</div>
+          <div id="trThemePicker" style="margin-bottom:12px;display:none;"></div>
+          <div class="tr-gen-row">
+            <div class="tr-week">
+              <label class="tr-week-lbl" for="trWeekPick">Week</label>
+              <div class="tr-week-ctl">
+                <button type="button" class="tr-week-step" onclick="trWeekStep(-1)" aria-label="Previous week">&lsaquo;</button>
+                <input type="date" id="trWeekPick" class="tr-week-in" onchange="trWeekChanged()">
+                <button type="button" class="tr-week-step" onclick="trWeekStep(1)" aria-label="Next week">&rsaquo;</button>
+                <button type="button" class="tr-week-today" onclick="trWeekStep(0)">This week</button>
+              </div>
+              <div class="tr-week-range" id="trWeekRange" aria-live="polite"></div>
+            </div>
+            <div class="tr-gen-actions">
+              <button onclick="trGenerateReport()" class="btn btn-green">Generate</button>
+              <button onclick="trDownloadPdf()" id="trPrintBtn" class="btn btn-outline" style="display:none;">Download PDF</button>
+            </div>
+          </div>
+          <div id="trReportOut" style="margin-top:16px;"></div>
+        </div>
+
+
         <!-- Placement: lead-authored weekly sections 1–4 -->
         <div class="card" id="trPlacementCard" style="margin-bottom:14px;padding:16px;display:none;">
           <div class="card-title" style="margin-bottom:4px;">Weekly report sections (lead)</div>
-          <div style="font-size:11.5px;color:var(--ui-ink-3,#64748b);margin-bottom:12px;max-width:70ch;">Student numbers and issue tables for the week selected below. Section 5 (the daily task grid) is built automatically from each member's daily log.</div>
+          <div style="font-size:11.5px;color:var(--ui-ink-3,#64748b);margin-bottom:12px;max-width:70ch;">Student numbers and issue tables for the week selected above. Section 5 (the daily task grid) is built automatically from each member's daily log.</div>
           <div id="trPlacementBody"></div>
         </div>
 
@@ -6898,18 +6956,6 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
           <div id="trMetricMsg" style="font-size:12px;margin-top:8px;"></div>
         </div>
 
-        <!-- Admin/lead: generate the weekly report -->
-        <div class="card" id="trAdminCard" style="margin-bottom:14px;padding:16px;display:none;">
-          <div class="card-title" style="margin-bottom:4px;">Generate weekly report</div>
-          <div style="font-size:11.5px;color:var(--ui-ink-3,#64748b);margin-bottom:12px;max-width:60ch;">Pick any date in the week; the report covers that Monday–Saturday for the whole team.</div>
-          <div id="trThemePicker" style="margin-bottom:12px;display:none;"></div>
-          <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;">
-            <div style="flex:1;min-width:150px;"><label style="font-size:11px;font-weight:600;color:var(--ui-ink-3,#64748b);">Week of</label><input type="date" id="trWeekPick" style="width:100%;border:1.5px solid var(--ui-line,#e2e8f0);border-radius:8px;padding:8px 12px;font-size:13px;font-family:inherit;outline:none;margin-top:3px;"></div>
-            <button onclick="trGenerateReport()" class="btn btn-green" style="padding:9px 16px;font-size:12px;">Generate</button>
-            <button onclick="trDownloadPdf()" id="trPrintBtn" style="padding:9px 16px;font-size:12px;font-weight:700;background:#0f172a;color:#fff;border:none;border-radius:8px;cursor:pointer;font-family:inherit;display:none;">Download PDF</button>
-          </div>
-          <div id="trReportOut" style="margin-top:16px;"></div>
-        </div>
 
       </div>
 
@@ -18155,18 +18201,21 @@ function initReportsPage(){
       if(b) b.style.display = ((myTeam && trTeamHasReport(myTeam)) || myIsAdmin) ? '' : 'none';
     })();
   }
-  // Default dates: last fortnight
+  // Default dates: the current pay fortnight (same Mon-Sun cycle as the home
+  // Hours card). Local dates only; toISOString() rolled Sydney mornings back a day.
+  const _fr = (typeof nxFortCurrent === 'function') ? nxFortCurrent() : null;
   const today = new Date();
   const start = new Date(today); start.setDate(today.getDate()-13);
-  const fmt = function(d){return d.toISOString().split('T')[0];};
-  ['reportPageStart','mgrStart'].forEach(function(id){
+  const fmt = function(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
+  ['reportPageStart','mgrStart','thStart'].forEach(function(id){
     const el = document.getElementById(id);
-    if(el && !el.value) el.value = fmt(start);
+    if(el && !el.value) el.value = _fr ? _fr.from : fmt(start);
   });
-  ['reportPageEnd','mgrEnd'].forEach(function(id){
+  ['reportPageEnd','mgrEnd','thEnd'].forEach(function(id){
     const el = document.getElementById(id);
-    if(el && !el.value) el.value = fmt(today);
+    if(el && !el.value) el.value = _fr ? _fr.to : fmt(today);
   });
+  if(typeof nxInitReportPeriods === 'function') nxInitReportPeriods();
   setTimeout(runHoursReport, 100);
   if(typeof loadFortLeaderboard==='function') loadFortLeaderboard();
 }
@@ -19438,6 +19487,10 @@ async function wipeAndResyncFromSheet(){
 }
 
 // ── PUNCH EDIT (admin only) ──────────────
+// Redesigned dialog. Every field id (peStaff, peInId, peOutId, peDate, peTimeIn,
+// peTimeOut, peBreak, peCoffee, peSaveBtn) and every action (savePunchEdit,
+// nukeBreakOnly, deletePunch) is unchanged — this only changes how it looks,
+// adds a read-only preview of what will be saved, and closes on Escape.
 async function openPunchEdit(staff, isoDate, timeIn, timeOut, inId, outId){
   let bd = document.getElementById('punchEditBack');
   if(!bd){
@@ -19446,42 +19499,106 @@ async function openPunchEdit(staff, isoDate, timeIn, timeOut, inId, outId){
     bd.style.cssText = 'position:fixed;inset:0;z-index:9560;background:rgba(15,23,42,.55);backdrop-filter:blur(10px);display:flex;align-items:center;justify-content:center;padding:16px;';
     document.body.appendChild(bd);
     bd.addEventListener('click', function(e){ if(e.target===bd) bd.style.display='none'; });
+    document.addEventListener('keydown', function(e){
+      if(e.key==='Escape' && bd.style.display!=='none') bd.style.display='none';
+    });
   }
+  // The per-row Delete / Nuke buttons create detached hidden #peStaff/#peDate
+  // inputs when this dialog was never opened. Left in place they come first in
+  // the document, so getElementById would read THEM — stale staff/date — instead
+  // of this dialog's fields. Remove any copies that live outside the dialog.
+  document.querySelectorAll('#peStaff,#peDate').forEach(function(el){ if(!bd.contains(el)) el.remove(); });
+
   const dateObj = new Date(isoDate+'T00:00:00');
-  const dateStr = dateObj.toLocaleDateString('en-AU',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
-  bd.innerHTML = '<div style="background:var(--ui-surface,#fff);border-radius:14px;width:100%;max-width:420px;box-shadow:0 24px 60px rgba(15,23,42,.3);overflow:hidden;" onclick="event.stopPropagation()">'+
-    '<div style="padding:16px 18px;border-bottom:1px solid var(--ui-line-soft,#f1f5f9);">'+
-      '<div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">Edit punch</div>'+
-      '<div style="font-size:16px;font-weight:700;color:var(--ui-ink,#0f172a);">'+staff+'</div>'+
-      ''+
+  const dateStr = isNaN(dateObj) ? '' : dateObj.toLocaleDateString('en-AU',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  const hasRows = !!(inId || outId);
+  const q = function(v){ return String(v==null?'':v).replace(/&/g,'&amp;').replace(/"/g,'&quot;'); };
+
+  bd.innerHTML =
+  '<div class="pe-card" role="dialog" aria-modal="true" aria-labelledby="peTitle" onclick="event.stopPropagation()">'+
+    '<div class="pe-hd">'+
+      '<div class="pe-hd-text">'+
+        '<div class="pe-kicker">Edit punch</div>'+
+        '<div class="pe-title" id="peTitle">'+esc(staff)+'</div>'+
+        (dateStr ? '<div class="pe-sub">'+esc(dateStr)+'</div>' : '')+
+      '</div>'+
+      '<button type="button" class="pe-x" aria-label="Close" onclick="document.getElementById(\'punchEditBack\').style.display=\'none\'">'+
+        '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>'+
+      '</button>'+
     '</div>'+
-    '<div style="padding:18px;">'+
-      '<input type="hidden" id="peStaff" value="'+staff.replace(/"/g,'&quot;')+'">'+
-      '<input type="hidden" id="peInId" value="'+(inId||'')+'">'+
-      '<input type="hidden" id="peOutId" value="'+(outId||'')+'">'+
-      '<div style="margin-bottom:12px;">'+
-        '<label style="font-size:11px;font-weight:600;color:var(--ui-ink-3,#64748b);">Date</label>'+
-        '<input type="date" id="peDate" value="'+isoDate+'" style="width:100%;border:1.5px solid var(--ui-line,#e2e8f0);border-radius:8px;padding:9px 12px;font-size:14px;font-family:inherit;outline:none;margin-top:3px;">'+
+    '<div class="pe-body">'+
+      '<input type="hidden" id="peStaff" value="'+q(staff)+'">'+
+      '<input type="hidden" id="peInId" value="'+q(inId||'')+'">'+
+      '<input type="hidden" id="peOutId" value="'+q(outId||'')+'">'+
+      '<div class="pe-field">'+
+        '<label class="pe-lbl" for="peDate">Date</label>'+
+        '<input type="date" id="peDate" class="pe-in" value="'+q(isoDate)+'" oninput="_pePreview()">'+
       '</div>'+
-      '<div style="display:flex;gap:10px;margin-bottom:12px;">'+
-        '<div style="flex:1;"><label style="font-size:11px;font-weight:600;color:var(--ui-ink-3,#64748b);">Time In</label><input type="time" id="peTimeIn" value="'+(timeIn||'')+'" style="width:100%;border:1.5px solid var(--ui-line,#e2e8f0);border-radius:8px;padding:9px 12px;font-size:14px;font-family:inherit;outline:none;margin-top:3px;"></div>'+
-        '<div style="flex:1;"><label style="font-size:11px;font-weight:600;color:var(--ui-ink-3,#64748b);">Time Out</label><input type="time" id="peTimeOut" value="'+(timeOut||'')+'" style="width:100%;border:1.5px solid var(--ui-line,#e2e8f0);border-radius:8px;padding:9px 12px;font-size:14px;font-family:inherit;outline:none;margin-top:3px;"></div>'+
+      '<div class="pe-row">'+
+        '<div class="pe-field"><label class="pe-lbl" for="peTimeIn">Clock in</label>'+
+          '<input type="time" id="peTimeIn" class="pe-in" value="'+q(timeIn||'')+'" oninput="_pePreview()"></div>'+
+        '<div class="pe-field"><label class="pe-lbl" for="peTimeOut">Clock out</label>'+
+          '<input type="time" id="peTimeOut" class="pe-in" value="'+q(timeOut||'')+'" oninput="_pePreview()"></div>'+
       '</div>'+
-      '<div style="display:flex;gap:10px;margin-bottom:12px;">'+
-        '<div style="flex:1;"><label style="font-size:11px;font-weight:600;color:var(--ui-ink-3,#64748b);">Break (hrs)</label><input type="number" step="0.25" min="0" id="peBreak" placeholder="0.5" style="width:100%;border:1.5px solid var(--ui-line,#e2e8f0);border-radius:8px;padding:9px 12px;font-size:14px;font-family:inherit;outline:none;margin-top:3px;"></div>'+
-        '<div style="flex:1;"><label style="font-size:11px;font-weight:600;color:var(--ui-ink-3,#64748b);">Coffee $</label><input type="text" id="peCoffee" placeholder="" style="width:100%;border:1.5px solid var(--ui-line,#e2e8f0);border-radius:8px;padding:9px 12px;font-size:14px;font-family:inherit;outline:none;margin-top:3px;"></div>'+
+      '<div class="pe-row">'+
+        '<div class="pe-field"><label class="pe-lbl" for="peBreak">Break <span class="pe-unit">hours</span></label>'+
+          '<input type="number" step="0.25" min="0" id="peBreak" class="pe-in" placeholder="Auto" inputmode="decimal" oninput="_pePreview()"></div>'+
+        '<div class="pe-field"><label class="pe-lbl" for="peCoffee">Coffee <span class="pe-unit">$</span></label>'+
+          '<input type="text" id="peCoffee" class="pe-in" placeholder="Auto" inputmode="decimal" oninput="_pePreview()"></div>'+
       '</div>'+
-      '<div style="font-size:11px;color:var(--ui-ink-4,#94a3b8);background:#fef3c7;padding:8px 10px;border-radius:8px;line-height:1.5;">⚠ Changes here update both the portal log and the Google Sheet for this staff member.</div>'+
+      '<div class="pe-preview" id="pePreview" aria-live="polite"></div>'+
+      '<div class="pe-note">'+
+        '<svg width="15" height="15" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M8.26 3.1c.77-1.36 2.71-1.36 3.48 0l5.58 9.92c.75 1.33-.21 2.98-1.74 2.98H4.42c-1.53 0-2.49-1.65-1.74-2.98L8.26 3.1zM10 7a1 1 0 00-1 1v3a1 1 0 102 0V8a1 1 0 00-1-1zm0 7.5a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/></svg>'+
+        '<span>Saving updates both the portal log and the Google Sheet for this person. Leave break or coffee blank to auto-fill.</span>'+
+      '</div>'+
     '</div>'+
-    '<div style="padding:12px 18px;border-top:1px solid var(--ui-line-soft,#f1f5f9);display:flex;gap:8px;justify-content:space-between;align-items:center;">'+
-      ((inId || outId) ? '<div style="display:flex;gap:6px;"><button onclick="nukeBreakOnly()" style="background:none;border:none;color:#a16207;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;padding:8px 12px;">Nuke breaks</button><button onclick="deletePunch()" style="background:none;border:none;color:#dc2626;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;padding:8px 14px;">Delete punch</button></div>' : '<div></div>')+
-      '<div style="display:flex;gap:8px;">'+
-        '<button onclick="document.getElementById(\'punchEditBack\').style.display=\'none\'" class="btn btn-outline" style="padding:8px 16px;font-size:13px;">Cancel</button>'+
-        '<button onclick="savePunchEdit()" class="btn btn-green" style="padding:8px 18px;font-size:13px;" id="peSaveBtn">Save changes</button>'+
+    '<div class="pe-ft">'+
+      (hasRows
+        ? '<div class="pe-danger"><button type="button" class="pe-link pe-link-warn" onclick="nukeBreakOnly()">Nuke breaks</button>'+
+          '<button type="button" class="pe-link pe-link-danger" onclick="deletePunch()">Delete punch</button></div>'
+        : '<div></div>')+
+      '<div class="pe-actions">'+
+        '<button type="button" onclick="document.getElementById(\'punchEditBack\').style.display=\'none\'" class="btn btn-outline">Cancel</button>'+
+        '<button type="button" onclick="savePunchEdit()" class="btn btn-green" id="peSaveBtn">Save changes</button>'+
       '</div>'+
     '</div>'+
   '</div>';
   bd.style.display='flex';
+  _pePreview();
+}
+
+// Read-only preview of what Save will write. Mirrors savePunchEdit's auto-fill
+// exactly: break 0.5h if more than 5h (none on Sat/Sun), coffee $5 if 4h or more.
+function _pePreview(){
+  const box = document.getElementById('pePreview');
+  if(!box) return;
+  const tin = (document.getElementById('peTimeIn')||{}).value || '';
+  const tout = (document.getElementById('peTimeOut')||{}).value || '';
+  const brk = (document.getElementById('peBreak')||{}).value || '';
+  const cof = (document.getElementById('peCoffee')||{}).value || '';
+  const iso = (document.getElementById('peDate')||{}).value || '';
+  if(!tin && !tout){ box.innerHTML=''; box.style.display='none'; return; }
+  box.style.display='';
+  if(!tin || !tout){
+    box.innerHTML = '<span class="pe-pv-main">'+(tin ? 'Clock-in only — no clock-out' : 'Clock-out only — no clock-in')+'</span>';
+    return;
+  }
+  const a = tin.split(':'), b = tout.split(':');
+  let mins = (parseInt(b[0],10)*60 + parseInt(b[1],10)) - (parseInt(a[0],10)*60 + parseInt(a[1],10));
+  if(isNaN(mins)){ box.innerHTML=''; box.style.display='none'; return; }
+  if(mins < 0) mins += 24*60;
+  const raw = mins/60;
+  let weekend = false;
+  try{ const p = iso.split('-'); const dow = new Date(+p[0], +p[1]-1, +p[2]).getDay(); weekend = (dow===0 || dow===6); }catch(e){}
+  const brkVal = brk !== '' ? brk : (weekend ? '0' : (raw > 5 ? '0.5' : '0'));
+  const brkShown = (parseFloat(brkVal) ? brkVal+'h break' : 'no break') + (brk !== '' ? '' : ' (auto)');
+  const cofAuto = raw >= 4 ? '5' : '';
+  const cofShown = cof !== '' ? '$'+cof+' coffee' : (cofAuto ? '$'+cofAuto+' coffee (auto)' : 'no coffee (auto)');
+  const h = Math.floor(mins/60), m = mins%60;
+  box.innerHTML =
+    '<span class="pe-pv-main">'+h+'h'+(m ? ' '+m+'m' : '')+' on the clock</span>'+
+    '<span class="pe-pv-item">'+esc(brkShown)+'</span>'+
+    '<span class="pe-pv-item">'+esc(cofShown)+'</span>';
 }
 
 async function nukeBreakOnly(){
@@ -19877,12 +19994,14 @@ function getPeriodRange(period){
     FORT_ANCHOR.setHours(0,0,0,0);
     const MS_DAY = 24*60*60*1000;
     const MS_FORT = 14*MS_DAY;
-    const diffMs = today.getTime() - FORT_ANCHOR.getTime();
-    const fortIdx = Math.floor(diffMs / MS_FORT);
-    start = new Date(FORT_ANCHOR.getTime() + fortIdx * MS_FORT);
-    end = new Date(start.getTime() + MS_FORT);
+    // Whole calendar days, not milliseconds: during daylight saving a fortnight's
+    // first Monday is 1h short of 14x24h and fell into the previous fortnight.
+    const dayDiff = Math.round((today.getTime() - FORT_ANCHOR.getTime()) / MS_DAY);
+    const fortIdx = Math.floor(dayDiff / 14);
+    start = new Date(FORT_ANCHOR.getFullYear(), FORT_ANCHOR.getMonth(), FORT_ANCHOR.getDate() + fortIdx*14);
+    end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 14);
     const startLbl = start.toLocaleDateString('en-AU',{day:'numeric',month:'short'});
-    const endLbl = (new Date(end.getTime()-MS_DAY)).toLocaleDateString('en-AU',{day:'numeric',month:'short'});
+    const endLbl = (new Date(end.getFullYear(), end.getMonth(), end.getDate()-1)).toLocaleDateString('en-AU',{day:'numeric',month:'short'});
     label = 'Fortnight: '+startLbl+' - '+endLbl;
   } else { // month
     start = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -27447,6 +27566,16 @@ select.f-input{
 }
 
 /* ── 12. Motion ───────────────────────────────────────────────── */
+/* The old "squish" layer shrinks every pressed <button> to 95% and every
+   pressed card to 99%. On full-width rows that reads as the row jumping, and
+   on the password eye it wipes the translateY(-50%) that centres it, so the
+   icon dropped half its height on every tap. Keep press feedback, lose the
+   movement, for those. */
+.card:active{ transform:none; }
+.nx-row:active,#todayChip:active,.nx-sheet-item:active,.auth-link:active{ transform:none; }
+.nx-row:active,#todayChip:active{ background:color-mix(in srgb,var(--m-ink) 4%,transparent); }
+.pw-eye:active{ transform:translateY(-50%); background:var(--accent-dim); color:var(--accent-text); }
+
 @media(prefers-reduced-motion:reduce){
   html{ scroll-behavior:auto !important; }
   .skel,.skeleton,.nx-sk .skel{ animation:none !important; }
@@ -28185,8 +28314,209 @@ input[type="date"].f-input{ width:100%; }
 @media(max-width:700px){ .page-hd{ margin-bottom:16px; } }
 
 [data-theme="win95"] .nx-modal-scrim:not(#nx-x) > div:first-child{ border-radius:0 !important; }
+/* ── 8. Punch edit dialog ─────────────────────────────────────── */
+.pe-card{
+  width:100%; max-width:468px;
+  background:var(--m-card); color:var(--m-ink);
+  border-radius:var(--nx-r-lg); overflow:hidden;
+  font-family:var(--nx-font-ui);
+}
+.pe-hd{ display:flex; align-items:flex-start; gap:12px; padding:18px 20px 14px; border-bottom:1px solid var(--m-border); }
+.pe-hd-text{ flex:1; min-width:0; }
+.pe-kicker{ font-size:12.5px; font-weight:600; color:var(--accent-text); margin-bottom:3px; }
+.pe-title{ font-size:19px; font-weight:700; letter-spacing:-.02em; line-height:1.2; color:var(--m-ink); overflow-wrap:anywhere; }
+.pe-sub{ font-size:13px; color:var(--m-ink-3); margin-top:3px; }
+.pe-x{
+  flex-shrink:0; width:34px; height:34px; margin:-4px -6px 0 0;
+  display:inline-flex; align-items:center; justify-content:center;
+  border:0; border-radius:var(--nx-r-pill); cursor:pointer;
+  background:var(--m-card-2); color:var(--m-ink-2);
+}
+.pe-x:hover{ color:var(--m-ink); background:color-mix(in srgb,var(--m-ink) 8%,var(--m-card)); }
+.pe-body{ padding:16px 20px 6px; }
+.pe-row{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.pe-field{ min-width:0; margin-bottom:14px; }
+.pe-lbl{ display:block; font-size:13px; font-weight:600; color:var(--m-ink-2); margin-bottom:6px; }
+.pe-unit{ font-weight:500; color:var(--m-ink-3); }
+.pe-in{
+  display:block; width:100%; min-width:0; max-width:100%; min-height:44px;
+  padding:9px 12px; border:1px solid var(--m-border-hi); border-radius:var(--nx-r-sm);
+  background:var(--m-card); color:var(--m-ink);
+  font-family:inherit; font-size:15px; font-weight:500; font-variant-numeric:tabular-nums;
+  outline:none; -webkit-appearance:none; appearance:none;
+  transition:border-color var(--nx-dur) var(--nx-ease),box-shadow var(--nx-dur) var(--nx-ease);
+}
+.pe-in::placeholder{ color:var(--m-ink-3); opacity:.8; }
+.pe-in:hover{ border-color:var(--m-ink-3); }
+.pe-in:focus{ border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-dim); }
+:is([data-theme="dark"],[data-theme="midnight"],[data-theme="renaissance"]) .pe-in{ color-scheme:dark; }
+.pe-preview{
+  display:flex; flex-wrap:wrap; align-items:center; gap:4px 10px;
+  margin:2px 0 12px; padding:10px 12px;
+  border-radius:var(--nx-r-sm); background:var(--m-card-2); border:1px solid var(--m-border);
+  font-size:13px; color:var(--m-ink-2); font-variant-numeric:tabular-nums;
+}
+.pe-pv-main{ font-weight:700; color:var(--m-ink); }
+.pe-pv-main,.pe-pv-item{ white-space:nowrap; }
+.pe-pv-item{ display:inline-flex; align-items:center; gap:8px; }
+.pe-pv-item::before{ content:""; width:4px; height:4px; border-radius:50%; background:var(--m-ink-3); }
+.pe-note{
+  display:flex; gap:8px; align-items:flex-start;
+  margin:0 0 12px; padding:10px 12px; border-radius:var(--nx-r-sm);
+  background:color-mix(in srgb,#f59e0b 10%,var(--m-card));
+  border:1px solid color-mix(in srgb,#f59e0b 32%,var(--m-border));
+  font-size:12.5px; line-height:1.45; color:var(--m-ink-2);
+}
+.pe-note svg{ flex-shrink:0; margin-top:1px; color:#d97706; }
+.pe-ft{
+  display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;
+  padding:12px 20px 16px; border-top:1px solid var(--m-border);
+}
+.pe-danger{ display:flex; gap:2px; margin-left:-10px; }
+.pe-actions{ display:flex; gap:8px; margin-left:auto; }
+.pe-link{
+  min-height:40px; padding:0 10px; border:0; border-radius:var(--nx-r-sm);
+  background:transparent; cursor:pointer; font-family:inherit; font-size:13px; font-weight:600;
+}
+.pe-link-warn{ color:#b45309; }
+.pe-link-danger{ color:var(--nx-danger); }
+.pe-link:hover{ background:color-mix(in srgb,currentColor 9%,transparent); }
+:is([data-theme="dark"],[data-theme="midnight"],[data-theme="renaissance"]) .pe-link-warn{ color:#f5b547; }
+[data-theme="win95"] .pe-card,[data-theme="win95"] .pe-in,[data-theme="win95"] .pe-x,
+[data-theme="win95"] .pe-preview,[data-theme="win95"] .pe-note{ border-radius:0; }
+@media(max-width:700px){
+  .pe-hd{ padding:14px 18px 12px; }
+  .pe-body{ padding:14px 18px 4px; }
+  .pe-ft{ padding:12px 18px 14px; }
+  .pe-actions{ width:100%; }
+  .pe-actions .btn{ flex:1 1 0; min-height:48px; }
+  .pe-danger{ width:100%; justify-content:space-between; margin-left:0; order:2; }
+}
+
+/* ── 9. Report periods: pay-fortnight picker + weekly-report stepper ── */
+.nx-fort{ margin:0 0 14px; }
+.nx-fort-lbl,.tr-week-lbl{ display:block; font-size:13px; font-weight:600; color:var(--m-ink-2); margin-bottom:6px; }
+.nx-fort-ctl,.tr-week-ctl{ display:flex; align-items:stretch; gap:6px; }
+.nx-fort-sel{ flex:1 1 auto; min-width:0; font-weight:600 !important; }
+.nx-fort-step,.tr-week-step{
+  flex:0 0 auto; width:44px; min-height:44px; padding:0;
+  display:inline-flex; align-items:center; justify-content:center;
+  border:1px solid var(--m-border-hi); border-radius:var(--nx-r-sm);
+  background:var(--m-card); color:var(--m-ink-2); cursor:pointer;
+  font-family:inherit; font-size:20px; line-height:1;
+  transition:background-color var(--nx-dur) var(--nx-ease),border-color var(--nx-dur) var(--nx-ease);
+}
+.nx-fort-step:hover:not(:disabled),.tr-week-step:hover{ background:var(--m-card-2); border-color:var(--m-ink-3); color:var(--m-ink); }
+.nx-fort-step:disabled{ opacity:.4; cursor:default; }
+
+.tr-gen-sub{ font-size:13px; color:var(--m-ink-3); margin:2px 0 14px; max-width:60ch; }
+.tr-gen-row{ display:flex; align-items:flex-end; gap:12px; flex-wrap:wrap; }
+.tr-week{ flex:1 1 320px; min-width:0; }
+.tr-week-in{
+  flex:1 1 auto; min-width:0; min-height:44px; padding:8px 12px;
+  border:1px solid var(--m-border-hi); border-radius:var(--nx-r-sm);
+  background:var(--m-card); color:var(--m-ink); font-family:inherit; font-size:14px; font-weight:500; outline:none;
+}
+.tr-week-in:focus{ border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-dim); }
+.tr-week-today{
+  flex:0 0 auto; min-height:44px; padding:0 14px;
+  border:1px solid var(--m-border-hi); border-radius:var(--nx-r-sm);
+  background:var(--m-card); color:var(--accent-text); cursor:pointer;
+  font-family:inherit; font-size:13px; font-weight:600; white-space:nowrap;
+}
+.tr-week-today:hover{ background:var(--m-card-2); }
+.tr-week-range{ margin-top:8px; font-size:13px; font-weight:600; color:var(--m-ink); font-variant-numeric:tabular-nums; min-height:18px; }
+.tr-gen-actions{ display:flex; gap:8px; flex:0 0 auto; }
+:is([data-theme="dark"],[data-theme="midnight"],[data-theme="renaissance"]) .tr-week-in{ color-scheme:dark; }
+[data-theme="win95"] :is(.nx-fort-step,.tr-week-step,.tr-week-in,.tr-week-today){ border-radius:0; }
+@media(max-width:700px){
+  .tr-week-today{ padding:0 10px; }
+  .tr-gen-actions{ width:100%; }
+  .tr-gen-actions .btn{ flex:1 1 0; min-height:48px; }
+}
+
 @keyframes nxSheetUp{ from{ transform:translateY(24px); opacity:.6; } to{ transform:none; opacity:1; } }
 @media(prefers-reduced-motion:reduce){ .nx-modal-scrim > div:first-child{ animation:none !important; } }
+</style>
+
+<style id="nexus-v2-clock-ring">
+/* ── Clock card: shift ring + rows ─────────────────────────────── */
+#clockCard .cc-head{ grid-template-areas:"left now" "body body" "act act"; row-gap:16px; }
+#clockCard .cc-body{ grid-area:body; display:flex; align-items:center; gap:18px; min-width:0; }
+#clockCard .cc-text{ flex:1 1 auto; min-width:0; }
+#clockCard .cc-text .cc-status{ margin-top:0; }
+#clockCard.nx-has-ring .cc-status{ font-size:22px; }
+
+.nx-ring{ position:relative; flex:0 0 112px; width:112px; height:112px; }
+.nx-ring[hidden]{ display:none; }
+.nx-ring svg{ display:block; width:100%; height:100%; }
+.nx-ring circle{ fill:none; stroke-width:10; }
+.nx-ring-track{ stroke:color-mix(in srgb,var(--accent) 14%,var(--m-card)); }
+.nx-ring-bar{ stroke:var(--accent); stroke-linecap:round; transition:stroke-dashoffset .6s var(--nx-ease),stroke .2s ease; }
+.nx-ring[data-tone="warn"] .nx-ring-bar{ stroke:#d97706; }
+.nx-ring[data-tone="warn"] .nx-ring-track{ stroke:color-mix(in srgb,#d97706 16%,var(--m-card)); }
+.nx-ring[data-tone="wait"] .nx-ring-track{ stroke:var(--m-border-hi); stroke-dasharray:3 7; stroke-width:6; }
+.nx-ring[data-tone="done"] .nx-ring-bar{ stroke:color-mix(in srgb,var(--accent) 55%,var(--m-card)); }
+:is([data-theme="dark"],[data-theme="midnight"],[data-theme="renaissance"]) .nx-ring[data-tone="warn"] .nx-ring-bar{ stroke:#f5b547; }
+.nx-ring-mid{
+  position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;
+  text-align:center; pointer-events:none;
+}
+.nx-ring-val{ font-family:var(--nx-font-display); font-size:19px; font-weight:700; letter-spacing:-.02em; line-height:1.1; color:var(--m-ink); font-variant-numeric:tabular-nums; }
+.nx-ring-lbl{ font-size:12px; font-weight:500; color:var(--m-ink-3); margin-top:2px; }
+
+.nx-shift{ margin-top:10px; }
+.nx-shift[hidden]{ display:none; }
+.nx-shift-lbl{ font-size:12.5px; font-weight:500; color:var(--m-ink-3); }
+.nx-shift-val{ font-size:17px; font-weight:700; color:var(--m-ink); letter-spacing:-.01em; font-variant-numeric:tabular-nums; margin-top:1px; }
+.nx-shift-meta{ font-size:12.5px; color:var(--m-ink-3); margin-top:2px; }
+.nx-shift-big .nx-shift-val{ font-family:var(--nx-font-display); font-size:28px; letter-spacing:-.025em; }
+
+.nx-row{
+  display:flex; align-items:center; gap:10px; width:100%; min-height:50px;
+  margin:0; padding:12px 2px; border:0; border-top:1px solid var(--m-border);
+  background:none; color:var(--m-ink); cursor:pointer; text-align:left;
+  font-family:inherit; font-size:14px; -webkit-tap-highlight-color:transparent;
+}
+#nxTeamRow{ margin-top:14px; }
+.nx-row[hidden]{ display:none; }
+.nx-row-ic{ flex:0 0 auto; color:var(--m-ink-3); }
+.nx-row-lbl{ flex:1 1 auto; min-width:0; font-weight:500; }
+.nx-row-val{ font-size:13.5px; color:var(--m-ink-2); font-variant-numeric:tabular-nums; white-space:nowrap; }
+.nx-row-chev{ flex:0 0 auto; color:var(--m-ink-3); transition:transform .2s var(--nx-ease); }
+.nx-row.open .nx-row-chev{ transform:rotate(180deg); }
+.nx-row:disabled{ cursor:default; }
+.nx-row:disabled .nx-row-chev{ display:none; }
+.nx-row:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; border-radius:6px; }
+
+.nx-av-stack{ display:inline-flex; align-items:center; }
+.nx-av{
+  width:26px; height:26px; border-radius:50%; flex:0 0 auto;
+  display:inline-flex; align-items:center; justify-content:center;
+  font-size:10.5px; font-weight:700; letter-spacing:0;
+  box-shadow:0 0 0 2px var(--m-card); margin-left:-7px;
+}
+.nx-av-stack .nx-av:first-child{ margin-left:0; }
+.nx-av-more{ background:var(--m-card-2); color:var(--m-ink-2); }
+.nx-row-count{ margin-left:10px; font-size:13.5px; font-weight:600; color:var(--m-ink-2); font-variant-numeric:tabular-nums; }
+.nx-team-list{ padding:2px 0 10px 28px; }
+.nx-team-list[hidden]{ display:none; }
+.nx-team-item{ display:flex; align-items:center; gap:10px; padding:5px 0; }
+.nx-team-item .nx-av{ margin-left:0; }
+.nx-team-name{ flex:1 1 auto; min-width:0; font-size:13.5px; color:var(--m-ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.nx-team-since{ font-size:12.5px; color:var(--m-ink-3); white-space:nowrap; font-variant-numeric:tabular-nums; }
+
+/* Hours view lives behind "This fortnight" */
+#clockCard:not(.nx-hours-open) #ccHours{ display:none !important; }
+#clockCard #ccHours{ border-top:0 !important; margin-top:0 !important; padding-top:2px !important; padding-bottom:6px; }
+
+@media(max-width:700px){
+  .nx-ring{ flex-basis:100px; width:100px; height:100px; }
+  .nx-ring-val{ font-size:17px; }
+  #clockCard .cc-body{ gap:14px; }
+  #clockCard.nx-has-ring .cc-status{ font-size:20px; }
+}
+@media(prefers-reduced-motion:reduce){ .nx-ring-bar,.nx-row-chev{ transition:none; } }
 </style>
 
 <!-- DialTRAC (Call Log tab) — extracted module. Bump ?v= on each deploy. -->
@@ -28598,6 +28928,449 @@ function nxEarlyAdminInit(){
     }catch(e){ console.warn('[early] realtime subscribe failed', e); }
   })();
 }
+</script>
+<script id="nexus-reports-periods">
+/* ════════════════════════════════════════════════════════════════
+   MY REPORTS · pay-fortnight picker, and TEAM REPORT · week stepper
+   Fortnights are anchored to Mon 4 May 2026 (the same cycle the home Hours
+   card uses). All maths is in whole calendar days, never milliseconds, so the
+   daylight-saving hour can't shift a fortnight.
+   ════════════════════════════════════════════════════════════════ */
+const NX_FORT_ANCHOR = [2026, 4, 4];   // year, monthIndex, day → Mon 4 May 2026
+
+function _nxYMD(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function _nxDateFromYMD(s){ const p=String(s||'').split('-'); if(p.length!==3) return null; const d=new Date(+p[0],+p[1]-1,+p[2]); return isNaN(d)?null:d; }
+function _nxDayIndex(d){ // whole days since the anchor (DST-proof)
+  const a=new Date(NX_FORT_ANCHOR[0],NX_FORT_ANCHOR[1],NX_FORT_ANCHOR[2]);
+  return Math.round((new Date(d.getFullYear(),d.getMonth(),d.getDate()) - a)/86400000);
+}
+function nxFortIndexOf(d){ return Math.floor(_nxDayIndex(d)/14); }
+function nxFortRange(idx){
+  const s=new Date(NX_FORT_ANCHOR[0],NX_FORT_ANCHOR[1],NX_FORT_ANCHOR[2]+idx*14);
+  const e=new Date(s.getFullYear(),s.getMonth(),s.getDate()+13);     // inclusive last day (Sunday)
+  return { idx:idx, start:s, end:e, from:_nxYMD(s), to:_nxYMD(e) };
+}
+function nxFortCurrent(){ return nxFortRange(nxFortIndexOf(new Date())); }
+const _NX_MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function _nxFortSpan(r){
+  const s=r.start, e=r.end;
+  const yr = e.getFullYear()!==new Date().getFullYear() ? ' '+e.getFullYear() : '';
+  return (s.getMonth()===e.getMonth() ? s.getDate() : s.getDate()+' '+_NX_MON[s.getMonth()])+' – '+e.getDate()+' '+_NX_MON[e.getMonth()]+yr;
+}
+// Short labels: the exact dates are always visible in From / To underneath.
+function _nxFortLabel(r, curIdx){
+  if(r.idx===curIdx) return 'This fortnight';
+  if(r.idx===curIdx-1) return 'Last fortnight';
+  return _nxFortSpan(r);
+}
+
+/* Mounts a picker above an existing From/To row. The From/To inputs stay the
+   source of truth — the picker only fills them in and presses Run. */
+const NX_FORT_BACK = 26;   // fortnights listed (about a year)
+function nxMountFortPicker(fromId, toId, runName){
+  const fromEl=document.getElementById(fromId), toEl=document.getElementById(toId);
+  if(!fromEl || !toEl || fromEl.dataset.nxFort) return;
+  fromEl.dataset.nxFort='1';
+  const row=fromEl.closest('div[style*="flex-wrap"]') || fromEl.parentElement;
+  const wrap=document.createElement('div');
+  wrap.className='nx-fort';
+  wrap.innerHTML=
+    '<label class="nx-fort-lbl" for="'+fromId+'_fort">Pay fortnight</label>'+
+    '<div class="nx-fort-ctl">'+
+      '<button type="button" class="nx-fort-step" data-dir="-1" aria-label="Previous fortnight">'+
+        '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></button>'+
+      '<select class="nx-fort-sel f-input" id="'+fromId+'_fort"></select>'+
+      '<button type="button" class="nx-fort-step" data-dir="1" aria-label="Next fortnight">'+
+        '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>'+
+    '</div>';
+  row.parentElement.insertBefore(wrap, row);
+  const sel=wrap.querySelector('select');
+  const prev=wrap.querySelector('[data-dir="-1"]'), next=wrap.querySelector('[data-dir="1"]');
+
+  function build(){
+    const cur=nxFortIndexOf(new Date());
+    let html='';
+    for(let i=cur;i>cur-NX_FORT_BACK;i--){ const r=nxFortRange(i); html+='<option value="'+i+'">'+_nxFortLabel(r,cur)+'</option>'; }
+    html+='<option value="custom">Custom dates</option>';
+    sel.innerHTML=html;
+  }
+  function run(){ const fn=window[runName]; if(typeof fn==='function') fn(); }
+  function apply(idx){
+    const cur=nxFortIndexOf(new Date());
+    idx=Math.min(cur, idx);
+    const r=nxFortRange(idx);
+    if(idx<=cur-NX_FORT_BACK){ // older than the list: add it so the select can show it
+      if(!sel.querySelector('option[value="'+idx+'"]')){
+        const o=document.createElement('option'); o.value=String(idx); o.textContent=_nxFortLabel(r,cur);
+        sel.insertBefore(o, sel.querySelector('option[value="custom"]'));
+      }
+    }
+    fromEl.value=r.from; toEl.value=r.to;
+    sync(); run();
+  }
+  // Reflect whatever the From/To inputs currently hold.
+  function sync(){
+    const cur=nxFortIndexOf(new Date());
+    const f=_nxDateFromYMD(fromEl.value), t=_nxDateFromYMD(toEl.value);
+    let idx=null;
+    if(f && t){
+      const i=nxFortIndexOf(f), r=nxFortRange(i);
+      if(r.from===fromEl.value && r.to===toEl.value) idx=i;
+    }
+    if(idx!==null && !sel.querySelector('option[value="'+idx+'"]')){
+      const o=document.createElement('option'); o.value=String(idx); o.textContent=_nxFortLabel(nxFortRange(idx),cur);
+      sel.insertBefore(o, sel.querySelector('option[value="custom"]'));
+    }
+    sel.value = idx===null ? 'custom' : String(idx);
+    const base = idx===null ? (f ? nxFortIndexOf(f) : cur) : idx;
+    prev.disabled=false;
+    next.disabled = idx===null ? (base>cur) : (idx>=cur);
+  }
+  sel.addEventListener('change',function(){ if(sel.value==='custom'){ fromEl.focus(); return; } apply(parseInt(sel.value,10)); });
+  prev.addEventListener('click',function(){
+    const f=_nxDateFromYMD(fromEl.value);
+    const base = sel.value==='custom' ? (f ? nxFortIndexOf(f) : nxFortIndexOf(new Date())) : parseInt(sel.value,10);
+    apply(sel.value==='custom' ? base : base-1);
+  });
+  next.addEventListener('click',function(){
+    const f=_nxDateFromYMD(fromEl.value);
+    const base = sel.value==='custom' ? (f ? nxFortIndexOf(f) : nxFortIndexOf(new Date())) : parseInt(sel.value,10);
+    apply(sel.value==='custom' ? base+1 : base+1);
+  });
+  fromEl.addEventListener('change',sync); toEl.addEventListener('change',sync);
+  fromEl.addEventListener('input',sync);  toEl.addEventListener('input',sync);
+  build(); sync();
+  wrap._nxSync=sync;
+}
+function nxInitReportPeriods(){
+  nxMountFortPicker('reportPageStart','reportPageEnd','runHoursReport');
+  nxMountFortPicker('thStart','thEnd','runTeamHours');
+  nxMountFortPicker('mgrStart','mgrEnd','runManagerReport');
+  document.querySelectorAll('.nx-fort').forEach(function(w){ if(w._nxSync) w._nxSync(); });
+}
+
+/* ── Team Report: week stepper for "Generate weekly report" ───────────── */
+let _nxPlSnap=null;           // placement sections as last loaded, to spot unsaved edits
+let _nxWeekPrev=null;         // week value before the current change (to undo a cancelled switch)
+if(typeof trLoadPlacementWeek==='function'){
+  const _nxOrigPlLoad=trLoadPlacementWeek;
+  trLoadPlacementWeek=async function(){
+    const out=await _nxOrigPlLoad.apply(this,arguments);
+    // Snapshot the form exactly as rendered (harvest normalises it), so a
+    // freshly loaded week never counts as "unsaved".
+    try{ if(typeof _plHarvest==='function') _plHarvest(); _nxPlSnap=JSON.stringify(_plWeek); }catch(e){ _nxPlSnap=null; }
+    return out;
+  };
+}
+// After a successful save the saved state is the new baseline.
+if(typeof plSaveWeek==='function'){
+  const _nxOrigPlSave=plSaveWeek;
+  plSaveWeek=async function(){
+    const out=await _nxOrigPlSave.apply(this,arguments);
+    try{
+      const m=document.getElementById('plSaveMsg');
+      if(m && m.textContent==='Saved') _nxPlSnap=JSON.stringify(_plWeek);
+    }catch(e){}
+    return out;
+  };
+}
+function _nxPlDirty(){
+  const card=document.getElementById('trPlacementCard');
+  if(!card || card.style.display==='none' || _nxPlSnap===null) return false;
+  try{ if(typeof _plHarvest==='function') _plHarvest(); }catch(e){ return false; }
+  try{ return JSON.stringify(_plWeek)!==_nxPlSnap; }catch(e){ return false; }
+}
+function trWeekRangeLabel(){
+  const el=document.getElementById('trWeekRange'), inp=document.getElementById('trWeekPick');
+  if(!el || !inp) return;
+  const v=inp.value || (typeof _trToday==='function' ? _trToday() : '');
+  const mon=_nxDateFromYMD(typeof _trMonday==='function' ? _trMonday(v) : v);
+  if(!mon){ el.textContent=''; return; }
+  const sat=new Date(mon.getFullYear(),mon.getMonth(),mon.getDate()+5);
+  const o={weekday:'short',day:'numeric',month:'short'};
+  const thisMon=_nxDateFromYMD(typeof _trMonday==='function' ? _trMonday(_trToday()) : '');
+  const tag = (thisMon && +thisMon===+mon) ? 'This week · ' : '';
+  el.textContent=tag+mon.toLocaleDateString('en-AU',o)+' – '+sat.toLocaleDateString('en-AU',o);
+}
+function trWeekChanged(){
+  const inp=document.getElementById('trWeekPick'); if(!inp) return;
+  if(_nxWeekPrev!==null && inp.value!==_nxWeekPrev && _nxPlDirty()){
+    const ok=confirm('You have unsaved changes to the placement sections for the week you were editing.\n\nSwitch weeks and discard them?');
+    if(!ok){ inp.value=_nxWeekPrev; trWeekRangeLabel(); return; }
+  }
+  _nxWeekPrev=inp.value;
+  // A report on screen belongs to the old week — clear it so the PDF can't mix weeks.
+  const out=document.getElementById('trReportOut'); if(out) out.innerHTML='';
+  const pb=document.getElementById('trPrintBtn'); if(pb) pb.style.display='none';
+  trWeekRangeLabel();
+  // Placement sections are per week: show the newly chosen week's.
+  const card=document.getElementById('trPlacementCard');
+  if(card && card.style.display!=='none' && typeof trLoadPlacementWeek==='function') trLoadPlacementWeek();
+}
+function trWeekStep(dir){
+  const inp=document.getElementById('trWeekPick'); if(!inp) return;
+  if(_nxWeekPrev===null) _nxWeekPrev=inp.value || _trToday();
+  const base=(dir===0) ? _trToday() : (inp.value || _trToday());
+  inp.value = dir===0 ? base : _trAddDays(_trMonday(base), dir*7);
+  trWeekChanged();
+}
+// Keep the range label right whenever the Team Report (re)initialises.
+if(typeof initTeamReport==='function'){
+  const _nxOrigInitTR=initTeamReport;
+  initTeamReport=async function(){
+    const out=await _nxOrigInitTR.apply(this,arguments);
+    try{ const inp=document.getElementById('trWeekPick'); if(inp) _nxWeekPrev=inp.value; trWeekRangeLabel(); }catch(e){}
+    return out;
+  };
+}
+</script>
+<script id="nexus-clock-ring">
+/* ════════════════════════════════════════════════════════════════
+   CLOCK CARD · shift ring, "on shift" row, fortnight row
+   Display only. Reads what the app already knows (clock state, your
+   clock_log, today's roster) and never writes anything.
+   ════════════════════════════════════════════════════════════════ */
+(function(){
+  'use strict';
+  const RING_C = 2*Math.PI*46;                // circumference of the ring (r=46)
+  let _shifts = [];                           // today's rostered shifts: [{s,e}] in minutes
+  let _fortRosterH = null;                    // rostered hours this fortnight
+  let _rosterDay = null;                      // Sydney yyyy-mm-dd the roster was loaded for
+  let _onShift = [];                          // [{name, since}] clocked in now (not me)
+  let _teamOpen = false;
+
+  const $ = function(id){ return document.getElementById(id); };
+  const pad = function(n){ return String(n).padStart(2,'0'); };
+  function sydNow(){
+    if(typeof _nxSydParts==='function') return _nxSydParts(new Date());
+    const d=new Date(); return { ymd:d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()), min:d.getHours()*60+d.getMinutes() };
+  }
+  function sydYMD(d){
+    try{
+      const f=new Intl.DateTimeFormat('en-AU',{timeZone:'Australia/Sydney',year:'numeric',month:'2-digit',day:'2-digit'});
+      const p={}; f.formatToParts(d).forEach(function(x){ p[x.type]=x.value; }); return p.year+'-'+p.month+'-'+p.day;
+    }catch(e){ return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); }
+  }
+  const toMin = function(t){ const a=String(t||'').split(':'); return (+a[0])*60+(+a[1]||0); };
+  function fmtClock(m){ m=((m%1440)+1440)%1440; const h=Math.floor(m/60), mm=m%60; return (((h+11)%12)+1)+':'+pad(mm)+' '+(h>=12?'pm':'am'); }
+  function fmtDur(m){ m=Math.max(0,Math.round(m)); if(m<60) return m+'m'; const h=Math.floor(m/60), r=m%60; return h+'h'+(r?' '+r+'m':''); }
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+  function myName(){ try{ return (typeof me!=='undefined' && me) ? me : ''; }catch(e){ return ''; } }
+
+  /* ── Data ─────────────────────────────────────────────────────── */
+  async function loadRoster(){
+    const who=myName(); if(!who || typeof sbGet!=='function') return;
+    const now=sydNow();
+    let from=now.ymd, to=now.ymd;
+    try{
+      if(typeof getPeriodRange==='function'){
+        const r=getPeriodRange('fortnight'); const e=new Date(r.end.getTime()-86400000);
+        from=r.start.getFullYear()+'-'+pad(r.start.getMonth()+1)+'-'+pad(r.start.getDate());
+        to=e.getFullYear()+'-'+pad(e.getMonth()+1)+'-'+pad(e.getDate());
+      }
+    }catch(e){}
+    let rows;
+    try{
+      rows=await sbGet('roster_shifts','?staff_name=eq.'+encodeURIComponent(who)+'&shift_date=gte.'+from+'&shift_date=lte.'+to+
+        '&status=eq.assigned&select=shift_date,start_time,end_time&order=shift_date.asc,start_time.asc');
+    }catch(e){ return; }
+    if(!Array.isArray(rows)) return;
+    _rosterDay=now.ymd;
+    _shifts=rows.filter(function(r){ return r.shift_date===now.ymd && r.start_time; })
+      .map(function(r){ const s=toMin(r.start_time); let e=r.end_time?toMin(r.end_time):s; if(e<=s) e+=1440; return {s:s,e:e}; });
+    let mins=0;
+    rows.forEach(function(r){ if(!r.start_time||!r.end_time) return; let s=toMin(r.start_time), e=toMin(r.end_time); if(e<=s) e+=1440; mins+=e-s; });
+    _fortRosterH = rows.length ? mins/60 : null;
+    render(); renderFort();
+  }
+  async function loadOnShift(){
+    const who=myName(); if(!who || typeof sbGet!=='function') return;
+    const since=new Date(Date.now()-20*3600*1000).toISOString();
+    let rows;
+    try{ rows=await sbGet('clock_log','?ts=gte.'+encodeURIComponent(since)+'&select=staff_name,action,ts&order=ts.asc&limit=1000'); }
+    catch(e){ return; }
+    if(!Array.isArray(rows)) return;
+    const today=sydNow().ymd, last={};
+    rows.forEach(function(r){
+      if(!r || !r.staff_name || !r.ts) return;
+      const t=new Date(r.ts);
+      if(sydYMD(t)!==today) return;
+      const k=r.staff_name;
+      if(r.action==='in'){ last[k]={ state:'in', since:t }; }
+      else if(r.action==='out'){ last[k]={ state:'out', since:null }; }
+    });
+    _onShift=Object.keys(last).filter(function(n){ return last[n].state==='in' && n!==who; })
+      .map(function(n){ return { name:n, since:last[n].since }; })
+      .sort(function(a,b){ return a.since-b.since; });
+    renderTeam();
+  }
+
+  /* ── Ring + shift text ────────────────────────────────────────── */
+  function clockedIn(){
+    try{
+      if(typeof _clockPending!=='undefined' && _clockPending) return _clockPending.action==='in';
+      return (typeof _clockState!=='undefined') && _clockState==='in';
+    }catch(e){ return false; }
+  }
+  function render(){
+    const card=$('clockCard'), ring=$('nxRing'), info=$('nxShift');
+    if(!card || !ring || !info) return;
+    const st=card.getAttribute('data-nx-state')||'loading';
+    if(st==='loading' || st==='other'){ show(false,false); return; }
+    const now=sydNow().min, isIn=clockedIn();
+    let cur=null, nxt=null, last=null;
+    _shifts.forEach(function(x){
+      if(now>=x.s && now<x.e) cur=x;
+      else if(x.s>now){ if(!nxt || x.s<nxt.s) nxt=x; }
+      else if(x.e<=now){ if(!last || x.e>last.e) last=x; }
+    });
+    const tgt=cur||nxt||last;
+
+    if(isIn){
+      if(!tgt){ // not rostered today: no ring, just time worked
+        let since=null; try{ since=_clockSinceTs ? new Date(_clockSinceTs) : null; }catch(e){}
+        const worked = since && !isNaN(since) ? (Date.now()-since.getTime())/60000 : null;
+        if(worked===null){ show(false,false); return; }
+        setInfo('On the clock', fmtDur(worked), 'Not rostered today', 'big');
+        show(false,true); return;
+      }
+      const left=tgt.e-now;
+      if(left>=0){
+        const done = now<=tgt.s ? 0 : (now-tgt.s)/(tgt.e-tgt.s);
+        setRing(done,'accent',fmtDur(left),'left');
+        setInfo('Shift ends', fmtClock(tgt.e), now<tgt.s ? 'Starts '+fmtClock(tgt.s) : Math.round(done*100)+'% done');
+      }else{
+        setRing(1,'warn',fmtDur(-left),'over');
+        setInfo('Shift ended', fmtClock(tgt.e), 'You\u2019re past your rostered finish');
+      }
+      show(true,true); return;
+    }
+    // Clocked out
+    if(!tgt){ show(false,false); return; }
+    const range=fmtClock(tgt.s)+' – '+fmtClock(tgt.e);
+    if(cur){
+      setRing((now-cur.s)/(cur.e-cur.s),'warn',fmtDur(now-cur.s),'since start');
+      setInfo('Your shift', range, 'Started '+fmtDur(now-cur.s)+' ago');
+    }else if(nxt){
+      setRing(0,'wait',fmtDur(nxt.s-now),'until start');
+      setInfo('Your shift', range, '');
+    }else{
+      setRing(1,'done','Done','for today');
+      setInfo('Your shift', range, 'Finished at '+fmtClock(last.e));
+    }
+    show(true,true);
+  }
+  function setRing(frac, tone, val, lbl){
+    frac=Math.max(0,Math.min(1,frac||0));
+    const bar=$('nxRingBar'), ring=$('nxRing');
+    bar.style.strokeDasharray=RING_C.toFixed(1)+' '+RING_C.toFixed(1);
+    bar.style.strokeDashoffset=(RING_C*(1-frac)).toFixed(1);
+    bar.style.opacity = frac>0 ? '1' : '0';
+    ring.setAttribute('data-tone',tone);
+    $('nxRingVal').textContent=val; $('nxRingLbl').textContent=lbl;
+    ring.setAttribute('aria-label', val+' '+lbl);
+  }
+  function setInfo(lbl,val,meta,size){
+    $('nxShiftLbl').textContent=lbl; $('nxShiftVal').textContent=val;
+    const m=$('nxShiftMeta'); m.textContent=meta||''; m.hidden=!meta;
+    $('nxShift').classList.toggle('nx-shift-big', size==='big');
+  }
+  function show(ring, info){
+    const r=$('nxRing'), i=$('nxShift'), c=$('clockCard');
+    if(r) r.hidden=!ring; if(i) i.hidden=!info;
+    if(c) c.classList.toggle('nx-has-ring', !!ring);
+  }
+
+  /* ── Rows ─────────────────────────────────────────────────────── */
+  const AV_TONES=['#e1f5ee:#085041','#eeedfe:#3c3489','#faece7:#712b13','#e6f1fb:#0c447c','#fbeaf0:#72243e','#faeeda:#633806'];
+  function initials(n){ const p=String(n).trim().split(/\s+/); return ((p[0]||'')[0]||'').toUpperCase()+((p.length>1?p[p.length-1][0]:'')||'').toUpperCase(); }
+  function tone(n){ let h=0; for(let i=0;i<n.length;i++) h=(h*31+n.charCodeAt(i))>>>0; return AV_TONES[h%AV_TONES.length].split(':'); }
+  function renderTeam(){
+    const row=$('nxTeamRow'), av=$('nxTeamAv'), lbl=$('nxTeamLbl'), list=$('nxTeamList');
+    if(!row || !av) return;
+    row.hidden=false;
+    lbl.textContent = clockedIn() ? 'On shift with you' : 'On shift now';
+    const n=_onShift.length;
+    if(!n){
+      av.innerHTML='<span class="nx-row-val">No one else yet</span>';
+      row.disabled=true; row.setAttribute('aria-expanded','false'); list.hidden=true; _teamOpen=false;
+      return;
+    }
+    row.disabled=false;
+    const shown=_onShift.slice(0, n>4 ? 3 : 4);
+    av.innerHTML = shown.map(function(p){ const t=tone(p.name); return '<span class="nx-av" style="background:'+t[0]+';color:'+t[1]+'" title="'+esc(p.name)+'">'+esc(initials(p.name))+'</span>'; }).join('')+
+      (n>shown.length ? '<span class="nx-av nx-av-more">+'+(n-shown.length)+'</span>' : '')+
+      '<span class="nx-row-count">'+n+'</span>';
+    list.innerHTML=_onShift.map(function(p){
+      const t=tone(p.name);
+      const since=p.since ? p.since.toLocaleTimeString('en-AU',{timeZone:'Australia/Sydney',hour:'numeric',minute:'2-digit'}) : '';
+      return '<div class="nx-team-item"><span class="nx-av" style="background:'+t[0]+';color:'+t[1]+'">'+esc(initials(p.name))+'</span>'+
+        '<span class="nx-team-name">'+esc(p.name)+'</span><span class="nx-team-since">'+(since?'since '+esc(since):'')+'</span></div>';
+    }).join('');
+    list.hidden=!_teamOpen;
+  }
+  window.nxToggleTeam=function(){
+    const row=$('nxTeamRow'), list=$('nxTeamList'); if(!row || row.disabled) return;
+    _teamOpen=!_teamOpen; list.hidden=!_teamOpen;
+    row.setAttribute('aria-expanded', String(_teamOpen)); row.classList.toggle('open',_teamOpen);
+  };
+  function renderFort(){
+    const el=$('nxFortVal'); if(!el) return;
+    try{
+      if(typeof getPeriodRange!=='function' || typeof calcHoursForRange!=='function') return;
+      const r=getPeriodRange('fortnight'), s=calcHoursForRange(r.start, r.end);
+      const h=((s.totalMs+s.liveMs)/3600000).toFixed(1);
+      el.textContent = h+' hrs' + (_fortRosterH ? ' of '+(Math.round(_fortRosterH*10)/10)+' rostered' : '');
+    }catch(e){}
+  }
+  window.nxToggleHours=function(open){
+    const c=$('clockCard'), row=$('nxFortRow'); if(!c || !row) return;
+    const on = typeof open==='boolean' ? open : !c.classList.contains('nx-hours-open');
+    c.classList.toggle('nx-hours-open', on);
+    row.setAttribute('aria-expanded', String(on)); row.classList.toggle('open', on);
+    try{ localStorage.setItem('nx_hours_open', on?'1':'0'); }catch(e){}
+  };
+
+  /* ── Wiring ───────────────────────────────────────────────────── */
+  function tick(){
+    const d=sydNow().ymd;
+    if(_rosterDay && d!==_rosterDay){ _shifts=[]; _rosterDay=null; loadRoster(); loadOnShift(); }
+    render(); renderFort();
+  }
+  function init(){
+    if(!$('clockCard')) return;
+    try{ if(localStorage.getItem('nx_hours_open')==='1') window.nxToggleHours(true); }catch(e){}
+    // Re-render whenever the existing code updates the clock status/button.
+    const st=$('clockStatus'), btn=$('clockBtn');
+    if(st && btn && typeof MutationObserver!=='undefined'){
+      let queued=false;
+      const mo=new MutationObserver(function(){
+        if(queued) return; queued=true;
+        setTimeout(function(){ queued=false; render(); renderTeam(); }, 0);
+      });
+      const o={childList:true,characterData:true,subtree:true};
+      mo.observe(st,o); mo.observe(btn,o);
+    }
+    // After the hours list reloads, refresh the fortnight total.
+    if(typeof renderHours==='function'){
+      const _orig=renderHours;
+      renderHours=function(){ const out=_orig.apply(this,arguments); try{ renderFort(); }catch(e){} return out; };
+    }
+    // Wait for sign-in (me) before the first fetch.
+    let tries=0;
+    (function boot(){
+      if(!myName()){ if(++tries<120) setTimeout(boot,1000); return; }
+      loadRoster(); loadOnShift();
+    })();
+    setInterval(tick, 30000);
+    setInterval(function(){ if(!document.hidden){ loadOnShift(); } }, 2*60*1000);
+    setInterval(function(){ if(!document.hidden){ loadRoster(); } }, 10*60*1000);
+    document.addEventListener('visibilitychange', function(){ if(!document.hidden && myName()){ loadRoster(); loadOnShift(); } });
+    render(); renderFort();
+  }
+  window.nxClockRingRefresh=function(){ loadRoster(); loadOnShift(); };
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',init); else init();
+})();
 </script>
 </body>
 </html>
