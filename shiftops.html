@@ -2717,6 +2717,7 @@ table tbody tr:hover,.pp-table tbody tr:hover{ background:color-mix(in srgb,var(
         <!-- At-a-glance strip. Each tile is a question asked before 9am, and
              each one clicks through to the screen that answers it. -->
         <div class="dash-strip" id="dashStrip"></div>
+        <div class="so-early" id="soEarly" hidden></div>
         <div class="coverage" id="coverage" hidden></div>
         <div class="morning-board" id="morningBoard"></div>
       </div>
@@ -11132,5 +11133,113 @@ function stopMorningBoard(){
 
 </script>
 <script src="payroll.js?v=3"></script>
+<style id="so-early-css">
+/* Early clock-in notices (hub admins) — sits under the dashboard tiles */
+.so-early{
+  margin:0 0 16px; background:var(--surface); border:1px solid color-mix(in srgb,var(--gold) 45%,var(--border));
+  border-radius:var(--r12); overflow:hidden;
+}
+.so-early[hidden]{ display:none !important; }
+.so-early-hd{
+  display:flex; align-items:center; gap:10px; padding:12px 16px;
+  background:color-mix(in srgb,var(--gold) 7%,var(--surface)); border-bottom:1px solid var(--border);
+}
+.so-early-ic{ width:30px; height:30px; border-radius:9px; display:flex; align-items:center; justify-content:center;
+  background:var(--gold-dim); color:var(--gold); flex-shrink:0; }
+.so-early-t{ font-size:14px; font-weight:700; color:var(--text); }
+.so-early-s{ font-size:12.5px; color:var(--text-dim); }
+.so-early-all{ margin-left:auto; }
+.so-early-row{ display:flex; align-items:center; gap:12px; padding:11px 16px; border-bottom:1px solid var(--border); }
+.so-early-row:last-child{ border-bottom:0; }
+.so-early-who{ flex:1; min-width:0; }
+.so-early-name{ font-size:13.5px; font-weight:600; color:var(--text); }
+.so-early-meta{ font-size:12.5px; color:var(--text-dim); margin-top:2px; }
+.so-early-reason{ font-size:12.5px; color:var(--text-mid); margin-top:3px; }
+.so-early-when{ font-size:12px; color:var(--muted); white-space:nowrap; }
+@media(max-width:640px){ .so-early-row{ flex-wrap:wrap; } .so-early-when{ order:3; } }
+</style>
+<script id="so-early-js">
+/* ── EARLY CLOCK-INS ──────────────────────────────────────────────────────
+   Nexus files a row in clock_early_notices when someone clocks in more than
+   30 min before their rostered start and chooses to go ahead. Hub admins see
+   the unacknowledged ones here. RLS decides who can read: team leads and
+   staff simply get nothing back, so the panel stays hidden for them. */
+function _soeEsc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+function _soeHdr(){
+  const tok=(typeof _soTok==='function' && _soTok()) ? _soTok() : null;
+  return tok ? {apikey:SUPABASE_KEY, Authorization:'Bearer '+tok, 'Content-Type':'application/json'} : null;
+}
+function _soeFmtStart(t){
+  const a=String(t||'').split(':'), h=+a[0], m=+a[1]||0;
+  return (((h+11)%12)+1)+':'+String(m).padStart(2,'0')+' '+(h>=12?'pm':'am');
+}
+function _soeFmtDur(m){ if(m<60) return m+' min'; const h=Math.floor(m/60), r=m%60; return h+'h'+(r?' '+r+'m':''); }
+function _soeWhen(iso){
+  const d=new Date(iso);
+  return d.toLocaleString('en-AU',{timeZone:'Australia/Sydney',weekday:'short',day:'numeric',month:'short',hour:'numeric',minute:'2-digit'});
+}
+let _soeRows=[];
+async function soEarlyLoad(){
+  const box=document.getElementById('soEarly'); if(!box) return;
+  const h=_soeHdr();
+  if(!h || (typeof _soTokAlive==='function' && !_soTokAlive())){ box.hidden=true; return; }
+  const since=new Date(Date.now()-14*864e5).toISOString();
+  try{
+    const r=await fetch(SUPABASE_URL+'/rest/v1/clock_early_notices?acknowledged_at=is.null&created_at=gte.'+encodeURIComponent(since)+
+      '&select=id,staff_name,clock_ts,shift_date,rostered_start,minutes_early,reason,created_at&order=created_at.desc&limit=50',{headers:h});
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    _soeRows=await r.json();
+  }catch(e){ console.warn('[early] load failed', e); return; }
+  soEarlyRender();
+}
+function soEarlyRender(){
+  const box=document.getElementById('soEarly'); if(!box) return;
+  if(!_soeRows.length){ box.hidden=true; box.innerHTML=''; return; }
+  box.hidden=false;
+  const n=_soeRows.length;
+  box.innerHTML=
+    '<div class="so-early-hd">'+
+      '<div class="so-early-ic"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div>'+
+      '<div><div class="so-early-t">Early clock-ins</div><div class="so-early-s">'+n+' to review · clocked in more than 30 min before their rostered start</div></div>'+
+      (n>1?'<button class="btn btn-ghost so-early-all" onclick="soEarlyAckAll()">Acknowledge all</button>':'')+
+    '</div>'+
+    _soeRows.map(function(r){
+      return '<div class="so-early-row">'+
+        '<div class="so-early-who">'+
+          '<div class="so-early-name">'+_soeEsc(r.staff_name)+'</div>'+
+          '<div class="so-early-meta">'+_soeFmtDur(r.minutes_early)+' before their '+_soeFmtStart(r.rostered_start)+' shift</div>'+
+          (r.reason?'<div class="so-early-reason">\u201C'+_soeEsc(r.reason)+'\u201D</div>':'')+
+        '</div>'+
+        '<div class="so-early-when">'+_soeEsc(_soeWhen(r.clock_ts))+'</div>'+
+        '<button class="btn btn-ghost" onclick="soEarlyAck('+Number(r.id)+')">Acknowledge</button>'+
+      '</div>';
+    }).join('');
+}
+async function _soeAckIds(ids){
+  const h=_soeHdr(); if(!h || !ids.length) return false;
+  let who=''; try{ who=sessionStorage.getItem('so_me')||''; }catch(e){}
+  const r=await fetch(SUPABASE_URL+'/rest/v1/clock_early_notices?id=in.('+ids.map(Number).join(',')+')',{
+    method:'PATCH', headers:Object.assign({Prefer:'return=representation'},h),
+    body:JSON.stringify({acknowledged_by:who||null, acknowledged_at:new Date().toISOString()})
+  });
+  if(!r.ok) return false;
+  const done=await r.json().catch(function(){ return []; });
+  const got=new Set((done||[]).map(function(x){ return x.id; }));
+  _soeRows=_soeRows.filter(function(x){ return !got.has(x.id); });
+  soEarlyRender();
+  return got.size===ids.length;
+}
+async function soEarlyAck(id){
+  const ok=await _soeAckIds([id]).catch(function(){ return false; });
+  if(!ok && typeof showToast==='function') showToast('Couldn\u2019t acknowledge — your session may have expired');
+}
+async function soEarlyAckAll(){
+  const ok=await _soeAckIds(_soeRows.map(function(x){ return x.id; })).catch(function(){ return false; });
+  if(!ok && typeof showToast==='function') showToast('Couldn\u2019t acknowledge — your session may have expired');
+}
+setTimeout(soEarlyLoad, 1500);
+setInterval(soEarlyLoad, 2*60*1000);
+document.addEventListener('visibilitychange', function(){ if(!document.hidden) soEarlyLoad(); });
+</script>
 </body>
 </html>

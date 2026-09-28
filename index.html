@@ -16442,6 +16442,14 @@ async function toggleClock(){
       }
     }catch(e){ /* if the check fails, fall through (don't hard-block on a network blip) */ }
   }
+  // EARLY CLOCK-IN: more than 30 min before today's rostered start → confirm,
+  // and if they go ahead, file a notice for hub admins. Any error here just
+  // falls through to a normal clock-in.
+  let _earlyNotice = null;
+  if(next === 'in' && typeof nxEarlyClockCheck === 'function'){
+    try{ _earlyNotice = await nxEarlyClockCheck(); }catch(e){ _earlyNotice = null; }
+    if(_earlyNotice === false){ window._lastClockToggle = 0; window._lastClockAnyToggle = 0; return; }
+  }
   // Ask for confirmation before clocking OUT — prevents accidental taps.
   if(next === 'out'){
     // GUARD: never fire a clock-OUT unless the source of truth confirms the
@@ -16570,6 +16578,10 @@ async function toggleClock(){
     showToast(next==='in' ? 'Clocking in…' : 'Clocking out…');
     applyGpsLock();
 
+    // Early clock-in they chose to go ahead with → tell the admins (queued if offline).
+    if(_earlyNotice && next === 'in' && typeof nxEarlyFileNotice === 'function'){
+      try{ nxEarlyFileNotice(Object.assign({}, _earlyNotice, { clock_ts: realTs })); }catch(_){}
+    }
     // ── BACKGROUND: fire Supabase write ──
     // A fetch only "fails" on a dropped connection; a rejected save (login
     // timed out, permission error, server error) still comes back "ok:false".
@@ -22864,6 +22876,7 @@ async function loadMySettings(){
       adminHasSetAvail=true;
       // Now that admin status is known, refresh admin-only UI
       if(typeof maybeShowGeofenceAdjuster === 'function') maybeShowGeofenceAdjuster();
+      if(typeof nxEarlyAdminInit === 'function') nxEarlyAdminInit();
       // Reveal admin-only nav items
       try{
         document.querySelectorAll('[data-admin-only]').forEach(function(el){ el.style.display = myIsAdmin ? '' : 'none'; });
@@ -27395,13 +27408,21 @@ select.f-input{
 .alert-err{ background:var(--nx-danger-dim); border:1px solid var(--nx-danger-bd); color:var(--nx-danger); }
 .alert-ok{ background:var(--accent-dim); border:1px solid var(--accent-bd); color:var(--accent-text); }
 
-.empty{ padding:40px 24px; color:var(--m-ink-3); }
+.empty:not(.cal-year-d){ padding:40px 24px; color:var(--m-ink-3); }
+/* The calendar's year view also uses "empty" for its blank leading day cells;
+   they must stay plain grid cells (padding here broke the whole year grid). */
 .empty-title{
   font-family:var(--nx-font-display);
   font-size:17px; font-weight:600; letter-spacing:-.01em;
   color:var(--m-ink); margin-bottom:6px;
 }
 .empty-sub{ font-size:13.5px; line-height:1.55; color:var(--m-ink-3); max-width:42ch; margin:0 auto; }
+
+/* Year view: mini-months never widen past their column; no hover lift */
+.cal-year-month{ min-width:0; }
+.cal-year-month:hover{ transform:none; box-shadow:none; }
+.cal-year-grid > *{ min-width:0; }
+.cal-year-wd{ font-size:10px; }
 
 /* ── 10. Floating surfaces (dropdowns, dialogs) ───────────────── */
 .notif-drop{ border-radius:var(--nx-r) !important; box-shadow:var(--nx-float) !important; }
@@ -28378,6 +28399,205 @@ input[type="date"].f-input{ width:100%; }
   }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',init); else init();
 })();
+</script>
+<script id="nexus-early-clockin">
+/* ════════════════════════════════════════════════════════════════
+   EARLY CLOCK-IN NOTICE
+   Tapping Clock In more than 30 min before today's rostered start shows a
+   confirm sheet. "Clock in anyway" proceeds with the normal clock-in and files
+   a row in clock_early_notices for hub admins (RLS: staff insert their own,
+   admins read/acknowledge). Every failure path falls back to a normal
+   clock-in — this never blocks anyone from clocking in.
+   ════════════════════════════════════════════════════════════════ */
+const NX_EARLY_MIN = 30;                       // warn when more than this many minutes early
+const NX_EARLY_QUEUE = 'early_notice_queue';   // notices that couldn't be sent yet
+const NX_EARLY_SEEN = 'early_notice_seen';     // admin: notice ids already put in the bell
+
+function _nxSydParts(d){
+  const f = new Intl.DateTimeFormat('en-AU',{timeZone:'Australia/Sydney',year:'numeric',month:'2-digit',
+    day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'});
+  const p = {};
+  f.formatToParts(d).forEach(function(x){ p[x.type]=x.value; });
+  return { ymd: p.year+'-'+p.month+'-'+p.day, min: (+p.hour)*60 + (+p.minute) };
+}
+function _nxTimeToMin(t){ const a=String(t||'').split(':'); return (+a[0])*60 + (+a[1]||0); }
+function _nxFmtMin(m){
+  const h=Math.floor(m/60), mm=m%60, ap=h>=12?'pm':'am', h12=((h+11)%12)+1;
+  return h12+':'+String(mm).padStart(2,'0')+' '+ap;
+}
+function _nxFmtDur(m){
+  if(m<60) return m+' minute'+(m===1?'':'s');
+  const h=Math.floor(m/60), r=m%60;
+  return h+' hour'+(h===1?'':'s')+(r?' '+r+' min':'');
+}
+function _nxEsc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+
+/* Returns null (not early / not rostered / couldn't check → clock in normally),
+   false (they chose to wait), or the notice details if they chose to go ahead. */
+async function nxEarlyClockCheck(){
+  if(typeof me==='undefined' || !me) return null;
+  const now = _nxSydParts(new Date());
+  let rows;
+  try{
+    rows = await sbGet('roster_shifts','?staff_name=eq.'+encodeURIComponent(me)+
+      '&shift_date=eq.'+now.ymd+'&status=eq.assigned&select=start_time,end_time&order=start_time.asc');
+  }catch(e){ return null; }
+  if(!Array.isArray(rows) || !rows.length) return null;
+
+  // Already inside a rostered shift → not early. Otherwise look at the next one today.
+  let inside=false, next=null;
+  rows.forEach(function(r){
+    const s=_nxTimeToMin(r.start_time), e=r.end_time ? _nxTimeToMin(r.end_time) : s;
+    if(now.min>=s && now.min<e) inside=true;
+    if(s>now.min && (!next || s<next.s)) next={ s:s, raw:r.start_time };
+  });
+  if(inside || !next) return null;
+  const early = next.s - now.min;
+  if(early <= NX_EARLY_MIN) return null;
+
+  const choice = await nxEarlyDialog(early, next.s);
+  if(!choice || !choice.go) return false;
+  return { shift_date: now.ymd, rostered_start: String(next.raw).slice(0,8), minutes_early: early, reason: choice.reason || null };
+}
+
+function nxEarlyDialog(early, startMin){
+  return new Promise(function(resolve){
+    const reasons=['Asked to come in early','Covering someone','Catching up on work','Other'];
+    const back=document.createElement('div');
+    back.id='earlyClockBack';
+    back.style.cssText='position:fixed;inset:0;z-index:9560;display:flex;align-items:center;justify-content:center;padding:20px;'+
+      'background:rgba(15,23,42,.5);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);';
+    back.innerHTML=
+      '<div role="dialog" aria-modal="true" aria-labelledby="earlyClockTitle" style="width:100%;max-width:420px;background:var(--m-card,#fff);'+
+        'color:var(--m-ink,#0f172a);border-radius:20px;padding:22px 22px 20px;font-family:var(--nx-font-ui,inherit);">'+
+        '<div style="width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;margin-bottom:14px;'+
+          'background:color-mix(in srgb,#f59e0b 16%,transparent);color:#b45309;">'+
+          '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div>'+
+        '<div id="earlyClockTitle" style="font-size:19px;font-weight:700;letter-spacing:-.02em;margin-bottom:6px;">You\u2019re '+_nxEsc(_nxFmtDur(early))+' early</div>'+
+        '<div style="font-size:14px;line-height:1.5;color:var(--m-ink-2,#475569);margin-bottom:16px;">'+
+          'Your shift today starts at <b style="color:var(--m-ink,#0f172a)">'+_nxEsc(_nxFmtMin(startMin))+'</b>. '+
+          'If you clock in now, the admins will be notified.</div>'+
+        '<div style="font-size:13px;font-weight:600;color:var(--m-ink-2,#475569);margin-bottom:8px;">Reason <span style="font-weight:500;color:var(--m-ink-3,#94a3b8)">(optional)</span></div>'+
+        '<div id="earlyClockChips" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">'+
+          reasons.map(function(r){ return '<button type="button" class="hours-tab" data-r="'+_nxEsc(r)+'">'+_nxEsc(r)+'</button>'; }).join('')+
+        '</div>'+
+        '<input id="earlyClockNote" class="f-input" type="text" maxlength="160" placeholder="Add a note for the admins" style="width:100%;margin-bottom:18px;">'+
+        '<div style="display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;">'+
+          '<button type="button" class="btn btn-outline" id="earlyClockWait">Wait</button>'+
+          '<button type="button" class="btn btn-green" id="earlyClockGo">Clock in anyway</button>'+
+        '</div>'+
+      '</div>';
+    document.body.appendChild(back);
+
+    let picked='';
+    back.querySelectorAll('#earlyClockChips [data-r]').forEach(function(b){
+      b.addEventListener('click',function(){
+        const on = picked!==b.dataset.r;
+        picked = on ? b.dataset.r : '';
+        back.querySelectorAll('#earlyClockChips [data-r]').forEach(function(x){ x.classList.toggle('active', on && x===b); });
+      });
+    });
+    function done(go){
+      const note=(document.getElementById('earlyClockNote')||{}).value||'';
+      const reason=[picked, note.trim()].filter(Boolean).join(' — ').slice(0,200);
+      document.removeEventListener('keydown',onKey);
+      back.remove();
+      resolve({go:go, reason:reason});
+    }
+    function onKey(e){ if(e.key==='Escape') done(false); }
+    document.addEventListener('keydown',onKey);
+    back.addEventListener('click',function(e){ if(e.target===back) done(false); });
+    document.getElementById('earlyClockWait').addEventListener('click',function(){ done(false); });
+    document.getElementById('earlyClockGo').addEventListener('click',function(){ done(true); });
+    // Focus the dialog itself (no ring on touch); Tab moves to the buttons.
+    const dlg=back.firstElementChild; dlg.tabIndex=-1; dlg.style.outline='none';
+    setTimeout(function(){ try{ dlg.focus({preventScroll:true}); }catch(e){} },50);
+  });
+}
+
+/* File a notice. Idempotent (unique staff_name+clock_ts, ignore duplicates);
+   anything that fails is kept on the phone and retried later. */
+async function _nxEarlyPost(n){
+  const r = await fetch(SB+'/rest/v1/clock_early_notices?on_conflict=staff_name,clock_ts',{
+    method:'POST',
+    headers:{ apikey:KEY, Authorization:'Bearer '+_sbBearer(), 'Content-Type':'application/json',
+              Prefer:'resolution=ignore-duplicates,return=minimal' },
+    body: JSON.stringify(n)
+  });
+  if(!r.ok) throw new Error('HTTP '+r.status);
+}
+async function nxEarlyFileNotice(n){
+  const row={ staff_name:me, clock_ts:n.clock_ts, shift_date:n.shift_date, rostered_start:n.rostered_start,
+              minutes_early:n.minutes_early, reason:n.reason||null };
+  try{ await _nxEarlyPost(row); }
+  catch(e){
+    console.warn('[early] notice not sent yet, queued:', e && e.message);
+    try{
+      const q=JSON.parse(localStorage.getItem(NX_EARLY_QUEUE)||'[]');
+      q.push(row); localStorage.setItem(NX_EARLY_QUEUE, JSON.stringify(q.slice(-20)));
+    }catch(_){}
+  }
+}
+let _nxEarlyFlushing=false;
+async function nxEarlyFlushQueue(){
+  if(_nxEarlyFlushing) return;
+  let q; try{ q=JSON.parse(localStorage.getItem(NX_EARLY_QUEUE)||'[]'); }catch(_){ q=[]; }
+  if(!q.length) return;
+  _nxEarlyFlushing=true;
+  const left=[];
+  for(const row of q){ try{ await _nxEarlyPost(row); }catch(e){ left.push(row); } }
+  try{ localStorage.setItem(NX_EARLY_QUEUE, JSON.stringify(left)); }catch(_){}
+  _nxEarlyFlushing=false;
+}
+window.addEventListener('online', function(){ nxEarlyFlushQueue(); });
+document.addEventListener('visibilitychange', function(){ if(!document.hidden) nxEarlyFlushQueue(); });
+setTimeout(nxEarlyFlushQueue, 6000);
+
+/* ── Admin side: new notices go into the hub admin's bell ─────────── */
+async function nxEarlyAdminPoll(){
+  if(typeof myIsAdmin==='undefined' || !myIsAdmin) return;
+  if(typeof NotifManager==='undefined' || !NotifManager.push) return;
+  const since=new Date(Date.now()-3*864e5).toISOString();
+  let rows;
+  try{
+    rows=await sbGet('clock_early_notices','?acknowledged_at=is.null&created_at=gte.'+encodeURIComponent(since)+
+      '&select=id,staff_name,rostered_start,minutes_early,reason,created_at&order=created_at.asc&limit=50');
+  }catch(e){ return; }
+  if(!Array.isArray(rows) || !rows.length) return;
+  let seen; try{ seen=new Set(JSON.parse(localStorage.getItem(NX_EARLY_SEEN)||'[]')); }catch(_){ seen=new Set(); }
+  rows.forEach(function(r){
+    if(seen.has(r.id)) return;
+    try{
+      NotifManager.push({
+        id:'early_'+r.id, type:'general',
+        title:r.staff_name+' clocked in early',
+        body:_nxFmtDur(r.minutes_early)+' before their '+_nxFmtMin(_nxTimeToMin(r.rostered_start))+' shift'+(r.reason?' · '+r.reason:''),
+        ts:Date.parse(r.created_at)||Date.now(), link:null
+      });
+    }catch(e){}
+    seen.add(r.id);
+  });
+  try{ localStorage.setItem(NX_EARLY_SEEN, JSON.stringify(Array.from(seen).slice(-300))); }catch(_){}
+}
+let _nxEarlyAdminStarted=false;
+function nxEarlyAdminInit(){
+  if(_nxEarlyAdminStarted || typeof myIsAdmin==='undefined' || !myIsAdmin) return;
+  _nxEarlyAdminStarted=true;
+  nxEarlyAdminPoll();
+  setInterval(nxEarlyAdminPoll, 5*60*1000);
+  document.addEventListener('visibilitychange', function(){ if(!document.hidden) nxEarlyAdminPoll(); });
+  // Live: subscribe once the shared realtime client exists.
+  let tries=0;
+  (function sub(){
+    let c=null; try{ c=(typeof _realtimeClient!=='undefined') ? _realtimeClient : null; }catch(_){}
+    if(!c){ if(++tries<30) setTimeout(sub,2000); return; }
+    try{
+      c.channel('early-clockin-notices')
+       .on('postgres_changes',{event:'INSERT',schema:'public',table:'clock_early_notices'},function(){ nxEarlyAdminPoll(); })
+       .subscribe();
+    }catch(e){ console.warn('[early] realtime subscribe failed', e); }
+  })();
+}
 </script>
 </body>
 </html>
