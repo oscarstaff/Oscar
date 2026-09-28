@@ -61,7 +61,7 @@
   --amber:#d97706; --amber-bg:rgba(217,119,6,.11); --amber-bd:rgba(217,119,6,.22);
   display:flex;flex-direction:column;height:100%;min-height:0;
   background:var(--m-canvas);
-  font-family:'Inter',system-ui,sans-serif;}
+  font-family:var(--nx-font-ui,system-ui,sans-serif);}
 
 /* ══════ COMMAND BAR ══════
    Gradient rather than flat fill, and a hairline highlight along the top
@@ -85,7 +85,7 @@
   box-shadow:0 2px 6px var(--accent-dim),
              inset 0 1px 0 rgba(255,255,255,.22);}
 .cl-rb-txt{display:flex;flex-direction:column;line-height:1.15;}
-.cl-rb-title{font-family:'Fraunces',Georgia,serif;font-size:17px;font-weight:600;
+.cl-rb-title{font-family:var(--nx-font-display,Georgia,serif);font-size:17px;font-weight:600;
   font-optical-sizing:auto;letter-spacing:-.01em;color:var(--m-ink);}
 .cl-rb-sub{font-size:10.5px;font-weight:600;color:var(--m-ink-3);
   letter-spacing:.04em;text-transform:lowercase;}
@@ -97,7 +97,7 @@
   transition:background var(--cl-t) var(--cl-ease);}
 .cl-stat:hover{background:var(--m-card-2);}
 .cl-stat:focus-visible{outline:2px solid var(--accent);outline-offset:1px;}
-.cl-stat-n{font-family:'Fraunces',Georgia,serif;font-size:21px;font-weight:600;
+.cl-stat-n{font-family:var(--nx-font-display,Georgia,serif);font-size:21px;font-weight:600;
   font-optical-sizing:auto;color:var(--m-ink);line-height:1;
   font-variant-numeric:tabular-nums;letter-spacing:-.01em;}
 .cl-stat-l{font-size:11px;font-weight:600;color:var(--m-ink-3);
@@ -144,7 +144,7 @@
 
 .cl-form-hd{display:flex;align-items:center;justify-content:space-between;
   margin-bottom:22px;}
-.cl-form-title{font-family:'Fraunces',Georgia,serif;font-size:16px;font-weight:600;
+.cl-form-title{font-family:var(--nx-font-display,Georgia,serif);font-size:16px;font-weight:600;
   font-optical-sizing:auto;color:var(--m-ink);margin:0;letter-spacing:-.01em;}
 .cl-keyhint{display:flex;gap:3px;}
 .cl-keyhint kbd{font-family:ui-monospace,'SF Mono',Menlo,monospace;font-size:10px;
