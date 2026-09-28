@@ -10,9 +10,9 @@
 (function(){ try{ var t=localStorage.getItem('so_theme');
   if(t==='light') document.documentElement.setAttribute('data-theme','light'); }catch(e){} })();
 </script>
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%235b5bd6'/><rect x='6.5' y='8' width='19' height='17' rx='2.5' fill='%23fff'/><path d='M6.5 12.5h19' stroke='%235b5bd6' stroke-width='1.6'/><path d='M11 6v4M21 6v4' stroke='%23fff' stroke-width='2' stroke-linecap='round'/><circle cx='16' cy='19' r='4.3' fill='%235b5bd6'/><path d='M16 16.6V19l1.7 1' stroke='%23fff' stroke-width='1.5' stroke-linecap='round' fill='none'/></svg>" />
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230b7a5c'/><rect x='6.5' y='8' width='19' height='17' rx='2.5' fill='%23fff'/><path d='M6.5 12.5h19' stroke='%235b5bd6' stroke-width='1.6'/><path d='M11 6v4M21 6v4' stroke='%23fff' stroke-width='2' stroke-linecap='round'/><circle cx='16' cy='19' r='4.3' fill='%230b7a5c'/><path d='M16 16.6V19l1.7 1' stroke='%23fff' stroke-width='1.5' stroke-linecap='round' fill='none'/></svg>" />
 <style>
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Figtree:wght@400..800&display=swap');
 
 :root {
   /* ══ COMMAND DECK — dark ops room, glowing signal colours ══
@@ -2087,6 +2087,405 @@ button, .btn { white-space: nowrap; }
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.4/dist/jspdf.plugin.autotable.min.js"></script>
+<style id="so-v2">
+/* ════════════════════════════════════════════════════════════════
+   SHIFTOPS v2 — visual revamp, same family as Nexus v2.
+   Cascade-last. Tokens, type and components only: no markup, no JS,
+   no change to the team-lead lockdown (its display:none rules still win).
+   Remove this block to revert.
+   ════════════════════════════════════════════════════════════════ */
+
+/* ── 1. Tokens ─────────────────────────────────────────────────────
+   Dark ("Command Deck", default): eucalyptus on deep gum-green charcoal.
+   Light ("Daylight"): Nexus Original. Every surface already routes through
+   these names, so remapping them re-skins the whole app. */
+:root{
+  --bg:#0e1411; --surface:#151c18; --surface2:#1b2420; --surface3:#232e29;
+  --border:#26312b; --border2:#35433b;
+
+  --accent:#3fbf94; --accent-dim:rgba(63,191,148,.13); --accent-border:rgba(63,191,148,.42);
+  --accent2:#5fd0a9; --accent-text:#7fdcbb; --accent-deep:#2e9e79;
+  --on-accent:#06140f;
+
+  --warn:#f0877d; --warn-dim:rgba(240,135,125,.12);
+  --gold:#f2c230; --gold-dim:rgba(242,194,48,.12);
+  --success:#4fd1a1; --success-dim:rgba(79,209,161,.12);
+
+  --text:#e9efeb; --text-mid:#b8c5bd; --text-dim:#8f9e95; --muted:#7a8a80;
+
+  --sans:'Figtree',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  --display:var(--sans);
+  --mono:var(--sans);   /* one family; numbers stay aligned via tabular figures */
+
+  --r4:6px; --r6:8px; --r8:10px; --r10:12px; --r12:14px; --r16:20px;
+
+  --glow-accent:none; --glow-success:none; --glow-warn:none; --glow-gold:none;
+  --shadow-sm:none;
+  --shadow-md:0 2px 6px rgba(0,0,0,.35),0 12px 28px -12px rgba(0,0,0,.55);
+  --shadow-lg:0 1px 2px rgba(0,0,0,.4),0 18px 44px -10px rgba(0,0,0,.65);
+  --ring:0 0 0 3px rgba(63,191,148,.32);
+  --scrim:rgba(0,0,0,.6);
+
+  /* payroll.js reads these; map them onto the theme */
+  --pp-ink:var(--text); --pp-mut:var(--text-dim); --pp-mut2:var(--muted);
+  --pp-line:var(--border2); --pp-prem:var(--gold);
+}
+:root[data-theme="light"]{
+  --bg:#eef2ef; --surface:#ffffff; --surface2:#f6f8f6; --surface3:#e8ede9;
+  --border:#dde4df; --border2:#c6d0c9;
+
+  --accent:#0b7a5c; --accent-dim:rgba(11,122,92,.10); --accent-border:rgba(11,122,92,.30);
+  --accent2:#0f8f6c; --accent-text:#086548; --accent-deep:#086548;
+  --on-accent:#ffffff;
+
+  --warn:#c9372c; --warn-dim:#fbecea;
+  --gold:#9a6400; --gold-dim:#fdf3dc;
+  --success:#0e8a5f; --success-dim:#e5f4ee;
+
+  --text:#15231c; --text-mid:#33443b; --text-dim:#5c6c63; --muted:#66766c;
+
+  --shadow-sm:none;
+  --shadow-md:0 1px 2px rgba(12,20,16,.05),0 8px 22px -8px rgba(12,20,16,.14);
+  --shadow-lg:0 1px 2px rgba(12,20,16,.06),0 16px 40px -8px rgba(12,20,16,.20);
+  --ring:0 0 0 3px rgba(11,122,92,.22);
+  --scrim:rgba(12,20,16,.46);
+}
+
+/* ── 2. Base ─────────────────────────────────────────────────── */
+body{
+  background:var(--bg) !important;
+  font-family:var(--sans);
+  font-variant-numeric:tabular-nums;
+}
+h1,h2,h3,.section-title,.modal-title{ font-family:var(--sans); letter-spacing:-.015em; }
+::selection{ background:color-mix(in srgb,var(--accent) 26%,transparent); }
+@media(hover:hover) and (pointer:fine){
+  ::-webkit-scrollbar{ width:10px; height:10px; }
+  ::-webkit-scrollbar-thumb{ background:var(--border2); border-radius:10px; border:3px solid transparent; background-clip:padding-box; }
+  ::-webkit-scrollbar-thumb:hover{ background:var(--muted); background-clip:padding-box; border:3px solid transparent; }
+}
+
+/* Sentence case: the console-style spaced capitals are gone everywhere. */
+.alloc-section-title,.avail-chip,.avail-team-name,.col-head,.cov-h,.ds-lbl,
+.ep-pay-field label,.form-label,.grid-col-head,.logo-sub,.lv-section-hd,.lv-src,
+.lv-status,.lv-th,.mb-lbl,.pp-rates thead th,.stat-label,.ws-pill,.section-title,
+[style*="text-transform:uppercase"],[style*="text-transform: uppercase"]{
+  text-transform:none !important; letter-spacing:0 !important;
+}
+
+/* ── 3. App bar ────────────────────────────────────────────────
+   Was hard-coded white, so in the dark theme a light bar sat on a dark app. */
+.appbar{
+  height:56px; gap:16px; padding:0 20px;
+  background:color-mix(in srgb,var(--surface) 90%,transparent) !important;
+  -webkit-backdrop-filter:blur(12px); backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--border);
+}
+.brand-mark{
+  width:28px; height:28px; border-radius:8px;
+  background:var(--accent) !important; color:var(--on-accent) !important;
+  font-size:14px; font-weight:800;
+}
+.brand-name{ font-size:16px; font-weight:700; letter-spacing:-.02em; color:var(--text); }
+.appbar-nav{ gap:4px; margin-left:12px; }
+.appbar-nav .nav-item{
+  padding:8px 13px; border-radius:10px;
+  font-size:14px; font-weight:500; color:var(--text-dim);
+}
+.appbar-nav .nav-item:hover{ background:var(--surface2); color:var(--text); }
+.appbar-nav .nav-item.active{
+  background:var(--accent-dim) !important; color:var(--accent-text) !important;
+  font-weight:600; box-shadow:none !important;
+}
+.appbar-nav .nav-item.active::before{ display:none; }
+.appbar-week{
+  font-size:12.5px; font-weight:600; color:var(--text-mid);
+  padding:6px 12px; border-radius:var(--r8); background:var(--surface2); border-color:var(--border);
+}
+#topbarWhoami{ font-size:12.5px; color:var(--text-dim); }
+.appbar .save-status{ font-size:12px; font-weight:500; }
+.theme-toggle{ width:36px; height:36px; border-radius:10px; background:transparent; border-color:var(--border); }
+.theme-toggle:hover{ background:var(--surface2); color:var(--text); border-color:var(--border2); }
+
+/* The main area is the canvas; the cards inside it are the surfaces. */
+.main{
+  margin:0 !important; border:0 !important; border-radius:0 !important;
+  box-shadow:none !important; background:var(--bg) !important;
+}
+.content{ padding:20px 28px 64px; }
+
+/* ── 4. Buttons ─────────────────────────────────────────────────
+   One shape, no lift on hover, no glow. */
+.btn{
+  border-radius:var(--r8) !important;
+  font-family:var(--sans); font-size:13px; font-weight:600 !important;
+  min-height:36px; padding:8px 15px;
+  box-shadow:none !important; filter:none;
+  transition:background-color .15s ease,border-color .15s ease,color .15s ease,transform .08s ease !important;
+  will-change:auto;
+}
+.btn:hover{ transform:none !important; }
+.btn:active{ transform:scale(.98) !important; }
+.appbar-actions .btn{ min-height:36px; padding:7px 14px; font-size:13px; border-radius:var(--r8) !important; }
+
+.btn-primary,.btn-save,.btn-green,.ws-publish-on{
+  background:var(--accent) !important; color:var(--on-accent) !important;
+  border:1px solid transparent !important; box-shadow:none !important;
+}
+.btn-primary:hover,.btn-save:hover,.btn-green:hover,.ws-publish-on:hover{
+  background:color-mix(in srgb,var(--accent) 86%,#000) !important;
+  box-shadow:none !important; filter:none !important;
+}
+:root:not([data-theme="light"]) :is(.btn-primary,.btn-save,.btn-green,.ws-publish-on):hover{
+  background:color-mix(in srgb,var(--accent) 86%,#fff) !important;
+}
+.btn-ghost,.ws-publish-off{
+  background:var(--surface) !important; color:var(--text-mid) !important;
+  border:1px solid var(--border2) !important; box-shadow:none !important;
+}
+.btn-ghost:hover,.ws-publish-off:hover{
+  background:var(--surface2) !important; color:var(--text) !important; border-color:var(--muted) !important;
+}
+.btn-warn,.ws-clear{
+  background:var(--warn-dim) !important; color:var(--warn) !important;
+  border:1px solid color-mix(in srgb,var(--warn) 35%,transparent) !important;
+}
+.btn-warn:hover,.ws-clear:hover{ background:color-mix(in srgb,var(--warn) 18%,transparent) !important; filter:none; }
+.df-btn{ border-radius:8px; font-size:12px; font-weight:600; min-height:30px; }
+.df-btn:hover,.df-btn-go{ background:var(--accent); border-color:transparent; color:var(--on-accent); }
+.week-btn{
+  width:34px !important; height:34px !important; border-radius:var(--r8) !important;
+  font-size:11px; color:var(--text-mid); background:var(--surface); border:1px solid var(--border2);
+}
+.week-btn:hover{ background:var(--surface2) !important; border-color:var(--muted) !important; color:var(--text); }
+:focus-visible{ box-shadow:var(--ring); }
+
+/* ── 5. Cards & strips ──────────────────────────────────────── */
+.card,.stats-strip,.week-spine,.morning-board,.coverage,.dash-find,.roster-grid,.lv-card,.avail-team-card,.ep-pay-card{
+  background:var(--surface) !important;
+  border:1px solid var(--border) !important;
+  border-radius:var(--r12) !important;
+  box-shadow:none !important;
+}
+.card:hover,.lv-card:hover,.staff-card:hover,.team-card:hover{ transform:none !important; box-shadow:none !important; }
+.card-title{ font-size:15px; font-weight:700; letter-spacing:-.01em; color:var(--text); }
+
+.stats-strip{ padding:12px 18px; gap:18px; margin-bottom:16px; }
+.stats-strip .stat-value,.stat-value{ font-family:var(--sans); font-size:20px; font-weight:700 !important; letter-spacing:-.02em !important; }
+.stats-strip .stat-label,.stat-label{ font-size:13px; font-weight:500 !important; color:var(--text-dim); }
+.stats-strip .stat-value.green{ color:var(--success); }
+.stats-strip .stat-value.blue{ color:var(--text); }
+.stats-strip .stat-value.orange{ color:var(--gold); }
+
+/* ── 6. Tabs ───────────────────────────────────────────────── */
+.sub-tab,.tab,.aa-tab{
+  font-size:13.5px; font-weight:600; color:var(--text-dim);
+}
+.sub-tab:hover,.tab:hover,.aa-tab:hover{ color:var(--text); }
+.sub-tab.active,.tab.active{ color:var(--text); font-weight:600; }
+.sub-tab::after{ background:var(--accent); height:2px; }
+/* Segmented bars (Employees) */
+.sub-tabs-bar{
+  background:var(--surface2) !important; border:1px solid var(--border) !important;
+  border-radius:12px !important; padding:3px !important; box-shadow:none !important;
+}
+.sub-tabs-bar .sub-tab{
+  border-radius:9px !important; padding:7px 14px !important; font-weight:600 !important;
+  color:var(--text-dim) !important; background:transparent !important;
+}
+.sub-tabs-bar .sub-tab::after{ display:none; }
+.sub-tabs-bar .sub-tab:hover{ color:var(--text) !important; background:color-mix(in srgb,var(--text) 5%,transparent) !important; }
+.sub-tabs-bar .sub-tab.active{
+  background:var(--surface) !important; color:var(--text) !important;
+  box-shadow:0 1px 2px rgba(0,0,0,.12),0 0 0 1px var(--border) !important;
+}
+
+/* ── 7. Roster grid ────────────────────────────────────────── */
+:root{ --staffcol:236px; }
+@media(max-width:1100px){ :root{ --staffcol:200px; } }
+.section-title{ color:var(--text) !important; font-weight:700 !important; letter-spacing:-.015em !important; }
+.grid-header{ background:var(--surface2) !important; border-bottom:1px solid var(--border2) !important; }
+.grid-col-head,.col-head{
+  background:transparent !important;
+  font-family:var(--sans); font-size:13px !important; font-weight:600 !important;
+  color:var(--text-mid); padding:10px 6px;
+}
+.grid-col-head > span{ font-size:11.5px !important; }
+.grid-col-head.today,.col-head.today,.col-head.active{
+  color:var(--accent-text) !important;
+  background:var(--accent-dim) !important;
+  box-shadow:inset 0 -2px 0 var(--accent) !important;
+}
+.dh-total{ font-size:11.5px; font-weight:600; color:var(--text-dim); margin-top:3px; }
+.grid-row:nth-child(even){ background:transparent; }
+.grid-row:hover{ background:color-mix(in srgb,var(--text) 3%,transparent) !important; }
+.staff-cell{ padding:9px 12px; gap:10px; }
+.avatar{ width:30px; height:30px; font-family:var(--sans); font-size:10.5px; font-weight:700 !important; box-shadow:none !important; }
+.staff-name{ font-size:13px !important; font-weight:600 !important; }
+.staff-role{ font-size:11.5px; color:var(--text-dim); }
+.hrs-num{ font-size:12px; font-weight:700; color:var(--text-mid); }
+.shift-cell{ padding:5px; gap:4px; min-height:58px; }
+/* Team header rows: readable labels instead of 9px spaced capitals */
+.roster-grid > div[data-team]:not(.grid-row) > div{
+  font-family:var(--sans) !important; font-size:12px !important; font-weight:600 !important;
+  color:var(--accent-text) !important;
+}
+.roster-grid > div[data-team]:not(.grid-row){ background:color-mix(in srgb,var(--accent) 7%,var(--surface)) !important; }
+
+/* Shift cards: the person's colour tints the card and draws its spine (inline);
+   the rest of the outline goes, and the time becomes the loudest thing. */
+.shift-badge{
+  border-radius:8px; font-family:var(--sans); font-size:11px; font-weight:600; line-height:1.35;
+  padding:6px 8px;
+}
+.shift-badge:hover{ transform:none; filter:none; }
+.shift-badge.shift-slot{
+  border-top-color:transparent; border-right-color:transparent; border-bottom-color:transparent;
+  color:var(--text) !important; box-shadow:none;
+}
+.shift-badge.shift-slot:hover{ box-shadow:0 0 0 1px var(--border2); transform:none; }
+.sb-time{ font-family:var(--sans); font-size:12.5px; font-weight:700; letter-spacing:-.01em; }
+.shift-leave{ border-radius:8px; }
+.ws-pill{ font-family:var(--sans); font-size:12px; font-weight:600; padding:5px 12px; }
+.ws-total{ font-family:var(--sans); font-size:12px; font-weight:600; padding:5px 12px; background:var(--surface2); border-color:var(--border); }
+.week-label{ font-size:15px; font-weight:700; }
+.week-spine{ padding:10px 14px; }
+.ws-today,.ws-fill,.ws-clear{ font-size:12.5px; padding:7px 12px; min-height:34px; }
+.ws-publish{ font-size:13px; min-height:36px; }
+
+/* ── 8. Dashboard ─────────────────────────────────────────── */
+.dash-find{ border-radius:var(--r12) !important; padding:0 16px; }
+.dash-find:focus-within{ border-color:var(--accent) !important; box-shadow:var(--ring) !important; }
+#dashFind{ font-size:15px; padding:15px 0; }
+.df-kbd{ font-family:var(--sans); border-radius:6px; }
+.df-row{ border-radius:12px; padding:10px 14px; }
+
+.ds-tile{
+  background:var(--surface) !important; border:1px solid var(--border) !important;
+  border-radius:var(--r12) !important; box-shadow:none !important;
+  padding:16px 18px; gap:4px;
+}
+.ds-tile::before{ display:none; }
+.ds-tile:hover{ transform:none !important; box-shadow:none !important; border-color:var(--border2) !important; }
+.ds-num{ font-family:var(--sans); font-size:32px; font-weight:700; letter-spacing:-.03em; text-shadow:none !important; }
+.ds-lbl{ font-size:13px; font-weight:600; color:var(--text-dim); white-space:normal; }
+.ds-warn:not(.ds-zero){ border-color:color-mix(in srgb,var(--warn) 45%,var(--border)) !important; background:color-mix(in srgb,var(--warn) 6%,var(--surface)) !important; }
+.ds-gold:not(.ds-zero){ border-color:color-mix(in srgb,var(--gold) 45%,var(--border)) !important; background:color-mix(in srgb,var(--gold) 6%,var(--surface)) !important; }
+.ds-warn:not(.ds-zero) .ds-lbl::after,.ds-gold:not(.ds-zero) .ds-lbl::after{ box-shadow:none; }
+
+.cov-h{ font-size:14px; font-weight:700; color:var(--text); }
+.cov-count b{ font-family:var(--sans); font-size:17px; }
+.cov-fill{ box-shadow:none !important; background:var(--success) !important; }
+.cov-warn .cov-fill{ background:var(--gold) !important; }
+.cov-miss .cov-fill{ background:var(--warn) !important; }
+.cov-pct{ font-family:var(--sans); font-size:12.5px; }
+
+.mb-head{ background:var(--surface2); }
+.mb-title{ font-size:13px; }
+.mb-chip{ font-size:12.5px; }
+.mb-chip b{ font-family:var(--sans); font-size:14px; }
+.mb-lbl{ font-family:var(--sans); font-size:12px; font-weight:600; }
+.mb-person{ font-size:13px; }
+.mb-meta{ font-family:var(--sans); font-size:11.5px; }
+
+/* ── 9. Forms & dialogs ───────────────────────────────────── */
+.form-label{ font-size:12.5px; font-weight:600 !important; color:var(--text-mid); margin-bottom:6px; }
+.form-input,.content input[type="date"],.content input[type="text"],.content input[type="number"],.content select{
+  background:var(--surface) !important; color:var(--text);
+  border:1px solid var(--border2) !important; border-radius:var(--r8) !important;
+  font-family:var(--sans); font-size:13.5px; min-height:38px;
+}
+.form-input:focus,.content input:focus,.content select:focus{
+  border-color:var(--accent) !important; box-shadow:var(--ring) !important; outline:none;
+}
+#dashFind{ background:none !important; border:0 !important; box-shadow:none !important; min-height:0; }
+
+.modal-overlay{
+  background:var(--scrim) !important;
+  -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px);
+}
+.modal{
+  background:var(--surface) !important;
+  border:1px solid var(--border) !important;
+  border-radius:var(--r16) !important;
+  box-shadow:var(--shadow-lg) !important;
+  padding:22px 24px;
+}
+.modal-title{ font-size:18px; font-weight:700 !important; letter-spacing:-.02em; }
+.modal-close{ width:32px; height:32px; font-size:17px; background:var(--surface2); border-color:var(--border); }
+.modal-actions{ gap:10px; margin-top:20px; }
+@media(max-width:700px){
+  /* Phones: dialogs rise from the bottom edge */
+  .modal-overlay{ align-items:flex-end !important; }
+  .modal{
+    width:100% !important; max-width:none !important;
+    border-radius:var(--r16) var(--r16) 0 0 !important; border-bottom:0 !important;
+    max-height:92dvh; padding-bottom:calc(22px + env(safe-area-inset-bottom,0px));
+  }
+}
+
+.tools-menu{
+  background:var(--surface) !important; border:1px solid var(--border) !important;
+  border-radius:var(--r10) !important; box-shadow:var(--shadow-lg) !important; padding:4px; min-width:200px;
+}
+.tools-menu-item{ border-radius:8px !important; padding:9px 12px; font-size:13px; color:var(--text-mid); border-bottom:0 !important; }
+.tools-menu-item:hover{ background:var(--surface2) !important; color:var(--text); }
+
+.toast{
+  background:var(--surface3); color:var(--text); border:1px solid var(--border2);
+  border-radius:12px; font-size:13px; padding:11px 16px; box-shadow:var(--shadow-lg); max-width:340px;
+}
+
+/* ── 10. Leave, availability, tables ──────────────────────── */
+.lv-card::before{ display:none; }
+.lv-th,.pp-rates thead th{ font-size:12px; font-weight:600; color:var(--text-dim); }
+table tbody tr:hover,.pp-table tbody tr:hover{ background:color-mix(in srgb,var(--text) 3%,transparent); }
+.avail-chip{ border-radius:8px !important; font-weight:600 !important; }
+.xt-chip:has(input:checked){ background:var(--accent); border-color:var(--accent); color:var(--on-accent); }
+
+/* ── 11. Team-lead badge, gate, boot ──────────────────────── */
+#tlPill{
+  background:var(--surface) !important; color:var(--text) !important;
+  border:1px solid var(--border2) !important; box-shadow:var(--shadow-md) !important;
+  font-family:var(--sans); font-size:12.5px; font-weight:600; letter-spacing:0;
+}
+#tlPill::before{ background:var(--accent); box-shadow:0 0 0 3px var(--accent-dim); }
+#__gate{ background:#0e1411 !important; font-family:var(--sans) !important; }
+#__gate > div{ background:#151c18 !important; border-color:#26312b !important; border-radius:20px !important; }
+#__gatePw{ background:#0e1411 !important; border-color:#35433b !important; }
+#soBootLoading{ background:var(--bg) !important; }
+
+/* ── 12. Phones ───────────────────────────────────────────── */
+@media(max-width:900px){
+  .appbar{ height:auto; flex-wrap:wrap; padding:8px 12px; row-gap:8px; }
+  .appbar-nav{ order:3; width:100%; margin-left:0; overflow-x:auto; scrollbar-width:none; }
+  .appbar-nav::-webkit-scrollbar{ display:none; }
+  .appbar-nav .nav-item{ flex:0 0 auto; }
+  .appbar-actions{ margin-left:auto; gap:6px; }
+  #topbarWhoami{ display:none; }
+  .appbar .save-status{ min-width:0 !important; }
+  .appbar .save-status span{ display:none; }
+  .content{ padding:14px 12px 60px; }
+  .stats-strip{ flex-wrap:wrap; row-gap:8px; }
+  .stats-strip .stat-sep{ display:none; }
+  /* The week grid keeps readable columns and scrolls sideways,
+     with the staff column pinned. */
+  .roster-grid{ overflow-x:auto !important; }
+  :root{ --staffcol:188px; }
+  .roster-grid > *{ min-width:1040px; }
+  .ws-state{ flex-wrap:wrap; }
+  .week-spine{ row-gap:10px; }
+  .grid-row > .staff-cell,.grid-header > .grid-col-head:first-child,
+  .roster-grid > div[data-team]:not(.grid-row) > div:first-child{
+    position:sticky; left:0; z-index:2; background:var(--surface);
+  }
+  .roster-grid > div[data-team]:not(.grid-row) > div:first-child{ background:color-mix(in srgb,var(--accent) 7%,var(--surface)) !important; }
+  .grid-header > .grid-col-head:first-child{ background:var(--surface2) !important; }
+}
+@media(prefers-reduced-motion:reduce){
+  .modal,.tab-content.active,.btn{ animation:none !important; transition:none !important; }
+}
+</style>
 </head>
 <body>
 <!-- NEXUS TOKEN GATE — app only opens when launched from Nexus -->
@@ -3552,7 +3951,7 @@ function renderRoster(){
       ((shifts[s.id]||{})[d]||[]).forEach(function(sh){ dayTotals[d]+=shiftHours(sh); });
     }
   });
-  let html='<div class="grid-header"><div class="grid-col-head">STAFF</div>';
+  let html='<div class="grid-header"><div class="grid-col-head">Staff</div>';
   for(let d=0;d<7;d++){
     const day=addDays(currentWeekStart,d);
     const t=dayTotals[d];
