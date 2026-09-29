@@ -8759,19 +8759,10 @@ async function doResetKey(){
     if(serverErr === 'incorrect answers'){
       err.textContent="Incorrect answers. Please try again.";err.classList.add("show");btn.disabled=false;btn.textContent="Reset Password";return;
     }
-    const rows=await sbGet("staff_credentials","?staff_name=eq."+encodeURIComponent(m));
-    if(!rows.length){err.textContent="Account not found.";err.classList.add("show");btn.disabled=false;btn.textContent="Reset Password";return;}
-    const r=rows[0];
-    if(r.sq1_answer_hash!==h1||r.sq2_answer_hash!==h2){
-      err.textContent="Incorrect answers. Please try again.";err.classList.add("show");btn.disabled=false;btn.textContent="Reset Password";return;
-    }
-    const nh=await hash(pass);
-    await fetch(SB+"/rest/v1/staff_credentials?staff_name=eq."+encodeURIComponent(m),{
-      method:"PATCH",
-      headers:{"apikey":KEY,"Authorization":"Bearer "+KEY,"Content-Type":"application/json","Prefer":"return=minimal"},
-      body:JSON.stringify({password_hash:nh})
-    });
-    ok.textContent="Password reset! Signing you in...";ok.classList.add("show");saveMe(m);setTimeout(enterHub,1500);
+    // The server-side reset above is the only supported route now. The old client-side
+    // hash comparison needed to read everyone's security-answer hashes, and it never set
+    // the real sign-in password anyway, so it has been removed.
+    err.textContent="Password reset is unavailable right now. Please try again shortly, or ask an admin to reset it for you.";err.classList.add("show");btn.disabled=false;btn.textContent="Reset Password";return;
   }catch(e){err.textContent="Failed. Please try again.";err.classList.add("show");}
   finally{btn.disabled=false;btn.textContent="Reset Password";}
 }
@@ -13259,29 +13250,6 @@ async function changePassword(){
   finally{btn.disabled=false;btn.textContent="Update";}
 }
 
-async function _changePasswordLegacyDisabled(){
-  try{
-    const rows=await sbGet("staff_credentials","?staff_name=eq."+encodeURIComponent(me));
-    if(!rows.length){err.textContent="Account not found.";err.classList.add("show");return;}
-    const currHash=await hash(curr);
-    if(rows[0].password_hash!==currHash){err.textContent="Current password is incorrect.";err.classList.add("show");return;}
-    const newHash=await hash(newp);
-    const res=await fetch(SB+"/rest/v1/staff_credentials?staff_name=eq."+encodeURIComponent(me),{
-      method:"PATCH",
-      headers:{"apikey":KEY,"Authorization":"Bearer "+KEY,"Content-Type":"application/json","Prefer":"return=minimal"},
-      body:JSON.stringify({password_hash:newHash})
-    });
-    if(res.ok||res.status===204){
-      ok.textContent="Password updated successfully!";ok.classList.add("show");
-      document.getElementById("profPassCurrent").value="";
-      document.getElementById("profPassNew").value="";
-      document.getElementById("profPassConfirm").value="";
-      setTimeout(()=>toggleSection("profPassSection"),1500);
-    }else throw new Error();
-  }catch(e){err.textContent="Failed. Please try again.";err.classList.add("show");}
-  finally{btn.disabled=false;btn.textContent="Update Password";}
-}
-
 async function saveSecurityQuestions(){
   const q1=document.getElementById("profQ1").value;
   const a1=document.getElementById("profA1").value.trim().toLowerCase();
@@ -17024,8 +16992,9 @@ const ONBOARDING_TASKS = [
     check: async function(){
       try{
         // Schema uses sq1_answer_hash (not sq1_answer)
-        const rows = await sbGet('staff_credentials','?staff_name=eq.'+encodeURIComponent(me)+'&select=sq1_question,sq2_question,sq1_answer_hash,sq2_answer_hash');
-        return !!(rows && rows[0] && rows[0].sq1_question && rows[0].sq2_question && rows[0].sq1_answer_hash && rows[0].sq2_answer_hash);
+        const rows = await sbGet('staff_credentials','?staff_name=eq.'+encodeURIComponent(me)+'&select=sq1_question,sq2_question');
+        // Questions and answers are always saved together, so the questions alone tell us it's set up.
+        return !!(rows && rows[0] && rows[0].sq1_question && rows[0].sq2_question);
       }catch(e){ return false; }
     }
   },

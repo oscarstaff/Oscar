@@ -3708,7 +3708,7 @@ async function syncStaffToNexus(){
     //    login/password fields stay empty until they migrate via admin set-pw.
     for(const c of current){
       try{
-        const up=await fetch(NX_SB+'/rest/v1/staff_credentials?staff_name=eq.'+enc(c.name),{
+        const up=await fetch(NX_SB+'/rest/v1/staff_credentials?select=staff_name&staff_name=eq.'+enc(c.name),{
           method:'PATCH',headers:Object.assign({Prefer:'return=representation'},H),
           body:JSON.stringify({team:c.team})
         });
@@ -7648,7 +7648,7 @@ async function addStaffToSupabase(fullName, team){
     // staff_credentials — set team if a row exists (auth created separately via
     // adminSetPw); if none yet, insert a minimal row carrying name+team so the
     // directory shows them immediately. password_hash='' satisfies NOT NULL.
-    const cu=await fetch(SUPABASE_URL+'/rest/v1/staff_credentials?staff_name=eq.'+enc(fullName),{
+    const cu=await fetch(SUPABASE_URL+'/rest/v1/staff_credentials?select=staff_name&staff_name=eq.'+enc(fullName),{
       method:'PATCH',headers:Object.assign({Prefer:'return=representation'},H),
       body:JSON.stringify({team:t})
     });
