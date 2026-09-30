@@ -6938,7 +6938,7 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
             <div class="card-title" id="trEntryTitle" style="margin:0;">Daily work log</div>
             <input type="date" id="trDate" onchange="trDateChanged()" style="border:1.5px solid var(--ui-line,#e2e8f0);border-radius:8px;padding:7px 11px;font-size:13px;font-family:inherit;outline:none;">
           </div>
-          <div style="font-size:11.5px;color:var(--ui-ink-3,#64748b);margin:2px 0 14px;max-width:60ch;">Log your work for the day. You can update it any time during the week; the totals roll up into the weekly report.</div>
+          <div id="trEntryHint" style="font-size:11.5px;color:var(--ui-ink-3,#64748b);margin:2px 0 14px;max-width:60ch;">Log your work for the day. You can update it any time during the week; the totals roll up into the weekly report.</div>
 
           <div id="trMetricFields" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:14px;">
             <div style="font-size:12px;color:var(--ui-ink-4,#94a3b8);"><div class="nx-sk" data-sk="lines" data-n="2" aria-hidden="true"></div></div>
@@ -18300,6 +18300,13 @@ async function initTeamReport(){
   }
   var team = trActiveTeam();
   var shape = trShape(team);
+  // Only Processing uses metrics. Drop any metrics left over from a previously
+  // viewed team so they can't leak into this team's week table, save, or report.
+  if(shape!=='metrics'){ _trMetrics = []; _trMetricsAll = []; }
+  var _hint = document.getElementById('trEntryHint');
+  if(_hint) _hint.textContent = (shape==='metrics')
+    ? 'Log your work for the day. You can update it any time during the week; the totals roll up into the weekly report.'
+    : 'Log your work for the day. You can update it any time during the week; it feeds into the weekly report.';
 
   // Admin team picker + per-team theme picker live in the admin card region.
   trRenderTeamPicker();
@@ -18420,7 +18427,17 @@ async function trSaveDay(btnEl){
   finally{ btn.disabled=false; trUpdateEntryHeader(); if(btn.textContent==='Saving…') btn.textContent=orig; setTimeout(function(){ if(msg.textContent==='✓ Saved') msg.textContent=''; }, 2500); }
 }
 
+// Log-only teams: show a short preview of the day's tasks instead of metric cells.
+function _trTaskCell(row){
+  if(!row || !row.tasks || !String(row.tasks).trim()) return '<td><span style="color:#cbd5e1;">–</span></td>';
+  var items = String(row.tasks).split(/\r?\n/).map(function(x){return x.trim();}).filter(Boolean);
+  var txt = items.join(' · ');
+  if(txt.length > 110) txt = txt.slice(0,107) + '…';
+  return '<td style="font-size:12px;color:var(--ui-ink-2b,#475569);">'+_trEsc(txt)+'</td>';
+}
+
 async function trRenderMyWeek(){
+  var isLog = trShape(trActiveTeam()) !== 'metrics';
   var mount = document.getElementById('trMyWeek');
   if(!mount) return;
   // Anchor to the selected date, then shift by the browsed week offset.
@@ -18449,7 +18466,7 @@ async function trRenderMyWeek(){
       var isFuture = dStr > todayStr;
       var isToday = dStr === todayStr;
       var logged = !!row;
-      var cells = _trMetrics.map(function(m){
+      var cells = isLog ? _trTaskCell(logged ? row : null) : _trMetrics.map(function(m){
         var v = logged ? (row.metrics && row.metrics[m.metric_key] || 0) : 0;
         if(logged) tot[m.metric_key]+=v;
         return '<td class="num">'+(logged? v : '<span style="color:#cbd5e1;">–</span>')+'</td>';
@@ -18474,6 +18491,7 @@ async function trRenderMyWeek(){
     }
     var head = '<th>Day</th>' + _trMetrics.map(function(m){ return '<th class="num">'+_trEsc(m.label)+'</th>'; }).join('') + '<th></th>';
     var totRow = '<tr class="tot"><td>Total</td>' + _trMetrics.map(function(m){ return '<td class="num">'+tot[m.metric_key]+'</td>'; }).join('') + '<td></td></tr>';
+    if(isLog){ head = '<th>Day</th><th>Tasks</th><th></th>'; totRow = ''; }
 
     // Week navigation header.
     var weekLabel = isCurrentWeek ? 'This week' :
@@ -18669,13 +18687,15 @@ async function trMoveMetric(key, dir){
 async function trGenerateReport(){
   if(!trIsLead()) return;
   if(trShape(trActiveTeam())==='placement'){ return trGeneratePlacementReport(); }
+  var isLog = trShape(trActiveTeam()) !== 'metrics';   // Enrolment etc: daily work log only
+  if(isLog){ _trMetrics = []; _trMetricsAll = []; }
   var out = document.getElementById('trReportOut');
   var pick = document.getElementById('trWeekPick').value || _trToday();
   var mon = _trMonday(pick), sun = _trAddDays(mon,TR_WEEK_DAYS-1);  // Sat
   out.innerHTML = '<div style="color:var(--ui-ink-4,#94a3b8);font-size:13px;padding:12px 0;">Generating…</div>';
   document.getElementById('trPrintBtn').style.display = 'none';
   try{
-    if(!_trMetrics.length) await trLoadMetrics();
+    if(!isLog && !_trMetrics.length) await trLoadMetrics();
     var teamResp = await fetch(SB + '/rest/v1/staff_credentials?team=eq.'+encodeURIComponent(trActiveTeam())+'&select=staff_name&order=staff_name.asc', { headers:_trHeaders() });
     var teamRows = await teamResp.json();
     var team = (Array.isArray(teamRows)?teamRows:[]).map(function(x){ return x.staff_name; }).filter(Boolean);
@@ -18685,7 +18705,7 @@ async function trGenerateReport(){
 
     // calls from call_log
     var callsByStaff = {};
-    try{
+    if(!isLog) try{
       var sunNext = _trAddDays(mon, TR_WEEK_DAYS);  // exclusive upper bound = Sunday 00:00 → counts Mon–Sat
       var clUrl = SB + '/rest/v1/call_log?created_at=gte.' + mon + '&created_at=lt.' + sunNext + '&deleted_at=is.null&select=logged_by';
       var clResp = await fetch(clUrl, { headers:_trHeaders() });
@@ -18711,7 +18731,7 @@ async function trGenerateReport(){
     var grand={calls:0}; mkeys.forEach(function(k){ grand[k]=0; });
 
     var html = '<div id="trPrintable">';
-    html += '<div style="margin-bottom:14px;"><div style="font-size:16px;font-weight:800;color:var(--ui-ink,#0f172a);">'+trActiveTeam()+' — Weekly Report</div>'+
+    html += '<div style="margin-bottom:14px;"><div style="font-size:16px;font-weight:800;color:var(--ui-ink,#0f172a);">'+trActiveTeam()+' — '+(isLog?'Daily Work Log':'Weekly Report')+'</div>'+
             '<div style="font-size:12.5px;color:var(--ui-ink-3,#64748b);">Week of '+_trFmtDay(mon)+' – '+_trFmtDay(sun)+'</div></div>';
 
     names.forEach(function(name){
@@ -18734,6 +18754,18 @@ async function trGenerateReport(){
       pdfTasks.push({ name:name, days: weekDates.map(function(d){ var rr=byDate[d]; return (rr&&rr.tasks&&rr.tasks.trim())? rr.tasks.split(/\r?\n/).map(function(x){return x.trim();}).filter(Boolean):[]; }) });
 
       html += '<div class="tr-person-h">'+_trEsc(name)+'</div>';
+      if(isLog){
+        if(!rows.length){ html += '<div style="font-size:12px;color:#cbd5e1;margin-bottom:8px;">No entries this week.</div>'; }
+        else {
+          var logRows = rows.map(function(row){
+            var items = (row.tasks||'').split(/\r?\n/).map(function(x){return x.trim();}).filter(Boolean);
+            var cell = items.length ? items.map(function(x){return '\u2022 '+_trEsc(x);}).join('<br>') : '<span style="color:#cbd5e1;">\u2014</span>';
+            return '<tr><td style="white-space:nowrap;vertical-align:top;">'+_trFmtDay(row.report_date)+'</td><td>'+cell+'</td></tr>';
+          }).join('');
+          html += '<div style="overflow-x:auto;"><table class="tr-table"><thead><tr><th>Day</th><th>Tasks</th></tr></thead><tbody>'+logRows+'</tbody></table></div>';
+        }
+        return;
+      }
       html += '<div style="font-size:12.5px;color:var(--ui-ink-2b,#475569);margin:0 0 8px;"><strong>Calls made this week:</strong> '+calls+'</div>';
       if(!rows.length){ html += '<div style="font-size:12px;color:#cbd5e1;margin-bottom:8px;">No report entries this week.</div>'; }
       else {
@@ -18744,7 +18776,7 @@ async function trGenerateReport(){
       }
     });
 
-    html += '<div class="tr-person-h" style="margin-top:20px;">Team total</div>'+
+    if(!isLog) html += '<div class="tr-person-h" style="margin-top:20px;">Team total</div>'+
       '<div style="overflow-x:auto;"><table class="tr-table"><thead><tr><th>Metric</th><th class="num">Total</th></tr></thead><tbody>'+
       '<tr><td>Calls Made</td><td class="num">'+grand.calls+'</td></tr>'+
       _trMetrics.map(function(m){ return '<tr><td>'+_trEsc(m.label)+'</td><td class="num">'+grand[m.metric_key]+'</td></tr>'; }).join('')+
@@ -18753,7 +18785,7 @@ async function trGenerateReport(){
     out.innerHTML = html;
 
     window._trReportData = { mon:mon, sun:sun, weekDates:weekDates, metricKeys:mkeys, metricLabels:mlabels,
-      metrics:pdfMetrics, tasks:pdfTasks, preparedBy:(window.me||me||'') };
+      metrics:pdfMetrics, tasks:pdfTasks, shape:(isLog?'log':'metrics'), preparedBy:(window.me||me||'') };
     document.getElementById('trPrintBtn').style.display = '';
   }catch(e){ out.innerHTML = '<div style="font-size:13px;color:#dc2626;">Could not generate the report.</div>'; }
 }
@@ -19033,6 +19065,8 @@ function trDownloadPdf(){
     doc.text(pageStr, PW-M, PH-7, {align:'right'});
   }
 
+  var isLog = (D.shape === 'log');   // daily work log only: no metrics page
+  if(!isLog){
   // PAGE 1 — metrics
   doc.setFont(undefined,'bold'); doc.setFontSize(15); doc.setTextColor.apply(doc, INK);
   doc.text('Oscars Training Centre — Weekly Performance Report', M, M+4);
@@ -19057,11 +19091,12 @@ function trDownloadPdf(){
   doc.setFontSize(7.5); doc.setTextColor.apply(doc, MUTED); doc.setFont(undefined,'normal');
   doc.text('Calls are counted automatically from the call log. Other metrics are self-reported daily by staff.', M, afterY);
   footer();
-
-  // PAGE 2 — task grid
   doc.addPage('a4','landscape');
+  }
+
+  // PAGE 2 — task grid (the only page for log-only teams)
   doc.setFont(undefined,'bold'); doc.setFontSize(15); doc.setTextColor.apply(doc, INK);
-  doc.text('Weekly Task Report: '+trActiveTeam(), M, M+4);
+  doc.text((isLog ? 'Daily Work Log: ' : 'Weekly Task Report: ')+trActiveTeam(), M, M+4);
   doc.setFont(undefined,'normal'); doc.setFontSize(9.5); doc.setTextColor.apply(doc, MUTED);
   doc.text(rangeStr(), M, M+10);
   var dayHeads = D.weekDates.map(function(d){ return fmtDay(d); });
@@ -19078,14 +19113,15 @@ function trDownloadPdf(){
     styles:{ fontSize:7.4, cellPadding:1.8, textColor:INK, lineColor:LINE, lineWidth:0.2, valign:'top', overflow:'linebreak' },
     headStyles:{ fillColor:HEAD, textColor:[255,255,255], fontStyle:'bold', fontSize:7.5, halign:'center', valign:'middle' },
     columnStyles:gCol, alternateRowStyles:{ fillColor:ZEBRA }, margin:{ left:M, right:M },
+    didDrawPage:function(){ if(isLog) footer(); },
     didParseCell:function(data){ if(data.section==='body' && data.cell.raw==='—'){ data.cell.styles.textColor=[203,213,225]; data.cell.styles.halign='center'; } }
   });
   var afterY2=doc.lastAutoTable.finalY+6;
   doc.setFontSize(7.5); doc.setTextColor.apply(doc, MUTED);
   doc.text('Note: Tasks summarised here are arranged from records provided by staff in the daily work log.', M, afterY2);
-  footer();
+  if(!isLog) footer();
 
-  doc.save(trActiveTeam()+'_Weekly_Report_'+D.mon+'.pdf');
+  doc.save(trActiveTeam()+(isLog?'_Daily_Work_Log_':'_Weekly_Report_')+D.mon+'.pdf');
 }
 
 function populateMgrStaff(){
