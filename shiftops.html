@@ -2485,6 +2485,76 @@ table tbody tr:hover,.pp-table tbody tr:hover{ background:color-mix(in srgb,var(
 @media(prefers-reduced-motion:reduce){
   .modal,.tab-content.active,.btn{ animation:none !important; transition:none !important; }
 }
+/* ── Class Days tab: full width, roster laid out in columns ───────── */
+#availsec-classdays .cd-card{ max-width:none; width:100%; }
+#availsec-classdays .cd-card > div:nth-child(2){ max-width:72ch; }               /* intro text stays readable */
+#availsec-classdays .cd-card > div:nth-child(3){ max-width:520px; }              /* add-a-day row */
+#classDayList{ display:grid; grid-template-columns:repeat(auto-fill,minmax(250px,1fr)); gap:6px; }
+#classDayList > div{ margin-bottom:0 !important; }
+#hkRosterList{ display:grid; grid-template-columns:repeat(auto-fill,minmax(440px,1fr)); gap:10px; align-items:start; }
+#hkRosterList > div{ margin-bottom:0 !important; min-width:0; }
+#hkRosterList > div[style*="font-size:12px"]{ grid-column:1 / -1; }             /* "No class days…" / "Building roster…" messages */
+@media(max-width:560px){
+  #classDayList{ grid-template-columns:1fr; }
+  #hkRosterList{ grid-template-columns:1fr; }
+}
+
+/* ── Class Days: summary, chips, collapsible history ──────────────── */
+#classDayList > .cd-sum, #classDayList > .cd-msg, #classDayList > .cd-toggle, #classDayList > .cd-past{ grid-column:1 / -1; }
+.cd-msg{ font-size:12.5px; color:var(--text-dim); padding:4px 2px; }
+.cd-sum{
+  display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; padding:10px 14px;
+  border-radius:var(--r8); background:var(--accent-dim); border:1px solid var(--accent-border);
+  font-size:13px; color:var(--text);
+}
+.cd-sum b{ font-weight:700; }
+.cd-sum-k{ font-size:12px; font-weight:600; color:var(--accent-text); }
+.cd-sum-rel{ font-weight:600; color:var(--accent-text); }
+.cd-sum-n{ margin-left:auto; font-size:12px; color:var(--text-dim); font-variant-numeric:tabular-nums; }
+.cd-sum-none{ background:var(--surface2); border-color:var(--border); color:var(--text-dim); }
+.cd-chip{
+  display:flex; align-items:center; justify-content:space-between; gap:10px; min-width:0;
+  padding:9px 12px; border-radius:var(--r8); background:var(--surface2); border:1px solid var(--border);
+}
+.cd-chip-main{ display:flex; flex-direction:column; min-width:0; }
+.cd-chip-date{ font-size:13px; font-weight:700; color:var(--text); white-space:nowrap; }
+.cd-chip-rel{ font-size:11.5px; color:var(--text-dim); }
+.cd-next{ border-color:var(--accent-border); box-shadow:inset 3px 0 0 var(--accent); }
+.cd-next .cd-chip-rel{ color:var(--accent-text); font-weight:600; }
+.cd-old{ background:transparent; }
+.cd-old .cd-chip-date{ font-weight:600; color:var(--text-mid); }
+.cd-chip-x{
+  flex:none; border:0; background:none; cursor:pointer; padding:6px 4px; border-radius:6px;
+  font:inherit; font-size:12px; font-weight:600; color:var(--warn); opacity:.85;
+}
+.cd-chip-x:hover{ opacity:1; text-decoration:underline; text-underline-offset:3px; }
+.cd-chip-x:focus-visible, .cd-toggle:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+.cd-toggle{
+  display:flex; align-items:center; gap:8px; width:100%; margin-top:2px; padding:10px 12px;
+  border:1px dashed var(--border2); border-radius:var(--r8); background:none; cursor:pointer;
+  font:inherit; font-size:13px; font-weight:600; color:var(--text-mid); text-align:left;
+}
+.cd-toggle:hover{ background:var(--surface2); color:var(--text); }
+.cd-toggle svg{ flex:none; transition:transform .18s ease; transform:rotate(-90deg); }
+.cd-toggle.open svg{ transform:rotate(0deg); }
+.cd-toggle-n{
+  min-width:22px; padding:1px 7px; border-radius:999px; background:var(--surface3); color:var(--text-mid);
+  font-size:11.5px; font-weight:700; text-align:center; font-variant-numeric:tabular-nums;
+}
+.cd-toggle-hint{ margin-left:auto; font-size:12px; font-weight:600; color:var(--accent-text); }
+.cd-past[hidden], .hk-past[hidden]{ display:none !important; }
+.cd-past{ display:grid; grid-template-columns:repeat(auto-fill,minmax(250px,1fr)); gap:6px; }
+.hk-past{ display:grid; grid-template-columns:repeat(auto-fill,minmax(440px,1fr)); gap:10px; align-items:start; }
+.hk-past > div{ margin-bottom:0 !important; min-width:0; }
+#hkRosterList > .hk-h, #hkRosterList > .hk-toggle, #hkRosterList > .hk-past{ grid-column:1 / -1; }
+.hk-h{ display:flex; align-items:center; gap:8px; font-size:12px; font-weight:700; letter-spacing:.02em; color:var(--text-dim); padding:2px 2px 0; }
+.hk-h span{ min-width:20px; padding:1px 7px; border-radius:999px; background:var(--surface3); color:var(--text-mid); font-size:11.5px; text-align:center; }
+.hk-h-none{ font-weight:500; letter-spacing:0; }
+.hk-h + div{ box-shadow:0 0 0 1px var(--accent-border); }        /* the next class day's card */
+@media(max-width:560px){
+  .cd-past, .hk-past{ grid-template-columns:1fr; }
+  .cd-sum-n{ margin-left:0; width:100%; }
+}
 </style>
 </head>
 <body>
@@ -2762,11 +2832,11 @@ table tbody tr:hover,.pp-table tbody tr:hover{ background:color-mix(in srgb,var(
           <div id="submittedAvailContent"></div>
         </div>
         <div id="availsec-classdays" style="display:none;">
-          <div class="card" style="padding:18px;max-width:640px;">
+          <div class="card cd-card" style="padding:18px;">
             <div style="font-size:15px;font-weight:700;margin-bottom:3px;">Class days</div>
             <div style="font-size:12.5px;color:var(--text-dim);line-height:1.5;margin-bottom:12px;">Mark class days. These are used to auto-generate the class housekeeping roster below. Punctuality is always measured against each person's rostered shift start.</div>
             <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;">
-              <div style="flex:1;min-width:150px;"><label style="font-size:11px;font-weight:600;color:var(--text-dim);">Add a class day</label><input type="date" id="classDayInput" style="width:100%;border:1.5px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;font-family:inherit;outline:none;margin-top:3px;background:var(--input-bg,#fff);color:inherit;"></div>
+              <div style="flex:1;min-width:150px;"><label style="font-size:11px;font-weight:600;color:var(--text-dim);">Add a class day</label><input type="date" id="classDayInput" onkeydown="if(event.key==='Enter'){addClassDay();}" style="width:100%;border:1.5px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;font-family:inherit;outline:none;margin-top:3px;background:var(--input-bg,#fff);color:inherit;"></div>
               <button onclick="addClassDay()" class="btn btn-primary" style="padding:9px 16px;font-size:12px;">Add</button>
             </div>
             <div id="classDayList" style="margin-top:14px;"></div>
@@ -4781,23 +4851,78 @@ async function _cdGet(path){ try{ const r=await fetch(SUPABASE_URL+'/rest/v1/'+p
 const _CD_H={apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY};
 const _CD_HJ={..._CD_H,'Content-Type':'application/json'};
 
+// ── CLASS DAYS list: upcoming first, older dates tucked away ─────────────
+// Upcoming class days (today and later) are shown soonest-first with a "Next" marker
+// and how far away each is. Past days are history — reshuffle and auto-fill only ever
+// touch upcoming days — so they sit behind a toggle that stays collapsed until asked.
+let _cdRows = [];
+let _cdPastOpen = (function(){ try{ return localStorage.getItem('so_cd_past_open') === '1'; }catch(e){ return false; } })();
+function _cdDayDiff(dateStr){
+  const t = _todayIsoSydney().split('-').map(Number), p = String(dateStr).split('-').map(Number);
+  return Math.round((Date.UTC(p[0],p[1]-1,p[2]) - Date.UTC(t[0],t[1]-1,t[2])) / 86400000);
+}
+function _cdRel(n){
+  if(n === 0) return 'Today';
+  if(n === 1) return 'Tomorrow';
+  if(n === -1) return 'Yesterday';
+  return n > 0 ? 'in ' + n + ' days' : Math.abs(n) + ' days ago';
+}
+function _cdLabel(dateStr, withYear){
+  const d = new Date(dateStr + 'T00:00:00');
+  const o = {weekday:'short', day:'numeric', month:'short'};
+  if(withYear || d.getFullYear() !== new Date().getFullYear()) o.year = 'numeric';
+  return d.toLocaleDateString('en-AU', o);
+}
 async function loadClassDays(){
-  const list=document.getElementById('classDayList');
+  const list = document.getElementById('classDayList');
   if(!list) return;
-  const rows=await _cdGet('class_days?select=class_date&order=class_date.desc&limit=60');
-  if(!rows.length){ list.innerHTML='<div style="font-size:12px;color:var(--text-dim);">No class days marked yet.</div>'; return; }
-  list.innerHTML=rows.map(function(r){
-    const d=new Date(r.class_date+'T00:00:00');
-    const lbl=d.toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
-    return '<div style="padding:8px 10px;border-radius:8px;background:var(--panel-2,rgba(127,127,127,.06));margin-bottom:5px;">'+
-      '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">'+
-        '<span style="font-size:13px;font-weight:600;">'+lbl+'</span>'+
-        '<div style="display:flex;gap:12px;align-items:center;flex-shrink:0;">'+
-          '<button onclick="removeClassDay(\''+r.class_date+'\')" style="background:none;border:none;color:#e5484d;cursor:pointer;font-size:12px;font-weight:600;font-family:inherit;">Remove</button>'+
-        '</div>'+
-      '</div>'+
+  if(!list.children.length) list.innerHTML = '<div class="cd-msg">Loading class days\u2026</div>';
+  const rows = await _cdGet('class_days?select=class_date&order=class_date.desc&limit=60');
+  _cdRows = rows || [];
+  _cdRender();
+}
+function toggleCdPast(){
+  _cdPastOpen = !_cdPastOpen;
+  try{ localStorage.setItem('so_cd_past_open', _cdPastOpen ? '1' : '0'); }catch(e){}
+  _cdRender();
+}
+function _cdRender(){
+  const list = document.getElementById('classDayList');
+  if(!list) return;
+  if(!_cdRows.length){ list.innerHTML = '<div class="cd-msg">No class days marked yet.</div>'; return; }
+  const today = _todayIsoSydney();
+  const up = _cdRows.filter(function(r){ return r.class_date >= today; })
+                    .sort(function(a,b){ return a.class_date < b.class_date ? -1 : 1; });
+  const past = _cdRows.filter(function(r){ return r.class_date < today; })
+                      .sort(function(a,b){ return a.class_date < b.class_date ? 1 : -1; });
+  const chip = function(r, cls){
+    const n = _cdDayDiff(r.class_date), lbl = _cdLabel(r.class_date);
+    return '<div class="cd-chip' + cls + '">' +
+      '<div class="cd-chip-main"><span class="cd-chip-date">' + lbl + '</span>' +
+      '<span class="cd-chip-rel">' + _cdRel(n) + '</span></div>' +
+      '<button type="button" class="cd-chip-x" onclick="removeClassDay(\'' + r.class_date + '\')" aria-label="Remove ' + lbl + '" title="Remove this class day">Remove</button>' +
     '</div>';
-  }).join('');
+  };
+  let h = '';
+  if(up.length){
+    const n0 = _cdDayDiff(up[0].class_date);
+    h += '<div class="cd-sum"><span class="cd-sum-k">Next class day</span> ' +
+         '<b>' + _cdLabel(up[0].class_date) + '</b> <span class="cd-sum-rel">' + _cdRel(n0) + '</span>' +
+         '<span class="cd-sum-n">' + up.length + ' upcoming' + (past.length ? ' \u00b7 ' + past.length + ' past' : '') + '</span></div>';
+    h += up.map(function(r, i){ return chip(r, i === 0 ? ' cd-next' : ''); }).join('');
+  }else{
+    h += '<div class="cd-sum cd-sum-none">No upcoming class days \u2014 add one above.' +
+         (past.length ? '<span class="cd-sum-n">' + past.length + ' past</span>' : '') + '</div>';
+  }
+  if(past.length){
+    h += '<button type="button" class="cd-toggle' + (_cdPastOpen ? ' open' : '') + '" aria-expanded="' + _cdPastOpen + '" aria-controls="cdPast" onclick="toggleCdPast()">' +
+         '<svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.17l3.71-3.94a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd"/></svg>' +
+         'Past class days <span class="cd-toggle-n">' + past.length + '</span>' +
+         '<span class="cd-toggle-hint">' + (_cdPastOpen ? 'Hide' : 'Show') + '</span></button>' +
+         '<div class="cd-past" id="cdPast"' + (_cdPastOpen ? '' : ' hidden') + '>' +
+         past.map(function(r){ return chip(r, ' cd-old'); }).join('') + '</div>';
+  }
+  list.innerHTML = h;
 }
 async function addClassDay(){
   const inp=document.getElementById('classDayInput');
@@ -4805,9 +4930,12 @@ async function addClassDay(){
   try{
     await fetch(SUPABASE_URL+'/rest/v1/class_days',{method:'POST',headers:{..._CD_HJ,'Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({class_date:inp.value})});
     inp.value=''; showToast('Class day added'); loadClassDays();
+    try{ loadHousekeeping(); }catch(e){}   // the roster fills itself for the new day straight away
   }catch(e){ showToast('Could not add (maybe already exists)'); }
 }
 async function removeClassDay(dateStr){
+  // Removing a class day does not remove its housekeeping roster, so say so.
+  if(!confirm('Remove ' + _cdLabel(dateStr, true) + ' as a class day?\n\nIts housekeeping roster stays until you remove those names.')) return;
   try{
     await fetch(SUPABASE_URL+'/rest/v1/class_days?class_date=eq.'+encodeURIComponent(dateStr),{method:'DELETE',headers:{..._CD_H,'Prefer':'return=minimal'}});
     showToast('Removed'); loadClassDays();
@@ -5232,7 +5360,8 @@ async function _hkRender(){
   const byDate={};
   rows.forEach(function(r){ (byDate[r.duty_date]=byDate[r.duty_date]||[]).push(r); });
   const today=_todayIsoSydney();
-  box.innerHTML=Object.keys(byDate).sort().reverse().map(function(d){
+  const _hkKeys=Object.keys(byDate).sort();
+  const _hkParts=_hkKeys.map(function(d){
     const dd=new Date(d+'T00:00:00');
     const lbl=dd.toLocaleDateString('en-AU',{weekday:'long',day:'numeric',month:'short'});
     const upcoming=d>=today;
@@ -5333,7 +5462,41 @@ async function _hkRender(){
             (isPub?'background:none;color:var(--text-dim);':'background:var(--accent,#3d9eff);color:#fff;')+'">'+(isPub?'Unpublish':'Publish')+'</button>'
           : '')+
       '</div>'+headRow+cells+'</div>';
-  }).join('');
+  });
+  _hkAssemble(box,_hkKeys,_hkParts,today);
+}
+
+// Roster layout: upcoming days first (soonest at the top), older days behind a toggle.
+let _hkPastOpen = (function(){ try{ return localStorage.getItem('so_hk_past_open') === '1'; }catch(e){ return false; } })();
+function toggleHkPast(){
+  _hkPastOpen = !_hkPastOpen;
+  try{ localStorage.setItem('so_hk_past_open', _hkPastOpen ? '1' : '0'); }catch(e){}
+  const p = document.getElementById('hkPast'), b = document.getElementById('hkPastToggle');
+  if(p) p.hidden = !_hkPastOpen;
+  if(b){
+    b.setAttribute('aria-expanded', String(_hkPastOpen));
+    b.classList.toggle('open', _hkPastOpen);
+    const hint = b.querySelector('.cd-toggle-hint'); if(hint) hint.textContent = _hkPastOpen ? 'Hide' : 'Show';
+  }
+}
+function _hkAssemble(box, keys, parts, today){
+  const up = [], past = [];
+  keys.forEach(function(d, i){ (d >= today ? up : past).push(parts[i]); });   // keys arrive oldest-first
+  past.reverse();                                                             // past: most recent first
+  let h = '';
+  if(up.length){
+    h += '<div class="hk-h">Upcoming <span>' + up.length + '</span></div>' + up.join('');
+  }else{
+    h += '<div class="hk-h hk-h-none">Nothing upcoming \u2014 add a class day above and the roster fills itself.</div>';
+  }
+  if(past.length){
+    h += '<button type="button" id="hkPastToggle" class="cd-toggle hk-toggle' + (_hkPastOpen ? ' open' : '') + '" aria-expanded="' + _hkPastOpen + '" aria-controls="hkPast" onclick="toggleHkPast()">' +
+         '<svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.17l3.71-3.94a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd"/></svg>' +
+         'Past days <span class="cd-toggle-n">' + past.length + '</span>' +
+         '<span class="cd-toggle-hint">' + (_hkPastOpen ? 'Hide' : 'Show') + '</span></button>' +
+         '<div class="hk-past" id="hkPast"' + (_hkPastOpen ? '' : ' hidden') + '>' + past.join('') + '</div>';
+  }
+  box.innerHTML = h;
 }
 
 /* ── Task, copy and publish ───────────────────────────────────────────── */
