@@ -2487,8 +2487,7 @@ table tbody tr:hover,.pp-table tbody tr:hover{ background:color-mix(in srgb,var(
 }
 /* ── Class Days tab: full width, roster laid out in columns ───────── */
 #availsec-classdays .cd-card{ max-width:none; width:100%; }
-#availsec-classdays .cd-card > div:nth-child(2){ max-width:72ch; }               /* intro text stays readable */
-#availsec-classdays .cd-card > div:nth-child(3){ max-width:520px; }              /* add-a-day row */
+#availsec-classdays .cd-card > div:nth-child(2){ max-width:520px; }              /* add-a-day row */
 #classDayList{ display:grid; grid-template-columns:repeat(auto-fill,minmax(250px,1fr)); gap:6px; }
 #classDayList > div{ margin-bottom:0 !important; }
 #hkRosterList{ display:grid; grid-template-columns:repeat(auto-fill,minmax(440px,1fr)); gap:10px; align-items:start; }
@@ -2554,6 +2553,94 @@ table tbody tr:hover,.pp-table tbody tr:hover{ background:color-mix(in srgb,var(
 @media(max-width:560px){
   .cd-past, .hk-past{ grid-template-columns:1fr; }
   .cd-sum-n{ margin-left:0; width:100%; }
+}
+
+/* ── Availability: weekly grid ────────────────────────────────────── */
+#availGrid.avail-grid{ background:none; border:0; box-shadow:none; overflow:visible; border-radius:0; margin-bottom:8px; --avcol:212px; }
+#availGrid .avail-header{ background:none; border:0; padding:2px 2px 16px; align-items:flex-end; gap:14px 20px; flex-wrap:wrap; }
+#availGrid .avail-header .section-title{ font-size:22px; letter-spacing:-.02em; }
+.av-week{ font-size:13px; color:var(--text-dim); margin-top:3px; }
+.av-hint{ font-size:12.5px; color:var(--text-dim); }
+.av-hint strong{ color:var(--text-mid); font-weight:600; }
+#availGrid .avail-header .btn{ font-size:13px !important; }
+
+.avail-filter{ display:flex; flex-wrap:wrap; gap:8px; margin:0 0 16px !important; }
+.avail-filter .role-pill{
+  display:inline-flex; align-items:center; gap:8px; padding:7px 14px; font-size:13px; font-weight:600;
+  border-radius:999px; box-shadow:none; color:var(--text-mid);
+}
+.rp-n{
+  min-width:20px; padding:1px 7px; border-radius:999px; background:var(--surface3); color:var(--text-mid);
+  font-size:11.5px; font-weight:700; text-align:center; font-variant-numeric:tabular-nums;
+}
+.avail-filter .role-pill.active .rp-n{ background:var(--accent); color:var(--on-accent); }
+
+#availGrid .avail-team-card{ margin-bottom:18px; }
+#availGrid .role-view-header{ padding:14px 18px; background:transparent; }
+#availGrid .role-view-title{ font-size:16px; font-weight:700; letter-spacing:-.01em; }
+#availGrid .avail-team-badge{
+  font-family:var(--sans); font-size:12px; font-weight:600; letter-spacing:0; text-transform:lowercase;
+  border-radius:999px; padding:2px 10px;
+}
+#availGrid .avail-team-tally .tt{ font-family:var(--sans); font-size:12.5px; }
+#availGrid .avail-team-tally i{ width:8px; height:8px; border-radius:50%; }
+
+/* one column each for: name, 7 days, and the Set/Save button (the original grid was one short) */
+#availGrid .avail-row{
+  grid-template-columns:var(--avcol) repeat(7,minmax(0,1fr)) 92px; align-items:stretch;
+  background:transparent !important; border-bottom:1px solid var(--border);
+}
+#availGrid .avail-row:last-child{ border-bottom:0; }
+#availGrid .avail-row:not(.avail-hd-row):not(.avail-row-editing):hover{ background:color-mix(in srgb,var(--text) 3%,transparent) !important; }
+#availGrid .avail-hd-row{ background:var(--surface2) !important; border-top:1px solid var(--border); }
+#availGrid .avail-name{ border-right:0; padding:10px 16px; gap:11px; }
+#availGrid .avail-hd-name{ font-family:var(--sans) !important; font-size:12px !important; font-weight:600 !important; color:var(--text-dim) !important; }
+#availGrid .avail-dot{ width:9px; height:9px; }
+.avail-who{ display:flex; flex-direction:column; min-width:0; }
+.avail-who-n{ font-size:14px; font-weight:600; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.avail-who-s{ font-size:12px; color:var(--text-dim); white-space:nowrap; font-variant-numeric:tabular-nums; }
+
+#availGrid .avail-cell{ border-right:0; padding:9px 5px; gap:5px; justify-content:center; }
+#availGrid .avail-dh{ padding:9px 4px; gap:1px; }
+.avail-dh-d{ font-size:12.5px; font-weight:700; color:var(--text-mid); }
+.avail-dh-n{ font-size:11.5px; color:var(--muted); }
+#availGrid .avail-today{ background:var(--accent-dim); }
+#availGrid .avail-dh.avail-today .avail-dh-d{ color:var(--accent-text); }
+#availGrid .avail-cell.avail-wknd:not(.avail-today){ background:color-mix(in srgb,var(--text) 2.5%,transparent); }
+
+/* chips: readable, calm, colour carries the meaning */
+#availGrid .avail-chip{
+  display:flex; align-items:center; justify-content:center; min-height:32px; padding:5px 4px;
+  font-size:12.5px !important; font-weight:600 !important; text-transform:none; letter-spacing:0;
+  border-radius:8px !important; opacity:1; font-variant-numeric:tabular-nums;
+}
+#availGrid .avail-chip:hover{ transform:none; filter:none; }
+body.avail-editing #availGrid .avail-chip:hover, #availGrid .avail-row-editing .avail-chip:hover{ box-shadow:0 0 0 2px var(--accent-border); }
+#availGrid .avail-yes{ background:var(--success-dim); color:var(--success); border:1px solid color-mix(in srgb,var(--success) 30%,transparent); }
+#availGrid .avail-no{ background:var(--warn-dim); color:var(--warn); border:1px solid color-mix(in srgb,var(--warn) 28%,transparent); }
+#availGrid .avail-pref{ background:color-mix(in srgb,#4f8ef7 14%,var(--surface)); color:#8db8ff; border:1px solid color-mix(in srgb,#4f8ef7 34%,transparent); }
+:root[data-theme="light"] #availGrid .avail-pref{ color:#1e4fc4; }
+#availGrid .avail-unset{ background:transparent; color:var(--muted); border:1px dashed var(--border2); }
+
+/* "Custom hours" only appears for the row being edited */
+#availGrid .avail-custom{ display:none; font-size:11.5px; font-weight:600; color:var(--accent-text); text-align:center; cursor:pointer; padding:1px 0; }
+#availGrid .avail-row-editing .avail-custom, body.avail-editing #availGrid .avail-custom{ display:block; }
+#availGrid .avail-custom:hover{ text-decoration:underline; text-underline-offset:3px; }
+
+/* the row being edited */
+#availGrid .avail-row.avail-row-editing{ outline:0; border-radius:0; box-shadow:inset 0 0 0 2px var(--accent); background:var(--accent-dim) !important; }
+#availGrid .avail-row > .avail-cell:last-child{ padding-right:14px; }
+#availGrid .avail-row > .avail-cell:last-child .btn{ font-size:12.5px !important; padding:7px 14px !important; border-radius:8px; min-width:62px; justify-content:center; }
+
+/* phones: keep readable columns and scroll sideways, name pinned */
+@media(max-width:900px){
+  #availGrid .avail-team-card{ overflow-x:auto; }
+  #availGrid .avail-team-card > .avail-row{ min-width:960px; }
+  #availGrid .avail-team-card > .role-view-header{ position:sticky; left:0; }
+  #availGrid .avail-row > .avail-name{ position:sticky; left:0; z-index:2; background:var(--surface); }
+  #availGrid .avail-hd-row > .avail-name{ background:var(--surface2); }
+  #availGrid .avail-row-editing > .avail-name{ background:var(--surface); }
+  #availGrid{ --avcol:170px; }
 }
 </style>
 </head>
@@ -2833,8 +2920,7 @@ table tbody tr:hover,.pp-table tbody tr:hover{ background:color-mix(in srgb,var(
         </div>
         <div id="availsec-classdays" style="display:none;">
           <div class="card cd-card" style="padding:18px;">
-            <div style="font-size:15px;font-weight:700;margin-bottom:3px;">Class days</div>
-            <div style="font-size:12.5px;color:var(--text-dim);line-height:1.5;margin-bottom:12px;">Mark class days. These are used to auto-generate the class housekeeping roster below. Punctuality is always measured against each person's rostered shift start.</div>
+            <div style="font-size:15px;font-weight:700;margin-bottom:12px;">Class days</div>
             <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;">
               <div style="flex:1;min-width:150px;"><label style="font-size:11px;font-weight:600;color:var(--text-dim);">Add a class day</label><input type="date" id="classDayInput" onkeydown="if(event.key==='Enter'){addClassDay();}" style="width:100%;border:1.5px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;font-family:inherit;outline:none;margin-top:3px;background:var(--input-bg,#fff);color:inherit;"></div>
               <button onclick="addClassDay()" class="btn btn-primary" style="padding:9px 16px;font-size:12px;">Add</button>
@@ -4734,10 +4820,10 @@ function renderAvailability(){
   let html=`<div class="avail-header">
     <div>
       <div class="section-title">Staff Availability</div>
-      <div style="font-family:var(--mono);font-size:8.5px;color:var(--text-dim);margin-top:3px">Week of ${weekLabel}</div>
+      <div class="av-week">Week of ${weekLabel}</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-      <span style="font-family:var(--mono);font-size:9px;color:var(--text-dim)">Press <strong>Set</strong> on a row to edit, then <strong>Save</strong></span>
+      <span class="av-hint">Press <strong>Set</strong> on a row to edit, then <strong>Save</strong></span>
       <button onclick="downloadSubmittedAvailability()" class="btn btn-save" style="font-size:11.5px;gap:5px;display:flex;align-items:center;">
         <svg width="13" height="13" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>Download PDF
       </button>
@@ -4758,11 +4844,11 @@ function renderAvailability(){
 
   // ── Team filter pills (same behaviour as Team View) ──
   const _teams = getUniqueTeams();
-  let fbar = `<div class="role-filter-bar" style="margin-bottom:14px">
-    <span style="font-family:var(--mono);font-size:9px;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;padding:4px 0">Team:</span>
-    <div class="role-pill${_availTeamFilter===null?' active':''}" onclick="setAvailTeamFilter(null)">All Teams</div>`;
+  const _teamCount = function(t){ return staff.filter(function(p){ return (p.team||'Unassigned')===t; }).length; };
+  let fbar = `<div class="role-filter-bar avail-filter" role="group" aria-label="Filter by team">
+    <div class="role-pill${_availTeamFilter===null?' active':''}" onclick="setAvailTeamFilter(null)">All teams <span class="rp-n">${staff.length}</span></div>`;
   _teams.forEach(t=>{ const enc=t.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
-    fbar += `<div class="role-pill${_availTeamFilter===t?' active':''}" onclick="setAvailTeamFilter('${enc}')">${t}</div>`; });
+    fbar += `<div class="role-pill${_availTeamFilter===t?' active':''}" onclick="setAvailTeamFilter('${enc}')">${t} <span class="rp-n">${_teamCount(t)}</span></div>`; });
   fbar += `</div>`;
   html += fbar;
 
@@ -4795,17 +4881,20 @@ function renderAvailability(){
       </div>`;
 
     // per-team day header
-    html+=`<div class="avail-row avail-hd-row"><div class="avail-name" style="font-family:var(--mono);font-size:8.5px;color:var(--text-dim);font-weight:700">STAFF</div>`;
+    html+=`<div class="avail-row avail-hd-row"><div class="avail-name avail-hd-name">Staff</div>`;
     for(let d=0;d<7;d++){
       const day=addDays(currentWeekStart,d);
-      html+=`<div class="avail-cell" style="flex-direction:column;gap:1px;padding:6px 2px"><div style="font-family:var(--mono);font-size:8.5px;color:var(--text-dim);font-weight:700">${DAYS[d]}</div><div style="font-family:var(--mono);font-size:7.5px;color:var(--muted)">${fmtDate(day)}</div></div>`;
+      html+=`<div class="avail-cell avail-dh${isToday(day)?' avail-today':''}${d>=5?' avail-wknd':''}"><span class="avail-dh-d">${DAYS[d]}</span><span class="avail-dh-n">${fmtDate(day)}</span></div>`;
     }
-    html+=`<div class="avail-cell" style="min-width:64px;justify-content:center"><div style="font-family:var(--mono);font-size:8.5px;color:var(--text-dim);font-weight:700">EDIT</div></div>`;
+    html+=`<div class="avail-cell avail-dh avail-hd-edit"><span class="avail-dh-d">Edit</span></div>`;
     html+='</div>';
 
     members.forEach(s=>{
     const _editing = _availRowEditing===s.id;
-    html+=`<div class="avail-row${_editing?' avail-row-editing':''}" data-avail-staff="${s.id}" data-team="${(s.team||'').replace(/"/g,'&quot;')}"><div class="avail-name"><div class="avail-dot" style="background:${s.color};flex-shrink:0"></div><span style="font-size:11px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${s.first} ${s.last}">${s.first} ${s.last}</span></div>`;
+    // How many days this week they can work, at a glance.
+    let _okDays=0,_unsetDays=0;
+    for(let d=0;d<7;d++){ const _a=getAvail(s.id,d); if(_a.type==='all'||_a.type==='custom') _okDays++; else if(_a.type!=='no') _unsetDays++; }
+    html+=`<div class="avail-row${_editing?' avail-row-editing':''}" data-avail-staff="${s.id}" data-team="${(s.team||'').replace(/"/g,'&quot;')}"><div class="avail-name"><div class="avail-dot" style="background:${s.color};flex-shrink:0"></div><div class="avail-who"><span class="avail-who-n" title="${s.first} ${s.last}">${s.first} ${s.last}</span><span class="avail-who-s">${_okDays} of 7 days${_unsetDays?' \u00b7 '+_unsetDays+' not set':''}</span></div></div>`;
     for(let d=0;d<7;d++){
       const av=getAvail(s.id,d);
       let chip='';
@@ -4819,8 +4908,9 @@ function renderAvailability(){
         chip=`<div class="avail-chip avail-unset" onclick="cycleAvail(${s.id},${d})">— Not Set</div>`;
       }
       // Small custom button always visible
-      const customBtn=`<div onclick="openCustomAvail(${s.id},${d})" title="Set custom hours" style="font-size:10px;color:var(--text-dim);cursor:pointer;text-align:center;margin-top:2px;opacity:.8;display:flex;align-items:center;justify-content:center;gap:3px"><span style="font-size:12px"></span><span style="font-family:var(--mono);font-size:8px;font-weight:600">Custom</span></div>`;
-      html+=`<div class="avail-cell" style="flex-direction:column;gap:2px">${chip}${customBtn}</div>`;
+      // Custom-hours link: only shown while the row is being edited (it can't be clicked before then).
+      const customBtn=`<div class="avail-custom" onclick="openCustomAvail(${s.id},${d})" title="Set custom hours">Custom hours</div>`;
+      html+=`<div class="avail-cell${isToday(addDays(currentWeekStart,d))?' avail-today':''}${d>=5?' avail-wknd':''}">${chip}${customBtn}</div>`;
     }
     // Per-row action: Set (unlock this row) → Save (write just this person).
     const rowBtn = _editing
@@ -5031,7 +5121,9 @@ const HK_MIN_END_MIN = 17*60 + 50;   // 17:50
 // are what remain when short-staffed, in this order. The second chairs slot
 // is the only optional one, so it drops first.
 const HK_TASKS = [
-  { key:'chairs',    label:'Chairs, boards, papers & pens',   slots:1, mins:10,  essential:1 },
+  // Two chairs slots (the second is optional, so it drops first when short-staffed): the Speaker now
+  // shares the rotation, so a full day is five people and Chairs is the heaviest job.
+  { key:'chairs',    label:'Chairs, boards, papers & pens',   slots:2, mins:10,  essential:1 },
   { key:'equipment', label:"Bed lifter & trainer's table",    slots:1, mins:6,   essential:1 },
   { key:'waterbin',  label:'Water & lollies + bring the bin back from Evershine',
                                                               slots:1, mins:5.5, essential:1 },
@@ -5076,10 +5168,9 @@ function _hkTaskSlots(headcount){
 // breaks those ties randomly, giving a genuinely different but equally fair
 // split on a reshuffle.
 function _hkAssignTasks(picks, hist, shuffle){
-  const people = picks.filter(function(p){ return p.team !== 'Speaker'; });
-  // The Speaker always does chairs (their fixed job), regardless of rotation.
-  picks.filter(function(p){ return p.team === 'Speaker'; })
-       .forEach(function(h){ h.task = 'chairs'; });
+  // The Speaker is part of the same rotation as everyone else. Nothing is fixed to them:
+  // Chairs (like every other job) goes to whoever is most owed, so it can be anyone on the day.
+  const people = picks.slice();
   if(!people.length) return picks;
 
   // Autofill often builds only the teams that are MISSING — e.g. one slot was
@@ -5091,7 +5182,7 @@ function _hkAssignTasks(picks, hist, shuffle){
   const taken = [];
   (hist || []).forEach(function(h){
     if(h.duty_date !== dayKey || !h.task) return;
-    if(h.team === 'Speaker' || h.task === 'speak') return; // Speaker's chairs is fixed, not a team slot
+    if(h.task === 'speak') return; // legacy value from when the Speaker had a fixed role: not a job slot
     if(picks.some(function(p){ return p.staff_name === h.staff_name; })) return; // being re-picked
     taken.push(h.task);
   });
@@ -5301,13 +5392,29 @@ async function _hkAutoFill(shuffle){
   const today=_todayIsoSydney();
   let days=[];
   try{ days=(await _cdGet('class_days?select=class_date&class_date=gte.'+today+'&order=class_date.asc&limit=8')).map(function(r){return r.class_date;}); }catch(e){}
+  if(!days.length){ _hkLastRun = {shuffled:0, skipped:0}; return; }
+
+  // PUBLISHED days are final: staff can already see them, so no automatic step (reshuffle or
+  // gap-filling) may change them. If we can't tell what is published, change nothing.
+  let pubSet = null;
+  try{
+    const pr = await fetch(SUPABASE_URL+'/rest/v1/housekeeping_published?select=duty_date', {headers:_CD_H});
+    if(pr.ok) pubSet = new Set((await pr.json()).map(function(x){ return x.duty_date; }));
+  }catch(e){ console.warn('hk published', e); }
+  if(!pubSet){ _hkLastRun = {error:true}; return; }
+  _hkPubDays = pubSet;
+  const skipped = days.filter(function(d){ return pubSet.has(d); }).length;
+  days = days.filter(function(d){ return !pubSet.has(d); });
+  _hkLastRun = {shuffled:days.length, skipped:skipped};
   if(!days.length) return;
 
   if(shuffle){
-    // Rebuild upcoming days — but never destroy a duty already marked done,
-    // since that's a record of what actually happened.
+    // Rebuild the DRAFT upcoming days. Never a duty already marked done (a record of what
+    // happened), and never a published day.
+    const keep = Array.from(pubSet).filter(function(d){ return d >= today; });
     try{
-      await fetch(SUPABASE_URL+'/rest/v1/housekeeping_roster?duty_date=gte.'+today+'&done=is.false',
+      await fetch(SUPABASE_URL+'/rest/v1/housekeeping_roster?duty_date=gte.'+today+
+        (keep.length ? '&duty_date=not.in.('+keep.join(',')+')' : '')+'&done=is.false',
         {method:'DELETE',headers:{..._CD_H,'Prefer':'return=minimal'}});
     }catch(e){ console.warn('hk clear',e); }
   }
@@ -5353,6 +5460,7 @@ async function _hkRender(){
   if(!box) return;
   await _hkLoadTeams();   // dropdowns need the team → staff map
   await loadHousekeepingPublished();
+  await _hkLoadLastDuty();
   let rows=[];
   try{ rows=await _cdGet('housekeeping_roster?select=id,duty_date,staff_name,team,done,task&order=duty_date.desc&limit=80'); }catch(e){}
   _hkRows=rows;   // copy-to-clipboard reads this rather than refetching
@@ -5383,7 +5491,7 @@ async function _hkRender(){
       // changed team or left the pool
       if(current && all.indexOf(current)===-1) own.unshift(current);
       const opt=function(nm){
-        return '<option value="'+_cdEsc(nm)+'"'+(nm===current?' selected':'')+'>'+_cdEsc(nm)+'</option>';
+        return '<option value="'+_cdEsc(nm)+'"'+(nm===current?' selected':'')+'>'+_cdEsc(nm)+(upcoming?_hkAgoSuffix(nm):'')+'</option>';
       };
       let html='<optgroup label="'+_cdEsc(tm)+'">'+own.map(opt).join('')+'</optgroup>';
       const others={};
@@ -5414,17 +5522,16 @@ async function _hkRender(){
         tick+
         '<span style="flex-shrink:0;width:74px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:'+(isHead?'var(--accent,#3d9eff)':'var(--text-dim)')+';">'+label+'</span>'+
         picker+
-        // The Speaker's fixed job is Chairs — shown (not editable) so it's clear.
-        (isHead ?
-          '<span style="flex-shrink:0;border:1px solid var(--border);border-radius:5px;padding:2px 6px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;background:var(--accent-dim,rgba(61,158,255,.12));color:var(--accent,#3d9eff);">Chairs</span>'
-          :
-          '<select onchange="setHousekeepingTask(this,\''+r.id+'\')" title="'+_cdEsc(_hkTaskLabel(r.task))+'"'+
-          ' style="flex-shrink:0;border:1px solid var(--border);border-radius:5px;padding:2px 5px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;font-family:inherit;background:var(--accent-dim,rgba(61,158,255,.12));color:var(--accent,#3d9eff);cursor:pointer;">'+
-          HK_TASKS.map(function(t){
-            return '<option value="'+t.key+'"'+(t.key===r.task?' selected':'')+'>'+_cdEsc(_hkTaskShort(t.key))+'</option>';
-          }).join('')+
-          '<option value=""'+(r.task?'':' selected')+'>&mdash;</option>'+
-          '</select>')+
+        // Every row, including the Speaker's, has an editable job: nothing is fixed to the Speaker any more.
+        '<select onchange="setHousekeepingTask(this,\''+r.id+'\')" title="'+_cdEsc(_hkTaskLabel(r.task))+'"'+
+        ' style="flex-shrink:0;border:1px solid var(--border);border-radius:5px;padding:2px 5px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;font-family:inherit;background:var(--accent-dim,rgba(61,158,255,.12));color:var(--accent,#3d9eff);cursor:pointer;">'+
+        HK_TASKS.map(function(t){
+          return '<option value="'+t.key+'"'+(t.key===r.task?' selected':'')+'>'+_cdEsc(_hkTaskShort(t.key))+'</option>';
+        }).join('')+
+        (r.task && !HK_TASKS.some(function(t){ return t.key===r.task; })
+          ? '<option value="'+_cdEsc(r.task)+'" selected>'+_cdEsc(_hkTaskShort(r.task))+'</option>' : '')+
+        '<option value=""'+(r.task?'':' selected')+'>&mdash;</option>'+
+        '</select>'+
         // Flag a cover from another team. Without this the roster silently
         // reads "Processing — Santosh" and looks like a mistake, when it's a
         // deliberate substitution.
@@ -5443,10 +5550,13 @@ async function _hkRender(){
       return '<div style="display:flex;align-items:center;gap:8px;padding:3px 0;">'+
         '<span style="width:15px;flex-shrink:0;"></span>'+
         '<span style="flex-shrink:0;width:74px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--text-dim);">'+tm+'</span>'+
-        // Renders whenever a team has no ROW — which is also what you get after
-        // hitting the x. Saying "nobody available" implied the system had
-        // searched and found no one, when usually the slot was just cleared.
-        '<span style="flex:1;font-size:12px;color:var(--text-dim);font-style:italic;">not rostered — press Reshuffle to fill</span>'+
+        // Renders whenever a team has no ROW (e.g. after the x). Pick someone to add;
+        // each name shows how long ago they last went for class.
+        '<select onchange="addHousekeepingPerson(this,\''+d+'\',\''+tm+'\')" title="Add someone to this slot"'+
+        ' style="flex:1;min-width:0;border:1px dashed var(--border2,var(--border));border-radius:7px;padding:4px 7px;font-size:12.5px;font-weight:600;font-family:inherit;background:var(--input-bg,#fff);color:var(--text-dim);cursor:pointer;">'+
+          '<option value="">Not rostered \u2014 add someone\u2026</option>'+
+          teamOptions(tm, null)+
+        '</select>'+
       '</div>';
     }).join('');
     const isPub=_hkPubDays.has(d);
@@ -5497,6 +5607,65 @@ function _hkAssemble(box, keys, parts, today){
          '<div class="hk-past" id="hkPast"' + (_hkPastOpen ? '' : ' hidden') + '>' + past.join('') + '</div>';
   }
   box.innerHTML = h;
+}
+
+// ── Who has been to class lately ──────────────────────────────────────────
+// When choosing someone for an upcoming day it helps to know how long ago they last did class
+// housekeeping. Only duties ticked DONE count (same rule the fairness rotation uses).
+let _hkLast = {};          // normalised name -> date of the last duty they actually did
+let _hkLastRun = null;     // what the last automatic fill did: {shuffled, skipped} or {error}
+async function _hkLoadLastDuty(){
+  try{
+    const rows = await _cdGet('housekeeping_roster?select=staff_name,duty_date&done=is.true&order=duty_date.desc&limit=1000');
+    const m = {};
+    (rows || []).forEach(function(r){ const k = _normName(r.staff_name); if(!m[k]) m[k] = r.duty_date; });
+    _hkLast = m;
+  }catch(e){ console.warn('hk last duty', e); }
+}
+function _hkAgoDays(nm){
+  const d = _hkLast[_normName(nm)];
+  return d ? Math.max(0, -_cdDayDiff(d)) : null;
+}
+function _hkAgoShort(n){
+  if(n <= 0) return 'today';
+  if(n === 1) return 'yesterday';
+  if(n < 7) return n + 'd ago';
+  if(n < 60) return Math.floor(n / 7) + 'w ago';
+  if(n < 365) return Math.round(n / 30) + 'mo ago';
+  return '1y+ ago';
+}
+function _hkAgoSuffix(nm){
+  const n = _hkAgoDays(nm);
+  return ' \u00b7 ' + (n === null ? 'no class yet' : _hkAgoShort(n));
+}
+function _hkAgoLong(nm){
+  const n = _hkAgoDays(nm);
+  if(n === null) return 'no class housekeeping yet';
+  const when = n === 0 ? 'today' : n === 1 ? 'yesterday' : n < 14 ? n + ' days ago' : n < 60 ? Math.floor(n / 7) + ' weeks ago' : Math.round(n / 30) + ' months ago';
+  return 'last class ' + when + ' (' + _cdLabel(_hkLast[_normName(nm)]) + ')';
+}
+
+// Put someone into an empty slot. Gets the job the day still needs (the same fair rule as
+// auto-fill); it can be changed from the job dropdown afterwards.
+async function addHousekeepingPerson(sel, d, team){
+  const nm = sel.value;
+  if(!nm) return;
+  if((_hkRows || []).some(function(r){ return r.duty_date === d && r.team === team; })){
+    showToast('That slot is already filled'); _hkRender(); return;
+  }
+  let task = null;
+  try{
+    const pk = [{duty_date:d, staff_name:nm, team:team}];
+    _hkAssignTasks(pk, _hkRows || [], false);
+    task = pk[0].task || null;
+  }catch(e){}
+  try{
+    const r = await fetch(SUPABASE_URL+'/rest/v1/housekeeping_roster',
+      {method:'POST', headers:{..._CD_HJ,'Prefer':'return=minimal'}, body:JSON.stringify({duty_date:d, staff_name:nm, team:team, task:task})});
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+    showToast(nm.split(' ')[0] + ' added' + (task ? ' \u2014 ' + _hkTaskShort(task) : '') + ' \u00b7 ' + _hkAgoLong(nm));
+    _hkRender();
+  }catch(e){ console.warn('hk add', e); showToast('Add failed'); _hkRender(); }
 }
 
 /* ── Task, copy and publish ───────────────────────────────────────────── */
@@ -5566,7 +5735,7 @@ function copyHousekeepingDay(d){
   const dt=new Date(d+'T00:00:00');
   const lines=[dt.toLocaleDateString('en-AU',{weekday:'long',day:'numeric',month:'long'})];
   const head=list.find(function(x){ return x.team==='Speaker'; });
-  if(head && head.staff_name) lines.push(head.staff_name+' — Speaker (Chairs)');
+  if(head && head.staff_name) lines.push(head.staff_name+' — Speaker'+(head.task && head.task!=='speak' ? ', '+_hkTaskLabel(head.task) : ''));
   HK_TEAMS.forEach(function(tm){
     const r=list.find(function(x){ return x.team===tm; });
     if(!r || !r.staff_name) return;
@@ -5596,7 +5765,9 @@ async function setHousekeepingPerson(sel, id){
   try{
     await fetch(SUPABASE_URL+'/rest/v1/housekeeping_roster?id=eq.'+encodeURIComponent(id),
       {method:'PATCH',headers:{..._CD_HJ,'Prefer':'return=minimal'},body:JSON.stringify({staff_name:nm})});
-    showToast(nm.split(' ')[0]+' recorded');
+    const _row=(_hkRows||[]).find(function(x){ return x.id===id; });
+    const _upcoming=_row && _row.duty_date >= _todayIsoSydney();
+    showToast(nm.split(' ')[0]+' recorded'+(_upcoming ? ' — '+_hkAgoLong(nm) : ''));
     _hkRender();
   }catch(e){ showToast('Save failed'); _hkRender(); }
 }
@@ -5643,14 +5814,17 @@ async function setHousekeepingDone(cb, id){
 
 // Rebuild the upcoming roster with a different (still fair) arrangement.
 async function reshuffleHousekeeping(){
-  if(!confirm('Reshuffle the upcoming housekeeping roster?\n\nThis replaces who is assigned on all upcoming class days. Past days are untouched.')) return;
+  if(!confirm('Reshuffle the upcoming housekeeping roster?\n\nThis replaces who is assigned on upcoming class days that are still drafts. Published days and past days are not touched.')) return;
   const btn=document.getElementById('hkShuffleBtn');
   if(btn){ btn.disabled=true; btn.textContent='Reshuffling…'; }
   const box=document.getElementById('hkRosterList');
   if(box) box.innerHTML='<div style="font-size:12px;color:var(--text-dim);">Reshuffling…</div>';
   try{
     await _hkAutoFill(true);
-    showToast('Roster reshuffled');
+    const _r = _hkLastRun || {};
+    if(_r.error) showToast('Couldn\u2019t check which days are published \u2014 nothing was changed');
+    else if(!_r.shuffled) showToast(_r.skipped ? 'All upcoming days are published \u2014 nothing to reshuffle' : 'No upcoming class days to reshuffle');
+    else showToast('Roster reshuffled' + (_r.skipped ? ' \u00b7 ' + _r.skipped + ' published day' + (_r.skipped > 1 ? 's' : '') + ' left as they were' : ''));
   }catch(e){ console.warn('hk reshuffle',e); showToast('Reshuffle failed'); }
   if(btn){ btn.disabled=false; btn.textContent='Reshuffle'; }
   // re-render without re-running autofill
