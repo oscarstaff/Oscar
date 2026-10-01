@@ -1720,6 +1720,16 @@
         }
       }, [openPdfWithTemplate]);
 
+      // Admin: pick a fillable PDF from disk and open it in Edit-fields mode. "Save form" adds it to
+      // the team library. If this exact PDF is already in the library it opens that form instead.
+      const addFormFromFile = useCallback(async (file) => {
+        if (!file) return;
+        if (!/\.pdf$/i.test(file.name) && file.type !== 'application/pdf') { showToast('Please choose a PDF file.', 'err'); return; }
+        await openPdfWithTemplate(file);
+        setMode('edit');
+        showToast('Review the fields, then click Save form to add it to the team library.', 'ok');
+      }, [openPdfWithTemplate]);
+
       const updateField = useCallback((name, patch) => {
         if (name === '__course' && patch.__draw) {
           try { localStorage.setItem('fc_course_draw', JSON.stringify(patch.__draw)); } catch {}
@@ -2165,7 +2175,7 @@
           )}
 
           {!pdfBytes ? (
-            <FormListLanding onOpen={openDbForm} busy={busy} showToast={showToast} />
+            <FormListLanding onOpen={openDbForm} busy={busy} showToast={showToast} isAdmin={isAdmin} onAddForm={addFormFromFile} />
           ) : fields.length === 0 ? (
             busy ? (
               <div className="landing">
@@ -2275,8 +2285,9 @@
     }
 
     // Landing = the DB form list. No uploads.
-    function FormListLanding({ onOpen, busy, showToast }) {
+    function FormListLanding({ onOpen, busy, showToast, isAdmin, onAddForm }) {
       const [rows, setRows] = useState(null); // null = loading
+      const addInputRef = useRef(null);
 
       const load = useCallback(async () => {
         setRows(null);
@@ -2299,6 +2310,16 @@
                 <button className="btn btn-ghost" style={{ marginLeft: 'auto', padding: '4px 10px' }} onClick={load}>
                   <i className="fa-solid fa-rotate" /> Refresh
                 </button>
+                {isAdmin && (
+                  <React.Fragment>
+                    <button className="btn btn-primary" style={{ marginLeft: '8px', padding: '4px 10px' }} disabled={busy}
+                      onClick={() => addInputRef.current && addInputRef.current.click()} title="Add a fillable PDF to the team library (admin)">
+                      <i className="fa-solid fa-plus" /> Add form
+                    </button>
+                    <input ref={addInputRef} type="file" accept="application/pdf,.pdf" style={{ display: 'none' }}
+                      onChange={(e) => { const f = e.target.files && e.target.files[0]; e.target.value = ''; if (f && onAddForm) onAddForm(f); }} />
+                  </React.Fragment>
+                )}
               </div>
 
               {rows === null ? (
@@ -2309,7 +2330,7 @@
               ) : rows.length === 0 ? (
                 <div className="db-empty">
                   <i className="fa-solid fa-folder-open" />
-                  <p>No forms in the library yet. An admin needs to add one before staff can fill it.</p>
+                  <p>No forms in the library yet. {isAdmin ? 'Use Add form above to upload a fillable PDF.' : 'An admin needs to add one before staff can fill it.'}</p>
                 </div>
               ) : (
                 rows.map(t => {
