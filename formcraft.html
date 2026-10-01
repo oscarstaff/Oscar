@@ -530,12 +530,14 @@
       var name=payload.name||'';
       window.NEXUS_USER=name;
       window.NEXUS_ADMIN=(payload.is_admin===true);
+      window.NEXUS_AT=payload.sb_at||'';   // user's Supabase access token (short-lived). sb_rt is deliberately ignored.
       var r=await fetch(SB+'/rest/v1/app_access?app=eq.'+APP+'&staff_name=eq.'+encodeURIComponent(name)+'&select=staff_name',{headers:{apikey:KEY,Authorization:'Bearer '+KEY}});
       var rows=r.ok?await r.json():[];
       if(!rows.length){fail('You no longer have access to this app.');return;}
       sessionStorage.setItem('ngate_'+APP,'1');
       try{sessionStorage.setItem('ngate_user_'+APP,name);}catch(e){}
       try{sessionStorage.setItem('ngate_admin_'+APP,(payload.is_admin===true)?'1':'0');}catch(e){}
+      try{ if(payload.sb_at) sessionStorage.setItem('ngate_at_'+APP,payload.sb_at); else sessionStorage.removeItem('ngate_at_'+APP); }catch(e){}
       try{history.replaceState(null,'',location.pathname+location.search);}catch(e){}
       pass();
     }catch(e){ fail('Access check failed.'); console.warn('gate',e); }
@@ -1392,7 +1394,9 @@
     // ── Shared library (Supabase) — forms live here as rows with embedded PDFs ──
     const SB_URL = window.NEXUS_SB || '';
     const SB_KEY = window.NEXUS_KEY || '';
-    const sbHeaders = { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY, 'Content-Type': 'application/json' };
+    // Authorization is evaluated per request: the user's session when we have one (needed to read
+    // formcraft_fills, which is authenticated-only), otherwise the anon key as before.
+    const sbHeaders = { apikey: SB_KEY, get Authorization() { return 'Bearer ' + (fcAccessToken() || SB_KEY); }, 'Content-Type': 'application/json' };
     // Resolve the logged-in staff name LIVE at call time (not once at load).
     // window.NEXUS_USER can be unset after a reload/re-entry (the gate strips the
     // token from the URL and takes its sessionStorage shortcut), so fall back to
@@ -1402,6 +1406,18 @@
     }
     // Admin = the caller's Nexus hub-admin status, signed into the launch token
     // (so it auto-tracks is_hub_admin and can't be forged by editing the URL).
+    // The signed-in user's Supabase access token, handed over by Nexus in the launch token.
+    // Returns '' if missing or expired. We never refresh it here: the refresh token is shared
+    // with the Nexus tab, and rotating it from two places can revoke the whole session.
+    function fcAccessToken(){
+      var t = (window.NEXUS_AT || sessionStorage.getItem('ngate_at_formcraft') || '').trim();
+      if (!t) return '';
+      try {
+        var p = JSON.parse(atob(t.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+        if (p.exp && p.exp * 1000 < Date.now() + 15000) return '';
+      } catch (e) { return ''; }
+      return t;
+    }
     function fcIsAdmin(){
       return window.NEXUS_ADMIN === true || sessionStorage.getItem('ngate_admin_formcraft') === '1';
     }
@@ -1416,7 +1432,7 @@
       if (text) body.text = text;
       if (fileBase64) { body.file_base64 = fileBase64; body.doc_mime = docMime || ''; }
       const r = await fetch(SB_URL + '/functions/v1/parse-enrolment', {
-        method: 'POST', headers: sbHeaders, body: JSON.stringify(body),
+        method: 'POST', headers: { ...sbHeaders, Authorization: 'Bearer ' + SB_KEY }, body: JSON.stringify(body),
       });
       const data = await r.json();
       if (!r.ok || data.error) throw new Error(data.error || ('HTTP ' + r.status));
@@ -1468,7 +1484,7 @@
     }
 
     // Admin-only audit trail: who filled which student's form, when.
-    // Reads formcraft_fills (anon-readable) and flags rows with no filler recorded.
+    // Reads formcraft_fills (authenticated-only) and flags rows with no filler recorded.
     function AuditPanel({ sbUrl, sbHeaders, onClose }) {
       const [rows, setRows] = useState(null);   // null = loading
       const [err, setErr] = useState('');
@@ -1477,7 +1493,9 @@
       useEffect(() => {
         (async () => {
           try {
+            if (!fcAccessToken()) { setErr('Your Nexus session was not passed to Formcraft, or it has expired. Close this tab and relaunch Formcraft from Nexus to view the audit trail.'); setRows([]); return; }
             const r = await fetch(sbUrl + '/rest/v1/formcraft_fills?select=*&order=filled_at.desc&limit=2000', { headers: sbHeaders });
+            if (r.status === 401 || r.status === 403) { setErr('Session expired. Close this tab and relaunch Formcraft from Nexus to view the audit trail.'); setRows([]); return; }
             if (!r.ok) { setErr('Could not load the fill log (HTTP ' + r.status + ').'); setRows([]); return; }
             setRows(await r.json());
           } catch (e) { setErr('Could not load the fill log.'); setRows([]); }
