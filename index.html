@@ -2865,6 +2865,14 @@ width:none !important;
 .fr-sub{ font-size:14px;font-weight:500;color:#71768a;margin-top:14px;line-height:1.45;padding:0 6px; }
 .fr-thanks-sub{ font-size:15px;font-weight:600;color:#4a4f63;margin-top:12px;line-height:1.5;padding:0 6px; }
 .fr-muted{ font-size:13px;color:#9498a8; }
+#punctualityNote{ margin-top:10px; }
+#punctualityNote:empty{ display:none; }
+/* Achievement slide (glowing name earned) */
+.fr-card[data-kind="achieve"]{ background:linear-gradient(180deg,#fff8e1,#fbfbfd); }
+.fr-ach{ position:relative;padding:10px 0 4px; }
+.fr-ach-fx{ position:absolute;inset:0;width:100%;height:100%;pointer-events:none; }
+.fr-ach-pill{ position:relative;display:inline-block;font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#6b4a00;background:linear-gradient(100deg,#f7d56a,#fff2c2 50%,#f7d56a);padding:6px 12px;border-radius:999px;box-shadow:0 2px 10px rgba(230,180,34,.35); }
+.fr-ach-name{ position:relative;font-size:clamp(28px,8vw,38px);font-weight:800;letter-spacing:-.02em;margin:16px 0 4px;line-height:1.15;word-break:break-word; }
 /* Earned glow — perfect-fortnight achievement. Slow, seamless shimmer.
    Each gradient is a palindrome (same colour at 0% and 100%) so at 200% size a
    full -200% slide loops with no visible jump. */
@@ -6189,6 +6197,7 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
           <span class="nx-row-val" id="nxFortVal"></span>
           <svg class="nx-row-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
         </button>
+        <div id="punctualityNote"></div>
         <!-- Hours view (opened from "This fortnight") -->
         <div id="ccHours" style="margin-top:14px;border-top:1px solid var(--ui-line-soft,#f1f5f9);padding-top:12px;">
           <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
@@ -6198,7 +6207,6 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
             <button onclick="setHoursPeriod('month')" id="hp-month" class="hours-tab">This month</button>
           </div>
           <div id="hoursDisplay" style="margin-top:12px;"></div>
-          <div id="punctualityNote" style="margin-top:12px;"></div>
         </div>
         <!-- Today's date — tap to open the full Calendar -->
         <button id="todayChip" onclick="goTo('calendar')" style="margin-top:14px;width:100%;border-top:1px solid var(--ui-line-soft,#f1f5f9);padding-top:12px;background:none;border-left:none;border-right:none;border-bottom:none;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:10px;text-align:left;">
@@ -20168,6 +20176,30 @@ function renderHours(){
 // are skipped entirely (not counted, not penalised).
 const _FORT_ANCHOR_MS = new Date(2026, 4, 4).setHours(0,0,0,0); // Mon 4 May 2026
 const _MS_DAY = 86400000, _MS_FORT = 14*_MS_DAY;
+
+// ── SYDNEY TIME ──────────────────────────────────────────────────────────
+// Roster start times, clock-ins and fortnight boundaries are all Sydney wall-clock
+// time. Scoring must never use the viewing device's own time zone or its daylight-
+// saving rules: a device set to another zone scored a whole fortnight wrongly (and
+// wrote it to history), and Sydney's own clock change hid the report for a day.
+const _SYD_TZ='Australia/Sydney';
+const _sydFmt=new Intl.DateTimeFormat('en-GB',{timeZone:_SYD_TZ,hourCycle:'h23',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit'});
+function _sydParts(ts){
+  const p={}; _sydFmt.formatToParts(new Date(ts)).forEach(function(x){ p[x.type]=x.value; });
+  return { y:+p.year, m:+p.month, d:+p.day, h:(+p.hour)%24, mi:+p.minute, ymd:p.year+'-'+p.month+'-'+p.day };
+}
+// The instant (ISO string) at which Sydney's clock reads y-m-d 00:00. m is 1-based; d may overflow.
+function _sydMidnightISO(y,m,d){
+  const target=new Date(Date.UTC(y,m-1,d));
+  const ty=target.getUTCFullYear(), tm=target.getUTCMonth()+1, td=target.getUTCDate();
+  const ymd=ty+'-'+String(tm).padStart(2,'0')+'-'+String(td).padStart(2,'0');
+  let t=Date.UTC(ty,tm-1,td)-14*3600000;      // always before Sydney's midnight (offset is +10 or +11)
+  for(let i=0;i<120;i++,t+=900000){            // walk forward in 15-minute steps
+    const p=_sydParts(t);
+    if(p.ymd===ymd && p.h===0 && p.mi===0) return new Date(t).toISOString();
+  }
+  return new Date(Date.UTC(ty,tm-1,td)-10*3600000).toISOString();   // fallback, not reachable
+}
 const _PUNCT_GRACE_MIN = 7;    // minutes of slack before "late" — matches the
                               // flexClockTime boundary (:07 rounds to :00, :08
                               // rounds to :15), so on-time here == on-time on the
@@ -20243,8 +20275,22 @@ function _flexRound(dt){
 // counted (absentDays) for the streak feature but never touch the punctuality
 // score. Approved leave days are skipped entirely.
 //   shiftsByYmd: { 'YYYY-MM-DD': 'HH:MM[:SS]' }  — assigned shift start per day
+// Snap minutes-since-midnight to the same 15-minute block the timesheet records
+// (same boundaries as _flexRound: <=7 -> :00, <=22 -> :15, <=37 -> :30, <=52 -> :45, else next hour).
+function _flexRoundMin(mins){
+  let h=Math.floor(mins/60), m=mins%60;
+  if(m<=7) m=0; else if(m<=22) m=15; else if(m<=37) m=30; else if(m<=52) m=45; else { m=0; h++; }
+  return h*60+m;
+}
 function _computePunctuality(shiftsByYmd, logs, leaveRows, start, end){
   shiftsByYmd = shiftsByYmd || {};
+  // First clock-in per SYDNEY calendar day, as minutes since Sydney midnight.
+  const firstInByYmd={};
+  (logs||[]).forEach(function(r){
+    if(r.action!=='in') return;
+    const sp=_sydParts(r.ts), mins=sp.h*60+sp.mi;
+    if(firstInByYmd[sp.ymd]===undefined || mins<firstInByYmd[sp.ymd]) firstInByYmd[sp.ymd]=mins;
+  });
   let measuredDays=0, onTimeDays=0, lateDays=0, totalLateMin=0, worstMin=0, worstDay='',
       leaveDays=0, absentDays=0;
   const cur=new Date(start);
@@ -20254,16 +20300,16 @@ function _computePunctuality(shiftsByYmd, logs, leaveRows, start, end){
     const expStart = shiftsByYmd[ymd] || null; // assigned shift start, or none
 
     if(expStart){
-      const firstIn=_firstClockInOn(logs, cur);
-      if(firstIn){
+      const firstInMin=firstInByYmd[ymd];
+      if(firstInMin!==undefined){
         measuredDays++;
         const pp=String(expStart).split(':');
-        const expected=new Date(cur.getFullYear(),cur.getMonth(),cur.getDate(),+pp[0],+pp[1]||0,0);
+        const expMin=(+pp[0])*60+(+pp[1]||0);
         // Compare the SAME rounded time the timesheet records, not the raw
         // clock. flexTimeStr snaps to 15-minute blocks, so an 08:07 arrival is
         // written to payroll as 08:00 — without this, someone reads "08:00" on
         // their timesheet and "late" on their report, from one clock-in.
-        const lateMin=Math.round((_flexRound(firstIn)-expected)/60000); // negative if early
+        const lateMin=_flexRoundMin(firstInMin)-expMin; // negative if early
         if(lateMin>_PUNCT_GRACE_MIN){
           lateDays++; totalLateMin+=lateMin;
           if(lateMin>worstMin){ worstMin=lateMin; worstDay=cur.toLocaleDateString('en-AU',{weekday:'long'}); }
@@ -20293,7 +20339,7 @@ async function _loadRosterShifts(fw){
   if(_rosterShiftCache) return _rosterShiftCache;
   const byName={};
   const startYmd = fw.start.getFullYear()+'-'+String(fw.start.getMonth()+1).padStart(2,'0')+'-'+String(fw.start.getDate()).padStart(2,'0');
-  const endD = new Date(fw.end.getTime()-_MS_DAY); // inclusive last day
+  const endD = new Date(fw.end.getFullYear(), fw.end.getMonth(), fw.end.getDate()-1); // inclusive last day (calendar maths, DST-safe)
   const endYmd = endD.getFullYear()+'-'+String(endD.getMonth()+1).padStart(2,'0')+'-'+String(endD.getDate()).padStart(2,'0');
   try{
     const rows=await sbGet('roster_shifts',
@@ -20322,8 +20368,7 @@ async function _loadRosterShifts(fw){
 // Returns { current, best, lastYmd }. Roster history only goes back as far as
 // roster_shifts exists, so streaks grow naturally from there.
 async function _computeMyStreak(){
-  const now=new Date();
-  const todayYmd = now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
+  const todayYmd = _sydParts(Date.now()).ymd;   // Sydney's today, not the device's
 
   // All of my assigned shifts up to and including today.
   let shifts=[];
@@ -20343,12 +20388,9 @@ async function _computeMyStreak(){
   try{
     const logs=await sbGet('clock_log',
       '?staff_name=eq.'+encodeURIComponent(me)+'&action=eq.in'+
-      '&ts=gte.'+new Date(firstD+'T00:00:00').toISOString()+
+      '&ts=gte.'+_sydMidnightISO(+firstD.slice(0,4), +firstD.slice(5,7), +firstD.slice(8,10))+
       '&select=ts&order=ts.asc&limit=5000')||[];
-    logs.forEach(function(r){
-      const t=new Date(r.ts);
-      inDays.add(t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0'));
-    });
+    logs.forEach(function(r){ inDays.add(_sydParts(r.ts).ymd); });
   }catch(e){}
 
   // Approved leave ranges.
@@ -20851,15 +20893,21 @@ async function _computeMyImprovement(fw, curScore, curX){
 
 // The last COMPLETED fortnight window + storage key.
 function _lastFortnight(){
-  const now=new Date();
-  const today=new Date(now.getFullYear(),now.getMonth(),now.getDate());
-  const curIdx=Math.floor((today.getTime()-_FORT_ANCHOR_MS)/_MS_FORT);
+  // Pure calendar-day maths on Sydney's date. (The old version added milliseconds to a local
+  // midnight, which drifts an hour across a daylight-saving change: on Mon 5 Oct 2026 it made
+  // Sydney devices think the fortnight that had just finished was still running, so the report
+  // was hidden for the day.)
+  const sp=_sydParts(Date.now());
+  const curIdx=Math.floor((Date.UTC(sp.y,sp.m-1,sp.d)-Date.UTC(2026,4,4))/_MS_FORT);   // 4 May 2026 = fortnight 0
   if(curIdx<1) return null;
-  const start=new Date(_FORT_ANCHOR_MS+(curIdx-1)*_MS_FORT);
-  const end=new Date(start.getTime()+_MS_FORT);
+  const base=4+(curIdx-1)*14;                      // May day-number of the fortnight's first day
+  const start=new Date(2026,4,base);               // local-midnight calendar dates
+  const end=new Date(2026,4,base+14);              // the Monday the next fortnight starts
   const key='oscars_fortreport_seen_'+start.getFullYear()+String(start.getMonth()+1).padStart(2,'0')+String(start.getDate()).padStart(2,'0');
-  const period=start.toLocaleDateString('en-AU',{day:'numeric',month:'short'})+' \u2013 '+new Date(end.getTime()-_MS_DAY).toLocaleDateString('en-AU',{day:'numeric',month:'short'});
-  return { start, end, key, period };
+  const period=start.toLocaleDateString('en-AU',{day:'numeric',month:'short'})+' \u2013 '+new Date(2026,4,base+13).toLocaleDateString('en-AU',{day:'numeric',month:'short'});
+  return { start, end, key, period,
+    startIso:_sydMidnightISO(start.getFullYear(),start.getMonth()+1,start.getDate()),   // exact Sydney-midnight instants,
+    endIso:_sydMidnightISO(end.getFullYear(),end.getMonth()+1,end.getDate()) };           // used for the clock_log queries
 }
 
 // The report surfaces from the new fortnight's TUESDAY through FRIDAY. Monday is
@@ -20868,20 +20916,18 @@ function _lastFortnight(){
 // opened; outside it, the report is hidden until the next fortnight.
 function _fortReportShowable(fw){
   if(!fw) return false;
-  const now=new Date();
+  const now=Date.now();
   // fw.end = the Monday that starts the new fortnight, i.e. the first day the
-  // previous fortnight is complete. Show from that Monday.
+  // previous fortnight is complete. Show from that Monday (Sydney time).
   //
   // This used to hold until Tuesday, to let overnight jobs settle. That buffer
   // isn't needed here: punctuality reads only clock-INS, and the reconcile /
   // auto-clock-out crons write clock-OUTS. A first clock-in is recorded when it
   // happens and doesn't change afterwards unless an admin amends it.
-  const openFrom=new Date(fw.end.getTime());
-  openFrom.setHours(0,0,0,0);
-  if(now<openFrom) return false;          // fortnight not finished yet
-  const friday=new Date(fw.end.getTime()+4*_MS_DAY);
-  friday.setHours(23,59,59,999);
-  if(now>friday) return false;            // past Friday — hide until next cycle
+  if(now<Date.parse(fw.endIso)) return false;          // fortnight not finished yet
+  // end of that Friday = Saturday 00:00 Sydney, minus 1 ms
+  const fridayEnd=Date.parse(_sydMidnightISO(fw.end.getFullYear(),fw.end.getMonth()+1,fw.end.getDate()+5))-1;
+  if(now>fridayEnd) return false;                      // past Friday — hide until next cycle
   return true;
 }
 function _markFortReportSeen(fw){
@@ -20898,9 +20944,9 @@ async function _computeMyFortnight(){
 
   let myLeave=[], myLogs=[];
   try{ myLeave=await sbGet('leave_submissions','?staff_name=eq.'+encodeURIComponent(me)+'&status=eq.approved&limit=100')||[]; }catch(e){ myLeave=[]; }
-  myLogs=(_hoursLogs||[]).filter(function(r){ const t=new Date(r.ts); return t>=fw.start && t<fw.end; });
+  myLogs=(_hoursLogs||[]).filter(function(r){ const t=new Date(r.ts).getTime(); return t>=Date.parse(fw.startIso) && t<Date.parse(fw.endIso); });
   if(!myLogs.length){
-    try{ myLogs=await sbGet('clock_log','?staff_name=eq.'+encodeURIComponent(me)+'&ts=gte.'+fw.start.toISOString()+'&ts=lt.'+fw.end.toISOString()+'&order=ts.asc&limit=1000')||[]; }catch(e){ myLogs=[]; }
+    try{ myLogs=await sbGet('clock_log','?staff_name=eq.'+encodeURIComponent(me)+'&ts=gte.'+fw.startIso+'&ts=lt.'+fw.endIso+'&order=ts.asc&limit=1000')||[]; }catch(e){ myLogs=[]; }
   }
 
   const rosterBy=await _loadRosterShifts(fw);
@@ -20912,7 +20958,7 @@ async function _computeMyFortnight(){
   let amendedCount=0, autoCount=0;
   try{
     const stamped=await sbGet('clock_log','?staff_name=eq.'+encodeURIComponent(me)+
-      '&ts=gte.'+fw.start.toISOString()+'&ts=lt.'+fw.end.toISOString()+
+      '&ts=gte.'+fw.startIso+'&ts=lt.'+fw.endIso+
       '&select=origin,edited_at&limit=500')||[];
     stamped.forEach(function(r){
       if(r.origin==='manual'||r.edited_at) amendedCount++;
@@ -20940,17 +20986,17 @@ async function _computeMyFortnight(){
 }
 
 // Slim clock-card banner: taps through to the slideshow.
-let _fortReportDone=false;
+let _fortReportDone=false, _fortReportBusy=false;
 async function renderPunctualityNote(){
   const el=document.getElementById('punctualityNote');
-  if(!el) return;
-  if(_fortReportDone) return;
+  if(!el || _fortReportDone || _fortReportBusy) return;
+  _fortReportBusy=true;
+  let data=null;
+  try{ data=await _computeMyFortnight(); }catch(e){ console.warn('fortnight banner',e); }
+  _fortReportBusy=false;
+  if(!data) return;                              // not ready yet: the next hours refresh retries
+  if(!_fortReportShowable(data.fw)) return;      // outside the Mon-Fri window
   _fortReportDone=true;
-  el.innerHTML='';
-
-  const data=await _computeMyFortnight();
-  if(!data) return; // no completed fortnight yet
-  if(!_fortReportShowable(data.fw)) return; // already opened this cycle
 
   el.innerHTML=
     '<button onclick="openFortReport()" class="fr-tap">'+
@@ -21151,6 +21197,11 @@ async function openFortReport(){
   }else{
     slides.push({label:'Punctuality', big:'\u2014', sub:'no rostered shifts worked this fortnight'});
   }
+  // Achievement: a perfect fortnight (100% on time, 4+ shifts) earns the glowing name.
+  if(m.measuredDays>=_PUNCT_MIN_DAYS && m.score===100){
+    const k=window.glowSkinFor?window.glowSkinFor(me):'gold';
+    slides.push({kind:'achieve', label:'Achievement unlocked', skin:((window.GLOW_SKINS||[]).indexOf(k)>=0?k:'gold'), name:me});
+  }
   // Work streak — consecutive rostered shifts clocked in (late still counts).
   if(data.streak && (data.streak.current>0 || data.streak.best>0)){
     const cur=data.streak.current, best=data.streak.best;
@@ -21238,6 +21289,12 @@ async function openFortReport(){
         '</div>'+
         (worst?'<div class="fr-sub" style="margin-top:14px;">'+worst+'</div>':'');
     }
+    if(s.kind==='achieve'){
+      return '<div class="fr-ach"><canvas class="fr-ach-fx"></canvas>'+
+        '<div class="fr-ach-pill">\u2605 '+s.label+'</div>'+
+        '<div class="fr-ach-name glow-name glow-'+s.skin+'">'+esc(s.name)+'</div>'+
+        '<div class="fr-sub">You earned a glowing name \u2014 a perfect fortnight, every shift on time.</div></div>';
+    }
     if(s.kind==='hero'){
       return '<div class="fr-icon fr-draw">'+svgCal+'</div><div class="fr-label">'+s.label+'</div><div class="fr-hero">'+s.big+'</div><div class="fr-sub">'+s.sub+'</div>';
     }
@@ -21270,8 +21327,10 @@ async function openFortReport(){
     const card=bd.querySelector('.fr-card');
     card.setAttribute('data-kind', s.kind||'stat');
     const inner=bd.querySelector('#frInner');
+    _fortAchieveStop();
     inner.style.animation='none'; void inner.offsetWidth; inner.style.animation='';
     inner.innerHTML=slideInner(s);
+    if(s.kind==='achieve') _fortAchieveFx(inner);
     const cnt=inner.querySelector('.fr-count'); if(cnt) runCountUp(cnt);
     bd.querySelector('#frDots').innerHTML=slides.map(function(_,i){return '<span class="'+(i===idx?'on':'')+'"></span>';}).join('');
     bd.querySelector('#frNext').textContent = idx===slides.length-1 ? 'Done' : 'Next';
@@ -21302,7 +21361,32 @@ async function openFortReport(){
   paint(false);
 }
 
+// Gold sparkles behind the achievement slide. Canvas 2D: the lightest tool for simple 2D particles.
+let _fortAchRaf=0;
+function _fortAchieveStop(){ if(_fortAchRaf){ cancelAnimationFrame(_fortAchRaf); _fortAchRaf=0; } }
+function _fortAchieveFx(root){
+  const cv=root.querySelector('.fr-ach-fx'); if(!cv) return;
+  if(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const box=cv.parentNode, dpr=Math.min(window.devicePixelRatio||1,2);
+  const W=box.clientWidth||320, H=box.clientHeight||200;
+  cv.width=W*dpr; cv.height=H*dpr;
+  const g=cv.getContext('2d'); g.scale(dpr,dpr);
+  const cols=['#e6b422','#fff2c2','#fbbf24','#ffffff'];
+  const ps=Array.from({length:46},function(){ return { x:Math.random()*W, y:H*Math.random(), r:1+Math.random()*2.2, v:.35+Math.random()*.9, p:Math.random()*6.28, c:cols[(Math.random()*cols.length)|0] }; });
+  function frame(t){
+    g.clearRect(0,0,W,H);
+    ps.forEach(function(q){
+      q.y-=q.v; if(q.y<-6){ q.y=H+6; q.x=Math.random()*W; }
+      g.globalAlpha=.25+.75*Math.abs(Math.sin(t/420+q.p)); g.fillStyle=q.c;
+      g.beginPath(); g.arc(q.x+Math.sin(t/900+q.p)*6,q.y,q.r,0,6.283); g.fill();
+    });
+    _fortAchRaf=requestAnimationFrame(frame);
+  }
+  _fortAchRaf=requestAnimationFrame(frame);
+}
+
 function closeFortReport(){
+  _fortAchieveStop();
   const bd=document.getElementById('fortShow');
   if(bd){ bd.classList.add('closing'); setTimeout(function(){ bd.remove(); }, 180); }
   document.body.style.overflow='';
@@ -21321,7 +21405,7 @@ async function _buildLeaderboard(fw){
   // Fetch all approved leave + all clock logs in the window once, then bucket.
   let allLeave=[], allLogs=[];
   try{ allLeave=await sbGet('leave_submissions','?status=eq.approved&select=staff_name,from_date,to_date,status&limit=2000')||[]; }catch(e){}
-  try{ allLogs=await sbGet('clock_log','?ts=gte.'+fw.start.toISOString()+'&ts=lt.'+fw.end.toISOString()+'&select=staff_name,action,ts&order=ts.asc&limit=5000')||[]; }catch(e){}
+  try{ allLogs=await sbGet('clock_log','?ts=gte.'+fw.startIso+'&ts=lt.'+fw.endIso+'&select=staff_name,action,ts&order=ts.asc&limit=5000')||[]; }catch(e){}
 
   const leaveBy={}, logsBy={};
   allLeave.forEach(function(l){ (leaveBy[l.staff_name]=leaveBy[l.staff_name]||[]).push(l); });
