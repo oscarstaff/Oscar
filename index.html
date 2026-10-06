@@ -10388,6 +10388,13 @@ async function openGatedApp(ev,app,url){
   if(ev)ev.preventDefault();
   try{
     const token=await makeAppToken(app, me);
+    // Apps that read RLS-locked tables need our live session. If we couldn't get one (it expired), opening them gives an
+    // empty, anonymous view (an admin looks like a Team Lead), so say so instead.
+    if(['shiftops','formcraft','slip'].indexOf(app)>=0){
+      let hasSess=false;
+      try{ const pl=JSON.parse(decodeURIComponent(escape(atob(token.split('.')[0])))); hasSess=!!pl.sb_at; }catch(e){}
+      if(!hasSess){ showToast('Your sign-in has expired. Sign out and back in, then open the app again.'); return; }
+    }
     window.open(url+'#t='+encodeURIComponent(token),'_blank','noopener,noreferrer');
   }catch(e){
     showToast('Could not open app');

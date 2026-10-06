@@ -3670,7 +3670,8 @@ async function loadData(){
 let _roleDataOk=false;
 
 async function loadStaffFromSupabase(){
-  const H={apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY};
+  // Use the signed-in session when there is one (the anon key now sees nothing on these tables).
+  const H={apikey:SUPABASE_KEY,Authorization:'Bearer '+(function(){ try{ return _soTok()||SUPABASE_KEY; }catch(e){ return SUPABASE_KEY; } })()};
   async function get(path){
     const r=await fetch(SUPABASE_URL+'/rest/v1/'+path,{headers:H});
     if(!r.ok) throw new Error(path+' -> '+r.status);
@@ -3695,7 +3696,12 @@ async function loadStaffFromSupabase(){
   const cfgByName={};
   (rcfg||[]).forEach(function(c){ if(c.staff_name) cfgByName[c.staff_name]=c; });
   // Expose whether role data is trustworthy this pass.
-  _roleDataOk = _settingsOk && _accessOk;
+  // An anonymous (token-less or expired-session) caller gets an EMPTY but successful answer from staff_settings,
+  // which reads as "nobody is an admin" and demoted every admin with ShiftOps access to Team Lead, locked in for the
+  // whole session. Role data therefore only counts when it came with a live session AND actually contains rows.
+  var _tokOk=false; try{ _tokOk=_soTokAlive(); }catch(e){}
+  _roleDataOk = _settingsOk && _accessOk && _tokOk && Array.isArray(settings) && settings.length>0;
+  try{ _soSessionBanner(!_tokOk); }catch(e){}
 
   if(!Array.isArray(names)||names.length===0){
     // Supabase gave us nothing usable — keep whatever loaded locally, do NOT
@@ -8769,14 +8775,8 @@ let AM_TEAM_LEAD=false;
 let MY_TEAM=null;
 let _tlResolved=false;   // once we know the signed-in user's role, latch it
 function computeTeamLeadState(){
-  // Latched: never downgrade a confirmed team lead on a transient empty pass
-  // (blob load strips isTeamLead before the Supabase rebuild restores it).
-  if(_tlResolved) return;
-
-  // If the role source data (staff_settings / app_access) failed to load, the
-  // flags on `meRec` are meaningless — an admin would look like a Team Lead
-  // because is_hub_admin came back missing. Never latch a role from bad data;
-  // wait for a pass where the fetches actually succeeded.
+  // Never set or change a role from failed, partial or anonymous data: wait for a pass where the role fetches succeeded
+  // with a live session and real rows (see _roleDataOk in loadStaffFromSupabase).
   if(!_roleDataOk) return;
 
   let me='';
@@ -8785,11 +8785,13 @@ function computeTeamLeadState(){
   const meRec=(staff||[]).find(function(s){
     return ((s.first||'')+' '+(s.last||'')).trim().toLowerCase()===me.toLowerCase();
   });
-  if(!meRec) return;                 // staff not loaded yet — try again next render
+  if(!meRec) return;                 // staff not loaded yet, try again next render
+  // A confirmed hub admin always wins, even if an earlier pass had latched Team Lead from bad data.
   if(meRec.isHubAdmin){ AM_TEAM_LEAD=false; MY_TEAM=null; _tlResolved=true; return; }
+  // Latched: keep a confirmed team lead (the blob load strips isTeamLead before the Supabase rebuild restores it).
+  if(_tlResolved) return;
   if(meRec.isTeamLead){ AM_TEAM_LEAD=true; MY_TEAM=meRec.team||null; _tlResolved=true; return; }
-  // meRec exists but flags not populated yet (isTeamLead undefined) → don't latch,
-  // don't downgrade; leave state as-is and resolve on a later pass.
+  // meRec exists but flags not populated yet: don't latch, don't downgrade.
 }
 function applyTeamLeadLock(){
   computeTeamLeadState();
@@ -10337,6 +10339,19 @@ function _soTokAlive(){
     var c = JSON.parse(atob(b));
     return !!(c.exp && (c.exp * 1000) > Date.now() + 30000);   // 30s margin
   }catch(e){ return false; }
+}
+
+/** Persistent notice when the inherited session is missing/expired: without it every read is anonymous and comes back
+ *  empty, which used to look like "no admins" (admin shown as Team Lead) and a blank roster. */
+function _soSessionBanner(show){
+  var el=document.getElementById('soSessionBanner');
+  if(!show){ if(el) el.remove(); return; }
+  if(el) return;
+  el=document.createElement('div'); el.id='soSessionBanner'; el.setAttribute('role','alert');
+  el.style.cssText='position:fixed;top:0;left:0;right:0;z-index:99999;padding:10px 16px;text-align:center;font-size:13px;font-weight:700;'+
+    'background:#2a1620;color:#fda4af;border-bottom:1px solid #fb7185;';
+  el.textContent='Your session has expired, so ShiftOps cannot confirm your role or load data. Close this tab and reopen ShiftOps from Nexus.';
+  document.body.appendChild(el);
 }
 
 /** Guard admin actions with a message that says what to actually do. */
