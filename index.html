@@ -6922,11 +6922,11 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
               <div class="tr-week-range" id="trWeekRange" aria-live="polite"></div>
             </div>
             <div class="tr-gen-actions">
-              <button onclick="trGenerateReport()" class="btn btn-green">Generate</button>
-              <button onclick="trDownloadPdf()" id="trPrintBtn" class="btn btn-outline" style="display:none;">Download PDF</button>
+              <button onclick="trGenerateReport()" id="trGenBtn" class="btn btn-green">Generate</button>
+              <button onclick="trDownloadPdf()" id="trPrintBtn" class="btn btn-outline" disabled title="Generate a report first">Download PDF</button>
             </div>
           </div>
-          <div id="trReportOut" style="margin-top:16px;"></div>
+          <div id="trReportOut" class="tr-out-empty" style="margin-top:16px;" aria-live="polite">Pick a week, then press <b>Generate</b>.</div>
         </div>
 
 
@@ -18226,8 +18226,10 @@ function trShape(team){ return TR_SHAPES[_teamKey(team||trActiveTeam())] || 'log
 // loadMySettings from staff_settings.is_shift_admin.
 function trIsLead(){
   if(myIsAdmin) return true;
-  return (typeof myIsShiftAdmin!=='undefined' && myIsShiftAdmin===true)
-    && _teamKey(myTeam)===_teamKey(trActiveTeam());
+  // A lead is either flagged is_shift_admin OR has ShiftOps access (ShiftOps' definition of a lead). Checking only the
+  // flag meant a lead with ShiftOps access but the flag off could not generate their own team's report.
+  var lead = (typeof myIsShiftAdmin!=='undefined' && myIsShiftAdmin===true) || (typeof myHasShiftops!=='undefined' && myHasShiftops===true);
+  return lead && _teamKey(myTeam)===_teamKey(trActiveTeam());
 }
 // Anyone on the active team may enter their own daily tasks.
 function trCanEnter(){ return myIsAdmin || _teamKey(myTeam)===_teamKey(trActiveTeam()); }
@@ -18749,8 +18751,8 @@ async function trGenerateReport(){
   var out = document.getElementById('trReportOut');
   var pick = document.getElementById('trWeekPick').value || _trToday();
   var mon = _trMonday(pick), sun = _trAddDays(mon,TR_WEEK_DAYS-1);  // Sat
-  out.innerHTML = '<div style="color:var(--ui-ink-4,#94a3b8);font-size:13px;padding:12px 0;">Generating…</div>';
-  document.getElementById('trPrintBtn').style.display = 'none';
+  _trOutState('loading');
+  _trPdf(false);
   try{
     if(!isLog && !_trMetrics.length) await trLoadMetrics();
     var teamResp = await fetch(SB + '/rest/v1/staff_credentials?team=eq.'+encodeURIComponent(trActiveTeam())+'&select=staff_name&order=staff_name.asc', { headers:_trHeaders() });
@@ -18839,12 +18841,12 @@ async function trGenerateReport(){
       _trMetrics.map(function(m){ return '<tr><td>'+_trEsc(m.label)+'</td><td class="num">'+grand[m.metric_key]+'</td></tr>'; }).join('')+
       '</tbody></table></div>';
     html += '</div>';
-    out.innerHTML = html;
+    _trOutState('report', html);
 
     window._trReportData = { mon:mon, sun:sun, weekDates:weekDates, metricKeys:mkeys, metricLabels:mlabels,
       metrics:pdfMetrics, tasks:pdfTasks, shape:(isLog?'log':'metrics'), preparedBy:(window.me||me||'') };
-    document.getElementById('trPrintBtn').style.display = '';
-  }catch(e){ out.innerHTML = '<div style="font-size:13px;color:#dc2626;">Could not generate the report.</div>'; }
+    _trPdf(true);
+  }catch(e){ _trOutState('error'); }
 }
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -18880,8 +18882,7 @@ function trRenderTeamPicker(){
 }
 async function trSwitchTeam(t){
   _trViewTeam = t; _trInited = false;
-  var out = document.getElementById('trReportOut'); if(out) out.innerHTML='';
-  var pb = document.getElementById('trPrintBtn'); if(pb) pb.style.display='none';
+  _trOutState('empty'); _trPdf(false);
   await initTeamReport();
 }
 
@@ -18980,8 +18981,8 @@ async function trGeneratePlacementReport(){
   var out = document.getElementById('trReportOut');
   var pick = document.getElementById('trWeekPick').value || _trToday();
   var mon = _trMonday(pick), sun = _trAddDays(mon,TR_WEEK_DAYS-1);
-  out.innerHTML = '<div style="color:var(--ui-ink-4,#94a3b8);font-size:13px;padding:12px 0;">Generating…</div>';
-  document.getElementById('trPrintBtn').style.display = 'none';
+  _trOutState('loading');
+  _trPdf(false);
   try{
     var pr = await fetch(SB + '/rest/v1/placement_weekly?team=eq.'+encodeURIComponent(trActiveTeam())+'&week_start=eq.'+mon+'&limit=1', { headers:_trHeaders() });
     var prRows = await pr.json();
@@ -19022,10 +19023,10 @@ async function trGeneratePlacementReport(){
       html+='<tr><td style="font-weight:700;">'+esc(n)+'</td>'+cells.map(function(c){ return '<td>'+(c?esc(c):'<span style="color:#cbd5e1;">—</span>')+'</td>'; }).join('')+'</tr>';
     });
     html+='</tbody></table></div></div>';
-    out.innerHTML=html;
+    _trOutState('report', html);
     window._trReportData = { placement:true, mon:mon, sun:sun, weekDates:weekDates, dayHeads:dayHeads, sections:sec, grid:gridRows, preparedBy:(window.me||me||''), team:trActiveTeam() };
-    document.getElementById('trPrintBtn').style.display='';
-  }catch(e){ out.innerHTML='<div style="font-size:13px;color:#dc2626;">Could not generate the report.</div>'; }
+    _trPdf(true);
+  }catch(e){ _trOutState('error'); }
 }
 
 // Placement PDF — sections 1–4 then the member×day grid, in the team's theme.
@@ -23148,11 +23149,14 @@ async function markAllNotificationsRead(silent){
 let myCanEditAvail=true;
 let myIsAdmin=false;
 let myIsShiftAdmin=false; // team-lead flag (staff_settings.is_shift_admin)
+let myHasShiftops=false;  // has ShiftOps access = a team lead by ShiftOps' own definition
 let adminHasSetAvail=false; // true only if admin explicitly set a value in staff_settings
 
 async function loadMySettings(){
   try{
     const rows=await sbGet("staff_settings","?name=eq."+encodeURIComponent(me));
+    // ShiftOps access marks a team lead (see trIsLead).
+    try{ const _ap=await sbGet('app_access','?app=eq.shiftops&staff_name=eq.'+encodeURIComponent(me)+'&select=app&limit=1'); myHasShiftops=!!(_ap&&_ap.length); }catch(e){ myHasShiftops=false; }
     if(rows&&rows.length){
       myIsAdmin=rows[0].is_hub_admin===true;
       myIsShiftAdmin=rows[0].is_shift_admin===true;
@@ -23175,6 +23179,9 @@ async function loadMySettings(){
       myIsAdmin=false;
       myCanEditAvail=true;
     }
+    // Lead status is only known now. If the Team Report is already on screen, re-apply its lead-only controls
+    // (the Generate card) instead of leaving them hidden until the next visit.
+    try{ const _trs=document.getElementById('rsec-teamreport'); if(_trs && _trs.style.display!=='none' && typeof initTeamReport==='function') initTeamReport(); }catch(e){}
   }catch(e){
     myIsAdmin=false;
     myCanEditAvail=true;
@@ -29205,6 +29212,26 @@ input[type="date"].f-input{ width:100%; }
 :is([data-theme="dark"],[data-theme="midnight"],[data-theme="renaissance"],[data-theme="graphite"],[data-theme="evergreen"],[data-theme="ember"],[data-theme="plum"],[data-theme="deepsea"]) .task-hero-btn,
 :is([data-theme="dark"],[data-theme="midnight"],[data-theme="renaissance"],[data-theme="graphite"],[data-theme="evergreen"],[data-theme="ember"],[data-theme="plum"],[data-theme="deepsea"]) .cal-view-btn.active,
 :is([data-theme="dark"],[data-theme="midnight"],[data-theme="renaissance"],[data-theme="graphite"],[data-theme="evergreen"],[data-theme="ember"],[data-theme="plum"],[data-theme="deepsea"]) .task-form-save{ color:var(--accent-text) !important; }
+
+/* Team Report: generate area (steady height, soft states, busy button) */
+#trReportOut{ min-height:96px; }
+#trReportOut.tr-out-empty{ display:flex; align-items:center; justify-content:center; text-align:center; padding:26px 16px;
+  border:1px dashed var(--m-border-hi); border-radius:12px; color:var(--m-ink-3); font-size:13px; }
+#trReportOut.tr-out-loading{ min-height:220px; }
+#trReportOut.tr-out-in{ animation:trOutIn .24s cubic-bezier(.22,1,.36,1) both; }
+#trReportOut.tr-out-err{ color:var(--warn,#dc2626); font-size:13px; padding:14px 2px; }
+@keyframes trOutIn{ from{ opacity:0; transform:translateY(6px); } to{ opacity:1; transform:none; } }
+.tr-sk{ display:flex; flex-direction:column; gap:12px; padding:6px 0 2px; }
+.tr-sk i{ display:block; height:12px; border-radius:6px; background:linear-gradient(90deg,var(--m-card-2) 25%,var(--m-border-hi) 50%,var(--m-card-2) 75%); background-size:200% 100%; animation:trShimmer 1.3s linear infinite; }
+.tr-sk-msg{ margin-top:12px; font-size:12.5px; color:var(--m-ink-3); }
+@keyframes trShimmer{ from{ background-position:200% 0; } to{ background-position:-200% 0; } }
+#trGenBtn{ min-width:132px; }
+#trPrintBtn{ min-width:132px; }
+#trGenBtn.is-busy{ cursor:progress; }
+#trGenBtn.is-busy::before{ content:""; display:inline-block; width:12px; height:12px; margin-right:8px; vertical-align:-2px;
+  border:2px solid currentColor; border-right-color:transparent; border-radius:50%; animation:trSpin .7s linear infinite; }
+@keyframes trSpin{ to{ transform:rotate(360deg); } }
+@media (prefers-reduced-motion:reduce){ #trReportOut.tr-out-in,.tr-sk i,#trGenBtn.is-busy::before{ animation:none; } }
 </style>
 
 <!-- DialTRAC (Call Log tab) — extracted module. Bump ?v= on each deploy. -->
@@ -29768,6 +29795,37 @@ function _nxPlDirty(){
   try{ if(typeof _plHarvest==='function') _plHarvest(); }catch(e){ return false; }
   try{ return JSON.stringify(_plWeek)!==_nxPlSnap; }catch(e){ return false; }
 }
+// ── TEAM REPORT: generate UI states ───────────────────────────────────────
+// The report area moves empty → loading → report in place (steady height, soft fade) instead of collapsing to nothing
+// and popping back; the Download PDF button stays put (disabled until a report exists).
+function _trOutState(state, html){
+  var out=document.getElementById('trReportOut'); if(!out) return;
+  out.classList.remove('tr-out-empty','tr-out-loading','tr-out-in','tr-out-err');
+  out.removeAttribute('aria-busy');
+  if(state==='report'){
+    out.innerHTML=html; void out.offsetWidth; out.classList.add('tr-out-in');
+  }else if(state==='loading'){
+    out.classList.add('tr-out-loading'); out.setAttribute('aria-busy','true');
+    out.innerHTML='<div class="tr-sk" aria-hidden="true"><i style="width:30%"></i><i style="width:94%"></i><i style="width:80%"></i><i style="width:88%"></i><i style="width:62%"></i></div><div class="tr-sk-msg" role="status">Generating report\u2026</div>';
+  }else if(state==='error'){
+    out.classList.add('tr-out-err'); out.innerHTML='<strong>Couldn\u2019t generate the report.</strong> Check your connection, then press Generate to try again.';
+  }else{
+    out.classList.add('tr-out-empty'); out.innerHTML='Pick a week, then press <b>Generate</b>.';
+  }
+}
+function _trPdf(on){ var pb=document.getElementById('trPrintBtn'); if(pb){ pb.disabled=!on; pb.title=on?'':'Generate a report first'; } }
+var _trGenBusy=false;
+(function(){
+  var orig=trGenerateReport;
+  trGenerateReport=async function(){
+    if(_trGenBusy) return;                       // ignore double-clicks
+    var b=document.getElementById('trGenBtn');
+    _trGenBusy=true;
+    if(b){ b.disabled=true; b.classList.add('is-busy'); b.setAttribute('aria-busy','true'); b.textContent='Generating\u2026'; }
+    try{ return await orig.apply(this,arguments); }
+    finally{ _trGenBusy=false; if(b){ b.disabled=false; b.classList.remove('is-busy'); b.removeAttribute('aria-busy'); b.textContent='Generate'; } }
+  };
+})();
 function trWeekRangeLabel(){
   const el=document.getElementById('trWeekRange'), inp=document.getElementById('trWeekPick');
   if(!el || !inp) return;
@@ -29788,8 +29846,7 @@ function trWeekChanged(){
   }
   _nxWeekPrev=inp.value;
   // A report on screen belongs to the old week — clear it so the PDF can't mix weeks.
-  const out=document.getElementById('trReportOut'); if(out) out.innerHTML='';
-  const pb=document.getElementById('trPrintBtn'); if(pb) pb.style.display='none';
+  _trOutState('empty'); _trPdf(false);
   trWeekRangeLabel();
   // Placement sections are per week: show the newly chosen week's.
   const card=document.getElementById('trPlacementCard');
