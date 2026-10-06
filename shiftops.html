@@ -5,6 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Oscars ShiftOprs — Employee Management</title>
 <script>
+// "Today" as a YYYY-MM-DD string in SYDNEY time. (new Date().toISOString() is the UTC date, which is
+// still yesterday in Sydney until ~10-11am.)
+function _sydToday(){ return new Date().toLocaleDateString('en-CA',{timeZone:'Australia/Sydney'}); }
+
 /* Apply the saved theme before the page paints so there's no flash.
    Default is dark (Command Deck); "light" restores the original Daylight theme. */
 (function(){ try{ var t=localStorage.getItem('so_theme');
@@ -6147,7 +6151,7 @@ function downloadSubmittedAvailability(){
     cursorY=doc.lastAutoTable.finalY+10;
   });
 
-  const stamp=new Date().toISOString().slice(0,10);
+  const stamp=_sydToday();
   const fname='availability_by_team'+(_availTeamFilter?('_'+String(_availTeamFilter).replace(/[^\w\-]+/g,'')):'')+'_'+stamp+'.pdf';
   doc.save(fname);
   showToast('Availability PDF downloaded');
@@ -7041,7 +7045,7 @@ async function _epFillHeaderStats(){
     const el=document.getElementById('epStatPunc'); if(el) el.textContent=(rows?rows.length:0)+' days';
   }catch(e){}
   try{
-    const today=new Date().toISOString().slice(0,10);
+    const today=_sydToday();
     const rows=await _cdGet('leave_submissions?staff_name=eq.'+encodeURIComponent(full)+'&status=eq.approved&to_date=gte.'+today+'&order=from_date.asc&select=from_date&limit=1');
     const el=document.getElementById('epStatLeave');
     if(el) el.textContent=(rows&&rows.length)?new Date(rows[0].from_date+'T00:00:00').toLocaleDateString('en-AU',{day:'numeric',month:'short'}):'None';
@@ -7664,7 +7668,7 @@ async function _fillEmpProfileStats(s){
   try{
     const lvEl=document.getElementById('empProfLeave');
     if(lvEl){
-      const today=new Date().toISOString().slice(0,10);
+      const today=_sydToday();
       const rows=await _cdGet('leave_submissions?staff_name=eq.'+encodeURIComponent(full)+'&status=eq.approved&to_date=gte.'+today+'&order=from_date.asc&select=from_date,to_date&limit=1');
       if(rows&&rows.length){
         const d=new Date(rows[0].from_date+'T00:00:00');
@@ -9451,7 +9455,7 @@ function openLeaveModal(){
   }
   document.getElementById('leaveModalTitle').textContent='Add Leave';
   document.getElementById('leaveStaff').innerHTML=staff.sort((a,b)=>a.first.localeCompare(b.first)).map(s=>`<option value="${s.id}">${s.first} ${s.last}</option>`).join('');
-  const today=new Date().toISOString().split('T')[0];
+  const today=_sydToday();
   document.getElementById('leaveFrom').value=today;
   document.getElementById('leaveTo').value=today;
   document.getElementById('leaveReason').value='';
