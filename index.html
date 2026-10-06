@@ -10218,6 +10218,7 @@ function setTheme(theme){
   if(THEME_IDS.indexOf(theme) < 0) theme = 'light';
   document.documentElement.setAttribute('data-theme', theme);
   localStorage.setItem('oscars_theme', theme);
+  if(typeof _nxApplyTextColor==='function') _nxApplyTextColor();
   renderAppearancePicker();
   // Persist cross-device (best-effort)
   try{
@@ -10261,6 +10262,7 @@ async function loadStaffTheme(){
     if(st && THEME_IDS.indexOf(st)>=0){
       document.documentElement.setAttribute('data-theme', st);
       localStorage.setItem('oscars_theme', st);
+      if(typeof _nxApplyTextColor==='function') _nxApplyTextColor();
       renderAppearancePicker();
     }
   }catch(e){}
@@ -12065,10 +12067,38 @@ function showSystemNotification(title, body, taskId, typeKey){
 }
 
 // ── NOTIFICATION SOUND ─────────────
+// The swatches are picked for light backgrounds, so on a dark theme the chosen colour is lightened (same hue) until it
+// reaches 5:1 against the theme's card colour; greys/slate just use the theme's own text. Re-applied on every theme change.
+var _NX_DARK_THEMES=['dark','midnight','renaissance','graphite','evergreen','ember','plum','deepsea'];
+function _nxHexRgb(h){ var m=/^#?([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(String(h||'').trim()); if(!m) return null; var x=m[1]; if(x.length===3) x=x.split('').map(function(c){return c+c;}).join(''); return [parseInt(x.slice(0,2),16),parseInt(x.slice(2,4),16),parseInt(x.slice(4,6),16)]; }
+function _nxLum(c){ var f=function(v){ v/=255; return v<=0.03928 ? v/12.92 : Math.pow((v+0.055)/1.055,2.4); }; return 0.2126*f(c[0])+0.7152*f(c[1])+0.0722*f(c[2]); }
+function _nxContrast(a,b){ var la=_nxLum(a), lb=_nxLum(b); return (Math.max(la,lb)+0.05)/(Math.min(la,lb)+0.05); }
+function _nxRgbHsl(c){ var r=c[0]/255,g=c[1]/255,b=c[2]/255,mx=Math.max(r,g,b),mn=Math.min(r,g,b),h=0,s=0,l=(mx+mn)/2,d=mx-mn;
+  if(d){ s=l>0.5 ? d/(2-mx-mn) : d/(mx+mn); if(mx===r) h=((g-b)/d+(g<b?6:0)); else if(mx===g) h=(b-r)/d+2; else h=(r-g)/d+4; h/=6; } return [h,s,l]; }
+function _nxHslRgb(h,s,l){ function q(p,qq,t){ if(t<0)t+=1; if(t>1)t-=1; if(t<1/6) return p+(qq-p)*6*t; if(t<1/2) return qq; if(t<2/3) return p+(qq-p)*(2/3-t)*6; return p; }
+  if(!s){ var v=Math.round(l*255); return [v,v,v]; } var qq=l<0.5 ? l*(1+s) : l+s-l*s, p=2*l-qq; return [Math.round(q(p,qq,h+1/3)*255),Math.round(q(p,qq,h)*255),Math.round(q(p,qq,h-1/3)*255)]; }
+function _nxReadableTextColor(hex){
+  var dark=_NX_DARK_THEMES.indexOf(document.documentElement.getAttribute('data-theme')||'light')>=0;
+  var bgRaw=''; try{ bgRaw=getComputedStyle(document.documentElement).getPropertyValue('--m-card'); }catch(e){}
+  var bg=_nxHexRgb(bgRaw) || (dark ? [19,24,32] : [255,255,255]);
+  var rgb=_nxHexRgb(hex); if(!rgb) return hex;
+  var target=5.0;
+  if(_nxContrast(rgb,bg)>=target) return hex;
+  var hsl=_nxRgbHsl(rgb);
+  if(dark && (hsl[1]<0.15 || String(hex).toLowerCase()==='#0f172a')) return 'var(--m-ink,#f1f5f9)';   // greys and the default Slate: just use the theme's own text
+  var l=hsl[2], step=dark ? 0.02 : -0.02;
+  for(var i=0;i<46;i++){ l=Math.min(0.95,Math.max(0.05,l+step)); var c=_nxHslRgb(hsl[0],hsl[1],l);
+    if(_nxContrast(c,bg)>=target) return '#'+c.map(function(v){ return ('0'+v.toString(16)).slice(-2); }).join(''); }
+  return dark ? '#f1f5f9' : '#0f172a';
+}
+function _nxApplyTextColor(){
+  var saved=localStorage.getItem('nexus_text_color'); if(!saved) return;
+  document.body.setAttribute('data-text-color', saved);
+  document.body.style.setProperty('--user-text-color', _nxReadableTextColor(saved));
+}
 function setTextColor(hex, label){
-  document.body.setAttribute('data-text-color', hex);
-  document.body.style.setProperty('--user-text-color', hex);
   localStorage.setItem('nexus_text_color', hex);
+  _nxApplyTextColor();
   // Update selection ring
   document.querySelectorAll('.tc-swatch').forEach(function(s){
     s.classList.toggle('selected', s.dataset.tc === hex);
@@ -12079,8 +12109,7 @@ function setTextColor(hex, label){
 function applySavedTextColor(){
   const saved = localStorage.getItem('nexus_text_color');
   if(!saved) return;
-  document.body.setAttribute('data-text-color', saved);
-  document.body.style.setProperty('--user-text-color', saved);
+  _nxApplyTextColor();
   // Sync swatch state
   setTimeout(function(){
     document.querySelectorAll('.tc-swatch').forEach(function(s){
@@ -29232,6 +29261,19 @@ input[type="date"].f-input{ width:100%; }
   border:2px solid currentColor; border-right-color:transparent; border-radius:50%; animation:trSpin .7s linear infinite; }
 @keyframes trSpin{ to{ transform:rotate(360deg); } }
 @media (prefers-reduced-motion:reduce){ #trReportOut.tr-out-in,.tr-sk i,#trGenBtn.is-busy::before{ animation:none; } }
+
+/* Generate row: Week label / controls + buttons / range, so the buttons line up with the controls (not the whole block) */
+.tr-gen-row{ display:grid; grid-template-columns:minmax(0,1fr) auto; grid-template-areas:"lbl lbl" "ctl act" "rng rng"; column-gap:12px; row-gap:0; align-items:center; }
+.tr-gen-row .tr-week{ display:contents; }
+.tr-gen-row .tr-week-lbl{ grid-area:lbl; }
+.tr-gen-row .tr-week-ctl{ grid-area:ctl; }
+.tr-gen-row .tr-week-range{ grid-area:rng; }
+.tr-gen-row .tr-gen-actions{ grid-area:act; align-self:stretch; align-items:stretch; }
+.tr-gen-row .tr-gen-actions .btn{ min-height:44px; }
+@media(max-width:700px){
+  .tr-gen-row{ grid-template-columns:1fr; grid-template-areas:"lbl" "ctl" "rng" "act"; }
+  .tr-gen-row .tr-gen-actions{ margin-top:12px; }
+}
 </style>
 
 <!-- DialTRAC (Call Log tab) — extracted module. Bump ?v= on each deploy. -->
