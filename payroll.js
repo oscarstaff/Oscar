@@ -146,6 +146,8 @@ html.pp-so:not([data-theme="light"]) #rsec-payroll{
 .pp-prem-pill .h{font-size:11px;font-weight:700;color:var(--pp-prem);font-variant-numeric:tabular-nums;}
 .pp-prem-pill .d{font-size:13px;font-weight:900;color:var(--pp-prem-ink);font-variant-numeric:tabular-nums;}
 .pp-prem-zero{color:var(--pp-mut2);font-size:12px;opacity:.4;}
+.pp-flat-pill{border-style:dashed;}
+.pp-flat-pill .d{font-weight:700;}
 /* Premium emphasis — the columns Accounts scans first get a tinted band down
    the whole column so they lock the eye, and rows WITH premium pop while
    zero-premium cells recede. */
@@ -468,9 +470,9 @@ async function runPayroll(){
   await _payLoadOrder();
   _payApplyOrder();
 
-  let totGross=0, totCoffee=0, totNet=0, totOrdG=0, totPremOnly=0, totPremPlus=0, totPremH=0, paidCount=0, premEarners=0, flags=0;
+  let totGross=0, totCoffee=0, totNet=0, totOrdG=0, totPremOnly=0, totPremPlus=0, totPremH=0, paidCount=0, premEarners=0, flatCount=0, flags=0;
   _payResults.forEach(function(r){
-    if(!r.noRate){ totGross+=r.gross; totCoffee+=r.coffee; totNet+=r.net; totOrdG+=r.ordG; totPremOnly+=r.premOnly; totPremPlus+=r.premPlus; totPremH+=r.premH; paidCount++; if(r.premH>0) premEarners++; }
+    if(!r.noRate){ totGross+=r.gross; totCoffee+=r.coffee; totNet+=r.net; totOrdG+=r.ordG; totPremOnly+=r.premOnly; totPremPlus+=r.premPlus; totPremH+=r.premH; paidCount++; if(r.premH>0) premEarners++; if(r.structure==='flat') flatCount++; }
     if(r.noRate || r.open) flags++;
   });
   const rows = _payRowsHtml();
@@ -485,7 +487,7 @@ async function runPayroll(){
         '<div class="pp-hero">'+
           '<div class="lbl">Premium payout</div>'+
           '<div class="val">$'+totPremPlus.toFixed(2)+'</div>'+
-          '<div class="sub"><b>'+totPremH.toFixed(1)+' hrs</b> above cap · incl. <b>$'+totCoffee.toFixed(2)+'</b> coffee</div>'+
+          '<div class="sub"><b>'+totPremH.toFixed(1)+' hrs</b> above cap · incl. <b>$'+totCoffee.toFixed(2)+'</b> coffee'+(flatCount?' \u00b7 <b>'+flatCount+'</b> on flat rate':'')+'</div>'+
         '</div>'+
         '<div class="pp-stat"><div class="lbl">Total pay</div><div class="val grand">$'+totGross.toFixed(2)+'</div><div class="note">'+paidCount+' paid · '+totNet.toFixed(1)+'h net</div></div>'+
         '<div class="pp-stat"><div class="lbl">Ordinary</div><div class="val">$'+totOrdG.toFixed(2)+'</div><div class="note">standard-rate hours</div></div>'+
@@ -616,6 +618,12 @@ function _payRowsHtml(){
     var premPlusCell = (r.premPlus>0)
       ? '<span class="pp-prem-pill"><span class="d">$'+r.premPlus.toFixed(2)+'</span></span>'
       : '<span class="pp-prem-zero">—</span>';
+    // Flat-rate staff have no premium tier (every hour is paid at the standard rate). Show that explicitly in the
+    // Premium columns instead of a faded dash, so they read as part of the section. Display only: no figures change.
+    if(r.structure==='flat' && !r.noRate && !(r.premOnly>0)){
+      premOnlyCell = '<span class="pp-prem-pill pp-flat-pill" title="Flat rate: every hour is paid at the standard rate, so there is no premium tier"><span class="h">Flat rate</span></span>';
+      if(!(r.premPlus>0)) premPlusCell = '<span class="pp-prem-pill pp-flat-pill" title="Flat rate: no premium, no coffee"><span class="d">$0.00</span></span>';
+    }
     rows += '<tr'+(r.noRate?' class="pp-flagrow"':'')+' draggable="true" data-name="'+String(r.name).replace(/"/g,'&quot;')+'">'+
       '<td class="pp-drag" title="Drag to reorder">≡</td>'+
       '<td><div class="pp-name">'+r.name+chips+'</div><div class="pp-struct">'+structTxt+'</div></td>'+
