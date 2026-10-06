@@ -84,6 +84,9 @@ function _pExtras(rawHours, customBreak, customCoffee, dateObj){
 (function(){
   'use strict';
 
+  // Flag the ShiftOps host so the dark palette can key off "not data-theme=light" there (its dark is the default, with no attribute).
+  try{ if(typeof SUPABASE_URL !== 'undefined' && SUPABASE_URL) document.documentElement.classList.add('pp-so'); }catch(e){}
+
   // Inject the module's own styles rather than adding them to index.html.
   if(!document.getElementById('payroll-styles')){
     var st = document.createElement('style');
@@ -91,12 +94,26 @@ function _pExtras(rawHours, customBreak, customCoffee, dateObj){
     st.textContent = `
 #rsec-payroll{
   --pp-prem:#b45309; --pp-prem-ink:#7c2d12; --pp-prem-soft:#fff7ed; --pp-prem-bd:#fed7aa;
-  --pp-ord:#64748b; --pp-line:#eef2f7; --pp-ink:#0f172a; --pp-mut:#64748b; --pp-mut2:#94a3b8;
+  --pp-ord:#475569; --pp-line:#e2e8f0; --pp-ink:#0f172a; --pp-mut:#3f4d60; --pp-mut2:#5a6a7e;
+  --pp-good:#047857; --pp-field:#ffffff;
+  --pp-bad:#b91c1c; --pp-bad-ink:#991b1b; --pp-bad-soft:#fef2f2; --pp-bad-bd:#fecaca;
+  --pp-warn-ink:#92400e; --pp-warn-soft:#fffbeb; --pp-warn-bd:#fde68a;
+  --pp-norate-bg:#fee2e2; --pp-norate-ink:#b91c1c; --pp-open-bg:#fef3c7; --pp-open-ink:#b45309;
 }
-:is([data-theme="dark"],[data-theme="midnight"]) #rsec-payroll{
+/* Dark palette. Applies to ALL of: ShiftOps dark (its default: no data-theme attribute; light is data-theme="light",
+   flagged by the pp-so class set below) and every dark Nexus theme. Every text token is >= 5.4:1 on the darkest AND
+   lightest dark surface payroll sits on (checked against ShiftOps surfaces and all Nexus dark cards). */
+:is([data-theme="dark"],[data-theme="midnight"],[data-theme="renaissance"],[data-theme="graphite"],[data-theme="evergreen"],[data-theme="ember"],[data-theme="plum"],[data-theme="deepsea"]) #rsec-payroll,
+html.pp-so:not([data-theme="light"]) #rsec-payroll{
   --pp-prem:#fbbf24; --pp-prem-ink:#fde68a; --pp-prem-soft:rgba(251,191,74,.10); --pp-prem-bd:rgba(251,191,74,.32);
-  --pp-ord:#8aa1bb; --pp-line:#22304a; --pp-ink:#e8eef7; --pp-mut:#8aa1bb; --pp-mut2:#5f7690;
+  --pp-ord:#a3b5ca; --pp-line:#2c3c56; --pp-ink:#e8eef7; --pp-mut:#a3b5ca; --pp-mut2:#94a8be;
+  --pp-good:#34d399; --pp-field:rgba(255,255,255,.06);
+  --pp-bad:#fca5a5; --pp-bad-ink:#fca5a5; --pp-bad-soft:rgba(239,68,68,.10); --pp-bad-bd:rgba(239,68,68,.35);
+  --pp-warn-ink:#fbbf24; --pp-warn-soft:rgba(251,191,74,.08); --pp-warn-bd:rgba(251,191,74,.28);
+  --pp-norate-bg:rgba(239,68,68,.16); --pp-norate-ink:#fca5a5; --pp-open-bg:rgba(251,191,36,.14); --pp-open-ink:#fcd34d;
 }
+/* Retro 95 (grey surface): darker text tokens */
+[data-theme="win95"] #rsec-payroll{ --pp-mut:#1f2937; --pp-mut2:#2b3a4d; --pp-ord:#1f2937; --pp-good:#04503a; --pp-bad:#8a2020; --pp-line:#7b7b7b; }
 /* controls */
 .pp-seg{display:inline-flex;background:var(--pp-prem-soft);border:1px solid var(--pp-prem-bd);border-radius:10px;padding:3px;gap:2px;}
 .pp-seg button{border:none;background:transparent;font-family:inherit;font-size:11.5px;font-weight:700;color:var(--pp-prem);padding:6px 12px;border-radius:7px;cursor:pointer;transition:background .15s;}
@@ -112,7 +129,7 @@ function _pExtras(rawHours, customBreak, customCoffee, dateObj){
 .pp-stat{border:1px solid var(--pp-line);border-radius:14px;padding:16px 18px;display:flex;flex-direction:column;justify-content:center;}
 .pp-stat .lbl{font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--pp-mut2);}
 .pp-stat .val{font-size:23px;font-weight:800;color:var(--pp-ink);font-variant-numeric:tabular-nums;margin-top:4px;letter-spacing:-.015em;}
-.pp-stat .val.grand{color:var(--accent);}
+.pp-stat .val.grand{color:var(--accent-text,var(--accent));}
 .pp-stat .note{font-size:11px;color:var(--pp-mut2);margin-top:3px;}
 /* table */
 .pp-scroll{overflow-x:auto;margin:0 -4px;}
@@ -143,25 +160,24 @@ function _pExtras(rawHours, customBreak, customCoffee, dateObj){
 .pp-prem-pill .d{font-size:14px;}
 .pp-net{font-weight:600;color:var(--pp-ink);}
 .pp-total{font-weight:900;color:var(--pp-ink);font-size:14px;font-variant-numeric:tabular-nums;}
-.pp-coffee{color:#10b981;font-weight:600;font-variant-numeric:tabular-nums;}
+.pp-coffee{color:var(--pp-good);font-weight:600;font-variant-numeric:tabular-nums;}
 .pp-coffee.zero{color:var(--pp-mut2);font-weight:400;}
-.pp-coffee-note{color:#10b981;font-size:11px;font-weight:700;margin-left:4px;}
+.pp-coffee-note{color:var(--pp-good);font-size:11px;font-weight:700;margin-left:4px;}
 .pp-drag-th{width:26px;}
 .pp-drag{width:26px;text-align:center;color:var(--pp-mut2);cursor:grab;user-select:none;font-size:15px;line-height:1;}
 .pp-drag:active{cursor:grabbing;}
 .pp-table tbody tr{transition:transform .16s cubic-bezier(.22,1,.36,1), background .12s, box-shadow .18s;}
 .pp-table tbody tr.pp-dragging{opacity:.92;background:var(--pp-prem-soft);box-shadow:0 10px 26px -10px rgba(16,24,40,.4);position:relative;z-index:5;}
-.pp-flagrow{background:#fef2f2;}
-:is([data-theme="dark"],[data-theme="midnight"]) .pp-flagrow{background:rgba(239,68,68,.08);}
+.pp-flagrow{background:var(--pp-bad-soft);}
 .pp-chip{font-size:10px;font-weight:800;padding:2px 7px;border-radius:6px;margin-left:6px;white-space:nowrap;}
-.pp-chip.norate{background:#fee2e2;color:#b91c1c;}
-.pp-chip.open{background:#fef3c7;color:#b45309;}
+.pp-chip.norate{background:var(--pp-norate-bg);color:var(--pp-norate-ink);}
+.pp-chip.open{background:var(--pp-open-bg);color:var(--pp-open-ink);}
 .pp-foot td{border-top:2px solid var(--pp-line);border-bottom:none;padding-top:15px;padding-bottom:4px;}
 .pp-foot .lbl{font-weight:800;color:var(--pp-ink);}
 .pp-foot .prem{font-weight:900;color:var(--pp-prem-ink);background:var(--pp-prem-soft);border-radius:8px;}
-.pp-foot .grand{font-weight:900;color:var(--accent);font-size:16px;}
-.pp-warn{margin-top:14px;padding:11px 14px;background:#fffbeb;border:1px solid #fde68a;border-radius:10px;font-size:12px;color:#92400e;line-height:1.55;}
-:is([data-theme="dark"],[data-theme="midnight"]) .pp-warn{background:rgba(251,191,74,.08);border-color:rgba(251,191,74,.28);color:#fbbf24;}
+.pp-foot .grand{font-weight:900;color:var(--accent-text,var(--accent));font-size:16px;}
+.pp-warn{margin-top:14px;padding:11px 14px;background:var(--pp-warn-soft);border:1px solid var(--pp-warn-bd);border-radius:10px;font-size:12px;color:var(--pp-warn-ink);line-height:1.55;}
+.pp-warn.pp-warn-err{background:var(--pp-bad-soft);border-color:var(--pp-bad-bd);color:var(--pp-bad-ink);}
 .pp-head-row{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:14px;}
 .pp-head-row .t{font-weight:800;font-size:15px;color:var(--pp-ink);letter-spacing:-.01em;}
 .pp-head-row .c{font-size:12px;color:var(--pp-mut2);}
@@ -170,11 +186,10 @@ function _pExtras(rawHours, customBreak, customCoffee, dateObj){
 .pp-rates th{font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:var(--pp-mut2);font-weight:700;padding:7px 6px;border-bottom:1px solid var(--pp-line);text-align:left;}
 .pp-rates th.prem{color:var(--pp-prem);}
 .pp-rates td{padding:6px;border-bottom:1px solid var(--pp-line);}
-.pp-rates input,.pp-rates select{border:1px solid var(--pp-line);border-radius:7px;padding:5px 7px;font-family:inherit;font-size:12px;background:var(--card,#fff);color:var(--pp-ink);}
+.pp-rates input,.pp-rates select{border:1px solid var(--pp-line);border-radius:7px;padding:5px 7px;font-family:inherit;font-size:12px;background:var(--pp-field);color:var(--pp-ink);}
 .pp-rates .pr-prem{border-color:var(--pp-prem-bd);background:var(--pp-prem-soft);color:var(--pp-prem-ink);font-weight:800;}
 .pp-rates tr.is-flat .pr-prem{opacity:.35;}
-.pp-rates tr.unset{background:#fef2f2;}
-:is([data-theme="dark"],[data-theme="midnight"]) .pp-rates tr.unset{background:rgba(239,68,68,.08);}
+.pp-rates tr.unset{background:var(--pp-bad-soft);}
 /* motion */
 @keyframes ppRise{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:none;}}
 .pp-animate{animation:ppRise .5s cubic-bezier(.22,1,.36,1) both;}
@@ -285,7 +300,7 @@ function initPayrollTab(){
   Promise.all([loadPayRates(), _payLoadCredNames()]).then(renderRatesEditor).catch(function(err){
     console.error('[PAYROLL] rates editor failed', err);
     const el=document.getElementById('payRatesEditor');
-    if(el) el.innerHTML='<div style="color:#b91c1c;font-size:13px;">Couldn\'t load rates — see console.</div>';
+    if(el) el.innerHTML='<div style="color:var(--pp-bad,#b91c1c);font-size:13px;">Couldn\'t load rates — see console.</div>';
   });
 }
 
@@ -389,8 +404,8 @@ async function runPayroll(){
   const startStr = document.getElementById('payStart').value;
   const endStr   = document.getElementById('payEnd').value;
   const el = document.getElementById('payResults');
-  if(!startStr || !endStr){ el.innerHTML = '<div style="color:#dc2626;">Pick both dates.</div>'; return; }
-  el.innerHTML = '<div style="color:#94a3b8;text-align:center;padding:20px;">Loading…</div>';
+  if(!startStr || !endStr){ el.innerHTML = '<div style="color:var(--pp-bad,#dc2626);">Pick both dates.</div>'; return; }
+  el.innerHTML = '<div style="color:var(--pp-mut2,#5a6a7e);text-align:center;padding:20px;">Loading…</div>';
 
   // Proactively refresh the auth token before a run so a long payrun doesn't
   // fail partway through on an expired session (the "only 3–4 staff show" bug).
@@ -405,7 +420,7 @@ async function runPayroll(){
 
   const ratesOk = await loadPayRates();
   if(!ratesOk){
-    el.innerHTML = '<div style="color:#dc2626;padding:20px;text-align:center;"><b>Couldn\'t load pay rates.</b><br>Your session may have expired — refresh the page (or log in again) and run the payrun once more.</div>';
+    el.innerHTML = '<div style="color:var(--pp-bad,#dc2626);padding:20px;text-align:center;"><b>Couldn\'t load pay rates.</b><br>Your session may have expired — refresh the page (or log in again) and run the payrun once more.</div>';
     return;
   }
 
@@ -415,7 +430,7 @@ async function runPayroll(){
     _pStaffNames().filter(Boolean)
   ))).sort(function(a,b){ return a.localeCompare(b); });
 
-  el.innerHTML = '<div style="color:#94a3b8;text-align:center;padding:20px;">Running payrun for '+roster.length+' staff…</div>';
+  el.innerHTML = '<div style="color:var(--pp-mut2,#5a6a7e);text-align:center;padding:20px;">Running payrun for '+roster.length+' staff…</div>';
 
   _payResults = [];
   let _loadErrors = 0;
@@ -461,7 +476,7 @@ async function runPayroll(){
   const rows = _payRowsHtml();
 
   const warn = flags ? '<div class="pp-warn"><strong>'+flags+' row(s) need a look.</strong> NO RATE = excluded from totals until you set a rate below. ⚠ OPEN = clocked in with no matching clock-out, so hours may read low — fix the punch in Timesheet Manager, then re-run.</div>' : '';
-  const loadWarn = _loadErrors ? '<div class="pp-warn" style="background:#fef2f2;border-color:#fecaca;color:#991b1b;"><strong>⚠ '+_loadErrors+' staff member(s) failed to load</strong> — their hours may be missing or wrong. This is usually an expired session. <b>Refresh the page and run the payrun again</b> before using these figures.</div>' : '';
+  const loadWarn = _loadErrors ? '<div class="pp-warn pp-warn-err"><strong>⚠ '+_loadErrors+' staff member(s) failed to load</strong> — their hours may be missing or wrong. This is usually an expired session. <b>Refresh the page and run the payrun again</b> before using these figures.</div>' : '';
 
   el.innerHTML =
     '<div class="pp-animate">'+
@@ -475,7 +490,7 @@ async function runPayroll(){
         '<div class="pp-stat"><div class="lbl">Total pay</div><div class="val grand">$'+totGross.toFixed(2)+'</div><div class="note">'+paidCount+' paid · '+totNet.toFixed(1)+'h net</div></div>'+
         '<div class="pp-stat"><div class="lbl">Ordinary</div><div class="val">$'+totOrdG.toFixed(2)+'</div><div class="note">standard-rate hours</div></div>'+
       '</div>'+
-      '<div class="pp-head-row"><div class="t">Payrun · '+startStr+' → '+endStr+'</div><div class="c">'+_payResults.length+' listed · <span style="color:var(--pp-mut2,#94a3b8);">drag ≡ to reorder</span> <button onclick="_payResetOrder()" style="background:none;border:none;color:var(--accent);font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;padding:0 0 0 8px;">reset</button></div></div>'+
+      '<div class="pp-head-row"><div class="t">Payrun · '+startStr+' → '+endStr+'</div><div class="c">'+_payResults.length+' listed · <span style="color:var(--pp-mut2,#5a6a7e);">drag ≡ to reorder</span> <button onclick="_payResetOrder()" style="background:none;border:none;color:var(--accent);font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;padding:0 0 0 8px;">reset</button></div></div>'+
       '<div class="pp-scroll"><table class="pp-table">'+
       '<thead><tr>'+
         '<th class="pp-drag-th"></th>'+
@@ -587,7 +602,7 @@ function _payRowsHtml(){
   _payResults.forEach(function(r, i){
     try{
     var chips = '';
-    if(r.loadError) chips += '<span class="pp-chip open" style="background:#fecaca;color:#991b1b;">⚠ LOAD FAILED</span>';
+    if(r.loadError) chips += '<span class="pp-chip norate">⚠ LOAD FAILED</span>';
     if(r.noRate) chips += '<span class="pp-chip norate">NO RATE</span>';
     if(r.open)   chips += '<span class="pp-chip open" title="'+r.open+' unclosed clock-in(s) — hours may be understated">⚠ '+r.open+' OPEN</span>';
     var structTxt = r.structure==='tiered' ? ('Tiered · '+(r.rate?parseFloat(r.rate.pay_cap):'')+'h cap') : (r.structure==='flat'?'Flat rate':'—');
@@ -728,7 +743,7 @@ function renderRatesEditor(){
     const missing = !_payRates[n];
     const isFlat = (r.structure!=='tiered');
     html += '<tr class="'+(missing?'unset ':'')+(isFlat?'is-flat':'')+'" data-name="'+nn+'">'+
-      '<td style="font-weight:600;color:var(--pp-ink,#0f172a);">'+n+(missing?' <span style="color:#b91c1c;font-size:10px;font-weight:800;">unset</span>':'')+'</td>'+
+      '<td style="font-weight:600;color:var(--pp-ink,#0f172a);">'+n+(missing?' <span style="color:var(--pp-bad,#b91c1c);font-size:10px;font-weight:800;">unset</span>':'')+'</td>'+
       '<td><select class="pr-struct" onchange="this.closest(\'tr\').classList.toggle(\'is-flat\', this.value!==\'tiered\')"><option value="tiered"'+(r.structure==='tiered'?' selected':'')+'>Tiered</option><option value="flat"'+(isFlat?' selected':'')+'>Flat</option></select></td>'+
       '<td><input class="pr-std" type="number" step="0.01" value="'+(parseFloat(r.std_rate)||0)+'" style="width:66px;"></td>'+
       '<td><input class="pr-prem" type="number" step="0.01" value="'+(parseFloat(r.prem_rate)||0)+'" style="width:66px;"></td>'+
