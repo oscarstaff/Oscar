@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════════════════════════════
    availlock.js — availability edits apply from NEXT week
-   Loaded by index.html:  <script src="availlock.js?v=6"></script>
+   Loaded by index.html:  <script src="availlock.js?v=9"></script>
 
    Separate module by convention — see ARCHITECTURE.md.
 
@@ -45,6 +45,14 @@
   var CUTOFF_DOW  = 5;   // Friday (0=Sun..6=Sat), in Sydney local time
   var CUTOFF_HOUR = 12;  // 12:00 noon Sydney
 
+  /* CALENDAR-DAY MATHS (DST-proof)
+     Never divide or add milliseconds to move between days: when daylight saving
+     starts a local day is only 23 hours long, so ms/DAY rounds down to the wrong
+     day (that made every Sydney device pick a TUESDAY as "next Monday" after the
+     4 Oct 2026 clock change). Count calendar days instead. */
+  function _dayNum(d){ return Math.round(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 86400000); }
+  function _addDays(d, n){ return new Date(d.getFullYear(), d.getMonth(), d.getDate() + n); }   // local midnight
+
   /** Current time as a Sydney-local Date (wall clock, DST-correct). */
   function sydNow(){
     return new Date(new Date().toLocaleString('en-US', { timeZone: 'Australia/Sydney' }));
@@ -52,13 +60,10 @@
 
   /** Raw next week start (Monday) from a given Sydney-midnight date (no cutoff). */
   function _rawNextWeek(d){
-    var DAY = 86400000;
-    var diff = Math.floor((d - WEEK_ANCHOR) / DAY);
+    var diff = _dayNum(d) - _dayNum(WEEK_ANCHOR);
     var rem = ((diff % 7) + 7) % 7;          // 0 on a Monday
     var add = (rem === 0) ? 7 : (7 - rem);   // Monday -> next Monday
-    var res = new Date(d.getTime() + add * DAY);
-    res.setHours(0,0,0,0);
-    return res;
+    return _addDays(d, add);
   }
 
   /**
@@ -70,7 +75,7 @@
     var d = new Date(now); d.setHours(0,0,0,0);
     var start = _rawNextWeek(d);                 // upcoming week Monday
     // Cutoff = the Friday before that Monday, at 12:00 Sydney (Mon - 3 days).
-    var cutoff = new Date(start.getTime() - 3 * 86400000);
+    var cutoff = _addDays(start, -3);
     cutoff.setHours(CUTOFF_HOUR, 0, 0, 0);
     return now.getTime() >= cutoff.getTime();
   }
@@ -82,8 +87,7 @@
     var res = _rawNextWeek(d);
     if(pastCutoff()){
       // Upcoming week is locked — defer one more week.
-      res = new Date(res.getTime() + 7 * 86400000);
-      res.setHours(0,0,0,0);
+      res = _addDays(res, 7);
     }
     return res;
   }

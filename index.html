@@ -9432,8 +9432,8 @@ let _effCalMonth = null;            // Date pointing at the visible month
 
 function _effFortnightAnchor(){ const d=new Date(2026,7,10); d.setHours(0,0,0,0); return d; }
 function _effIsFortnightStart(d){
-  const a=_effFortnightAnchor();
-  const diff=Math.round((d - a)/86400000);
+  // Count calendar days (not milliseconds, which drift by an hour across daylight saving)
+  const diff=Math.round(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())/86400000 - Date.UTC(2026,7,10)/86400000);
   return diff>=0 && diff%7===0;    // any Monday (weekly cadence)
 }
 function _effSoonestValid(){
@@ -9445,7 +9445,7 @@ function _effSoonestValid(){
   else {
     const a=_effFortnightAnchor(); const today=new Date(); today.setHours(0,0,0,0);
     let d=new Date(a);
-    while(d<=today){ d=new Date(d.getTime()+7*86400000); }
+    while(d<=today){ d=new Date(d.getFullYear(),d.getMonth(),d.getDate()+7); }
     base=d;
   }
   // Never earlier than the cutoff floor.
@@ -9470,14 +9470,12 @@ function _availCutoffFloor(now){
   const d = new Date(now); d.setHours(0,0,0,0);
   // Monday of the current calendar week (Mon=0).
   const dow = (d.getDay()+6)%7;
-  const thisMon = new Date(d.getTime() - dow*86400000);
-  const nextMon = new Date(thisMon.getTime() + 7*86400000);
-  // The cutoff that locks NEXT week is 12:00 the Friday of THIS week
-  // (Friday = thisMon + 4 days).
-  const friday = new Date(thisMon.getTime() + 4*86400000);
-  friday.setHours(12,0,0,0);
+  // Calendar-day arithmetic (adding milliseconds drifts an hour across daylight saving)
+  const nextMon = new Date(d.getFullYear(), d.getMonth(), d.getDate()-dow+7);
+  // The cutoff that locks NEXT week is 12:00 the Friday of THIS week.
+  const friday = new Date(d.getFullYear(), d.getMonth(), d.getDate()-dow+4, 12, 0, 0, 0);
   // Before that cutoff → next Monday still editable. At/after → week after.
-  return (now < friday) ? nextMon : new Date(nextMon.getTime() + 7*86400000);
+  return (now < friday) ? nextMon : new Date(d.getFullYear(), d.getMonth(), d.getDate()-dow+14);
 }
 
 function initEffDate(){
@@ -10116,6 +10114,18 @@ async function submitAvail(){
         }
       }catch(e){}
     }
+    // Safety net: a start date must be a Monday. If anything upstream produced another day,
+    // snap to that week's Monday (or the next one if that would be before the cutoff).
+    try{
+      const _p=_effectiveFrom.split('-').map(Number);
+      const _dow=(new Date(_p[0],_p[1]-1,_p[2]).getDay()+6)%7;
+      if(_dow!==0){
+        let _m=new Date(_p[0],_p[1]-1,_p[2]-_dow);
+        const _fl=(typeof _availCutoffFloor==='function')?_availCutoffFloor():null;
+        if(_fl && _m<_fl) _m=new Date(_p[0],_p[1]-1,_p[2]-_dow+7);
+        _effectiveFrom=_dfmt(_m);
+      }
+    }catch(_e){}
     const _liveValid = (typeof _hasValidAvailability === 'function')
       ? _hasValidAvailability(existing) : false;
     const _applyNow = !existing.length || !_liveValid;
@@ -29201,7 +29211,7 @@ input[type="date"].f-input{ width:100%; }
 <script src="dialtrac.js?v=44"></script>
 <script src="quizreview.js?v=2"></script>
 <script src="teamhours.js?v=2"></script>
-<script src="availlock.js?v=8"></script>
+<script src="availlock.js?v=9"></script>
 <script src="hubradial.js?v=3"></script>
 <script src="sessionlimit.js?v=2"></script>
 <script id="nexus-v2-shell-js">
