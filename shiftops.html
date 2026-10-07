@@ -1391,6 +1391,7 @@ body.radar-on .shift-cell[data-why]:hover::after{
 .shift-cell{ position:relative; }
 .shift-badge[draggable="true"]{ cursor:grab; }
 .shift-badge.dragging{ opacity:.4; cursor:grabbing; }
+body.so-pickup .shift-cell[data-sid]{ cursor:copy; }
 
 /* ── Week copy/paste tools (appear on row hover) ── */
 .wk-tools{ display:flex; gap:3px; opacity:0; transition:opacity .13s; flex-shrink:0; }
@@ -2808,9 +2809,6 @@ body.avail-editing #availGrid .avail-chip:hover, #availGrid .avail-row-editing .
           <div class="tools-menu-item" onclick="closeToolsMenu();rtOpen('hours')">
             <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path d="M10 2a8 8 0 100 16 8 8 0 000-16zm-1 11.4L5.6 10l1.4-1.4L9 10.6l4-4L14.4 8 9 13.4z"/></svg>Hours Balance
           </div>
-          <div class="tools-menu-item" onclick="closeToolsMenu();rtOpen('copy')">
-            <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path d="M8 2a2 2 0 00-2 2v8a2 2 0 002 2h6a2 2 0 002-2V6.4L12.6 3H8zM4 6a2 2 0 00-2 2v8a2 2 0 002 2h6a2 2 0 002-2H4V6z"/></svg>Copy Day
-          </div>
           <div class="tools-menu-item" onclick="closeToolsMenu();rtOpen('changes')">
             <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path d="M10 2a8 8 0 100 16 8 8 0 000-16zm-1 11.4L5.6 10l1.4-1.4L9 10.6l4-4L14.4 8 9 13.4z"/></svg>Shift Changes
           </div>
@@ -3073,16 +3071,6 @@ body.avail-editing #availGrid .avail-chip:hover, #availGrid .avail-row-editing .
       <select class="form-input" id="shiftDevice">
         <option value="">— No device —</option>
       </select>
-    </div>
-    <div class="form-group" id="shiftRepeatBox" style="display:none;border:1px solid var(--border);border-radius:8px;padding:10px 12px;">
-      <label class="form-label" style="margin-bottom:6px">Copy this shift to other days</label>
-      <div id="shiftRepeatDays" style="display:flex;gap:5px;flex-wrap:wrap"></div>
-      <div style="display:flex;gap:8px;margin-top:9px;align-items:center;flex-wrap:wrap">
-        <button class="btn btn-ghost" type="button" style="padding:5px 10px" onclick="shiftRepeatPick('wk')">Mon–Fri</button>
-        <button class="btn btn-ghost" type="button" style="padding:5px 10px" onclick="shiftRepeatPick('none')">Clear</button>
-        <button class="btn btn-primary" type="button" style="padding:5px 12px;margin-left:auto" onclick="shiftRepeatGo(this)">Copy</button>
-      </div>
-      <div style="font-size:11px;opacity:.65;margin-top:6px">Uses the times above. Skips days they're on leave, unavailable, or already rostered.</div>
     </div>
     <!-- Shift-pickup status: only shown for shifts that exist in roster_shifts -->
     <div class="form-group" id="shiftPickupBox" style="display:none;border:1px solid var(--border);border-radius:8px;padding:10px 12px;background:var(--bg);">
@@ -3400,7 +3388,6 @@ body.avail-editing #availGrid .avail-chip:hover, #availGrid .avail-row-editing .
       <button class="btn btn-ghost" data-t="cover" onclick="rtTab('cover')">Find cover</button>
       <button class="btn btn-ghost" data-t="hours" onclick="rtTab('hours')">Hours</button>
       <button class="btn btn-ghost" data-t="changes" onclick="rtTab('changes')">Changes</button>
-      <button class="btn btn-ghost" data-t="copy" onclick="rtTab('copy')">Copy day</button>
     </div>
     <div id="rtBody" style="overflow:auto;min-height:120px"></div>
   </div>
@@ -4198,8 +4185,8 @@ function rtTab(t){
   _rtCur=t;
   document.querySelectorAll('#rtTabs button').forEach(function(b){ b.classList.toggle('btn-primary',b.getAttribute('data-t')===t); b.classList.toggle('btn-ghost',b.getAttribute('data-t')!==t); });
   var wk=fmtDate(currentWeekStart)+' – '+fmtDate(addDays(currentWeekStart,6));
-  document.getElementById('rtTitle').textContent={check:'Roster check',cover:'Find cover',hours:'Hours balance',changes:'Shift changes',copy:'Copy a day'}[t]+' · '+wk;
-  _rcnCur=t; ({check:_rtRenderCheck,cover:_rtRenderCover,hours:_rtRenderHours,changes:_rtRenderChanges,copy:_rtRenderCopy})[t]();
+  document.getElementById('rtTitle').textContent={check:'Roster check',cover:'Find cover',hours:'Hours balance',changes:'Shift changes'}[t]+' · '+wk;
+  _rcnCur=t; ({check:_rtRenderCheck,cover:_rtRenderCover,hours:_rtRenderHours,changes:_rtRenderChanges})[t]();
   if(t==='changes') loadChangeNotices();
 }
 function _rtRenderCheck(){
@@ -4323,131 +4310,6 @@ function _rtRenderChanges(){
     h+='<div style="padding:8px 10px;margin:0 0 6px;border:1px solid var(--border);border-radius:8px"><div style="display:flex;justify-content:space-between;gap:10px"><b style="font-size:13px">'+_rtEsc(n.staff_name)+'</b><span style="font-size:11px;opacity:.65">'+_rtEsc(when)+'</span></div><div style="font-size:12px;margin:2px 0">'+what+'</div><div style="font-size:11.5px">'+status+'</div></div>';
   });
   document.getElementById('rtBody').innerHTML=h;
-}
-
-/* ── COPY: one shift to other days, or a whole day to other days ──────────
-   Both build a plan first, then write in one bulk call. A copy is skipped for
-   a person who's on leave that day, marked unavailable, or already has a
-   shift that overlaps — copying must never double-book or override leave. */
-function _rtCopyPlan(items, skipUnavail){
-  const ok=[], skip=[], taken={};
-  items.forEach(function(it){
-    const nm=_rtName((staff||[]).find(function(x){return x.id===it.sid;})||{})||'?';
-    const tag=nm+' '+DAYS[it.day];
-    if(_rtLeave(it.sid,it.day)){ skip.push(tag+' (leave)'); return; }
-    if(skipUnavail && getAvail(it.sid,it.day).type==='no'){ skip.push(tag+' (unavailable)'); return; }
-    const a=_rtMin(it.start), b=_rtMin(it.end);
-    const k=it.sid+'|'+it.day;
-    const busy=_rtWork(it.sid,it.day).concat(taken[k]||[]).some(function(x){
-      const c=_rtMin(x.start), e=_rtMin(x.end); return c!=null&&e!=null&&a<e&&c<b; });
-    if(busy){ skip.push(tag+' (already rostered)'); return; }
-    (taken[k]=taken[k]||[]).push({start:it.start,end:it.end});
-    ok.push(it);
-  });
-  return {ok:ok, skip:skip};
-}
-async function _rtCopyRun(plan){
-  if(!plan.ok.length) return 0;
-  plan.ok.forEach(function(it){
-    const blk={start:it.start,end:it.end,type:'shift',role:it.role||''};
-    if(!shifts[it.sid]) shifts[it.sid]={};
-    if(!shifts[it.sid][it.day]) shifts[it.sid][it.day]=[];
-    shifts[it.sid][it.day].push(blk);
-    queueShift(it.sid, it.day, blk);
-  });
-  try{ renderRoster(); updateStats(); }catch(e){}
-  const n=await flushShiftQueue();
-  loadWeekShiftsFromDB(currentWeekStart);
-  return n;
-}
-function _rtCopyMsg(n, plan){
-  let m=n?('Copied '+n+' shift'+(n===1?'':'s')):'Nothing copied';
-  if(plan.skip.length) m+=' · skipped '+plan.skip.length+(plan.skip.length<=3?': '+plan.skip.join(', '):'');
-  try{ if(n && _pubWeeks && _pubWeeks.has(_curWeekISO())) m+=' · staff will be notified'; }catch(e){}
-  return m;
-}
-
-/* shift modal: repeat one shift */
-let _repeatDays=new Set(), _repeatFrom=0;
-function _shiftRepeatInit(dayIdx, show){
-  const box=document.getElementById('shiftRepeatBox'); if(!box) return;
-  box.style.display=show?'':'none';
-  _repeatDays=new Set(); _repeatFrom=+dayIdx||0;
-  _shiftRepeatPaint();
-}
-function _shiftRepeatPaint(){
-  const host=document.getElementById('shiftRepeatDays'); if(!host) return;
-  host.innerHTML=DAYS.map(function(n,i){
-    if(i===_repeatFrom) return '<button type="button" class="btn btn-ghost" disabled style="padding:4px 9px;opacity:.35">'+n+'</button>';
-    const on=_repeatDays.has(i);
-    return '<button type="button" class="btn '+(on?'btn-primary':'btn-ghost')+'" style="padding:4px 9px" onclick="shiftRepeatToggle('+i+')">'+n+'</button>';
-  }).join('');
-}
-function shiftRepeatToggle(i){ if(_repeatDays.has(i)) _repeatDays.delete(i); else _repeatDays.add(i); _shiftRepeatPaint(); }
-function shiftRepeatPick(k){ _repeatDays=new Set(k==='wk'?[0,1,2,3,4].filter(function(i){return i!==_repeatFrom;}):[]); _shiftRepeatPaint(); }
-async function shiftRepeatGo(btn){
-  if(!_repeatDays.size){ showToast('Pick at least one day'); return; }
-  const sid=parseInt(document.getElementById('shiftStaff').value);
-  const start=document.getElementById('shiftStart').value, end=document.getElementById('shiftEnd').value;
-  const role=document.getElementById('shiftRole').value;
-  if(!start||!end||start>=end){ showToast('End time must be after start time'); return; }
-  const plan=_rtCopyPlan(Array.from(_repeatDays).sort().map(function(d){ return {sid:sid,day:d,start:start,end:end,role:role}; }), true);
-  if(btn){ btn.disabled=true; btn.textContent='Copying…'; }
-  const n=await _rtCopyRun(plan);
-  if(btn){ btn.disabled=false; btn.textContent='Copy'; }
-  closeModal('shiftModal');
-  showToast(_rtCopyMsg(n, plan));
-}
-
-/* tools: copy a whole day */
-let _cdFrom=0, _cdTo=new Set(), _cdTeam='', _cdSkipUnavail=true;
-function _rtRenderCopy(){
-  const teams=Array.from(new Set(_rtPeople().map(function(s){return s.team;}).filter(Boolean))).sort();
-  const dayOpt=DAYS.map(function(n,i){ return '<option value="'+i+'"'+(i===_cdFrom?' selected':'')+'>'+n+' '+fmtDate(addDays(currentWeekStart,i))+'</option>'; }).join('');
-  const chips=DAYS.map(function(n,i){
-    if(i===_cdFrom) return '<button type="button" class="btn btn-ghost" disabled style="padding:4px 9px;opacity:.35">'+n+'</button>';
-    return '<button type="button" class="btn '+(_cdTo.has(i)?'btn-primary':'btn-ghost')+'" style="padding:4px 9px" onclick="_cdToggle('+i+')">'+n+'</button>';
-  }).join('');
-  document.getElementById('rtBody').innerHTML=
-    '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin:0 0 10px">'+
-      '<div><label class="form-label">Copy from</label><select class="form-input" onchange="_cdFrom=+this.value;_cdTo.delete(_cdFrom);_rtRenderCopy()">'+dayOpt+'</select></div>'+
-      '<div><label class="form-label">Team</label><select class="form-input" onchange="_cdTeam=this.value;_rtRenderCopy()"><option value="">All teams</option>'+
-        teams.map(function(t){return '<option'+(t===_cdTeam?' selected':'')+'>'+_rtEsc(t)+'</option>';}).join('')+'</select></div>'+
-    '</div>'+
-    '<label class="form-label">Copy to</label><div style="display:flex;gap:5px;flex-wrap:wrap;margin:0 0 8px">'+chips+
-      '<button type="button" class="btn btn-ghost" style="padding:4px 9px" onclick="_cdTo=new Set([0,1,2,3,4].filter(function(i){return i!==_cdFrom;}));_rtRenderCopy()">Mon–Fri</button></div>'+
-    '<label style="display:flex;gap:7px;align-items:center;font-size:12.5px;margin:0 0 12px"><input type="checkbox" '+(_cdSkipUnavail?'checked':'')+' onchange="_cdSkipUnavail=this.checked;_rtRenderCopy()"> Skip people marked unavailable on the target day</label>'+
-    '<div id="cdPreview"></div>';
-  _cdPreview();
-}
-function _cdToggle(i){ if(_cdTo.has(i)) _cdTo.delete(i); else _cdTo.add(i); _rtRenderCopy(); }
-function _cdItems(){
-  const items=[];
-  _rtPeople().forEach(function(s){
-    if(_cdTeam && s.team!==_cdTeam) return;
-    _rtWork(s.id,_cdFrom).forEach(function(sh){
-      Array.from(_cdTo).sort().forEach(function(d){ items.push({sid:s.id,day:d,start:sh.start,end:sh.end,role:sh.role||''}); });
-    });
-  });
-  return items;
-}
-function _cdPreview(){
-  const host=document.getElementById('cdPreview'); if(!host) return;
-  const src=_rtPeople().filter(function(s){ return (!_cdTeam||s.team===_cdTeam) && _rtWork(s.id,_cdFrom).length; }).length;
-  if(!src){ host.innerHTML='<div style="opacity:.7;padding:8px 0">Nobody'+(_cdTeam?' on '+_rtEsc(_cdTeam):'')+' is rostered on '+DAYS[_cdFrom]+'.</div>'; return; }
-  if(!_cdTo.size){ host.innerHTML='<div style="opacity:.7;padding:8px 0">'+src+' people rostered on '+DAYS[_cdFrom]+'. Pick the day(s) to copy to.</div>'; return; }
-  const plan=_rtCopyPlan(_cdItems(), _cdSkipUnavail);
-  host.innerHTML='<div style="padding:10px 12px;border:1px solid var(--border);border-radius:8px;margin:0 0 10px;font-size:13px">'+
-    '<b>'+plan.ok.length+'</b> shift'+(plan.ok.length===1?'':'s')+' will be created'+
-    (plan.skip.length?' · <b>'+plan.skip.length+'</b> skipped<div style="font-size:11.5px;opacity:.75;margin-top:5px;max-height:90px;overflow:auto">'+plan.skip.map(_rtEsc).join('<br>')+'</div>':'')+'</div>'+
-    '<button class="btn btn-primary" '+(plan.ok.length?'':'disabled')+' onclick="_cdGo(this)">Copy '+plan.ok.length+' shift'+(plan.ok.length===1?'':'s')+'</button>';
-}
-async function _cdGo(btn){
-  const plan=_rtCopyPlan(_cdItems(), _cdSkipUnavail);
-  if(btn){ btn.disabled=true; btn.textContent='Copying…'; }
-  const n=await _rtCopyRun(plan);
-  showToast(_rtCopyMsg(n, plan));
-  _cdTo=new Set(); _rtRenderCopy();
 }
 
 /* ── LEAVE CLASH CHECK ────────────────────────────────────────────────────
@@ -4615,7 +4477,7 @@ function renderRoster(){
           const stCls = sh._status==='open' ? ' shift-openpick' : (sh._status==='pending_release' ? ' shift-pendrel' : '');
           const stTag = sh._status==='open' ? '<br><span class="sb-tag">OPEN FOR PICKUP</span>'
                       : (sh._status==='pending_release' ? '<br><span class="sb-tag">RELEASE ASKED</span>' : '');
-          html+=`<div class="shift-badge ${il?'shift-leave':'shift-slot'}${stCls}" ${il?'':`style="background:${s.color}1a;border-left:3px solid ${s.color};" draggable="true" ondragstart="shiftDragStart(event,${s.id},${d},${i})" ondragend="shiftDragEnd(event)"`} onclick="event.stopPropagation();editShift(${s.id},${d},${i})">${il?'LEAVE':`<b class="sb-time">${sh.start}–${sh.end}</b>`}${stTag}${(!il&&sh._dbId&&_rcnPending[sh._dbId])?'<span title="Change not yet seen by '+s.first+'" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#f59e0b;margin-left:4px;vertical-align:middle"></span>':''}${dev?`<br><span style="font-size:8px;opacity:.85;color:${devConflict?'#ff6432':'inherit'}"> ${dev.name}${sh.deviceStart?` ${sh.deviceStart}–${sh.deviceEnd}`:''}${devConflict?' ':''}</span>`:`${staffRoleLabel(s)?`<br><span style="font-size:8px;opacity:.7">${staffRoleLabel(s)}</span>`:''}`}</div>`;
+          html+=`<div class="shift-badge ${il?'shift-leave':'shift-slot'}${stCls}" ${il?'':`style="background:${s.color}1a;border-left:3px solid ${s.color};" draggable="true" onmousedown="shiftBadgeDown(${s.id},${d},${i})" ondragstart="shiftDragStart(event,${s.id},${d},${i})" ondragend="shiftDragEnd(event)"`} onclick="event.stopPropagation();${il?'editShift':'shiftBadgeClick'}(${s.id},${d},${i})">${il?'LEAVE':`<b class="sb-time">${sh.start}–${sh.end}</b>`}${stTag}${(!il&&sh._dbId&&_rcnPending[sh._dbId])?'<span title="Change not yet seen by '+s.first+'" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#f59e0b;margin-left:4px;vertical-align:middle"></span>':''}${dev?`<br><span style="font-size:8px;opacity:.85;color:${devConflict?'#ff6432':'inherit'}"> ${dev.name}${sh.deviceStart?` ${sh.deviceStart}–${sh.deviceEnd}`:''}${devConflict?' ':''}</span>`:`${staffRoleLabel(s)?`<br><span style="font-size:8px;opacity:.7">${staffRoleLabel(s)}</span>`:''}`}</div>`;
         });
         html+='</div>';
       }
@@ -4647,7 +4509,6 @@ function clickCell(staffId,day){
   populateShiftDeviceSelect(null);
   onShiftTypeChange(document.getElementById('shiftType'));
   renderShiftPickupBox(null);   // new shift: nothing to open for pickup yet
-  try{ _shiftRepeatInit(0, false); }catch(e){}
   openModal('shiftModal');
 }
 
@@ -4666,7 +4527,6 @@ function editShift(staffId,dayIdx,shiftIdx){
   populateShiftDeviceSelect(sh.deviceId||null);
   onShiftTypeChange(document.getElementById('shiftType'));
   renderShiftPickupBox(sh);
-  try{ _shiftRepeatInit(dayIdx, sh.type!=='leave'); }catch(e){}
   openModal('shiftModal');
 }
 
@@ -6973,7 +6833,6 @@ function openAddShift(staffId,dayIdx){
   document.getElementById('shiftRole').value='';
   onShiftTypeChange(document.getElementById('shiftType'));
   renderShiftPickupBox(null);   // new shift: nothing to open for pickup yet
-  try{ _shiftRepeatInit(0, false); }catch(e){}
   openModal('shiftModal');
 }
 /* ── Shift pickup: manager controls ───────────────────────────────────────
@@ -11465,11 +11324,69 @@ function radarClear(){
 }
 
 /* ── Drag handlers ── */
+/* ── Shift badge gestures ─────────────────────────────────────────────────
+   single click  → edit the shift (after a short pause, so a double-click
+                   can be told apart)
+   drag          → COPY to the cell you drop on; the original stays
+   double-click  → pick the shift up for TRANSFER: the next cell you click
+                   gets it and it leaves its old place (Esc cancels).
+                   Double-click-and-drag also transfers. */
+let _sbEditTimer=null, _sbEditKey=null, _sbLastDown={k:null,t:0}, _sbArmed=null, _pickup=null;
+function _sbCancelEdit(){ if(_sbEditTimer){ clearTimeout(_sbEditTimer); _sbEditTimer=null; _sbEditKey=null; } }
+function shiftBadgeDown(sid,day,idx){
+  const k=sid+'|'+day+'|'+idx, now=Date.now();
+  _sbArmed = (_sbLastDown.k===k && now-_sbLastDown.t<380) ? k : null;   // 2nd press of a double-click
+  _sbLastDown={k:k,t:now};
+}
+function shiftBadgeClick(sid,day,idx){
+  const k=sid+'|'+day+'|'+idx;
+  if(_pickup){ _pickupDrop(sid,day); return; }            // dropping onto a cell that already has shifts
+  if(_sbEditTimer && _sbEditKey===k){ _sbCancelEdit(); _sbArmed=null; _pickupStart(sid,day,idx); return; }
+  _sbCancelEdit();
+  _sbEditKey=k;
+  _sbEditTimer=setTimeout(function(){ _sbEditTimer=null; _sbEditKey=null; editShift(sid,day,idx); }, 300);
+}
+function _pickupStart(sid,day,idx){
+  if(document.body.classList.contains('tl-readonly')) return;
+  const sh=((shifts[sid]||{})[day]||[])[idx];
+  if(!sh || sh.type==='leave') return;
+  _pickup={sid:sid,day:day,idx:idx,shift:JSON.parse(JSON.stringify(sh))};
+  try{ radarPaint(_pickup.shift); }catch(e){}
+  document.body.classList.add('so-pickup');
+  showToast('Transferring '+sh.start+'–'+sh.end+' — click where it should go (Esc to cancel)');
+}
+function _pickupCancel(msg){
+  _pickup=null; document.body.classList.remove('so-pickup');
+  try{ radarClear(); }catch(e){}
+  if(msg) showToast(msg);
+}
+function _pickupDrop(sid,day){
+  const p=_pickup; if(!p) return;
+  if(sid===p.sid && day===p.day){ _pickupCancel('Transfer cancelled'); return; }
+  // reuse the drag-and-drop path exactly, as a MOVE
+  _drag={sid:p.sid, day:p.day, idx:p.idx, shift:p.shift, copy:false};
+  _pickup=null; document.body.classList.remove('so-pickup');
+  cellDrop({preventDefault:function(){}}, sid, day);
+}
+// While a shift is picked up, a click on ANY roster cell drops it there
+// (empty cells normally open "Assign shift", so intercept before that).
+document.addEventListener('click',function(e){
+  if(!_pickup) return;
+  const cell=e.target.closest && e.target.closest('.shift-cell[data-sid]');
+  if(!cell){ if(!(e.target.closest&&e.target.closest('.shift-badge'))) _pickupCancel('Transfer cancelled'); return; }
+  e.stopPropagation(); e.preventDefault();
+  _pickupDrop(parseInt(cell.getAttribute('data-sid'),10), parseInt(cell.getAttribute('data-day'),10));
+}, true);
+document.addEventListener('keydown',function(e){ if(e.key==='Escape' && _pickup) _pickupCancel('Transfer cancelled'); });
+
 function shiftDragStart(e, sid, day, idx){
   if(document.body.classList.contains('tl-readonly')){ e.preventDefault(); return; }
   const shift = ((shifts[sid]||{})[day]||[])[idx];
   if(!shift || shift.type==='leave'){ e.preventDefault(); return; }
-  _drag = {sid, day, idx, shift:JSON.parse(JSON.stringify(shift)), copy:e.altKey||e.ctrlKey||e.metaKey};
+  // Plain drag COPIES (the original stays). Double-click-and-drag MOVES it.
+  const _armed = _sbArmed===sid+'|'+day+'|'+idx;
+  _sbCancelEdit(); _sbArmed=null;
+  _drag = {sid, day, idx, shift:JSON.parse(JSON.stringify(shift)), copy:!_armed};
   e.dataTransfer.effectAllowed = 'copyMove';
   try{ e.dataTransfer.setData('text/plain', 'shift'); }catch(_){}
   e.target.classList.add('dragging');
@@ -11484,7 +11401,7 @@ function cellDragOver(e, sid, day){
   const r = radarCheck(sid, day, _drag.shift);
   if(r.level==='block'){ e.dataTransfer.dropEffect='none'; return; }  // can't drop
   e.preventDefault();
-  e.dataTransfer.dropEffect = (_drag.copy||e.altKey||e.ctrlKey||e.metaKey) ? 'copy' : 'move';
+  e.dataTransfer.dropEffect = _drag.copy ? 'copy' : 'move';
   e.currentTarget.classList.add('radar-hover');
 }
 function cellDragLeave(e){ e.currentTarget.classList.remove('radar-hover'); }
@@ -11496,7 +11413,7 @@ function cellDrop(e, sid, day){
   if(r.level==='block'){ showToast(`Can't drop — ${r.why}`); radarClear(); _drag=null; return; }
   if(sid===_drag.sid && day===_drag.day){ radarClear(); _drag=null; return; }
 
-  const isCopy = _drag.copy || e.altKey || e.ctrlKey || e.metaKey;
+  const isCopy = !!_drag.copy;
   if(!shifts[sid]) shifts[sid]={};
   if(!shifts[sid][day]) shifts[sid][day]=[];
   const _moved=JSON.parse(JSON.stringify(_drag.shift));
