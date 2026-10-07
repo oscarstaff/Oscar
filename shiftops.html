@@ -2678,8 +2678,17 @@ body.avail-editing #availGrid .avail-chip.av2:hover{ background:color-mix(in srg
 .av2-edit:hover{ color:var(--accent-text); border-color:var(--accent-border); }
 #availGrid .av2-row:hover .av2-edit, .av2-edit:focus-visible{ opacity:1; }
 @media (hover:none){ .av2-edit{ opacity:1; } }
-.av2-act-on{ display:flex; gap:6px; margin-top:7px; }
-.av2-act-on .btn{ font-size:12px !important; padding:5px 12px !important; border-radius:7px; }
+.av2-act-on{ display:flex; gap:6px; margin-top:1px; height:22px; }
+.av2-act-on .btn{ font-size:11.5px !important; padding:0 10px !important; height:22px !important; min-height:0 !important; line-height:20px; border-radius:6px; }
+#availGrid .av2-row.avail-row-editing .avail-name{ padding-top:6px; padding-bottom:6px; }
+/* every row keeps the same height whether or not it's being edited — nothing jumps */
+#availGrid .av2-row:not(.avail-hd-row):not(.av2-foot){ min-height:60px; }
+#availGrid .av2-row .avail-cell{ position:relative; }
+#availGrid .av2-custom{ position:absolute !important; top:6px; right:6px; width:22px; height:22px; padding:0 !important;
+  display:none; place-items:center; border-radius:6px; color:var(--accent-text); background:var(--surface); border:1px solid var(--border); }
+#availGrid .avail-row-editing .av2-custom, body.avail-editing #availGrid .av2-custom{ display:grid !important; }
+#availGrid .av2-custom:hover{ text-decoration:none; border-color:var(--accent-border); }
+#availGrid .avail-row-editing .avail-chip.av2{ padding-right:30px; }
 #availGrid .av2-row.avail-row-editing{ box-shadow:inset 3px 0 0 var(--accent); background:color-mix(in srgb,var(--accent) 5%,transparent) !important; }
 /* per-day footer */
 #availGrid .av2-foot{ background:color-mix(in srgb,var(--text) 2.5%,transparent) !important; }
@@ -5281,11 +5290,11 @@ function renderAvailability(){
       html+=`<div class="avail-row av2-row${_editing?' avail-row-editing':''}" data-avail-staff="${s.id}" data-team="${(s.team||'').replace(/"/g,'&quot;')}">
         <div class="avail-name"><div class="avail-dot" style="background:${s.color};flex-shrink:0"></div>
           <div class="avail-who"><span class="avail-who-n" title="${s.first} ${s.last}">${s.first} ${s.last}</span>
-          <span class="avail-who-s">${_okDays} of 7 days${_unsetDays?` · <b class="av2-unset-n">${_unsetDays} not set</b>`:''}</span>${actions}</div>${editBtn}</div>`;
+          ${_editing?actions:`<span class="avail-who-s">${_okDays} of 7 days${_unsetDays?` · <b class="av2-unset-n">${_unsetDays} not set</b>`:''}</span>`}</div>${editBtn}</div>`;
       for(let d=0;d<7;d++){
         const c=_av2Cell(getAvail(s.id,d), d);
         html+=`<div class="avail-cell${isToday(addDays(currentWeekStart,d))?' avail-today':''}"><div class="avail-chip av2 ${c.cls}" onclick="cycleAvail(${s.id},${d})">${c.html}</div>`+
-              `<div class="avail-custom" onclick="openCustomAvail(${s.id},${d})" title="Set custom hours">Custom hours</div></div>`;
+              `<div class="avail-custom av2-custom" onclick="openCustomAvail(${s.id},${d})" title="Set custom hours" aria-label="Set custom hours"><svg width="13" height="13" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/></svg></div></div>`;
       }
       html+='</div>';
     });
