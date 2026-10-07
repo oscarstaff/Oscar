@@ -2647,6 +2647,47 @@ body.avail-editing #availGrid .avail-chip:hover, #availGrid .avail-row-editing .
   #availGrid .avail-row-editing > .avail-name{ background:var(--surface); }
   #availGrid{ --avcol:170px; }
 }
+
+/* ── Availability v2: calm timeline cells ──────────────────────────────── */
+#availGrid .avail-row.av2-row{ grid-template-columns:var(--avcol) repeat(7,minmax(0,1fr)); }
+#availGrid .av2-card .role-view-header{ display:flex; align-items:baseline; gap:10px; justify-content:flex-start; }
+.av2-count{ font-size:12.5px; color:var(--text-dim); font-weight:500; }
+#availGrid .avail-hd-row.av2-row{ background:transparent !important; }
+#availGrid .av2-row .avail-dh{ align-items:flex-start; padding:10px 10px 8px; }
+#availGrid .av2-row .avail-cell{ align-items:stretch; padding:8px 6px; }
+#availGrid .avail-chip.av2{
+  display:flex; flex-direction:column; align-items:stretch; justify-content:center; gap:6px;
+  min-height:40px; padding:6px 8px; background:transparent !important; border:0 !important;
+  border-radius:8px !important; text-align:left;
+}
+.av2-t{ font-size:13px; font-weight:600; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-variant-numeric:tabular-nums; }
+.av2-track{ position:relative; display:block; height:5px; border-radius:3px; background:color-mix(in srgb,var(--text) 7%,transparent); }
+.av2-track i{ position:absolute; top:0; bottom:0; border-radius:3px; background:var(--accent); }
+.av2-no .av2-t{ color:var(--muted); font-weight:500; }
+.av2-no .av2-track{ background:transparent; }
+.av2-unset .av2-t{ color:var(--text-dim); font-weight:500; font-style:italic; }
+.av2-unset .av2-track{ background:repeating-linear-gradient(90deg,var(--border2) 0 5px,transparent 5px 9px); }
+.av2-unset-n{ font-weight:600; color:var(--text-mid); }
+#availGrid .avail-row-editing .avail-chip.av2:hover,
+body.avail-editing #availGrid .avail-chip.av2:hover{ background:color-mix(in srgb,var(--accent) 10%,transparent) !important; box-shadow:none; }
+#availGrid .avail-chip.av2{ opacity:1; }
+/* name column: Edit appears on hover, Save/Cancel stay while editing */
+#availGrid .av2-row .avail-name{ position:relative; }
+.av2-edit{ position:absolute; right:10px; top:50%; transform:translateY(-50%); width:30px; height:30px; display:grid; place-items:center;
+  border:1px solid var(--border); border-radius:8px; background:var(--surface); color:var(--text-mid); cursor:pointer; opacity:0; transition:opacity .12s; }
+.av2-edit:hover{ color:var(--accent-text); border-color:var(--accent-border); }
+#availGrid .av2-row:hover .av2-edit, .av2-edit:focus-visible{ opacity:1; }
+@media (hover:none){ .av2-edit{ opacity:1; } }
+.av2-act-on{ display:flex; gap:6px; margin-top:7px; }
+.av2-act-on .btn{ font-size:12px !important; padding:5px 12px !important; border-radius:7px; }
+#availGrid .av2-row.avail-row-editing{ box-shadow:inset 3px 0 0 var(--accent); background:color-mix(in srgb,var(--accent) 5%,transparent) !important; }
+/* per-day footer */
+#availGrid .av2-foot{ background:color-mix(in srgb,var(--text) 2.5%,transparent) !important; }
+.av2-foot-l{ font-size:12px; font-weight:600; color:var(--text-dim); }
+.av2-foot-n{ display:block; padding:0 8px; font-size:13px; font-weight:700; color:var(--text-mid); font-variant-numeric:tabular-nums; }
+.av2-foot-n span{ font-weight:500; color:var(--muted); }
+.av2-foot-zero{ color:var(--warn); }
+@media(max-width:900px){ #availGrid .av2-card > .avail-row{ min-width:900px; } }
 </style>
 </head>
 <body>
@@ -5062,7 +5103,10 @@ function setAvail(staffId,day,val){
 }
 let _availRowEditing = null;   // staffId of the row currently in per-line edit, or null
 // Unlock ONE staff row for editing (per-line availability).
+let _availRowSnap = null;
 function editOneAvail(staffId){
+  if(_availRowEditing!==null && _availRowEditing!==staffId) cancelOneAvail(_availRowEditing, true);
+  _availRowSnap = JSON.parse(JSON.stringify(availability[staffId]||{}));
   _availRowEditing = staffId;
   renderAvailability();
 }
@@ -5073,8 +5117,15 @@ async function saveOneAvail(staffId){
     await _doPushAvail(Number(staffId));   // immediate, awaited write for this person
     _availEditedIds.delete(staffId);
   }catch(e){ console.warn('saveOneAvail',e); showToast('Save failed — try again'); }
-  _availRowEditing = null;
+  _availRowEditing = null; _availRowSnap = null;
   renderAvailability(); renderRoster();
+}
+// Throw away this row's unsaved clicks and lock it again.
+function cancelOneAvail(staffId, quiet){
+  if(_availRowSnap) availability[staffId]=_availRowSnap;
+  _availRowSnap=null; _availRowEditing=null;
+  try{ _availEditedIds.delete(staffId); }catch(e){}
+  if(!quiet){ renderAvailability(); renderRoster(); }
 }
 let _availEditedIds = new Set();
 
@@ -5150,35 +5201,47 @@ async function _doPushAvail(staffId){
 
 let editingAvail={staffId:null,day:null};
 
+function _av2Fmt(t){ const m=/^(\d{1,2}):(\d{2})/.exec(String(t||'')); if(!m) return ''; let h=+m[1]; const ap=h>=12?'pm':'am'; h=h%12||12; return h+(m[2]!=='00'?':'+m[2]:'')+ap; }
+function _av2Min(t){ const m=/^(\d{1,2}):(\d{2})/.exec(String(t||'')); return m?(+m[1])*60+(+m[2]):null; }
+/* One availability cell: a label plus a thin bar drawn on a 7am–9pm track, so
+   the hours someone can work read at a glance without a wall of coloured boxes. */
+function _av2Cell(av, day){
+  let type=av.type, start=null, end=null, label='';
+  if(type==='all'){ start=(day>=5)?'09:00':'09:00'; end=(day>=5)?'16:00':'19:00'; }
+  else if(type==='custom'){ start=av.start; end=av.end; }
+  if(start&&end) label=_av2Fmt(start)+' – '+_av2Fmt(end);
+  else if(type==='no') label='Off';
+  else label='Not set';
+  let bar='';
+  if(start&&end){
+    const T0=7*60, SPAN=14*60, a=Math.max(0,(_av2Min(start)-T0)/SPAN), b=Math.min(1,(_av2Min(end)-T0)/SPAN);
+    bar='<i style="left:'+(a*100).toFixed(1)+'%;width:'+(Math.max(.04,b-a)*100).toFixed(1)+'%"></i>';
+  }
+  const cls=(type==='all'||type==='custom')?'av2-yes':(type==='no'?'av2-no':'av2-unset');
+  return {cls:cls, html:'<span class="av2-t">'+label+'</span><span class="av2-track">'+bar+'</span>'};
+}
 function renderAvailability(){
   const grid=document.getElementById('availGrid');
   const weekLabel=`${fmtDate(currentWeekStart)} – ${fmtDate(addDays(currentWeekStart,6))}`;
   let html=`<div class="avail-header">
     <div>
       <div class="section-title">Staff Availability</div>
-      <div class="av-week">Week of ${weekLabel}</div>
+      <div class="av-week">Week of ${weekLabel} · bars show the hours each person can work</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-      <span class="av-hint">Press <strong>Set</strong> on a row to edit, then <strong>Save</strong></span>
-      <button onclick="downloadSubmittedAvailability()" class="btn btn-save" style="font-size:11.5px;gap:5px;display:flex;align-items:center;">
+      <button onclick="downloadSubmittedAvailability()" class="btn btn-ghost" style="gap:6px;display:flex;align-items:center;">
         <svg width="13" height="13" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>Download PDF
       </button>
-      <button id="availSetBtn" class="btn btn-primary" onclick="enterAvailEdit()" style="display:none;font-size:11.5px;gap:5px;align-items:center">
-        <svg width="13" height="13" viewBox="0 0 20 20" fill="currentColor"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/></svg>Set Availability
-      </button>
-      <button id="availSaveBtn" class="btn btn-save" onclick="saveAvailEdit()" style="display:none;font-size:11.5px;gap:5px;align-items:center">
-        <svg width="13" height="13" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>Save
-      </button>
-      <button id="availCancelBtn" class="btn" onclick="cancelAvailEdit()" style="display:none;font-size:11.5px;">Cancel</button>
+      <button id="availSetBtn" class="btn btn-primary" onclick="enterAvailEdit()" style="display:none">Set Availability</button>
+      <button id="availSaveBtn" class="btn btn-save" onclick="saveAvailEdit()" style="display:none">Save</button>
+      <button id="availCancelBtn" class="btn" onclick="cancelAvailEdit()" style="display:none">Cancel</button>
     </div>
   </div>
-  <div id="availEditHint" style="display:none;background:var(--accent-dim);border:1px solid var(--accent-bd);border-radius:8px;padding:8px 12px;margin:0 0 12px;font-size:11.5px;color:var(--accent-text)">
-    <strong>Edit mode</strong> — click chips to change availability. Nothing is saved until you press <strong>Save</strong>.
-  </div>
+  <div id="availEditHint" style="display:none;background:var(--accent-dim);border:1px solid var(--accent-bd);border-radius:8px;padding:8px 12px;margin:0 0 12px;font-size:12px;color:var(--accent-text)">
+    <strong>Edit mode</strong> — click a day to change it. Nothing is saved until you press <strong>Save</strong>.
+  </div>`;
 
-  `;
-
-  // ── Team filter pills (same behaviour as Team View) ──
+  // ── Team filter pills ──
   const _teams = getUniqueTeams();
   const _teamCount = function(t){ return staff.filter(function(p){ return (p.team||'Unassigned')===t; }).length; };
   let fbar = `<div class="role-filter-bar avail-filter" role="group" aria-label="Filter by team">
@@ -5188,7 +5251,6 @@ function renderAvailability(){
   fbar += `</div>`;
   html += fbar;
 
-  // ── Group staff by team, render one card per team (mirrors Team View) ──
   const _byTeam = {};
   [...staff].sort((a,b)=>a.first.localeCompare(b.first)||a.last.localeCompare(b.last))
     .forEach(p=>{ const t=p.team||'Unassigned'; (_byTeam[t]=_byTeam[t]||[]).push(p); });
@@ -5197,74 +5259,51 @@ function renderAvailability(){
   _showTeams.forEach(team=>{
     const members = _byTeam[team]||[];
     if(!members.length) return;
+    html += `<div class="role-view-card avail-team-card av2-card" data-team="${(team||'').replace(/"/g,'&quot;')}">
+      <div class="role-view-header"><div class="role-view-title">${team}</div><span class="av2-count">${members.length} staff</span></div>`;
 
-    // week tally for this team
-    let tYes=0,tNo=0,tUnset=0;
-    members.forEach(p=>{ for(let d=0;d<7;d++){ const a=getAvail(p.id,d);
-      if(a.type==='no') tNo++; else if(a.type==='all'||a.type==='custom') tYes++; else tUnset++; } });
-
-    html += `<div class="role-view-card avail-team-card" data-team="${(team||'').replace(/"/g,'&quot;')}">
-      <div class="role-view-header">
-        <div style="display:flex;align-items:center;gap:10px">
-          <div class="role-view-title">${team}</div>
-          <span class="avail-team-badge">${members.length} STAFF</span>
-        </div>
-        <div class="avail-team-tally">
-          <span class="tt"><i class="tt-yes"></i>${tYes} available</span>
-          <span class="tt"><i class="tt-no"></i>${tNo} unavailable</span>
-          <span class="tt"><i class="tt-unset"></i>${tUnset} not set</span>
-        </div>
-      </div>`;
-
-    // per-team day header
-    html+=`<div class="avail-row avail-hd-row"><div class="avail-name avail-hd-name">Staff</div>`;
+    html+=`<div class="avail-row avail-hd-row av2-row"><div class="avail-name avail-hd-name">Staff</div>`;
     for(let d=0;d<7;d++){
       const day=addDays(currentWeekStart,d);
-      html+=`<div class="avail-cell avail-dh${isToday(day)?' avail-today':''}${d>=5?' avail-wknd':''}"><span class="avail-dh-d">${DAYS[d]}</span><span class="avail-dh-n">${fmtDate(day)}</span></div>`;
+      html+=`<div class="avail-cell avail-dh${isToday(day)?' avail-today':''}"><span class="avail-dh-d">${DAYS[d]}</span><span class="avail-dh-n">${fmtDate(day)}</span></div>`;
     }
-    html+=`<div class="avail-cell avail-dh avail-hd-edit"><span class="avail-dh-d">Edit</span></div>`;
     html+='</div>';
 
+    const perDay=[0,0,0,0,0,0,0];
     members.forEach(s=>{
-    const _editing = _availRowEditing===s.id;
-    // How many days this week they can work, at a glance.
-    let _okDays=0,_unsetDays=0;
-    for(let d=0;d<7;d++){ const _a=getAvail(s.id,d); if(_a.type==='all'||_a.type==='custom') _okDays++; else if(_a.type!=='no') _unsetDays++; }
-    html+=`<div class="avail-row${_editing?' avail-row-editing':''}" data-avail-staff="${s.id}" data-team="${(s.team||'').replace(/"/g,'&quot;')}"><div class="avail-name"><div class="avail-dot" style="background:${s.color};flex-shrink:0"></div><div class="avail-who"><span class="avail-who-n" title="${s.first} ${s.last}">${s.first} ${s.last}</span><span class="avail-who-s">${_okDays} of 7 days${_unsetDays?' \u00b7 '+_unsetDays+' not set':''}</span></div></div>`;
-    for(let d=0;d<7;d++){
-      const av=getAvail(s.id,d);
-      let chip='';
-      if(av.type==='no'){
-        chip=`<div class="avail-chip avail-no" onclick="cycleAvail(${s.id},${d})">Unavail</div>`;
-      } else if(av.type==='custom'){
-        chip=`<div class="avail-chip avail-pref" onclick="cycleAvail(${s.id},${d})" title="Click to cycle · use Custom below to edit hours" style="font-size:7.5px">${av.start}–${av.end}</div>`;
-      } else if(av.type==='all'){
-        chip=`<div class="avail-chip avail-yes" onclick="cycleAvail(${s.id},${d})">9-7</div>`;
-      } else {
-        chip=`<div class="avail-chip avail-unset" onclick="cycleAvail(${s.id},${d})">— Not Set</div>`;
+      const _editing = _availRowEditing===s.id;
+      let _okDays=0,_unsetDays=0;
+      for(let d=0;d<7;d++){ const _a=getAvail(s.id,d); if(_a.type==='all'||_a.type==='custom'){ _okDays++; perDay[d]++; } else if(_a.type!=='no') _unsetDays++; }
+      const actions = _editing
+        ? `<div class="av2-act-on"><button class="btn btn-save" onclick="saveOneAvail(${s.id})" data-tl-hide="1">Save</button><button class="btn btn-ghost" onclick="cancelOneAvail(${s.id})" data-tl-hide="1">Cancel</button></div>`
+        : '';
+      const editBtn = _editing ? '' : `<button class="av2-edit" onclick="editOneAvail(${s.id})" title="Edit ${s.first}'s availability" aria-label="Edit ${s.first}'s availability" data-tl-hide="1"><svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/></svg></button>`;
+      html+=`<div class="avail-row av2-row${_editing?' avail-row-editing':''}" data-avail-staff="${s.id}" data-team="${(s.team||'').replace(/"/g,'&quot;')}">
+        <div class="avail-name"><div class="avail-dot" style="background:${s.color};flex-shrink:0"></div>
+          <div class="avail-who"><span class="avail-who-n" title="${s.first} ${s.last}">${s.first} ${s.last}</span>
+          <span class="avail-who-s">${_okDays} of 7 days${_unsetDays?` · <b class="av2-unset-n">${_unsetDays} not set</b>`:''}</span>${actions}</div>${editBtn}</div>`;
+      for(let d=0;d<7;d++){
+        const c=_av2Cell(getAvail(s.id,d), d);
+        html+=`<div class="avail-cell${isToday(addDays(currentWeekStart,d))?' avail-today':''}"><div class="avail-chip av2 ${c.cls}" onclick="cycleAvail(${s.id},${d})">${c.html}</div>`+
+              `<div class="avail-custom" onclick="openCustomAvail(${s.id},${d})" title="Set custom hours">Custom hours</div></div>`;
       }
-      // Small custom button always visible
-      // Custom-hours link: only shown while the row is being edited (it can't be clicked before then).
-      const customBtn=`<div class="avail-custom" onclick="openCustomAvail(${s.id},${d})" title="Set custom hours">Custom hours</div>`;
-      html+=`<div class="avail-cell${isToday(addDays(currentWeekStart,d))?' avail-today':''}${d>=5?' avail-wknd':''}">${chip}${customBtn}</div>`;
+      html+='</div>';
+    });
+
+    // per-day count: how many on this team can work that day
+    html+=`<div class="avail-row av2-row av2-foot"><div class="avail-name"><span class="av2-foot-l">Available</span></div>`;
+    for(let d=0;d<7;d++){
+      const n=perDay[d];
+      html+=`<div class="avail-cell${isToday(addDays(currentWeekStart,d))?' avail-today':''}"><span class="av2-foot-n${n===0?' av2-foot-zero':''}">${n}<span> / ${members.length}</span></span></div>`;
     }
-    // Per-row action: Set (unlock this row) → Save (write just this person).
-    const rowBtn = _editing
-      ? `<button class="btn btn-save" style="font-size:10px;padding:4px 10px" onclick="saveOneAvail(${s.id})" data-tl-hide="1">Save</button>`
-      : `<button class="btn btn-ghost" style="font-size:10px;padding:4px 10px" onclick="editOneAvail(${s.id})" data-tl-hide="1">Set</button>`;
-    html+=`<div class="avail-cell" style="min-width:64px;justify-content:center">${rowBtn}</div>`;
-    html+='</div>';   // close staff row
-    });               // close members.forEach
+    html+='</div></div>';
+  });
 
-    html+='</div>';   // close team card
-  });                 // close _showTeams.forEach
-
-  if(!_showTeams.length) html+=`<div style="padding:40px;text-align:center;color:var(--text-dim);font-family:var(--mono);font-size:12px">No staff found.</div>`;
-
+  if(!_showTeams.length) html+=`<div style="padding:40px;text-align:center;color:var(--text-dim);font-size:13px">No staff found.</div>`;
   grid.innerHTML=html;
   try{ if(typeof applyTeamLeadLock==='function' && document.body.classList.contains('tl-readonly')) applyTeamLeadLock(); }catch(e){}
 }
-// team filter state + setter for the Availability tab
+
 let _availTeamFilter = null;
 function setAvailTeamFilter(t){ _availTeamFilter = t; renderAvailability(); }
 
