@@ -2799,6 +2799,21 @@ body.avail-editing #availGrid .avail-chip:hover, #availGrid .avail-row-editing .
           <div class="tools-menu-item" onclick="closeToolsMenu();openAutoAllocate()">
             <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM14 11a1 1 0 011 1v1h1a1 1 0 110 2h-1v1a1 1 0 11-2 0v-1h-1a1 1 0 110-2h1v-1a1 1 0 011-1z"/></svg>Rostering Menu
           </div>
+          <div class="tools-menu-item" onclick="closeToolsMenu();rtOpen('check')">
+            <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path d="M10 2a8 8 0 100 16 8 8 0 000-16zm-1 11.4L5.6 10l1.4-1.4L9 10.6l4-4L14.4 8 9 13.4z"/></svg>Roster Check
+          </div>
+          <div class="tools-menu-item" onclick="closeToolsMenu();rtOpen('cover')">
+            <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path d="M10 2a8 8 0 100 16 8 8 0 000-16zm-1 11.4L5.6 10l1.4-1.4L9 10.6l4-4L14.4 8 9 13.4z"/></svg>Find Cover
+          </div>
+          <div class="tools-menu-item" onclick="closeToolsMenu();rtOpen('hours')">
+            <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path d="M10 2a8 8 0 100 16 8 8 0 000-16zm-1 11.4L5.6 10l1.4-1.4L9 10.6l4-4L14.4 8 9 13.4z"/></svg>Hours Balance
+          </div>
+          <div class="tools-menu-item" onclick="closeToolsMenu();rtOpen('copy')">
+            <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path d="M8 2a2 2 0 00-2 2v8a2 2 0 002 2h6a2 2 0 002-2V6.4L12.6 3H8zM4 6a2 2 0 00-2 2v8a2 2 0 002 2h6a2 2 0 002-2H4V6z"/></svg>Copy Day
+          </div>
+          <div class="tools-menu-item" onclick="closeToolsMenu();rtOpen('changes')">
+            <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path d="M10 2a8 8 0 100 16 8 8 0 000-16zm-1 11.4L5.6 10l1.4-1.4L9 10.6l4-4L14.4 8 9 13.4z"/></svg>Shift Changes
+          </div>
           <div class="tools-menu-item" onclick="closeToolsMenu();openExportModal()">
             <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V7.414A2 2 0 0015.414 6L12 2.586A2 2 0 0010.586 2H6zm5 6a1 1 0 10-2 0v3.586l-1.293-1.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V8z" clip-rule="evenodd"/></svg>Export PDF
           </div>
@@ -3058,6 +3073,16 @@ body.avail-editing #availGrid .avail-chip:hover, #availGrid .avail-row-editing .
       <select class="form-input" id="shiftDevice">
         <option value="">— No device —</option>
       </select>
+    </div>
+    <div class="form-group" id="shiftRepeatBox" style="display:none;border:1px solid var(--border);border-radius:8px;padding:10px 12px;">
+      <label class="form-label" style="margin-bottom:6px">Copy this shift to other days</label>
+      <div id="shiftRepeatDays" style="display:flex;gap:5px;flex-wrap:wrap"></div>
+      <div style="display:flex;gap:8px;margin-top:9px;align-items:center;flex-wrap:wrap">
+        <button class="btn btn-ghost" type="button" style="padding:5px 10px" onclick="shiftRepeatPick('wk')">Mon–Fri</button>
+        <button class="btn btn-ghost" type="button" style="padding:5px 10px" onclick="shiftRepeatPick('none')">Clear</button>
+        <button class="btn btn-primary" type="button" style="padding:5px 12px;margin-left:auto" onclick="shiftRepeatGo(this)">Copy</button>
+      </div>
+      <div style="font-size:11px;opacity:.65;margin-top:6px">Uses the times above. Skips days they're on leave, unavailable, or already rostered.</div>
     </div>
     <!-- Shift-pickup status: only shown for shifts that exist in roster_shifts -->
     <div class="form-group" id="shiftPickupBox" style="display:none;border:1px solid var(--border);border-radius:8px;padding:10px 12px;background:var(--bg);">
@@ -3357,6 +3382,29 @@ body.avail-editing #availGrid .avail-chip:hover, #availGrid .avail-row-editing .
 </div>
 
 <!-- EXPORT PDF MODAL -->
+<div class="modal-overlay" id="leaveClashModal">
+  <div class="modal" style="width:min(600px,94vw);max-height:88vh;display:flex;flex-direction:column">
+    <div class="modal-title"><span id="lcTitle">Approve leave</span><button class="modal-close" onclick="closeModal('leaveClashModal')">×</button></div>
+    <div id="lcBody" style="overflow:auto;min-height:100px"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('leaveClashModal')">Cancel</button>
+      <button class="btn btn-primary" id="lcApprove">Approve leave</button>
+    </div>
+  </div>
+</div>
+<div class="modal-overlay" id="rtModal">
+  <div class="modal" style="width:min(640px,94vw);max-height:86vh;display:flex;flex-direction:column">
+    <div class="modal-title"><span id="rtTitle">Roster tools</span><button class="modal-close" onclick="closeModal('rtModal')">×</button></div>
+    <div id="rtTabs" style="display:flex;gap:6px;margin:0 0 12px;flex-wrap:wrap">
+      <button class="btn btn-ghost" data-t="check" onclick="rtTab('check')">Check</button>
+      <button class="btn btn-ghost" data-t="cover" onclick="rtTab('cover')">Find cover</button>
+      <button class="btn btn-ghost" data-t="hours" onclick="rtTab('hours')">Hours</button>
+      <button class="btn btn-ghost" data-t="changes" onclick="rtTab('changes')">Changes</button>
+      <button class="btn btn-ghost" data-t="copy" onclick="rtTab('copy')">Copy day</button>
+    </div>
+    <div id="rtBody" style="overflow:auto;min-height:120px"></div>
+  </div>
+</div>
 <div class="modal-overlay" id="exportModal">
   <div class="modal" style="width:360px">
     <div class="modal-title"><span>Export PDF</span><button class="modal-close" onclick="closeModal('exportModal')">×</button></div>
@@ -4104,6 +4152,386 @@ function closeToolsMenu(){ document.getElementById('toolsMenu').classList.remove
 function closeToolsMenuOutside(e){ if(!e.target.closest('.tools-dropdown'))closeToolsMenu(); }
 
 
+/* ── SHIFT-CHANGE NOTICES (manager side) ──────────────────────────────────
+   The database writes a notice when a shift in a PUBLISHED week changes (see
+   roster_change_notices.sql). Here: warn the manager it happened, mark shifts
+   whose change the person hasn't confirmed yet, and list them in Tools → Changes. */
+let _rcnRecent=[], _rcnPending={};
+function _rcnT(t){ const m=/^(\d{1,2}):(\d{2})/.exec(String(t||'')); return m?(m[1].padStart(2,'0')+':'+m[2]):''; }
+function _rcnD(d){ try{ return new Date(d+'T00:00:00').toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short'}); }catch(e){ return String(d||''); } }
+function _rcnWarn(who){
+  try{
+    if(!_pubWeeks || !_pubWeeks.has(_curWeekISO())) return;
+    setTimeout(function(){ showToast((who||'Staff')+' will be notified — this week is published'); }, 1000);
+  }catch(e){}
+}
+async function loadChangeNotices(){
+  try{
+    const since=new Date(Date.now()-14*864e5).toISOString();
+    const r=await fetch(SUPABASE_URL+'/rest/v1/roster_change_notices?select=id,shift_id,staff_name,kind,old_date,old_start,old_end,new_date,new_start,new_end,created_at,seen_at'+
+      '&created_at=gte.'+encodeURIComponent(since)+'&order=created_at.desc&limit=300',
+      {headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY}});
+    if(!r.ok) return;                       // table not created yet / no access: stay quiet
+    const rows=await r.json(); if(!Array.isArray(rows)) return;
+    const pend={}; rows.forEach(function(n){ if(!n.seen_at && n.shift_id) pend[n.shift_id]=n; });
+    const changed=JSON.stringify(Object.keys(pend).sort())!==JSON.stringify(Object.keys(_rcnPending).sort());
+    _rcnRecent=rows; _rcnPending=pend;
+    if(changed && typeof renderRoster==='function') renderRoster();
+    if(_rcnCur==='changes' && document.getElementById('rtModal').classList.contains('open')) _rtRenderChanges();
+  }catch(e){ console.warn('loadChangeNotices',e); }
+}
+var _rcnCur='';
+
+/* ── ROSTER MINI TOOLS ────────────────────────────────────────────────────
+   Check: problems in the visible week. Find cover: who can take a gap.
+   Hours: who is under/over their hours. All read the grid already on screen,
+   so they match exactly what the manager is looking at. */
+function _rtEsc(v){ return String(v==null?'':v).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+function _rtMin(t){ var m=/^(\d{1,2}):(\d{2})/.exec(String(t||'')); return m?(+m[1])*60+(+m[2]):null; }
+function _rtName(s){ return ((s.first||'')+' '+(s.last||'')).trim(); }
+function _rtPeople(){ return (staff||[]).filter(function(s){return !s.isOfficeManager&&s.isManager!=='office';}); }
+function _rtLeave(sid,d){ return ((shifts[sid]||{})[d]||[]).some(function(x){return x.type==='leave';}); }
+function _rtWork(sid,d){ return ((shifts[sid]||{})[d]||[]).filter(function(x){return x.type!=='leave';}); }
+var _rtCur='check';
+function rtOpen(t){ rtTab(t||'check'); openModal('rtModal'); }
+function rtTab(t){
+  _rtCur=t;
+  document.querySelectorAll('#rtTabs button').forEach(function(b){ b.classList.toggle('btn-primary',b.getAttribute('data-t')===t); b.classList.toggle('btn-ghost',b.getAttribute('data-t')!==t); });
+  var wk=fmtDate(currentWeekStart)+' – '+fmtDate(addDays(currentWeekStart,6));
+  document.getElementById('rtTitle').textContent={check:'Roster check',cover:'Find cover',hours:'Hours balance',changes:'Shift changes',copy:'Copy a day'}[t]+' · '+wk;
+  _rcnCur=t; ({check:_rtRenderCheck,cover:_rtRenderCover,hours:_rtRenderHours,changes:_rtRenderChanges,copy:_rtRenderCopy})[t]();
+  if(t==='changes') loadChangeNotices();
+}
+function _rtRenderCheck(){
+  var issues=[], ppl=_rtPeople();
+  ppl.forEach(function(s){
+    var nm=_rtName(s);
+    for(var d=0;d<7;d++){
+      var list=_rtWork(s.id,d), av=getAvail(s.id,d), day=DAYS[d];
+      if(list.length && _rtLeave(s.id,d)) issues.push({sev:2,sid:s.id,d:d,i:0,t:nm+' · '+day,m:'rostered on a day of approved leave'});
+      list.forEach(function(sh,i){
+        var a=_rtMin(sh.start), b=_rtMin(sh.end);
+        if(av.type==='no') issues.push({sev:2,sid:s.id,d:d,i:i,t:nm+' · '+day,m:'rostered but marked unavailable'});
+        else if(av.type==='custom' && a!=null && b!=null){
+          var as=_rtMin(av.start), ae=_rtMin(av.end);
+          if(as!=null&&ae!=null&&(a<as||b>ae)) issues.push({sev:1,sid:s.id,d:d,i:i,t:nm+' · '+day,m:'shift '+sh.start+'–'+sh.end+' is outside availability '+av.start+'–'+av.end});
+        }
+        for(var j=i+1;j<list.length;j++){
+          var c=_rtMin(list[j].start), e=_rtMin(list[j].end);
+          if(a!=null&&b!=null&&c!=null&&e!=null&&a<e&&c<b) issues.push({sev:2,sid:s.id,d:d,i:i,t:nm+' · '+day,m:'two shifts overlap ('+sh.start+'–'+sh.end+' and '+list[j].start+'–'+list[j].end+')'});
+        }
+      });
+      if(staffHoursDay(s.id,d)>10) issues.push({sev:1,sid:s.id,d:d,i:0,t:nm+' · '+day,m:Math.round(staffHoursDay(s.id,d)*10)/10+'h in one day'});
+    }
+    var wkH=staffHoursWeek(s.id), mx=Number(s.maxHours)||0;
+    if(mx && wkH>mx+0.01) issues.push({sev:1,t:nm,m:'over weekly hours: '+(Math.round(wkH*10)/10)+'h of '+mx+'h'});
+  });
+  for(var d2=0;d2<5;d2++){
+    var tot=0; ppl.forEach(function(s){ tot+=staffHoursDay(s.id,d2); });
+    if(!tot) issues.push({sev:1,t:DAYS[d2],m:'nobody rostered'});
+  }
+  issues.sort(function(x,y){return y.sev-x.sev;});
+  var h='';
+  if(!issues.length) h='<div style="padding:22px;text-align:center;font-weight:700">No problems found in this week.</div>';
+  else{
+    h='<div style="font-size:12px;opacity:.7;margin:0 0 8px">'+issues.length+' thing'+(issues.length>1?'s':'')+' to look at</div>';
+    issues.forEach(function(x){
+      var col=x.sev>=2?'#fb7185':'#fbbf24';
+      h+='<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;margin:0 0 6px;border:1px solid var(--border);border-left:3px solid '+col+';border-radius:8px">'+
+         '<div style="flex:1;min-width:0"><div style="font-weight:700;font-size:13px">'+_rtEsc(x.t)+'</div><div style="font-size:12px;opacity:.8">'+_rtEsc(x.m)+'</div></div>'+
+         (x.sid!=null?'<button class="btn btn-ghost" style="padding:4px 10px" onclick="closeModal(\'rtModal\');editShift('+x.sid+','+x.d+','+x.i+')">Open</button>':'')+'</div>';
+    });
+  }
+  document.getElementById('rtBody').innerHTML=h;
+}
+function _rtRenderCover(){
+  var opts=DAYS.map(function(n,i){return '<option value="'+i+'"'+(i===(window._rtDay||0)?' selected':'')+'>'+n+' '+fmtDate(addDays(currentWeekStart,i))+'</option>';}).join('');
+  document.getElementById('rtBody').innerHTML=
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin:0 0 12px">'+
+    '<div><label class="form-label">Day</label><select class="form-input" id="rtDay" onchange="window._rtDay=+this.value;_rtCoverList()">'+opts+'</select></div>'+
+    '<div><label class="form-label">From</label><input class="form-input" type="time" id="rtFrom" value="'+(window._rtFrom||'09:00')+'" onchange="window._rtFrom=this.value;_rtCoverList()"></div>'+
+    '<div><label class="form-label">To</label><input class="form-input" type="time" id="rtTo" value="'+(window._rtTo||'17:00')+'" onchange="window._rtTo=this.value;_rtCoverList()"></div>'+
+    '<div><label class="form-label">Team</label><select class="form-input" id="rtTeam" onchange="_rtCoverList()"><option value="">All teams</option>'+
+      Array.from(new Set(_rtPeople().map(function(s){return s.team;}).filter(Boolean))).sort().map(function(t){return '<option>'+_rtEsc(t)+'</option>';}).join('')+'</select></div>'+
+    '</div><div id="rtCoverOut"></div>';
+  _rtCoverList();
+}
+function _rtCoverList(){
+  var d=+document.getElementById('rtDay').value, f=document.getElementById('rtFrom').value, t=document.getElementById('rtTo').value, team=document.getElementById('rtTeam').value;
+  var a=_rtMin(f), b=_rtMin(t), out=document.getElementById('rtCoverOut');
+  if(a==null||b==null||b<=a){ out.innerHTML='<div style="opacity:.7;padding:10px">Pick a start and end time.</div>'; return; }
+  var need=(b-a)/60, rows=[];
+  _rtPeople().forEach(function(s){
+    if(team && s.team!==team) return;
+    if(_rtLeave(s.id,d)) return;
+    var av=getAvail(s.id,d);
+    if(av.type==='no') return;
+    var why='', ok=true;
+    if(av.type==='custom'){ var as=_rtMin(av.start), ae=_rtMin(av.end); if(as!=null&&ae!=null&&(a<as||b>ae)){ ok=false; why='only '+av.start+'–'+av.end; } }
+    if(av.type==='unset'){ why='availability not set'; }
+    if(ok && _rtWork(s.id,d).some(function(sh){ var c=_rtMin(sh.start), e=_rtMin(sh.end); return c!=null&&e!=null&&a<e&&c<b; })){ ok=false; why='already rostered then'; }
+    var left=(Number(s.maxHours)||0)?Math.max(0,(Number(s.maxHours)||0)-staffHoursWeek(s.id)):null;
+    if(ok && left!=null && left+0.01<need){ why=(why?why+' · ':'')+'only '+(Math.round(left*10)/10)+'h left this week'; }
+    rows.push({s:s,ok:ok,why:why,left:left});
+  });
+  rows.sort(function(x,y){ return (y.ok-x.ok) || ((y.left==null?99:y.left)-(x.left==null?99:x.left)); });
+  if(!rows.length){ out.innerHTML='<div style="opacity:.7;padding:10px">Nobody is available that day.</div>'; return; }
+  out.innerHTML=rows.map(function(r){
+    return '<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;margin:0 0 6px;border:1px solid var(--border);border-radius:8px;'+(r.ok?'':'opacity:.55')+'">'+
+      '<div style="flex:1;min-width:0"><div style="font-weight:700;font-size:13px">'+_rtEsc(_rtName(r.s))+' <span style="font-weight:400;opacity:.65">· '+_rtEsc(r.s.team||'')+'</span></div>'+
+      '<div style="font-size:12px;opacity:.8">'+(r.left!=null?(Math.round(r.left*10)/10)+'h left this week':'no hours cap')+(r.why?' · '+_rtEsc(r.why):'')+'</div></div>'+
+      (r.ok?'<button class="btn btn-primary" style="padding:4px 10px" onclick="rtAssign('+r.s.id+','+d+',\''+f+'\',\''+t+'\')">Assign</button>':'')+'</div>';
+  }).join('');
+}
+function rtAssign(sid,d,f,t){
+  closeModal('rtModal');
+  clickCell(sid,d);
+  document.getElementById('shiftStart').value=f;
+  document.getElementById('shiftEnd').value=t;
+}
+function _rtRenderHours(){
+  var rows=_rtPeople().map(function(s){
+    var h=staffHoursWeek(s.id), mx=Number(s.maxHours)||0, onLeaveAll=0;
+    for(var d=0;d<7;d++) if(_rtLeave(s.id,d)) onLeaveAll++;
+    return {s:s,h:h,mx:mx,leave:onLeaveAll};
+  });
+  rows.sort(function(x,y){ return (x.h===0)!==(y.h===0) ? (x.h===0?-1:1) : ((y.mx-y.h)-(x.mx-x.h)); });
+  var none=rows.filter(function(r){return r.h===0;}).length;
+  var h='<div style="font-size:12px;opacity:.7;margin:0 0 8px">'+none+' with no shifts this week · sorted by hours still available</div>';
+  rows.forEach(function(r){
+    var pct=r.mx?Math.min(100,r.h/r.mx*100):0, over=r.mx&&r.h>r.mx+0.01;
+    var col=over?'#fb7185':(r.h===0?'#fbbf24':'var(--accent,#4ade80)');
+    h+='<div style="display:flex;align-items:center;gap:10px;padding:7px 10px;margin:0 0 5px;border:1px solid var(--border);border-radius:8px">'+
+      '<div style="width:170px;min-width:0"><div style="font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+_rtEsc(_rtName(r.s))+'</div><div style="font-size:11px;opacity:.65">'+_rtEsc(r.s.team||'')+(r.leave?' · leave '+r.leave+'d':'')+'</div></div>'+
+      '<div style="flex:1;height:7px;border-radius:4px;background:var(--border);overflow:hidden"><div style="height:100%;width:'+pct+'%;background:'+col+'"></div></div>'+
+      '<div style="width:78px;text-align:right;font-size:12px;font-weight:700;font-family:var(--mono)">'+(Math.round(r.h*10)/10)+(r.mx?' / '+r.mx:'')+'h</div></div>';
+  });
+  document.getElementById('rtBody').innerHTML=h;
+}
+
+function _rtRenderChanges(){
+  _rcnCur='changes';
+  const rows=_rcnRecent||[], unseen=rows.filter(function(n){return !n.seen_at;});
+  let h='<div style="font-size:12px;opacity:.7;margin:0 0 8px">'+unseen.length+' not yet seen · last 14 days · staff must tap “Got it” in Nexus</div>';
+  if(!rows.length) h+='<div style="padding:22px;text-align:center;opacity:.75">No changes to published rosters.</div>';
+  rows.forEach(function(n){
+    const oldT=n.old_date?_rcnD(n.old_date)+' '+_rcnT(n.old_start)+'–'+_rcnT(n.old_end):'';
+    const newT=n.new_date?_rcnD(n.new_date)+' '+_rcnT(n.new_start)+'–'+_rcnT(n.new_end):'';
+    const what=n.kind==='published'?'roster published · week of '+_rtEsc(_rcnD(n.new_date)):(n.kind==='changed'?_rtEsc(oldT)+' → <b>'+_rtEsc(newT)+'</b>':(n.kind==='cancelled'?'removed: '+_rtEsc(oldT):'added: <b>'+_rtEsc(newT)+'</b>'));
+    const when=new Date(n.created_at).toLocaleString('en-AU',{day:'numeric',month:'short',hour:'numeric',minute:'2-digit'});
+    const status=n.seen_at?'<span style="color:#10b981;font-weight:700">Seen '+_rtEsc(new Date(n.seen_at).toLocaleString('en-AU',{day:'numeric',month:'short',hour:'numeric',minute:'2-digit'}))+'</span>':'<span style="color:#f59e0b;font-weight:700">Not seen yet</span>';
+    h+='<div style="padding:8px 10px;margin:0 0 6px;border:1px solid var(--border);border-radius:8px"><div style="display:flex;justify-content:space-between;gap:10px"><b style="font-size:13px">'+_rtEsc(n.staff_name)+'</b><span style="font-size:11px;opacity:.65">'+_rtEsc(when)+'</span></div><div style="font-size:12px;margin:2px 0">'+what+'</div><div style="font-size:11.5px">'+status+'</div></div>';
+  });
+  document.getElementById('rtBody').innerHTML=h;
+}
+
+/* ── COPY: one shift to other days, or a whole day to other days ──────────
+   Both build a plan first, then write in one bulk call. A copy is skipped for
+   a person who's on leave that day, marked unavailable, or already has a
+   shift that overlaps — copying must never double-book or override leave. */
+function _rtCopyPlan(items, skipUnavail){
+  const ok=[], skip=[], taken={};
+  items.forEach(function(it){
+    const nm=_rtName((staff||[]).find(function(x){return x.id===it.sid;})||{})||'?';
+    const tag=nm+' '+DAYS[it.day];
+    if(_rtLeave(it.sid,it.day)){ skip.push(tag+' (leave)'); return; }
+    if(skipUnavail && getAvail(it.sid,it.day).type==='no'){ skip.push(tag+' (unavailable)'); return; }
+    const a=_rtMin(it.start), b=_rtMin(it.end);
+    const k=it.sid+'|'+it.day;
+    const busy=_rtWork(it.sid,it.day).concat(taken[k]||[]).some(function(x){
+      const c=_rtMin(x.start), e=_rtMin(x.end); return c!=null&&e!=null&&a<e&&c<b; });
+    if(busy){ skip.push(tag+' (already rostered)'); return; }
+    (taken[k]=taken[k]||[]).push({start:it.start,end:it.end});
+    ok.push(it);
+  });
+  return {ok:ok, skip:skip};
+}
+async function _rtCopyRun(plan){
+  if(!plan.ok.length) return 0;
+  plan.ok.forEach(function(it){
+    const blk={start:it.start,end:it.end,type:'shift',role:it.role||''};
+    if(!shifts[it.sid]) shifts[it.sid]={};
+    if(!shifts[it.sid][it.day]) shifts[it.sid][it.day]=[];
+    shifts[it.sid][it.day].push(blk);
+    queueShift(it.sid, it.day, blk);
+  });
+  try{ renderRoster(); updateStats(); }catch(e){}
+  const n=await flushShiftQueue();
+  loadWeekShiftsFromDB(currentWeekStart);
+  return n;
+}
+function _rtCopyMsg(n, plan){
+  let m=n?('Copied '+n+' shift'+(n===1?'':'s')):'Nothing copied';
+  if(plan.skip.length) m+=' · skipped '+plan.skip.length+(plan.skip.length<=3?': '+plan.skip.join(', '):'');
+  try{ if(n && _pubWeeks && _pubWeeks.has(_curWeekISO())) m+=' · staff will be notified'; }catch(e){}
+  return m;
+}
+
+/* shift modal: repeat one shift */
+let _repeatDays=new Set(), _repeatFrom=0;
+function _shiftRepeatInit(dayIdx, show){
+  const box=document.getElementById('shiftRepeatBox'); if(!box) return;
+  box.style.display=show?'':'none';
+  _repeatDays=new Set(); _repeatFrom=+dayIdx||0;
+  _shiftRepeatPaint();
+}
+function _shiftRepeatPaint(){
+  const host=document.getElementById('shiftRepeatDays'); if(!host) return;
+  host.innerHTML=DAYS.map(function(n,i){
+    if(i===_repeatFrom) return '<button type="button" class="btn btn-ghost" disabled style="padding:4px 9px;opacity:.35">'+n+'</button>';
+    const on=_repeatDays.has(i);
+    return '<button type="button" class="btn '+(on?'btn-primary':'btn-ghost')+'" style="padding:4px 9px" onclick="shiftRepeatToggle('+i+')">'+n+'</button>';
+  }).join('');
+}
+function shiftRepeatToggle(i){ if(_repeatDays.has(i)) _repeatDays.delete(i); else _repeatDays.add(i); _shiftRepeatPaint(); }
+function shiftRepeatPick(k){ _repeatDays=new Set(k==='wk'?[0,1,2,3,4].filter(function(i){return i!==_repeatFrom;}):[]); _shiftRepeatPaint(); }
+async function shiftRepeatGo(btn){
+  if(!_repeatDays.size){ showToast('Pick at least one day'); return; }
+  const sid=parseInt(document.getElementById('shiftStaff').value);
+  const start=document.getElementById('shiftStart').value, end=document.getElementById('shiftEnd').value;
+  const role=document.getElementById('shiftRole').value;
+  if(!start||!end||start>=end){ showToast('End time must be after start time'); return; }
+  const plan=_rtCopyPlan(Array.from(_repeatDays).sort().map(function(d){ return {sid:sid,day:d,start:start,end:end,role:role}; }), true);
+  if(btn){ btn.disabled=true; btn.textContent='Copying…'; }
+  const n=await _rtCopyRun(plan);
+  if(btn){ btn.disabled=false; btn.textContent='Copy'; }
+  closeModal('shiftModal');
+  showToast(_rtCopyMsg(n, plan));
+}
+
+/* tools: copy a whole day */
+let _cdFrom=0, _cdTo=new Set(), _cdTeam='', _cdSkipUnavail=true;
+function _rtRenderCopy(){
+  const teams=Array.from(new Set(_rtPeople().map(function(s){return s.team;}).filter(Boolean))).sort();
+  const dayOpt=DAYS.map(function(n,i){ return '<option value="'+i+'"'+(i===_cdFrom?' selected':'')+'>'+n+' '+fmtDate(addDays(currentWeekStart,i))+'</option>'; }).join('');
+  const chips=DAYS.map(function(n,i){
+    if(i===_cdFrom) return '<button type="button" class="btn btn-ghost" disabled style="padding:4px 9px;opacity:.35">'+n+'</button>';
+    return '<button type="button" class="btn '+(_cdTo.has(i)?'btn-primary':'btn-ghost')+'" style="padding:4px 9px" onclick="_cdToggle('+i+')">'+n+'</button>';
+  }).join('');
+  document.getElementById('rtBody').innerHTML=
+    '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin:0 0 10px">'+
+      '<div><label class="form-label">Copy from</label><select class="form-input" onchange="_cdFrom=+this.value;_cdTo.delete(_cdFrom);_rtRenderCopy()">'+dayOpt+'</select></div>'+
+      '<div><label class="form-label">Team</label><select class="form-input" onchange="_cdTeam=this.value;_rtRenderCopy()"><option value="">All teams</option>'+
+        teams.map(function(t){return '<option'+(t===_cdTeam?' selected':'')+'>'+_rtEsc(t)+'</option>';}).join('')+'</select></div>'+
+    '</div>'+
+    '<label class="form-label">Copy to</label><div style="display:flex;gap:5px;flex-wrap:wrap;margin:0 0 8px">'+chips+
+      '<button type="button" class="btn btn-ghost" style="padding:4px 9px" onclick="_cdTo=new Set([0,1,2,3,4].filter(function(i){return i!==_cdFrom;}));_rtRenderCopy()">Mon–Fri</button></div>'+
+    '<label style="display:flex;gap:7px;align-items:center;font-size:12.5px;margin:0 0 12px"><input type="checkbox" '+(_cdSkipUnavail?'checked':'')+' onchange="_cdSkipUnavail=this.checked;_rtRenderCopy()"> Skip people marked unavailable on the target day</label>'+
+    '<div id="cdPreview"></div>';
+  _cdPreview();
+}
+function _cdToggle(i){ if(_cdTo.has(i)) _cdTo.delete(i); else _cdTo.add(i); _rtRenderCopy(); }
+function _cdItems(){
+  const items=[];
+  _rtPeople().forEach(function(s){
+    if(_cdTeam && s.team!==_cdTeam) return;
+    _rtWork(s.id,_cdFrom).forEach(function(sh){
+      Array.from(_cdTo).sort().forEach(function(d){ items.push({sid:s.id,day:d,start:sh.start,end:sh.end,role:sh.role||''}); });
+    });
+  });
+  return items;
+}
+function _cdPreview(){
+  const host=document.getElementById('cdPreview'); if(!host) return;
+  const src=_rtPeople().filter(function(s){ return (!_cdTeam||s.team===_cdTeam) && _rtWork(s.id,_cdFrom).length; }).length;
+  if(!src){ host.innerHTML='<div style="opacity:.7;padding:8px 0">Nobody'+(_cdTeam?' on '+_rtEsc(_cdTeam):'')+' is rostered on '+DAYS[_cdFrom]+'.</div>'; return; }
+  if(!_cdTo.size){ host.innerHTML='<div style="opacity:.7;padding:8px 0">'+src+' people rostered on '+DAYS[_cdFrom]+'. Pick the day(s) to copy to.</div>'; return; }
+  const plan=_rtCopyPlan(_cdItems(), _cdSkipUnavail);
+  host.innerHTML='<div style="padding:10px 12px;border:1px solid var(--border);border-radius:8px;margin:0 0 10px;font-size:13px">'+
+    '<b>'+plan.ok.length+'</b> shift'+(plan.ok.length===1?'':'s')+' will be created'+
+    (plan.skip.length?' · <b>'+plan.skip.length+'</b> skipped<div style="font-size:11.5px;opacity:.75;margin-top:5px;max-height:90px;overflow:auto">'+plan.skip.map(_rtEsc).join('<br>')+'</div>':'')+'</div>'+
+    '<button class="btn btn-primary" '+(plan.ok.length?'':'disabled')+' onclick="_cdGo(this)">Copy '+plan.ok.length+' shift'+(plan.ok.length===1?'':'s')+'</button>';
+}
+async function _cdGo(btn){
+  const plan=_rtCopyPlan(_cdItems(), _cdSkipUnavail);
+  if(btn){ btn.disabled=true; btn.textContent='Copying…'; }
+  const n=await _rtCopyRun(plan);
+  showToast(_rtCopyMsg(n, plan));
+  _cdTo=new Set(); _rtRenderCopy();
+}
+
+/* ── LEAVE CLASH CHECK ────────────────────────────────────────────────────
+   Approving goes through this screen: for each day of the leave it shows who
+   else on the same team is off (approved or still pending) and who is
+   rostered, so a manager doesn't approve the third person off on a busy day
+   without seeing it. Approve here runs the normal approval. */
+function _lcISO(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+async function openLeaveClash(id){
+  const r=leaveRequests.find(function(x){return x.id===id;}); if(!r) return;
+  const person=_staffForLeave(r);
+  const name=r.staff_name||r.staffName||(person?_rtName(person):'');
+  const fromS=r.from||r.from_date||'', toS=r.to||r.to_date||'';
+  document.getElementById('lcTitle').textContent='Approve leave · '+name;
+  document.getElementById('lcBody').innerHTML='<div style="padding:24px;text-align:center;opacity:.7">Checking the team roster…</div>';
+  const btn=document.getElementById('lcApprove');
+  btn.disabled=false; btn.textContent='Approve leave';
+  btn.onclick=function(){ closeModal('leaveClashModal'); applyLeaveUpdate(id,'approved',''); };
+  openModal('leaveClashModal');
+
+  const team=person?person.team:'';
+  const mates=(staff||[]).filter(function(s){ return team && s.team===team; });
+  const mateNames={}; mates.forEach(function(s){ mateNames[_normName(_rtName(s))]=_rtName(s); });
+  const myKey=_normName(name);
+
+  // days of the leave (capped so a long leave can't flood the screen)
+  const days=[]; const f=new Date(fromS+'T00:00:00'), t=new Date(toS+'T00:00:00');
+  if(!isNaN(f)&&!isNaN(t)) for(let c=new Date(f); c<=t && days.length<31; c.setDate(c.getDate()+1)) days.push(_lcISO(c));
+
+  // others off (same team, overlapping, approved or pending)
+  const others=(leaveRequests||[]).filter(function(x){
+    if(x.id===id) return false;
+    const st=String(x.status||'').toLowerCase(); if(st!=='approved'&&st!=='pending') return false;
+    const k=_normName(x.staff_name||x.staffName||''); if(!mateNames[k]||k===myKey) return false;
+    const a=x.from||x.from_date||'', b=x.to||x.to_date||'';
+    return a && b && a<=toS && b>=fromS;
+  });
+
+  let rows=[];
+  try{
+    if(days.length){
+      const res=await fetch(SUPABASE_URL+'/rest/v1/roster_shifts?select=staff_name,shift_date,start_time,end_time,status'+
+        '&shift_date=gte.'+days[0]+'&shift_date=lte.'+days[days.length-1]+'&order=start_time.asc',
+        {headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY}});
+      if(res.ok) rows=await res.json();
+    }
+  }catch(e){ console.warn('leave clash roster',e); }
+  if(!document.getElementById('leaveClashModal').classList.contains('open')) return;
+
+  const hm=function(x){ return String(x||'').slice(0,5); };
+  let html='';
+  if(!team) html+='<div style="padding:10px 12px;border-radius:8px;margin:0 0 10px;background:rgba(251,191,36,.12);font-size:12.5px">Couldn\'t match '+_rtEsc(name)+' to a team, so the team check is limited.</div>';
+  html+='<div style="padding:10px 12px;border:1px solid var(--border);border-radius:8px;margin:0 0 12px;font-size:13px">'+
+    '<div><b>'+_rtEsc(name)+'</b>'+(team?' · '+_rtEsc(team):'')+' · '+_rtEsc(fromS)+(toS!==fromS?' → '+_rtEsc(toS):'')+'</div>'+
+    '<div style="margin-top:4px">'+(others.length
+      ? '<span style="color:#f59e0b;font-weight:700">Also off:</span> '+others.map(function(x){ return _rtEsc(x.staff_name||x.staffName)+' ('+String(x.status).toLowerCase()+', '+_rtEsc(x.from||x.from_date)+(((x.to||x.to_date)!==(x.from||x.from_date))?' → '+_rtEsc(x.to||x.to_date):'')+')'; }).join(', ')
+      : '<span style="color:#10b981;font-weight:700">Nobody else'+(team?' on '+_rtEsc(team):'')+' is off during this time.</span>')+'</div></div>';
+
+  days.forEach(function(iso){
+    const dlabel=new Date(iso+'T00:00:00').toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short'});
+    const dayRows=(rows||[]).filter(function(x){ return x.shift_date===iso; });
+    const mine=dayRows.filter(function(x){ return _normName(x.staff_name)===myKey && x.status!=='open'; });
+    const offToday=others.filter(function(x){ const a=x.from||x.from_date, b=x.to||x.to_date; return a<=iso && b>=iso; })
+                         .map(function(x){ return _normName(x.staff_name||x.staffName); });
+    const working=dayRows.filter(function(x){ const k=_normName(x.staff_name); return mateNames[k] && k!==myKey && x.status!=='open' && offToday.indexOf(k)<0; });
+    const openShifts=dayRows.filter(function(x){ return x.status==='open' && mateNames[_normName(x.staff_name)]; }).length;
+    const risk=(mine.length && !working.length) ? 2 : (offToday.length ? 1 : 0);
+    const col=risk===2?'#fb7185':(risk===1?'#f59e0b':'var(--border)');
+    if(!mine.length && !working.length && !offToday.length && !openShifts) {
+      html+='<div style="padding:6px 10px;margin:0 0 5px;border:1px dashed var(--border);border-radius:8px;font-size:12px;opacity:.6">'+dlabel+' · no team shifts</div>';
+      return;
+    }
+    html+='<div style="padding:8px 10px;margin:0 0 6px;border:1px solid var(--border);border-left:3px solid '+col+';border-radius:8px;font-size:12.5px">'+
+      '<div style="font-weight:700;margin-bottom:3px">'+dlabel+(risk===2?' · <span style="color:#fb7185">nobody else on '+_rtEsc(team)+' rostered</span>':'')+'</div>'+
+      (mine.length?'<div>'+_rtEsc(name)+' is rostered '+mine.map(function(x){return hm(x.start_time)+'–'+hm(x.end_time);}).join(', ')+' <span style="opacity:.7">— approving opens this for pickup</span></div>':'')+
+      '<div><span style="opacity:.7">Working:</span> '+(working.length?working.map(function(x){ return _rtEsc(mateNames[_normName(x.staff_name)])+' '+hm(x.start_time)+'–'+hm(x.end_time); }).join(', '):'—')+'</div>'+
+      (offToday.length?'<div><span style="color:#f59e0b">Off:</span> '+offToday.map(function(k){return _rtEsc(mateNames[k]||k);}).join(', ')+'</div>':'')+
+      (openShifts?'<div style="opacity:.75">'+openShifts+' open shift'+(openShifts>1?'s':'')+' already waiting for cover</div>':'')+
+    '</div>';
+  });
+  if(days.length===31) html+='<div style="font-size:11.5px;opacity:.65">Showing the first 31 days.</div>';
+  document.getElementById('lcBody').innerHTML=html;
+}
+
 function renderRoster(){
   const grid=document.getElementById('rosterGrid');
   // Derive this week's leaves straight from leave_submissions: match by name,
@@ -4187,7 +4615,7 @@ function renderRoster(){
           const stCls = sh._status==='open' ? ' shift-openpick' : (sh._status==='pending_release' ? ' shift-pendrel' : '');
           const stTag = sh._status==='open' ? '<br><span class="sb-tag">OPEN FOR PICKUP</span>'
                       : (sh._status==='pending_release' ? '<br><span class="sb-tag">RELEASE ASKED</span>' : '');
-          html+=`<div class="shift-badge ${il?'shift-leave':'shift-slot'}${stCls}" ${il?'':`style="background:${s.color}1a;border-left:3px solid ${s.color};" draggable="true" ondragstart="shiftDragStart(event,${s.id},${d},${i})" ondragend="shiftDragEnd(event)"`} onclick="event.stopPropagation();editShift(${s.id},${d},${i})">${il?'LEAVE':`<b class="sb-time">${sh.start}–${sh.end}</b>`}${stTag}${dev?`<br><span style="font-size:8px;opacity:.85;color:${devConflict?'#ff6432':'inherit'}"> ${dev.name}${sh.deviceStart?` ${sh.deviceStart}–${sh.deviceEnd}`:''}${devConflict?' ':''}</span>`:`${staffRoleLabel(s)?`<br><span style="font-size:8px;opacity:.7">${staffRoleLabel(s)}</span>`:''}`}</div>`;
+          html+=`<div class="shift-badge ${il?'shift-leave':'shift-slot'}${stCls}" ${il?'':`style="background:${s.color}1a;border-left:3px solid ${s.color};" draggable="true" ondragstart="shiftDragStart(event,${s.id},${d},${i})" ondragend="shiftDragEnd(event)"`} onclick="event.stopPropagation();editShift(${s.id},${d},${i})">${il?'LEAVE':`<b class="sb-time">${sh.start}–${sh.end}</b>`}${stTag}${(!il&&sh._dbId&&_rcnPending[sh._dbId])?'<span title="Change not yet seen by '+s.first+'" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#f59e0b;margin-left:4px;vertical-align:middle"></span>':''}${dev?`<br><span style="font-size:8px;opacity:.85;color:${devConflict?'#ff6432':'inherit'}"> ${dev.name}${sh.deviceStart?` ${sh.deviceStart}–${sh.deviceEnd}`:''}${devConflict?' ':''}</span>`:`${staffRoleLabel(s)?`<br><span style="font-size:8px;opacity:.7">${staffRoleLabel(s)}</span>`:''}`}</div>`;
         });
         html+='</div>';
       }
@@ -4219,6 +4647,7 @@ function clickCell(staffId,day){
   populateShiftDeviceSelect(null);
   onShiftTypeChange(document.getElementById('shiftType'));
   renderShiftPickupBox(null);   // new shift: nothing to open for pickup yet
+  try{ _shiftRepeatInit(0, false); }catch(e){}
   openModal('shiftModal');
 }
 
@@ -4237,6 +4666,7 @@ function editShift(staffId,dayIdx,shiftIdx){
   populateShiftDeviceSelect(sh.deviceId||null);
   onShiftTypeChange(document.getElementById('shiftType'));
   renderShiftPickupBox(sh);
+  try{ _shiftRepeatInit(dayIdx, sh.type!=='leave'); }catch(e){}
   openModal('shiftModal');
 }
 
@@ -4378,7 +4808,7 @@ function _staffIdByName(){
   return m;
 }
 
-let _dbShiftsLoading=false;
+let _dbShiftsLoading=false, _dbShiftsQueued=null, _dbShiftsFails=0;
 /**
  * Keep the grid honest against changes made elsewhere.
  *
@@ -4403,17 +4833,40 @@ function startShiftAutoRefresh(){
   setInterval(refresh, 120000);
 }
 
+function _rosterLoadBar(show){
+  var el=document.getElementById('rosterLoadBar');
+  if(!show){ if(el) el.remove(); return; }
+  if(el) return;
+  var grid=document.getElementById('rosterGrid'); if(!grid||!grid.parentNode) return;
+  el=document.createElement('div'); el.id='rosterLoadBar'; el.setAttribute('role','alert');
+  el.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 10px;padding:10px 14px;border-radius:10px;font-size:12.5px;font-weight:600;background:rgba(251,113,133,.12);border:1px solid rgba(251,113,133,.45);color:var(--text,inherit)';
+  el.innerHTML='<span>Shifts didn\'t load for this week.</span><button class="btn btn-primary" style="padding:5px 12px" onclick="_dbShiftsFails=0;loadWeekShiftsFromDB(currentWeekStart)">Retry</button>';
+  grid.parentNode.insertBefore(el,grid);
+}
 async function loadWeekShiftsFromDB(weekStart){
-  if(_dbShiftsLoading) return;
+  // A load already running used to make this return silently, so switching week
+  // mid-load (or a focus refresh landing at the wrong moment) left the new week
+  // never fetched. Remember the latest request and run it when the current one ends.
+  if(_dbShiftsLoading){ _dbShiftsQueued=weekStart; return; }
   _dbShiftsLoading=true;
+  const wk=_isoDate(weekStart);
   try{
-    const from=_isoDate(weekStart), to=_isoDate(addDays(new Date(weekStart),6));
+    // roster_shifts is readable by logged-in users only. With no live token the
+    // anon key gets "200 OK, []" — which painted a blank roster until a reload.
+    // Get a fresh token first, and treat "no live session" as a failure, not as
+    // an empty week.
+    let tok=null; try{ tok=await _soFreshTok(); }catch(e){}
+    if(!tok || !_soTokAlive()) throw new Error('no live session');
+    const from=wk, to=_isoDate(addDays(new Date(weekStart),6));
     const r=await fetch(SUPABASE_URL+'/rest/v1/roster_shifts'+
       '?select=id,staff_name,shift_date,start_time,end_time,role,status,open_to_team,release_requested_by'+
       '&shift_date=gte.'+from+'&shift_date=lte.'+to+'&order=shift_date.asc,start_time.asc',
-      {headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY}});
+      {headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+tok}});
     if(!r.ok) throw new Error('HTTP '+r.status);
     const rows=await r.json();
+    if(!Array.isArray(rows)) throw new Error('bad response');
+    // The user moved to another week while this was in flight: drop the result.
+    if(_isoDate(currentWeekStart)!==wk) return;
 
     const byName=_staffIdByName();
     // Clear only non-leave blocks; leave is painted separately from
@@ -4425,7 +4878,7 @@ async function loadWeekShiftsFromDB(weekStart){
       });
     });
 
-    (rows||[]).forEach(function(row){
+    rows.forEach(function(row){
       const sid=byName[_normName(row.staff_name)];
       if(sid===undefined) return;                     // not on this roster
       const d=new Date(row.shift_date+'T00:00:00');
@@ -4444,13 +4897,26 @@ async function loadWeekShiftsFromDB(weekStart){
       });
     });
 
+    _dbShiftsFails=0; _rosterLoadBar(false); _soSessionBanner(false);
+    try{ loadChangeNotices(); }catch(_){}
     if(typeof renderRoster==='function') renderRoster();
     if(typeof updateStats==='function') updateStats();
     if(typeof renderPublishState==='function') renderPublishState();
   }catch(e){
     console.warn('loadWeekShiftsFromDB failed', e);
-    try{ showToast('Couldn\'t load shifts — check connection'); }catch(_){}
-  }finally{ _dbShiftsLoading=false; }
+    _dbShiftsFails++;
+    // Quietly retry a few times (token still settling, brief network drop)
+    // before bothering anyone; then leave a visible Retry bar instead of a
+    // blank grid that looks like an empty week.
+    if(_dbShiftsFails<=3){ setTimeout(function(){ try{ loadWeekShiftsFromDB(currentWeekStart); }catch(_){} }, 1200*_dbShiftsFails); }
+    else{
+      _rosterLoadBar(true);
+      if(String(e&&e.message).indexOf('no live session')>=0){ try{ _soSessionBanner(true); }catch(_){} }
+    }
+  }finally{
+    _dbShiftsLoading=false;
+    if(_dbShiftsQueued){ const q=_dbShiftsQueued; _dbShiftsQueued=null; loadWeekShiftsFromDB(q); }
+  }
 }
 
 function loadWeek(key){
@@ -6507,6 +6973,7 @@ function openAddShift(staffId,dayIdx){
   document.getElementById('shiftRole').value='';
   onShiftTypeChange(document.getElementById('shiftType'));
   renderShiftPickupBox(null);   // new shift: nothing to open for pickup yet
+  try{ _shiftRepeatInit(0, false); }catch(e){}
   openModal('shiftModal');
 }
 /* ── Shift pickup: manager controls ───────────────────────────────────────
@@ -6870,7 +7337,7 @@ async function dbCreateShift(staffId, dayIdx, sh){
       throw new Error('HTTP '+r.status);
     }
     const rows=await r.json();
-    if(rows&&rows[0]){ sh._dbId=rows[0].id; sh._status=rows[0].status; return rows[0].id; }
+    if(rows&&rows[0]){ sh._dbId=rows[0].id; sh._status=rows[0].status; _rcnWarn(name); return rows[0].id; }
   }catch(e){
     console.warn('dbCreateShift',e);
     showToast('Shift not saved to server — check connection');
@@ -6889,6 +7356,7 @@ async function dbUpdateShift(sh, staffId, dayIdx){
     const r=await fetch(SUPABASE_URL+'/rest/v1/roster_shifts?id=eq.'+encodeURIComponent(sh._dbId),
       {method:'PATCH',headers:_DB_H,body:JSON.stringify(body)});
     if(!r.ok) throw new Error('HTTP '+r.status);
+    _rcnWarn(name);
     return true;
   }catch(e){
     console.warn('dbUpdateShift',e);
@@ -6903,6 +7371,7 @@ async function dbDeleteShift(sh){
     const r=await fetch(SUPABASE_URL+'/rest/v1/roster_shifts?id=eq.'+encodeURIComponent(sh._dbId),
       {method:'DELETE',headers:_DB_H});
     if(!r.ok) throw new Error('HTTP '+r.status);
+    _rcnWarn('Staff');
     return true;
   }catch(e){
     console.warn('dbDeleteShift',e);
@@ -9732,6 +10201,7 @@ function updateLeave(id,status){
     openModal('declineModal');
     return;
   }
+  if(status==='approved' && typeof openLeaveClash==='function'){ openLeaveClash(id); return; }
 
   applyLeaveUpdate(id,status,'');
 }
@@ -10431,6 +10901,20 @@ async function _soFreshTok(){
             init = init || {};
             const h = new Headers((init && init.headers) || (typeof input!=='string' && input.headers) || {});
             if(ftok) h.set('Authorization', 'Bearer ' + ftok);
+            if(!h.has('apikey')) h.set('apikey', SUPABASE_KEY);
+            init.headers = h;
+            return _origFetch(input, init);
+          })();
+        }
+        if(tok && !_soTokAlive()){
+          // Aged-out token on a READ: refresh first, otherwise the read goes out
+          // with a dead JWT (or silently as anon) and RLS tables come back empty.
+          return (async function(){
+            let ftok = tok;
+            try{ ftok = await _soFreshTok(); }catch(e){}
+            init = init || {};
+            const h = new Headers((init && init.headers) || (typeof input!=='string' && input.headers) || {});
+            h.set('Authorization', 'Bearer ' + (ftok||tok));
             if(!h.has('apikey')) h.set('apikey', SUPABASE_KEY);
             init.headers = h;
             return _origFetch(input, init);

@@ -9054,6 +9054,7 @@ async function enterHub(){
     setTimeout(function(){
       maybeShowTour();
     }, 300);
+    try{ checkShiftChangeNotices(); }catch(e){}
   }).catch(function(e){ console.warn('boot data', e); });
   if(typeof applySavedTextColor === 'function') applySavedTextColor();
   loadGlobalGeofence(); // pull global geofence value at startup
@@ -23389,6 +23390,115 @@ function hideBanner(){
 
 // Track last polled timestamp + IDs to prevent duplicate alerts
 async function checkNewDiscussions(){ /* discussions retired */ }
+
+/* ── SHIFT-CHANGE NOTICES ─────────────────────────────────────────────────
+   When a shift in an already-PUBLISHED week is changed, moved, removed or
+   added, the database (trigger on roster_shifts) writes a row to
+   roster_change_notices for that person. Here we show it as a popup that stays
+   until they tap "Got it", and drop a line in the bell. Reads fail soft: if the
+   table is missing or the call fails we simply show nothing. */
+let _rcnShown=new Set(), _rcnBusy=false;
+function _rcnT(t){ const m=/^(\d{1,2}):(\d{2})/.exec(String(t||'')); if(!m) return ''; let h=+m[1]; const ap=h>=12?'pm':'am'; h=h%12||12; return h+':'+m[2]+' '+ap; }
+function _rcnD(d){ try{ return new Date(d+'T00:00:00').toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short'}); }catch(e){ return String(d||''); } }
+function _rcnEsc(v){ return String(v==null?'':v).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+function _rcnAdd(iso,n){ const d=new Date(iso+'T00:00:00'); d.setDate(d.getDate()+n); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function _rcnHrs(list){ let m=0; (list||[]).forEach(function(x){ const a=/^(\d+):(\d+)/.exec(x.start_time||''), b=/^(\d+):(\d+)/.exec(x.end_time||''); if(a&&b) m+=Math.max(0,(+b[1]*60+ +b[2])-(+a[1]*60+ +a[2])); }); return Math.round(m/6)/10; }
+function _rcnLine(r){
+  const oldTxt=r.old_date?(_rcnD(r.old_date)+' · '+_rcnT(r.old_start)+' – '+_rcnT(r.old_end)):'';
+  const newTxt=r.new_date?(_rcnD(r.new_date)+' · '+_rcnT(r.new_start)+' – '+_rcnT(r.new_end)):'';
+  return {oldTxt:oldTxt,newTxt:newTxt};
+}
+async function checkShiftChangeNotices(){
+  if(!me || _rcnBusy) return;
+  _rcnBusy=true;
+  try{
+    const rows=await sbGet('roster_change_notices','?staff_name=eq.'+encodeURIComponent(me)+'&seen_at=is.null&order=created_at.asc&limit=30');
+    if(!Array.isArray(rows)||!rows.length){ const el=document.getElementById('rcnModal'); if(el) el.remove(); return; }
+    // "Your roster is out" digests carry only the week; pull the person's live shifts for it.
+    const pubs=rows.filter(function(r){ return r.kind==='published' && r.new_date; });
+    if(pubs.length){
+      const wks=pubs.map(function(r){return r.new_date;}).sort();
+      let sh=[];
+      try{ sh=await sbGet('roster_shifts','?staff_name=eq.'+encodeURIComponent(me)+'&shift_date=gte.'+wks[0]+'&shift_date=lte.'+_rcnAdd(wks[wks.length-1],6)+
+        '&status=neq.open&select=shift_date,start_time,end_time,status&order=shift_date.asc,start_time.asc')||[]; }catch(e){}
+      pubs.forEach(function(r){ const end=_rcnAdd(r.new_date,6); r._shifts=(sh||[]).filter(function(x){ return x.shift_date>=r.new_date && x.shift_date<=end; }); });
+    }
+    rows.sort(function(a,b){ return (a.kind==='published'?0:1)-(b.kind==='published'?0:1); });
+    // only (re)open when something new has arrived since the popup last showed
+    const fresh=rows.filter(function(r){ return !_rcnShown.has(r.id+'|'+(r.created_at||'')); });
+    rows.forEach(function(r){ _rcnShown.add(r.id+'|'+(r.created_at||'')); });
+    fresh.forEach(function(r){
+      try{
+        if(typeof NotifManager!=='undefined' && NotifManager.push){
+          const l=_rcnLine(r);
+          const isPub=r.kind==='published';
+          NotifManager.push({ id:'rcn_'+r.id+'_'+(Date.parse(r.created_at)||0), type:'general',
+            title: isPub?'Your roster is out':(r.kind==='cancelled'?'Shift removed':(r.kind==='added'?'New shift added':'Your shift changed')),
+            body: isPub ? ('Week of '+_rcnD(r.new_date)+' · '+((r._shifts||[]).length)+' shift'+(((r._shifts||[]).length===1)?'':'s')+' · '+_rcnHrs(r._shifts)+'h')
+                        : (r.kind==='changed'? (l.oldTxt+' → '+l.newTxt) : (l.newTxt||l.oldTxt)),
+            ts: Date.parse(r.created_at)||Date.now(), link:null });
+        }
+      }catch(e){}
+    });
+    if(fresh.length || !document.getElementById('rcnModal')) _rcnRender(rows);
+  }catch(e){ console.warn('checkShiftChangeNotices',e); }
+  finally{ _rcnBusy=false; }
+}
+function _rcnRender(rows){
+  let el=document.getElementById('rcnModal');
+  if(el) el.remove();
+  el=document.createElement('div'); el.id='rcnModal'; el.setAttribute('role','alertdialog'); el.setAttribute('aria-modal','true');
+  el.style.cssText='position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:16px';
+  const allPub=rows.every(function(r){ return r.kind==='published'; });
+  const items=rows.map(function(r){
+    if(r.kind==='published'){
+      const list=r._shifts||[];
+      const lines=list.length ? list.map(function(x){ return '<div style="display:flex;justify-content:space-between;gap:10px;padding:3px 0;font-size:14px"><span>'+_rcnEsc(_rcnD(x.shift_date))+'</span><b>'+_rcnT(x.start_time)+' – '+_rcnT(x.end_time)+'</b></div>'; }).join('')
+                              : '<div style="font-size:13px;opacity:.75">No shifts for you this week.</div>';
+      return '<div style="padding:11px 13px;margin:0 0 9px;border:1px solid var(--ui-line,#e2e8f0);border-left:4px solid #3b82f6;border-radius:10px;background:var(--ui-surface-2,transparent)">'+
+             '<div style="display:flex;justify-content:space-between;gap:8px;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#3b82f6;margin-bottom:6px"><span>Week of '+_rcnEsc(_rcnD(r.new_date))+'</span>'+(list.length?'<span>'+_rcnHrs(list)+'h</span>':'')+'</div>'+lines+'</div>';
+    }
+    const l=_rcnLine(r);
+    const label=r.kind==='cancelled'?'Shift removed':(r.kind==='added'?'New shift':'Shift changed');
+    const col=r.kind==='cancelled'?'#ef4444':(r.kind==='added'?'#10b981':'#f59e0b');
+    let body='';
+    if(r.kind==='changed') body='<div style="text-decoration:line-through;opacity:.6;font-size:13px">'+_rcnEsc(l.oldTxt)+'</div><div style="font-weight:800;font-size:15px;margin-top:2px">'+_rcnEsc(l.newTxt)+'</div>';
+    else if(r.kind==='cancelled') body='<div style="text-decoration:line-through;opacity:.7;font-size:14px">'+_rcnEsc(l.oldTxt)+'</div>';
+    else body='<div style="font-weight:800;font-size:15px">'+_rcnEsc(l.newTxt)+'</div>';
+    return '<div style="padding:11px 13px;margin:0 0 9px;border:1px solid var(--ui-line,#e2e8f0);border-left:4px solid '+col+';border-radius:10px;background:var(--ui-surface-2,transparent)">'+
+           '<div style="font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:'+col+';margin-bottom:4px">'+label+'</div>'+body+'</div>';
+  }).join('');
+  el.innerHTML='<div style="width:min(440px,100%);max-height:86vh;overflow:auto;border-radius:18px;padding:20px;background:var(--ui-surface,#fff);color:var(--ui-ink,#0f172a);box-shadow:0 20px 60px rgba(0,0,0,.4)">'+
+    (allPub ? '<div style="font-size:17px;font-weight:800;margin:0 0 4px">Your roster is out</div><div style="font-size:13px;opacity:.75;margin:0 0 14px">Here are your shifts. You\'ll get a message here if anything changes.</div>'
+            : '<div style="font-size:17px;font-weight:800;margin:0 0 4px">Your roster was updated</div><div style="font-size:13px;opacity:.75;margin:0 0 14px">'+(rows.length>1?'These shifts changed':'This shift changed')+' after the roster was published.</div>')+
+    items+
+    '<button id="rcnAck" style="width:100%;margin-top:6px;padding:12px;border:0;border-radius:12px;font-size:14px;font-weight:800;cursor:pointer;background:var(--ui-accent,#2563eb);color:#fff">Got it</button></div>';
+  document.body.appendChild(el);
+  document.getElementById('rcnAck').onclick=function(){ _rcnAck(rows.map(function(r){return r.id;}), this); };
+}
+async function _rcnAck(ids, btn){
+  if(btn){ btn.disabled=true; btn.textContent='Saving…'; }
+  try{
+    const r=await fetch(SB+'/rest/v1/roster_change_notices?id=in.('+ids.map(encodeURIComponent).join(',')+')',{
+      method:'PATCH',
+      headers:{apikey:KEY,Authorization:'Bearer '+_sbBearer(),'Content-Type':'application/json',Prefer:'return=minimal'},
+      body:JSON.stringify({seen_at:new Date().toISOString()})
+    });
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const el=document.getElementById('rcnModal'); if(el) el.remove();
+    try{ if(typeof loadMyRoster==='function') loadMyRoster(); }catch(e){}
+    try{ if(typeof loadHomeData==='function') loadHomeData(); }catch(e){}
+  }catch(e){
+    console.warn('rcn ack',e);
+    if(btn){ btn.disabled=false; btn.textContent='Got it'; }
+    try{ showToast('Couldn\'t save — try again'); }catch(_){}
+  }
+}
+(function(){
+  if(window._rcnBound) return; window._rcnBound=true;
+  document.addEventListener('visibilitychange',function(){ if(document.visibilityState==='visible') checkShiftChangeNotices(); });
+  setInterval(function(){ if(!document.hidden) checkShiftChangeNotices(); }, 180000);
+})();
 
 async function checkNewNotifications(){
   if(!me) return;
