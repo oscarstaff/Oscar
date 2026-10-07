@@ -2689,6 +2689,131 @@ body.avail-editing #availGrid .avail-chip.av2:hover{ background:color-mix(in srg
 #availGrid .avail-row-editing .av2-custom, body.avail-editing #availGrid .av2-custom{ display:grid !important; }
 #availGrid .av2-custom:hover{ text-decoration:none; border-color:var(--accent-border); }
 #availGrid .avail-row-editing .avail-chip.av2{ padding-right:30px; }
+
+/* ═══ PRO LAYER ════════════════════════════════════════════════════════════
+   Dashboard, Availability, Employees and Payroll follow the Roster tab:
+   hairline borders, neutral surfaces, one accent, colour only where it means
+   something (a status), no glows, no tiny shouting mono capitals.
+   ═════════════════════════════════════════════════════════════════════════ */
+:is(#section-home,#section-availability,#section-staff,#section-payroll){ --pro-r:10px; }
+
+/* one tab style everywhere: underline */
+#section-staff .sub-tabs-bar{ display:flex !important; background:none !important; border:0 !important; border-bottom:1px solid var(--border) !important;
+  border-radius:0 !important; padding:0 !important; gap:2px !important; box-shadow:none !important; width:100%; }
+#section-staff .sub-tabs-bar .sub-tab, #section-availability .sub-tab{ border-radius:0 !important; padding:10px 14px !important; background:none !important;
+  box-shadow:none !important; font-weight:500 !important; font-size:13.5px !important; color:var(--text-dim) !important; border-bottom:2px solid transparent !important; margin-bottom:-1px !important; }
+#section-staff .sub-tabs-bar .sub-tab:hover, #section-availability .sub-tab:hover{ background:none !important; color:var(--text) !important; }
+#section-staff .sub-tabs-bar .sub-tab.active, #section-availability .sub-tab.active{ color:var(--text) !important; border-bottom-color:var(--accent) !important; font-weight:600 !important; }
+:is(#section-staff,#section-availability) .sub-tab::after{ display:none !important; }
+
+/* team / filter pills: plain */
+:is(#section-staff,#section-availability) .role-pill{ box-shadow:none !important; font-weight:500; border-radius:999px; }
+:is(#section-staff,#section-availability) .role-pill.active{ font-weight:600; }
+
+/* ── Dashboard ── */
+#section-home .ds-tile, #section-home .ds-tile.ds-warn, #section-home .ds-tile.ds-gold{
+  background:var(--surface) !important; border:1px solid var(--border) !important; box-shadow:none !important; border-radius:var(--pro-r) !important; }
+#section-home .ds-tile:hover{ border-color:var(--border2) !important; }
+#section-home .ds-tile .ds-num{ color:var(--text) !important; text-shadow:none !important; font-weight:650 !important; }
+#section-home .ds-tile.ds-zero .ds-num{ color:var(--muted) !important; }
+#section-home .ds-tile .ds-lbl{ color:var(--text-dim) !important; font-weight:500 !important; }
+#section-home .ds-warn:not(.ds-zero) .ds-lbl::after{ background:var(--warn) !important; animation:none !important; }
+#section-home .ds-gold:not(.ds-zero) .ds-lbl::after{ background:var(--gold) !important; animation:none !important; }
+#section-home .coverage{ box-shadow:none !important; border-radius:var(--pro-r) !important; }
+#section-home .cov-fill, #section-home .cov-warn .cov-fill{ background:var(--accent) !important; box-shadow:none !important; }
+#section-home .cov-miss .cov-fill{ background:var(--warn) !important; box-shadow:none !important; }
+#section-home .cov-pct, #section-home .cov-warn .cov-pct{ color:var(--text-dim) !important; font-family:var(--sans) !important; font-weight:500 !important; }
+#section-home .cov-miss .cov-pct{ color:var(--warn) !important; }
+
+/* ── Submitted availability ── */
+.sa-list{ display:flex; flex-direction:column; gap:10px; }
+.sa-card{ background:var(--surface); border:1px solid var(--border); border-radius:var(--pro-r,10px); overflow:hidden; }
+.sa-hd{ display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 16px; border-bottom:1px solid var(--border); flex-wrap:wrap; }
+.sa-who{ display:flex; align-items:center; gap:11px; min-width:0; }
+.sa-ava{ width:30px !important; height:30px !important; font-size:10px !important; position:relative; flex-shrink:0; }
+.sa-dot{ position:absolute; top:-2px; right:-2px; width:9px; height:9px; border-radius:50%; background:var(--gold); border:2px solid var(--surface); }
+.sa-name{ font-size:14px; font-weight:600; color:var(--text); }
+.sa-period{ font-size:12px; color:var(--text-dim); margin-top:1px; }
+.sa-period.sa-expired{ color:var(--warn); }
+.sa-meta{ display:flex; align-items:center; gap:12px; }
+.sa-review{ align-items:center; gap:10px; }
+.sa-changed-tag{ display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:600; color:var(--text-mid); }
+.sa-changed-tag::before{ content:''; width:7px; height:7px; border-radius:50%; background:var(--gold); }
+.sa-mark{ font-size:12px !important; padding:5px 11px !important; }
+.sa-upd{ font-size:12px; color:var(--muted); white-space:nowrap; }
+.sa-sub{ font-size:12px; font-weight:600; color:var(--text-dim); padding:10px 16px 0; }
+.sa-sub-new{ color:var(--text-mid); border-top:1px solid var(--border); margin-top:4px; }
+.sa-sub span{ font-weight:400; color:var(--muted); }
+.sa-grid{ display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:0; padding:6px 8px 10px; }
+.sa-day{ display:flex; flex-direction:column; gap:5px; padding:8px 8px; border-radius:8px; min-width:0; }
+.sa-d{ font-size:11.5px; font-weight:600; color:var(--muted); }
+.sa-day.sa-changed{ background:color-mix(in srgb,var(--gold) 12%,transparent); }
+@media(max-width:760px){ .sa-grid{ grid-template-columns:repeat(4,minmax(0,1fr)); } }
+
+/* ── Team view ── */
+.pro-count{ font-size:12.5px; font-weight:500; color:var(--text-dim); }
+#roleViewContent .role-view-card{ box-shadow:none !important; border-radius:var(--pro-r,10px) !important; }
+#roleViewContent .pro-hd-row{ background:transparent !important; }
+#roleViewContent .pro-hd-row .role-staff-name{ font-size:12px; font-weight:600; color:var(--text-dim); }
+#roleViewContent .pro-hd-row .role-shift-cell{ padding:8px 8px; gap:1px; align-items:flex-start; }
+#roleViewContent .pro-hd-row .role-shift-cell b{ font-size:12.5px; color:var(--text-mid); }
+#roleViewContent .pro-hd-row .role-shift-cell span{ font-size:11.5px; color:var(--muted); }
+#roleViewContent .role-staff-row{ grid-template-columns:200px repeat(7,1fr); }
+#roleViewContent .role-staff-name{ font-size:13px; padding:9px 14px; }
+.pro-sub{ font-size:11.5px; font-weight:400; color:var(--text-dim); margin-top:1px; }
+.pro-empty{ font-size:12px; color:var(--muted); padding-left:6px; }
+#roleViewContent .role-shift-cell .shift-badge.shift-slot{
+  background:var(--surface2) !important; color:var(--text) !important; border:1px solid var(--border) !important; border-left:3px solid var(--accent) !important;
+  border-radius:6px !important; font-size:12px !important; font-weight:600 !important; padding:5px 8px !important; text-align:left; box-shadow:none !important; }
+#roleViewContent .role-shift-cell .shift-badge.shift-leave{ font-size:11.5px !important; }
+#roleViewContent .shift-conflict{ outline:0 !important; background:color-mix(in srgb,var(--warn) 7%,transparent) !important; box-shadow:inset 3px 0 0 var(--warn) !important; }
+
+/* ── Employees ── */
+#section-staff .badge{ background:transparent !important; border:1px solid var(--border2) !important; color:var(--text-mid) !important; font-weight:500 !important; border-radius:6px !important; }
+#section-staff .btn-warn, #section-staff .lv-del, #section-staff .lv-decline{
+  background:transparent !important; border-color:var(--border) !important; color:var(--text-dim) !important; filter:none !important; }
+#section-staff .btn-warn:hover, #section-staff .lv-del:hover, #section-staff .lv-decline:hover{
+  color:var(--warn) !important; border-color:color-mix(in srgb,var(--warn) 45%,transparent) !important; background:color-mix(in srgb,var(--warn) 8%,transparent) !important; }
+#section-staff .lv-approve{ background:transparent !important; color:var(--success) !important; border-color:color-mix(in srgb,var(--success) 45%,transparent) !important; }
+#section-staff .lv-approve:hover{ background:color-mix(in srgb,var(--success) 10%,transparent) !important; }
+#section-staff .lv-src{ background:transparent !important; border:0 !important; color:var(--muted) !important; font-family:var(--sans) !important; text-transform:none !important; letter-spacing:0 !important; font-size:11.5px !important; font-weight:500 !important; padding:0 !important; }
+#section-staff .lv-type{ background:transparent !important; border:1px solid var(--border2) !important; color:var(--text-mid) !important; font-family:var(--sans) !important; text-transform:none !important; letter-spacing:0 !important; font-weight:500 !important; }
+#section-staff .lv-status{ background:transparent !important; font-family:var(--sans) !important; text-transform:capitalize !important; letter-spacing:0 !important; font-size:12px !important; font-weight:600 !important; padding:0 !important; display:inline-flex; align-items:center; gap:6px; }
+#section-staff .lv-status::before{ content:''; width:7px; height:7px; border-radius:50%; background:currentColor; }
+#section-staff .lv-status-pending{ color:var(--gold) !important; }
+#section-staff .lv-status-approved{ color:var(--success) !important; }
+#section-staff .lv-status-declined{ color:var(--warn) !important; }
+:root[data-theme="light"] #section-staff .lv-status-pending{ color:#a16207 !important; }
+#section-staff .lv-tr::before{ display:none !important; }
+#section-staff .card, #section-staff .lv-card, #section-staff .role-view-card{ box-shadow:none !important; }
+
+/* ── Payroll ── */
+#section-payroll .pp-seg{ background:var(--surface2) !important; border:1px solid var(--border) !important; }
+#section-payroll .pp-seg button{ color:var(--text-mid) !important; font-weight:600 !important; }
+#section-payroll .pp-seg button:hover{ background:var(--surface3) !important; color:var(--text) !important; }
+#section-payroll .card{ box-shadow:none !important; }
+
+/* ── Class days / housekeeping ── */
+.hk-state{ display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:500; color:var(--text-dim); }
+.hk-state::before{ content:''; width:7px; height:7px; border-radius:50%; background:var(--border2); }
+.hk-state-pub{ color:var(--success); }
+.hk-state-pub::before{ background:var(--success); }
+.hk-x{ color:var(--muted); }
+.hk-x:hover{ color:var(--warn); }
+#section-availability .cd-chip-x{ color:var(--text-dim) !important; }
+#section-availability .cd-chip-x:hover{ color:var(--warn) !important; }
+#section-availability .cd-chip{ box-shadow:none !important; }
+
+/* tiny shouting mono labels → readable sentence-case labels */
+:is(#section-staff,#section-availability,#section-home) :is([style*="font-size:8px"],[style*="font-size:8.5px"],[style*="font-size:9px"],[style*="font-size: 8px"],[style*="font-size: 9px"]){
+  font-size:11.5px !important; }
+:is(#section-staff,#section-availability) :is([style*="text-transform:uppercase"],[style*="text-transform: uppercase"]){
+  text-transform:none !important; letter-spacing:0 !important; }
+:is(#section-staff,#section-availability) [style*="font-family:var(--mono)"]:not(.sb-time){ font-family:var(--sans) !important; }
+#section-staff .lv-section-hd{ font-family:var(--sans) !important; font-size:13px !important; font-weight:600 !important; letter-spacing:0 !important; text-transform:none !important; color:var(--text-mid) !important; margin-top:6px; }
+#section-staff #leaveSubBadge, #section-staff #healthBadge{ font-size:10.5px !important; font-family:var(--sans) !important; }
+
+
 #availGrid .av2-row.avail-row-editing{ box-shadow:inset 3px 0 0 var(--accent); background:color-mix(in srgb,var(--accent) 5%,transparent) !important; }
 /* per-day footer */
 #availGrid .av2-foot{ background:color-mix(in srgb,var(--text) 2.5%,transparent) !important; }
@@ -3023,7 +3148,7 @@ body.avail-editing #availGrid .avail-chip.av2:hover{ background:color-mix(in srg
             <div style="flex:1;min-width:140px;"><label style="font-size:11px;font-weight:600;color:var(--pp-mut,#64748b);">Fortnight start (Mon)</label><input type="date" id="payStart" style="width:100%;border:1.5px solid var(--pp-line,#e2e8f0);border-radius:9px;padding:9px 12px;font-size:13px;font-family:inherit;outline:none;margin-top:4px;background:var(--card,#fff);color:var(--pp-ink,#0f172a);"></div>
             <div style="flex:1;min-width:140px;"><label style="font-size:11px;font-weight:600;color:var(--pp-mut,#64748b);">End</label><input type="date" id="payEnd" style="width:100%;border:1.5px solid var(--pp-line,#e2e8f0);border-radius:9px;padding:9px 12px;font-size:13px;font-family:inherit;outline:none;margin-top:4px;background:var(--card,#fff);color:var(--pp-ink,#0f172a);"></div>
             <button onclick="runPayroll()" class="btn btn-green" style="padding:10px 18px;font-size:12px;">Run payrun</button>
-            <button onclick="exportPayrollCsv()" style="padding:10px 18px;font-size:12px;font-weight:700;background:var(--pp-ink,#0f172a);color:#fff;border:none;border-radius:9px;cursor:pointer;font-family:inherit;">Export CSV</button>
+            <button onclick="exportPayrollCsv()" class="btn btn-ghost" style="padding:10px 18px;font-size:12px;">Export CSV</button>
           </div>
         </div>
         <div id="payResults" class="card" style="padding:20px;margin-bottom:14px;">Set the dates and run.</div>
@@ -5923,7 +6048,7 @@ async function _hkRender(){
           ? '<span title="Covering for '+_cdEsc(r.team)+' — normally '+_cdEsc(_hkTeamMap[r.staff_name])+'" style="flex-shrink:0;font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;padding:2px 6px;border-radius:5px;background:rgba(180,116,10,.14);color:#b4740a;">cover</span>'
           : '')+
         (r.done?'<span style="flex-shrink:0;font-size:10px;font-weight:700;color:#22a06b;">done</span>':'')+
-        '<button onclick="removeHousekeeping(\''+r.id+'\')" title="Remove from the roster (does NOT pick a replacement — use Reshuffle for that)" style="background:none;border:none;color:#e5484d;cursor:pointer;font-size:14px;line-height:1;padding:0 2px;font-family:inherit;">&times;</button>'+
+        '<button onclick="removeHousekeeping(\''+r.id+'\')" title="Remove from the roster (does NOT pick a replacement — use Reshuffle for that)" class="hk-x" style="background:none;border:none;cursor:pointer;font-size:15px;line-height:1;padding:0 3px;font-family:inherit;">&times;</button>'+
       '</div>';
     };
     const head=list.find(function(x){ return x.team==='Speaker'; });
@@ -5944,11 +6069,10 @@ async function _hkRender(){
       '</div>';
     }).join('');
     const isPub=_hkPubDays.has(d);
-    return '<div id="hkday-'+d+'" style="padding:9px 11px;border-radius:9px;background:var(--panel-2,rgba(127,127,127,.06));margin-bottom:6px;'+(upcoming?'border-left:3px solid '+(isPub?'#22a06b':'var(--accent,#3d9eff)')+';':'opacity:.62;')+'">'+
+    return '<div id="hkday-'+d+'" class="hk-day" style="padding:10px 12px;border-radius:10px;background:var(--surface);border:1px solid var(--border);margin-bottom:8px;'+(upcoming?'':'opacity:.62;')+'">'+
       '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:5px;">'+
         '<div style="font-size:12.5px;font-weight:800;">'+lbl+(upcoming?'':' <span style="font-weight:500;color:var(--text-dim);">(past)</span>')+'</div>'+
-        '<span style="font-size:9px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;padding:2px 7px;border-radius:999px;'+
-          (isPub?'background:rgba(34,160,107,.14);color:#22a06b;':'background:rgba(180,116,10,.14);color:#b4740a;')+'">'+(isPub?'published':'draft')+'</span>'+
+        '<span class="hk-state '+(isPub?'hk-state-pub':'hk-state-draft')+'">'+(isPub?'Published':'Draft')+'</span>'+
         '<div style="flex:1;"></div>'+
         '<button onclick="copyHousekeepingDay(\''+d+'\')" title="Copy this day\'s roster to the clipboard" style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--text-dim);cursor:pointer;font-size:10px;font-weight:700;padding:3px 9px;font-family:inherit;">Copy</button>'+
         (upcoming
@@ -6252,23 +6376,15 @@ function _availDaysDiffer(a,b){
 }
 function _renderAvailGrid(avObj,compareTo){
   const DAYS_SHORT=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
-  let h='<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:0;">';
+  let h='<div class="sa-grid">';
   DAYS_SHORT.forEach(function(day,i){
     const a=avObj[i]||avObj[String(i)]||{type:'unset'};
-    const st=_availDayLabel(a);
     let changed=false;
-    if(compareTo){
-      const b=compareTo[i]||compareTo[String(i)]||{type:'unset'};
-      changed=_availDaysDiffer(a,b);
-    }
-    const ring=changed?'box-shadow:inset 0 0 0 2px var(--warn);':'';
-    h+='<div style="padding:10px 4px;text-align:center;background:'+st.bg+';border-right:1px solid var(--border);position:relative;'+ring+'">';
-    h+='<div style="font-family:var(--mono);font-size:8px;font-weight:700;color:var(--muted);margin-bottom:4px;">'+day+'</div>';
-    h+='<div style="font-size:9.5px;font-weight:'+st.fw+';color:'+st.col+';line-height:1.3;">'+st.label+'</div>';
-    h+='</div>';
+    if(compareTo){ const b=compareTo[i]||compareTo[String(i)]||{type:'unset'}; changed=_availDaysDiffer(a,b); }
+    const c=_av2Cell(a,i);
+    h+='<div class="sa-day '+c.cls+(changed?' sa-changed':'')+'"><span class="sa-d">'+day+'</span>'+c.html+'</div>';
   });
-  h+='</div>';
-  return h;
+  return h+'</div>';
 }
 
 async function loadSubmittedAvailability(){
@@ -6301,7 +6417,7 @@ async function loadSubmittedAvailability(){
     const DAYS_SHORT=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
     const today=new Date();today.setHours(0,0,0,0);
 
-    let html='<div style="display:flex;flex-direction:column;gap:12px;">';
+    let html='<div class="sa-list">';
 
     let _needsReviewCount=0;
     rows.forEach(row=>{
@@ -6320,13 +6436,13 @@ async function loadSubmittedAvailability(){
       const _nameEsc=String(row.staff_name).replace(/'/g,"\\'").replace(/"/g,'&quot;');
       // Period label
       let period='Ongoing';
-      let periodColor='var(--accent)';
+      let periodCls='';
       if(row.is_ongoing===false){
         if(row.valid_from&&row.valid_until){
           period='From '+row.valid_from+' – '+row.valid_until;
           // Check if expired
           const until=new Date(row.valid_until+'T00:00:00');
-          if(today>until){period+=' (expired)';periodColor='var(--warn)';}
+          if(today>until){period+=' (expired)';periodCls=' sa-expired';}
         } else if(row.valid_from){
           period='From '+row.valid_from;
         }
@@ -6336,34 +6452,25 @@ async function loadSubmittedAvailability(){
         row.updated_at ? new Date(row.updated_at).getTime() : 0,
         row.pending_set_at ? new Date(row.pending_set_at).getTime() : 0
       );
-      const updated=_lastTouch ? new Date(_lastTouch).toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}):'';
+      const updated=_lastTouch ? new Date(_lastTouch).toLocaleString('en-AU',{day:'numeric',month:'short',hour:'numeric',minute:'2-digit'}):'';
 
       const s=staff.find(x=>`${x.first} ${x.last}`.toLowerCase()===row.staff_name.toLowerCase());
       const _cardTeam=(s&&s.team)?String(s.team).replace(/"/g,'&quot;'):'';
-      html+='<div data-team="'+_cardTeam+'" data-availcard="'+_nameEsc+'" style="background:rgba(255,255,255,.03);border:1px solid '+(needsReview?'var(--warn)':'var(--border)')+';border-radius:12px;overflow:hidden;">';
-      // Header
-      html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:rgba(255,255,255,.03);border-bottom:1px solid var(--border);">';
-      html+='<div style="display:flex;align-items:center;gap:10px;">';
+      html+='<div class="sa-card" data-team="'+_cardTeam+'" data-availcard="'+_nameEsc+'">';
       const color=s?s.color:'#667';
       const ava=row.staff_name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
-      html+='<div class="avatar" style="background:'+color+';width:28px;height:28px;font-size:9px;flex-shrink:0;position:relative;">'+ava;
-      html+='<span data-availdot style="display:'+(needsReview?'block':'none')+';position:absolute;top:-3px;right:-3px;width:9px;height:9px;border-radius:50%;background:var(--warn);border:2px solid var(--bg,#0e1116);"></span>';
-      html+='</div>';
-      html+='<div><div style="font-size:13px;font-weight:700;">'+row.staff_name+'</div>';
-      html+='<div style="font-size:10px;color:'+periodColor+';font-weight:600;margin-top:1px;">'+period+'</div></div>';
-      html+='</div>';
-      html+='<div style="display:flex;align-items:center;gap:10px;">';
-      html+='<div data-availreview style="display:'+(needsReview?'flex':'none')+';align-items:center;gap:8px;">';
-      html+='<span style="font-family:var(--mono);font-size:8px;font-weight:800;color:var(--warn);letter-spacing:.5px;">CHANGED</span>';
-      html+='<button onclick="markAvailReviewed(\''+_nameEsc+'\',this)" style="cursor:pointer;background:var(--warn);color:#fff;border:none;border-radius:7px;padding:5px 10px;font-size:9px;font-weight:800;font-family:var(--mono);letter-spacing:.3px;">MARK REVIEWED</button>';
-      html+='</div>';
-      if(updated)html+='<div style="font-family:var(--mono);font-size:8px;color:var(--muted);">Updated '+updated+'</div>';
-      html+='</div>';
-      html+='</div>';
+      html+='<div class="sa-hd"><div class="sa-who">'+
+              '<div class="avatar sa-ava" style="background:'+color+'">'+ava+'<span data-availdot class="sa-dot" style="display:'+(needsReview?'block':'none')+'"></span></div>'+
+              '<div class="sa-id"><div class="sa-name">'+row.staff_name+'</div><div class="sa-period'+periodCls+'">'+period+'</div></div></div>'+
+            '<div class="sa-meta">'+
+              '<div data-availreview class="sa-review" style="display:'+(needsReview?'flex':'none')+'"><span class="sa-changed-tag">Changed</span>'+
+              '<button class="btn btn-ghost sa-mark" onclick="markAvailReviewed(\''+_nameEsc+'\',this)">Mark reviewed</button></div>'+
+              (updated?'<span class="sa-upd">Updated '+updated+'</span>':'')+
+            '</div></div>';
 
       // Current (live) grid. If there's a pending change, label this as current.
       if(hasPending){
-        html+='<div style="font-family:var(--mono);font-size:8px;font-weight:800;letter-spacing:.5px;color:var(--muted);padding:8px 16px 4px;">CURRENT</div>';
+        html+='<div class="sa-sub">Current</div>';
       }
       html+=_renderAvailGrid(av,null);
 
@@ -6372,10 +6479,7 @@ async function loadSubmittedAvailability(){
         const _pf=row.pending_from;
         let _pfLabel=_pf;
         try{ _pfLabel=new Date(_pf+'T00:00:00').toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short'}); }catch(e){}
-        html+='<div style="display:flex;align-items:center;gap:8px;padding:10px 16px 4px;border-top:1px dashed var(--border);margin-top:2px;">';
-        html+='<span style="font-family:var(--mono);font-size:8px;font-weight:800;letter-spacing:.5px;color:var(--warn);">NEW — EFFECTIVE '+_pfLabel+'</span>';
-        html+='<span style="font-size:9px;color:var(--muted);">outlined days changed</span>';
-        html+='</div>';
+        html+='<div class="sa-sub sa-sub-new">New from '+_pfLabel+' <span>· highlighted days change</span></div>';
         html+=_renderAvailGrid(pend,av);
       }
       html+='</div>';
@@ -6812,7 +6916,7 @@ function renderRoleView(){
   const teams=getUniqueTeams();
   const bar=document.getElementById('roleFilterBar');
   const content=document.getElementById('roleViewContent');
-  let barHtml='<span style="font-family:var(--mono);font-size:9px;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;padding:4px 0">Team:</span>';
+  let barHtml='';
   barHtml+=`<div class="role-pill${activeRoleFilter===null?' active':''}" onclick="setRoleFilter(null)">All Teams</div>`;
   teams.forEach(t=>{const enc=t.replace(/\\/g,'\\\\').replace(/'/g,"\\'");barHtml+=`<div class="role-pill${activeRoleFilter===t?' active':''}" onclick="setRoleFilter('${enc}')">${t}</div>`;});
   bar.innerHTML=barHtml;
@@ -6828,14 +6932,14 @@ function renderRoleView(){
     html+=`<div class="role-view-card" data-team="${(team||'').replace(/"/g,'&quot;')}"><div class="role-view-header">
       <div style="display:flex;align-items:center;gap:10px">
         <div class="role-view-title">${team}</div>
-        <span style="background:rgba(0,229,160,.12);color:var(--accent);border:1px solid rgba(0,229,160,.25);border-radius:4px;padding:2px 8px;font-size:9px;font-family:var(--mono);font-weight:700">${teamStaff.length} STAFF</span>
+        <span class="pro-count">${teamStaff.length} staff</span>
       </div>
       <div class="role-view-count">${totalS} shifts this week</div>
     </div>`;
 
     // Column headers
-    html+=`<div class="role-staff-row" style="background:var(--surface2)"><div class="role-staff-name" style="font-family:var(--mono);font-size:8px;color:var(--text-dim);text-transform:uppercase">NAME / ROLE</div>`;
-    for(let d=0;d<7;d++){const day=addDays(currentWeekStart,d);html+=`<div class="role-shift-cell" style="font-family:var(--mono);font-size:8px;color:var(--text-dim);padding:8px 5px">${DAYS[d]}<br><span style="opacity:.6">${fmtDate(day)}</span></div>`;}
+    html+=`<div class="role-staff-row pro-hd-row"><div class="role-staff-name">Staff</div>`;
+    for(let d=0;d<7;d++){const day=addDays(currentWeekStart,d);html+=`<div class="role-shift-cell"><b>${DAYS[d]}</b><span>${fmtDate(day)}</span></div>`;}
     html+='</div>';
 
     teamStaff.forEach(s=>{
@@ -6845,14 +6949,14 @@ function renderRoleView(){
           <div class="avail-dot" style="background:${s.color}"></div>
           <div style="min-width:0">
             <div style="font-size:12px;font-weight:${ismgr?700:500};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${s.first} ${s.last}</div>
-            <div style="font-family:var(--mono);font-size:8px;color:${ismgr?'var(--accent)':'var(--text-dim)'};margin-top:1px">${s.team}</div>
+            <div class="pro-sub">${s.team}</div>
           </div>
         </div>`;
       for(let d=0;d<7;d++){
         const ds=(shifts[s.id]||{})[d]||[];
         const conflict=getAvail(s.id,d).type==='no'&&ds.some(sh=>sh.type!=='leave');
         html+=`<div class="role-shift-cell${conflict?' shift-conflict':''}">`;
-        if(!ds.length)html+=`<span style="font-family:var(--mono);font-size:8px;color:var(--border)">—</span>`;
+        if(!ds.length)html+=`<span class="pro-empty">—</span>`;
         else ds.forEach((sh,i)=>{const il=sh.type==='leave';html+=`<div class="shift-badge ${il?'shift-leave':'shift-slot'}" style="font-size:8.5px;cursor:pointer" onclick="editShift(${s.id},${d},${i})">${il?'LEAVE':`${sh.start}–${sh.end}`}</div>`;});
         html+='</div>';
       }
