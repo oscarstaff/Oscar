@@ -2697,15 +2697,6 @@ body.avail-editing #availGrid .avail-chip.av2:hover{ background:color-mix(in srg
    ═════════════════════════════════════════════════════════════════════════ */
 :is(#section-home,#section-availability,#section-staff,#section-payroll){ --pro-r:10px; }
 
-/* one tab style everywhere: underline */
-#section-staff .sub-tabs-bar{ display:flex !important; background:none !important; border:0 !important; border-bottom:1px solid var(--border) !important;
-  border-radius:0 !important; padding:0 !important; gap:2px !important; box-shadow:none !important; width:100%; }
-#section-staff .sub-tabs-bar .sub-tab, #section-availability .sub-tab{ border-radius:0 !important; padding:10px 14px !important; background:none !important;
-  box-shadow:none !important; font-weight:500 !important; font-size:13.5px !important; color:var(--text-dim) !important; border-bottom:2px solid transparent !important; margin-bottom:-1px !important; }
-#section-staff .sub-tabs-bar .sub-tab:hover, #section-availability .sub-tab:hover{ background:none !important; color:var(--text) !important; }
-#section-staff .sub-tabs-bar .sub-tab.active, #section-availability .sub-tab.active{ color:var(--text) !important; border-bottom-color:var(--accent) !important; font-weight:600 !important; }
-:is(#section-staff,#section-availability) .sub-tab::after{ display:none !important; }
-
 /* team / filter pills: plain */
 :is(#section-staff,#section-availability) .role-pill{ box-shadow:none !important; font-weight:500; border-radius:999px; }
 :is(#section-staff,#section-availability) .role-pill.active{ font-weight:600; }
@@ -2951,7 +2942,7 @@ body.avail-editing #availGrid .avail-chip.av2:hover{ background:color-mix(in srg
       <div class="brand-mark">O</div>
       <span class="brand-name">ShiftOps</span>
     </div>
-    <nav class="appbar-nav">
+    <nav class="appbar-nav seg">
       <div class="nav-item active" onclick="switchNav('home',this)">Dashboard</div>
       <div class="nav-item" onclick="switchNav('roster',this)">Roster</div>
       <div class="nav-item" onclick="switchNav('availability',this);clearAvailBadge()">Availability<span id="availNavBadge" style="display:none;margin-left:6px;background:var(--warn);color:#fff;border-radius:8px;padding:1px 6px;font-size:8px;font-weight:800;font-family:var(--mono);"></span></div>
@@ -3094,7 +3085,7 @@ body.avail-editing #availGrid .avail-chip.av2:hover{ background:color-mix(in srg
 
       <div class="tab-content" id="section-availability">
         <!-- Sub-tabs -->
-        <div style="display:flex;gap:0;margin-bottom:18px;border-bottom:1px solid var(--border);">
+        <div class="sub-tabs-bar seg">
           <div class="sub-tab active" id="subtab-avail-edit" onclick="showAvailTab('edit')">Weekly Grid</div>
           <div class="sub-tab" id="subtab-avail-submitted" onclick="showAvailTab('submitted')">Submitted Availability</div>
           <div class="sub-tab" id="subtab-avail-classdays" data-tl-hide="1" onclick="showAvailTab('classdays')">Class Days</div>
@@ -3161,7 +3152,7 @@ body.avail-editing #availGrid .avail-chip.av2:hover{ background:color-mix(in srg
       </div>
       <div class="tab-content" id="section-staff">
         <!-- Staff sub-tabs -->
-        <div class="sub-tabs-bar" style="display:inline-flex;gap:3px;margin-bottom:18px;background:var(--surface2);border:1px solid var(--border);border-radius:13px;padding:4px;">
+        <div class="sub-tabs-bar seg">
           <div class="sub-tab active" id="subtab-list" onclick="showSubTab('list')">Employee List</div>
           <div class="sub-tab" id="subtab-teamview" onclick="showSubTab('teamview')">Team View</div>
           <div class="sub-tab" id="subtab-manageteams" onclick="showSubTab('manageteams')">Manage Teams</div>
@@ -12149,6 +12140,173 @@ async function soEarlyAckAll(){
 setTimeout(soEarlyLoad, 1500);
 setInterval(soEarlyLoad, 2*60*1000);
 document.addEventListener('visibilitychange', function(){ if(!document.hidden) soEarlyLoad(); });
+</script>
+
+<style id="apple-layer">
+/* ═══ APPLE LAYER ══════════════════════════════════════════════════════════
+   After Apple's HIG / "Designing Fluid Interfaces": system type with
+   size-specific tracking, neutral system greys, a translucent toolbar the
+   page scrolls under, segmented controls with a sliding thumb, instant press
+   feedback, symmetric critically-damped motion (no overshoot on things the
+   user didn't throw), and full respect for reduced motion / transparency /
+   increased contrast. Brand accent is unchanged.
+   ═════════════════════════════════════════════════════════════════════════ */
+:root{
+  --ease-spring: cubic-bezier(.32,.72,0,1);   /* ≈ critically damped spring, response ~0.35s */
+  --sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --display: -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: var(--sans);
+}
+/* dark — Apple's elevated dark greys */
+html:root:not([data-theme="light"]){
+  --bg:#000000; --surface:#1c1c1e; --surface2:#232325; --surface3:#2c2c2e;
+  --border:#38383a; --border2:#48484a;
+  --text:#f5f5f7; --text-mid:#d1d1d6; --text-dim:#a1a1a6; --muted:#8e8e93;
+  --seg-fill:rgba(118,118,128,.24); --seg-thumb:#636366;
+  --material:rgba(28,28,30,.72); --menu-material:rgba(44,44,46,.94); --material-solid:#1c1c1e; --hairline:rgba(84,84,88,.65);
+  --scrim:rgba(0,0,0,.48);
+}
+/* light — Apple's grouped greys */
+html:root[data-theme="light"]{
+  --bg:#f5f5f7; --surface:#ffffff; --surface2:#f9f9fb; --surface3:#f0f0f3;
+  --border:#e5e5ea; --border2:#d2d2d7;
+  --text:#1d1d1f; --text-mid:#424245; --text-dim:#6e6e73; --muted:#737378;
+  --seg-fill:rgba(118,118,128,.12); --seg-thumb:#ffffff;
+  --material:rgba(255,255,255,.72); --menu-material:rgba(250,250,252,.95); --material-solid:#ffffff; --hairline:rgba(60,60,67,.18);
+  --scrim:rgba(0,0,0,.28);
+}
+
+/* ── Typography: system face, tracking by size, tight leading on headings ── */
+body{ font-family:var(--sans) !important; letter-spacing:-.006em; -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
+  font-variant-numeric:tabular-nums; text-rendering:optimizeLegibility; }
+.section-title, #availGrid .avail-header .section-title{ font-family:var(--display) !important; letter-spacing:-.022em !important; line-height:1.15; font-weight:700 !important; }
+.card-title, .role-view-title, .modal-title{ font-family:var(--display) !important; letter-spacing:-.014em !important; }
+.ds-num, .stat-num, .stats-strip b{ letter-spacing:-.02em; }
+.sa-period, .avail-who-s, .pro-sub, .ds-lbl, .av-week, .sa-upd{ letter-spacing:0; }
+
+/* ── Toolbar: a translucent material the page scrolls under ── */
+.shell{ position:relative; }
+.appbar{ position:absolute !important; top:0; left:0; right:0; z-index:60;
+  background:var(--material) !important; -webkit-backdrop-filter:saturate(180%) blur(20px); backdrop-filter:saturate(180%) blur(20px) !important;
+  border-bottom:1px solid transparent !important; transition:border-color .2s ease, box-shadow .2s ease; }
+.appbar.is-scrolled{ border-bottom-color:var(--hairline) !important; }
+.main{ padding-top:52px; scroll-padding-top:64px; }
+.brand-name{ letter-spacing:-.015em; }
+
+/* ── Segmented controls with a sliding thumb ── */
+.seg.seg{ position:relative; display:inline-flex !important; align-items:center; gap:0 !important; padding:2px !important;
+  background:var(--seg-fill) !important; border:0 !important; border-radius:9px !important; box-shadow:none !important; width:auto !important; }
+.sub-tabs-bar.seg{ margin:0 0 18px !important; }
+.appbar-nav.seg{ margin-left:12px; }
+.seg.seg > .sub-tab, .seg.seg > .nav-item{ position:relative; z-index:1; background:none !important; border:0 !important; border-radius:7px !important;
+  padding:5px 14px !important; margin:0 !important; font-size:13px !important; font-weight:500 !important; color:var(--text-mid) !important;
+  box-shadow:none !important; transform:none; transition:color .2s ease, transform .12s ease !important; white-space:nowrap; line-height:1.4; }
+.seg.seg > .sub-tab:hover, .seg.seg > .nav-item:hover{ color:var(--text) !important; background:none !important; }
+.seg.seg > .active{ color:var(--text) !important; font-weight:600 !important; }
+.seg.seg > .sub-tab::after, .seg.seg > .nav-item::before{ display:none !important; }
+.seg-thumb{ position:absolute; z-index:0; top:2px; bottom:2px; left:0; width:0; border-radius:7px; background:var(--seg-thumb);
+  box-shadow:0 3px 8px rgba(0,0,0,.12), 0 3px 1px rgba(0,0,0,.04), 0 0 0 .5px rgba(0,0,0,.04); pointer-events:none; opacity:0; }
+.seg.seg-ready .seg-thumb{ opacity:1; transition:transform .38s var(--ease-spring), width .38s var(--ease-spring); }
+/* sub-tab separators like UISegmentedControl, hidden next to the thumb */
+.seg.seg > .sub-tab + .sub-tab::before, .seg.seg > .nav-item + .nav-item::after{ content:''; position:absolute; left:0; top:25%; bottom:25%; width:1px; background:var(--hairline); transition:opacity .2s; }
+.seg.seg > .active::before, .seg.seg > .active + *::before, .seg.seg > .active::after, .seg.seg > .active + *::after{ opacity:0; }
+
+/* ── Response: feedback on press, instantly ── */
+.btn, .role-pill, .ds-tile, .lv-btn, .av2-edit, .tools-menu-item, .cd-chip, .sub-tab, .nav-item{
+  transition:transform .14s ease, background-color .15s ease, color .15s ease, border-color .15s ease, opacity .15s ease, box-shadow .15s ease; }
+:is(.btn, .role-pill, .ds-tile, .lv-btn, .av2-edit, .seg.seg > .sub-tab, .seg.seg > .nav-item):active{ transform:scale(.97) !important; transition-duration:60ms !important; }
+.btn{ font-weight:600 !important; letter-spacing:-.006em; }
+.btn:active{ filter:brightness(.96); }
+:focus-visible{ outline:3px solid color-mix(in srgb,var(--accent) 45%,transparent) !important; outline-offset:2px; border-radius:8px; }
+
+/* ── Modals: dim to focus; rise in and settle back out along the same path ── */
+.modal-overlay{ background:var(--scrim) !important; -webkit-backdrop-filter:blur(3px); backdrop-filter:blur(3px) !important; transition:opacity .28s ease !important; }
+.modal{ animation:none !important; opacity:0; transform:translateY(18px) scale(.97);
+  transition:transform .42s var(--ease-spring), opacity .24s ease !important; border-radius:14px !important; border:1px solid var(--border) !important;
+  box-shadow:0 24px 60px -12px rgba(0,0,0,.35), 0 2px 6px rgba(0,0,0,.08) !important; }
+.modal-overlay.open .modal{ opacity:1; transform:none; }
+
+/* ── Menus: a material that grows from its trigger, interruptible ── */
+.tools-menu{ display:block !important; visibility:hidden; opacity:0; transform:scale(.94); transform-origin:top right; pointer-events:none;
+  animation:none !important; background:var(--menu-material) !important; -webkit-backdrop-filter:saturate(180%) blur(40px); backdrop-filter:saturate(180%) blur(40px);
+  box-shadow:0 12px 32px -6px rgba(0,0,0,.28), 0 0 0 .5px rgba(0,0,0,.06) !important;
+  border:1px solid var(--border) !important; border-radius:12px !important; padding:4px; min-width:200px;
+  transition:opacity .18s ease, transform .3s var(--ease-spring), visibility 0s linear .3s; }
+.tools-menu.open{ visibility:visible; opacity:1; transform:none; pointer-events:auto; transition:opacity .18s ease, transform .3s var(--ease-spring), visibility 0s; }
+.tools-menu-item{ border-radius:8px; border:0 !important; box-shadow:none !important; background:transparent !important; padding:8px 12px; font-size:13px; color:var(--text) !important; }
+.tools-menu-item:hover{ background:var(--accent) !important; color:var(--on-accent,#fff) !important; }
+.tools-menu-item:hover svg{ color:inherit; }
+
+/* ── Toast: a capsule that rises from the bottom edge and leaves the same way ── */
+.toast{ left:50% !important; right:auto !important; bottom:24px !important; max-width:min(440px,calc(100vw - 32px)) !important;
+  transform:translate(-50%,16px) !important; opacity:0; border-radius:999px !important; padding:10px 18px !important; text-align:center;
+  background:rgba(29,29,31,.86) !important; color:#fff !important; -webkit-backdrop-filter:saturate(180%) blur(20px); backdrop-filter:saturate(180%) blur(20px);
+  font-size:13px !important; box-shadow:0 10px 30px -8px rgba(0,0,0,.35) !important; transition:opacity .2s ease, transform .4s var(--ease-spring) !important; }
+.toast.show{ transform:translate(-50%,0) !important; opacity:1; }
+html:root:not([data-theme="light"]) .toast{ background:rgba(58,58,60,.88) !important; }
+
+/* ── Surfaces: quiet cards, consistent corners ── */
+.card, .role-view-card, .sa-card, .coverage, .ds-tile, .stats-strip, .lv-card{ border-color:var(--border) !important; }
+.form-input, input[type="text"], input[type="date"], input[type="time"], input[type="number"], select, textarea{
+  border-radius:8px !important; transition:border-color .15s ease, box-shadow .15s ease; }
+.form-input:focus, input:focus, select:focus, textarea:focus{ border-color:var(--accent) !important; box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 22%,transparent) !important; outline:none !important; }
+
+/* scrollbars that stay out of the way */
+.main::-webkit-scrollbar{ width:11px; height:11px; }
+.main::-webkit-scrollbar-thumb{ background:rgba(128,128,128,.38); border-radius:10px; border:3px solid transparent; background-clip:content-box; }
+.main::-webkit-scrollbar-track{ background:transparent; }
+
+/* ── Accessibility preferences ── */
+@media (prefers-reduced-motion: reduce){
+  .seg.seg-ready .seg-thumb{ transition:none; }
+  .modal{ transform:none !important; transition:opacity .2s ease !important; }
+  .tools-menu{ transform:none !important; }
+  .toast{ transform:translate(-50%,0) !important; }
+  :is(.btn, .role-pill, .ds-tile, .lv-btn, .av2-edit, .seg.seg > *):active{ transform:none !important; }
+}
+@media (prefers-reduced-transparency: reduce){
+  .appbar, .tools-menu{ background:var(--material-solid) !important; -webkit-backdrop-filter:none; backdrop-filter:none !important; }
+  .toast{ background:#1d1d1f !important; -webkit-backdrop-filter:none; backdrop-filter:none; }
+  .modal-overlay{ -webkit-backdrop-filter:none; backdrop-filter:none !important; }
+}
+@media (prefers-contrast: more){
+  :root{ --border:var(--border2); --hairline:var(--border2); }
+  .appbar, .tools-menu{ background:var(--material-solid) !important; }
+}
+</style>
+<script>
+/* Segmented controls: slide the thumb to the selected segment. Watches class
+   changes (any code path that switches tabs) and size changes (a section
+   becoming visible, a font loading) so the thumb is always where it belongs. */
+(function(){
+  function place(seg){
+    var thumb=seg.querySelector(':scope > .seg-thumb');
+    if(!thumb){ thumb=document.createElement('span'); thumb.className='seg-thumb'; thumb.setAttribute('aria-hidden','true'); seg.insertBefore(thumb,seg.firstChild); }
+    var act=seg.querySelector(':scope > .active');
+    if(!act || !seg.offsetWidth || act.offsetParent===null){ thumb.style.width='0px'; return; }
+    thumb.style.transform='translateX('+act.offsetLeft+'px)';
+    thumb.style.width=act.offsetWidth+'px';
+    if(!seg.classList.contains('seg-ready')) requestAnimationFrame(function(){ seg.classList.add('seg-ready'); });
+  }
+  function all(){ document.querySelectorAll('.seg').forEach(place); }
+  function init(){
+    all();
+    var mo=new MutationObserver(function(){ requestAnimationFrame(all); });
+    document.querySelectorAll('.seg').forEach(function(seg){
+      mo.observe(seg,{subtree:true,attributes:true,attributeFilter:['class'],childList:true});
+      if(window.ResizeObserver) new ResizeObserver(function(){ place(seg); }).observe(seg);
+    });
+    // sections hide/show via .active on .tab-content — re-place when that happens
+    var main=document.querySelector('.main');
+    document.querySelectorAll('.tab-content').forEach(function(tc){ mo.observe(tc,{attributes:true,attributeFilter:['class','style']}); });
+    if(document.fonts && document.fonts.ready) document.fonts.ready.then(all);
+    window.addEventListener('resize',all);
+    // scroll-edge effect: the toolbar's hairline only appears once content is under it
+    var bar=document.querySelector('.appbar');
+    if(main && bar){ var on=function(){ bar.classList.toggle('is-scrolled', main.scrollTop>2); }; main.addEventListener('scroll',on,{passive:true}); on(); }
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',init); else init();
+})();
 </script>
 </body>
 </html>
