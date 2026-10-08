@@ -166,6 +166,14 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 
 .au-det table{border-collapse:collapse;width:100%;}.au-det td{padding:3px 8px 3px 0;vertical-align:top;}.au-det td:first-child{color:var(--ink-dim);width:92px;}
 .au-state{text-align:center;color:var(--ink-dim);padding:44px 20px;font-size:14px;line-height:1.6;}
 @media(max-width:820px){.au-row{grid-template-columns:1fr auto;}.au-when{grid-column:1/-1;}}
+/* ── session lock ── */
+#slipLock{position:fixed;inset:0;z-index:99998;display:none;align-items:center;justify-content:center;padding:20px;background:linear-gradient(135deg,#0f1117,#1a1d27);font-family:'Inter',system-ui,sans-serif;}
+#slipLock.on{display:flex;}
+#slipLock .lk{background:#1e2230;border:1px solid #2e3344;border-radius:18px;padding:38px 34px;width:min(400px,92vw);text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.5);}
+#slipLock .lk-ic{font-size:40px;margin-bottom:12px;}
+#slipLock .lk-t{font-size:20px;font-weight:700;color:#fff;margin-bottom:8px;}
+#slipLock .lk-m{font-size:13.5px;color:#8b94a8;line-height:1.55;margin-bottom:22px;}
+#slipLock button{background:var(--accent);color:#fff;border:0;border-radius:11px;padding:11px 22px;font-family:'Inter';font-weight:600;font-size:14px;cursor:pointer;}
 .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--ink);color:#fff;padding:13px 22px;border-radius:11px;font-size:14px;font-weight:500;box-shadow:0 8px 28px rgba(0,0,0,.25);opacity:0;transition:all .3s;z-index:100;}
 .toast.show{transform:translateX(-50%) translateY(0);opacity:1;}
 @page{ size:A4; margin:0; }
@@ -224,6 +232,7 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 
       sessionStorage.setItem('ngate_'+APP,'1');
       try{ if(name){ sessionStorage.setItem('slip_user',name); window.__slipUser=name; } }catch(e){}
       try{ if(payload.sb_at) sessionStorage.setItem('slip_sb_at',payload.sb_at); sessionStorage.setItem('slip_is_admin',payload.is_admin===true?'1':'0'); }catch(e){}
+      try{ window.dispatchEvent(new Event('slip-unlocked')); }catch(e){}
       try{history.replaceState(null,'',location.pathname+location.search);}catch(e){}
       pass();
     }catch(e){ fail('Access check failed.'); console.warn('gate',e); }
@@ -395,6 +404,11 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 
 </div>
 
 <div class="toast" id="toast"></div>
+<div id="slipLock" role="alertdialog" aria-modal="true" aria-labelledby="lkT" aria-describedby="lkM">
+  <div class="lk"><div class="lk-ic">🔒</div><div class="lk-t" id="lkT">Session expired</div>
+  <div class="lk-m" id="lkM">Your sign-in has expired, so Slip has locked. Reopen Slip from Nodes in Nexus to continue.</div>
+  <button type="button" onclick="try{window.close()}catch(e){}">Close this tab</button></div>
+</div>
 
 <script>
 const LS={settings:'slip_settings',receipts:'slip_receipts',nextNum:'slip_nextnum'};
@@ -409,6 +423,27 @@ function slipTokAlive(){
     const c=JSON.parse(atob(b)); return !!(c.exp && c.exp*1000>Date.now()+30000); }catch(e){ return false; }
 }
 function slipHdr(){ return {apikey:SLIP_KEY,Authorization:'Bearer '+(slipTokAlive()?slipTok():SLIP_KEY),'Content-Type':'application/json'}; }
+// Slip only works with a live sign-in: without one nothing can be tied to a person, so lock the whole page.
+let _lockWarned=false;
+function slipEnforce(){
+  const lk=document.getElementById('slipLock'); if(!lk) return slipTokAlive();
+  const ok=slipTokAlive();
+  const root=[document.querySelector('.topnav'),document.querySelector('.wrap')];
+  if(!ok){
+    lk.classList.add('on'); root.forEach(function(n){ if(n) n.setAttribute('inert',''); });
+    try{ closeWho(); }catch(e){}
+    try{ const b=lk.querySelector('button'); if(b&&document.activeElement!==b) b.focus(); }catch(e){}
+  } else {
+    lk.classList.remove('on'); root.forEach(function(n){ if(n) n.removeAttribute('inert'); });
+    // heads-up a few minutes before it ends, so a half-typed invoice isn't lost by surprise
+    try{ const t=slipTok().split('.')[1].replace(/-/g,'+').replace(/_/g,'/'); const exp=JSON.parse(atob(t+'='.repeat((4-t.length%4)%4))).exp*1000;
+      if(!_lockWarned && exp-Date.now()<5*60*1000){ _lockWarned=true; toast('Your sign-in ends in a few minutes. Finish up, then reopen Slip from Nexus.'); } }catch(e){}
+  }
+  return ok;
+}
+setInterval(slipEnforce,15000);
+document.addEventListener('visibilitychange',function(){ if(!document.hidden) slipEnforce(); });
+window.addEventListener('focus',slipEnforce);
 // Report a view / PDF to the audit trail. Never blocks or breaks the page.
 function slipLog(action,num,detail){
   try{ if(!slipTokAlive()) return;
@@ -561,6 +596,7 @@ function _renderReceiptBody(){
 }
 
 async function downloadPDF(){
+  if(!slipEnforce()) return;
   const name=document.getElementById('f-name').value.trim();
   if(!name){toast('Enter a student name first');return;}
   const receipt=document.getElementById('receiptPrint');
@@ -594,6 +630,7 @@ async function downloadPDF(){
 }
 
 async function saveReceipt(){
+  if(!slipEnforce()) return;
   const name=document.getElementById('f-name').value.trim();
   if(!name){toast('Enter a name first');return;}
   const items=lineData.filter(li=>li.desc||li.price||li.qty);
@@ -638,6 +675,7 @@ function resetForm(){
   renderLines();renderReceipt();
 }
 async function renderHistory(){
+  if(!slipEnforce()) return;
   const c=document.getElementById('histList');
   c.innerHTML='<div class="empty"><div class="ic">🧾</div>Loading…</div>';
   let all=[];
@@ -657,6 +695,7 @@ async function renderHistory(){
   });
 }
 async function deleteReceipt(num){
+  if(!slipEnforce()) return;
   if(!confirm('Delete invoice #'+num+'? This cannot be undone.'))return;
   try{
     const r=await fetch(SLIP_SB+'/rest/v1/slip_invoices?num=eq.'+num,{method:'DELETE',headers:Object.assign({Prefer:'return=minimal'},slipHdr())});
@@ -666,6 +705,7 @@ async function deleteReceipt(num){
   toast('Invoice #'+num+' deleted');
 }
 function loadReceipt(r){
+  if(!slipEnforce()) return;
   window._viewingSaved = true;
   showPage('new');
   document.getElementById('f-name').value=r.name||'';
@@ -831,7 +871,8 @@ async function renderAudit(reset){
   finally{ AU.busy=false; }
 }
 
-renderWho();setTimeout(loadMe,300);
+renderWho();slipEnforce();setTimeout(loadMe,300);
+window.addEventListener('slip-unlocked',function(){ renderWho(); slipEnforce(); setTimeout(loadMe,100); });
 </script>
 </body>
 </html>
