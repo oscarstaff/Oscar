@@ -2914,7 +2914,7 @@ body.avail-editing #availGrid .avail-chip.av2:hover{ background:color-mix(in srg
       }
       var rows=r.ok?await r.json():[];
       if(!rows.length){fail('You no longer have access to this app.');return;}
-      try{ sessionStorage.setItem('so_me', name); }catch(e){}
+      try{ sessionStorage.setItem('so_me', name); sessionStorage.setItem('so_is_admin', payload.is_admin ? '1' : '0'); }catch(e){}
       try{ if(typeof _renderWhoami==='function') _renderWhoami(); }catch(e){}
       // Capture Nexus' Supabase session so ShiftOps writes as an authenticated
       // user (RLS-locked tables reject the anon key). Stash for the tab session.
@@ -3655,12 +3655,16 @@ function _whoStaffRec(){
   }catch(e){ return null; }
 }
 function _whoRole(rec){
-  if(!rec) return '';
-  if(rec.isHubAdmin) return 'Admin';
+  // The label must never guess. Until the role data has really loaded, show only what
+  // the launch token said (Admin) or nothing, so an admin never flashes "Team Lead".
+  let hint=false; try{ hint=sessionStorage.getItem('so_is_admin')==='1'; }catch(e){}
+  if(rec && rec.isHubAdmin) return 'Admin';
+  let ok=false; try{ ok=!!_roleDataOk; }catch(e){}
+  if(!ok || !rec) return hint ? 'Admin' : '';
   if(rec.isShiftAdmin) return 'Roster admin';
   try{ if(typeof AM_TEAM_LEAD!=='undefined' && AM_TEAM_LEAD && typeof _tlResolved!=='undefined' && _tlResolved) return 'Team Lead'; }catch(e){}
   if(rec.isTeamLead && !rec.isHubAdmin) return 'Team Lead';
-  return '';
+  return hint ? 'Admin' : '';
 }
 function _whoInk(hex){
   const m=/^#?([0-9a-f]{6})$/i.exec(hex||''); if(!m) return '#fff';
@@ -3758,14 +3762,16 @@ async function _loadMyProfile(){
     if(!_soTokAlive()){ setTimeout(_loadMyProfile, 1500*_meProfileTries); return; }
     const q=encodeURIComponent('eq.'+me);
     const H={apikey:SUPABASE_KEY, Authorization:'Bearer '+_soTok()};
-    const [cr,ar]=await Promise.all([
+    const [cr,ar,au]=await Promise.all([
       fetch(SUPABASE_URL+'/rest/v1/staff_credentials?staff_name='+q+'&select=nickname,email,team,last_login&limit=1',{headers:H}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}),
-      fetch(SUPABASE_URL+'/rest/v1/staff_avatars?staff_name='+q+'&select=avatar&limit=1',{headers:H}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;})
+      fetch(SUPABASE_URL+'/rest/v1/staff_avatars?staff_name='+q+'&select=avatar&limit=1',{headers:H}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}),
+      // The sign-in service knows the real last sign-in; staff_credentials.last_login stopped being updated.
+      fetch(SUPABASE_URL+'/auth/v1/user',{headers:H}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;})
     ]);
     if(!cr){ setTimeout(_loadMyProfile, 1500*_meProfileTries); return; }
     const c=(cr&&cr[0])||{};
     const a=(ar&&ar[0]&&ar[0].avatar)||'';
-    _meProfile={ nickname:(c.nickname||'').trim(), email:c.email||'', team:c.team||'', last_login:c.last_login||null,
+    _meProfile={ nickname:(c.nickname||'').trim(), email:c.email||'', team:c.team||'', last_login:(au&&au.last_sign_in_at)||null,
                  avatar:/^data:image\//.test(a)?a:'' };
     _renderWhoami();
   }catch(e){ console.warn('[whoami] profile load failed', e); }
