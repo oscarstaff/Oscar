@@ -655,6 +655,13 @@ body{ font-size:14px; letter-spacing:-.006em; }
 @media (prefers-reduced-motion:reduce){ .more-menu,.toast,.lib-modal,.lib-overlay{ animation:none !important; } .btn,.db-form-card{ transition:none !important; } .btn:active,.db-form-card:active{ transform:none; } }
 @media (prefers-reduced-transparency:reduce){ .header,.pdf-toolbar,.more-menu,.toast,.lib-overlay{ -webkit-backdrop-filter:none; backdrop-filter:none; } .header,.pdf-toolbar{ background:#fff; } .more-menu{ background:#fff; } }
 @media (prefers-contrast:more){ :root{ --border:#8e8e93; --border-strong:#6e6e73; --text-3:#424245; --text-4:#58585d; } }
+
+/* Draft name + Clear fields: two separate, always-visible actions above Export (fc-tools-v1) */
+.form-tools{ display:flex; gap:10px; padding:12px 20px 0; border-top:1px solid rgba(60,60,67,.12); }
+.form-tools .btn{ flex:1 1 0; justify-content:center; height:36px; font-size:13px; background:var(--surface); border:1px solid var(--border); }
+.form-tools .btn.danger{ color:var(--err); }
+.form-tools .btn.danger:hover{ background:rgba(215,0,21,.08); border-color:rgba(215,0,21,.25); }
+.form-tools + .form-footer{ border-top:0; }
 </style>
 </head>
 <body>
@@ -2643,9 +2650,7 @@ window.FC_SEED_FORMS=[{"name":"Arcare Vocational Placement - Schedule 1","finger
                       <div className="more-menu" role="menu">
                         <button role="menuitem" onClick={() => { setMoreOpen(false); openLibrary(); }}><i className="fa-solid fa-folder-open" /> Team forms{library.length ? ' (' + library.length + ')' : ''}</button>
                         {isAdmin && <button role="menuitem" onClick={() => { setMoreOpen(false); saveTemplate(); }}><i className="fa-solid fa-floppy-disk" /> Save form</button>}
-                        {mode === 'fill' && <button role="menuitem" onClick={() => { setMoreOpen(false); copyDraftName(); }} title="Copy: GIVEN SURNAME - CERTIFICATE - APPLICATION NO"><i className="fa-solid fa-copy" /> Copy draft name</button>}
                         {isAdmin && <button role="menuitem" onClick={() => { setMoreOpen(false); setAuditOpen(true); }}><i className="fa-solid fa-clipboard-list" /> Audit trail</button>}
-                        {mode === 'fill' && <React.Fragment><div className="more-sep" /><button role="menuitem" className="danger" onClick={() => { setMoreOpen(false); clearValues(false); }} title="Empty the form, keep it loaded"><i className="fa-solid fa-eraser" /> Clear all fields</button></React.Fragment>}
                       </div>
                     )}
                   </div>
@@ -2831,6 +2836,12 @@ window.FC_SEED_FORMS=[{"name":"Arcare Vocational Placement - Schedule 1","finger
                     </div>
                   ))}
                 </div>
+                {mode === 'fill' && (
+                  <div className="form-tools">
+                    <button className="btn btn-ghost" onClick={copyDraftName} title="Copy: GIVEN SURNAME - CERTIFICATE - APPLICATION NO"><i className="fa-solid fa-copy" /> Copy draft name</button>
+                    <button className="btn btn-ghost danger" onClick={() => clearValues(false)} title="Empty the form, keep it loaded"><i className="fa-solid fa-eraser" /> Clear fields</button>
+                  </div>
+                )}
                 <div className="form-footer">
                   <div className="form-footer-info">
                     {mode === 'fill'
