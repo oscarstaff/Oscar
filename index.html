@@ -8169,13 +8169,17 @@ async function setAvailEmailPref(on){
   if(t) t.disabled=true;
   _availEmailPrefUI(on);
   try{
+    // return=minimal: the table hides some columns (e.g. password hashes) from signed-in
+    // users, so asking for the whole row back is refused.
     const r = await fetch(SB+'/rest/v1/staff_credentials?staff_name=eq.'+encodeURIComponent(me),{
       method:'PATCH',
-      headers:{'apikey':KEY,'Authorization':'Bearer '+_sbBearer(),'Content-Type':'application/json','Prefer':'return=representation'},
+      headers:{'apikey':KEY,'Authorization':'Bearer '+_sbBearer(),'Content-Type':'application/json','Prefer':'return=minimal'},
       body: JSON.stringify({avail_email_optout:!on})
     });
-    const j = r.ok ? await r.json() : null;
-    if(!r.ok || !j || !j.length) throw new Error('not saved');
+    if(!r.ok) throw new Error('http '+r.status);
+    // A blocked update can succeed with zero rows changed, so read the value back.
+    const rows = await sbGet('staff_credentials','?staff_name=eq.'+encodeURIComponent(me)+'&select=avail_email_optout');
+    if(!rows || !rows.length || !!rows[0].avail_email_optout !== !on) throw new Error('not saved');
     showToast(on ? 'Reminder emails on' : 'Reminder emails off');
   }catch(e){
     _availEmailPrefUI(!on);               // put it back so the screen tells the truth
