@@ -2827,6 +2827,53 @@ body.avail-editing #availGrid .avail-chip.av2:hover{ background:color-mix(in srg
 .appbar .brand-name{ font-size:17px; font-weight:650; letter-spacing:-.024em; line-height:1; color:var(--text); }
 .appbar .brand-name .brand-ops{ font-weight:500; color:var(--text-dim); }
 @media (max-width:640px){ .appbar .brand-name{ font-size:16px; } }
+
+/* ── Week bar (shiftops-spine-v1) ─────────────────────────────────
+   One row height (34px), one corner radius, quiet secondary actions, one filled primary action at the end.
+   Week total is plain text, not a button-looking pill. Nothing in the bar can be text-selected by a quick double-click,
+   and the Publish button keeps its space while it loads so the bar doesn't shuffle. Delete this block to go back. */
+.week-spine{ padding:8px 10px !important; gap:10px 16px; user-select:none; -webkit-user-select:none; }
+.week-spine .ws-nav{ gap:6px; }
+.week-spine .week-btn{
+  width:34px !important; height:34px !important; padding:0; border-radius:10px !important; font-size:0 !important;
+  display:inline-flex; align-items:center; justify-content:center; color:var(--text-dim);
+  background:var(--surface) !important; border:1px solid var(--border) !important; transition:background .12s, transform .12s !important;
+}
+.week-spine .week-btn:hover{ background:var(--surface2) !important; color:var(--text); border-color:var(--border) !important; }
+.week-spine .week-btn:active{ transform:scale(.94); }
+.week-spine .week-label{ min-width:156px !important; font-size:15px !important; font-weight:650 !important; letter-spacing:-.012em; font-variant-numeric:tabular-nums; }
+.week-spine .btn{
+  height:34px; min-height:34px !important; padding:0 14px !important; border-radius:10px !important;
+  font-size:13px !important; font-weight:550 !important; letter-spacing:-.005em; white-space:nowrap;
+  display:inline-flex; align-items:center; justify-content:center; gap:6px; transition:background .12s, transform .12s, border-color .12s;
+}
+.week-spine .btn:active{ transform:scale(.97); }
+.week-spine .ws-state{ gap:8px; }
+.week-spine .ws-total{
+  background:none !important; border:0 !important; padding:0 4px !important; font-size:13px !important; font-weight:500 !important;
+  color:var(--text-dim); font-variant-numeric:tabular-nums; min-width:128px; text-align:right;
+}
+.week-spine .ws-total.ws-total-empty{ color:var(--muted); }
+.week-spine .ws-pill{ height:28px; padding:0 11px !important; font-size:12.5px !important; font-weight:600 !important; min-width:0; }
+.week-spine .ws-sep{ width:1px; height:20px; background:var(--border); margin:0 4px; flex:0 0 auto; }
+.week-spine .ws-clear{
+  background:transparent !important; border-color:transparent !important; color:var(--warn) !important; padding:0 10px !important;
+}
+.week-spine .ws-clear:hover{ background:color-mix(in srgb,var(--warn) 12%,transparent) !important; }
+.week-spine .ws-fill{ background:var(--surface) !important; }
+.week-spine .ws-publish{ min-width:122px; margin-left:4px; }
+.week-spine .ws-publish[style*="display: none"]{ display:inline-flex !important; visibility:hidden; }
+.week-spine .ws-publish-on{ background:var(--accent) !important; color:var(--on-accent,#fff) !important; border:1px solid transparent !important; box-shadow:inset 0 1px 0 rgba(255,255,255,.22); }
+.week-spine .ws-publish-on:hover{ filter:brightness(1.06); }
+.week-spine .ws-publish-off{ background:var(--surface) !important; color:var(--text) !important; border:1px solid var(--border) !important; }
+.week-spine .ws-publish-off:hover{ background:var(--surface2) !important; color:var(--text) !important; border-color:var(--border) !important; }
+@media (max-width:900px){ .week-spine .ws-total{ text-align:left; min-width:0; } .week-spine .ws-sep{ display:none; } }
+@media (prefers-reduced-motion:reduce){ .week-spine .btn,.week-spine .week-btn{ transition:none; } .week-spine .btn:active,.week-spine .week-btn:active{ transform:none; } }
+
+/* Conflict banner folds in and out instead of snapping (shiftops-spine-v1) */
+.conflict-banner{ overflow:hidden; max-height:120px; transition:max-height .28s cubic-bezier(.32,.72,0,1), opacity .2s ease, margin .28s cubic-bezier(.32,.72,0,1), padding .28s cubic-bezier(.32,.72,0,1); }
+.conflict-banner.cb-off{ max-height:0 !important; opacity:0; margin-top:0 !important; margin-bottom:0 !important; padding-top:0 !important; padding-bottom:0 !important; border-width:0 !important; pointer-events:none; }
+@media (prefers-reduced-motion:reduce){ .conflict-banner{ transition:none; } }
 </style>
 </head>
 <body>
@@ -3060,7 +3107,7 @@ body.avail-editing #availGrid .avail-chip.av2:hover{ background:color-mix(in srg
         <div class="stat"><span class="stat-value orange" id="statOpen">0</span><span class="stat-label">open slots</span></div>
       </div>
 
-      <div class="conflict-banner" id="conflictBanner" style="display:none"> <strong>Conflicts detected.</strong>&nbsp; Some staff are rostered on unavailable days.</div>
+      <div class="conflict-banner cb-off" id="conflictBanner" role="status"> <strong>Conflicts detected.</strong>&nbsp; Some staff are rostered on unavailable days.</div>
 
       <div class="tab-content active" id="section-home">
         <!-- Find a person. The most common HR action isn't reading a number,
@@ -3088,17 +3135,18 @@ body.avail-editing #availGrid .avail-chip.av2:hover{ background:color-mix(in srg
              time, whether staff can see it yet, and the act of releasing it. -->
         <div class="week-spine">
           <div class="ws-nav">
-            <button class="week-btn" onclick="prevWeek()" aria-label="Previous week">◀</button>
+            <button class="week-btn" onclick="prevWeek()" aria-label="Previous week"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3L5 8l5 5"/></svg></button>
             <div class="week-label" id="weekLabel"></div>
-            <button class="week-btn" onclick="nextWeek()" aria-label="Next week">▶</button>
+            <button class="week-btn" onclick="nextWeek()" aria-label="Next week"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3l5 5-5 5"/></svg></button>
             <button class="btn btn-ghost ws-today" onclick="goToday()">Today</button>
           </div>
           <div class="ws-state">
             <span class="ws-total" id="wsTotal" title="Total rostered hours this week">—</span>
-            <button class="btn btn-ghost ws-fill" onclick="fillFromPreviousWeek()">Fill from last week</button>
             <span class="ws-pill" id="pubPill">…</span>
-            <button class="btn ws-publish" id="pubBtn" onclick="togglePublishWeek()" style="display:none;">Publish week</button>
+            <span class="ws-sep" aria-hidden="true"></span>
+            <button class="btn btn-ghost ws-fill" onclick="fillFromPreviousWeek()">Fill from last week</button>
             <button class="btn btn-ghost ws-clear" onclick="clearWeek()">Clear week</button>
+            <button class="btn ws-publish" id="pubBtn" onclick="togglePublishWeek()" style="display:none;">Publish week</button>
           </div>
         </div>
         <div class="roster-grid" id="rosterGrid"></div>
@@ -4453,7 +4501,14 @@ function updateStats(){
   document.getElementById('statOpen').textContent=Math.max(0,staff.length*5-totalShifts);
   let conflict=false;
   staff.forEach(s=>{if(!shifts[s.id])return;for(let d=0;d<7;d++)if(shifts[s.id][d]&&shifts[s.id][d].some(sh=>sh.type!=='leave')&&getAvail(s.id,d).type==='no')conflict=true;});
-  document.getElementById('conflictBanner').style.display=conflict?'':'none';
+  // Show straight away, but wait before hiding: while a week is loading the shifts are briefly empty, which used to
+  // make this banner vanish and reappear and shove the whole roster up and down.
+  (function(){
+    const el=document.getElementById('conflictBanner'); if(!el) return;
+    clearTimeout(window.__cbHide);
+    if(conflict) el.classList.remove('cb-off');
+    else window.__cbHide=setTimeout(function(){ el.classList.add('cb-off'); },800);
+  })();
 }
 
 // ── ROSTER ────────────────────────────────────────────────────────────────
@@ -4826,7 +4881,17 @@ function renderRoster(){
       html+='</div>';
     });
   });
+  // Keep the page still while the week changes. The grid is re-drawn several times in quick succession (once
+  // straight away, again when availability and the shifts arrive), and a draw that is briefly shorter made the
+  // browser pull the page up and then push it back. Hold the old height and scroll position until things settle.
+  const _sc=(function(n){ while(n&&n!==document.body){ const o=getComputedStyle(n).overflowY; if((o==='auto'||o==='scroll')&&n.scrollHeight>n.clientHeight) return n; n=n.parentElement; } return document.scrollingElement; })(grid);
+  const _top=_sc?_sc.scrollTop:0;
+  const _h=grid.offsetHeight;
+  if(_h>0){ grid.style.minHeight=Math.max(_h,parseFloat(grid.style.minHeight)||0)+'px'; }
   grid.innerHTML=html;
+  if(_sc&&_sc.scrollTop!==_top) _sc.scrollTop=_top;
+  clearTimeout(window.__rgHold);
+  window.__rgHold=setTimeout(function(){ grid.style.minHeight=''; },900);
   // Totals must track every render — editing a shift changes them too.
   try{ if(typeof renderWeekTotal==='function') renderWeekTotal(); }catch(e){}
   const wl=`${fmtDate(currentWeekStart)} – ${fmtDate(addDays(currentWeekStart,6))}`;
