@@ -804,11 +804,11 @@ async function loadMe(){
     const get=function(u){ return fetch(SLIP_SB+'/rest/v1/'+u,{headers:H}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}); };
     const [c,av,st]=await Promise.all([
       get('staff_credentials?staff_name='+q+'&select=nickname,email,team,last_login&limit=1'),
-      get('staff_avatars?staff_name='+q+'&select=avatar&limit=1'),
+      get('staff_avatars?staff_name='+q+'&select=avatar,avatar_path&limit=1'),
       get('staff_settings?name='+q+'&select=is_hub_admin&limit=1')]);
     if(!c){ setTimeout(loadMe,1500*me.tries); return; }
-    const r0=c[0]||{}, a0=(av&&av[0]&&av[0].avatar)||'';
-    me.profile={nickname:(r0.nickname||'').trim(),email:r0.email||'',team:r0.team||'',last_login:r0.last_login||null,avatar:/^data:image\//.test(a0)?a0:''};
+    const r0=c[0]||{}, a0=(av&&av[0]&&av[0].avatar_path)?(SLIP_SB+'/storage/v1/object/public/avatars/'+av[0].avatar_path.split('/').map(encodeURIComponent).join('/')):((av&&av[0]&&av[0].avatar)||'');
+    me.profile={nickname:(r0.nickname||'').trim(),email:r0.email||'',team:r0.team||'',last_login:r0.last_login||null,avatar:/^(data:image\/|https:\/\/)/.test(a0)?a0:''};
     if(st&&st.length) me.isAdmin=st[0].is_hub_admin===true;
     renderWho();
   }catch(e){ console.warn('profile',e); }

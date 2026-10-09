@@ -1759,12 +1759,12 @@ window.FC_SEED_FORMS=[{"name":"Arcare Vocational Placement - Schedule 1","finger
             const get = (u) => fetch(SB_URL + '/rest/v1/' + u, { headers: sbHeaders }).then(r => r.ok ? r.json() : null).catch(() => null);
             const [c, av] = await Promise.all([
               get('staff_credentials?staff_name=' + q + '&select=nickname,email,team,last_login&limit=1'),
-              get('staff_avatars?staff_name=' + q + '&select=avatar&limit=1'),
+              get('staff_avatars?staff_name=' + q + '&select=avatar,avatar_path&limit=1'),
             ]);
             if (dead) return;
             if (!c) { if (tries < 3) setTimeout(() => !dead && setTries(t => t + 1), 1500 * (tries + 1)); return; }
-            const r0 = c[0] || {}, a0 = (av && av[0] && av[0].avatar) || '';
-            setProf({ nickname: (r0.nickname || '').trim(), email: r0.email || '', team: r0.team || '', last_login: r0.last_login || null, avatar: /^data:image\//.test(a0) ? a0 : '' });
+            const r0 = c[0] || {}, a0 = (av && av[0] && av[0].avatar_path) ? (SB_URL + '/storage/v1/object/public/avatars/' + av[0].avatar_path.split('/').map(encodeURIComponent).join('/')) : ((av && av[0] && av[0].avatar) || '');
+            setProf({ nickname: (r0.nickname || '').trim(), email: r0.email || '', team: r0.team || '', last_login: r0.last_login || null, avatar: /^(data:image\/|https:\/\/)/.test(a0) ? a0 : '' });
           } catch (e) {}
         })();
         return () => { dead = true; };

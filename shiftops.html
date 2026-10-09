@@ -3764,15 +3764,15 @@ async function _loadMyProfile(){
     const H={apikey:SUPABASE_KEY, Authorization:'Bearer '+_soTok()};
     const [cr,ar,au]=await Promise.all([
       fetch(SUPABASE_URL+'/rest/v1/staff_credentials?staff_name='+q+'&select=nickname,email,team,last_login&limit=1',{headers:H}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}),
-      fetch(SUPABASE_URL+'/rest/v1/staff_avatars?staff_name='+q+'&select=avatar&limit=1',{headers:H}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}),
+      fetch(SUPABASE_URL+'/rest/v1/staff_avatars?staff_name='+q+'&select=avatar,avatar_path&limit=1',{headers:H}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}),
       // The sign-in service knows the real last sign-in; staff_credentials.last_login stopped being updated.
       fetch(SUPABASE_URL+'/auth/v1/user',{headers:H}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;})
     ]);
     if(!cr){ setTimeout(_loadMyProfile, 1500*_meProfileTries); return; }
     const c=(cr&&cr[0])||{};
-    const a=(ar&&ar[0]&&ar[0].avatar)||'';
+    const a=(ar&&ar[0]&&ar[0].avatar_path)?(SUPABASE_URL+'/storage/v1/object/public/avatars/'+ar[0].avatar_path.split('/').map(encodeURIComponent).join('/')):((ar&&ar[0]&&ar[0].avatar)||'');
     _meProfile={ nickname:(c.nickname||'').trim(), email:c.email||'', team:c.team||'', last_login:(au&&au.last_sign_in_at)||null,
-                 avatar:/^data:image\//.test(a)?a:'' };
+                 avatar:/^(data:image\/|https:\/\/)/.test(a)?a:'' };
     _renderWhoami();
   }catch(e){ console.warn('[whoami] profile load failed', e); }
 }

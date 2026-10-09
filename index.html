@@ -13073,8 +13073,24 @@ async function pickMySkin(skin){
   }catch(e){ showToast&&showToast('Could not save glow'); }
 }
 
-// Compress an uploaded image to a small square avatar (<=256px) and store as
-// base64 in staff_avatars. Keeps the blob tiny so reads stay fast.
+// Profile photos live in the public 'avatars' storage bucket (file name = random, under the person's own folder);
+// staff_avatars.avatar_path points at the file. The old base64 'avatar' column is only a fallback for photos that
+// haven't been moved yet.
+function _avatarUrl(path){
+  if(!path) return null;
+  return SB+'/storage/v1/object/public/avatars/'+String(path).split('/').map(encodeURIComponent).join('/');
+}
+function _dataUrlToBlob(d){
+  var m=/^data:([^;]+);base64,(.*)$/.exec(d); if(!m) return null;
+  var bin=atob(m[2]), u=new Uint8Array(bin.length);
+  for(var i=0;i<bin.length;i++) u[i]=bin.charCodeAt(i);
+  return new Blob([u],{type:m[1]});
+}
+function _myAuthUid(){
+  try{ var t=_sbBearer().split('.')[1].replace(/-/g,'+').replace(/_/g,'/'); return JSON.parse(atob(t)).sub||null; }catch(e){ return null; }
+}
+// Compress an uploaded image to a small square avatar (<=256px), upload it to storage and
+// point staff_avatars at it.
 async function uploadMyAvatar(ev){
   const file=ev && ev.target && ev.target.files && ev.target.files[0];
   if(ev&&ev.target) ev.target.value='';
@@ -13177,14 +13193,35 @@ async function saveAvatarCrop(){
     el.style.setProperty('background-size','cover','important');
     el.style.setProperty('background-position','center','important');
   });
-  try{
-    await fetch(SB+"/rest/v1/staff_avatars?on_conflict=staff_name",{
+  const H={ "apikey":KEY, "Authorization":"Bearer "+_sbBearer() };
+  const saveRow=function(fields){
+    return fetch(SB+"/rest/v1/staff_avatars?on_conflict=staff_name",{
       method:"POST",
-      headers:{ "apikey":KEY, "Authorization":"Bearer "+_sbBearer(),
-                "Content-Type":"application/json",
-                "Prefer":"resolution=merge-duplicates,return=minimal" },
-      body:JSON.stringify([{ staff_name:me, avatar:compressed, updated_at:new Date().toISOString() }])
+      headers:Object.assign({ "Content-Type":"application/json", "Prefer":"resolution=merge-duplicates,return=minimal" },H),
+      body:JSON.stringify([Object.assign({ staff_name:me, updated_at:new Date().toISOString() },fields)])
     });
+  };
+  try{
+    // 1) preferred: upload the file to storage (own folder), then point the row at it
+    var uid=_myAuthUid(), blob=_dataUrlToBlob(compressed), path=null;
+    if(uid && blob){
+      const p=uid+'/'+Date.now()+'-'+Math.random().toString(36).slice(2,8)+'.jpg';
+      const up=await fetch(SB+'/storage/v1/object/avatars/'+p,{ method:'POST', headers:Object.assign({'Content-Type':'image/jpeg','cache-control':'max-age=31536000'},H), body:blob });
+      if(up.ok) path=p;
+    }
+    if(path){
+      // remember the old file so it can be tidied away once the new one is saved
+      var oldPath=null;
+      try{ const o=await sbGet('staff_avatars','?staff_name=eq.'+encodeURIComponent(me)+'&select=avatar_path'); oldPath=(o&&o[0]&&o[0].avatar_path)||null; }catch(e){}
+      const r=await saveRow({ avatar_path:path, avatar:null });
+      if(!r.ok) throw new Error('row '+r.status);
+      window._avatars[me]=_avatarUrl(path);
+      if(oldPath && oldPath!==path){ fetch(SB+'/storage/v1/object/avatars/'+oldPath,{ method:'DELETE', headers:H }).catch(function(){}); }
+    } else {
+      // 2) fallback (storage unavailable): keep the old way so the photo is never lost
+      const r=await saveRow({ avatar:compressed, avatar_path:null });
+      if(!r.ok) throw new Error('row '+r.status);
+    }
     showToast&&showToast('Photo updated');
   }catch(e){ showToast&&showToast('Could not save photo'); }
 }
@@ -20694,8 +20731,8 @@ window.loadGlowData = window.loadGlowData || async function(force){
       });
     }catch(e){}
     try{
-      const av=await sbGet('staff_avatars','?select=staff_name,avatar&limit=500')||[];
-      av.forEach(function(a){ if(a.staff_name && a.avatar) avs[a.staff_name]=a.avatar; });
+      const av=await sbGet('staff_avatars','?select=staff_name,avatar,avatar_path&limit=500')||[];
+      av.forEach(function(a){ var u=_avatarUrl(a.avatar_path)||a.avatar; if(a.staff_name && u) avs[a.staff_name]=u; });
     }catch(e){}
     window._earnedGlow=earned; window._nameSkins=skins; window._avatars=avs; window._eliteCallers=elite;
     window._callMsMap=callMs; window._trainCtMap=trainCt; window._nickNames=nicks;
