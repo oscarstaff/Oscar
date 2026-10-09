@@ -1674,6 +1674,84 @@ window.FC_SEED_FORMS=[{"name":"Arcare Vocational Placement - Schedule 1","finger
       return window.NEXUS_ADMIN === true || sessionStorage.getItem('ngate_admin_formcraft') === '1';
     }
 
+
+    // ---- Enrolment sheet headings -----------------------------------------------------------------
+    // The enrolment Google Sheet has fixed column headings. When someone pastes the heading row plus a student's
+    // row (tab-separated), match each column to its heading here, so the AI is told exactly what every value is
+    // (e.g. "Title" = Mr/Ms, not a job title) instead of guessing from a long row of tabs.
+    const SHEET_COLS = [
+      [/^timestamp/i, null],                                            // when the form was submitted: not needed
+      [/^email address$/i, 'Form-login email (not the student’s primary email)'],
+      [/^title$/i, 'Title (honorific such as Mr / Ms / Mrs / Miss / Dr)'],
+      [/^full name/i, 'Full name'],
+      [/^referred by/i, 'Referred by'],
+      [/^gender/i, 'Gender'],
+      [/^date of birth/i, 'Date of birth (DD/MM/YYYY)'],
+      [/^mobile/i, 'Mobile phone'],
+      [/^email \(/i, 'Primary email'],
+      [/^residential address/i, 'Residential address'],
+      [/^postal address/i, 'Postal address (“Same as residential address” means identical to the residential address)'],
+      [/^indigenous/i, 'Indigenous status'],
+      [/citizen/i, 'Australian citizen? (if no, country of citizenship)'],
+      [/language other than english/i, 'Language other than English spoken at home'],
+      [/^prior educational/i, 'Prior educational achievement'],
+      [/^labou?r force/i, 'Labour force status'],
+      [/^high school/i, 'Highest school level completed'],
+      [/disability/i, 'Disability'],
+      [/emergency contact.*full name/i, 'Emergency contact (next of kin) – full name'],
+      [/emergency contact.*(number|phone)/i, 'Emergency contact (next of kin) – contact number'],
+      [/emergency contact.*relationship/i, 'Emergency contact (next of kin) – relationship to student'],
+      [/^placement/i, 'Placement'],
+      [/^usi/i, 'USI (Unique Student Identifier)'],
+      [/qualification/i, 'Qualification the student is enrolling in'],
+      [/level of english/i, 'Level of English'],
+      [/first arrival/i, 'First arrival date in Australia'],
+      [/availability for first aid/i, 'Availability for First Aid, CPR and Manual Handling training'],
+    ];
+    // Column order of the sheet, used when only the student's row is pasted (no heading row)
+    const SHEET_ORDER = ['Timestamp','Email Address','Title','Full Name','Referred By','Gender','Date of Birth','Mobile No','Email (primary)','Residential Address','Postal Address','Indigenous Status','Are you an Australian citizen','Do you speak a language other than English','Prior educational flag','Labor force status','High School Level Completed','Do you have a disability','Emergency Contact Full Name','Emergency Contact Number','Emergency Contact Relationship','Placement','USI','Qualification','Level of English','First Arrival Date','Availability For First Aid'];
+    const SHEET_ORDER_FIX = { 8: 'Email (primary email)', 18: 'Emergency Contact (Next of Kin) - Full Name', 19: 'Emergency Contact (Next of Kin) - Contact Number', 20: 'Emergency Contact (Next of Kin) - Relationship' };
+
+    function fcParseTSV(text) {
+      const rows = []; let row = [], cell = '', q = false;
+      for (let i = 0; i < text.length; i++) {
+        const c = text[i];
+        if (q) { if (c === '"') { if (text[i + 1] === '"') { cell += '"'; i++; } else q = false; } else cell += c; }
+        else if (c === '"' && cell === '') q = true;
+        else if (c === '\t') { row.push(cell); cell = ''; }
+        else if (c === '\n' || c === '\r') { if (c === '\r' && text[i + 1] === '\n') i++; row.push(cell); rows.push(row); row = []; cell = ''; }
+        else cell += c;
+      }
+      row.push(cell); rows.push(row);
+      return rows.filter(r => r.some(x => x.trim() !== ''));
+    }
+    function fcSheetLabel(h, idx) {
+      const clean = h.replace(/\s+/g, ' ').trim();
+      for (const [re, label] of SHEET_COLS) if (re.test(clean)) return label;
+      return clean || null;
+    }
+    // Returns clean "Heading: value" lines when the text is a pasted sheet row, otherwise the text untouched.
+    function fcNormaliseSheet(text) {
+      try {
+        if (!text || text.indexOf('\t') < 0) return text;
+        const rows = fcParseTSV(text);
+        if (!rows.length || Math.max.apply(null, rows.map(r => r.length)) < 8) return text;
+        let heads, data;
+        const looksHead = r => r.filter(x => /[a-z]{3}/i.test(x) && !/^\s*\d/.test(x)).length >= r.filter(x => x.trim()).length * 0.8
+          && r.some(x => /full name|date of birth|mobile|email/i.test(x));
+        if (looksHead(rows[0])) { heads = rows[0]; data = rows.slice(1); }
+        else if (rows[0].length >= 24) { heads = SHEET_ORDER.map((h, i) => SHEET_ORDER_FIX[i] || h); data = rows; }
+        else return text;
+        const rowv = data.length ? data[data.length - 1] : [];       // most recent student if several were pasted
+        const lines = [];
+        heads.forEach((h, i) => {
+          const label = fcSheetLabel(h, i); const v = (rowv[i] || '').replace(/\s+/g, ' ').trim();
+          if (label && v) lines.push(label + ': ' + v);
+        });
+        return lines.length ? lines.join('\n') : text;
+      } catch (e) { return text; }
+    }
+
     // Send the form's fields + the pasted text or uploaded file to the
     // parse-enrolment Edge Function (Gemini). Returns { values, unmatched }.
     async function parseEnrolment({ fields, text, fileBase64, docMime }) {
@@ -2464,7 +2542,7 @@ window.FC_SEED_FORMS=[{"name":"Arcare Vocational Placement - Schedule 1","finger
         if (!text) { showToast('Paste the enrolment sheet first', 'err'); return; }
         setAutofillBusy(true);
         try {
-          const parsed = await parseEnrolment({ fields, text });
+          const parsed = await parseEnrolment({ fields, text: fcNormaliseSheet(text) });
           const n = applyParsedValues(parsed);
           setShowAutofill(false);
           setAutofillText('');
@@ -2484,7 +2562,13 @@ window.FC_SEED_FORMS=[{"name":"Arcare Vocational Placement - Schedule 1","finger
           const isDocx = /\.docx$/i.test(file.name)
             || file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
           let parsed;
-          if (isDocx) {
+          if (/\.(csv|tsv|txt)$/i.test(file.name)) {
+            let text = new TextDecoder('utf-8').decode(buf);
+            if (/\.csv$/i.test(file.name)) text = text.replace(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/g, '\t');   // commas outside quotes -> tabs
+            text = fcNormaliseSheet(text.trim());
+            if (!text) throw new Error('That file is empty');
+            parsed = await parseEnrolment({ fields, text });
+          } else if (isDocx) {
             // .docx is a zip of XML — the backend can't read it. Extract the
             // text in-browser with mammoth and send that as plain text instead.
             if (!window.mammoth) throw new Error('Word reader not loaded — paste the text or use a PDF');
@@ -2639,7 +2723,7 @@ window.FC_SEED_FORMS=[{"name":"Arcare Vocational Placement - Schedule 1","finger
                   <textarea
                     className="form-input"
                     style={{ minHeight: 200, fontFamily: 'var(--font-mono)', fontSize: 12.5, lineHeight: 1.5 }}
-                    placeholder="Paste the enrolment details here…"
+                    placeholder="Paste straight from the enrolment sheet: the heading row and the student’s row. Plain text works too."
                     value={autofillText}
                     onChange={(e) => setAutofillText(e.target.value)}
                     disabled={autofillBusy}
@@ -2653,7 +2737,7 @@ window.FC_SEED_FORMS=[{"name":"Arcare Vocational Placement - Schedule 1","finger
                     <span style={{ fontSize: 12, color: 'var(--text-4)' }}>or</span>
                     <label className="btn btn-ghost" style={{ cursor: autofillBusy ? 'not-allowed' : 'pointer', margin: 0 }}>
                       <i className="fa-solid fa-file-arrow-up" /> Upload file
-                      <input type="file" accept=".txt,.pdf,.docx,.png,.jpg,.jpeg,.webp,.gif,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/*" style={{ display: 'none' }} disabled={autofillBusy}
+                      <input type="file" accept=".txt,.csv,.tsv,.pdf,.docx,.png,.jpg,.jpeg,.webp,.gif,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/*" style={{ display: 'none' }} disabled={autofillBusy}
                         onChange={(e) => { const f = e.target.files[0]; e.target.value = ''; runAutofillFile(f); }} />
                     </label>
                   </div>
