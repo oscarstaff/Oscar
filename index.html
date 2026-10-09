@@ -6851,6 +6851,12 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
         </div>
       </div>
       <div id="rsec-manager" style="display:none;">
+        <div class="roster-segment" id="mgrViews" style="margin-bottom:14px;">
+          <button class="roster-seg-btn active" id="mview-hours" onclick="showMgrView('hours')">All hours</button>
+          <button class="roster-seg-btn" id="mview-breaks" onclick="showMgrView('breaks')">Breaks</button>
+          <button class="roster-seg-btn" id="mview-edit" onclick="showMgrView('edit')">Edit punches</button>
+        </div>
+      <div id="msec-hours">
         <div class="card" style="margin-bottom:14px;">
           <div class="card-title" style="margin-bottom:4px;">All staff hours</div>
           <div style="font-size:11.5px;color:var(--ui-ink-3,#64748b);margin-bottom:12px;max-width:60ch;">Everyone's net hours for a date range, grouped by team — same figures as the timesheet (breaks deducted).</div>
@@ -6862,6 +6868,8 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
           </div>
           <div id="thResults" style="margin-top:14px;"></div>
         </div>
+      </div><!-- /msec-hours -->
+      <div id="msec-breaks" style="display:none;">
         <!-- Short-shift break answers (clock-outs of 5h or less) -->
         <div class="card" id="bcCard" style="margin-bottom:14px;">
           <div class="card-title" style="margin-bottom:4px;">Short-shift break answers</div>
@@ -6877,6 +6885,8 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
           <div class="card-title" style="margin-bottom:10px;">Extra break requests</div>
           <div id="ebrAdminList" style="margin:-6px -6px 0;"><div style="padding:14px;color:var(--ui-ink-4,#94a3b8);font-size:13px;"><div class="nx-sk" data-sk="list" data-n="3" aria-hidden="true"></div></div></div>
         </div>
+      </div><!-- /msec-breaks -->
+      <div id="msec-edit" style="display:none;">
         <div class="card" style="margin-bottom:14px;">
           <div class="card-title" style="margin-bottom:12px;">Edit any staff member's punches</div>
           <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;">
@@ -6905,6 +6915,7 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
         </div>
         <div id="debugOut" style="margin-bottom:12px;font-family:monospace;font-size:11px;color:var(--ui-ink,#0f172a);display:none;"></div>
         <div id="mgrReportResults" class="card" style="padding:16px;margin-bottom:14px;">Pick a staff member.</div>
+      </div><!-- /msec-edit -->
       </div>
 
       <!-- TEAM REPORT (Processing team only; report generator is admin-only) -->
@@ -10247,7 +10258,7 @@ async function submitAvail(){
 
 // ── THEME PRESETS ──
 const NEXUS_THEMES = [
-  {id:'light',    name:'Original', sub:'Eucalyptus',     swatch:'linear-gradient(135deg,#eef2ef,#0b7a5c)'},
+  {id:'light',    name:'Original', sub:'Soft grey',      swatch:'linear-gradient(135deg,#f5f5f7,#0b7a5c)'},
   {id:'warm',     name:'Warm',     sub:'Amber & cream',  swatch:'linear-gradient(135deg,#fdf6ee,#f5b45a)'},
   {id:'ocean',    name:'Ocean',    sub:'Calm blues',     swatch:'linear-gradient(135deg,#eef6fb,#38b6de)'},
   {id:'rose',     name:'Rose',     sub:'Soft pink',      swatch:'linear-gradient(135deg,#fdf2f6,#db2777)'},
@@ -18269,18 +18280,45 @@ function autoGrow(textarea){
 
 
 // ── MY REPORTS PAGE ──────────────────
+// Which My Reports tabs this person may open right now.
+function _repTabAllowed(tab){
+  if(tab === 'hours') return true;
+  if(tab === 'manager') return !!myIsAdmin;
+  if(tab === 'teamreport'){ var b = document.getElementById('rtab-teamreport'); return !!(b && b.style.display !== 'none'); }
+  return false;
+}
+function _repStore(k, v){ try{ sessionStorage.setItem(k, v); }catch(e){} }
+function _repRead(k){ try{ return sessionStorage.getItem(k); }catch(e){ return null; } }
+// Manager tab has three sections: everyone's hours / breaks / edit punches.
+function showMgrView(v){
+  if(v !== 'hours' && v !== 'breaks' && v !== 'edit') v = 'hours';
+  ['hours','breaks','edit'].forEach(function(k){
+    var sec = document.getElementById('msec-'+k), btn = document.getElementById('mview-'+k);
+    if(sec) sec.style.display = (k === v) ? '' : 'none';
+    if(btn) btn.classList.toggle('active', k === v);
+  });
+  _repStore('nx_rep_mgr', v);
+  if(v === 'breaks'){
+    try{ if(typeof loadExtraBreakRequests === 'function') loadExtraBreakRequests(); }catch(e){}
+    try{ if(typeof nxBreakCheckLoad === 'function') nxBreakCheckLoad(); }catch(e){}
+  }
+  if(v === 'edit'){ try{ populateMgrStaff(); }catch(e){} }
+}
 function showReportsTab(tab){
   // Payroll moved to ShiftOps — it's a manager tool, not a staff-portal one.
   if(tab === 'payroll'){ tab = 'hours'; }
+  // Never open a tab this person isn't allowed to see (e.g. a remembered admin tab after losing access).
+  if(!_repTabAllowed(tab)) tab = 'hours';
+  _repStore('nx_rep_tab', tab);
   document.getElementById('rsec-hours').style.display = tab === 'hours' ? '' : 'none';
-  document.getElementById('rsec-manager').style.display = tab === 'manager' ? '' : 'none'; if(tab === 'manager' && typeof loadExtraBreakRequests === 'function') loadExtraBreakRequests();
+  document.getElementById('rsec-manager').style.display = tab === 'manager' ? '' : 'none';
   var trSec = document.getElementById('rsec-teamreport');
   if(trSec) trSec.style.display = tab === 'teamreport' ? '' : 'none';
   document.getElementById('rtab-hours').classList.toggle('active', tab === 'hours');
   document.getElementById('rtab-manager').classList.toggle('active', tab === 'manager');
   var trTab = document.getElementById('rtab-teamreport');
   if(trTab) trTab.classList.toggle('active', tab === 'teamreport');
-  if(tab === 'manager'){ populateMgrStaff(); if(typeof initTeamHours === 'function') initTeamHours(); }
+  if(tab === 'manager'){ if(typeof initTeamHours === 'function') initTeamHours(); showMgrView(_repRead('nx_rep_mgr') || 'hours'); }
   if(tab === 'teamreport' && typeof initTeamReport === 'function') initTeamReport();
 }
 
@@ -18358,6 +18396,18 @@ function initReportsPage(){
     if(el && !el.value) el.value = _fr ? _fr.to : fmt(today);
   });
   if(typeof nxInitReportPeriods === 'function') nxInitReportPeriods();
+  // Reopen the tab you were last on (once per page load), but only if you may see it.
+  // If the tab you are on is no longer allowed (admin status loaded late), drop back to Hours.
+  try{
+    var _cur = ['hours','manager','teamreport'].filter(function(k){ var sec=document.getElementById('rsec-'+k); return sec && sec.style.display!=='none'; })[0] || 'hours';
+    if(!window._repTabRestored){
+      var _saved = _repRead('nx_rep_tab');
+      if(!_saved){ window._repTabRestored = true; }
+      else if(_repTabAllowed(_saved)){ window._repTabRestored = true; if(_saved !== _cur){ showReportsTab(_saved); _cur = _saved; } }
+      // else: that tab isn't available yet (settings still loading) - try again on the next call
+    }
+    if(!_repTabAllowed(_cur)) showReportsTab('hours');
+  }catch(e){}
   setTimeout(runHoursReport, 100);
   if(typeof loadFortLeaderboard==='function') loadFortLeaderboard();
 }
@@ -29411,6 +29461,7 @@ input[type="date"].f-input{ width:100%; }
 
 /* Team Report: generate area (steady height, soft states, busy button) */
 #trReportOut{ min-height:96px; }
+#trReportOut.tr-out-empty b{ margin-left:.3em; }
 #trReportOut.tr-out-empty{ display:flex; align-items:center; justify-content:center; text-align:center; padding:26px 16px;
   border:1px dashed var(--m-border-hi); border-radius:12px; color:var(--m-ink-3); font-size:13px; }
 #trReportOut.tr-out-loading{ min-height:220px; }
@@ -30453,5 +30504,122 @@ function nxBreakCheckRender(){
   }
 })();
 </script>
+<style id="nexus-quiet-v1">
+/* ═══════════════════════════════════════════════════════════════════════════
+   NEXUS · QUIET LAYER  (restraint pass — styling only, no behaviour changes)
+   Goal: stop looking like a template. Colour carries meaning (accent = the one
+   thing to press / where you are), everything else is neutral. Hairlines, not
+   shadows. One radius scale. Type that changes shape with size. Press feedback
+   on touch-down. Loud decoration (rainbow icons, glows, hover-lifts) removed.
+   Skipped for the Win95 and Renaissance themes, which are deliberate looks.
+   REVERT: delete this single <style id="nexus-quiet-v1"> block.
+   ═══════════════════════════════════════════════════════════════════════════ */
+html:not([data-theme="win95"]):not([data-theme="renaissance"]){
+  --q-r-card:12px;           /* cards, panels            */
+  --q-r-ctl:9px;             /* buttons, inputs, tabs    */
+  --q-ease:cubic-bezier(.2,.8,.2,1);
+  accent-color:var(--accent);   /* native checkboxes/radios follow the theme, not browser blue */
+}
+
+/* ── Type: tighter as it grows, calmer weights, steady numerals ───────────── */
+html:not([data-theme="win95"]):not([data-theme="renaissance"]) .page-title{
+  font-weight:650;letter-spacing:-.026em;line-height:1.12;
+}
+html:not([data-theme="win95"]):not([data-theme="renaissance"]) :is(.card-title,.roster-card-title,.hub-card-title){
+  font-weight:600;letter-spacing:-.011em;
+}
+html:not([data-theme="win95"]):not([data-theme="renaissance"]) .roster-stat-val{
+  font-weight:650;letter-spacing:-.025em;font-variant-numeric:tabular-nums;
+}
+html:not([data-theme="win95"]):not([data-theme="renaissance"]) :is(#clockTime,.cc-time,.cc-clock,[id*="ClockTime"]){
+  font-variant-numeric:tabular-nums;
+}
+/* a status colour on a statistic is noise; the label already says what it is */
+html:not([data-theme="win95"]):not([data-theme="renaissance"]) #leaveStatPending{color:var(--ui-ink,#0f172a) !important;}
+
+/* ── Surfaces: one radius scale, hairline borders, no decorative shadow ───── */
+html:not([data-theme="win95"]):not([data-theme="renaissance"]) :is(.card,.roster-card,.roster-stat,.hub-card){
+  border-radius:var(--q-r-card);box-shadow:none;
+}
+html:not([data-theme="win95"]):not([data-theme="renaissance"]) :is(.btn,.cc-btn,.cc-btn3,.f-input,.f-select,.f-textarea,select,textarea){
+  border-radius:var(--q-r-ctl);
+}
+html:not([data-theme="win95"]):not([data-theme="renaissance"]) .btn-green{
+  box-shadow:none;
+}
+
+/* ── Nodes: one calm tile treatment instead of a rainbow of gradient icons ── */
+html:not([data-theme="win95"]):not([data-theme="renaissance"]) .hub-card-icon{
+  width:44px;height:44px;border-radius:11px;
+  background:var(--ui-surface-2,#f4f6f5) !important;      /* beats the per-app gradient classes */
+  border:1px solid var(--ui-line,#e2e8f0);
+  color:var(--ui-ink-3,#5c6c63);
+  box-shadow:none;
+  transition:color .18s var(--q-ease),border-color .18s var(--q-ease),background-color .18s var(--q-ease);
+}
+html:not([data-theme="win95"]):not([data-theme="renaissance"]) .hub-card-icon svg{width:24px;height:24px;stroke-width:1.6;}
+html:not([data-theme="win95"]):not([data-theme="renaissance"]) .hub-card:hover .hub-card-icon{
+  color:var(--accent);border-color:var(--accent-bd,var(--ui-line));background:var(--accent-dim,var(--ui-surface-2)) !important;
+}
+/* no hover "lift": emphasise the edge instead of moving the card */
+html:not([data-theme="win95"]):not([data-theme="renaissance"]) .hub-card:hover{
+  transform:none;box-shadow:none;border-color:var(--accent-bd,var(--accent));
+}
+
+/* ── Login: keep the node motif and wordmark, drop the glow and gradient ──── */
+/* (the login page pins its own look with !important, so this has to as well) */
+html:not([data-theme="win95"]):not([data-theme="renaissance"]) #authLayer.login-edge #pg-login::before{
+  background:#e3eee8 !important;background-color:#e3eee8 !important;
+}
+html:not([data-theme="win95"]):not([data-theme="renaissance"]) #authLayer.login-edge #loginNet{opacity:.5;}
+html:not([data-theme="win95"]):not([data-theme="renaissance"]) #authLayer.login-edge .auth-card .btn-green{
+  background:var(--accent) !important;box-shadow:none !important;
+}
+html:not([data-theme="win95"]):not([data-theme="renaissance"]) #authLayer.login-edge .auth-greet h2{font-weight:650 !important;letter-spacing:-.022em;}
+
+/* stray hard-coded blue icon inside an accent-tinted circle: follow the theme */
+html:not([data-theme="win95"]):not([data-theme="renaissance"]) .card svg[fill="#2563eb"]{fill:var(--accent);}
+
+/* ═══ Default (Original) theme only: neutral greys instead of a green wash ═══
+   The stock palette tinted the canvas, borders AND text green. Swap those for
+   true neutrals so the accent is the only colour on the page. Named themes and
+   the Appearance accent picker are untouched. */
+html:not([data-theme]),html[data-theme="light"]{
+  --ui-ink:#1d1d1f; --ui-ink-1b:#232326; --ui-ink-2:#3a3a3d; --ui-ink-2b:#48484c;
+  --ui-ink-3:#636366; --ui-ink-4:#6e6e73;
+  --ui-surface:#ffffff; --ui-surface-2:#f5f5f7; --ui-surface-3:#ececef; --ui-surface-4:#e0e0e4;
+  --ui-line-soft:#efeff2; --ui-line:#e3e3e8; --ui-line-hi:#cfcfd5;
+  --m-canvas:#f5f5f7; --m-card:#ffffff; --m-card-2:#f5f5f7;
+  --m-border:#e3e3e8; --m-border-hi:#cfcfd5;
+  --m-ink:#1d1d1f; --m-ink-2:#48484c; --m-ink-3:#6e6e73;
+}
+/* Sidebar: where you are = a quiet neutral highlight, with the accent on the icon only */
+html:not([data-theme]) .sidebar .nav-item.active,html[data-theme="light"] .sidebar .nav-item.active{
+  background:rgba(0,0,0,.06) !important;color:var(--ui-ink) !important;box-shadow:none !important;
+}
+html:not([data-theme]) .sidebar .nav-item.active svg,html[data-theme="light"] .sidebar .nav-item.active svg{color:var(--accent);fill:currentColor;}
+
+html:not([data-theme]) .sidebar .nav-child.active,html[data-theme="light"] .sidebar .nav-child.active{background:rgba(0,0,0,.06) !important;color:var(--ui-ink) !important;box-shadow:none !important;}
+
+/* Phone bottom bar: neutral pill for the current tab */
+html:not([data-theme]) .bn-item.active,html[data-theme="light"] .bn-item.active{background:rgba(0,0,0,.06) !important;box-shadow:none !important;}
+
+/* ── Feedback on touch-down (instant), restrained everywhere else ─────────── */
+html:not([data-theme="win95"]):not([data-theme="renaissance"]) :is(.btn,.cc-btn,.cc-btn3,.nav-item,.hub-card,.sub-tab,.bn-item){
+  transition:background-color .16s var(--q-ease),border-color .16s var(--q-ease),color .16s var(--q-ease),transform .1s var(--q-ease);
+}
+html:not([data-theme="win95"]):not([data-theme="renaissance"]) :is(.btn,.cc-btn,.cc-btn3):active{transform:scale(.975);}
+html:not([data-theme="win95"]):not([data-theme="renaissance"]) :is(.nav-item,.hub-card):active{transform:scale(.99);}
+
+/* ── One focus ring, theme accent ────────────────────────────────────────── */
+html:not([data-theme="win95"]):not([data-theme="renaissance"]) :is(a,button,input,select,textarea,.nav-item,.hub-card):focus-visible{
+  outline:2px solid var(--accent);outline-offset:2px;
+}
+
+/* ── Reduced motion: keep the colour feedback, drop the movement ─────────── */
+@media (prefers-reduced-motion:reduce){
+  html:not([data-theme="win95"]) :is(.btn,.cc-btn,.cc-btn3,.nav-item,.hub-card):active{transform:none !important;}
+}
+</style>
 </body>
 </html>
