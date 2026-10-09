@@ -6687,6 +6687,15 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
         <!-- Pending change: waiting for / acknowledged by a manager -->
         <div id="availPendingStatus" style="display:none;"></div>
 
+        <!-- Weekly reminder email: staff choose whether to receive it -->
+        <label id="availEmailPref" style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;margin-bottom:12px;border-radius:12px;background:var(--ui-surface-2,#f8fafc);border:1px solid var(--ui-line-soft,#e2e8f0);cursor:pointer;">
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:13.5px;font-weight:600;color:var(--ui-ink,#0f172a);">Availability reminder email</div>
+            <div id="availEmailPrefSub" style="font-size:12px;color:var(--ui-ink-2b,#475569);margin-top:3px;line-height:1.45;">Get an email reminder to update your availability.</div>
+          </div>
+          <input type="checkbox" id="availEmailPrefToggle" checked onchange="setAvailEmailPref(this.checked)" style="width:20px;height:20px;cursor:pointer;accent-color:var(--accent);flex-shrink:0;">
+        </label>
+
         <div id="availSuccess" style="display:none">
           <div class="card roster-card" style="text-align:center;padding:28px 20px;">
             <div style="width:44px;height:44px;border-radius:50%;background:#dcfce7;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;color:#16a34a;margin:0 auto 12px;">&#10003;</div>
@@ -8139,6 +8148,42 @@ let weekStart=gMon(new Date()),rWS=gMon(new Date()),me=null;
 
 
 
+// ── AVAILABILITY REMINDER EMAIL PREFERENCE ──
+// Stored as staff_credentials.avail_email_optout (false = receives the email).
+function _availEmailPrefUI(on){
+  const t=document.getElementById('availEmailPrefToggle');
+  const s=document.getElementById('availEmailPrefSub');
+  if(t) t.checked=!!on;
+  if(s) s.textContent = on
+    ? 'You\u2019ll get an email reminder to update your availability.'
+    : 'Reminder emails are off. You can still update your availability here any time.';
+}
+async function loadAvailEmailPref(){
+  try{
+    const rows = await sbGet('staff_credentials','?staff_name=eq.'+encodeURIComponent(me)+'&select=avail_email_optout');
+    if(rows && rows.length) _availEmailPrefUI(!rows[0].avail_email_optout);
+  }catch(e){ /* leave the default on-state showing */ }
+}
+async function setAvailEmailPref(on){
+  const t=document.getElementById('availEmailPrefToggle');
+  if(t) t.disabled=true;
+  _availEmailPrefUI(on);
+  try{
+    const r = await fetch(SB+'/rest/v1/staff_credentials?staff_name=eq.'+encodeURIComponent(me),{
+      method:'PATCH',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+_sbBearer(),'Content-Type':'application/json','Prefer':'return=representation'},
+      body: JSON.stringify({avail_email_optout:!on})
+    });
+    const j = r.ok ? await r.json() : null;
+    if(!r.ok || !j || !j.length) throw new Error('not saved');
+    showToast(on ? 'Reminder emails on' : 'Reminder emails off');
+  }catch(e){
+    _availEmailPrefUI(!on);               // put it back so the screen tells the truth
+    showToast('Couldn\u2019t save that \u2014 please try again');
+  }
+  if(t) t.disabled=false;
+}
+
 // ── SCHEDULE SUB-TABS ──
 function showSchedTab(tab){
   // Sync sidebar child highlight
@@ -8157,6 +8202,7 @@ function showSchedTab(tab){
   }
   if(tab==='availability'){
     refreshAvailPendingStatus();
+    loadAvailEmailPref();
     checkLock();
     if(myIsAdmin){
       document.getElementById('adminAvailSection').style.display='block';
