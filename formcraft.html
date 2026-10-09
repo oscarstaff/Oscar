@@ -451,6 +451,37 @@
     .lib-del { flex-shrink: 0; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; font-size: 12.5px; border: 1px solid var(--border); border-radius: 8px; background: transparent; color: var(--text-3); cursor: pointer; transition: all .12s; }
     .lib-del:hover { background: var(--err-soft); border-color: var(--err); color: var(--err); }
 
+
+    /* ── who (signed-in profile) ── */
+    .who { position: relative; }
+    .who-btn { display: flex; align-items: center; gap: 9px; height: 38px; padding: 3px 11px 3px 3px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer; font: inherit; transition: background .12s, border-color .12s; }
+    .who-btn:hover, .who-btn[aria-expanded="true"] { background: var(--surface-2); border-color: var(--border-strong); }
+    .who-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .who-ava { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; flex: none; font-size: 12px; font-weight: 700; color: #fff; background-size: cover; background-position: center; box-shadow: inset 0 0 0 1px rgba(0,0,0,.08); }
+    .who-ava-lg { width: 52px; height: 52px; font-size: 19px; }
+    .who-txt { display: flex; flex-direction: column; align-items: flex-start; line-height: 1.2; text-align: left; min-width: 0; }
+    .who-txt b { font-size: 12.5px; font-weight: 600; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .who-txt i { font-style: normal; font-size: 11px; color: var(--text-3); max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .who-chev { color: var(--text-3); font-size: 9px; transition: transform .2s ease; }
+    .who-btn[aria-expanded="true"] .who-chev { transform: rotate(180deg); }
+    .who-menu { position: absolute; right: 0; top: calc(100% + 8px); width: 300px; background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 14px; box-shadow: 0 16px 40px -8px rgba(0,0,0,.22); padding: 6px; z-index: 200;
+      opacity: 0; visibility: hidden; transform: translateY(-6px) scale(.97); transform-origin: top right; transition: opacity .14s ease, transform .2s cubic-bezier(.32,.72,0,1), visibility 0s linear .2s; }
+    .who-menu.open { opacity: 1; visibility: visible; transform: none; transition: opacity .14s ease, transform .2s cubic-bezier(.32,.72,0,1), visibility 0s; }
+    .who-head { display: flex; align-items: center; gap: 13px; padding: 12px 10px 12px; }
+    .who-nm { font-size: 16px; font-weight: 700; letter-spacing: -.02em; line-height: 1.2; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .who-fn { font-size: 12px; color: var(--text-3); margin-top: 1px; }
+    .who-badge { display: inline-block; margin-top: 6px; font-size: 11px; font-weight: 600; padding: 2px 9px; border-radius: 999px; background: var(--accent-soft); color: var(--accent-hover); border: 1px solid var(--accent-border); }
+    .who-badge.plain { background: var(--surface-2); color: var(--text-2); border-color: var(--border); }
+    .who-rows { padding: 2px 10px 6px; }
+    .who-row { display: flex; justify-content: space-between; gap: 16px; padding: 7px 0; font-size: 12.5px; border-top: 1px solid var(--border); }
+    .who-row:first-child { border-top: 0; }
+    .who-row span { color: var(--text-3); flex: none; }
+    .who-row b { font-weight: 500; text-align: right; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .who-sep { height: 1px; background: var(--border); margin: 4px 10px; }
+    .who-act { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 10px; border: 0; border-radius: 8px; background: transparent; color: var(--text); font: inherit; font-size: 13px; text-align: left; cursor: pointer; }
+    .who-act:hover { background: var(--surface-2); }
+    @media (max-width: 820px) { .who-txt, .who-chev { display: none; } .who-btn { padding: 3px; } }
+
     .divider { width: 5px; flex-shrink: 0; cursor: col-resize; background: transparent; position: relative; }
     .divider::after { content: ''; position: absolute; inset: 0 2px; background: var(--border); transition: background .12s; }
     .divider:hover::after, .divider.dragging::after { background: var(--accent); }
@@ -494,6 +525,7 @@
       if(pw.value===TEST_CODE){
         window.NEXUS_USER='Test Staff';
         try{sessionStorage.setItem('ngate_'+APP,'1');}catch(e){}
+        try{ window.dispatchEvent(new Event('fc-unlocked')); }catch(e){}
         pass();
       }else{
         if(err) err.textContent='Incorrect passcode.';
@@ -539,12 +571,53 @@
       try{sessionStorage.setItem('ngate_admin_'+APP,(payload.is_admin===true)?'1':'0');}catch(e){}
       try{ if(payload.sb_at) sessionStorage.setItem('ngate_at_'+APP,payload.sb_at); else sessionStorage.removeItem('ngate_at_'+APP); }catch(e){}
       try{history.replaceState(null,'',location.pathname+location.search);}catch(e){}
+      try{ window.dispatchEvent(new Event('fc-unlocked')); }catch(e){}
       pass();
     }catch(e){ fail('Access check failed.'); console.warn('gate',e); }
   })();
 })();
 </script>
 <!-- END GATE -->
+<!-- SESSION LOCK — FormCraft only works with a live Nexus sign-in -->
+<div id="fcLock" role="alertdialog" aria-modal="true" aria-labelledby="fcLockT" aria-describedby="fcLockM" style="display:none;position:fixed;inset:0;z-index:99998;align-items:center;justify-content:center;padding:20px;background:linear-gradient(135deg,#0f1117,#1a1d27);font-family:system-ui,sans-serif;">
+  <div style="background:#1e2230;border:1px solid #2e3344;border-radius:18px;padding:38px 34px;width:min(400px,92vw);text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.5);">
+    <div style="font-size:40px;margin-bottom:12px;">🔒</div>
+    <div id="fcLockT" style="font-size:20px;font-weight:700;color:#fff;margin-bottom:8px;">Session expired</div>
+    <div id="fcLockM" style="font-size:13.5px;color:#8b94a8;line-height:1.55;margin-bottom:22px;">Your sign-in has expired, so FormCraft has locked. Reopen FormCraft from Nodes in Nexus to continue.</div>
+    <button type="button" id="fcLockBtn" style="background:#4f46e5;color:#fff;border:0;border-radius:11px;padding:11px 22px;font-weight:600;font-size:14px;cursor:pointer;">Close this tab</button>
+  </div>
+</div>
+<div id="fcWarn" style="display:none;position:fixed;top:0;left:0;right:0;z-index:99997;padding:9px 16px;text-align:center;font:600 13px system-ui,sans-serif;background:#fef3c7;color:#78350f;border-bottom:1px solid #f59e0b;">Your sign-in ends in a few minutes. Finish up, then reopen FormCraft from Nexus.</div>
+<script>
+(function(){
+  function tok(){ try{ return (window.NEXUS_AT||sessionStorage.getItem('ngate_at_formcraft')||'').trim(); }catch(e){ return ''; } }
+  function expMs(){ var t=tok(); if(!t) return 0; try{ var p=JSON.parse(atob(t.split('.')[1].replace(/-/g,'+').replace(/_/g,'/'))); return (p.exp||0)*1000; }catch(e){ return 0; } }
+  window.fcSessionAlive=function(){ return expMs()>Date.now()+30000; };
+  function enforce(){
+    if(document.getElementById('__gate')) return;               // still checking access: the gate screen covers everything
+    var lk=document.getElementById('fcLock'), root=document.getElementById('root'), warn=document.getElementById('fcWarn');
+    if(!lk) return;
+    var ok=window.fcSessionAlive();
+    if(!ok){
+      if(lk.style.display!=='flex'){ lk.style.display='flex'; if(root) root.setAttribute('inert',''); var b=document.getElementById('fcLockBtn'); if(b) b.focus(); }
+      if(warn) warn.style.display='none';
+    } else {
+      if(lk.style.display==='flex'){ lk.style.display='none'; if(root) root.removeAttribute('inert'); }
+      if(warn) warn.style.display=(expMs()-Date.now()<5*60*1000)?'block':'none';
+    }
+  }
+  window.fcEnforce=enforce;
+  document.addEventListener('DOMContentLoaded',function(){
+    var b=document.getElementById('fcLockBtn'); if(b) b.addEventListener('click',function(){ try{window.close();}catch(e){} });
+    enforce();
+  });
+  window.addEventListener('fc-unlocked',enforce);
+  document.addEventListener('visibilitychange',function(){ if(!document.hidden) enforce(); });
+  window.addEventListener('focus',enforce);
+  setInterval(enforce,1000);
+})();
+</script>
+<!-- END SESSION LOCK -->
 
   <div id="root"></div>
 
@@ -1445,6 +1518,7 @@ window.FC_SEED_FORMS=[{"name":"Arcare Vocational Placement - Schedule 1","finger
       });
       const data = await r.json();
       if (!r.ok || data.error) throw new Error(data.error || ('HTTP ' + r.status));
+      fcLogEvent('ai_parse', fcFormLabel(), { via: fileBase64 ? 'file' : 'text', type: docMime || undefined, chars: text ? text.length : undefined });
       return data;
     }
 
@@ -1470,19 +1544,36 @@ window.FC_SEED_FORMS=[{"name":"Arcare Vocational Placement - Schedule 1","finger
       return (await r.json())[0];
     }
     async function updateTemplateInCloud(id, name, fingerprint, data) {
-      // formcraft_templates only allows UPDATE for the anon role, so use the anon key here.
-      const r = await fetch(SB_URL + '/rest/v1/formcraft_templates?id=eq.' + id, {
-        method: 'PATCH', headers: { ...sbHeaders, Authorization: 'Bearer ' + SB_KEY, Prefer: 'return=representation' },
-        body: JSON.stringify({ name, pdf_fingerprint: fingerprint, data }),
-      });
-      if (!r.ok) throw new Error('update failed (' + r.status + ')');
-      const out = await r.json();
-      if (!Array.isArray(out) || out.length === 0) throw new Error('update was blocked by the database');
-      return out[0];
+      // Edit as the signed-in person so the audit trail can name them (needs the fc_tpl_update_auth policy from
+      // formcraft_audit.sql). If the database doesn't allow that yet, fall back to the anon key as before.
+      const body = JSON.stringify({ name, pdf_fingerprint: fingerprint, data });
+      const url = SB_URL + '/rest/v1/formcraft_templates?id=eq.' + id;
+      for (const asUser of [true, false]) {
+        if (asUser && !fcAccessToken()) continue;
+        const r = await fetch(url, {
+          method: 'PATCH', headers: { ...sbHeaders, Authorization: 'Bearer ' + (asUser ? fcAccessToken() : SB_KEY), Prefer: 'return=representation' }, body,
+        });
+        if (!r.ok) { if (asUser) continue; throw new Error('update failed (' + r.status + ')'); }
+        const out = await r.json();
+        if (!Array.isArray(out) || out.length === 0) { if (asUser) continue; throw new Error('update was blocked by the database'); }
+        return out[0];
+      }
+      throw new Error('update failed');
     }
     async function deleteTemplateFromCloud(id) {
       const r = await fetch(SB_URL + '/rest/v1/formcraft_templates?id=eq.' + id, { method: 'DELETE', headers: sbHeaders });
       if (!r.ok) throw new Error('delete failed');
+    }
+    // Tell the audit trail about something only the page knows (AI autofill). Never blocks or breaks the page.
+    function fcFormLabel() { try { var el = document.querySelector('.header-file'); return el ? el.textContent.trim() : ''; } catch (e) { return ''; } }
+    function fcLogEvent(action, subject, detail) {
+      try {
+        if (!fcAccessToken()) return;
+        fetch(SB_URL + '/rest/v1/rpc/formcraft_log_event', {
+          method: 'POST', headers: sbHeaders, keepalive: true,
+          body: JSON.stringify({ p_action: action, p_subject: subject || '', p_detail: detail || {} }),
+        }).catch(function () {});
+      } catch (e) {}
     }
     // Fill-log — one tiny row per export. No PDF stored, so it barely touches storage.
     async function logFill(row) {
@@ -1495,17 +1586,24 @@ window.FC_SEED_FORMS=[{"name":"Arcare Vocational Placement - Schedule 1","finger
       } catch (e) { console.warn('logFill', e); }
     }
 
-    // Admin-only audit trail: who filled which student's form, when.
-    // Reads formcraft_fills (authenticated-only) and flags rows with no filler recorded.
+    // Admin-only audit trail. "Fills" = who filled which student's form. "Activity" = everything else
+    // (saved forms created / edited / deleted, AI autofill), written by the database so it can't be edited from here.
     function AuditPanel({ sbUrl, sbHeaders, onClose }) {
+      const [tab, setTab] = useState('fills');
       const [rows, setRows] = useState(null);   // null = loading
       const [err, setErr] = useState('');
+      const [acts, setActs] = useState(null);
+      const [actErr, setActErr] = useState('');
       const [q, setQ] = useState('');
       const [onlyMissing, setOnlyMissing] = useState(false);
+      const [open, setOpen] = useState({});
+      const [note, setNote] = useState('');
+      const [restored, setRestored] = useState({});
+      const expired = 'Your Nexus session was not passed to Formcraft, or it has expired. Close this tab and relaunch Formcraft from Nexus to view the audit trail.';
       useEffect(() => {
         (async () => {
           try {
-            if (!fcAccessToken()) { setErr('Your Nexus session was not passed to Formcraft, or it has expired. Close this tab and relaunch Formcraft from Nexus to view the audit trail.'); setRows([]); return; }
+            if (!fcAccessToken()) { setErr(expired); setRows([]); return; }
             const r = await fetch(sbUrl + '/rest/v1/formcraft_fills?select=*&order=filled_at.desc&limit=2000', { headers: sbHeaders });
             if (r.status === 401 || r.status === 403) { setErr('Session expired. Close this tab and relaunch Formcraft from Nexus to view the audit trail.'); setRows([]); return; }
             if (!r.ok) { setErr('Could not load the fill log (HTTP ' + r.status + ').'); setRows([]); return; }
@@ -1513,6 +1611,19 @@ window.FC_SEED_FORMS=[{"name":"Arcare Vocational Placement - Schedule 1","finger
           } catch (e) { setErr('Could not load the fill log.'); setRows([]); }
         })();
       }, []);
+      const loadActs = async () => {
+        try {
+          if (!fcAccessToken()) { setActErr(expired); setActs([]); return; }
+          const r = await fetch(sbUrl + '/rest/v1/formcraft_audit?select=*&order=id.desc&limit=1000', { headers: sbHeaders });
+          if (!r.ok) {
+            const t = await r.text().catch(() => '');
+            setActErr(/formcraft_audit|PGRST205|42P01/.test(t) ? 'The activity log isn\'t set up yet. Run formcraft_audit.sql in Supabase once, then reopen this tab.' : 'Could not load the activity log (HTTP ' + r.status + ').');
+            setActs([]); return;
+          }
+          setActs(await r.json());
+        } catch (e) { setActErr('Could not load the activity log.'); setActs([]); }
+      };
+      useEffect(() => { if (tab === 'activity' && acts === null) loadActs(); }, [tab]);
       const fmt = (iso) => { try { return new Date(iso).toLocaleString('en-AU', { timeZone: 'Australia/Sydney', day: '2-digit', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' }); } catch (e) { return iso || ''; } };
       const hasFiller = (r) => !!(r.staff_name && r.staff_name.trim());
       const missingCount = (rows || []).filter(r => !hasFiller(r)).length;
@@ -1522,27 +1633,56 @@ window.FC_SEED_FORMS=[{"name":"Arcare Vocational Placement - Schedule 1","finger
         const hay = ((r.staff_name || '') + ' ' + (r.student_first || '') + ' ' + (r.student_last || '') + ' ' + (r.form_name || '') + ' ' + (r.student_dob || '')).toLowerCase();
         return hay.indexOf(q.trim().toLowerCase()) !== -1;
       });
+      const label = { template_created: 'Form saved', template_edited: 'Form edited', template_deleted: 'Form deleted', filled: 'Form filled', ai_parse: 'AI autofill' };
+      const tone = { template_created: ['#dcfce7', '#166534'], template_edited: ['#fef3c7', '#92400e'], template_deleted: ['#fee2e2', '#991b1b'], filled: ['#e0e7ff', '#3730a3'], ai_parse: ['#f3e8ff', '#6b21a8'] };
+      const summary = (a) => {
+        const d = a.detail || {};
+        if (a.action === 'template_created') return (d.fields != null ? d.fields + ' fields' : '');
+        if (a.action === 'template_edited') return 'Changed: ' + (d.changed || []).join(', ') + (d.changed && d.changed.indexOf('data') !== -1 ? ' (' + d.fields_before + ' → ' + d.fields_after + ' fields)' : '') + (d.old_name && d.old_name !== a.subject ? ' · was "' + d.old_name + '"' : '');
+        if (a.action === 'template_deleted') return 'Contents kept — can be restored';
+        if (a.action === 'filled') return d.student || '';
+        if (a.action === 'ai_parse') return 'Read an enrolment ' + (d.via === 'file' ? 'file' : 'sheet (pasted text)');
+        return '';
+      };
+      const restore = async (a) => {
+        const t = (a.detail || {}).template;
+        if (!t || !t.name) return;
+        if (!window.confirm('Restore "' + t.name + '" to the team forms?')) return;
+        try { await saveTemplateToCloud(t.name, t.pdf_fingerprint, t.data); setRestored(m => ({ ...m, [a.id]: true })); setNote('Restored "' + t.name + '" to the team forms.'); loadActs(); }
+        catch (e) { setNote('Could not restore: ' + (e.message || e)); }
+      };
+      const actList = (acts || []).filter(a => {
+        if (!q.trim()) return true;
+        return ((a.actor || '') + ' ' + (a.subject || '') + ' ' + (label[a.action] || '') + ' ' + summary(a)).toLowerCase().indexOf(q.trim().toLowerCase()) !== -1;
+      });
       const ov = { position: 'fixed', inset: 0, background: 'rgba(15,23,42,.55)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', zIndex: 9999, padding: '40px 16px', overflow: 'auto' };
       const card = { background: '#fff', borderRadius: '14px', width: 'min(940px,100%)', maxHeight: '86vh', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,.3)' };
       const th = { textAlign: 'left', padding: '8px 10px', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '.04em', color: '#64748b', borderBottom: '1px solid #e2e8f0', position: 'sticky', top: 0, background: '#fff' };
       const td = { padding: '8px 10px', fontSize: '13px', borderBottom: '1px solid #f1f5f9', verticalAlign: 'top' };
       const missTag = { color: '#b91c1c', fontWeight: 700, fontSize: '11px', background: '#fee2e2', padding: '2px 7px', borderRadius: '999px' };
+      const unvTag = { color: '#92400e', fontWeight: 700, fontSize: '10px', background: '#fef3c7', border: '1px solid #fcd34d', padding: '1px 6px', borderRadius: '6px', marginLeft: '6px' };
+      const tabBtn = (id, text) => (
+        <button onClick={() => setTab(id)} style={{ padding: '7px 14px', fontSize: '13px', fontWeight: 600, border: 'none', borderRadius: '8px', cursor: 'pointer', background: tab === id ? '#4f46e5' : 'transparent', color: tab === id ? '#fff' : '#475569' }}>{text}</button>
+      );
       return (
         <div style={ov} onClick={onClose}>
           <div style={card} onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px 18px', borderBottom: '1px solid #e2e8f0' }}>
-              <div style={{ fontWeight: 800, fontSize: '16px', flex: 1 }}><i className="fa-solid fa-clipboard-list" /> Fill audit trail</div>
+              <div style={{ fontWeight: 800, fontSize: '16px', flex: 1 }}><i className="fa-solid fa-clipboard-list" /> Audit trail</div>
               <button className="btn btn-ghost" onClick={onClose}><i className="fa-solid fa-xmark" /> Close</button>
             </div>
             <div style={{ display: 'flex', gap: '10px', alignItems: 'center', padding: '12px 18px', borderBottom: '1px solid #f1f5f9', flexWrap: 'wrap' }}>
-              <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search student, staff, form, DOB…" style={{ flex: 1, minWidth: '220px', padding: '8px 12px', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '13px' }} />
-              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#334155', cursor: 'pointer' }}>
+              <div style={{ display: 'flex', gap: '4px', background: '#f1f5f9', padding: '3px', borderRadius: '10px' }}>{tabBtn('fills', 'Fills')}{tabBtn('activity', 'Activity')}</div>
+              <input value={q} onChange={e => setQ(e.target.value)} placeholder={tab === 'fills' ? 'Search student, staff, form, DOB…' : 'Search person, form or action…'} style={{ flex: 1, minWidth: '220px', padding: '8px 12px', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '13px' }} />
+              {tab === 'fills' && <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#334155', cursor: 'pointer' }}>
                 <input type="checkbox" checked={onlyMissing} onChange={e => setOnlyMissing(e.target.checked)} />
                 Only missing filler{missingCount ? ' (' + missingCount + ')' : ''}
-              </label>
+              </label>}
             </div>
+            {note && <div style={{ padding: '8px 18px', fontSize: '13px', background: '#eef2ff', color: '#3730a3', borderBottom: '1px solid #e0e7ff' }}>{note}</div>}
             <div style={{ overflow: 'auto', padding: '0 6px' }}>
-              {rows === null ? <div style={{ padding: '24px', color: '#64748b' }}>Loading…</div>
+              {tab === 'fills' ? (
+                rows === null ? <div style={{ padding: '24px', color: '#64748b' }}>Loading…</div>
                 : err ? <div style={{ padding: '24px', color: '#b91c1c' }}>{err}</div>
                 : list.length === 0 ? <div style={{ padding: '24px', color: '#64748b' }}>No matching fills.</div>
                 : (
@@ -1560,11 +1700,117 @@ window.FC_SEED_FORMS=[{"name":"Arcare Vocational Placement - Schedule 1","finger
                       ))}
                     </tbody>
                   </table>
-                )}
+                )
+              ) : (
+                acts === null ? <div style={{ padding: '24px', color: '#64748b' }}>Loading…</div>
+                : actErr ? <div style={{ padding: '24px', color: '#b91c1c', lineHeight: 1.6 }}>{actErr}</div>
+                : actList.length === 0 ? <div style={{ padding: '24px', color: '#64748b' }}>{q.trim() ? 'No matching activity.' : 'No activity recorded yet. Saved forms being created, edited or deleted, and AI autofill use, will appear here.'}</div>
+                : (
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead><tr><th style={th}>When (Sydney)</th><th style={th}>Who</th><th style={th}>What</th><th style={th}>Form</th><th style={th}>Details</th></tr></thead>
+                    <tbody>
+                      {actList.map(a => {
+                        const tn = tone[a.action] || ['#f1f5f9', '#334155'];
+                        return (
+                          <tr key={a.id}>
+                            <td style={td}>{fmt(a.at)}</td>
+                            <td style={td}>{a.actor || 'Unknown'}{a.actor_verified ? null : <span style={unvTag} title="This came in without a signed-in session, so the name is only what the page claimed.">unverified</span>}</td>
+                            <td style={td}><span style={{ background: tn[0], color: tn[1], fontSize: '11px', fontWeight: 700, padding: '2px 8px', borderRadius: '999px', whiteSpace: 'nowrap' }}>{label[a.action] || a.action}</span></td>
+                            <td style={td}>{a.subject || '—'}</td>
+                            <td style={td}>{summary(a)}{a.action === 'template_deleted' && (restored[a.id] ? <span style={{ marginLeft: '8px', color: '#166534', fontWeight: 600 }}>Restored</span> : <button className="btn btn-ghost" style={{ marginLeft: '8px', padding: '2px 8px', fontSize: '12px' }} onClick={() => restore(a)}>Restore</button>)}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                )
+              )}
             </div>
             <div style={{ padding: '10px 18px', borderTop: '1px solid #e2e8f0', fontSize: '12px', color: '#64748b' }}>
-              {rows ? (list.length + ' of ' + rows.length + ' fills') : ''}{missingCount ? ' · ' + missingCount + ' with no filler recorded' : ''}
+              {tab === 'fills'
+                ? ((rows ? (list.length + ' of ' + rows.length + ' fills') : '') + (missingCount ? ' · ' + missingCount + ' with no filler recorded' : ''))
+                : (acts ? (actList.length + ' of ' + acts.length + ' entries · entries can\'t be edited or removed') : '')}
             </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Who is signed in: avatar chip in the header with a small profile popover.
+    function WhoChip({ isAdmin, onAudit }) {
+      const [, force] = useState(0);
+      const [open, setOpen] = useState(false);
+      const [prof, setProf] = useState(null);
+      const [tries, setTries] = useState(0);
+      const ref = useRef(null);
+      const name = fcCurrentUser();
+      useEffect(() => {
+        const on = () => { force(n => n + 1); setTries(0); };
+        window.addEventListener('fc-unlocked', on);
+        return () => window.removeEventListener('fc-unlocked', on);
+      }, []);
+      useEffect(() => {
+        if (!name || prof) return;
+        if (!fcAccessToken()) return;
+        let dead = false;
+        (async () => {
+          try {
+            const q = encodeURIComponent('eq.' + name);
+            const get = (u) => fetch(SB_URL + '/rest/v1/' + u, { headers: sbHeaders }).then(r => r.ok ? r.json() : null).catch(() => null);
+            const [c, av] = await Promise.all([
+              get('staff_credentials?staff_name=' + q + '&select=nickname,email,team,last_login&limit=1'),
+              get('staff_avatars?staff_name=' + q + '&select=avatar&limit=1'),
+            ]);
+            if (dead) return;
+            if (!c) { if (tries < 3) setTimeout(() => !dead && setTries(t => t + 1), 1500 * (tries + 1)); return; }
+            const r0 = c[0] || {}, a0 = (av && av[0] && av[0].avatar) || '';
+            setProf({ nickname: (r0.nickname || '').trim(), email: r0.email || '', team: r0.team || '', last_login: r0.last_login || null, avatar: /^data:image\//.test(a0) ? a0 : '' });
+          } catch (e) {}
+        })();
+        return () => { dead = true; };
+      }, [name, tries, prof]);
+      useEffect(() => {
+        if (!open) return;
+        const away = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+        const esc = (e) => { if (e.key === 'Escape') setOpen(false); };
+        document.addEventListener('mousedown', away); document.addEventListener('keydown', esc);
+        return () => { document.removeEventListener('mousedown', away); document.removeEventListener('keydown', esc); };
+      }, [open]);
+      if (!name) return null;
+      const p = prof || {};
+      const disp = p.nickname || name;
+      const role = isAdmin ? 'Admin' : 'FormCraft user';
+      const sub = [role, p.team].filter(Boolean).join(' · ');
+      const palette = ['#4f46e5', '#0d8a53', '#c2410c', '#7c3aed', '#0e7490', '#be185d', '#a16207', '#475569'];
+      let h = 0; for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+      const parts = name.split(/\s+/);
+      const ini = ((parts[0] || '?')[0] + (parts.length > 1 ? parts[parts.length - 1][0] : '')).toUpperCase();
+      const avaStyle = p.avatar ? { backgroundImage: 'url("' + p.avatar.replace(/"/g, '%22') + '")', backgroundColor: '#e4e4e7' } : { backgroundColor: palette[h % palette.length] };
+      let last = '';
+      try { if (p.last_login) last = new Date(p.last_login).toLocaleString('en-AU', { timeZone: 'Australia/Sydney', weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }); } catch (e) {}
+      const row = (k, v) => v ? <div className="who-row"><span>{k}</span><b>{v}</b></div> : null;
+      return (
+        <div className="who" ref={ref}>
+          <button type="button" className="who-btn" aria-haspopup="true" aria-expanded={open} aria-label={'Profile: ' + disp + ', ' + role} onClick={() => setOpen(o => !o)}>
+            <span className="who-ava" style={avaStyle} aria-hidden="true">{p.avatar ? '' : ini}</span>
+            <span className="who-txt"><b>{disp}</b><i>{sub}</i></span>
+            <i className="fa-solid fa-chevron-down who-chev" aria-hidden="true" />
+          </button>
+          <div className={'who-menu' + (open ? ' open' : '')} role="menu" aria-label="Your profile">
+            <div className="who-head">
+              <span className="who-ava who-ava-lg" style={avaStyle} aria-hidden="true">{p.avatar ? '' : ini}</span>
+              <div style={{ minWidth: 0 }}>
+                <div className="who-nm">{disp}</div>
+                {disp !== name && <div className="who-fn">{name}</div>}
+                <span className={'who-badge' + (isAdmin ? '' : ' plain')}>{role}</span>
+              </div>
+            </div>
+            <div className="who-rows">
+              {row('Team', p.team)}{row('Email', p.email)}{row('Access', isAdmin ? 'Fill, edit forms & audit trail' : 'Fill forms')}{row('Last sign-in', last)}
+            </div>
+            <div className="who-sep" />
+            {isAdmin && <button type="button" className="who-act" role="menuitem" onClick={() => { setOpen(false); onAudit(); }}><span>Audit trail</span><span>›</span></button>}
+            <button type="button" className="who-act" role="menuitem" onClick={() => { setOpen(false); try { window.close(); } catch (e) {} }}><span>Close FormCraft</span></button>
           </div>
         </div>
       );
@@ -1598,6 +1844,11 @@ window.FC_SEED_FORMS=[{"name":"Arcare Vocational Placement - Schedule 1","finger
 
       const [isAdmin, setIsAdmin] = useState(fcIsAdmin());
       const [auditOpen, setAuditOpen] = useState(false);
+      useEffect(() => {
+        const on = () => { if (fcIsAdmin()) setIsAdmin(true); };
+        window.addEventListener('fc-unlocked', on);
+        return () => window.removeEventListener('fc-unlocked', on);
+      }, []);
       useEffect(() => {
         if (fcIsAdmin()) { setIsAdmin(true); return; }   // Nexus hub-admin (from the signed launch token)
         const u = fcCurrentUser();
@@ -2118,7 +2369,7 @@ window.FC_SEED_FORMS=[{"name":"Arcare Vocational Placement - Schedule 1","finger
               )}
             </div>
             <div className="header-right">
-              {isAdmin && <button className="btn btn-ghost" onClick={() => setAuditOpen(true)} title="Fill audit trail (admin)"><i className="fa-solid fa-clipboard-list" /> Audit</button>}
+              {isAdmin && <button className="btn btn-ghost" onClick={() => setAuditOpen(true)} title="Audit trail (admin)"><i className="fa-solid fa-clipboard-list" /> Audit</button>}
               {pdfBytes && (
                 <React.Fragment>
                   <button className="btn btn-ghost" onClick={openLibrary}><i className="fa-solid fa-folder-open" /> Team forms{library.length ? ' (' + library.length + ')' : ''}</button>
@@ -2134,6 +2385,7 @@ window.FC_SEED_FORMS=[{"name":"Arcare Vocational Placement - Schedule 1","finger
                   </button>
                 </React.Fragment>
               )}
+              <WhoChip isAdmin={isAdmin} onAudit={() => setAuditOpen(true)} />
             </div>
           </header>
 
