@@ -5511,6 +5511,80 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 
+
+<style id="nx-notif-v1">
+/* Notifications panel (nx-notif-v1). One list design for the desktop panel and the phone sheet:
+   translucent material anchored to the bell, a large title with quiet actions, rows with a type icon,
+   unread dot, relative time, and a dismiss button that appears on hover. Delete this block (and see the
+   NotifManager.listHtml function) to go back. */
+html .notif-drop{
+  width:372px; max-width:calc(100vw - 24px); max-height:min(580px, calc(100vh - 80px)); padding:0; border-radius:20px; overflow-x:hidden; overflow-y:auto;
+  background:color-mix(in srgb, var(--ui-surface,#fff) 90%, transparent) !important;
+  -webkit-backdrop-filter:saturate(180%) blur(28px); backdrop-filter:saturate(180%) blur(28px);
+  border:1px solid color-mix(in srgb, var(--ui-ink,#0f172a) 11%, transparent) !important;
+  box-shadow:0 22px 56px rgba(0,0,0,.18), 0 3px 10px rgba(0,0,0,.06) !important;
+  scrollbar-width:thin; scrollbar-color:color-mix(in srgb,var(--ui-ink,#0f172a) 25%,transparent) transparent;
+}
+html .notif-drop.open{ animation:ndIn .24s cubic-bezier(.32,.72,0,1); transform-origin:top left; }
+@keyframes ndIn{ from{ opacity:0; transform:scale(.965) translateY(-6px); } to{ opacity:1; transform:none; } }
+html .notif-drop .notif-drop-header{
+  display:flex; align-items:center; justify-content:space-between; gap:12px; position:sticky; top:0; z-index:2;
+  padding:18px 18px 10px; border:0 !important; font-size:17px; font-weight:700; letter-spacing:-.022em; line-height:1.2;
+  color:var(--ui-ink,#0f172a) !important;
+  background:linear-gradient(to bottom, color-mix(in srgb,var(--ui-surface,#fff) 96%,transparent) 70%, transparent) !important;
+}
+.nd-acts{ display:inline-flex; align-items:center; gap:2px; font-size:13px; letter-spacing:0; }
+.nd-acts button{ font:inherit; font-weight:600; color:var(--accent); background:none; border:0; padding:5px 8px; border-radius:8px; cursor:pointer; transition:background .12s, color .12s; }
+.nd-acts button:hover{ background:color-mix(in srgb,var(--accent) 12%,transparent); }
+.nd-acts button:active{ transform:scale(.96); }
+.nd-acts .nd-clear{ color:var(--ui-ink-3,#64748b); }
+.nd-acts .nd-clear:hover{ color:#d70015; background:rgba(215,0,21,.09); }
+.nd-list{ padding:2px 8px 10px; }
+.nd-row{
+  display:grid; grid-template-columns:8px 32px minmax(0,1fr) auto; align-items:start; column-gap:10px;
+  position:relative; padding:11px 10px 11px 4px; border-radius:14px; cursor:pointer; outline:none;
+  -webkit-tap-highlight-color:transparent; transition:background .12s ease, transform .12s ease;
+}
+.nd-row:hover{ background:color-mix(in srgb,var(--ui-ink,#0f172a) 5.5%,transparent); }
+.nd-row:active{ transform:scale(.985); background:color-mix(in srgb,var(--ui-ink,#0f172a) 9%,transparent); }
+.nd-row:focus-visible{ box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 55%,transparent); }
+.nd-dot{ width:8px; height:8px; border-radius:50%; margin-top:12px; background:transparent; }
+.nd-row.unread .nd-dot{ background:var(--accent); box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 18%,transparent); }
+.nd-ico{ width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; background:color-mix(in srgb,var(--nd-c,#6e6e73) 14%,transparent); color:var(--nd-c,#6e6e73); }
+.nd-ico svg{ width:17px; height:17px; }
+.nd-ico-ok{ --nd-c:#1c9a45; } .nd-ico-no{ --nd-c:#d70015; } .nd-ico-learn{ --nd-c:#0a84ff; } .nd-ico-time{ --nd-c:#d98200; } .nd-ico-chat{ --nd-c:#8944ab; } .nd-ico-bell{ --nd-c:#6e6e73; }
+.nd-main{ display:flex; flex-direction:column; gap:2px; min-width:0; padding-top:1px; }
+.nd-title{ font-size:14px; line-height:1.3; font-weight:600; letter-spacing:-.01em; color:var(--ui-ink,#0f172a); }
+.nd-row.unread .nd-title{ font-weight:700; }
+.nd-body{ font-size:13px; line-height:1.4; color:var(--ui-ink-3,#64748b); display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.nd-row.read .nd-ico,.nd-row.read .nd-main{ opacity:.7; }
+.nd-meta{ position:relative; min-width:26px; text-align:right; padding-top:2px; }
+.nd-time{ font-size:12px; color:var(--ui-ink-4,#94a3b8); font-variant-numeric:tabular-nums; transition:opacity .12s; }
+.nd-x{
+  position:absolute; top:0; right:-2px; width:22px; height:22px; border-radius:50%; border:0; cursor:pointer; padding:0;
+  display:flex; align-items:center; justify-content:center; opacity:0; pointer-events:none;
+  color:var(--ui-ink-3,#64748b); background:color-mix(in srgb,var(--ui-ink,#0f172a) 9%,transparent); transition:opacity .12s, background .12s;
+}
+.nd-x svg{ width:10px; height:10px; }
+.nd-x:hover{ background:color-mix(in srgb,var(--ui-ink,#0f172a) 16%,transparent); color:var(--ui-ink,#0f172a); }
+.nd-row:hover .nd-x,.nd-row:focus-within .nd-x{ opacity:1; pointer-events:auto; }
+.nd-row:hover .nd-time,.nd-row:focus-within .nd-time{ opacity:0; }
+@media (hover:none){ .nd-x{ display:none; } .nd-row:hover .nd-time{ opacity:1; } }
+.nd-empty{ padding:34px 24px 38px; text-align:center; }
+.nd-empty-ico{ width:44px; height:44px; margin:0 auto 12px; border-radius:50%; display:flex; align-items:center; justify-content:center; background:color-mix(in srgb,var(--ui-ink,#0f172a) 7%,transparent); color:var(--ui-ink-3,#64748b); }
+.nd-empty-ico svg{ width:22px; height:22px; }
+.nd-empty-t{ font-size:15px; font-weight:650; letter-spacing:-.015em; color:var(--ui-ink,#0f172a); }
+.nd-empty-s{ font-size:13px; color:var(--ui-ink-4,#94a3b8); margin-top:3px; }
+/* older-style rows still used while a list is loading from the leave history */
+html .notif-drop .notif-drop-item{ margin:0 8px; padding:11px 12px; border:0; border-radius:14px; }
+html .notif-drop .notif-drop-item.unread{ background:color-mix(in srgb,var(--accent) 9%,transparent); }
+html .notif-drop .notif-drop-item:hover{ background:color-mix(in srgb,var(--ui-ink,#0f172a) 6%,transparent); }
+html .notif-drop .notif-drop-actions{ background:none !important; border:0 !important; padding:0 18px 6px; }
+/* phone sheet */
+#mhNotifModal .notif-drop-header{ border-radius:20px 20px 0 0; }
+@media (prefers-reduced-motion:reduce){ html .notif-drop.open{ animation:none; } .nd-row,.nd-acts button{ transition:none; } .nd-row:active,.nd-acts button:active{ transform:none; } }
+@media (prefers-reduced-transparency:reduce){ html .notif-drop{ background:var(--ui-surface,#fff) !important; -webkit-backdrop-filter:none; backdrop-filter:none; } }
+</style>
 </head>
 <body>
 <!-- Boot skeleton: ghost of the home screen shown while the app loads + verifies
@@ -6030,7 +6104,7 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
         <div id="mhBellBadge" class="bell-badge" style="display:none;">0</div>
       </button>
       <div class="notif-drop" id="mhNotifDrop" style="right:8px;left:auto;">
-        <div class="notif-drop-header">Notifications</div>
+        <div class="notif-drop-header"><span class="nd-title-h">Notifications</span><span class="nd-acts"><button type="button" onclick="NotifManager.markAllRead()">Mark all read</button><button type="button" class="nd-clear" onclick="NotifManager.clearAll()">Clear</button></span></div>
         <div id="mhNotifDropList"><div class="notif-drop-empty" style="color:var(--ui-ink-3,#64748b);padding:30px 16px;text-align:center;"><div class="nx-sk" data-sk="list" data-n="4" aria-hidden="true"></div></div></div>
       </div>
     </div>
@@ -6116,7 +6190,7 @@ textarea[id^="discReply-"][data-rt-upgraded]{ display:none !important; }
   </aside>
   <!-- Desktop notifications panel (opened by the sidebar bell) -->
   <div class="notif-drop" id="notifDrop" role="dialog" aria-label="Notifications">
-          <div class="notif-drop-header">Notifications</div>
+          <div class="notif-drop-header"><span class="nd-title-h">Notifications</span><span class="nd-acts"><button type="button" onclick="NotifManager.markAllRead()">Mark all read</button><button type="button" class="nd-clear" onclick="NotifManager.clearAll()">Clear</button></span></div>
           <div id="notifDropList"><div class="notif-drop-empty" style="color:var(--ui-ink-3,#64748b);padding:30px 16px;text-align:center;"><div class="nx-sk" data-sk="list" data-n="4" aria-hidden="true"></div></div></div>
   </div>
 
@@ -25873,32 +25947,65 @@ const NotifManager = (function(){
     if(typeof updateBellBadge === 'function') updateBellBadge(count);
   }
 
-  function repaintDropdown(){
-    document.querySelectorAll('.notif-drop').forEach(function(el){
-      const list = load();
-      if(!list.length){
-        el.innerHTML = '<div class="notif-drop-empty" style="padding:24px;text-align:center;color:var(--ui-ink-4,#94a3b8);font-size:13px;">All caught up. No notifications.</div>';
-        return;
-      }
-      const html = '<div class="notif-drop-actions" style="display:flex;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--ui-line-soft,#f1f5f9);background:#fafbfc;border-radius:14px 14px 0 0;">'+
-        '<button onclick="NotifManager.markAllRead()" style="background:none;border:none;color:var(--accent);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">Mark all read</button>'+
-        '<button onclick="NotifManager.clearAll()" style="background:none;border:none;color:#dc2626;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">Clear all</button>'+
-      '</div>'+
-      '<div class="notif-drop-list" style="max-height:50dvh;overflow-y:auto;padding:6px 8px;">'+
-        list.map(function(n){
-          const ago = timeAgo(n.ts);
-          const safeTitle = esc(n.title||'');
-          const safeBody = esc(n.body||'');
-          return '<div class="notif-item'+(n.read?' read':'')+'" data-id="'+n.id+'" onclick="NotifManager._handleClick(\''+n.id+'\')" style="position:relative;padding:11px 32px 11px 14px;cursor:pointer;border-radius:10px;'+(n.read?'background:transparent;opacity:.65;':'background:var(--accent-dim);')+'">'+
-            '<button onclick="event.stopPropagation();NotifManager.clearOne(\''+n.id+'\')" title="Dismiss" style="position:absolute;top:8px;right:8px;background:none;border:none;color:var(--ui-ink-4,#94a3b8);font-size:16px;line-height:1;cursor:pointer;width:20px;height:20px;border-radius:50%;">×</button>'+
-            '<div style="font-size:13px;font-weight:700;color:var(--ui-ink,#0f172a);margin-bottom:2px;line-height:1.3;">'+safeTitle+'</div>'+
-            (safeBody ? '<div style="font-size:12px;color:var(--ui-ink-3,#64748b);line-height:1.4;">'+safeBody+'</div>' : '')+
-            '<div style="font-size:10.5px;color:var(--ui-ink-4,#94a3b8);margin-top:4px;">'+ago+'</div>'+
-          '</div>';
-        }).join('')+
+  // One renderer for the notification list, used by the desktop panel, the phone sheet and loadNotifDrop().
+  const _ND_ICONS = {
+    ok:   '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 10.5l3.5 3.5 7.5-8"/></svg>',
+    no:   '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l8 8M14 6l-8 8"/></svg>',
+    learn:'<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5.5C5.5 4.5 8 4.8 10 6.2c2-1.4 4.5-1.7 7-.7v9c-2.5-1-5-.7-7 .7-2-1.4-4.5-1.7-7-.7z"/><path d="M10 6.2v9"/></svg>',
+    time: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="6.5"/><path d="M10 6.5V10l2.5 1.5"/></svg>',
+    chat: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5A1.5 1.5 0 015.5 4h9A1.5 1.5 0 0116 5.5v6a1.5 1.5 0 01-1.5 1.5H9l-3.5 3v-3h0A1.5 1.5 0 014 11.5z"/></svg>',
+    bell: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 13.5V9a4.5 4.5 0 119 0v4.5l1 1.5h-11z"/><path d="M8.5 17h3"/></svg>'
+  };
+  function _ndKind(n){
+    const t = String(n.type||'').toLowerCase();
+    if(t.indexOf('declin')>=0 || t.indexOf('reject')>=0) return 'no';
+    if(t.indexOf('approv')>=0) return 'ok';
+    if(t.indexOf('quiz')>=0 || t.indexOf('train')>=0 || t.indexOf('learn')>=0) return 'learn';
+    if(t.indexOf('avail')>=0 || t.indexOf('remind')>=0 || t.indexOf('expir')>=0) return 'time';
+    if(t.indexOf('mention')>=0 || t.indexOf('reply')>=0 || t.indexOf('react')>=0 || t.indexOf('chat')>=0) return 'chat';
+    return 'bell';
+  }
+  function _ndShort(ts){
+    const d = Math.max(0, Date.now() - ts);
+    if(d < 60000) return 'now';
+    if(d < 3600000) return Math.floor(d/60000)+'m';
+    if(d < 86400000) return Math.floor(d/3600000)+'h';
+    if(d < 604800000) return Math.floor(d/86400000)+'d';
+    return new Date(ts).toLocaleDateString('en-AU',{day:'numeric',month:'short'});
+  }
+  function listHtml(list){
+    list = list || load();
+    if(!list.length){
+      return '<div class="nd-empty"><span class="nd-empty-ico">'+_ND_ICONS.bell+'</span><div class="nd-empty-t">You\'re all caught up</div><div class="nd-empty-s">New alerts will show up here.</div></div>';
+    }
+    return '<div class="nd-list" role="list">'+list.map(function(n){
+      const kind = _ndKind(n);
+      const id = String(n.id).replace(/'/g,"\\'").replace(/"/g,'&quot;');
+      return '<div class="nd-row'+(n.read?' read':' unread')+'" role="listitem" tabindex="0" data-id="'+String(n.id).replace(/"/g,'&quot;')+'" '+
+        'onclick="NotifManager._handleClick(\''+id+'\')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();NotifManager._handleClick(\''+id+'\');}">'+
+        '<span class="nd-dot" aria-hidden="true"></span>'+
+        '<span class="nd-ico nd-ico-'+kind+'" aria-hidden="true">'+_ND_ICONS[kind]+'</span>'+
+        '<span class="nd-main"><span class="nd-title">'+esc(n.title||'')+'</span>'+(n.body?'<span class="nd-body">'+esc(n.body)+'</span>':'')+'</span>'+
+        '<span class="nd-meta"><span class="nd-time">'+_ndShort(n.ts||Date.now())+'</span>'+
+          '<button type="button" class="nd-x" aria-label="Dismiss" title="Dismiss" onclick="event.stopPropagation();NotifManager.clearOne(\''+id+'\')"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 3l6 6M9 3l-6 6"/></svg></button></span>'+
       '</div>';
-      el.innerHTML = html;
+    }).join('')+'</div>';
+  }
+
+  function repaintDropdown(){
+    const list = load();
+    const html = listHtml(list);
+    ['notifDropList','mhNotifDropList'].forEach(function(id){
+      const el = document.getElementById(id);
+      if(el) el.innerHTML = html;
     });
+    document.querySelectorAll('.nd-acts').forEach(function(a){ a.style.visibility = list.length ? '' : 'hidden'; });
+  }
+
+  function _closePanels(){
+    document.querySelectorAll('.notif-drop').forEach(function(d){ d.classList.remove('open'); d.style.display='none'; });
+    const m = document.getElementById('mhNotifModal'); if(m) m.remove();
+    const orig = document.getElementById('mhNotifDropList_orig'); if(orig) orig.id = 'mhNotifDropList';
   }
 
   function _handleClick(id){
@@ -25907,6 +26014,7 @@ const NotifManager = (function(){
     markRead(id);
     const validPages = ['home','schedule','engagement','documents','training','calendar','myreports','notifs','profile'];
     if(item.link && typeof goTo === 'function' && validPages.indexOf(item.link) >= 0){
+      _closePanels();
       goTo(item.link);
     }
   }
@@ -25929,6 +26037,7 @@ const NotifManager = (function(){
     unreadCount: unreadCount,
     getAll: getAll,
     refresh: refreshUI,
+    listHtml: listHtml,
     _handleClick: _handleClick
   };
 })();
@@ -25969,7 +26078,7 @@ function handleMobileBell(e){
   if(originalMhList){ originalMhList.id = 'mhNotifDropList_orig'; }
   overlay.innerHTML = '<div style="background:'+bg+';border:1px solid '+border+';border-radius:14px;width:100%;max-width:380px;max-height:80vh;overflow-y:auto;-webkit-overflow-scrolling:touch;box-shadow:0 20px 50px rgba(15,23,42,.2);" onclick="event.stopPropagation()">'+
     '<div class="notif-drop-header" style="padding:14px 16px;font-size:14px;font-weight:700;color:'+txtPrimary+';border-bottom:1px solid '+border+';position:sticky;top:0;background:'+bg+';z-index:1;display:flex;align-items:center;justify-content:space-between;">'+
-      '<span>Notifications</span>'+
+      '<span class="nd-title-h">Notifications</span><span class="nd-acts"><button type="button" onclick="NotifManager.markAllRead()">Mark all read</button><button type="button" class="nd-clear" onclick="NotifManager.clearAll()">Clear</button></span>'+
       '<button onclick="document.getElementById(\'mhNotifModal\') && (document.getElementById(\'mhNotifModal\').remove(), document.getElementById(\'mhNotifDropList_orig\') && (document.getElementById(\'mhNotifDropList_orig\').id=\'mhNotifDropList\'))" style="background:none;border:none;font-size:20px;line-height:1;color:var(--ui-ink-4,#94a3b8);cursor:pointer;padding:0 4px;">×</button>'+
     '</div>'+
     '<div id="mhNotifDropList"><div class="notif-drop-empty" style="color:var(--ui-ink-3,#64748b);padding:30px 16px;text-align:center;">'+nxSkel('list',4)+'</div></div>'+
@@ -26046,41 +26155,7 @@ async function loadNotifDrop(dropId){
     try{
       const allNotifs = NotifManager.getAll();
       if(allNotifs && allNotifs.length){
-        let html = '';
-        allNotifs.forEach(function(n){
-          const t = n.ts || Date.now();
-          const diff = Math.max(0, Date.now() - t); // clamp negative future-timestamps to 0
-          let timeStr = 'just now';
-          if(diff >= 60000 && diff < 3600000) timeStr = Math.floor(diff/60000)+'m ago';
-          else if(diff >= 3600000 && diff < 86400000) timeStr = Math.floor(diff/3600000)+'h ago';
-          else if(diff >= 86400000) timeStr = Math.floor(diff/86400000)+'d ago';
-          const unreadDot = n.read ? '' : '<span style="display:inline-block;width:7px;height:7px;background:#8b5cf6;border-radius:50%;margin-right:6px;flex-shrink:0;"></span>';
-          html += '<div class="notif-drop-item'+(n.read?'':' unread')+'" data-notif-id="'+n.id+'" style="display:block;cursor:pointer;">'+
-            '<div style="display:flex;align-items:start;gap:6px;">'+unreadDot+
-            '<div style="flex:1;min-width:0;">'+
-              '<div style="font-size:13px;font-weight:'+(n.read?'500':'700')+';color:var(--ui-ink,#0f172a);margin-bottom:2px;">'+(n.title||'').replace(/</g,'&lt;')+'</div>'+
-              '<div style="font-size:12px;color:var(--ui-ink-2b,#475569);line-height:1.4;margin-bottom:3px;white-space:normal;">'+(n.body||'').replace(/</g,'&lt;')+'</div>'+
-              '<div style="font-size:11px;color:var(--ui-ink-4,#94a3b8);">'+timeStr+'</div>'+
-            '</div></div></div>';
-        });
-        el.innerHTML = html;
-        // Wire clicks to mark-read + navigate
-        el.querySelectorAll('[data-notif-id]').forEach(function(item){
-          item.addEventListener('click', function(){
-            const id = item.getAttribute('data-notif-id');
-            NotifManager.markRead(id);
-            const notif = NotifManager.getAll().find(function(n){return n.id===id;});
-            const validPages = ['home','schedule','engagement','documents','training','calendar','myreports','notifs','profile'];
-            if(notif && notif.link && validPages.indexOf(notif.link) >= 0){
-              const drop = document.getElementById(dropId);
-              if(drop) drop.classList.remove('open');
-              // Also close any mobile notif modal
-              const mhModal = document.getElementById('mhNotifModal');
-              if(mhModal) mhModal.remove();
-              if(typeof goTo === 'function') goTo(notif.link);
-            }
-          });
-        });
+        el.innerHTML = NotifManager.listHtml(allNotifs);
         return;
       }
     }catch(e){ console.warn('NotifManager render failed:', e); }
