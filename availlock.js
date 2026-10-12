@@ -120,6 +120,30 @@
    * their availability on Wednesday, sees no change to Thursday's shift, and
    * assumes it didn't save.
    */
+  /** Plain "when would a change I save right now start?" note, with the deadline spelled out. */
+  function availStartNote(){
+    var now = sydNow();
+    var d = new Date(now); d.setHours(0,0,0,0);
+    var upcoming = _rawNextWeek(d);                       // the Monday that is next
+    var cutoff = _addDays(upcoming, -3); cutoff.setHours(CUTOFF_HOUR, 0, 0, 0);
+    var nice = function(x){ return x.toLocaleDateString('en-AU', { weekday:'long', day:'numeric', month:'long' }); };
+    var short = function(x){ return x.toLocaleDateString('en-AU', { weekday:'short', day:'numeric', month:'short' }); };
+    var starts = nextMonday();
+    if(pastCutoff()){
+      return 'Changes you save now start <b>' + nice(starts) + '</b>. The deadline to start ' + short(upcoming) +
+             ' was <b>' + short(cutoff) + ', 12:00 pm</b>, because that week\u2019s roster is already built. Your current hours stay live until then.';
+    }
+    return 'Changes you save now start <b>' + nice(starts) + '</b>. Save before <b>' + short(cutoff) +
+           ', 12:00 pm</b> to make that week; after that it moves to the week after. Your current hours stay live until then.';
+  }
+
+  /**
+   * Note explaining when a change lands (shown in the editor only).
+   *
+   * Stating the date AND the deadline matters: without it, someone updates their
+   * availability just after Friday noon, sees no change to next week's shifts, and
+   * assumes it didn't save.
+   */
   function applyAvailLock(){
     var host = document.getElementById('ssec-availability');
     if(!host) return;
@@ -128,15 +152,15 @@
     if(!bar){
       bar = document.createElement('div');
       bar.id = 'availLockBar';
-      bar.style.cssText = 'border-radius:10px;padding:11px 14px;margin:0 0 14px;'+
-                          'font-size:12.5px;line-height:1.5;';
-      host.insertBefore(bar, host.firstChild);
+      bar.className = 'av-note av-startbar';
+      var area = document.getElementById('availFormArea');
+      if(area) area.insertBefore(bar, area.firstChild); else host.insertBefore(bar, host.firstChild);
     }
-    bar.style.background = '#eef2ff';
-    bar.style.border     = '1px solid #c7d2fe';
-    bar.style.color      = '#3730a3';
-    bar.innerHTML = '<strong>Starts ' + fmt(nextMonday()) +
-                    '</strong> — ' + availLockMessage();
+    bar.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg><div>' + availStartNote() + '</div>';
+    // Only useful while editing, and only when there is no pending change (that has its own note).
+    var ps = document.getElementById('availPendingStatus');
+    var pendingShown = ps && ps.style.display !== 'none' && ps.innerHTML;
+    bar.style.display = pendingShown ? 'none' : '';
 
     // Everything stays editable.
     var btn = document.getElementById('availBtn');
@@ -157,6 +181,7 @@
     return { locked: pastCutoff(), appliesFrom: nextMonday(), pastCutoff: pastCutoff() };
   }
 
+  window.availStartNote     = availStartNote;
   window.availPastCutoff    = pastCutoff;
   window.availWindow        = availWindow;
   window.availLocked        = availLocked;

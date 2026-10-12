@@ -5585,6 +5585,144 @@ html .notif-drop .notif-drop-actions{ background:none !important; border:0 !impo
 @media (prefers-reduced-motion:reduce){ html .notif-drop.open{ animation:none; } .nd-row,.nd-acts button{ transition:none; } .nd-row:active,.nd-acts button:active{ transform:none; } }
 @media (prefers-reduced-transparency:reduce){ html .notif-drop{ background:var(--ui-surface,#fff) !important; -webkit-backdrop-filter:none; backdrop-filter:none; } }
 </style>
+<style id="nx-avail-v1">
+/* Availability screen (nx-avail-v1). Overview with a clear "Now vs Pending" comparison, a progress strip
+   (Submitted > Acknowledged > Goes live), segmented day controls in the editor, and an iOS-style switch for
+   the reminder email. Everything is scoped to #ssec-availability and uses the theme's --ui-* colours.
+   Delete this block (and restore the old JS, backup index_before_avail.html) to go back. */
+#ssec-availability{
+  --av-amber:#b45309; --av-amber-bg:rgba(245,158,11,.12);
+  --av-green:#047857; --av-green-bg:rgba(16,185,129,.14);
+  --av-blue:#0369a1;  --av-red:#b91c1c; --av-red-bg:rgba(239,68,68,.12);
+  --av-line:color-mix(in srgb,var(--ui-ink,#0f172a) 10%,transparent);
+  --av-fill:color-mix(in srgb,var(--ui-ink,#0f172a) 5%,transparent);
+  --av-ease:cubic-bezier(.32,.72,0,1);
+}
+:is([data-theme="dark"],[data-theme="midnight"],[data-theme="renaissance"],[data-theme="graphite"],[data-theme="evergreen"],[data-theme="ember"],[data-theme="plum"],[data-theme="deepsea"]) #ssec-availability{
+  --av-amber:#fbbf24; --av-amber-bg:rgba(251,191,36,.16);
+  --av-green:#34d399; --av-green-bg:rgba(52,211,153,.16);
+  --av-blue:#38bdf8;  --av-red:#f87171; --av-red-bg:rgba(248,113,113,.16);
+}
+#ssec-availability .av-card{
+  background:var(--ui-surface,#fff); border:1px solid var(--av-line); border-radius:20px;
+  padding:20px 22px; margin:0 0 14px; box-shadow:0 1px 2px rgba(0,0,0,.03);
+}
+#ssec-availability .av-hero{ animation:avIn .38s var(--av-ease) both; }
+@keyframes avIn{ from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:none;} }
+#ssec-availability .av-top{ display:flex; align-items:center; justify-content:space-between; gap:12px; }
+#ssec-availability .av-eyebrow{ font-size:11.5px; font-weight:600; letter-spacing:.07em; text-transform:uppercase; color:var(--ui-ink-4,#94a3b8); }
+#ssec-availability .av-title{ font-size:25px; line-height:1.14; font-weight:700; letter-spacing:-.024em; color:var(--ui-ink,#0f172a); margin:10px 0 8px; }
+#ssec-availability .av-sub{ font-size:14px; line-height:1.55; color:var(--ui-ink-3,#64748b); max-width:60ch; }
+#ssec-availability .av-sub b{ color:var(--ui-ink-2,#334155); font-weight:600; }
+#ssec-availability .av-pill{ display:inline-flex; align-items:center; gap:6px; height:24px; padding:0 10px; border-radius:999px; font-size:12px; font-weight:600; letter-spacing:.01em; white-space:nowrap; }
+#ssec-availability .av-pill i{ width:7px; height:7px; border-radius:50%; background:currentColor; }
+#ssec-availability .av-pill.pending{ background:var(--av-amber-bg); color:var(--av-amber); }
+#ssec-availability .av-pill.live{ background:var(--av-green-bg); color:var(--av-green); }
+#ssec-availability .av-pill.expired{ background:var(--av-red-bg); color:var(--av-red); }
+#ssec-availability .av-saved{ display:inline-flex; align-items:center; gap:6px; margin-top:12px; font-size:12.5px; font-weight:600; color:var(--av-green); }
+/* progress strip */
+#ssec-availability .av-steps{ list-style:none; margin:20px 0 4px; padding:0; display:grid; grid-template-columns:repeat(3,1fr); }
+#ssec-availability .av-steps li{ position:relative; display:flex; flex-direction:column; align-items:center; text-align:center; padding:0 4px; }
+#ssec-availability .av-steps li:not(:first-child)::before{ content:""; position:absolute; top:11px; right:50%; width:100%; height:2px; border-radius:2px; background:var(--av-line); z-index:0; }
+#ssec-availability .av-steps li.done::before, #ssec-availability .av-steps li.wait::before{ background:var(--av-green); }
+#ssec-availability .av-sdot{ position:relative; z-index:1; width:24px; height:24px; border-radius:50%; display:flex; align-items:center; justify-content:center; background:var(--ui-surface,#fff); border:2px solid var(--av-line); color:#fff; box-sizing:border-box; }
+#ssec-availability .av-steps li.done .av-sdot{ background:var(--av-green); border-color:var(--av-green); }
+#ssec-availability .av-steps li.wait .av-sdot{ border-color:var(--av-amber); box-shadow:0 0 0 4px var(--av-amber-bg); }
+#ssec-availability .av-steps li.wait .av-sdot::after{ content:""; width:8px; height:8px; border-radius:50%; background:var(--av-amber); }
+#ssec-availability .av-steps b{ margin-top:9px; font-size:13px; font-weight:600; color:var(--ui-ink,#0f172a); letter-spacing:-.005em; }
+#ssec-availability .av-steps small{ margin-top:2px; font-size:12px; line-height:1.4; color:var(--ui-ink-3,#64748b); }
+#ssec-availability .av-steps li.next b{ color:var(--ui-ink-3,#64748b); }
+#ssec-availability .av-fine{ margin-top:14px; font-size:12.5px; line-height:1.5; color:var(--ui-ink-3,#64748b); text-align:center; }
+#ssec-availability .av-actions{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:20px; }
+#ssec-availability .av-btn{ appearance:none; -webkit-appearance:none; border:0; cursor:pointer; height:38px; padding:0 18px; border-radius:999px; font:inherit; font-size:14px; font-weight:600; letter-spacing:-.005em; background:var(--accent,#0b7a5c); color:#fff; transition:transform .12s ease-out, filter .15s; }
+#ssec-availability .av-btn:hover{ filter:brightness(1.06); }
+#ssec-availability .av-btn:active{ transform:scale(.97); }
+#ssec-availability .av-btn:focus-visible, #ssec-availability .av-back:focus-visible, #ssec-availability .av-opt:focus-visible{ outline:2px solid var(--accent,#0b7a5c); outline-offset:2px; }
+/* comparison */
+#ssec-availability .av-cmp-hd, #ssec-availability .av-row{ display:grid; grid-template-columns:104px 1fr 1fr; align-items:center; column-gap:10px; }
+#ssec-availability .av-cmp-hd.single, #ssec-availability .av-row.single{ grid-template-columns:104px 1fr; }
+#ssec-availability .av-cmp-hd{ padding:0 12px 12px 6px; border-bottom:1px solid var(--av-line); }
+#ssec-availability .av-col{ display:flex; flex-direction:column; align-items:flex-start; gap:6px; font-size:13px; font-weight:600; color:var(--ui-ink,#0f172a); }
+#ssec-availability .av-rows{ margin:4px -6px 0; }
+#ssec-availability .av-row{ padding:11px 12px; border-radius:12px; font-size:14px; color:var(--ui-ink-2,#334155); }
+#ssec-availability .av-row + .av-row{ margin-top:1px; }
+#ssec-availability .av-row .av-d{ font-weight:600; color:var(--ui-ink,#0f172a); letter-spacing:-.005em; }
+#ssec-availability .av-row .av-d .s{ display:none; }
+#ssec-availability .av-v{ display:flex; align-items:center; gap:8px; min-width:0; font-variant-numeric:tabular-nums; }
+#ssec-availability .av-v small{ font-size:12px; color:var(--ui-ink-4,#94a3b8); margin-left:2px; }
+#ssec-availability .av-vdot{ width:8px; height:8px; border-radius:50%; flex-shrink:0; background:var(--ui-ink-4,#94a3b8); opacity:.55; }
+#ssec-availability .av-vdot.yes{ background:var(--av-green); opacity:1; }
+#ssec-availability .av-vdot.custom{ background:var(--av-blue); opacity:1; }
+#ssec-availability .av-vdot.no{ background:var(--av-red); opacity:.85; }
+#ssec-availability .av-row.changed{ background:var(--av-amber-bg); }
+#ssec-availability .av-row.changed .av-v.old{ color:var(--ui-ink-3,#64748b); text-decoration:line-through; text-decoration-color:color-mix(in srgb,var(--ui-ink,#0f172a) 30%,transparent); }
+#ssec-availability .av-row.changed .av-v.new{ color:var(--ui-ink,#0f172a); font-weight:600; }
+#ssec-availability .av-row:not(.changed):not(.single) .av-v.new{ color:var(--ui-ink-4,#94a3b8); }
+#ssec-availability .av-foot{ display:flex; align-items:center; gap:8px; margin-top:12px; padding:12px 12px 0; border-top:1px solid var(--av-line); font-size:12.5px; color:var(--ui-ink-3,#64748b); }
+#ssec-availability .av-foot b{ color:var(--av-amber); font-weight:600; }
+/* in-editor note + back link */
+#ssec-availability .av-note{ display:flex; gap:12px; align-items:flex-start; margin:0 0 14px; padding:14px 16px; border-radius:16px; background:var(--av-amber-bg); color:var(--ui-ink-2,#334155); font-size:13.5px; line-height:1.5; }
+#ssec-availability .av-note svg{ flex-shrink:0; margin-top:1px; color:var(--av-amber); }
+#ssec-availability .av-note b{ color:var(--ui-ink,#0f172a); font-weight:600; }
+#ssec-availability .av-back{ appearance:none; -webkit-appearance:none; border:0; background:none; cursor:pointer; display:none; align-items:center; gap:4px; margin:0 0 12px; padding:6px 10px 6px 4px; border-radius:10px; font:inherit; font-size:14px; font-weight:600; color:var(--accent,#0b7a5c); }
+#ssec-availability .av-back:active{ opacity:.6; }
+/* editor: segmented day control */
+#ssec-availability #availForm .av-fday{ padding:12px 10px; margin:0 -10px; border-radius:14px; transition:background .2s; }
+#ssec-availability #availForm .av-fday + .av-fday{ border-top:1px solid var(--av-line); border-radius:0 0 14px 14px; }
+#ssec-availability #availForm .av-fday.av-changed{ background:var(--av-amber-bg); border-top-color:transparent; border-radius:14px; }
+#ssec-availability .av-ftop{ display:flex; align-items:center; justify-content:space-between; gap:12px; }
+#ssec-availability .av-fname{ font-size:15px; font-weight:600; color:var(--ui-ink,#0f172a); letter-spacing:-.01em; min-width:92px; }
+#ssec-availability .av-seg{ display:flex; gap:2px; padding:2px; border-radius:11px; background:var(--av-fill); flex:1; max-width:380px; }
+#ssec-availability .av-opt{ appearance:none; -webkit-appearance:none; flex:1; min-width:0; height:32px; padding:0 8px; border:0; border-radius:9px; background:transparent; cursor:pointer; font:inherit; font-size:13px; font-weight:500; color:var(--ui-ink-3,#64748b); white-space:nowrap; transition:background .2s var(--av-ease), color .2s, box-shadow .2s, transform .12s ease-out; }
+#ssec-availability .av-opt:active{ transform:scale(.97); }
+#ssec-availability .av-opt.is-yes{ background:var(--ui-surface,#fff); color:var(--av-green); font-weight:600; box-shadow:0 1px 3px rgba(0,0,0,.14), 0 0 0 .5px rgba(0,0,0,.05); }
+#ssec-availability .av-opt.is-custom{ background:var(--ui-surface,#fff); color:var(--av-blue); font-weight:600; box-shadow:0 1px 3px rgba(0,0,0,.14), 0 0 0 .5px rgba(0,0,0,.05); }
+#ssec-availability .av-opt.is-no{ background:var(--ui-surface,#fff); color:var(--av-red); font-weight:600; box-shadow:0 1px 3px rgba(0,0,0,.14), 0 0 0 .5px rgba(0,0,0,.05); }
+:is([data-theme="dark"],[data-theme="midnight"],[data-theme="renaissance"],[data-theme="graphite"],[data-theme="evergreen"],[data-theme="ember"],[data-theme="plum"],[data-theme="deepsea"]) #ssec-availability .av-opt.is-yes,
+:is([data-theme="dark"],[data-theme="midnight"],[data-theme="renaissance"],[data-theme="graphite"],[data-theme="evergreen"],[data-theme="ember"],[data-theme="plum"],[data-theme="deepsea"]) #ssec-availability .av-opt.is-custom,
+:is([data-theme="dark"],[data-theme="midnight"],[data-theme="renaissance"],[data-theme="graphite"],[data-theme="evergreen"],[data-theme="ember"],[data-theme="plum"],[data-theme="deepsea"]) #ssec-availability .av-opt.is-no{ background:var(--ui-surface-4,#2d3f55); box-shadow:0 1px 3px rgba(0,0,0,.4); }
+#ssec-availability .av-cap{ font-size:12.5px; color:var(--ui-ink-3,#64748b); margin:6px 0 0 104px; min-height:0; }
+#ssec-availability .av-cap:empty{ display:none; }
+#ssec-availability .av-ctr{ display:none; align-items:center; gap:8px; margin:10px 0 0 104px; }
+#ssec-availability .av-ctr .to{ color:var(--ui-ink-4,#94a3b8); font-size:13px; }
+#ssec-availability input.av-time{ width:128px; height:36px; padding:0 10px; font-size:14px; border-radius:10px; font-variant-numeric:tabular-nums; }
+/* reminder email: iOS-style switch row */
+#ssec-availability #availEmailPref{ display:flex; align-items:center; gap:14px; margin:18px 0 0; padding:14px 16px; border-radius:18px; background:var(--ui-surface,#fff); border:1px solid var(--av-line); cursor:pointer; -webkit-tap-highlight-color:transparent; }
+#ssec-availability #availEmailPref .av-ico{ width:34px; height:34px; border-radius:9px; flex-shrink:0; display:flex; align-items:center; justify-content:center; background:#0a84ff; color:#fff; }
+#ssec-availability #availEmailPref .av-ptxt{ flex:1; min-width:0; }
+#ssec-availability #availEmailPref .av-ptit{ font-size:15px; font-weight:600; letter-spacing:-.01em; color:var(--ui-ink,#0f172a); }
+#ssec-availability #availEmailPref .av-psub{ font-size:12.5px; line-height:1.45; color:var(--ui-ink-3,#64748b); margin-top:2px; }
+#ssec-availability #availEmailPrefToggle{ appearance:none; -webkit-appearance:none; position:relative; flex-shrink:0; width:51px; height:31px; margin:0; border:0; border-radius:999px; background:color-mix(in srgb,var(--ui-ink,#0f172a) 18%,transparent); cursor:pointer; transition:background .25s var(--av-ease); }
+#ssec-availability #availEmailPrefToggle::after{ content:""; position:absolute; top:2px; left:2px; width:27px; height:27px; border-radius:50%; background:#fff; box-shadow:0 2px 5px rgba(0,0,0,.25), 0 0 0 .5px rgba(0,0,0,.06); transition:transform .28s var(--av-ease), width .2s var(--av-ease); }
+#ssec-availability #availEmailPrefToggle:checked{ background:#34c759; }
+#ssec-availability #availEmailPrefToggle:checked::after{ transform:translateX(20px); }
+#ssec-availability #availEmailPref:active #availEmailPrefToggle::after{ width:33px; }
+#ssec-availability #availEmailPref:active #availEmailPrefToggle:checked::after{ transform:translateX(14px); }
+#ssec-availability #availEmailPrefToggle:disabled{ opacity:.6; }
+#ssec-availability #availEmailPrefToggle:focus-visible{ outline:2px solid var(--accent,#0b7a5c); outline-offset:3px; }
+@media (max-width:640px){
+  #ssec-availability .av-card{ padding:18px 16px; border-radius:18px; }
+  #ssec-availability .av-title{ font-size:22px; }
+  #ssec-availability .av-cmp-hd, #ssec-availability .av-row{ grid-template-columns:44px 1fr 1fr; column-gap:8px; }
+  #ssec-availability .av-cmp-hd.single, #ssec-availability .av-row.single{ grid-template-columns:44px 1fr; }
+  #ssec-availability .av-row .av-d .l{ display:none; } #ssec-availability .av-row .av-d .s{ display:inline; }
+  #ssec-availability .av-row{ padding:11px 10px; font-size:13.5px; }
+  #ssec-availability .av-cmp-hd{ padding:0 10px 12px 4px; }
+  #ssec-availability .av-steps small{ font-size:11.5px; }
+  #ssec-availability .av-ftop{ flex-direction:column; align-items:stretch; gap:8px; }
+  #ssec-availability .av-seg{ max-width:none; }
+  #ssec-availability .av-cap, #ssec-availability .av-ctr{ margin-left:0; }
+  #ssec-availability input.av-time{ flex:1; width:auto; }
+  #ssec-availability .av-actions .av-btn{ flex:1; }
+}
+@media (prefers-reduced-motion:reduce){
+  #ssec-availability .av-hero{ animation:none; }
+  #ssec-availability *{ transition-duration:.01ms !important; }
+}
+@media (prefers-contrast:more){
+  #ssec-availability .av-card, #ssec-availability #availEmailPref{ border-color:var(--ui-ink-3,#64748b); }
+}
+</style>
 </head>
 <body>
 <!-- Boot skeleton: ghost of the home screen shown while the app loads + verifies
@@ -6761,30 +6899,14 @@ html .notif-drop .notif-drop-actions{ background:none !important; border:0 !impo
         <!-- Pending change: waiting for / acknowledged by a manager -->
         <div id="availPendingStatus" style="display:none;"></div>
 
-        <!-- Weekly reminder email: staff choose whether to receive it -->
-        <label id="availEmailPref" style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;margin-bottom:12px;border-radius:12px;background:var(--ui-surface-2,#f8fafc);border:1px solid var(--ui-line-soft,#e2e8f0);cursor:pointer;">
-          <div style="flex:1;min-width:0;">
-            <div style="font-size:13.5px;font-weight:600;color:var(--ui-ink,#0f172a);">Availability reminder email</div>
-            <div id="availEmailPrefSub" style="font-size:12px;color:var(--ui-ink-2b,#475569);margin-top:3px;line-height:1.45;">Get an email reminder to update your availability.</div>
-          </div>
-          <input type="checkbox" id="availEmailPrefToggle" checked onchange="setAvailEmailPref(this.checked)" style="width:20px;height:20px;cursor:pointer;accent-color:var(--accent);flex-shrink:0;">
-        </label>
-
-        <div id="availSuccess" style="display:none">
-          <div class="card roster-card" style="text-align:center;padding:28px 20px;">
-            <div style="width:44px;height:44px;border-radius:50%;background:#dcfce7;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;color:#16a34a;margin:0 auto 12px;">&#10003;</div>
-            <div style="font-size:16px;font-weight:700;color:var(--ui-ink,#0f172a);margin-bottom:6px;">Availability saved</div>
-            <div style="font-size:13px;color:var(--ui-ink-3,#64748b);margin-bottom:8px;line-height:1.6;" id="availSavedPeriod"></div>
-            <button onclick="showAvailForm()" class="btn btn-outline" style="padding:9px 20px;font-size:13px;margin-top:10px;">Edit availability</button>
-          </div>
-          <div id="availSuccessSummary"></div>
-        </div>
+        <div id="availSuccess" style="display:none"><div id="availOverview"></div></div>
 
         <div id="availFormArea">
+          <button type="button" class="av-back" id="availBack" onclick="availBackToOverview()"><svg width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 1.5L2 7.5l5.5 6"/></svg>Back</button>
           <div class="card roster-card" id="availEffectiveCard" style="margin-bottom:12px;">
-            <div class="roster-card-hd"><div class="roster-card-title">Week Effective Date</div></div>
-            <div style="font-size:12px;color:var(--ui-ink-3,#64748b);line-height:1.5;margin:2px 0 12px;">
-              Changes take effect from the week you choose. Only fortnight start dates can be selected — other weeks are locked because their roster is already being prepared.
+            <div class="roster-card-hd"><div class="roster-card-title">Starts from</div></div>
+            <div style="font-size:12.5px;color:var(--ui-ink-3,#64748b);line-height:1.5;margin:2px 0 12px;">
+              Your new hours begin on the week you pick. Only fortnight starts can be chosen, because the other weeks are already on the roster. Until then your current hours stay live.
             </div>
             <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
               <button type="button" id="availEffBtn" onclick="toggleEffCal()" class="btn btn-outline" style="padding:9px 14px;font-size:13px;display:flex;align-items:center;gap:8px;">
@@ -6797,7 +6919,7 @@ html .notif-drop .notif-drop-actions{ background:none !important; border:0 !impo
           </div>
 
           <div class="card roster-card">
-            <div class="roster-card-hd"><div class="roster-card-title">Weekly schedule</div></div>
+            <div class="roster-card-hd"><div class="roster-card-title">Your weekly hours</div></div>
             <div id="availForm"></div>
           </div>
           <div class="alert alert-err" id="availErr"></div>
@@ -6805,6 +6927,15 @@ html .notif-drop .notif-drop-actions{ background:none !important; border:0 !impo
             <button class="btn btn-green btn-block" id="availBtn" onclick="submitAvail()">Save availability</button>
           </div>
         </div>
+        <!-- Reminder email: staff choose whether to receive it -->
+        <label id="availEmailPref">
+          <span class="av-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M3.5 7.5l8.5 6 8.5-6"/></svg></span>
+          <span class="av-ptxt">
+            <span class="av-ptit" style="display:block">Reminder emails</span>
+            <span class="av-psub" id="availEmailPrefSub" style="display:block">We\u2019ll email you a reminder to check your availability.</span>
+          </span>
+          <input type="checkbox" id="availEmailPrefToggle" checked onchange="setAvailEmailPref(this.checked)" aria-label="Reminder emails">
+        </label>
         <!-- Admin: all staff availability grid -->
         <div id="adminAvailSection" style="display:none;margin-top:20px;">
           <div style="font-size:11px;font-weight:700;color:var(--ui-ink-4,#94a3b8);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;">All staff availability</div>
@@ -8240,8 +8371,8 @@ function _availEmailPrefUI(on){
   const s=document.getElementById('availEmailPrefSub');
   if(t) t.checked=!!on;
   if(s) s.textContent = on
-    ? 'You\u2019ll get an email reminder to update your availability.'
-    : 'Reminder emails are off. You can still update your availability here any time.';
+    ? 'We\u2019ll email you a reminder to check your availability.'
+    : 'Off. You can still update your availability here any time.';
 }
 async function loadAvailEmailPref(){
   try{
@@ -9710,22 +9841,21 @@ function buildAvailForm(){
     const defEnd = isWeekend ? '16:00' : '19:00';
     const wrap=document.createElement("div");
     wrap.id="dayWrap-"+i;
-    wrap.style.cssText="margin-bottom:10px;";
+    wrap.className="av-fday";
     wrap.innerHTML=
-      '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--ui-line-soft,#f1f5f9);">'+
-        '<div style="font-size:13px;font-weight:600;color:var(--ui-ink-1b,#1e293b);">'+day+'</div>'+
-        '<div style="display:flex;gap:6px;">'+
-          '<button class="ao" id="ao-yes-'+i+'" onclick="setDay('+i+',\'all\')">'+availLabel+'</button>'+
-          '<button class="ao" id="ao-custom-'+i+'" onclick="setDay('+i+',\'custom\')">Custom hours</button>'+
-          '<button class="ao" id="ao-no-'+i+'" onclick="setDay('+i+',\'no\')">Unavailable</button>'+
+      '<div class="av-ftop">'+
+        '<div class="av-fname">'+day+'</div>'+
+        '<div class="av-seg" role="group" aria-label="'+day+' availability">'+
+          '<button type="button" class="av-opt" id="ao-yes-'+i+'" onclick="setDay('+i+',\'all\')">Available</button>'+
+          '<button type="button" class="av-opt" id="ao-custom-'+i+'" onclick="setDay('+i+',\'custom\')">Custom</button>'+
+          '<button type="button" class="av-opt" id="ao-no-'+i+'" onclick="setDay('+i+',\'no\')">Unavailable</button>'+
         '</div>'+
       '</div>'+
-      '<div id="ctr-'+i+'" style="display:none;flex-direction:column;gap:8px;padding:8px 0;">'+
-        '<div style="display:flex;align-items:center;gap:8px;">'+
-          '<input type="time" class="f-input" id="cs-'+i+'" value="09:00" style="width:130px;padding:6px 10px;font-size:13px;">'+
-          '<span style="color:var(--ui-ink-4,#94a3b8);font-size:13px;">to</span>'+
-          '<input type="time" class="f-input" id="ce-'+i+'" value="'+defEnd+'" style="width:130px;padding:6px 10px;font-size:13px;">'+
-        '</div>'+
+      '<div class="av-cap" id="cap-'+i+'"></div>'+
+      '<div class="av-ctr" id="ctr-'+i+'">'+
+        '<input type="time" class="f-input av-time" id="cs-'+i+'" value="09:00" aria-label="'+day+' start">'+
+        '<span class="to">to</span>'+
+        '<input type="time" class="f-input av-time" id="ce-'+i+'" value="'+defEnd+'" aria-label="'+day+' end">'+
       '</div>';
     el.appendChild(wrap);
   });
@@ -9738,12 +9868,15 @@ function setDay(i,type){
   // Optimistic: update UI immediately, then save
 
   dayState[i]={type};
-  const base="ao";
-  document.getElementById("ao-yes-"+i).className=base+(type==="all"?" yes":"");
-  document.getElementById("ao-custom-"+i).className=base+(type==="custom"?" custom":"");
-  document.getElementById("ao-no-"+i).className=base+(type==="no"?" no":"");
+  const base="av-opt";
+  const _y=document.getElementById("ao-yes-"+i), _c=document.getElementById("ao-custom-"+i), _n=document.getElementById("ao-no-"+i);
+  _y.className=base+(type==="all"?" is-yes":"");   _y.setAttribute("aria-pressed",type==="all");
+  _c.className=base+(type==="custom"?" is-custom":""); _c.setAttribute("aria-pressed",type==="custom");
+  _n.className=base+(type==="no"?" is-no":"");     _n.setAttribute("aria-pressed",type==="no");
   const ct=document.getElementById("ctr-"+i);
   if(ct)ct.style.display=type==="custom"?"flex":"none";
+  const cap=document.getElementById("cap-"+i);
+  if(cap)cap.textContent = type==="all" ? (i>=5?"Free from 9:00 to 16:00":"Free from 9:00 to 19:00") : "";
   if(type==="custom"){renderStartPresets(i);enforceStartFloor(i);syncStartPreset(i);}
 }
 
@@ -9794,21 +9927,15 @@ function syncStartPreset(){}
 // so submitting again automatically puts it back to "waiting".
 function renderAvailPendingStatus(r){
   const el=document.getElementById('availPendingStatus'); if(!el) return;
-  if(!r || !r.pending_availability || !r.pending_from){ el.style.display='none'; el.innerHTML=''; return; }
-  const fmtDT=function(iso){ return new Date(iso).toLocaleString('en-AU',{timeZone:'Australia/Sydney',weekday:'short',day:'numeric',month:'short',hour:'numeric',minute:'2-digit',hour12:true}); };
-  const starts=new Date(r.pending_from+'T00:00:00').toLocaleDateString('en-AU',{weekday:'long',day:'numeric',month:'long'});
-  const setAt=r.pending_set_at?Date.parse(r.pending_set_at):0;
-  const revAt=r.availability_reviewed_at?Date.parse(r.availability_reviewed_at):0;
-  const acked=!!(setAt && revAt && revAt>=setAt);
-  const ic=acked
-    ? '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.7 2.7L16 9.5"/></svg>'
-    : '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>';
-  const title=acked?'Change acknowledged':'Waiting for acknowledgement';
-  const body=acked
-    ? 'Your manager acknowledged your availability change on <b>'+fmtDT(r.availability_reviewed_at)+'</b>. It starts <b>'+starts+'</b>; until then your current availability stays.'
-    : 'Your availability change (starts <b>'+starts+'</b>) was submitted '+(setAt?fmtDT(r.pending_set_at):'')+'. Your manager hasn\u2019t acknowledged it yet \u2014 you\u2019ll see it here once they have.';
-  el.style.cssText='display:flex;gap:10px;align-items:flex-start;margin:0 0 12px;padding:12px 14px;border-radius:12px;border:1px solid '+(acked?'#a7f3d0':'#fde68a')+';background:'+(acked?'#ecfdf5':'#fffbeb')+';color:'+(acked?'#065f46':'#92400e')+';';
-  el.innerHTML=ic+'<div style="flex:1;min-width:0;"><div style="font-size:13.5px;font-weight:700;">'+title+'</div><div style="font-size:12.5px;line-height:1.5;margin-top:2px;">'+body+'</div></div>';
+  const ov=document.getElementById('availSuccess');
+  // On the overview screen the full status lives in the card itself, so this strip is only for the editor.
+  const _bar=document.getElementById('availLockBar');
+  if(!r || !r.pending_availability || !r.pending_from || (ov && ov.style.display==='block')){ el.style.display='none'; el.innerHTML=''; el.className=''; if(_bar) _bar.style.display=''; return; }
+  if(_bar) _bar.style.display='none';
+  const starts=_avNiceDate(r.pending_from,true);
+  el.style.cssText='display:block;';
+  el.className='';
+  el.innerHTML='<div class="av-note"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><div>You\u2019re editing a change that\u2019s <b>waiting to start</b> on <b>'+starts+'</b>. Your current hours stay live until then. Days that differ from your current hours are highlighted. Saving again keeps the same start date unless you pick another below.</div></div>';
 }
 async function refreshAvailPendingStatus(){
   try{
@@ -9860,11 +9987,7 @@ async function loadExistingAvail(){
           const live = (r.availability||{})[k];
           const changed = JSON.stringify(live) !== JSON.stringify(a);
           const row = document.getElementById('dayWrap-'+k);
-          if(row){
-            row.style.background = changed ? '#fffbeb' : '';
-            row.style.borderRadius = changed ? '9px' : '';
-            row.style.padding = changed ? '0 10px' : '';
-          }
+          if(row) row.classList.toggle('av-changed', changed);
         }catch(e){}
       }
     });
@@ -9912,88 +10035,114 @@ async function checkLock(){
   }
 }
 
+// ── AVAILABILITY OVERVIEW (nx-avail-v1) ──
+function _avSydToday(){ return new Date().toLocaleDateString('en-CA',{timeZone:'Australia/Sydney'}); }
+function _avDaysUntil(ymd){ return Math.round((Date.parse(ymd+'T00:00:00Z')-Date.parse(_avSydToday()+'T00:00:00Z'))/86400000); }
+function _avNiceDate(ymd,long){ return new Date(ymd+'T00:00:00').toLocaleDateString('en-AU', long?{weekday:'long',day:'numeric',month:'long'}:{weekday:'short',day:'numeric',month:'short'}); }
+function _avNiceDT(iso){ return new Date(iso).toLocaleString('en-AU',{timeZone:'Australia/Sydney',weekday:'short',day:'numeric',month:'short',hour:'numeric',minute:'2-digit',hour12:true}); }
+function _avNorm(a){ a=a||{}; const t=a.type||'unset'; return t==='custom' ? 'custom|'+(a.start||'')+'|'+(a.end||'') : t; }
+function _avValHtml(a,i){
+  a=a||{type:'unset'};
+  if(a.type==='all') return '<span class="av-vdot yes"></span><span>Available<small>'+(i>=5?'9–16':'9–19')+'</small></span>';
+  if(a.type==='custom') return '<span class="av-vdot custom"></span><span>'+(a.start||'?')+'–'+(a.end||'?')+'</span>';
+  if(a.type==='no') return '<span class="av-vdot no"></span><span>Unavailable</span>';
+  return '<span class="av-vdot"></span><span>Not set</span>';
+}
+function _avCheck(sz){ return '<svg width="'+sz+'" height="'+sz+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>'; }
+
+function renderAvailOverview(row){
+  const host=document.getElementById('availOverview'); if(!host) return;
+  window._availRow=row;
+  const live=row.availability||{};
+  const pend=(row.pending_availability && row.pending_from) ? row.pending_availability : null;
+  const FULL=["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
+  const SHORT=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+  const get=(o,i)=>(o&&(o[i]||o[String(i)]))||{type:'unset'};
+  let changed=0;
+  const rows=FULL.map((d,i)=>{
+    const a=get(live,i), b=pend?get(pend,i):null;
+    const diff=pend && _avNorm(a)!==_avNorm(b);
+    if(diff) changed++;
+    const day='<div class="av-d"><span class="l">'+d+'</span><span class="s">'+SHORT[i]+'</span></div>';
+    return pend
+      ? '<div class="av-row'+(diff?' changed':'')+'">'+day+'<div class="av-v old">'+_avValHtml(a,i)+'</div><div class="av-v new">'+_avValHtml(b,i)+'</div></div>'
+      : '<div class="av-row single">'+day+'<div class="av-v">'+_avValHtml(a,i)+'</div></div>';
+  }).join('');
+
+  // ── hero ──
+  let pill, title, sub, steps='';
+  if(pend){
+    const days=_avDaysUntil(row.pending_from);
+    const setAt=row.pending_set_at?Date.parse(row.pending_set_at):0;
+    const revAt=row.availability_reviewed_at?Date.parse(row.availability_reviewed_at):0;
+    const acked=!!(setAt && revAt && revAt>=setAt);
+    pill='<span class="av-pill pending"><i></i>Pending</span>';
+    title='New hours start '+_avNiceDate(row.pending_from,true);
+    sub='Your change is <b>saved but not live yet</b>. Until then your current hours stay in place and this fortnight’s roster doesn’t change.';
+    const when = days>1 ? 'in '+days+' days' : days===1 ? 'tomorrow' : 'today';
+    steps='<ol class="av-steps">'+
+      '<li class="done"><span class="av-sdot">'+_avCheck(12)+'</span><b>Submitted</b><small>'+(setAt?_avNiceDT(row.pending_set_at):'Saved')+'</small></li>'+
+      '<li class="'+(acked?'done':'wait')+'"><span class="av-sdot">'+(acked?_avCheck(12):'')+'</span><b>Acknowledged</b><small>'+(acked?_avNiceDT(row.availability_reviewed_at):'Waiting for your manager')+'</small></li>'+
+      '<li class="next"><span class="av-sdot"></span><b>Goes live</b><small>'+_avNiceDate(row.pending_from,false)+' · '+when+'</small></li>'+
+    '</ol><div class="av-fine">Tip: changes saved after Friday 12:00 pm start a week later, because the next week’s roster is built then.</div>';
+  }else{
+    let expired=false;
+    if(!row.is_ongoing && row.valid_until){ const u=new Date(row.valid_until+'T00:00:00'), t=new Date(); t.setHours(0,0,0,0); expired=u<t; }
+    pill = expired ? '<span class="av-pill expired"><i></i>Expired</span>' : '<span class="av-pill live"><i></i>Live</span>';
+    title = expired ? 'Your availability has expired' : 'Your availability is live';
+    let per = (!row.is_ongoing && row.valid_from) ? 'Valid from '+fmtF(row.valid_from)+(row.valid_until?' until '+fmtF(row.valid_until):'')+'. ' : '';
+    sub = per+(typeof availStartNote==='function' ? availStartNote() : 'Any change you make starts from an upcoming Monday, so the current roster isn’t disturbed.');
+  }
+  const saved = row._justSaved ? '<div class="av-saved">'+_avCheck(14)+(row._appliedNow?'Saved. These hours are live now.':'Saved. We’ll switch to these hours on the start date.')+'</div>' : '';
+
+  let h='<div class="av-card av-hero">'+
+    '<div class="av-top"><span class="av-eyebrow">Availability</span>'+pill+'</div>'+
+    '<div class="av-title">'+title+'</div><div class="av-sub">'+sub+'</div>'+saved+steps+
+    '<div class="av-actions"><button type="button" class="av-btn" onclick="availStartEdit()">'+(pend?'Edit this change':'Edit availability')+'</button></div>'+
+  '</div>';
+
+  // ── hours card ──
+  if(pend){
+    h+='<div class="av-card"><div class="av-cmp-hd"><div></div>'+
+      '<div class="av-col">Now<span class="av-pill live"><i></i>Live</span></div>'+
+      '<div class="av-col">From '+_avNiceDate(row.pending_from,false)+'<span class="av-pill pending"><i></i>Pending</span></div></div>'+
+      '<div class="av-rows">'+rows+'</div>'+
+      '<div class="av-foot">'+(changed?'<b>'+changed+' day'+(changed!==1?'s':'')+' will change</b> · '+(7-changed)+' stay the same':'No days change. Your hours stay the same.')+'</div></div>';
+  }else{
+    h+='<div class="av-card"><div class="av-cmp-hd single"><div></div><div class="av-col">Your hours</div></div><div class="av-rows">'+rows+'</div></div>';
+  }
+  host.innerHTML=h;
+}
+
 function showAvailSuccess(row){
   document.getElementById("availSuccess").style.display="block";
   document.getElementById("availFormArea").style.display="none";
-  const avail=row.availability||{};
-  // Is this row already expired?
-  //  • dated   → end date has passed
-  //  • ongoing → last saved (updated_at) more than 1 month ago
-  let expired=false;
-  if(row && !row.is_ongoing && row.valid_until){
-    const until=new Date(row.valid_until+'T00:00:00');
-    const today=new Date(); today.setHours(0,0,0,0);
-    expired=until<today;
-  }
-  // Ongoing rows no longer expire on a timer — nothing to mark here.
-  // Period label
-  let period="Ongoing availability";
-  if(!row.is_ongoing&&row.valid_from){
-    period="Valid from "+fmtF(row.valid_from)+(row.valid_until?" until "+fmtF(row.valid_until):"");
-  }
-  if(expired) period="Expired — "+period.toLowerCase();
-  const periodEl=document.getElementById("availSavedPeriod");
-  if(periodEl)periodEl.textContent=period;
-  // Effective-from line: tell the person plainly when this takes effect, so a
-  // deferred change doesn't look like it failed to save.
-  (function(){
-    var el=document.getElementById("availEffectiveNote");
-    if(!el){
-      var anchor=document.getElementById("availSavedPeriod");
-      if(anchor&&anchor.parentNode){
-        el=document.createElement("div");
-        el.id="availEffectiveNote";
-        el.style.cssText="font-size:12.5px;line-height:1.5;margin-top:8px;padding:9px 12px;border-radius:10px;";
-        anchor.parentNode.insertBefore(el, anchor.nextSibling);
-      }
-    }
-    if(el){
-      if(row._appliedNow){
-        el.style.background="#ecfdf5"; el.style.border="1px solid #a7f3d0"; el.style.color="#065f46";
-        el.innerHTML="<strong>Saved.</strong> Your availability is live now \u2014 you're all set.";
-      }else if(row._startsFrom){
-        var dt=new Date(row._startsFrom+"T00:00:00");
-        var nice=dt.toLocaleDateString('en-AU',{weekday:'long',day:'numeric',month:'long'});
-        el.style.background="#eef2ff"; el.style.border="1px solid #c7d2fe"; el.style.color="#3730a3";
-        el.innerHTML="<strong>Saved.</strong> Your new availability starts "+nice+". Until then, your current availability stays and this fortnight's roster is unchanged.";
-      }else{ el.style.display="none"; }
-    }
-  })();
-  // Status banner
-  const banner=document.getElementById("availStatusBanner");
-  if(banner){
-    const availDays=Object.values(avail).filter(function(a){return a&&a.type!=="no"&&a.type!=="unset";}).length;
-    document.getElementById("availBannerIcon").textContent="";
-    document.getElementById("availBannerTitle").textContent="Availability set";
-    document.getElementById("availBannerSub").textContent=availDays+" day"+(availDays!==1?"s":"")+" available · "+period.toLowerCase();
-    banner.style.display="flex";
-  }
-  // Day summary
-  const days=["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
-  let html='<div class="card"><div class="card-title" style="margin-bottom:14px">Your Availability</div>';
-  days.forEach((day,i)=>{
-    const a=avail[i]||avail[String(i)]||{type:"unset"};
-    const lbl=a.type==="custom"?(a.start+" - "+a.end):a.type==="all"?"All Day":a.type==="no"?"Unavailable":"Not Set";
-    const col=a.type==="all"?"#16a34a":a.type==="no"?"#dc2626":a.type==="custom"?"#0284c7":"#94a3b8";
-    html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--ui-line-soft,#f1f5f9);">';
-    html+='<div style="font-size:13px;font-weight:600;color:var(--ui-ink-1b,#1e293b);">'+day+'</div>';
-    html+='<div style="font-size:12px;font-weight:600;color:'+col+'">'+lbl+'</div>';
-    html+='</div>';
-  });
-  html+='</div>';
-  document.getElementById("availSuccessSummary").innerHTML=html;
+  const banner=document.getElementById("availStatusBanner"); if(banner) banner.style.display="none";
+  const ps=document.getElementById("availPendingStatus"); if(ps){ ps.style.display="none"; ps.innerHTML=""; }
+  const _lb=document.getElementById("availLockBar"); if(_lb) _lb.style.display="none";
+  renderAvailOverview(row);
+}
+function availStartEdit(){
+  showAvailForm();
+  try{ loadExistingAvail(); }catch(e){}
+}
+function availBackToOverview(){
+  if(window._availRow) showAvailSuccess(window._availRow);
 }
 
 function showAvailForm(){
   document.getElementById("availSuccess").style.display="none";
   document.getElementById("availFormArea").style.display="block";
+  const bk=document.getElementById("availBack"); if(bk) bk.style.display = window._availRow ? "inline-flex" : "none";
   const banner=document.getElementById("availStatusBanner");
   if(banner){
     document.getElementById("availBannerIcon").textContent="";
     document.getElementById("availBannerTitle").textContent="Set your availability";
     document.getElementById("availBannerSub").textContent="Pick the days and hours you can work so your manager can plan the roster.";
-    banner.style.display="flex";
+    banner.style.display = window._availRow ? "none" : "flex";
   }
+  try{ if(typeof applyAvailLock==='function') applyAvailLock(); }catch(e){}
+  try{ refreshAvailPendingStatus(); }catch(e){}
 }
 
 // Shown when a staff member's previously-saved availability has expired:
@@ -10319,8 +10468,16 @@ async function submitAvail(){
       if(_strip)_strip.remove();
       const _bn=document.getElementById("availStatusBanner");
       if(_bn)_bn.classList.remove("avail-expired");
-      showAvailSuccess({availability:avail,is_ongoing:isOngoing,valid_from:validFrom,valid_until:validUntil,
-                        _appliedNow:_applyNow, _startsFrom:_applyNow?null:_effectiveFrom});
+      let _fresh=null;
+      try{ const _rr=await sbGet("staff_availability","?staff_name=eq."+encodeURIComponent(me)+"&limit=1"); _fresh=_rr&&_rr[0]; }catch(_e){}
+      if(!_fresh){
+        const _was=(existing&&existing[0])||{};
+        _fresh=_applyNow
+          ? {availability:avail,is_ongoing:isOngoing,valid_from:validFrom,valid_until:validUntil}
+          : {availability:_was.availability||{},is_ongoing:_was.is_ongoing,pending_availability:avail,pending_from:_effectiveFrom,pending_set_at:payload.pending_set_at};
+      }
+      _fresh._justSaved=true; _fresh._appliedNow=_applyNow;
+      showAvailSuccess(_fresh);
       refreshAvailPendingStatus();
       loadHomeData();
       if(typeof recheckOnboarding==='function') recheckOnboarding();
@@ -29610,7 +29767,7 @@ input[type="date"].f-input{ width:100%; }
 <script src="dialtrac.js?v=44"></script>
 <script src="quizreview.js?v=2"></script>
 <script src="teamhours.js?v=2"></script>
-<script src="availlock.js?v=9"></script>
+<script src="availlock.js?v=10"></script>
 <script src="hubradial.js?v=3"></script>
 <script src="sessionlimit.js?v=2"></script>
 <script id="nexus-v2-shell-js">
