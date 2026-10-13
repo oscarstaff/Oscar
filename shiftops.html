@@ -1371,6 +1371,26 @@ body.tl-readonly #tlPill{ display:inline-flex; }
 .mb-dot{ width:6px; height:6px; border-radius:50%; flex-shrink:0; }
 .mb-meta{ font-family:var(--mono); font-size:9.5px; color:var(--muted); text-decoration:none; margin-left:auto; }
 .mb-empty,.mb-err{ font-size:12px; color:var(--muted); padding:12px 14px; }
+/* View switch (By team / By status) */
+.mb-seg{ display:flex; align-items:center; gap:2px; margin:5px 10px 5px auto; padding:2px;
+  background:var(--surface); border:1px solid var(--border); border-radius:8px; }
+.mb-seg button{ border:0; background:transparent; color:var(--text-dim); font:600 11.5px var(--sans,inherit);
+  padding:4px 10px; border-radius:6px; cursor:pointer; transition:background .12s,color .12s; }
+.mb-seg button:hover{ color:var(--text); }
+.mb-seg button.on{ background:var(--surface2); color:var(--text); box-shadow:0 0 0 1px var(--border); }
+/* Team view: one column per team */
+.mb-lbl.team{ color:var(--text); justify-content:space-between; }
+.mb-lbl.team::before{ display:none; }
+.mb-lbl.team .mb-tn{ display:flex; align-items:center; gap:6px; }
+.mb-lbl.team .mb-tc{ font-weight:600; color:var(--muted); }
+.mb-tflag{ font-size:10.5px; font-weight:600; letter-spacing:0; text-transform:none; color:var(--warn); margin:-3px 0 6px; font-family:var(--sans,inherit); }
+.mb-tflag.w{ color:var(--gold); }
+.mb-dot.ok{ background:var(--success); } .mb-dot.warn{ background:var(--gold); } .mb-dot.miss{ background:var(--warn); }
+.mb-dot.done{ background:var(--accent); } .mb-dot.leave{ background:var(--muted); opacity:.6; }
+.mb-meta.ok{ color:var(--success); } .mb-meta.warn{ color:var(--gold); } .mb-meta.miss{ color:var(--warn); }
+.mb-meta.done{ color:var(--accent-text); }
+.mb-person.is-leave > span:not(.mb-meta){ color:var(--muted); }
+@media (prefers-reduced-motion:reduce){ .mb-seg button{ transition:none; } }
 .mb-err{ color:var(--warn); }
 
 /* ── Conflict Radar: shading while dragging ── */
@@ -2874,6 +2894,7 @@ body.avail-editing #availGrid .avail-chip.av2:hover{ background:color-mix(in srg
 .conflict-banner{ overflow:hidden; max-height:120px; transition:max-height .28s cubic-bezier(.32,.72,0,1), opacity .2s ease, margin .28s cubic-bezier(.32,.72,0,1), padding .28s cubic-bezier(.32,.72,0,1); }
 .conflict-banner.cb-off{ max-height:0 !important; opacity:0; margin-top:0 !important; margin-bottom:0 !important; padding-top:0 !important; padding-bottom:0 !important; border-width:0 !important; pointer-events:none; }
 @media (prefers-reduced-motion:reduce){ .conflict-banner{ transition:none; } }
+.lv-of{ color:var(--muted); font-weight:500; font-size:.85em; white-space:nowrap; }
 </style>
 </head>
 <body>
@@ -9808,6 +9829,23 @@ function updateLeaveBadge(){
 
 
 // Count leave days excluding Sundays and days staff are unavailable
+// Same counting rule as countLeaveDays, but with the real numbers: how many days the person would have worked, and how many
+// calendar days the request covers (no "at least 1" floor).
+function leaveDayInfo(fromStr, toStr, staffId){
+  const from=new Date(fromStr+'T00:00:00'), to=new Date(toStr+'T00:00:00');
+  if(isNaN(from)||isNaN(to)) return {work:1,span:1};
+  let work=0, span=0; const cur=new Date(from);
+  while(cur<=to){
+    const dow=cur.getDay(); span++;
+    if(dow!==0){
+      const dayIdx=dow-1;
+      const avail=staffId!=null?(availability[staffId]||{})[dayIdx]:null;
+      if(!(avail&&avail.type==='no')) work++;
+    }
+    cur.setDate(cur.getDate()+1);
+  }
+  return {work:work, span:span};
+}
 function countLeaveDays(fromStr, toStr, staffId){
   const from=new Date(fromStr+'T00:00:00');
   const to=new Date(toStr+'T00:00:00');
@@ -10067,7 +10105,13 @@ function renderLeave(filterName){
     }
     const name=rName||(s?`${s.first} ${s.last}`:'Unknown');
     const color=s?s.color:'#666';
-    const days=countLeaveDays(r.from||r.from_date||'',(r.to||r.to_date||''),(r.staffId||null));
+    const _lvSid=(r.staffId||(s&&s.id)||null);
+    // The Days column counts the days the person would actually have worked (Sundays and days they're marked unavailable don't
+    // count). If that is fewer than the dates covered, say so, instead of showing a bare number that looks wrong.
+    const _lvInfo=leaveDayInfo(r.from||r.from_date||'',(r.to||r.to_date||''),_lvSid);
+    const daysHtml=(_lvInfo.work===_lvInfo.span)
+      ? String(_lvInfo.work)
+      : `<span title="${_lvInfo.span} day${_lvInfo.span===1?'':'s'} off in total. ${_lvInfo.work} of them ${_lvInfo.work===1?'is a day':'are days'} they would have worked; the rest are Sundays or days they are marked unavailable.">${_lvInfo.work}<span class="lv-of"> of ${_lvInfo.span}</span></span>`;
     // Where the request came from. Admin-added rows are stamped
     // resolved_by='Admin (ShiftOps)' by the relay; anything else came from a
     // staff member submitting in Nexus. "WEB" told you the transport; this
@@ -10097,7 +10141,7 @@ function renderLeave(filterName){
       <td class="lv-td">${ty?`<span class="lv-type ${_typeCls(ty)}">${_typeShort(ty)}</span>`:'<span class="lv-dash">—</span>'}</td>
       <td class="lv-td lv-td-sm">${fmtLeaveDate(r.from||r.from_date)}</td>
       <td class="lv-td lv-td-sm">${fmtLeaveDate(r.to||r.to_date)}</td>
-      <td class="lv-td lv-td-num">${days}</td>
+      <td class="lv-td lv-td-num">${daysHtml}</td>
       <td class="lv-td"><span class="lv-status lv-status-${r.status}">${r.status}</span></td>
       <td class="lv-td lv-td-act">
         ${showActions?`<div class="lv-actions">
@@ -12242,6 +12286,51 @@ async function refreshMorningBoard(){
   }catch(e){ console.warn('coverage', e); }
 
   const anyone = lateList.length||notInList.length||inNow.length||leaveList.length||doneList.length;
+
+  // ── By team ── one column per team, in the same order as the Teams list.
+  // Inside a team, the people who need attention come first (late, not in),
+  // then on shift, finished, and on leave last.
+  const teamColumns = () => {
+    const rows = [
+      ...lateList.map(o=>({o,k:'warn', r:0, meta:`late ${o.actual}`})),
+      ...notInList.map(o=>({o,k:'miss', r:1, meta:o.rostered?`due ${o.start}`:'not rostered'})),
+      ...inNow.map(o=>({o,k:'ok',   r:2, meta:o.at})),
+      ...doneList.map(o=>({o,k:'done', r:3, meta:`out ${o.at}`})),
+      ...leaveList.map(o=>({o,k:'leave',r:4, meta:'leave'}))
+    ];
+    const norm = t => String(t||'').trim().toLowerCase();
+    const order = (typeof teams!=='undefined' && Array.isArray(teams)) ? teams : [];
+    const groups = new Map();
+    rows.forEach(x=>{
+      const key = norm(x.o.s.team) || '\u0000none';
+      if(!groups.has(key)) groups.set(key, {name:(String(x.o.s.team||'').trim()||'No team'), rows:[]});
+      groups.get(key).rows.push(x);
+    });
+    const rank = key => { const i = order.findIndex(t=>norm(t)===key); return i<0 ? (key==='\u0000none'?1e6:1e5) : i; };
+    return [...groups.entries()]
+      .sort((a,b)=> rank(a[0])-rank(b[0]) || a[1].name.localeCompare(b[1].name))
+      .map(([key,g])=>{
+        const named = order.find(t=>norm(t)===key);
+        if(named) g.name = named;
+        g.rows.sort((a,b)=> a.r-b.r || a.o.s.first.localeCompare(b.o.s.first));
+        const nLate = g.rows.filter(x=>x.k==='warn').length, nMiss = g.rows.filter(x=>x.k==='miss').length;
+        const flag = [nMiss?`${nMiss} not in`:'', nLate?`${nLate} late`:''].filter(Boolean).join(' · ');
+        const flagCls = nMiss ? '' : ' w';
+        return `<div class="mb-col"><div class="mb-lbl team"><span class="mb-tn">${g.name}</span><span class="mb-tc">${g.rows.length}</span></div>`+
+          (flag?`<div class="mb-tflag${flagCls}">${flag}</div>`:'')+
+          g.rows.map(x=>`<div class="mb-person${x.k==='leave'?' is-leave':''}"><i class="mb-dot ${x.k}"></i><span>${x.o.s.first} ${x.o.s.last.charAt(0)}.</span><s class="mb-meta ${x.k}">${x.meta}</s></div>`).join('')+
+          `</div>`;
+      }).join('');
+  };
+
+  const paint = () => {
+  let view = 'team';
+  try{ view = localStorage.getItem('so_board_view') || 'team'; }catch(e){}
+  if(_tlMine) view = 'status';   // a lead only ever sees their own team, so there's nothing to group
+  const seg = _tlMine ? '' : `<div class="mb-seg" role="group" aria-label="Group the board by">
+        <button type="button" class="${view==='team'?'on':''}" onclick="setBoardView('team')">By team</button>
+        <button type="button" class="${view==='status'?'on':''}" onclick="setBoardView('status')">By status</button>
+      </div>`;
   host.innerHTML = `
     <div class="mb-head">
       <span class="mb-title">${dateLbl}</span>
@@ -12250,15 +12339,25 @@ async function refreshMorningBoard(){
       ${chip('miss','not in',notInList.length)}
       ${chip('done','finished',doneList.length)}
       ${chip('leave','leave',leaveList.length)}
-      <button class="mb-refresh" onclick="refreshMorningBoard()" title="Refresh now">↻</button>
+      ${seg}
+      <button class="mb-refresh" onclick="refreshMorningBoard()" title="Refresh now"${seg?'':' style="margin-left:auto"'}>↻</button>
     </div>
-    ${anyone?`<div class="mb-lists">
+    ${anyone && view==='team' ? `<div class="mb-lists">${teamColumns()}</div>` : anyone?`<div class="mb-lists">
       ${lateList.length?`<div class="mb-col"><div class="mb-lbl warn">Late</div>${lateList.map(o=>person(o,`${o.actual} · due ${o.start}`)).join('')}</div>`:''}
       ${notInList.length?`<div class="mb-col"><div class="mb-lbl miss">Not clocked in</div>${notInList.map(o=>person(o, o.rostered?`due ${o.start}`:'not rostered')).join('')}</div>`:''}
       ${inNow.length?`<div class="mb-col"><div class="mb-lbl ok">On shift</div>${inNow.map(o=>person(o,o.at)).join('')}</div>`:''}
       ${doneList.length?`<div class="mb-col"><div class="mb-lbl done">Finished</div>${doneList.map(o=>person(o,`out ${o.at}`)).join('')}</div>`:''}
       ${leaveList.length?`<div class="mb-col"><div class="mb-lbl leave">On leave</div>${leaveList.map(o=>person(o)).join('')}</div>`:''}
     </div>`:`<div class="mb-empty">Nothing to report today.</div>`}`;
+  };
+  window._mbPaint = paint;
+  paint();
+}
+
+// Switch the board between "By team" and "By status" without re-fetching.
+function setBoardView(v){
+  try{ localStorage.setItem('so_board_view', v==='status'?'status':'team'); }catch(e){}
+  if(typeof window._mbPaint==='function') window._mbPaint(); else refreshMorningBoard();
 }
 
 function startMorningBoard(){
