@@ -2477,7 +2477,6 @@ table tbody tr:hover,.pp-table tbody tr:hover{ background:color-mix(in srgb,var(
 #tlPill::before{ background:var(--accent); box-shadow:0 0 0 3px var(--accent-dim); }
 #__gate{ background:#0e1411 !important; font-family:var(--sans) !important; }
 #__gate > div{ background:#151c18 !important; border-color:#26312b !important; border-radius:20px !important; }
-#__gatePw{ background:#0e1411 !important; border-color:#35433b !important; }
 #soBootLoading{ background:var(--bg) !important; }
 
 /* ── 12. Phones ───────────────────────────────────────────── */
@@ -2904,12 +2903,7 @@ body.avail-editing #availGrid .avail-chip.av2:hover{ background:color-mix(in srg
     <div id="__gateLock" style="width:64px;height:64px;margin:0 auto 18px;border-radius:18px;cursor:default;user-select:none;background:linear-gradient(180deg,rgba(255,255,255,.22),rgba(255,255,255,0) 55%),#5b6cf0;box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 6px 18px rgba(60,70,200,.35);display:flex;align-items:center;justify-content:center;"><svg width="44" height="44" viewBox="0 0 28 28" aria-hidden="true" focusable="false"><rect x="6" y="7.5" width="11" height="3.6" rx="1.8" fill="#fff"/><rect x="10" y="12.2" width="12" height="3.6" rx="1.8" fill="#fff" fill-opacity=".8"/><rect x="7.5" y="16.9" width="9" height="3.6" rx="1.8" fill="#fff" fill-opacity=".6"/></svg></div>
     <div style="font-size:21px;font-weight:650;letter-spacing:-.02em;color:#fff;margin-bottom:8px;">Shift<span style="font-weight:500;color:#8b94a8;">Ops</span></div>
     <div id="__gateMsg" style="font-size:13.5px;color:#8b94a8;line-height:1.5;">Checking access…</div>
-    <div id="__gatePwWrap" style="display:none;margin-top:18px;">
-      <input id="__gatePw" type="password" inputmode="numeric" autocomplete="off" placeholder="Passcode"
-        style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid #2e3344;background:#151824;color:#fff;font-size:14px;text-align:center;letter-spacing:.3em;outline:none;" />
-      <div id="__gatePwErr" style="font-size:11.5px;color:#e06b6b;margin-top:8px;min-height:14px;"></div>
     </div>
-  </div>
 </div>
 <script>
 (function(){
@@ -2919,28 +2913,6 @@ body.avail-editing #availGrid .avail-chip.av2:hover{ background:color-mix(in srg
   var KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpjZmdsZHFyZGJma2diaXhzemRzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1Nzc3NzEsImV4cCI6MjA5MDE1Mzc3MX0.Wj8cCpnlsoZOPj5sKWeEdfvgjG4Nc-UuTTYgbcrPfeI';
   function fail(m){var el=document.getElementById('__gateMsg');if(el){el.innerHTML=m+'<br><br><span style=\"color:#6b7585;font-size:12px;\">Open this app from the Nodes page in Nexus.</span>';}}
   function pass(){var g=document.getElementById('__gate');if(g)g.remove();}
-  // ── Hidden test bypass: triple-click the lock to reveal a passcode box.
-  //    Correct code unlocks as a test user; gate otherwise stays fully live. ──
-  (function(){
-    var TEST_CODE='2006', clicks=0, timer=null;
-    function reveal(){var w=document.getElementById('__gatePwWrap');if(!w)return;w.style.display='block';var pw=document.getElementById('__gatePw');if(pw)pw.focus();}
-    function tryCode(){
-      var pw=document.getElementById('__gatePw'), err=document.getElementById('__gatePwErr');
-      if(!pw)return;
-      if(pw.value===TEST_CODE){
-        try{sessionStorage.setItem('so_me','Test Staff');}catch(e){}
-        try{if(typeof _renderWhoami==='function')_renderWhoami();}catch(e){}
-        try{sessionStorage.setItem('ngate_'+APP,'1');}catch(e){}
-        pass();
-      }else{ if(err)err.textContent='Incorrect passcode.'; pw.value=''; pw.focus(); }
-    }
-    document.addEventListener('DOMContentLoaded',function(){
-      var lock=document.getElementById('__gateLock');
-      if(lock){lock.addEventListener('click',function(){clicks++;clearTimeout(timer);timer=setTimeout(function(){clicks=0;},800);if(clicks>=3){clicks=0;reveal();}});}
-      var pw=document.getElementById('__gatePw');
-      if(pw){pw.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();tryCode();}});}
-    });
-  })();
   async function hmacHex(secret,msg){var enc=new TextEncoder();var k=await crypto.subtle.importKey('raw',enc.encode(secret),{name:'HMAC',hash:'SHA-256'},false,['verify','sign']);var s=await crypto.subtle.sign('HMAC',k,enc.encode(msg));return Array.from(new Uint8Array(s)).map(x=>x.toString(16).padStart(2,'0')).join('');}
   // session unlock — once verified, stay in for this tab session
   if(sessionStorage.getItem('ngate_'+APP)==='1'){pass();return;}
@@ -2958,20 +2930,19 @@ body.avail-editing #availGrid .avail-chip.av2:hover{ background:color-mix(in srg
       var payload=JSON.parse(decodeURIComponent(escape(atob(b64))));
       if(payload.app!==APP){fail('Token is for a different app.');return;}
       if(Date.now()>payload.exp){fail('Token expired — relaunch from Nexus.');return;}
-      // verify the person is still on the access list (server-side truth).
-      // Use the session token Nexus passed in the payload, not the anon key:
-      // app_access is RLS-locked to authenticated, and this gate script runs
-      // before the fetch interceptor exists, so nothing would swap it for us.
-      var name=payload.name||'';
+      // Verify access SERVER-SIDE from the caller's own session. The name in the launch
+      // token is never trusted: identity, admin status and app access are all derived
+      // from the Supabase JWT by RPC, so a forged token cannot name someone else, and a
+      // token with no valid session is rejected (no anon-key fallback).
       var _at=payload.sb_at||'';
-      async function _checkAccess(tok){
-        return fetch(SB+'/rest/v1/app_access?app=eq.'+APP+'&staff_name=eq.'+encodeURIComponent(name)+'&select=staff_name',
-          {headers:{apikey:KEY,Authorization:'Bearer '+(tok||KEY)}});
+      if(!_at){fail('No active session. Go back to Nexus, refresh, and launch again.');return;}
+      async function _rpc(fn,body,tok){
+        return fetch(SB+'/rest/v1/rpc/'+fn,{method:'POST',
+          headers:{apikey:KEY,Authorization:'Bearer '+tok,'Content-Type':'application/json'},
+          body:JSON.stringify(body||{})});
       }
-      var r=await _checkAccess(_at);
-      // A stale access token looks exactly like "no access" from here, which is
-      // how idle staff got locked out. Spend the refresh token and retry before
-      // telling anyone they've lost access.
+      var r=await _rpc('has_app_access',{p_app:APP},_at);
+      // Stale access token → spend the refresh token and retry before reporting a lock-out.
       if((r.status===401||r.status===403) && payload.sb_rt){
         try{
           var rf=await fetch(SB+'/auth/v1/token?grant_type=refresh_token',{
@@ -2985,7 +2956,7 @@ body.avail-editing #availGrid .avail-chip.av2:hover{ background:color-mix(in srg
               _at=s.access_token;
               payload.sb_at=s.access_token;
               if(s.refresh_token) payload.sb_rt=s.refresh_token;
-              r=await _checkAccess(_at);
+              r=await _rpc('has_app_access',{p_app:APP},_at);
             }
           }
         }catch(e){ console.warn('[gate] refresh failed', e); }
@@ -2994,9 +2965,14 @@ body.avail-editing #availGrid .avail-chip.av2:hover{ background:color-mix(in srg
         fail('Your session expired. Go back to Nexus, refresh, and launch again.');
         return;
       }
-      var rows=r.ok?await r.json():[];
-      if(!rows.length){fail('You no longer have access to this app.');return;}
-      try{ sessionStorage.setItem('so_me', name); sessionStorage.setItem('so_is_admin', payload.is_admin ? '1' : '0'); }catch(e){}
+      var allowed=r.ok?await r.json():false;
+      if(allowed!==true){fail('You no longer have access to this app.');return;}
+      var nr=await _rpc('current_staff_name',{},_at);
+      var name=nr.ok?await nr.json():null;
+      if(!name){fail('Could not verify your identity.');return;}
+      var ar=await _rpc('is_current_user_hub_admin',{},_at);
+      var isAdmin=ar.ok?(await ar.json())===true:false;
+      try{ sessionStorage.setItem('so_me', name); sessionStorage.setItem('so_is_admin', isAdmin ? '1' : '0'); }catch(e){}
       try{ if(typeof _renderWhoami==='function') _renderWhoami(); }catch(e){}
       // Capture Nexus' Supabase session so ShiftOps writes as an authenticated
       // user (RLS-locked tables reject the anon key). Stash for the tab session.

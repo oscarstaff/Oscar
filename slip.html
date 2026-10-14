@@ -223,15 +223,21 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 
       var payload=JSON.parse(decodeURIComponent(escape(atob(b64))));
       if(payload.app!==APP){fail('Token is for a different app.');return;}
       if(Date.now()>payload.exp){fail('Token expired — relaunch from Nexus.');return;}
-      // verify the person is still on the access list (server-side truth)
-      var name=payload.name||'';
-      var r=await fetch(SB+'/rest/v1/app_access?app=eq.'+APP+'&staff_name=eq.'+encodeURIComponent(name)+'&select=staff_name',{headers:{apikey:KEY,Authorization:'Bearer '+KEY}});
-      var rows=r.ok?await r.json():[];
-      if(!rows.length){fail('You no longer have access to this app.');return;}
+      var _at=payload.sb_at||'';
+      if(!_at){fail('No active session. Go back to Nexus, refresh, and launch again.');return;}
+      // Server-side verification from the caller's OWN session: the name in the launch token is
+      // never trusted, and there is no anon-key fallback. A forged token cannot pass this.
+      async function _rpc(fn){return fetch(SB+'/rest/v1/rpc/'+fn,{method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+_at,'Content-Type':'application/json'},body:fn==='has_app_access'?JSON.stringify({p_app:APP}):'{}'});}
+      var r=await _rpc('has_app_access');
+      if(r.status===401||r.status===403){fail('Your session expired. Go back to Nexus, refresh, and launch again.');return;}
+      if(!(r.ok&&(await r.json())===true)){fail('You no longer have access to this app.');return;}
+      var nr=await _rpc('current_staff_name'); var name=nr.ok?await nr.json():null;
+      if(!name){fail('Could not verify your identity.');return;}
+      var ar=await _rpc('is_current_user_hub_admin'); var isAdmin=ar.ok?(await ar.json())===true:false;
       // success — strip token from URL + unlock for session
       sessionStorage.setItem('ngate_'+APP,'1');
       try{ if(name){ sessionStorage.setItem('slip_user',name); window.__slipUser=name; } }catch(e){}
-      try{ if(payload.sb_at) sessionStorage.setItem('slip_sb_at',payload.sb_at); sessionStorage.setItem('slip_is_admin',payload.is_admin===true?'1':'0'); }catch(e){}
+      try{ sessionStorage.setItem('slip_sb_at',_at); sessionStorage.setItem('slip_is_admin',isAdmin?'1':'0'); }catch(e){}
       try{ window.dispatchEvent(new Event('slip-unlocked')); }catch(e){}
       try{history.replaceState(null,'',location.pathname+location.search);}catch(e){}
       pass();

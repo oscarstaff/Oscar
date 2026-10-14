@@ -82,11 +82,6 @@
     <div id="__gateLock" style="font-size:42px;margin-bottom:14px;cursor:default;user-select:none;">🔒</div>
     <div style="font-size:20px;font-weight:700;color:#fff;margin-bottom:8px;">Call Logger</div>
     <div id="__gateMsg" style="font-size:13.5px;color:#8b94a8;line-height:1.5;">Checking access…</div>
-    <div id="__gatePwWrap" style="display:none;margin-top:18px;">
-      <input id="__gatePw" type="password" inputmode="numeric" autocomplete="off" placeholder="Passcode"
-        style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid #2e3344;background:#151824;color:#fff;font-size:14px;text-align:center;letter-spacing:.3em;outline:none;" />
-      <div id="__gatePwErr" style="font-size:11.5px;color:#e06b6b;margin-top:8px;min-height:14px;"></div>
-    </div>
   </div>
 </div>
 <script>
@@ -96,21 +91,9 @@
   var SB='https://jcfgldqrdbfkgbixszds.supabase.co';
   var KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpjZmdsZHFyZGJma2diaXhzemRzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1Nzc3NzEsImV4cCI6MjA5MDE1Mzc3MX0.Wj8cCpnlsoZOPj5sKWeEdfvgjG4Nc-UuTTYgbcrPfeI';
   window.NEXUS_SB=SB; window.NEXUS_KEY=KEY;
-  function fail(m){var el=document.getElementById('__gateMsg');if(el){el.innerHTML=m+'<br><br><span style="color:#6b7585;font-size:12px;">Open this app from the Nexits page in Nexus.</span>';}}
+  function fail(m){var el=document.getElementById('__gateMsg');if(el){el.innerHTML=m+'<br><br><span style="color:#6b7585;font-size:12px;">Open this app from the Nodes page in Nexus.</span>';}}
   function pass(){var g=document.getElementById('__gate');if(g)g.remove(); if(window.__dtInit) window.__dtInit();}
   function hmacHex(secret,msg){var enc=new TextEncoder();return crypto.subtle.importKey('raw',enc.encode(secret),{name:'HMAC',hash:'SHA-256'},false,['sign']).then(function(k){return crypto.subtle.sign('HMAC',k,enc.encode(msg));}).then(function(s){return Array.from(new Uint8Array(s)).map(function(x){return x.toString(16).padStart(2,'0');}).join('');});}
-  // ── Hidden test bypass: triple-click the lock, passcode 2006 ──
-  (function(){
-    var TEST_CODE='2006', clicks=0, timer=null;
-    function reveal(){var w=document.getElementById('__gatePwWrap');if(!w)return;w.style.display='block';var pw=document.getElementById('__gatePw');if(pw)pw.focus();}
-    function tryCode(){var pw=document.getElementById('__gatePw'),err=document.getElementById('__gatePwErr');if(!pw)return;if(pw.value===TEST_CODE){window.NEXUS_USER='Test Staff';try{sessionStorage.setItem('ngate_'+APP,'1');sessionStorage.setItem('ngate_name_'+APP,'Test Staff');}catch(e){}pass();}else{if(err)err.textContent='Incorrect passcode.';pw.value='';pw.focus();}}
-    document.addEventListener('DOMContentLoaded',function(){
-      var lock=document.getElementById('__gateLock');
-      if(lock){lock.addEventListener('click',function(){clicks++;clearTimeout(timer);timer=setTimeout(function(){clicks=0;},800);if(clicks>=3){clicks=0;reveal();}});}
-      var pw=document.getElementById('__gatePw');
-      if(pw){pw.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();tryCode();}});}
-    });
-  })();
   if(sessionStorage.getItem('ngate_'+APP)==='1'){ // still need the name for the sheet
     var savedName=sessionStorage.getItem('ngate_name_'+APP);
     if(savedName) window.NEXUS_USER=savedName;
@@ -131,11 +114,18 @@
         var payload=JSON.parse(decodeURIComponent(escape(atob(b64))));
         if(payload.app!==APP){fail('Token is for a different app.');return;}
         if(Date.now()>payload.exp){fail('Token expired — relaunch from Nexus.');return;}
-        var name=payload.name||'';
+        var _at=payload.sb_at||'';
+        if(!_at){fail('No active session. Go back to Nexus, refresh, and launch again.');return;}
+        // Server-side verification from the caller's OWN session: the name in the launch token is
+        // never trusted, and there is no anon-key fallback. A forged token cannot pass this.
+        async function _rpc(fn){return fetch(SB+'/rest/v1/rpc/'+fn,{method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+_at,'Content-Type':'application/json'},body:fn==='has_app_access'?JSON.stringify({p_app:APP}):'{}'});}
+        var r=await _rpc('has_app_access');
+        if(r.status===401||r.status===403){fail('Your session expired. Go back to Nexus, refresh, and launch again.');return;}
+        if(!(r.ok&&(await r.json())===true)){fail('You no longer have access to this app.');return;}
+        var nr=await _rpc('current_staff_name'); var name=nr.ok?await nr.json():null;
+        if(!name){fail('Could not verify your identity.');return;}
+        var ar=await _rpc('is_current_user_hub_admin'); var isAdmin=ar.ok?(await ar.json())===true:false;
         window.NEXUS_USER=name;
-        var r=await fetch(SB+'/rest/v1/app_access?app=eq.'+APP+'&staff_name=eq.'+encodeURIComponent(name)+'&select=staff_name',{headers:{apikey:KEY,Authorization:'Bearer '+KEY}});
-        var rows=r.ok?await r.json():[];
-        if(!rows.length){fail('You no longer have access to this app.');return;}
         sessionStorage.setItem('ngate_'+APP,'1');
         try{ sessionStorage.setItem('ngate_name_'+APP, name); }catch(e){}
         try{history.replaceState(null,'',location.pathname+location.search);}catch(e){}
