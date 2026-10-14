@@ -11782,13 +11782,25 @@ async function pollForNewActivity(){
     if(!_lastQuizSeen){
       try{
         const q = await sbGet('quiz_access','?staff_name=eq.'+encodeURIComponent(me)+'&order=granted_at.desc&limit=1');
-        _lastQuizSeen = (q && q[0] && q[0].granted_at) ? new Date(q[0].granted_at).getTime() : Date.now();
+        // +1ms: Postgres stores microseconds but JS Dates only keep milliseconds. Without the
+        // bump, "granted_at > since" matches the very same row again on every poll (the
+        // truncated value is always slightly smaller), re-creating a notification the user cleared.
+        _lastQuizSeen = (q && q[0] && q[0].granted_at) ? new Date(q[0].granted_at).getTime() + 1 : Date.now();
       }catch(e){ _lastQuizSeen = Date.now(); }
     } else {
       try{
         const since = new Date(_lastQuizSeen).toISOString();
-        const newQ = await sbGet('quiz_access','?staff_name=eq.'+encodeURIComponent(me)+
+        let newQ = await sbGet('quiz_access','?staff_name=eq.'+encodeURIComponent(me)+
                                  '&granted_at=gt.'+encodeURIComponent(since)+'&order=granted_at.asc&limit=5') || [];
+        // Belt and braces: remember which grants we've already announced (survives reloads and "Clear").
+        const _qsKey = 'quiz_notified_'+me;
+        let _qSeen = [];
+        try{ _qSeen = JSON.parse(localStorage.getItem(_qsKey)||'[]'); }catch(e){}
+        newQ = newQ.filter(function(q){ return _qSeen.indexOf(q.id) < 0 && q.granted_by !== me; });
+        if(newQ.length){
+          newQ.forEach(function(q){ _qSeen.push(q.id); });
+          try{ localStorage.setItem(_qsKey, JSON.stringify(_qSeen.slice(-200))); }catch(e){}
+        }
         // Resolve friendly quiz titles once if there's anything new.
         let titles = {};
         if(newQ.length){
@@ -11798,7 +11810,7 @@ async function pollForNewActivity(){
           }catch(e){}
         }
         newQ.forEach(function(q){
-          _lastQuizSeen = Math.max(_lastQuizSeen, new Date(q.granted_at).getTime());
+          _lastQuizSeen = Math.max(_lastQuizSeen, new Date(q.granted_at).getTime() + 1);
           const nice = titles[String(q.quiz_id)] || 'A new quiz';
           NotifManager.push({
             id: 'quiz-'+q.id,
