@@ -5097,9 +5097,13 @@ html .notif-drop .notif-drop-actions{ background:none !important; border:0 !impo
         <div id="availFormArea">
           <button type="button" class="av-back" id="availBack" onclick="availBackToOverview()"><svg width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 1.5L2 7.5l5.5 6"/></svg>Back</button>
           <div class="card roster-card" id="availEffectiveCard" style="margin-bottom:12px;">
-            <div class="roster-card-hd"><div class="roster-card-title">Starts from</div></div>
-            <div style="font-size:12.5px;color:var(--ui-ink-3,#64748b);line-height:1.5;margin:2px 0 12px;">
-              Your new hours begin on the week you pick. Only fortnight starts can be chosen, because the other weeks are already on the roster. Until then your current hours stay live.
+            <div class="roster-card-hd"><div class="roster-card-title">When does this apply?</div></div>
+            <div id="availModeSeg" style="display:none;gap:6px;margin:4px 0 10px;">
+              <button type="button" id="availModeFrom" class="btn btn-outline" onclick="setAvailMode('from')" style="padding:8px 12px;font-size:12.5px;flex:1;">From week starting</button>
+              <button type="button" id="availModeOne" class="btn btn-outline" onclick="setAvailMode('oneoff')" style="padding:8px 12px;font-size:12.5px;flex:1;">One-off: for week starting</button>
+            </div>
+            <div id="availModeNote" style="font-size:12.5px;color:var(--ui-ink-3,#64748b);line-height:1.5;margin:2px 0 12px;">
+              Your new hours begin on the Monday you pick and stay until you change them again. Until then your current hours stay live.
             </div>
             <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
               <button type="button" id="availEffBtn" onclick="toggleEffCal()" class="btn btn-outline" style="padding:9px 14px;font-size:13px;display:flex;align-items:center;gap:8px;">
@@ -5111,6 +5115,10 @@ html .notif-drop .notif-drop-actions{ background:none !important; border:0 !impo
             <div id="availEffCal" style="display:none;margin-top:12px;background:var(--card-bg,var(--ui-surface,#fff));border:1px solid var(--ui-line,#e2e8f0);border-radius:12px;padding:14px;max-width:340px;box-shadow:0 8px 30px rgba(0,0,0,.10);"></div>
           </div>
 
+          <div class="card roster-card" id="availOneoffCard" style="display:none;margin-bottom:12px;">
+            <div class="roster-card-hd"><div class="roster-card-title">Your one-off weeks</div></div>
+            <div id="availOneoffList" style="font-size:13px;"></div>
+          </div>
           <div class="card roster-card">
             <div class="roster-card-hd"><div class="roster-card-title">Your weekly hours</div></div>
             <div id="availForm"></div>
@@ -7881,6 +7889,87 @@ function _availCutoffFloor(now){
   return (now < friday) ? nextMon : new Date(d.getFullYear(), d.getMonth(), d.getDate()-dow+14);
 }
 
+
+// ── ONE-OFF WEEK AVAILABILITY ("For week starting") ─────────────────
+// A one-off replaces the whole week for one Monday; the standing pattern
+// ("From week starting") is untouched and resumes afterwards. Hidden until
+// the availability_oneoffs table exists.
+let _availMode='from', _oneoffOK=false, _oneoffRows=[];
+function setAvailMode(m){
+  _availMode=(m==='oneoff' && _oneoffOK)?'oneoff':'from';
+  const a=document.getElementById('availModeFrom'), b=document.getElementById('availModeOne');
+  if(a&&b){
+    a.classList.toggle('btn-green',_availMode==='from'); a.classList.toggle('btn-outline',_availMode!=='from');
+    b.classList.toggle('btn-green',_availMode==='oneoff'); b.classList.toggle('btn-outline',_availMode!=='oneoff');
+  }
+  const n=document.getElementById('availModeNote');
+  if(n) n.textContent=_availMode==='oneoff'
+    ? 'These hours apply to the one week you pick only. Afterwards your usual hours carry on automatically.'
+    : 'Your new hours begin on the Monday you pick and stay until you change them again. Until then your current hours stay live.';
+  const bt=document.getElementById('availBtn');
+  if(bt) bt.textContent=_availMode==='oneoff'?'Save one-off week':'Save availability';
+}
+async function loadOneoffs(){
+  try{
+    const r=await fetch(SB+"/rest/v1/availability_oneoffs?staff_name=eq."+encodeURIComponent(me)+"&select=week_start,availability&order=week_start.asc",
+      {headers:{apikey:KEY,Authorization:"Bearer "+_sbBearer()}});
+    if(!r.ok){ _oneoffOK=false; }
+    else{ _oneoffRows=await r.json(); _oneoffOK=true; }
+  }catch(e){ _oneoffOK=false; }
+  const seg=document.getElementById('availModeSeg');
+  if(seg) seg.style.display=_oneoffOK?'flex':'none';
+  if(!_oneoffOK) _availMode='from';
+  setAvailMode(_availMode);
+  renderOneoffs();
+}
+function renderOneoffs(){
+  const card=document.getElementById('availOneoffCard'), el=document.getElementById('availOneoffList');
+  if(!card||!el) return;
+  const today=_effFmtIso(new Date());
+  const rows=(_oneoffRows||[]).filter(function(r){ return r.week_start>=_effFmtIso(new Date(new Date().getTime()-6*864e5)); });
+  card.style.display=(_oneoffOK&&rows.length)?'block':'none';
+  const floor=_effFmtIso(_availCutoffFloor());
+  el.innerHTML=rows.map(function(r){
+    const d=new Date(r.week_start+'T00:00:00');
+    const locked=r.week_start<floor;
+    return '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--ui-line,#e2e8f0);">'+
+      '<span>Week of <b>'+_effFmtNice(d)+'</b></span>'+
+      (locked?'<span style="font-size:11.5px;color:var(--ui-ink-4,#94a3b8);">locked</span>'
+             :'<button type="button" class="btn btn-outline" style="padding:4px 10px;font-size:12px;" onclick="cancelOneoff(\''+r.week_start+'\')">Cancel</button>')+
+      '</div>';
+  }).join('');
+}
+async function cancelOneoff(ws){
+  if(!confirm('Cancel your one-off availability for that week? Your usual hours will apply.')) return;
+  try{
+    const r=await fetch(SB+"/rest/v1/availability_oneoffs?staff_name=eq."+encodeURIComponent(me)+"&week_start=eq."+ws,
+      {method:'DELETE',headers:{apikey:KEY,Authorization:"Bearer "+_sbBearer(),Prefer:'return=representation'}});
+    const out=await r.json().catch(function(){return null;});
+    if(!r.ok||!Array.isArray(out)||!out.length) throw new Error('x');
+  }catch(e){ alert('Could not cancel. Please try again.'); return; }
+  await loadOneoffs();
+}
+async function _saveOneoff(avail,err,btn){
+  let ws=_effChosen;
+  const cd=ws?new Date(ws+'T00:00:00'):null;
+  if(!cd || (cd.getDay()+6)%7!==0 || cd<_availCutoffFloor()){
+    err.textContent='Pick a Monday that is still open for availability.'; err.classList.add('show'); return;
+  }
+  btn.disabled=true; btn.innerHTML='<span class="sp"></span> Saving...';
+  try{
+    const r=await fetch(SB+"/rest/v1/availability_oneoffs?on_conflict=staff_name,week_start",{
+      method:'POST',
+      headers:{apikey:KEY,Authorization:"Bearer "+_sbBearer(),'Content-Type':'application/json',Prefer:'resolution=merge-duplicates,return=representation'},
+      body:JSON.stringify({staff_name:me,week_start:ws,availability:avail,updated_at:new Date().toISOString()})
+    });
+    const out=await r.json().catch(function(){return null;});
+    if(!r.ok||!Array.isArray(out)||!out.length) throw new Error('save '+r.status);
+    await loadOneoffs();
+    if(typeof showToast==='function') showToast('One-off saved for week of '+_effFmtNice(cd));
+    else alert('One-off saved for week of '+_effFmtNice(cd));
+  }catch(e){ err.textContent='Failed to save the one-off. Please check your connection.'; err.classList.add('show'); }
+  finally{ btn.disabled=false; setAvailMode(_availMode); }
+}
 function initEffDate(){
   // Default to the soonest valid week; staff can change it.
   const d=_effSoonestValid();
@@ -7996,7 +8085,7 @@ function buildAvailForm(){
     el.appendChild(wrap);
   });
   fBuilt=true;
-  initEffDate();
+  initEffDate(); loadOneoffs();
   loadExistingAvail();
 }
 
@@ -8491,6 +8580,7 @@ async function submitAvail(){
       avail[i]={type:"custom",start:"09:00",end:"16:00"};
     }else avail[i]={type:s.type};
   }
+  if(_availMode==='oneoff'){ return _saveOneoff(avail,err,document.getElementById("availBtn")); }
   // Always ongoing — the date-range option was removed.
   const isOngoing=true, validFrom=null, validUntil=null;
 
