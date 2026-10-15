@@ -12341,7 +12341,7 @@ function startMorningBoard(){
   if(!host || !host.offsetParent) return;   // only when the roster tab is visible
   refreshMorningBoard();
   if(_boardTimer) clearInterval(_boardTimer);
-  _boardTimer = setInterval(refreshMorningBoard, 120000); // refresh every 2 min
+  _boardTimer = setInterval(function(){ if(!document.hidden) refreshMorningBoard(); }, 120000); // every 2 min, only while visible
 }
 function stopMorningBoard(){
   if(_boardTimer){ clearInterval(_boardTimer); _boardTimer=null; }   // don't poll off-tab
@@ -12454,7 +12454,7 @@ async function soEarlyAckAll(){
   if(!ok && typeof showToast==='function') showToast('Couldn\u2019t acknowledge — your session may have expired');
 }
 setTimeout(soEarlyLoad, 1500);
-setInterval(soEarlyLoad, 2*60*1000);
+setInterval(function(){ if(!document.hidden) soEarlyLoad(); }, 2*60*1000);   // skip while the tab is hidden (egress)
 document.addEventListener('visibilitychange', function(){ if(!document.hidden) soEarlyLoad(); });
 </script>
 

@@ -11762,6 +11762,13 @@ let _pollBaselined = false;
 
 async function pollForNewActivity(){
   if(!me) return;
+  // Hidden tabs still check (that's how background notifications arrive) but only every 5 min,
+  // not every minute: ~30 people leaving tabs open all day was a big share of Supabase egress.
+  if(document.hidden){
+    const _t = Date.now();
+    if(_t - (window._pollLastHidden || 0) < 5*60*1000) return;
+    window._pollLastHidden = _t;
+  }
   console.log('[poll] tick at', new Date().toISOString());
   if(typeof showSystemNotification !== 'function') return;
   // First call — just establish baseline, don't fire notifs
@@ -24803,6 +24810,7 @@ setTimeout(nxEarlyFlushQueue, 6000);
 
 /* ── Admin side: new notices go into the hub admin's bell ─────────── */
 async function nxEarlyAdminPoll(){
+  if(document.hidden) return;
   if(typeof myIsAdmin==='undefined' || !myIsAdmin) return;
   if(typeof NotifManager==='undefined' || !NotifManager.push) return;
   const since=new Date(Date.now()-3*864e5).toISOString();
