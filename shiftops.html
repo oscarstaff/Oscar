@@ -8136,17 +8136,41 @@ async function _epLoadCalls(reset){
   }catch(e){ const b=document.getElementById('empProfBody'); if(reset&&b) b.innerHTML=_epEmpty('Couldn\'t load call logs.'); }
 }
 
+// "Added by …" / "Requested … · Approved by …" line under each leave, so every leave shows who put it there.
+function _epLeaveAudit(r,full){
+  const when=function(iso){ if(!iso) return ''; try{ return new Date(iso).toLocaleString('en-AU',{timeZone:'Australia/Sydney',day:'numeric',month:'short',hour:'numeric',minute:'2-digit'}); }catch(e){ return ''; } };
+  const strip=function(n){ return String(n||'').replace(/\s*\(added in profile\)\s*$/i,'').trim(); };
+  let line='';
+  const adminAdded=(r.source==='ShiftOps'||r.source==='Admin'||/added in profile/i.test(r.resolved_by||''));
+  if(adminAdded){
+    let by=(r.created_by&&r.created_by!==full)?r.created_by:strip(r.resolved_by);
+    if(!by||/^admin(\s*\(shiftops\))?$/i.test(by)) by='an admin (name not recorded)';
+    line='Added by '+by+(when(r.resolved_at||r.submitted_at)?' · '+when(r.resolved_at||r.submitted_at):'');
+  }else{
+    line='Requested by '+full+(when(r.submitted_at)?' · '+when(r.submitted_at):'');
+    if(r.resolved_by&&(r.status==='approved'||r.status==='declined')) line+=' · '+(r.status==='approved'?'Approved':'Declined')+' by '+strip(r.resolved_by);
+  }
+  return '<div style="font-size:10.5px;color:var(--text-dim);opacity:.8;margin-top:2px;">'+_cdEsc(line)+'</div>';
+}
+
 async function _epLoadLeave(reset){
   const s=_epStaff, full=(s.first+' '+s.last).trim();
   const off=_epPage.leave*_EP_PAGE;
   try{
-    const rows=await _cdGet('leave_submissions?staff_name=eq.'+encodeURIComponent(full)+'&order=from_date.desc&limit='+_EP_PAGE+'&offset='+off+'&select=from_date,to_date,reason,status,reason_type');
+    // created_by exists once security_08 is applied; until then ask without it so the list never breaks.
+    const _lvBase='leave_submissions?staff_name=eq.'+encodeURIComponent(full)+'&order=from_date.desc&limit='+_EP_PAGE+'&offset='+off+'&select=from_date,to_date,reason,status,reason_type,source,resolved_by,resolved_at,submitted_at';
+    let rows=null;
+    try{
+      const r1=await fetch(SUPABASE_URL+'/rest/v1/'+_lvBase+',created_by',{headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY}});
+      if(r1.ok) rows=await r1.json();
+    }catch(e){}
+    if(rows===null) rows=await _cdGet(_lvBase);
     const b=document.getElementById('empProfBody');
     // Note: even with no records we still render the add-leave form below.
     const badge=st=>{ const c={approved:'#10b981',pending:'#f59e0b',declined:'#ef4444'}[st]||'var(--text-dim)'; return '<span style="color:'+c+';font-weight:700;text-transform:capitalize;">'+(st||'—')+'</span>'; };
     const rowsHtml=(rows||[]).map(function(r){
       const range=r.from_date===r.to_date?_epDate(r.from_date):(_epDate(r.from_date)+' → '+_epDate(r.to_date));
-      return _epRow([{v:range,w:'1.6fr'},{v:'<span style="color:var(--text-dim);">'+_cdEsc(r.reason||r.reason_type||'')+'</span>'},{v:badge(r.status)}]);
+      return _epRow([{v:range,w:'1.6fr'},{v:'<span style="color:var(--text-dim);">'+_cdEsc(r.reason||r.reason_type||'')+'</span>'+_epLeaveAudit(r,full)},{v:badge(r.status)}]);
     }).join('');
     if(reset){
       const addForm=
@@ -8202,6 +8226,10 @@ function _epLvReasonChange(){
   const wrap=document.getElementById('_epLvOtherWrap');
   if(sel&&wrap) wrap.style.display=(sel.value==='Other')?'block':'none';
 }
+// Who is signed in, as verified by the launch gate (derived server-side from the login).
+// ShiftOps never defined `currentUser`, so audit fields used to fall back to 'Admin'/'Manager'/null.
+function _soWho(){ try{ return (sessionStorage.getItem('so_me')||'').trim(); }catch(e){ return ''; } }
+
 async function _epAddLeave(){
   const s=_epStaff; if(!s) return;
   const full=(s.first+' '+s.last).trim();
@@ -8216,17 +8244,19 @@ async function _epAddLeave(){
   if(!sel){ setMsg('Please choose a reason.'); return; }
   if(sel==='Other' && !otherTxt){ setMsg('Please specify the reason.'); return; }
   const reason=(sel==='Other')?otherTxt:sel;
+  const who=_soWho();
+  if(!who){ setMsg('Could not confirm who you are. Reopen ShiftOps from Nexus, then try again.'); return; }
   const btn=document.getElementById('_epLvSaveBtn');
   if(btn){ btn.disabled=true; btn.textContent='Adding…'; }
   try{
-    // Admin-added → approved immediately. resolved_by records who added it.
-    const who=(typeof currentUser!=='undefined'&&currentUser)?currentUser:'Admin';
+    // Admin-added → approved immediately. resolved_by/resolved_at record who and when; the database also
+    // stamps created_by from the login itself (security_08), which the browser cannot fake.
     const res=await fetch(SUPABASE_URL+'/rest/v1/leave_submissions',{
       method:'POST',
       headers:{'apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
       body:JSON.stringify({
         staff_name:full, from_date:from, to_date:to, reason:reason, reason_type:sel,
-        status:'approved', source:'ShiftOps', resolved_by:(who+' (added in profile)')
+        status:'approved', source:'ShiftOps', resolved_by:(who+' (added in profile)'), resolved_at:new Date().toISOString()
       })
     });
     if(!(res.ok||res.status===201)) throw new Error('insert failed '+res.status);
@@ -10411,6 +10441,7 @@ function syncLeaveToPortal(staffId,from,to,reason,reasonType){
           reason:reason||'',
           reasonType:reasonType||'',   // categorised leave type → leave_submissions.reason_type
           source:'Admin',   // stamps leave_submissions.source (relay must persist this)
+          addedBy:_soWho(), // who added it; the relay should store this as created_by / resolved_by
           token:GAS_TOKEN
         })
       }).then(function(r){ return r.json().catch(function(){return {};}); })
