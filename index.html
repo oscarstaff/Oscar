@@ -7921,6 +7921,10 @@ async function loadOneoffs(){
   if(!_oneoffOK) _availMode='from';
   setAvailMode(_availMode);
   renderOneoffs();
+  try{
+    const sc=document.getElementById('availSuccess');
+    if(sc && sc.style.display==='block' && window._availRow) renderAvailOverview(window._availRow);
+  }catch(e){}
 }
 function renderOneoffs(){
   const card=document.getElementById('availOneoffCard'), el=document.getElementById('availOneoffList');
@@ -7964,9 +7968,10 @@ async function _saveOneoff(avail,err,btn){
     });
     const out=await r.json().catch(function(){return null;});
     if(!r.ok||!Array.isArray(out)||!out.length) throw new Error('save '+r.status);
+    window._oneoffJustSaved=ws;
     await loadOneoffs();
     if(typeof showToast==='function') showToast('One-off saved for week of '+_effFmtNice(cd));
-    else alert('One-off saved for week of '+_effFmtNice(cd));
+    if(window._availRow) showAvailSuccess(window._availRow);
   }catch(e){ err.textContent='Failed to save the one-off. Please check your connection.'; err.classList.add('show'); }
   finally{ btn.disabled=false; setAvailMode(_availMode); }
 }
@@ -8327,6 +8332,28 @@ function renderAvailOverview(row){
   }else{
     h+='<div class="av-card"><div class="av-cmp-hd single"><div></div><div class="av-col">Your hours</div></div><div class="av-rows">'+rows+'</div></div>';
   }
+  // ── one-off weeks card ──
+  try{
+    const _t=new Date(); _t.setHours(0,0,0,0); _t.setDate(_t.getDate()-((_t.getDay()+6)%7));
+    const _cut=_effFmtIso(_t);
+    const oo=(typeof _oneoffRows!=='undefined'&&_oneoffOK)?(_oneoffRows||[]).filter(function(o){return o.week_start>=_cut;}):[];
+    if(oo.length){
+      const floor=_effFmtIso(_availCutoffFloor());
+      h+='<div class="av-card"><div class="av-cmp-hd single"><div></div><div class="av-col">One-off weeks<span class="av-pill pending"><i></i>This week only</span></div></div>'+
+        '<div class="av-fine" style="margin:0 0 6px;">These replace your usual hours for that week only. Your usual hours carry on afterwards.</div>'+
+        oo.map(function(o){
+          const d=new Date(o.week_start+'T00:00:00');
+          const just=(window._oneoffJustSaved===o.week_start);
+          const days=FULL.map(function(dn,i){
+            return '<div class="av-row single"><div class="av-d"><span class="l">'+dn+'</span><span class="s">'+SHORT[i]+'</span></div><div class="av-v">'+_avValHtml(get(o.availability,i),i)+'</div></div>';
+          }).join('');
+          return '<div style="padding:8px 0 4px;"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin:4px 0;"><b>Week of '+_effFmtNice(d)+'</b>'+
+            (just?'<span class="av-saved" style="margin:0;">'+_avCheck(14)+'Saved</span>':'')+
+            (o.week_start>=floor?'<button type="button" class="av-btn" style="padding:4px 10px;font-size:12px;" onclick="cancelOneoff(\''+o.week_start+'\')">Cancel</button>':'<span style="font-size:11.5px;opacity:.6;">locked</span>')+
+            '</div><div class="av-rows">'+days+'</div></div>';
+        }).join('')+'</div>';
+    }
+  }catch(e){}
   host.innerHTML=h;
 }
 
@@ -8337,6 +8364,7 @@ function showAvailSuccess(row){
   const ps=document.getElementById("availPendingStatus"); if(ps){ ps.style.display="none"; ps.innerHTML=""; }
   const _lb=document.getElementById("availLockBar"); if(_lb) _lb.style.display="none";
   renderAvailOverview(row);
+  try{ if(typeof loadOneoffs==='function') loadOneoffs(); }catch(e){}
 }
 function availStartEdit(){
   showAvailForm();

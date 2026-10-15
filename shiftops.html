@@ -6626,6 +6626,16 @@ async function loadSubmittedAvailability(){
       {headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`}}
     ).then(r=>r.ok?r.json():[]);
 
+    // Upcoming one-off weeks, grouped by person (ignore weeks that have fully passed).
+    const _ooBy={};
+    try{
+      const _t=new Date(); _t.setHours(0,0,0,0); _t.setDate(_t.getDate()-((_t.getDay()+6)%7));
+      const _cut=_t.getFullYear()+'-'+String(_t.getMonth()+1).padStart(2,'0')+'-'+String(_t.getDate()).padStart(2,'0');
+      const _or=await fetch(`${SUPABASE_URL}/rest/v1/availability_oneoffs?select=staff_name,week_start,availability,updated_at&week_start=gte.${_cut}&order=week_start.asc`,
+        {headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`}});
+      if(_or.ok) (await _or.json()).forEach(function(o){ (_ooBy[String(o.staff_name).toLowerCase()]=_ooBy[String(o.staff_name).toLowerCase()]||[]).push(o); });
+    }catch(e){}
+
     if(!rows.length){
       el.innerHTML='<div style="text-align:center;padding:48px;color:var(--text-dim);"><div style="font-size:36px;margin-bottom:12px;"></div><div style="font-size:14px;font-weight:600;">No availability submitted yet</div><div style="font-size:12px;margin-top:6px;color:var(--muted);">Staff submit availability via the Employee Portal</div></div>';
       return;
@@ -6660,7 +6670,9 @@ async function loadSubmittedAvailability(){
       const _rev=row.availability_reviewed_at?new Date(row.availability_reviewed_at).getTime():0;
       const _upd=row.updated_at?new Date(row.updated_at).getTime():0;
       const _pset=row.pending_set_at?new Date(row.pending_set_at).getTime():0;
-      const needsReview=(_upd>_rev)||(hasPending&&_pset>_rev);
+      const _oos=_ooBy[String(row.staff_name).toLowerCase()]||[];
+      const _ooUpd=_oos.reduce(function(m,o){ return Math.max(m,o.updated_at?new Date(o.updated_at).getTime():0); },0);
+      const needsReview=(_upd>_rev)||(hasPending&&_pset>_rev)||(_ooUpd>_rev);
       if(needsReview)_needsReviewCount++;
       const _nameEsc=String(row.staff_name).replace(/'/g,"\\'").replace(/"/g,'&quot;');
       // Period label
@@ -6679,7 +6691,8 @@ async function loadSubmittedAvailability(){
 
       const _lastTouch = Math.max(
         row.updated_at ? new Date(row.updated_at).getTime() : 0,
-        row.pending_set_at ? new Date(row.pending_set_at).getTime() : 0
+        row.pending_set_at ? new Date(row.pending_set_at).getTime() : 0,
+        _ooUpd
       );
       const updated=_lastTouch ? new Date(_lastTouch).toLocaleString('en-AU',{day:'numeric',month:'short',hour:'numeric',minute:'2-digit'}):'';
 
@@ -6711,6 +6724,13 @@ async function loadSubmittedAvailability(){
         html+='<div class="sa-sub sa-sub-new">New from '+_pfLabel+' <span>· highlighted days change</span></div>';
         html+=_renderAvailGrid(pend,av);
       }
+      _oos.forEach(function(o){
+        let _wl=o.week_start;
+        try{ _wl=new Date(o.week_start+'T00:00:00').toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short'}); }catch(e){}
+        const _oav={}; Object.keys(o.availability||{}).forEach(function(k){ _oav[parseInt(k)]=o.availability[k]; });
+        html+='<div class="sa-sub sa-sub-new">One-off · week of '+_wl+' <span>· this week only, then usual hours resume</span></div>';
+        html+=_renderAvailGrid(_oav,av);
+      });
       html+='</div>';
     });
 
@@ -11368,19 +11388,6 @@ async function _syncAvailabilityCore(silent){
     const rows=await res.json();
     if(!rows.length){ if(typeof setAvailBadge==='function')setAvailBadge(0); return 0; }
 
-    // Update the "changed since reviewed" nav badge from this pull.
-    try{
-      let _nr=0;
-      rows.forEach(function(r){
-        const u=r.updated_at?new Date(r.updated_at).getTime():0;
-        const v=r.availability_reviewed_at?new Date(r.availability_reviewed_at).getTime():0;
-        if(u>v)_nr++;
-      });
-      if(typeof setAvailBadge==='function')setAvailBadge(_nr);
-    }catch(e){}
-
-    // Skip re-applying if nothing changed since last pull (avoids needless saves
-    // on the auto-timer). Signature = staff_name+updated_at pairs.
     // One-off weeks ("For week starting"): a single Monday that overrides the standing pattern.
     // Table may not exist yet or may fail — then there are simply no one-offs.
     let _oneoffs={};
@@ -11389,6 +11396,24 @@ async function _syncAvailabilityCore(silent){
         {headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`}});
       if(_or.ok){ (await _or.json()).forEach(function(o){ _oneoffs[String(o.staff_name).toLowerCase()+'|'+o.week_start]=o; }); }
     }catch(e){}
+    // Update the "changed since reviewed" nav badge from this pull.
+    try{
+      let _nr=0;
+      const _ooNewest={};
+      Object.keys(_oneoffs).forEach(function(k){
+        const o=_oneoffs[k], n=String(o.staff_name).toLowerCase(), t=o.updated_at?new Date(o.updated_at).getTime():0;
+        if(t>(_ooNewest[n]||0)) _ooNewest[n]=t;
+      });
+      rows.forEach(function(r){
+        const u=Math.max(r.updated_at?new Date(r.updated_at).getTime():0, _ooNewest[String(r.staff_name).toLowerCase()]||0);
+        const v=r.availability_reviewed_at?new Date(r.availability_reviewed_at).getTime():0;
+        if(u>v)_nr++;
+      });
+      if(typeof setAvailBadge==='function')setAvailBadge(_nr);
+    }catch(e){}
+
+    // Skip re-applying if nothing changed since last pull (avoids needless saves
+    // on the auto-timer). Signature = staff_name+updated_at pairs.
     const sig=rows.map(function(r){return r.staff_name+'@'+(r.updated_at||'');}).sort().join('|')
       +'#'+Object.keys(_oneoffs).sort().map(function(k){return k+'@'+(_oneoffs[k].updated_at||'');}).join('|');
     if(silent && sig===_lastAvailSig) return 0;
