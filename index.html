@@ -12150,6 +12150,30 @@ function maybeAutoClockOut8pm(){
   // only fire once 8pm has actually passed
   if(Date.now() < eight.getTime()) return;
   _auto8Fired = true;
+  return _verifyThenAutoOut8pm(eight, inDate);
+}
+// This device's idea of "still clocked in" can be stale (clocked out on another
+// device/tab, or the clock-out landed from the retry queue). Before writing an
+// 8pm auto-out, ask the server: if the latest punch since this clock-in is already
+// an OUT, the person did clock out — just sync local state, write nothing.
+async function _verifyThenAutoOut8pm(eight, inDate){
+  try{
+    const since = new Date(inDate.getTime() - 60000).toISOString();
+    const rows = await sbGet('clock_log','?staff_name=eq.'+encodeURIComponent(me)+'&ts=gte.'+encodeURIComponent(since)+'&order=ts.desc&limit=1');
+    if(rows && rows.length && rows[0].action === 'out'){
+      _clockState = 'out';
+      _clockSinceTs = new Date(rows[0].ts);
+      try{ localStorage.setItem('clock_state_'+me, JSON.stringify({state:'out', ts:new Date(rows[0].ts).toISOString()})); }catch(e){}
+      try{ renderClockCard(); }catch(e){}
+      const btn = document.getElementById('clockBtn');
+      if(btn){ btn.textContent='Clock In'; btn.style.background='var(--accent)'; btn.disabled=false; }
+      return;
+    }
+  }catch(e){
+    // Couldn't verify (offline). Don't guess: try again on the next minute tick.
+    _auto8Fired = false;
+    return;
+  }
   return doAutoClockOut8pm(eight);
 }
 
