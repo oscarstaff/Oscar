@@ -12081,10 +12081,14 @@ async function loadClockState(){
       _cachedSaidIn = !!(_c && _c.state === 'in');
     }catch(_){}
 
-    const rows = await sbGet('clock_log','?staff_name=eq.'+encodeURIComponent(me)+'&order=ts.desc&limit=1');
+    const rows = await sbGet('clock_log','?staff_name=eq.'+encodeURIComponent(me)+'&order=ts.desc&limit=4');
     if(rows && rows.length){
       _clockState = rows[0].action;
-      _clockSinceTs = new Date(rows[0].ts);
+      // If the latest punches are several OUTs in a row (e.g. a real clock-out followed by a
+      // stray auto 8pm one), the real finish is the FIRST out after the clock-in, not the last.
+      let _k = 0;
+      if(rows[0].action === 'out'){ while(_k+1 < rows.length && rows[_k+1].action === 'out') _k++; }
+      _clockSinceTs = new Date(rows[_k].ts);
     } else {
       _clockState = 'out';
       _clockSinceTs = null;
