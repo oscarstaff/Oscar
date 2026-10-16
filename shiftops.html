@@ -2971,9 +2971,14 @@ body.avail-editing #availGrid .avail-chip.av2:hover{ background:color-mix(in srg
       var name=nr.ok?await nr.json():null;
       if(!name){fail('Could not verify your identity.');return;}
       var ar=await _rpc('is_current_user_hub_admin',{},_at);
-      var isAdmin=ar.ok?(await ar.json())===true:false;
-      try{ sessionStorage.setItem('so_me', name); sessionStorage.setItem('so_is_admin', isAdmin ? '1' : '0'); }catch(e){}
+      // Tri-state, straight from the server: true = hub admin, false = NOT an admin (so a team lead, since
+      // has_app_access already passed), null = the check itself failed (unknown, so don't guess either way).
+      var isAdmin=ar.ok?((await ar.json())===true):null;
+      try{ sessionStorage.setItem('so_me', name); sessionStorage.setItem('so_is_admin', isAdmin===true ? '1' : (isAdmin===false ? '0' : '')); }catch(e){}
       try{ if(typeof _renderWhoami==='function') _renderWhoami(); }catch(e){}
+      // A team lead must get the read-only view from the very first screen, not only after the staff/role
+      // fetch finishes (or after a refresh). The server has already told us they are not an admin.
+      try{ if(typeof applyTeamLeadLock==='function') applyTeamLeadLock(); }catch(e){}
       // Capture Nexus' Supabase session so ShiftOps writes as an authenticated
       // user (RLS-locked tables reject the anon key). Stash for the tab session.
       try{
@@ -9559,7 +9564,12 @@ function applyTeamLeadLock(){
   // admin whose flags haven't arrived), default to the full admin view rather
   // than flashing the locked view — which is the "first login shows Team Lead"
   // bug. An admin should never briefly see the restricted UI.
-  const confirmedLead = _tlResolved && AM_TEAM_LEAD === true;
+  // Two ways to be a confirmed lead: the loaded role data says so, OR the server (the sign-in gate's
+  // is_current_user_hub_admin check) already said "not an admin" and the role data hasn't proved otherwise.
+  // The second path closes the window where a team lead saw the full admin view until the next refresh.
+  // Role data that positively resolves to "admin" always overrides the hint.
+  let _serverSaysNotAdmin=false; try{ _serverSaysNotAdmin=sessionStorage.getItem('so_is_admin')==='0'; }catch(e){}
+  const confirmedLead = (_tlResolved && AM_TEAM_LEAD === true) || (_serverSaysNotAdmin && !(_tlResolved && AM_TEAM_LEAD === false));
   document.body.classList.toggle('tl-readonly', confirmedLead);
   if(!confirmedLead) return;
 
@@ -11678,7 +11688,7 @@ console.log('%c[ShiftOps build '+SHIFTOPS_BUILD+' loaded]','background:#0071e3;c
 // only ever added later, and only once the role is positively confirmed as team
 // lead (see applyTeamLeadLock). This guarantees no team-lead flash at startup for
 // admins whose role data hasn't finished loading yet.
-try{ document.body.classList.remove('tl-readonly'); }catch(e){}
+try{ document.body.classList.remove('tl-readonly'); applyTeamLeadLock(); }catch(e){}   // re-locks at once if the sign-in gate already said "not an admin" (refresh case)
 // Failsafe: never let the loading overlay trap the UI, even if boot throws.
 setTimeout(function(){ try{ var b=document.getElementById('soBootLoading'); if(b) b.style.display='none'; }catch(e){} }, 12000);
 (async()=>{
