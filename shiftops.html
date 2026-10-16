@@ -4186,6 +4186,29 @@ async function loadStaffFromSupabase(){
     seen[s.id]=true;
   });
 
+  // The signed-in person's own admin status is decided by the server (is_current_user_hub_admin), not by whether
+  // the staff_settings list happened to include a matching row. Ask the server directly (and fall back to the
+  // verdict stored at launch), so an admin can never be rebuilt as a Team Lead on refresh.
+  try{
+    var _meN=(sessionStorage.getItem('so_me')||'').trim().toLowerCase();
+    var _hint=sessionStorage.getItem('so_is_admin')==='1';
+    var _srvAdmin=null;
+    try{
+      var _tk=_soTok();
+      if(_tk && _soTokAlive()){
+        var _ar=await fetch(SUPABASE_URL+'/rest/v1/rpc/is_current_user_hub_admin',{method:'POST',headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+_tk,'Content-Type':'application/json'},body:'{}'});
+        if(_ar.ok) _srvAdmin=((await _ar.json())===true);
+      }
+    }catch(e){}
+    var _isAdminNow=(_srvAdmin===null)?_hint:_srvAdmin;
+    if(_srvAdmin!==null){ try{ sessionStorage.setItem('so_is_admin',_srvAdmin?'1':'0'); }catch(e){} }
+    if(_meN && _isAdminNow){
+      built.forEach(function(s){
+        if(((s.first||'')+' '+(s.last||'')).trim().toLowerCase()===_meN){ s.isHubAdmin=true; s.isTeamLead=false; }
+      });
+    }
+  }catch(e){ console.warn('[ROLE] self admin check failed', e); }
+
   staff=built;
   nextStaffId=Math.max.apply(null,[1].concat(built.map(function(s){return s.id;})))+1;
   _staffFromSupabase=true;
