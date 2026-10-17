@@ -4901,25 +4901,40 @@ html .notif-drop .notif-drop-actions{ background:none !important; border:0 !impo
         Back
       </button>
       <div class="card" style="overflow:hidden;padding:0;">
-        <!-- Header band -->
-        <div style="background:linear-gradient(135deg,var(--accent),#7c3aed);height:80px;"></div>
-        <div style="padding:0 24px 24px;margin-top:-44px;">
-          <div id="pvAva" style="width:88px;height:88px;border-radius:50%;border:4px solid #fff;background:linear-gradient(135deg,var(--accent),#7c3aed);display:flex;align-items:center;justify-content:center;color:#fff;font-size:30px;font-weight:800;box-shadow:0 4px 12px rgba(0,0,0,.12);"></div>
-          <div style="margin-top:14px;display:flex;align-items:center;flex-wrap:wrap;gap:2px;">
-            <span id="pvName" style="font-size:24px;font-weight:800;color:var(--ui-ink,#0f172a);line-height:1.15;"></span>
+        <!-- Header band: themed by the person's team -->
+        <div id="pvBand" style="position:relative;height:140px;overflow:hidden;background:linear-gradient(120deg,var(--accent),#7c3aed);">
+          <div style="position:absolute;inset:0;opacity:.32;background-image:radial-gradient(rgba(255,255,255,.7) 1.2px,transparent 1.5px);background-size:17px 17px;"></div>
+          <div style="position:absolute;inset:0;background:radial-gradient(120% 90% at 85% 0%,rgba(255,255,255,.22),transparent 60%);"></div>
+          <div id="pvBandWord" style="position:absolute;right:14px;bottom:-14px;font-size:84px;font-weight:900;letter-spacing:-.05em;line-height:1;color:rgba(255,255,255,.17);white-space:nowrap;pointer-events:none;user-select:none;"></div>
+        </div>
+        <div style="padding:0 24px 24px;margin-top:-58px;position:relative;">
+          <div id="pvAvaRing" style="display:inline-flex;padding:4px;border-radius:50%;background:linear-gradient(135deg,var(--accent),#7c3aed);box-shadow:0 0 0 5px var(--ui-surface,#fff),0 8px 22px rgba(15,23,42,.22);">
+            <div id="pvAva" style="width:104px;height:104px;border-radius:50%;border:3px solid var(--ui-surface,#fff);background:linear-gradient(135deg,var(--accent),#7c3aed);display:flex;align-items:center;justify-content:center;color:#fff;font-size:34px;font-weight:800;"></div>
+          </div>
+          <div style="margin-top:14px;display:flex;align-items:baseline;flex-wrap:wrap;gap:2px 4px;">
+            <span id="pvName" style="font-size:27px;font-weight:800;color:var(--ui-ink,#0f172a);line-height:1.12;letter-spacing:-.02em;"></span>
           </div>
           <div id="pvTitle" style="font-size:13px;font-weight:700;color:#047857;margin-top:4px;display:none;"></div>
           <div style="display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap;">
-            <span id="pvTeam" style="font-size:12px;color:var(--ui-ink-2b,#475569);background:var(--ui-surface-3,#f1f5f9);padding:4px 12px;border-radius:999px;font-weight:600;display:none;"></span>
+            <span id="pvTeam" style="font-size:12px;color:#fff;padding:4px 13px;border-radius:999px;font-weight:700;letter-spacing:.01em;display:none;"></span>
             <span id="pvPronouns" style="font-size:12px;color:var(--ui-ink-4,#94a3b8);display:none;"></span>
             <span id="pvRole" title="Admin" style="color:#92400e;background:#fef3c7;padding:4px 8px;border-radius:999px;display:none;align-items:center;justify-content:center;"></span>
           </div>
+          <!-- "Known for": fun tags earned from real activity -->
+          <div id="pvKnown" style="display:none;margin-top:16px;">
+            <div style="font-size:10.5px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--ui-ink-4,#94a3b8);margin-bottom:8px;">Known for</div>
+            <div id="pvKnownChips" style="display:flex;flex-wrap:wrap;gap:7px;"></div>
+          </div>
+          <!-- Quick stats -->
+          <div id="pvStats" style="display:none;margin-top:18px;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:10px;"></div>
         </div>
       </div>
       <!-- About -->
       <div class="card" id="pvBioCard" style="margin-top:14px;display:none;">
-        <div style="font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--ui-ink-4,#94a3b8);margin-bottom:8px;">About</div>
-        <div id="pvBio" style="font-size:14px;line-height:1.55;color:var(--ui-ink-2,#334155);white-space:pre-wrap;"></div>
+        <div id="pvBioHead" style="font-size:11px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--ui-ink-4,#94a3b8);margin-bottom:10px;">In their words</div>
+        <div style="position:relative;padding-left:18px;border-left:3px solid var(--accent);" id="pvBioQuote">
+          <div id="pvBio" style="font-size:15px;line-height:1.6;color:var(--ui-ink-2,#334155);white-space:pre-wrap;font-style:italic;"></div>
+        </div>
       </div>
       <!-- Achievements -->
       <div class="card" id="pvAchCard" style="margin-top:14px;display:none;">
@@ -10693,7 +10708,7 @@ async function ensureStaffDirData(force){
     let tier = null;
     if(days >= 4 && sc >= 90) tier = 'gold';
     else if(days >= 4 && sc >= 80) tier = 'silver';
-    tierMap[r.staff_name] = { tier: tier, score: sc };
+    tierMap[r.staff_name] = { tier: tier, score: sc, days: days, fort: String(r.fort_start||'').slice(0,10) };
   });
   window._sdPunctTier = tierMap;
   // Call milestones reached per staff — highest threshold crossed (100/500/1000).
@@ -10758,7 +10773,7 @@ async function openProfilePage(name){
   const _nick=(window.nicknameFor?window.nicknameFor(name):null);
   const _hasNick=!!_nick;
   const _nameHtml=renderStaffName(name, esc, name)   // force REAL name as shown text
-    + (_hasNick ? '<span style="font-size:15px;font-weight:600;color:var(--ui-ink-4,#94a3b8);margin-left:6px;">('+esc(_nick)+')</span>' : '');
+    + (_hasNick ? '<span style="font-size:14px;font-weight:600;font-style:italic;color:var(--ui-ink-4,#94a3b8);margin-left:8px;">aka &ldquo;'+esc(_nick)+'&rdquo;</span>' : '');
   document.getElementById('pvName').innerHTML=_nameHtml+(window.achBadgesInline?window.achBadgesInline(name,{size:16}):'');
   // Title
   const tEl=document.getElementById('pvTitle');
@@ -10771,6 +10786,7 @@ async function openProfilePage(name){
   if(p.pronouns){ pr.textContent=p.pronouns; pr.style.display='inline-block'; } else pr.style.display='none';
   const role=document.getElementById('pvRole');
   if(p.is_admin){ role.innerHTML=(window.adminIcon?window.adminIcon(15):'Admin'); role.style.display='inline-flex'; } else role.style.display='none';
+  try{ _pvPaintPersonality(p, name); }catch(e){ console.warn('profile paint', e); }
   // Achievements (full rows)
   const achHtml=(typeof buildAchievementsRows==='function')?buildAchievementsRows(p):'';
   const achCard=document.getElementById('pvAchCard');
@@ -10820,6 +10836,14 @@ function closeStaffDirectory(){
 }
 
 // Medal disc for punctuality tiers — mirrors the On-Time Club leaderboard style.
+// "21 Sep – 4 Oct" for a stored fortnight start (yyyy-mm-dd). The punctuality shown on a profile is the last COMPLETED
+// fortnight (the current one is only saved once it closes), so say which one it is instead of "this fortnight".
+function _punctPeriod(fort){
+  const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(fort||'')); if(!m) return 'last fortnight';
+  const a=new Date(+m[1],+m[2]-1,+m[3]), b=new Date(+m[1],+m[2]-1,+m[3]+13);
+  const f=function(d){ return d.getDate()+' '+['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()]; };
+  return f(a)+' \u2013 '+f(b);
+}
 function _tierMedal(fill, ring){
   return '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" style="flex-shrink:0;display:block;">'+
     '<path d="M8.5 2h3l-2.2 7h-3z" fill="'+ring+'"/>'+
@@ -10879,7 +10903,7 @@ function buildAchievementBadges(p){
       cls: isGold?'solid-gold':'solid-slate',
       inner:_ACH_ICONS.medal,
       title:(isGold?'Gold':'Silver')+' — On-Time Club',
-      sub:'This fortnight · '+p.punct.score+'% on time'
+      sub:_punctPeriod(p.punct.fort)+' · '+p.punct.score+'% on time ('+(p.punct.days||'?')+' days)'
     });
   }
   // Training — solid green, NUMBER shown on the badge.
@@ -10939,43 +10963,159 @@ function showBadgeInfo(i){
 // Legacy: kept so any old caller doesn't break. No longer used for the profile.
 
 
-// Full-row achievements for the profile PAGE (roomier than inline badges).
+// ── Profile personality ──────────────────────────────────────────────────────────────────────
+const _PV_THEMES = {
+  'Enrolment':  {a:'#0ea5e9', b:'#6366f1'},
+  'Processing': {a:'#f97316', b:'#db2777'},
+  'Placement':  {a:'#10b981', b:'#0ea5e9'},
+  'Evershine':  {a:'#8b5cf6', b:'#ec4899'},
+  'Accounts':   {a:'#334155', b:'#b45309'},
+  'Education':  {a:'#4f46e5', b:'#06b6d4'},
+  'Office':     {a:'#0f766e', b:'#65a30d'}
+};
+function _pvTheme(team){ return _PV_THEMES[team] || {a:'#059669', b:'#7c3aed'}; }
+
+// Fun "known for" tags, earned only from real data (never invented).
+function _pvKnownFor(p){
+  const t=[];
+  const elite=window.isEliteCaller&&window.isEliteCaller(p.staff_name);
+  const calls=Number(p.call_milestone)||0, tr=Number(p.training_count)||0;
+  if(elite) t.push({t:'The Call-Handler', c:'#047857', bg:'#ecfdf5', bd:'#a7f3d0'});
+  else if(calls>=500) t.push({t:'Phone legend', c:'#92400e', bg:'#fffbeb', bd:'#fde68a'});
+  else if(calls>=100) t.push({t:'Dial-ready', c:'#1d4ed8', bg:'#eff6ff', bd:'#bfdbfe'});
+  if(p.punct&&p.punct.tier==='gold') t.push({t:'Never late', c:'#92400e', bg:'#fffbeb', bd:'#fde68a'});
+  else if(p.punct&&p.punct.tier==='silver') t.push({t:'Reliably on time', c:'#475569', bg:'#f8fafc', bd:'#e2e8f0'});
+  if(tr>=10) t.push({t:'Walking handbook', c:'#065f46', bg:'#f0fdf9', bd:'#cdeee3'});
+  else if(tr>=5) t.push({t:'Quiz champion', c:'#065f46', bg:'#f0fdf9', bd:'#cdeee3'});
+  else if(tr>=1) t.push({t:'Always learning', c:'#065f46', bg:'#f0fdf9', bd:'#cdeee3'});
+  if(window.hasEarnedGlow&&window.hasEarnedGlow(p.staff_name)&&!elite) t.push({t:'Perfect fortnight', c:'#6d28d9', bg:'#f5f3ff', bd:'#ddd6fe'});
+  if(p.is_admin) t.push({t:'Behind the scenes', c:'#92400e', bg:'#fef3c7', bd:'#fde68a'});
+  return t.slice(0,4);
+}
+function _pvStatTile(value, label, color){
+  return '<div style="border-radius:14px;padding:12px 12px 11px;background:var(--ui-surface-3,#f1f5f9);text-align:left;">'+
+    '<div style="font-size:24px;font-weight:800;line-height:1;letter-spacing:-.02em;color:'+color+';">'+value+'</div>'+
+    '<div style="font-size:11px;font-weight:600;color:var(--ui-ink-3,#64748b);margin-top:5px;">'+label+'</div></div>';
+}
+function _pvPaintPersonality(p, name){
+  const th=_pvTheme(p.team||'');
+  const grad='linear-gradient(120deg,'+th.a+','+th.b+')';
+  const band=document.getElementById('pvBand'); if(band) band.style.background=grad;
+  const ring=document.getElementById('pvAvaRing'); if(ring) ring.style.background='linear-gradient(135deg,'+th.a+','+th.b+')';
+  const ava=document.getElementById('pvAva'); if(ava && !ava.style.backgroundImage) ava.style.background='linear-gradient(135deg,'+th.a+','+th.b+')';
+  const word=document.getElementById('pvBandWord'); if(word) word.textContent=(p.team||'').toUpperCase();
+  const team=document.getElementById('pvTeam'); if(team && p.team){ team.style.background='linear-gradient(120deg,'+th.a+','+th.b+')'; }
+  const q=document.getElementById('pvBioQuote'); if(q) q.style.borderLeftColor=th.a;
+  // known-for chips
+  const kn=document.getElementById('pvKnown'), kc=document.getElementById('pvKnownChips');
+  const tags=_pvKnownFor(p);
+  if(kn&&kc){
+    kc.innerHTML=tags.map(function(x){
+      return '<span style="font-size:12px;font-weight:700;padding:5px 12px;border-radius:999px;color:'+x.c+';background:'+x.bg+';border:1px solid '+x.bd+';">'+x.t+'</span>';
+    }).join('');
+    kn.style.display=tags.length?'block':'none';
+  }
+  // stat tiles (only what we really have)
+  const st=document.getElementById('pvStats');
+  if(st){
+    const tiles=[];
+    const calls=Number(p.call_milestone)||0;
+    if(calls>0) tiles.push(_pvStatTile(calls+'+','Calls logged',th.a));
+    if(Number(p.training_count)>0) tiles.push(_pvStatTile(p.training_count,'Trainings passed',th.a));
+    if(p.punct && p.punct.score!=null) tiles.push(_pvStatTile(p.punct.score+'%','On time · '+_punctPeriod(p.punct.fort),th.a));
+    st.innerHTML=tiles.join('');
+    st.style.display=tiles.length?'grid':'none';
+  }
+}
+
+// ── Badge rows ───────────────────────────────────────────────────────────────────────────────
+// Each tone = a gradient disc + a soft row colour. Earned rows are full colour; "next up" rows are muted with a dashed edge.
+const _ACH_TONES = {
+  gold:    {disc:'linear-gradient(145deg,#fde68a,#f59e0b)', ink:'#78350f', bg:'#fffbeb', bd:'#fde68a'},
+  silver:  {disc:'linear-gradient(145deg,#f8fafc,#94a3b8)', ink:'#334155', bg:'#f8fafc', bd:'#e2e8f0'},
+  bronze:  {disc:'linear-gradient(145deg,#fed7aa,#c2410c)', ink:'#7c2d12', bg:'#fff7ed', bd:'#fed7aa'},
+  blue:    {disc:'linear-gradient(145deg,#bfdbfe,#2563eb)', ink:'#1e3a8a', bg:'#eff6ff', bd:'#dbeafe'},
+  green:   {disc:'linear-gradient(145deg,#a7f3d0,#047857)', ink:'#064e3b', bg:'#f0fdf9', bd:'#cdeee3'},
+  emerald: {disc:'linear-gradient(145deg,#6ee7b7,#059669)', ink:'#064e3b', bg:'#ecfdf5', bd:'#a7f3d0'},
+  violet:  {disc:'linear-gradient(145deg,#ddd6fe,#7c3aed)', ink:'#4c1d95', bg:'#f5f3ff', bd:'#ddd6fe'},
+  platinum:{disc:'linear-gradient(145deg,#a5f3fc,#7c3aed)', ink:'#312e81', bg:'#f0f9ff', bd:'#c7d2fe'}
+};
+function _achDisc(inner, tone, locked){
+  const t=_ACH_TONES[tone]||_ACH_TONES.silver;
+  return '<div style="width:38px;height:38px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;'+
+    (locked ? 'background:#eef2f7;color:#94a3b8;border:1.5px dashed #cbd5e1;'
+            : 'background:'+t.disc+';color:#fff;box-shadow:0 1px 2px rgba(15,23,42,.18),inset 0 1px 0 rgba(255,255,255,.45);')+
+    'font-size:15px;font-weight:800;line-height:1;">'+inner+'</div>';
+}
+function _achRow2(inner, title, sub, tone, locked, tag){
+  const t=_ACH_TONES[tone]||_ACH_TONES.silver;
+  return '<div style="display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:12px;'+
+    (locked ? 'background:#fafbfc;border:1px dashed #dbe2ea;' : 'background:'+t.bg+';border:1px solid '+t.bd+';')+'">'+
+    _achDisc(inner,tone,locked)+
+    '<div style="min-width:0;flex:1;"><div style="font-size:13.5px;font-weight:700;line-height:1.2;color:'+(locked?'#94a3b8':'var(--ui-ink,#0f172a)')+';">'+title+'</div>'+
+    (sub?'<div style="font-size:11.5px;margin-top:2px;color:'+(locked?'#a3adbb':'var(--ui-ink-3,#64748b)')+';">'+sub+'</div>':'')+'</div>'+
+    (tag?'<span style="flex-shrink:0;font-size:10px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;padding:3px 8px;border-radius:999px;'+
+         (locked?'background:#eef2f7;color:#94a3b8;':'background:rgba(255,255,255,.75);color:'+t.ink+';')+'">'+tag+'</span>':'')+
+    '</div>';
+}
+function _achSection(title, rowsHtml){
+  if(!rowsHtml) return '';
+  return '<div style="margin-top:4px;"><div style="font-size:10.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--ui-ink-4,#94a3b8);margin:6px 2px 8px;">'+title+'</div>'+
+         '<div style="display:flex;flex-direction:column;gap:8px;">'+rowsHtml+'</div></div>';
+}
+
+// Full-row achievements for the profile PAGE: grouped, tiered, with muted "next up" rows.
 function buildAchievementsRows(p){
-  const rows=[];
+  const I=_ACH_ICONS;
+  let earned=0;
+  const sec={recog:'',calls:'',punct:'',learn:''};
+
+  // Recognition: glow / elite
   if(window.hasEarnedGlow && window.hasEarnedGlow(p.staff_name)){
     const skin=(window.glowSkinFor?window.glowSkinFor(p.staff_name):'gold');
     const skinLabel=(window.GLOW_SKIN_LABELS&&window.GLOW_SKIN_LABELS[skin])||skin;
     const elite=window.isEliteCaller&&window.isEliteCaller(p.staff_name);
-    const chip='<span class="glow-name glow-'+skin+'" style="font-size:14px;font-weight:800;">'+(elite?'Elite':'Glow')+'</span>';
-    rows.push(_achRow(chip, elite?'The Call-Handler':'Perfect Fortnight',
-      elite?'Elite glow — 1000 calls logged':(skinLabel+' glow earned'),'#fffdf5','#f6e9c8'));
+    sec.recog+=_achRow2('<span class="glow-name glow-'+skin+'" style="font-size:12px;font-weight:800;">'+(elite?'Elite':'Glow')+'</span>',
+      elite?'The Call-Handler':'Perfect Fortnight', elite?'Elite glow — 1000 calls logged':(skinLabel+' glow earned'), elite?'emerald':'gold', false, elite?'Elite':'Glow');
+    earned++;
   }
-  // Call milestones. 1000+ collapses to one elite row; below, earned tiers.
+
+  // Calls
   const top=Number(p.call_milestone)||0;
   if(top>=1000){
-    const medal='<svg width="18" height="18" viewBox="0 0 20 20" fill="#047857" style="flex-shrink:0;"><path d="M6.5 1h2.2L6.9 6.2 4.7 5.4 6.5 1Zm7 0-1.8 4.4-2.2.8L11.3 1h2.2Z"/><circle cx="10" cy="13" r="6"/><path d="M10 9.6l1.3 2.6 2.9.42-2.1 2.05.5 2.88L10 16.2l-2.6 1.35.5-2.88-2.1-2.05 2.9-.42L10 9.6Z" fill="#fff"/></svg>';
-    rows.push(_achRow(medal, 'The Call-Handler', 'Elite — 1000 calls logged', '#ecfdf5', '#a7f3d0'));
+    sec.calls+=_achRow2(I.medal.replace('<svg','<svg width="20" height="20"'),'The Call-Handler','Elite — 1000 calls logged','emerald',false,'1000');
+    earned++;
   } else {
-    [{t:100, sub:'Call volume milestone',        fill:'#2563eb', bg:'#eff6ff', bd:'#dbeafe'},
-     {t:500, sub:'Gold — consistent dedication', fill:'#b8860b', bg:'#fffbeb', bd:'#fde68a'}].forEach(function(k){
+    [{t:100,sub:'Call volume milestone',tone:'blue'},{t:500,sub:'Consistent dedication',tone:'gold'}].forEach(function(k){
       if(top<k.t) return;
-      const fill=k.fill;
-      const phone='<svg width="18" height="18" viewBox="0 0 20 20" fill="'+fill+'" style="flex-shrink:0;"><path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z"/></svg>';
-      rows.push(_achRow(phone, k.t+' Calls Logged', k.sub, k.bg, k.bd));
+      sec.calls+=_achRow2(I.phone.replace('<svg','<svg width="19" height="19"'),k.t+' Calls Logged',k.sub,k.tone,false,String(k.t));
+      earned++;
     });
+    const nx=top<100?100:(top<500?500:1000);
+    sec.calls+=_achRow2(I.phone.replace('<svg','<svg width="19" height="19"'),'Next: '+nx+' Calls Logged',nx===1000?'Unlocks the Call-Handler glow':'Keep logging calls','blue',true,'Locked');
   }
+
+  // Reliability (punctuality) — current fortnight
   if(p.punct && p.punct.tier){
     const isGold=p.punct.tier==='gold';
-    const fill=isGold?'#efa927':'#c2c1ba', ring=isGold?'#633806':'#4a4a46';
-    const bg=isGold?'#faeeda':'#f4f4f2', bd=isGold?'#ef9f27':'#c9c8c1';
-    rows.push(_achRow(_tierMedal(fill,ring),(isGold?'Gold':'Silver')+' — On-Time Club',
-      'This fortnight · '+p.punct.score+'% on time',bg,bd));
+    sec.punct+=_achRow2(_tierMedal(isGold?'#fff7d6':'#ffffff',isGold?'#633806':'#4a4a46').replace(/width="18" height="18"/,'width="22" height="22"'),
+      (isGold?'Gold':'Silver')+' — On-Time Club',_punctPeriod(p.punct.fort)+' · '+p.punct.score+'% on time ('+(p.punct.days||'?')+' days)',isGold?'gold':'silver',false,isGold?'Gold':'Silver');
+    earned++;
+  } else if(p.punct && p.punct.score!=null){
+    sec.punct+=_achRow2(I.medal.replace('<svg','<svg width="19" height="19"'),'Silver — On-Time Club',_punctPeriod(p.punct.fort)+': '+p.punct.score+'% on time · 80% (4+ days) unlocks it','silver',true,'Locked');
   }
-  if(p.training_count>0){
-    const cap='<svg width="18" height="18" viewBox="0 0 20 20" fill="#047857" style="flex-shrink:0;"><path d="M10 2 1 6l9 4 7.36-3.27V11a1 1 0 1 0 1 0V6L10 2Z"/><path d="M4 10.3V13c0 1.66 2.69 3 6 3s6-1.34 6-3v-2.7l-6 2.67-6-2.67Z"/></svg>';
-    rows.push(_achRow(cap,p.training_count+' Training'+(p.training_count===1?'':'s')+' Passed','Completed assigned quizzes','#f0fdf9','#cdeee3'));
+
+  // Learning
+  const tc=Number(p.training_count)||0;
+  if(tc>0){
+    sec.learn+=_achRow2(I.cap.replace('<svg','<svg width="20" height="20"'),tc+' Training'+(tc===1?'':'s')+' Passed','Completed assigned quizzes',tc>=10?'gold':(tc>=5?'emerald':'green'),false,String(tc));
+    earned++;
   }
-  return rows.join('');
+
+  const head='<div style="display:flex;align-items:baseline;justify-content:space-between;margin:0 2px 2px;"><span style="font-size:13px;font-weight:700;color:var(--ui-ink,#0f172a);">'+
+    earned+(earned===1?' badge earned':' badges earned')+'</span></div>';
+  return head+_achSection('Recognition',sec.recog)+_achSection('Calls',sec.calls)+
+         _achSection('Reliability',sec.punct)+_achSection('Learning',sec.learn);
 }
 
 // Training badge — count of DISTINCT quizzes passed. Positive-only: no pill at 0.
