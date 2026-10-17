@@ -4920,6 +4920,7 @@ html .notif-drop .notif-drop-actions{ background:none !important; border:0 !impo
             <span id="pvPronouns" style="font-size:12px;color:var(--ui-ink-4,#94a3b8);display:none;"></span>
             <span id="pvRole" title="Admin" style="color:#92400e;background:#fef3c7;padding:4px 8px;border-radius:999px;display:none;align-items:center;justify-content:center;"></span>
           </div>
+          <div id="pvTeamMoves" style="display:none;margin-top:10px;font-size:12px;line-height:1.5;color:var(--ui-ink-3,#64748b);"></div>
           <!-- "Known for": fun tags earned from real activity -->
           <div id="pvKnown" style="display:none;margin-top:16px;">
             <div style="font-size:10.5px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--ui-ink-4,#94a3b8);margin-bottom:8px;">Known for</div>
@@ -10672,7 +10673,7 @@ let _staffDirData = [];
 async function ensureStaffDirData(force){
   if(!force && _staffDirData && _staffDirData.length) return _staffDirData;
   // Fetch staff list from staff_names, then credentials for team/pronouns, then settings for admin
-  const [names, creds, settings, quizAccess, quizResults, passedCustom, passedTraining, punctHistory, callMs] = await Promise.all([
+  const [names, creds, settings, quizAccess, quizResults, passedCustom, passedTraining, punctHistory, callMs, teamMoveRows] = await Promise.all([
     sbGet('staff_names','?order=name.asc'),
     sbGet('staff_credentials','?select=staff_name,team,pronouns'),
     sbGet('staff_settings','?select=name,is_hub_admin'),
@@ -10681,7 +10682,8 @@ async function ensureStaffDirData(force){
     sbGet('custom_quiz_results','?select=staff_name,quiz_id&passed=is.true'),
     sbGet('training_quiz_results','?select=staff_name,quiz_id&passed=is.true'),
     sbGet('punctuality_history','?select=staff_name,score,x,fort_start&order=fort_start.desc&limit=2000'),
-    sbGet('call_milestones','?select=staff_name,milestone')
+    sbGet('call_milestones','?select=staff_name,milestone'),
+    sbGet('staff_team_history','?select=staff_name,from_team,to_team,changed_at&order=changed_at.desc&limit=500')
   ]);
   const quizAccessSet = new Set((quizAccess||[]).map(function(q){return q.staff_name;}));
   const quizResultMap = {};
@@ -10718,6 +10720,8 @@ async function ensureStaffDirData(force){
     const m=Number(r.milestone)||0;
     if(m > (callMsMap[r.staff_name]||0)) callMsMap[r.staff_name]=m;
   });
+  const teamMoves={};
+  (teamMoveRows||[]).forEach(function(r){ if(r&&r.staff_name){ (teamMoves[r.staff_name]=teamMoves[r.staff_name]||[]).push(r); } });
   const credMap={};
   (creds||[]).forEach(function(c){ credMap[c.staff_name]=c; });
   const settMap={};
@@ -10733,7 +10737,8 @@ async function ensureStaffDirData(force){
       is_admin: s.is_hub_admin===true,
       training_count: trainingCountMap[nm]||0,
       punct: tierMap[nm]||null,
-      call_milestone: callMsMap[nm]||0
+      call_milestone: callMsMap[nm]||0,
+      team_moves: teamMoves[nm]||[]
     };
   }).filter(function(p){return p.staff_name;});
   try{ await loadGlowData(); }catch(e){}
@@ -10989,6 +10994,7 @@ function _pvKnownFor(p){
   else if(tr>=5) t.push({t:'Quiz champion', c:'#065f46', bg:'#f0fdf9', bd:'#cdeee3'});
   else if(tr>=1) t.push({t:'Always learning', c:'#065f46', bg:'#f0fdf9', bd:'#cdeee3'});
   if(window.hasEarnedGlow&&window.hasEarnedGlow(p.staff_name)&&!elite) t.push({t:'Perfect fortnight', c:'#6d28d9', bg:'#f5f3ff', bd:'#ddd6fe'});
+  { const mv=(p.team_moves||[])[0]; if(mv && (Date.now()-new Date(mv.changed_at).getTime())<30*864e5) t.unshift({t:'New to '+(mv.to_team||'the team'), c:'#6d28d9', bg:'#f5f3ff', bd:'#ddd6fe'}); }
   if(p.is_admin) t.push({t:'Behind the scenes', c:'#92400e', bg:'#fef3c7', bd:'#fde68a'});
   return t.slice(0,4);
 }
@@ -11006,6 +11012,17 @@ function _pvPaintPersonality(p, name){
   const word=document.getElementById('pvBandWord'); if(word) word.textContent=(p.team||'').toUpperCase();
   const team=document.getElementById('pvTeam'); if(team && p.team){ team.style.background='linear-gradient(120deg,'+th.a+','+th.b+')'; }
   const q=document.getElementById('pvBioQuote'); if(q) q.style.borderLeftColor=th.a;
+  // team moves (recorded from the day team history was switched on)
+  const tm=document.getElementById('pvTeamMoves');
+  if(tm){
+    const mv=(p.team_moves||[]).slice(0,3);
+    const fmt=function(iso){ const d=new Date(iso); return isNaN(d)?'':d.toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'}); };
+    tm.innerHTML=mv.map(function(r){
+      return '<div style="display:flex;align-items:center;gap:6px;"><svg width="13" height="13" viewBox="0 0 20 20" fill="currentColor" style="flex-shrink:0;opacity:.7"><path d="M3 10a1 1 0 0 1 1-1h9.59l-2.3-2.29a1 1 0 1 1 1.42-1.42l4 4a1 1 0 0 1 0 1.42l-4 4a1 1 0 0 1-1.42-1.42L13.59 11H4a1 1 0 0 1-1-1Z"/></svg>'+
+        '<span>Moved from <b>'+esc(r.from_team||'?')+'</b> to <b>'+esc(r.to_team||'?')+'</b> &middot; '+fmt(r.changed_at)+'</span></div>';
+    }).join('');
+    tm.style.display=mv.length?'block':'none';
+  }
   // known-for chips
   const kn=document.getElementById('pvKnown'), kc=document.getElementById('pvKnownChips');
   const tags=_pvKnownFor(p);
