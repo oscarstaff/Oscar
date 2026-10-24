@@ -10074,21 +10074,48 @@ function filterLeaveSummaryYear(yr){
 }
 
 function setLeaveStatusFilter(st){ window._leaveStatusFilter = st; renderLeave(); }
-// Leave proofs live in a private Drive folder. The gateway returns one only to the
-// person who attached it or a hub admin.
+// Leave proofs preview inside the app. A separate file opens only when "Open file" is clicked.
+// The gateway returns one only to the person who attached it or a hub admin.
+let _lpUrl=null;
+function _lpOverlay(){
+  let ov=document.getElementById('leaveProofOverlay');
+  if(ov) return ov;
+  ov=document.createElement('div');
+  ov.id='leaveProofOverlay';
+  ov.style.cssText='position:fixed;inset:0;z-index:99990;background:rgba(15,23,42,.6);display:none;align-items:center;justify-content:center;padding:16px;';
+  ov.innerHTML='<div style="background:#fff;color:#0f172a;border-radius:16px;width:min(880px,100%);max-height:92vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 50px rgba(0,0,0,.3);">'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid #e2e8f0;"><strong style="font-size:14px;">Leave proof</strong><button type="button" onclick="closeLeaveProof()" aria-label="Close" style="border:0;background:none;font-size:22px;line-height:1;cursor:pointer;color:inherit;">&times;</button></div>'
+    +'<div id="lpBody" style="flex:1;min-height:300px;display:flex;align-items:center;justify-content:center;background:#f1f5f9;overflow:auto;"></div>'
+    +'<div style="display:flex;justify-content:flex-end;padding:10px 16px;border-top:1px solid #e2e8f0;"><button type="button" id="lpOpen" disabled onclick="openLeaveProofFile()" style="padding:8px 16px;border-radius:8px;border:0;background:#059669;color:#fff;font-weight:600;cursor:pointer;">Open file</button></div>'
+    +'</div>';
+  ov.addEventListener('click',function(e){ if(e.target===ov) closeLeaveProof(); });
+  document.body.appendChild(ov);
+  return ov;
+}
+function closeLeaveProof(){
+  const ov=document.getElementById('leaveProofOverlay'); if(ov) ov.style.display='none';
+  const b=document.getElementById('lpBody'); if(b) b.innerHTML='';
+  if(_lpUrl){ URL.revokeObjectURL(_lpUrl); _lpUrl=null; }
+  const o=document.getElementById('lpOpen'); if(o) o.disabled=true;
+}
+function openLeaveProofFile(){ if(_lpUrl) window.open(_lpUrl,'_blank'); }
 async function viewLeaveProof(fileId){
-  const w=window.open('about:blank','_blank');
+  const ov=_lpOverlay(); ov.style.display='flex';
+  const body=document.getElementById('lpBody');
+  body.innerHTML='<div style="color:#64748b;font-size:13px;">Loading proof…</div>';
   try{
     const r=await fetch(GAS_EXEC_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'getLeaveProof',token:GAS_TOKEN,sbAccessToken:_soTok(),fileId:fileId})});
     const j=r.ok?await r.json():null;
-    if(!j||!j.ok){ if(w) w.close(); showToast('Proof not available. Only the person who attached it or a hub admin can open it.'); return; }
+    if(!j||!j.ok) throw new Error('get');
     const bin=atob(j.base64), u8=new Uint8Array(bin.length);
     for(let i=0;i<bin.length;i++) u8[i]=bin.charCodeAt(i);
-    const url=URL.createObjectURL(new Blob([u8],{type:j.mime}));
-    if(w) w.location.href=url;
+    if(_lpUrl) URL.revokeObjectURL(_lpUrl);
+    _lpUrl=URL.createObjectURL(new Blob([u8],{type:j.mime}));
+    if(String(j.mime).indexOf('image/')===0) body.innerHTML='<img src="'+_lpUrl+'" alt="Leave proof" style="max-width:100%;max-height:72vh;display:block;margin:auto;">';
+    else body.innerHTML='<iframe src="'+_lpUrl+'" title="Leave proof" style="width:100%;height:72vh;border:0;background:#fff;"></iframe>';
+    document.getElementById('lpOpen').disabled=false;
   }catch(e){
-    if(w) w.close();
-    showToast('Could not open the proof.');
+    body.innerHTML='<div style="padding:24px;color:#64748b;font-size:13px;text-align:center;">Could not load the proof. Only the person who attached it or a hub admin can open it.</div>';
   }
 }
 function renderLeave(filterName){
