@@ -315,70 +315,291 @@ async function uploadLeaveProof(file){
   if(!j||!j.ok||!j.id) throw new Error("proof-upload");
   return j.id;
 }
-// Leave proof viewer. Previews inside the app. A separate file opens only when "Open file" is clicked.
-// The gateway returns the file only to the person who attached it or a hub admin.
-let _lpUrl=null, _lpSeq=0;
-const _lpCache={}, _lpOrder=[];
-const _LP_IC_PDF='<svg width="18" height="18" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M5 2h7l4 4v11a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1zm6 1.5V7h3.5z"/></svg>';
-const _LP_IC_IMG='<svg width="18" height="18" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M3 4h14v12H3zm2 9 2.5-3 2 2.4L11 10l3 3.6V6H5z"/></svg>';
-const _LP_IC_OPEN='<svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 4H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-3M11 4h5v5M16 4l-7 7"/></svg>';
+// Leave proof viewer. Full-screen, in the app. A separate file opens only from "Open file".
+// Opens out of the button you pressed and closes back into it. Pinch, double-tap or scroll to zoom, drag to pan,
+// drag down (or up) to dismiss. Every move is a spring that starts from where the picture is right now,
+// so you can grab it mid-flight. The gateway returns the file only to the person who attached it or a hub admin.
+let _lpUrl=null,_lpSeq=0,_lpOpen=false,_lpClosing=false,_lpKind='',_lpChromeOn=true,_lpSrcEl=null,_lpTapT=0,_lpLastTap=null,_lpG=null,_lpPrevFocus=null,_lpRetry=null;
+
+const _lpCache={},_lpOrder=[],_lpE={},_lpAnims={},_lpPtrs=new Map();
+const _lpV={x:0,y:0,s:1,bg:0,ch:0,mo:0};
+const _lpReduce=function(){ return !!(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches); };
+const _LP_SVG=function(d,n){ return '<svg width="'+(n||20)+'" height="'+(n||20)+'" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+d+'</svg>'; };
+const _LP_IC={
+  x:_LP_SVG('<path d="M5.5 5.5l9 9M14.5 5.5l-9 9"/>'),
+  open:_LP_SVG('<path d="M8 4H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-3M11 4h5v5M16 4l-7 7"/>',17),
+  warn:_LP_SVG('<path d="M10 6.2v4.6M10 13.6v.01"/><circle cx="10" cy="10" r="7.2"/>',26)
+};
+
+/* ---------- springs ---------- */
+// response = seconds to reach the target. damping 1 = no bounce, below 1 bounces a little.
+function _lpSpringTo(key,target,vel,o,done){
+  if(_lpAnims[key]) _lpAnims[key]();
+  if(_lpReduce()){ _lpV[key]=target; _lpRender(); if(done) done(); return; }
+  const z=(o&&o.z!=null)?o.z:1, r=(o&&o.r)||.4, w=2*Math.PI/r, k=w*w, c=2*z*w;
+  const px=(key==='x'||key==='y');
+  const eps=(o&&o.eps)||(px?.3:.001), veps=(o&&o.veps)||(px?6:.02);
+  let x=_lpV[key], v=vel||0, last=performance.now(), raf=0, dead=false;
+  function step(t){
+    if(dead) return;
+    const dt=Math.min((t-last)/1000,.034); last=t;
+    const n=Math.max(1,Math.ceil(dt/.004)), h=dt/n;
+    for(let i=0;i<n;i++){ v+=(-k*(x-target)-c*v)*h; x+=v*h; }
+    _lpV[key]=x; _lpRender();
+    if(Math.abs(x-target)<eps && Math.abs(v)<veps){ _lpV[key]=target; _lpRender(); delete _lpAnims[key]; if(done) done(); return; }
+    raf=requestAnimationFrame(step);
+  }
+  raf=requestAnimationFrame(step);
+  _lpAnims[key]=function(){ dead=true; cancelAnimationFrame(raf); delete _lpAnims[key]; };
+}
+function _lpStop(keys){ (keys||Object.keys(_lpAnims)).forEach(function(k){ if(_lpAnims[k]) _lpAnims[k](); }); }
+// where a flick would come to rest (scroll-style deceleration)
+function _lpProject(v,d){ d=d||.998; return (v/1000)*d/(1-d); }
+function _lpRub(o,dim){ const c=.55; return (o*dim*c)/(dim+c*Math.abs(o)); }
+function _lpClamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
+
+function _lpRender(){
+  if(!_lpE.bg) return;
+  _lpE.bg.style.opacity=_lpV.bg;
+  const c=_lpClamp(_lpV.ch,0,1);
+  _lpE.top.style.opacity=c; _lpE.bar.style.opacity=c;
+  const off=c<.05?'none':'';
+  _lpE.top.style.pointerEvents=off; _lpE.bar.style.pointerEvents=off;
+  const m=_lpE.media;
+  if(m){ m.style.transform='translate3d('+_lpV.x+'px,'+_lpV.y+'px,0) scale('+_lpV.s+')'; m.style.opacity=_lpClamp(_lpV.mo,0,1); }
+}
+
+/* ---------- styles ---------- */
 function _lpCss(){
   if(document.getElementById('lpStyle')) return;
   const s=document.createElement('style'); s.id='lpStyle';
   s.textContent=
-  '#leaveProofOverlay{position:fixed;inset:0;z-index:99990;background:rgba(15,23,42,.5);display:none;align-items:center;justify-content:center;padding:24px;}'+
-  '#leaveProofOverlay.open{display:flex;}'+
-  '#leaveProofOverlay .lp-card{background:var(--ui-surface,#fff);color:var(--ui-ink,#0f172a);border:1px solid var(--ui-line,#e2e8f0);border-radius:20px;width:min(920px,100%);height:min(88vh,840px);display:flex;flex-direction:column;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,.25);font-family:inherit;}'+
-  '#leaveProofOverlay .lp-hd{display:flex;align-items:center;gap:12px;padding:14px 16px 14px 18px;border-bottom:1px solid var(--ui-line,#e2e8f0);}'+
-  '#leaveProofOverlay .lp-ico{width:36px;height:36px;border-radius:11px;background:#ecfdf5;color:#059669;display:flex;align-items:center;justify-content:center;flex:none;}'+
-  '#leaveProofOverlay .lp-ttl{font-weight:800;font-size:15px;letter-spacing:-.01em;line-height:1.2;}'+
-  '#leaveProofOverlay .lp-sub{font-size:12px;color:var(--ui-ink-3,#64748b);margin-top:2px;}'+
-  '#leaveProofOverlay .lp-x{margin-left:auto;width:36px;height:36px;border-radius:50%;border:0;background:transparent;color:var(--ui-ink-3,#64748b);font-size:22px;line-height:1;cursor:pointer;flex:none;transition:background .15s,transform .12s;}'+
-  '#leaveProofOverlay .lp-x:hover{background:var(--ui-surface-3,#f1f5f9);color:var(--ui-ink,#0f172a);}'+
-  '#leaveProofOverlay .lp-x:active{transform:scale(.92);}'+
-  '#leaveProofOverlay .lp-body{flex:1;min-height:0;background:var(--ui-surface-3,#f1f5f9);display:flex;align-items:center;justify-content:center;overflow:auto;padding:16px;}'+
-  '#leaveProofOverlay .lp-body img{max-width:100%;max-height:100%;object-fit:contain;border-radius:10px;box-shadow:0 6px 20px rgba(15,23,42,.12);background:#fff;}'+
-  '#leaveProofOverlay .lp-body iframe{width:100%;height:100%;border:0;border-radius:10px;background:#fff;}'+
-  '#leaveProofOverlay .lp-ft{display:flex;align-items:center;gap:10px;padding:12px 16px;border-top:1px solid var(--ui-line,#e2e8f0);}'+
-  '#leaveProofOverlay .lp-hint{font-size:12px;color:var(--ui-ink-3,#64748b);margin-right:auto;line-height:1.35;}'+
-  '#leaveProofOverlay .lp-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:40px;padding:0 18px;border-radius:12px;font-weight:600;font-size:13.5px;line-height:1;cursor:pointer;border:1px solid var(--ui-line,#e2e8f0);background:var(--ui-surface,#fff);color:var(--ui-ink,#0f172a);font-family:inherit;transition:background .15s,transform .12s,box-shadow .15s;}'+
-  '#leaveProofOverlay .lp-btn:hover{background:var(--ui-surface-3,#f1f5f9);}'+
-  '#leaveProofOverlay .lp-btn:active{transform:scale(.97);}'+
-  '#leaveProofOverlay .lp-btn:focus-visible{outline:2px solid #10b981;outline-offset:2px;}'+
-  '#leaveProofOverlay .lp-btn.primary{background:linear-gradient(180deg,#10b981,#059669);border-color:#059669;color:#fff;box-shadow:0 4px 12px rgba(5,150,105,.28);}'+
-  '#leaveProofOverlay .lp-btn.primary:hover{filter:brightness(1.06);}'+
-  '#leaveProofOverlay .lp-btn:disabled{opacity:.45;cursor:not-allowed;box-shadow:none;}'+
-  '#leaveProofOverlay .lp-state{text-align:center;color:var(--ui-ink-3,#64748b);font-size:13px;padding:24px;max-width:340px;line-height:1.5;}'+
-  '#leaveProofOverlay .lp-state b{display:block;color:var(--ui-ink,#0f172a);font-size:14px;margin-bottom:6px;}'+
-  '#leaveProofOverlay .lp-spin{width:28px;height:28px;border-radius:50%;border:3px solid rgba(100,116,139,.25);border-top-color:#10b981;animation:lpSpin .8s linear infinite;margin:0 auto 12px;}'+
-  '@keyframes lpSpin{to{transform:rotate(360deg);}}'+
-  '@media (max-width:640px){#leaveProofOverlay{padding:0;}#leaveProofOverlay .lp-card{width:100%;height:100%;border-radius:0;border:0;}#leaveProofOverlay .lp-hint{display:none;}#leaveProofOverlay .lp-ft{padding-bottom:max(12px,env(safe-area-inset-bottom));}#leaveProofOverlay .lp-btn{flex:1;}}';
+  '#leaveProofOverlay{--lp-pad:84px;position:fixed;inset:0;z-index:99990;display:none;color:#fff;touch-action:none;overscroll-behavior:contain;-webkit-tap-highlight-color:transparent;-webkit-font-smoothing:antialiased;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Inter",system-ui,"Segoe UI",sans-serif;}'+
+  '#leaveProofOverlay.open{display:block;}'+
+  '#leaveProofOverlay.closing{pointer-events:none;}'+
+  '#leaveProofOverlay.pdf{touch-action:auto;}'+
+  '#leaveProofOverlay #lpBg{position:absolute;inset:0;background:rgba(0,0,0,.9);-webkit-backdrop-filter:blur(30px) saturate(150%);backdrop-filter:blur(30px) saturate(150%);opacity:0;}'+
+  '#leaveProofOverlay .lp-stage{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;overflow:hidden;}'+
+  '#leaveProofOverlay.pdf .lp-stage{pointer-events:none;}'+
+  '#leaveProofOverlay.pdf .lp-stage .lp-media{pointer-events:auto;}'+
+  '#leaveProofOverlay img.lp-media{max-width:calc(100% - 32px);max-height:calc(100% - var(--lp-pad) * 2);object-fit:contain;border-radius:14px;box-shadow:0 18px 50px rgba(0,0,0,.5),0 0 0 .5px rgba(255,255,255,.1);cursor:grab;user-select:none;-webkit-user-select:none;-webkit-user-drag:none;will-change:transform,opacity;opacity:0;}'+
+  '#leaveProofOverlay .lp-pdf{width:min(940px,calc(100% - 32px));height:calc(100% - var(--lp-pad) * 2);border-radius:14px;overflow:hidden;background:#fff;box-shadow:0 18px 50px rgba(0,0,0,.5);will-change:transform,opacity;opacity:0;}'+
+  '#leaveProofOverlay .lp-pdf iframe{width:100%;height:100%;border:0;display:block;}'+
+  /* chrome */
+  '#leaveProofOverlay .lp-top{position:absolute;top:0;left:0;right:0;z-index:2;display:flex;align-items:center;gap:12px;padding:max(12px,env(safe-area-inset-top)) max(14px,env(safe-area-inset-right)) 28px max(14px,env(safe-area-inset-left));background:linear-gradient(rgba(0,0,0,.5),rgba(0,0,0,0));opacity:0;}'+
+  '#leaveProofOverlay .lp-head{min-width:0;flex:1;}'+
+  '#leaveProofOverlay .lp-title{font-size:17px;font-weight:600;letter-spacing:-.022em;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}'+
+  '#leaveProofOverlay .lp-sub{font-size:13px;font-weight:500;letter-spacing:-.006em;color:rgba(235,235,245,.66);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}'+
+  '#leaveProofOverlay .lp-chip{display:inline-block;margin-left:8px;padding:2px 8px;border-radius:999px;font-size:11.5px;font-weight:600;letter-spacing:.01em;vertical-align:2px;}'+
+  '#leaveProofOverlay .lp-chip.pending{background:rgba(255,214,10,.17);color:#ffd60a;}'+
+  '#leaveProofOverlay .lp-chip.approved{background:rgba(48,209,88,.17);color:#32d74b;}'+
+  '#leaveProofOverlay .lp-chip.declined{background:rgba(255,69,58,.17);color:#ff6961;}'+
+  '#leaveProofOverlay .lp-mat,#leaveProofOverlay .lp-glass{background:rgba(58,58,60,.55);-webkit-backdrop-filter:blur(24px) saturate(180%);backdrop-filter:blur(24px) saturate(180%);box-shadow:inset 0 .5px 0 rgba(255,255,255,.22),0 0 0 .5px rgba(255,255,255,.1),0 6px 20px rgba(0,0,0,.28);}'+
+  '#leaveProofOverlay .lp-glass{border:0;color:#fff;font-family:inherit;cursor:pointer;transition:transform .12s ease-out,background .2s;}'+
+  '#leaveProofOverlay .lp-glass:hover{background:rgba(84,84,88,.62);}'+
+  '#leaveProofOverlay .lp-glass:active{transform:scale(.94);background:rgba(110,110,116,.62);transition-duration:.06s;}'+
+  '#leaveProofOverlay .lp-glass:focus-visible,#leaveProofOverlay .lp-act:focus-visible{outline:2px solid #64d2ff;outline-offset:2px;}'+
+  '#leaveProofOverlay .lp-glass:disabled{opacity:.4;cursor:default;pointer-events:none;}'+
+  '#leaveProofOverlay .lp-circle{width:44px;height:44px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;flex:none;padding:0;}'+
+  '#leaveProofOverlay .lp-pill{height:44px;padding:0 16px 0 14px;border-radius:22px;display:inline-flex;align-items:center;gap:7px;font-size:15px;font-weight:600;letter-spacing:-.011em;flex:none;white-space:nowrap;}'+
+  '#leaveProofOverlay .lp-bar{position:absolute;left:50%;bottom:max(18px,env(safe-area-inset-bottom));transform:translateX(-50%);z-index:2;width:min(440px,calc(100% - 28px));display:flex;gap:6px;padding:6px;border-radius:28px;opacity:0;}'+
+  '#leaveProofOverlay .lp-act{flex:1;height:46px;border-radius:22px;border:0;font-family:inherit;font-size:16px;font-weight:600;letter-spacing:-.011em;color:#fff;background:rgba(255,255,255,.1);cursor:pointer;white-space:nowrap;transition:transform .12s ease-out,background .2s,filter .2s;}'+
+  '#leaveProofOverlay .lp-act:hover{background:rgba(255,255,255,.17);}'+
+  '#leaveProofOverlay .lp-act:active{transform:scale(.95);transition-duration:.06s;}'+
+  '#leaveProofOverlay .lp-act.no{background:rgba(255,69,58,.17);color:#ff6961;}'+
+  '#leaveProofOverlay .lp-act.no:hover{background:rgba(255,69,58,.27);}'+
+  '#leaveProofOverlay .lp-act.ok{background:#30d158;color:#04210c;}'+
+  '#leaveProofOverlay .lp-act.ok:hover{background:#3ddc66;}'+
+  '#leaveProofOverlay .lp-act.ok:active{background:#27b84c;}'+
+  /* loading and error */
+  '#leaveProofOverlay .lp-state{text-align:center;color:rgba(235,235,245,.62);font-size:14px;line-height:1.45;max-width:320px;padding:24px;}'+
+  '#leaveProofOverlay .lp-state b{display:block;color:#fff;font-size:17px;font-weight:600;letter-spacing:-.022em;margin:10px 0 4px;}'+
+  '#leaveProofOverlay .lp-state .lp-glass{margin-top:18px;}'+
+  '#leaveProofOverlay .lp-spin{width:30px;height:30px;margin:0 auto 14px;border-radius:50%;border:2.5px solid rgba(255,255,255,.16);border-top-color:rgba(255,255,255,.85);animation:lpSpin .75s linear infinite;}'+
+  '#leaveProofOverlay .lp-fadein{animation:lpFade .3s .18s both;}'+
+  '@keyframes lpSpin{to{transform:rotate(360deg);}}@keyframes lpFade{from{opacity:0}to{opacity:1}}'+
+  '@media (max-width:480px){#leaveProofOverlay .lp-pill span{display:none;}#leaveProofOverlay .lp-pill{width:44px;padding:0;justify-content:center;}}'+
+  '@media (prefers-reduced-motion:reduce){#leaveProofOverlay.open #lpBg,#leaveProofOverlay.open .lp-top,#leaveProofOverlay.open .lp-bar,#leaveProofOverlay.open .lp-media{transition:opacity .2s;}#leaveProofOverlay .lp-spin{animation-duration:2s;}}'+
+  '@media (prefers-reduced-transparency:reduce){#leaveProofOverlay #lpBg{background:#000;-webkit-backdrop-filter:none;backdrop-filter:none;}#leaveProofOverlay .lp-mat,#leaveProofOverlay .lp-glass{background:#2c2c2e;-webkit-backdrop-filter:none;backdrop-filter:none;}}'+
+  '@media (prefers-contrast:more){#leaveProofOverlay .lp-mat,#leaveProofOverlay .lp-glass{background:#1c1c1e;box-shadow:0 0 0 1px rgba(255,255,255,.6);}#leaveProofOverlay .lp-sub{color:#fff;}}';
   document.head.appendChild(s);
 }
+
+/* ---------- overlay ---------- */
 function _lpOverlay(){
   _lpCss();
   let ov=document.getElementById('leaveProofOverlay');
   if(ov) return ov;
   ov=document.createElement('div');
-  ov.id='leaveProofOverlay';
-  ov.innerHTML='<div class="lp-card" role="dialog" aria-modal="true" aria-labelledby="lpTitle">'
-    +'<div class="lp-hd"><div class="lp-ico" id="lpIco"></div><div style="min-width:0;"><div class="lp-ttl" id="lpTitle">Leave proof</div><div class="lp-sub" id="lpSub"></div></div><button type="button" class="lp-x" aria-label="Close" onclick="closeLeaveProof()">&times;</button></div>'
-    +'<div class="lp-body" id="lpBody"></div>'
-    +'<div class="lp-ft"><div class="lp-hint" id="lpHint"></div><button type="button" class="lp-btn" onclick="closeLeaveProof()">Close</button><button type="button" class="lp-btn primary" id="lpOpen" disabled onclick="openLeaveProofFile()">'+_LP_IC_OPEN+'Open file</button></div>'
-    +'</div>';
-  ov.addEventListener('click',function(e){ if(e.target===ov) closeLeaveProof(); });
-  document.addEventListener('keydown',function(e){ if(e.key==='Escape' && ov.classList.contains('open')) closeLeaveProof(); });
+  ov.id='leaveProofOverlay'; ov.setAttribute('role','dialog'); ov.setAttribute('aria-modal','true'); ov.setAttribute('aria-labelledby','lpTitle');
+  ov.innerHTML='<div id="lpBg"></div>'
+    +'<div class="lp-stage" id="lpStage"><div class="lp-state" id="lpState"></div></div>'
+    +'<div class="lp-top" id="lpTop">'
+    +'<button type="button" class="lp-glass lp-circle" id="lpClose" aria-label="Close" onclick="closeLeaveProof()">'+_LP_IC.x+'</button>'
+    +'<div class="lp-head"><div class="lp-title"><span id="lpTitle">Leave proof</span><span id="lpChip"></span></div><div class="lp-sub" id="lpSub"></div></div>'
+    +'<button type="button" class="lp-glass lp-pill" id="lpOpen" disabled aria-label="Open file in a new tab" onclick="openLeaveProofFile()">'+_LP_IC.open+'<span>Open file</span></button>'
+    +'</div>'
+    +'';
   document.body.appendChild(ov);
+  _lpE.ov=ov; _lpE.bg=ov.querySelector('#lpBg'); _lpE.stage=ov.querySelector('#lpStage'); _lpE.state=ov.querySelector('#lpState');
+  _lpE.top=ov.querySelector('#lpTop'); _lpE.bar=ov.querySelector('#lpBar')||document.createElement('div'); _lpE.close=ov.querySelector('#lpClose'); _lpE.open=ov.querySelector('#lpOpen');
+  _lpBind(_lpE.stage);
+  document.addEventListener('keydown',function(e){ if(e.key==='Escape' && _lpOpen) closeLeaveProof(); });
   return ov;
 }
-function closeLeaveProof(){
-  _lpSeq++;
-  const ov=document.getElementById('leaveProofOverlay'); if(ov) ov.classList.remove('open');
-  const b=document.getElementById('lpBody'); if(b) b.innerHTML='';
-  _lpUrl=null;
-  const o=document.getElementById('lpOpen'); if(o) o.disabled=true;
+
+/* ---------- gestures ---------- */
+function _lpFC(e){ const r=_lpE.stage.getBoundingClientRect(); return {x:e.clientX-(r.left+r.width/2), y:e.clientY-(r.top+r.height/2)}; }
+function _lpCentroid(p){ let x=0,y=0; p.forEach(function(q){x+=q.x;y+=q.y;}); return {x:x/p.length,y:y/p.length}; }
+function _lpBounds(s){
+  const m=_lpE.media; if(!m) return {mx:0,my:0};
+  return {mx:Math.max(0,(m.offsetWidth*s-_lpE.stage.clientWidth)/2), my:Math.max(0,(m.offsetHeight*s-_lpE.stage.clientHeight)/2)};
 }
+// Keeps the point under your fingers fixed while you pan and pinch.
+function _lpBase(){
+  const pts=Array.from(_lpPtrs.values());
+  if(!pts.length){ _lpG=null; return; }
+  const c=_lpCentroid(pts), prev=_lpG;
+  _lpG={
+    s0:_lpV.s, x0:_lpV.x, y0:_lpV.y, c0:c, mode:'',
+    q:{x:(c.x-_lpV.x)/_lpV.s, y:(c.y-_lpV.y)/_lpV.s},
+    d0:pts.length>1?Math.hypot(pts[0].x-pts[1].x,pts[0].y-pts[1].y):0,
+    moved:prev?prev.moved:false, multi:pts.length>1||(prev?prev.multi:false), hist:[]
+  };
+}
+function _lpBind(st){
+  st.addEventListener('pointerdown',function(e){
+    if(_lpKind!=='img'||!_lpE.media||_lpClosing) return;
+    if(e.pointerType==='mouse'&&e.button!==0) return;
+    _lpStop(['x','y','s','mo']);                    // grab it mid-flight
+    try{ st.setPointerCapture(e.pointerId); }catch(_){}
+    _lpPtrs.set(e.pointerId,_lpFC(e));
+    _lpBase();
+  });
+  st.addEventListener('pointermove',function(e){
+    const G=_lpG; if(!G||!_lpPtrs.has(e.pointerId)) return;
+    _lpPtrs.set(e.pointerId,_lpFC(e));
+    const pts=Array.from(_lpPtrs.values()), c=_lpCentroid(pts), now=performance.now();
+    G.hist.push({t:now,x:c.x,y:c.y}); while(G.hist.length>2&&now-G.hist[0].t>100) G.hist.shift();
+    const dx=c.x-G.c0.x, dy=c.y-G.c0.y;
+    if(!G.moved){ if(Math.hypot(dx,dy)<=8&&pts.length<2) return; G.moved=true; }
+    const H=_lpE.stage.clientHeight, W=_lpE.stage.clientWidth;
+    if(pts.length>1){
+      G.mode='zoom';
+      let s=G.s0*Math.hypot(pts[0].x-pts[1].x,pts[0].y-pts[1].y)/(G.d0||1);
+      if(s>6) s=6+_lpRub(s-6,6); else if(s<1) s=1-_lpRub(1-s,1);
+      _lpV.s=s; _lpV.x=c.x-G.q.x*s; _lpV.y=c.y-G.q.y*s; _lpV.bg=1;
+    }else{
+      if(!G.mode) G.mode=(G.s0>1.06)?'pan':(Math.abs(dy)>=Math.abs(dx)?'dismiss':'idle');
+      if(G.mode==='pan'){
+        let x=c.x-G.q.x*G.s0, y=c.y-G.q.y*G.s0;
+        const b=_lpBounds(G.s0);
+        if(Math.abs(x)>b.mx) x=Math.sign(x)*(b.mx+_lpRub(Math.abs(x)-b.mx,W));
+        if(Math.abs(y)>b.my) y=Math.sign(y)*(b.my+_lpRub(Math.abs(y)-b.my,H));
+        _lpV.x=x; _lpV.y=y;
+      }else if(G.mode==='dismiss'){
+        const y=G.y0+dy, p=Math.min(1,Math.abs(y)/(H*.5));
+        _lpV.x=G.x0+dx; _lpV.y=y; _lpV.s=1-.3*p; _lpV.bg=1-p; _lpV.ch=_lpChromeOn?1-Math.min(1,p*3):0;
+      }
+    }
+    _lpRender();
+  });
+  const up=function(e){
+    if(!_lpPtrs.has(e.pointerId)) return;
+    const G=_lpG;
+    _lpPtrs.delete(e.pointerId);
+    if(_lpPtrs.size>0){ _lpBase(); return; }
+    _lpG=null; if(!G) return;
+    let vx=0,vy=0; const h=G.hist;
+    if(e.type!=='pointercancel'&&h.length>1&&performance.now()-h[h.length-1].t<120){
+      const a=h[0],b=h[h.length-1],dt=Math.max(16,b.t-a.t)/1000; vx=(b.x-a.x)/dt; vy=(b.y-a.y)/dt;
+    }
+    if(!G.moved&&!G.multi){ if(e.type!=='pointercancel') _lpTap(G.c0); return; }
+    if(G.mode==='dismiss'){
+      const H=_lpE.stage.clientHeight, py=_lpV.y+_lpProject(vy,.99);
+      if(Math.abs(py)>H*.3) _lpFinish({vx:vx,vy:vy}); else _lpSettle(vx,vy);
+    }else _lpSettle(vx,vy);
+  };
+  st.addEventListener('pointerup',up); st.addEventListener('pointercancel',up);
+  st.addEventListener('wheel',function(e){
+    if(_lpKind!=='img'||!_lpE.media||_lpClosing) return;
+    e.preventDefault(); _lpStop(['x','y','s']);
+    const f=_lpFC(e), s=_lpV.s, sT=_lpClamp(s*Math.exp(-e.deltaY*(e.ctrlKey?.012:.0022)),1,6);
+    const q={x:(f.x-_lpV.x)/s,y:(f.y-_lpV.y)/s}, b=_lpBounds(sT);
+    _lpV.s=sT; _lpV.x=sT===1?0:_lpClamp(f.x-q.x*sT,-b.mx,b.mx); _lpV.y=sT===1?0:_lpClamp(f.y-q.y*sT,-b.my,b.my); _lpRender();
+  },{passive:false});
+}
+// After pinch or pan: snap near 1x, clamp to 6x, glide into bounds carrying the flick.
+function _lpSettle(vx,vy){
+  const s=_lpV.s, sT=s<1.06?1:Math.min(6,s);
+  let tx=_lpV.x, ty=_lpV.y, ms=_lpV.mo;
+  if(sT===1){ tx=0; ty=0; }
+  else{
+    const b=_lpBounds(sT);
+    if(sT===s){ tx+=_lpProject(vx,.99); ty+=_lpProject(vy,.99); } else { tx*=sT/s; ty*=sT/s; }
+    tx=_lpClamp(tx,-b.mx,b.mx); ty=_lpClamp(ty,-b.my,b.my);
+  }
+  const bounce=Math.hypot(vx,vy)>400?.82:1;
+  _lpSpringTo('x',tx,vx,{z:bounce,r:.4}); _lpSpringTo('y',ty,vy,{z:bounce,r:.4});
+  _lpSpringTo('s',sT,0,{z:1,r:.36}); _lpSpringTo('bg',1,0,{z:1,r:.3}); _lpSpringTo('ch',_lpChromeOn?1:0,0,{z:1,r:.3});
+}
+function _lpTap(f){
+  const now=performance.now();
+  if(_lpLastTap&&now-_lpLastTap.t<300&&Math.hypot(f.x-_lpLastTap.x,f.y-_lpLastTap.y)<28){
+    clearTimeout(_lpTapT); _lpLastTap=null; _lpZoomAt(f); return;
+  }
+  _lpLastTap={t:now,x:f.x,y:f.y};
+  clearTimeout(_lpTapT);
+  _lpTapT=setTimeout(function(){ _lpLastTap=null; _lpToggleChrome(); },260);
+}
+function _lpZoomAt(f){
+  const s=_lpV.s, sT=s>1.05?1:2.6;
+  let tx=0,ty=0;
+  if(sT!==1){ const q={x:(f.x-_lpV.x)/s,y:(f.y-_lpV.y)/s}, b=_lpBounds(sT); tx=_lpClamp(f.x-q.x*sT,-b.mx,b.mx); ty=_lpClamp(f.y-q.y*sT,-b.my,b.my); }
+  _lpSpringTo('x',tx,0,{z:1,r:.42}); _lpSpringTo('y',ty,0,{z:1,r:.42}); _lpSpringTo('s',sT,0,{z:1,r:.42});
+}
+function _lpToggleChrome(){ if(!_lpOpen||_lpKind!=='img') return; _lpChromeOn=!_lpChromeOn; _lpSpringTo('ch',_lpChromeOn?1:0,0,{z:1,r:.3}); }
+
+/* ---------- open / close ---------- */
+function _lpResetMedia(){ if(_lpE.media){ _lpE.media.remove(); _lpE.media=null; } _lpKind=''; _lpUrl=null; }
 function openLeaveProofFile(){ if(_lpUrl) window.open(_lpUrl,'_blank'); }
+function _lpHideOverlay(){
+  _lpStop(); _lpResetMedia(); _lpClosing=false;
+  if(_lpE.ov){ _lpE.ov.classList.remove('open','pdf','closing'); }
+  _lpV.x=0;_lpV.y=0;_lpV.s=1;_lpV.bg=0;_lpV.ch=0;_lpV.mo=0;
+  if(_lpE.open) _lpE.open.disabled=true;
+  
+  if(_lpPrevFocus&&_lpPrevFocus.isConnected){ try{ _lpPrevFocus.focus({preventScroll:true}); }catch(_){} }
+  _lpPrevFocus=null;
+}
+// Leaves the way it came in: back into the button that opened it (or fades out if that is gone).
+function _lpFinish(vel){ closeLeaveProof(vel); }
+function closeLeaveProof(o){
+  if(!_lpOpen) return;
+  _lpOpen=false; _lpClosing=true; _lpE.ov.classList.add('closing'); clearTimeout(_lpTapT); _lpLastTap=null; _lpPtrs.clear(); _lpG=null;
+  const tok=++_lpSeq, done=function(){ if(tok===_lpSeq) _lpHideOverlay(); };
+  _lpStop();
+  if(_lpReduce()){ _lpV.bg=0;_lpV.ch=0;_lpV.mo=0; _lpRender(); setTimeout(done,200); return; }
+  const m=_lpE.media, vx=(o&&o.vx)||0, vy=(o&&o.vy)||0;
+  if(m){
+    let tx=_lpV.x, ty=_lpV.y, ts=_lpV.s*.94;
+    if(!(o&&o.quick)){
+      const p=_lpSrcPoint();
+      if(p){ tx=p.x; ty=p.y; ts=.26; } else { ty=_lpV.y+(vy>=0?1:-1)*_lpE.stage.clientHeight*.35; ts=.8; }
+    }
+    _lpSpringTo('x',tx,vx,{z:1,r:.36}); _lpSpringTo('y',ty,vy,{z:1,r:.36}); _lpSpringTo('s',ts,0,{z:1,r:.36});
+    _lpSpringTo('mo',0,0,{z:1,r:.3});
+  }
+  _lpSpringTo('ch',0,0,{z:1,r:.22});
+  _lpSpringTo('bg',0,0,{z:1,r:.3,eps:.012,veps:.2},done);
+}
+function _lpSrcPoint(){
+  if(!_lpSrcEl||!_lpSrcEl.isConnected) return null;
+  const r=_lpSrcEl.getBoundingClientRect(); if(!r.width&&!r.height) return null;
+  const st=_lpE.stage.getBoundingClientRect();
+  return {x:r.left+r.width/2-(st.left+st.width/2), y:r.top+r.height/2-(st.top+st.height/2)};
+}
+
 // Fetched once per file and kept for the session, so reopening is instant. Hovering or touching
 // "View proof" starts the fetch early. The last 6 files are kept.
 function _lpFetch(fileId){
@@ -401,38 +622,64 @@ function _lpFetch(fileId){
   return p;
 }
 function prefetchLeaveProof(fileId){ _lpFetch(fileId).catch(function(){}); }
-function _lpShowError(fileId){
-  document.getElementById('lpIco').innerHTML=_LP_IC_IMG;
-  document.getElementById('lpSub').textContent='Could not open';
-  document.getElementById('lpHint').textContent='';
-  document.getElementById('lpBody').innerHTML='<div class="lp-state"><b>This proof could not be loaded</b>It may have been removed, or only the person who attached it and hub admins can open it.<div style="margin-top:14px;"><button type="button" class="lp-btn" onclick="viewLeaveProof(\''+fileId+'\')">Try again</button></div></div>';
+
+function _lpShowState(html){ _lpE.state.style.display=''; _lpE.state.innerHTML=html; }
+async function _lpMount(o,seq){
+  const isImg=o.mime.indexOf('image/')===0;
+  let el;
+  if(isImg){ el=document.createElement('img'); el.src=o.url; el.alt='Leave proof'; el.draggable=false; el.className='lp-media'; try{ await el.decode(); }catch(_){} }
+  else{ el=document.createElement('div'); el.className='lp-pdf lp-media'; el.innerHTML='<iframe src="'+o.url+'" title="Leave proof"></iframe>'; }
+  if(seq!==_lpSeq) return;
+  _lpKind=isImg?'img':'pdf'; _lpUrl=o.url; _lpE.ov.classList.toggle('pdf',!isImg);
+  if(!isImg){ _lpChromeOn=true; _lpSpringTo('ch',1,0,{z:1,r:.3}); }
+  _lpE.state.style.display='none';
+  _lpE.stage.insertBefore(el,_lpE.stage.firstChild); _lpE.media=el;
+  // start from the button that opened it, then spring to rest
+  let sx=0,sy=0,ss=.92; const p=_lpSrcPoint(); if(p){ sx=p.x; sy=p.y; ss=.26; }
+  _lpV.x=_lpReduce()?0:sx; _lpV.y=_lpReduce()?0:sy; _lpV.s=_lpReduce()?1:ss; _lpV.mo=0; _lpRender(); void el.offsetWidth;
+  _lpSpringTo('x',0,0,{z:1,r:.46}); _lpSpringTo('y',0,0,{z:1,r:.46}); _lpSpringTo('s',1,0,{z:1,r:.46}); _lpSpringTo('mo',1,0,{z:1,r:.26});
+  _lpE.open.disabled=false;
+  _lpHead('ready',o);
 }
-async function viewLeaveProof(fileId){
+async function _lpView(fileId){
+  const ev=window.event;
+  let src=null; if(ev&&ev.currentTarget&&ev.currentTarget.nodeType===1) src=ev.currentTarget; else if(ev&&ev.target&&ev.target.closest) src=ev.target.closest('button,a');
+  const ov=_lpOverlay();
+  if(src&&!ov.contains(src)) _lpSrcEl=src;
   const seq=++_lpSeq;
-  const ov=_lpOverlay(); ov.classList.add('open');
-  document.getElementById('lpTitle').textContent='Leave proof';
-  document.getElementById('lpIco').innerHTML=_LP_IC_PDF;
-  document.getElementById('lpSub').textContent='Loading…';
-  document.getElementById('lpHint').textContent='';
-  document.getElementById('lpOpen').disabled=true;
-  document.getElementById('lpBody').innerHTML='<div class="lp-state"><div class="lp-spin"></div><b>Fetching from Drive</b>The first open can take a few seconds.</div>';
+  if(!_lpOpen){
+    _lpStop(); _lpResetMedia(); _lpClosing=false; _lpOpen=true;
+    _lpPrevFocus=document.activeElement;
+    ov.classList.remove('pdf','closing'); ov.classList.add('open');
+    _lpChromeOn=true; _lpV.x=0;_lpV.y=0;_lpV.s=1;_lpV.bg=0;_lpV.ch=0;_lpV.mo=0; _lpRender(); void ov.offsetWidth;
+    _lpSpringTo('bg',1,0,{z:1,r:.4}); _lpSpringTo('ch',1,0,{z:1,r:.5});
+    try{ _lpE.close.focus({preventScroll:true}); }catch(_){}
+  }else{ _lpResetMedia(); ov.classList.remove('pdf'); }
+  _lpRetry=function(){ _lpView(fileId); };
+  _lpE.open.disabled=true;
+  _lpHead('loading');
+  _lpShowState('<div class="lp-fadein"><div class="lp-spin"></div>Fetching from Drive</div>');
   try{
     const o=await _lpFetch(fileId);
     if(seq!==_lpSeq) return;
-    _lpUrl=o.url;
-    const isImg=o.mime.indexOf('image/')===0;
-    document.getElementById('lpIco').innerHTML=isImg?_LP_IC_IMG:_LP_IC_PDF;
-    document.getElementById('lpSub').textContent=(isImg?'Image':'PDF document')+' · '+o.kb+' KB';
-    document.getElementById('lpHint').textContent=isImg?'':'If the preview is blank on your device, use Open file.';
-    document.getElementById('lpBody').innerHTML=isImg
-      ?'<img src="'+o.url+'" alt="Leave proof">'
-      :'<iframe src="'+o.url+'" title="Leave proof"></iframe>';
-    document.getElementById('lpOpen').disabled=false;
+    await _lpMount(o,seq);
   }catch(e){
     if(seq!==_lpSeq) return;
-    _lpShowError(fileId);
+    _lpHead('error');
+    _lpShowState('<div style="color:#ff9f0a;">'+_LP_IC.warn+'</div><b>Can’t open this proof</b>It may have been removed, or only the person who attached it and hub admins can open it.<div><button type="button" class="lp-glass lp-pill" onclick="_lpRetry&&_lpRetry()"><span style="display:inline">Try again</span></button></div>');
   }
 }
+
+function _lpHead(phase,o){
+  document.getElementById('lpTitle').textContent='Leave proof';
+  document.getElementById('lpChip').innerHTML='';
+  document.getElementById('lpSub').textContent=
+    phase==='ready' ? ((o.mime.indexOf('image/')===0?'Image':'PDF document')+' · '+o.kb+' KB')
+    : phase==='error' ? 'Could not open' : 'Opening…';
+}
+function viewLeaveProof(fileId){ return _lpView(fileId); }
+
+
 async function submitLeave(){
   const from=document.getElementById("leaveFrom").value;
   const to=document.getElementById("leaveTo").value;
