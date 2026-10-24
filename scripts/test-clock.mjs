@@ -4,7 +4,8 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import assert from 'node:assert/strict';
 
-const html = fs.readFileSync('index.html', 'utf8');
+// calcHoursForRange lives in nexus-hours.js since the module split, so read index.html plus all nexus-*.js modules.
+const html = ['index.html', ...fs.readdirSync('.').filter(f => /^nexus-.*\.js$/.test(f))].map(f => fs.readFileSync(f, 'utf8')).join('\n');
 const start = html.indexOf('function calcHoursForRange(');
 assert.ok(start > 0, 'calcHoursForRange not found in index.html');
 let depth = 0, i = html.indexOf('{', start), end = -1;
