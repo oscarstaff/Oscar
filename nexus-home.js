@@ -299,48 +299,95 @@ async function uploadLeaveProof(file){
   if(!j||!j.ok||!j.id) throw new Error("proof-upload");
   return j.id;
 }
-// The proof previews inside the app. A separate file opens only when "Open file" is clicked.
+// Leave proof viewer. Previews inside the app. A separate file opens only when "Open file" is clicked.
 // The gateway returns the file only to the person who attached it or a hub admin.
 let _lpUrl=null;
+const _LP_ICON_PDF='<svg width="18" height="18" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M5 2h7l4 4v11a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1zm6 1.5V7h3.5z"/></svg>';
+const _LP_ICON_IMG='<svg width="18" height="18" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M3 4h14v12H3zm2 9 2.5-3 2 2.4L11 10l3 3.6V6H5z"/></svg>';
+function _lpCss(){
+  if(document.getElementById('lpStyle')) return;
+  const s=document.createElement('style'); s.id='lpStyle';
+  s.textContent=
+  '#leaveProofOverlay{position:fixed;inset:0;z-index:99990;background:rgba(15,23,42,.5);display:none;align-items:center;justify-content:center;padding:24px;}'+
+  '#leaveProofOverlay.open{display:flex;}'+
+  '#leaveProofOverlay .lp-card{background:var(--ui-surface,#fff);color:var(--ui-ink,#0f172a);border:1px solid var(--ui-line,#e2e8f0);border-radius:20px;width:min(920px,100%);height:min(88vh,840px);display:flex;flex-direction:column;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,.25);font-family:inherit;}'+
+  '#leaveProofOverlay .lp-hd{display:flex;align-items:center;gap:12px;padding:14px 16px 14px 18px;border-bottom:1px solid var(--ui-line,#e2e8f0);}'+
+  '#leaveProofOverlay .lp-ico{width:36px;height:36px;border-radius:11px;background:#ecfdf5;color:#059669;display:flex;align-items:center;justify-content:center;flex:none;}'+
+  '#leaveProofOverlay .lp-ttl{font-weight:800;font-size:15px;letter-spacing:-.01em;line-height:1.2;}'+
+  '#leaveProofOverlay .lp-sub{font-size:12px;color:var(--ui-ink-3,#64748b);margin-top:2px;}'+
+  '#leaveProofOverlay .lp-x{margin-left:auto;width:36px;height:36px;border-radius:10px;border:0;background:transparent;color:var(--ui-ink-3,#64748b);font-size:22px;line-height:1;cursor:pointer;flex:none;}'+
+  '#leaveProofOverlay .lp-x:hover{background:var(--ui-surface-3,#f1f5f9);color:var(--ui-ink,#0f172a);}'+
+  '#leaveProofOverlay .lp-body{flex:1;min-height:0;background:var(--ui-surface-3,#f1f5f9);display:flex;align-items:center;justify-content:center;overflow:auto;padding:16px;}'+
+  '#leaveProofOverlay .lp-body img{max-width:100%;max-height:100%;object-fit:contain;border-radius:10px;box-shadow:0 6px 20px rgba(15,23,42,.12);background:#fff;}'+
+  '#leaveProofOverlay .lp-body iframe{width:100%;height:100%;border:0;border-radius:10px;background:#fff;}'+
+  '#leaveProofOverlay .lp-ft{display:flex;align-items:center;gap:10px;padding:12px 16px;border-top:1px solid var(--ui-line,#e2e8f0);}'+
+  '#leaveProofOverlay .lp-hint{font-size:12px;color:var(--ui-ink-3,#64748b);margin-right:auto;line-height:1.35;}'+
+  '#leaveProofOverlay .lp-btn{padding:9px 16px;border-radius:10px;font-weight:700;font-size:13px;cursor:pointer;border:1px solid var(--ui-line,#e2e8f0);background:var(--ui-surface,#fff);color:var(--ui-ink,#0f172a);font-family:inherit;}'+
+  '#leaveProofOverlay .lp-btn:hover{background:var(--ui-surface-3,#f1f5f9);}'+
+  '#leaveProofOverlay .lp-btn.primary{background:#059669;border-color:#059669;color:#fff;}'+
+  '#leaveProofOverlay .lp-btn.primary:hover{background:#047857;}'+
+  '#leaveProofOverlay .lp-btn:disabled{opacity:.45;cursor:not-allowed;}'+
+  '#leaveProofOverlay .lp-state{text-align:center;color:var(--ui-ink-3,#64748b);font-size:13px;padding:24px;max-width:340px;line-height:1.5;}'+
+  '#leaveProofOverlay .lp-state b{display:block;color:var(--ui-ink,#0f172a);font-size:14px;margin-bottom:6px;}'+
+  '@media (max-width:640px){#leaveProofOverlay{padding:0;}#leaveProofOverlay .lp-card{width:100%;height:100%;border-radius:0;border:0;}#leaveProofOverlay .lp-hint{display:none;}}';
+  document.head.appendChild(s);
+}
 function _lpOverlay(){
-  let ov=document.getElementById("leaveProofOverlay");
+  _lpCss();
+  let ov=document.getElementById('leaveProofOverlay');
   if(ov) return ov;
-  ov=document.createElement("div");
-  ov.id="leaveProofOverlay";
-  ov.style.cssText="position:fixed;inset:0;z-index:99990;background:rgba(15,23,42,.6);display:none;align-items:center;justify-content:center;padding:16px;";
-  ov.innerHTML='<div style="background:var(--ui-surface,#fff);color:var(--ui-ink,#0f172a);border-radius:16px;width:min(880px,100%);max-height:92vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 50px rgba(0,0,0,.3);">'
-    +'<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--ui-line,#e2e8f0);"><strong style="font-size:14px;">Leave proof</strong><button type="button" onclick="closeLeaveProof()" aria-label="Close" style="border:0;background:none;font-size:22px;line-height:1;cursor:pointer;color:inherit;">&times;</button></div>'
-    +'<div id="lpBody" style="flex:1;min-height:300px;display:flex;align-items:center;justify-content:center;background:#f1f5f9;overflow:auto;"></div>'
-    +'<div style="display:flex;justify-content:flex-end;padding:10px 16px;border-top:1px solid var(--ui-line,#e2e8f0);"><button type="button" id="lpOpen" disabled onclick="openLeaveProofFile()" style="padding:8px 16px;border-radius:8px;border:0;background:#059669;color:#fff;font-weight:600;cursor:pointer;">Open file</button></div>'
+  ov=document.createElement('div');
+  ov.id='leaveProofOverlay';
+  ov.innerHTML='<div class="lp-card" role="dialog" aria-modal="true" aria-labelledby="lpTitle">'
+    +'<div class="lp-hd"><div class="lp-ico" id="lpIco"></div><div style="min-width:0;"><div class="lp-ttl" id="lpTitle">Leave proof</div><div class="lp-sub" id="lpSub"></div></div><button type="button" class="lp-x" aria-label="Close" onclick="closeLeaveProof()">&times;</button></div>'
+    +'<div class="lp-body" id="lpBody"></div>'
+    +'<div class="lp-ft"><div class="lp-hint" id="lpHint"></div><button type="button" class="lp-btn" onclick="closeLeaveProof()">Close</button><button type="button" class="lp-btn primary" id="lpOpen" disabled onclick="openLeaveProofFile()">Open file</button></div>'
     +'</div>';
-  ov.addEventListener("click",function(e){ if(e.target===ov) closeLeaveProof(); });
+  ov.addEventListener('click',function(e){ if(e.target===ov) closeLeaveProof(); });
+  document.addEventListener('keydown',function(e){ if(e.key==='Escape' && ov.classList.contains('open')) closeLeaveProof(); });
   document.body.appendChild(ov);
   return ov;
 }
 function closeLeaveProof(){
-  const ov=document.getElementById("leaveProofOverlay"); if(ov) ov.style.display="none";
-  const b=document.getElementById("lpBody"); if(b) b.innerHTML="";
+  const ov=document.getElementById('leaveProofOverlay'); if(ov) ov.classList.remove('open');
+  const b=document.getElementById('lpBody'); if(b) b.innerHTML='';
   if(_lpUrl){ URL.revokeObjectURL(_lpUrl); _lpUrl=null; }
-  const o=document.getElementById("lpOpen"); if(o) o.disabled=true;
+  const o=document.getElementById('lpOpen'); if(o) o.disabled=true;
 }
-function openLeaveProofFile(){ if(_lpUrl) window.open(_lpUrl,"_blank"); }
+function openLeaveProofFile(){ if(_lpUrl) window.open(_lpUrl,'_blank'); }
+function _lpShowError(fileId){
+  document.getElementById('lpIco').innerHTML=_LP_ICON_IMG;
+  document.getElementById('lpSub').textContent='Could not open';
+  document.getElementById('lpHint').textContent='';
+  document.getElementById('lpBody').innerHTML='<div class="lp-state"><b>This proof could not be loaded</b>It may have been removed, or only the person who attached it and hub admins can open it.<div style="margin-top:14px;"><button type="button" class="lp-btn" onclick="viewLeaveProof(\''+fileId+'\')">Try again</button></div></div>';
+}
 async function viewLeaveProof(fileId){
-  const ov=_lpOverlay(); ov.style.display="flex";
-  const body=document.getElementById("lpBody");
-  body.innerHTML='<div style="color:#64748b;font-size:13px;">Loading proof…</div>';
+  const ov=_lpOverlay(); ov.classList.add('open');
+  document.getElementById('lpTitle').textContent='Leave proof';
+  document.getElementById('lpIco').innerHTML=_LP_ICON_PDF;
+  document.getElementById('lpSub').textContent='Loading…';
+  document.getElementById('lpHint').textContent='';
+  document.getElementById('lpOpen').disabled=true;
+  document.getElementById('lpBody').innerHTML='<div class="lp-state">Loading proof…</div>';
   try{
-    const r=await fetch(_leaveProofUrl(),{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({action:"getLeaveProof",token:GAS_TOKEN,sbAccessToken:_sbBearer(),fileId:fileId})});
+    const r=await fetch(_leaveProofUrl(),{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'getLeaveProof',token:GAS_TOKEN,sbAccessToken:_sbBearer(),fileId:fileId})});
     const j=r.ok?await r.json():null;
-    if(!j||!j.ok) throw new Error("get");
+    if(!j||!j.ok) throw new Error('get');
     const bin=atob(j.base64), u8=new Uint8Array(bin.length);
     for(let i=0;i<bin.length;i++) u8[i]=bin.charCodeAt(i);
     if(_lpUrl) URL.revokeObjectURL(_lpUrl);
     _lpUrl=URL.createObjectURL(new Blob([u8],{type:j.mime}));
-    if(String(j.mime).indexOf("image/")===0) body.innerHTML='<img src="'+_lpUrl+'" alt="Leave proof" style="max-width:100%;max-height:72vh;display:block;margin:auto;">';
-    else body.innerHTML='<iframe src="'+_lpUrl+'" title="Leave proof" style="width:100%;height:72vh;border:0;background:#fff;"></iframe>';
-    document.getElementById("lpOpen").disabled=false;
+    const isImg=String(j.mime).indexOf('image/')===0;
+    const kb=Math.max(1,Math.round(bin.length/1024));
+    document.getElementById('lpIco').innerHTML=isImg?_LP_ICON_IMG:_LP_ICON_PDF;
+    document.getElementById('lpSub').textContent=(isImg?'Image':'PDF document')+' · '+kb+' KB';
+    document.getElementById('lpHint').textContent=isImg?'':'If the preview is blank on your device, use Open file.';
+    document.getElementById('lpBody').innerHTML=isImg
+      ?'<img src="'+_lpUrl+'" alt="Leave proof">'
+      :'<iframe src="'+_lpUrl+'" title="Leave proof"></iframe>';
+    document.getElementById('lpOpen').disabled=false;
   }catch(e){
-    body.innerHTML='<div style="padding:24px;color:#64748b;font-size:13px;text-align:center;">Could not load the proof. Try again.</div>';
+    _lpShowError(fileId);
   }
 }
 async function submitLeave(){
