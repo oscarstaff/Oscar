@@ -287,7 +287,23 @@ function onLeaveProofPick(){
 function _leaveProofUrl(){
   return localStorage.getItem("oscars_sheet_url") || "https://script.google.com/macros/s/AKfycby0Bq97bCZAsmnruXFuJuCqXQE_kOxhYE2KFuJnVzLXtT5CV0Y12k5176dxZbdaYVGE/exec";
 }
+// Photos are shrunk before upload (longest side 1600px, JPEG). A phone photo is often 3-5 MB, which makes
+// both the upload and every later view slow. PDFs and images that don't get smaller are sent unchanged.
+async function compressLeaveProof(file){
+  if(!/^image\/(jpeg|png)$/.test(file.type)) return file;
+  try{
+    const bmp=await createImageBitmap(file);
+    const k=Math.min(1,1600/Math.max(bmp.width,bmp.height));
+    const w=Math.round(bmp.width*k), h=Math.round(bmp.height*k);
+    const c=document.createElement("canvas"); c.width=w; c.height=h;
+    const x=c.getContext("2d"); x.fillStyle="#fff"; x.fillRect(0,0,w,h); x.drawImage(bmp,0,0,w,h);
+    const blob=await new Promise(function(res){ c.toBlob(res,"image/jpeg",0.82); });
+    if(blob && blob.size<file.size) return new File([blob],"proof.jpg",{type:"image/jpeg"});
+  }catch(e){}
+  return file;
+}
 async function uploadLeaveProof(file){
+  file=await compressLeaveProof(file);
   const base64=await new Promise(function(resolve,reject){
     const rd=new FileReader();
     rd.onload=function(){ resolve(String(rd.result).split(",")[1]); };
@@ -301,9 +317,11 @@ async function uploadLeaveProof(file){
 }
 // Leave proof viewer. Previews inside the app. A separate file opens only when "Open file" is clicked.
 // The gateway returns the file only to the person who attached it or a hub admin.
-let _lpUrl=null;
-const _LP_ICON_PDF='<svg width="18" height="18" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M5 2h7l4 4v11a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1zm6 1.5V7h3.5z"/></svg>';
-const _LP_ICON_IMG='<svg width="18" height="18" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M3 4h14v12H3zm2 9 2.5-3 2 2.4L11 10l3 3.6V6H5z"/></svg>';
+let _lpUrl=null, _lpSeq=0;
+const _lpCache={}, _lpOrder=[];
+const _LP_IC_PDF='<svg width="18" height="18" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M5 2h7l4 4v11a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1zm6 1.5V7h3.5z"/></svg>';
+const _LP_IC_IMG='<svg width="18" height="18" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M3 4h14v12H3zm2 9 2.5-3 2 2.4L11 10l3 3.6V6H5z"/></svg>';
+const _LP_IC_OPEN='<svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 4H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-3M11 4h5v5M16 4l-7 7"/></svg>';
 function _lpCss(){
   if(document.getElementById('lpStyle')) return;
   const s=document.createElement('style'); s.id='lpStyle';
@@ -315,21 +333,26 @@ function _lpCss(){
   '#leaveProofOverlay .lp-ico{width:36px;height:36px;border-radius:11px;background:#ecfdf5;color:#059669;display:flex;align-items:center;justify-content:center;flex:none;}'+
   '#leaveProofOverlay .lp-ttl{font-weight:800;font-size:15px;letter-spacing:-.01em;line-height:1.2;}'+
   '#leaveProofOverlay .lp-sub{font-size:12px;color:var(--ui-ink-3,#64748b);margin-top:2px;}'+
-  '#leaveProofOverlay .lp-x{margin-left:auto;width:36px;height:36px;border-radius:10px;border:0;background:transparent;color:var(--ui-ink-3,#64748b);font-size:22px;line-height:1;cursor:pointer;flex:none;}'+
+  '#leaveProofOverlay .lp-x{margin-left:auto;width:36px;height:36px;border-radius:50%;border:0;background:transparent;color:var(--ui-ink-3,#64748b);font-size:22px;line-height:1;cursor:pointer;flex:none;transition:background .15s,transform .12s;}'+
   '#leaveProofOverlay .lp-x:hover{background:var(--ui-surface-3,#f1f5f9);color:var(--ui-ink,#0f172a);}'+
+  '#leaveProofOverlay .lp-x:active{transform:scale(.92);}'+
   '#leaveProofOverlay .lp-body{flex:1;min-height:0;background:var(--ui-surface-3,#f1f5f9);display:flex;align-items:center;justify-content:center;overflow:auto;padding:16px;}'+
   '#leaveProofOverlay .lp-body img{max-width:100%;max-height:100%;object-fit:contain;border-radius:10px;box-shadow:0 6px 20px rgba(15,23,42,.12);background:#fff;}'+
   '#leaveProofOverlay .lp-body iframe{width:100%;height:100%;border:0;border-radius:10px;background:#fff;}'+
   '#leaveProofOverlay .lp-ft{display:flex;align-items:center;gap:10px;padding:12px 16px;border-top:1px solid var(--ui-line,#e2e8f0);}'+
   '#leaveProofOverlay .lp-hint{font-size:12px;color:var(--ui-ink-3,#64748b);margin-right:auto;line-height:1.35;}'+
-  '#leaveProofOverlay .lp-btn{padding:9px 16px;border-radius:10px;font-weight:700;font-size:13px;cursor:pointer;border:1px solid var(--ui-line,#e2e8f0);background:var(--ui-surface,#fff);color:var(--ui-ink,#0f172a);font-family:inherit;}'+
+  '#leaveProofOverlay .lp-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:40px;padding:0 18px;border-radius:12px;font-weight:600;font-size:13.5px;line-height:1;cursor:pointer;border:1px solid var(--ui-line,#e2e8f0);background:var(--ui-surface,#fff);color:var(--ui-ink,#0f172a);font-family:inherit;transition:background .15s,transform .12s,box-shadow .15s;}'+
   '#leaveProofOverlay .lp-btn:hover{background:var(--ui-surface-3,#f1f5f9);}'+
-  '#leaveProofOverlay .lp-btn.primary{background:#059669;border-color:#059669;color:#fff;}'+
-  '#leaveProofOverlay .lp-btn.primary:hover{background:#047857;}'+
-  '#leaveProofOverlay .lp-btn:disabled{opacity:.45;cursor:not-allowed;}'+
+  '#leaveProofOverlay .lp-btn:active{transform:scale(.97);}'+
+  '#leaveProofOverlay .lp-btn:focus-visible{outline:2px solid #10b981;outline-offset:2px;}'+
+  '#leaveProofOverlay .lp-btn.primary{background:linear-gradient(180deg,#10b981,#059669);border-color:#059669;color:#fff;box-shadow:0 4px 12px rgba(5,150,105,.28);}'+
+  '#leaveProofOverlay .lp-btn.primary:hover{filter:brightness(1.06);}'+
+  '#leaveProofOverlay .lp-btn:disabled{opacity:.45;cursor:not-allowed;box-shadow:none;}'+
   '#leaveProofOverlay .lp-state{text-align:center;color:var(--ui-ink-3,#64748b);font-size:13px;padding:24px;max-width:340px;line-height:1.5;}'+
   '#leaveProofOverlay .lp-state b{display:block;color:var(--ui-ink,#0f172a);font-size:14px;margin-bottom:6px;}'+
-  '@media (max-width:640px){#leaveProofOverlay{padding:0;}#leaveProofOverlay .lp-card{width:100%;height:100%;border-radius:0;border:0;}#leaveProofOverlay .lp-hint{display:none;}}';
+  '#leaveProofOverlay .lp-spin{width:28px;height:28px;border-radius:50%;border:3px solid rgba(100,116,139,.25);border-top-color:#10b981;animation:lpSpin .8s linear infinite;margin:0 auto 12px;}'+
+  '@keyframes lpSpin{to{transform:rotate(360deg);}}'+
+  '@media (max-width:640px){#leaveProofOverlay{padding:0;}#leaveProofOverlay .lp-card{width:100%;height:100%;border-radius:0;border:0;}#leaveProofOverlay .lp-hint{display:none;}#leaveProofOverlay .lp-ft{padding-bottom:max(12px,env(safe-area-inset-bottom));}#leaveProofOverlay .lp-btn{flex:1;}}';
   document.head.appendChild(s);
 }
 function _lpOverlay(){
@@ -341,7 +364,7 @@ function _lpOverlay(){
   ov.innerHTML='<div class="lp-card" role="dialog" aria-modal="true" aria-labelledby="lpTitle">'
     +'<div class="lp-hd"><div class="lp-ico" id="lpIco"></div><div style="min-width:0;"><div class="lp-ttl" id="lpTitle">Leave proof</div><div class="lp-sub" id="lpSub"></div></div><button type="button" class="lp-x" aria-label="Close" onclick="closeLeaveProof()">&times;</button></div>'
     +'<div class="lp-body" id="lpBody"></div>'
-    +'<div class="lp-ft"><div class="lp-hint" id="lpHint"></div><button type="button" class="lp-btn" onclick="closeLeaveProof()">Close</button><button type="button" class="lp-btn primary" id="lpOpen" disabled onclick="openLeaveProofFile()">Open file</button></div>'
+    +'<div class="lp-ft"><div class="lp-hint" id="lpHint"></div><button type="button" class="lp-btn" onclick="closeLeaveProof()">Close</button><button type="button" class="lp-btn primary" id="lpOpen" disabled onclick="openLeaveProofFile()">'+_LP_IC_OPEN+'Open file</button></div>'
     +'</div>';
   ov.addEventListener('click',function(e){ if(e.target===ov) closeLeaveProof(); });
   document.addEventListener('keydown',function(e){ if(e.key==='Escape' && ov.classList.contains('open')) closeLeaveProof(); });
@@ -349,44 +372,64 @@ function _lpOverlay(){
   return ov;
 }
 function closeLeaveProof(){
+  _lpSeq++;
   const ov=document.getElementById('leaveProofOverlay'); if(ov) ov.classList.remove('open');
   const b=document.getElementById('lpBody'); if(b) b.innerHTML='';
-  if(_lpUrl){ URL.revokeObjectURL(_lpUrl); _lpUrl=null; }
+  _lpUrl=null;
   const o=document.getElementById('lpOpen'); if(o) o.disabled=true;
 }
 function openLeaveProofFile(){ if(_lpUrl) window.open(_lpUrl,'_blank'); }
-function _lpShowError(fileId){
-  document.getElementById('lpIco').innerHTML=_LP_ICON_IMG;
-  document.getElementById('lpSub').textContent='Could not open';
-  document.getElementById('lpHint').textContent='';
-  document.getElementById('lpBody').innerHTML='<div class="lp-state"><b>This proof could not be loaded</b>It may have been removed, or only the person who attached it and hub admins can open it.<div style="margin-top:14px;"><button type="button" class="lp-btn" onclick="viewLeaveProof(\''+fileId+'\')">Try again</button></div></div>';
-}
-async function viewLeaveProof(fileId){
-  const ov=_lpOverlay(); ov.classList.add('open');
-  document.getElementById('lpTitle').textContent='Leave proof';
-  document.getElementById('lpIco').innerHTML=_LP_ICON_PDF;
-  document.getElementById('lpSub').textContent='Loading…';
-  document.getElementById('lpHint').textContent='';
-  document.getElementById('lpOpen').disabled=true;
-  document.getElementById('lpBody').innerHTML='<div class="lp-state">Loading proof…</div>';
-  try{
+// Fetched once per file and kept for the session, so reopening is instant. Hovering or touching
+// "View proof" starts the fetch early. The last 6 files are kept.
+function _lpFetch(fileId){
+  if(_lpCache[fileId]) return _lpCache[fileId];
+  const p=(async function(){
     const r=await fetch(_leaveProofUrl(),{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'getLeaveProof',token:GAS_TOKEN,sbAccessToken:_sbBearer(),fileId:fileId})});
     const j=r.ok?await r.json():null;
     if(!j||!j.ok) throw new Error('get');
     const bin=atob(j.base64), u8=new Uint8Array(bin.length);
     for(let i=0;i<bin.length;i++) u8[i]=bin.charCodeAt(i);
-    if(_lpUrl) URL.revokeObjectURL(_lpUrl);
-    _lpUrl=URL.createObjectURL(new Blob([u8],{type:j.mime}));
-    const isImg=String(j.mime).indexOf('image/')===0;
-    const kb=Math.max(1,Math.round(bin.length/1024));
-    document.getElementById('lpIco').innerHTML=isImg?_LP_ICON_IMG:_LP_ICON_PDF;
-    document.getElementById('lpSub').textContent=(isImg?'Image':'PDF document')+' · '+kb+' KB';
+    return {url:URL.createObjectURL(new Blob([u8],{type:j.mime})), mime:String(j.mime), kb:Math.max(1,Math.round(bin.length/1024))};
+  })();
+  _lpCache[fileId]=p;
+  _lpOrder.push(fileId);
+  p.catch(function(){ delete _lpCache[fileId]; const i=_lpOrder.indexOf(fileId); if(i>=0) _lpOrder.splice(i,1); });
+  while(_lpOrder.length>6){
+    const old=_lpOrder.shift(), op=_lpCache[old]; delete _lpCache[old];
+    if(op) op.then(function(o){ if(o.url!==_lpUrl) URL.revokeObjectURL(o.url); }).catch(function(){});
+  }
+  return p;
+}
+function prefetchLeaveProof(fileId){ _lpFetch(fileId).catch(function(){}); }
+function _lpShowError(fileId){
+  document.getElementById('lpIco').innerHTML=_LP_IC_IMG;
+  document.getElementById('lpSub').textContent='Could not open';
+  document.getElementById('lpHint').textContent='';
+  document.getElementById('lpBody').innerHTML='<div class="lp-state"><b>This proof could not be loaded</b>It may have been removed, or only the person who attached it and hub admins can open it.<div style="margin-top:14px;"><button type="button" class="lp-btn" onclick="viewLeaveProof(\''+fileId+'\')">Try again</button></div></div>';
+}
+async function viewLeaveProof(fileId){
+  const seq=++_lpSeq;
+  const ov=_lpOverlay(); ov.classList.add('open');
+  document.getElementById('lpTitle').textContent='Leave proof';
+  document.getElementById('lpIco').innerHTML=_LP_IC_PDF;
+  document.getElementById('lpSub').textContent='Loading…';
+  document.getElementById('lpHint').textContent='';
+  document.getElementById('lpOpen').disabled=true;
+  document.getElementById('lpBody').innerHTML='<div class="lp-state"><div class="lp-spin"></div><b>Fetching from Drive</b>The first open can take a few seconds.</div>';
+  try{
+    const o=await _lpFetch(fileId);
+    if(seq!==_lpSeq) return;
+    _lpUrl=o.url;
+    const isImg=o.mime.indexOf('image/')===0;
+    document.getElementById('lpIco').innerHTML=isImg?_LP_IC_IMG:_LP_IC_PDF;
+    document.getElementById('lpSub').textContent=(isImg?'Image':'PDF document')+' · '+o.kb+' KB';
     document.getElementById('lpHint').textContent=isImg?'':'If the preview is blank on your device, use Open file.';
     document.getElementById('lpBody').innerHTML=isImg
-      ?'<img src="'+_lpUrl+'" alt="Leave proof">'
-      :'<iframe src="'+_lpUrl+'" title="Leave proof"></iframe>';
+      ?'<img src="'+o.url+'" alt="Leave proof">'
+      :'<iframe src="'+o.url+'" title="Leave proof"></iframe>';
     document.getElementById('lpOpen').disabled=false;
   }catch(e){
+    if(seq!==_lpSeq) return;
     _lpShowError(fileId);
   }
 }
@@ -736,7 +779,7 @@ async function loadLeaveHistory(){
             '<div class="lv-pill '+st+'">'+sl+'</div>'+
           '</div>'+
           (r.reason?'<div class="lv-reason">'+esc(r.reason)+'</div>':'')+
-          (r.proof_path?'<div class="lv-note"><a href="#" onclick="viewLeaveProof(\''+esc(r.proof_path)+'\');return false;">View attached proof</a></div>':'')+
+          (r.proof_path?'<div class="lv-note"><a href="#" onmouseenter="prefetchLeaveProof(\''+esc(r.proof_path)+'\')" ontouchstart="prefetchLeaveProof(\''+esc(r.proof_path)+'\')" onclick="viewLeaveProof(\''+esc(r.proof_path)+'\');return false;">View attached proof</a></div>':'')+
           (st==="declined"&&r.decline_reason?'<div class="lv-note"><strong>Manager note:</strong> '+esc(r.decline_reason)+'</div>':'')+
         '</div>'+
       '</div>';
