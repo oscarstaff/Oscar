@@ -265,6 +265,56 @@ async function loadHomeData(){
   }catch(e){if(sumEl)sumEl.innerHTML='<div style="padding:12px 0;font-size:12px;color:var(--ui-ink-4,#94a3b8)">Could not load data.</div>';}
 }
 
+const LEAVE_PROOF_MAX=5*1024*1024;
+const LEAVE_PROOF_EXT={'application/pdf':'pdf','image/jpeg':'jpg','image/png':'png'};
+function onLeaveProofPick(){
+  const inp=document.getElementById("leaveProof"), info=document.getElementById("leaveProofInfo");
+  const f=inp&&inp.files&&inp.files[0];
+  if(!f){ if(info) info.textContent=""; return; }
+  if(!LEAVE_PROOF_EXT[f.type] || f.size>LEAVE_PROOF_MAX){
+    inp.value="";
+    if(info) info.textContent="";
+    const err=document.getElementById("leaveErr");
+    err.textContent="Proof must be a PDF, JPG or PNG under 5 MB.";
+    err.classList.add("show");
+    return;
+  }
+  document.getElementById("leaveErr").classList.remove("show");
+  if(info) info.textContent="Attached: "+f.name;
+}
+// Proofs are saved to a private Google Drive folder through the Apps Script gateway.
+// The gateway checks the signed-in user. Returns the Drive file id, which is stored in leave_submissions.proof_path.
+function _leaveProofUrl(){
+  return localStorage.getItem("oscars_sheet_url") || "https://script.google.com/macros/s/AKfycby0Bq97bCZAsmnruXFuJuCqXQE_kOxhYE2KFuJnVzLXtT5CV0Y12k5176dxZbdaYVGE/exec";
+}
+async function uploadLeaveProof(file){
+  const base64=await new Promise(function(resolve,reject){
+    const rd=new FileReader();
+    rd.onload=function(){ resolve(String(rd.result).split(",")[1]); };
+    rd.onerror=reject;
+    rd.readAsDataURL(file);
+  });
+  const r=await fetch(_leaveProofUrl(),{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({action:"uploadLeaveProof",token:GAS_TOKEN,sbAccessToken:_sbBearer(),mime:file.type,base64:base64})});
+  const j=r.ok?await r.json():null;
+  if(!j||!j.ok||!j.id) throw new Error("proof-upload");
+  return j.id;
+}
+// The gateway returns the file only to the person who attached it or a hub admin.
+async function viewLeaveProof(fileId){
+  const w=window.open("about:blank","_blank");
+  try{
+    const r=await fetch(_leaveProofUrl(),{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({action:"getLeaveProof",token:GAS_TOKEN,sbAccessToken:_sbBearer(),fileId:fileId})});
+    const j=r.ok?await r.json():null;
+    if(!j||!j.ok) throw new Error("get");
+    const bin=atob(j.base64), u8=new Uint8Array(bin.length);
+    for(let i=0;i<bin.length;i++) u8[i]=bin.charCodeAt(i);
+    const url=URL.createObjectURL(new Blob([u8],{type:j.mime}));
+    if(w) w.location.href=url;
+  }catch(e){
+    if(w) w.close();
+    if(typeof showToast==="function") showToast("Could not open the proof.");
+  }
+}
 async function submitLeave(){
   const from=document.getElementById("leaveFrom").value;
   const to=document.getElementById("leaveTo").value;
@@ -294,15 +344,30 @@ async function submitLeave(){
   const reason = (sel==="Other") ? otherTxt : sel;
   const btn=document.getElementById("leaveBtn");btn.disabled=true;btn.innerHTML='<span class="sp"></span> Submitting...';
   try{
-    const res=await sbPost("leave_submissions",{staff_name:me,from_date:from,to_date:to,reason,reason_type:reasonType,status:"pending",source:"Web"});
+    let proofPath=null;
+    const pf=document.getElementById("leaveProof").files[0];
+    if(pf){
+      try{ proofPath=await uploadLeaveProof(pf); }
+      catch(e){ throw new Error("proof"); }
+    }
+    const row={staff_name:me,from_date:from,to_date:to,reason,reason_type:reasonType,status:"pending",source:"Web"};
+    if(proofPath) row.proof_path=proofPath;
+    const res=await sbPost("leave_submissions",row);
     if(res.ok||res.status===201){
       ok.textContent="Request submitted. Your manager will review it shortly.";ok.classList.add("show");
       document.getElementById("leaveReason").value="";
       document.getElementById("leaveOther").value="";
+      document.getElementById("leaveProof").value="";
+      document.getElementById("leaveProofInfo").textContent="";
       document.getElementById("leaveOtherWrap").style.display="none";
       loadLeaveHistory();loadHomeData();
     }else throw new Error();
-  }catch(e){err.textContent="Failed to submit. Please check your connection.";err.classList.add("show");}
+  }catch(e){
+    err.textContent = e && e.message==="proof"
+      ? "Could not upload your proof. Try again, or submit without it."
+      : "Failed to submit. Please check your connection.";
+    err.classList.add("show");
+  }
   finally{btn.disabled=false;btn.textContent="Submit Leave Request";}
 }
 function onLeaveReasonChange(){
@@ -596,6 +661,7 @@ async function loadLeaveHistory(){
             '<div class="lv-pill '+st+'">'+sl+'</div>'+
           '</div>'+
           (r.reason?'<div class="lv-reason">'+esc(r.reason)+'</div>':'')+
+          (r.proof_path?'<div class="lv-note"><a href="#" onclick="viewLeaveProof(\''+esc(r.proof_path)+'\');return false;">View attached proof</a></div>':'')+
           (st==="declined"&&r.decline_reason?'<div class="lv-note"><strong>Manager note:</strong> '+esc(r.decline_reason)+'</div>':'')+
         '</div>'+
       '</div>';

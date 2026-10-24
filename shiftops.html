@@ -4026,6 +4026,7 @@ async function loadData(){
             from:row.from_date, to:row.to_date,
             reason:row.reason||'',
             reason_type:row.reason_type||'',
+            proof_path:row.proof_path||'',
             status:row.status||'pending',
             declineReason:row.decline_reason||'',
             // Carried so the list can show WHERE a request came from and WHEN
@@ -10073,6 +10074,23 @@ function filterLeaveSummaryYear(yr){
 }
 
 function setLeaveStatusFilter(st){ window._leaveStatusFilter = st; renderLeave(); }
+// Leave proofs live in a private Drive folder. The gateway returns one only to the
+// person who attached it or a hub admin.
+async function viewLeaveProof(fileId){
+  const w=window.open('about:blank','_blank');
+  try{
+    const r=await fetch(GAS_EXEC_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'getLeaveProof',token:GAS_TOKEN,sbAccessToken:_soTok(),fileId:fileId})});
+    const j=r.ok?await r.json():null;
+    if(!j||!j.ok){ if(w) w.close(); showToast('Proof not available. Only the person who attached it or a hub admin can open it.'); return; }
+    const bin=atob(j.base64), u8=new Uint8Array(bin.length);
+    for(let i=0;i<bin.length;i++) u8[i]=bin.charCodeAt(i);
+    const url=URL.createObjectURL(new Blob([u8],{type:j.mime}));
+    if(w) w.location.href=url;
+  }catch(e){
+    if(w) w.close();
+    showToast('Could not open the proof.');
+  }
+}
 function renderLeave(filterName){
   const el=document.getElementById('leaveContentMain')||document.getElementById('leaveContent');if(!el)return;
   // If no filter passed, use current stored filter
@@ -10184,6 +10202,7 @@ function renderLeave(filterName){
           <span class="lv-name">${name}</span>
           <span class="lv-src ${addedHere?'lv-src-added':'lv-src-nexus'}">${addedHere?'Added':'Applied'}</span>
           ${r.reason?`<span class="lv-reason" title="${String(r.reason).replace(/"/g,'&quot;')}">${r.reason}</span>`:''}
+          ${r.proof_path?`<button type="button" class="lv-btn" style="margin-top:4px;" onclick="viewLeaveProof('${String(r.proof_path).replace(/[^A-Za-z0-9_\-\/.]/g,'')}')">View proof</button>`:''}
         </span>
       </td>
       <td class="lv-td lv-td-sm">${applied}</td>
@@ -10851,8 +10870,18 @@ function applyLeaveUpdate(id,status,declineReason){
   else showToast('Leave declined');
 }
 
-function deleteLeave(id){
+async function deleteLeave(id){
   const r=leaveRequests.find(x=>x.id===id);
+  // Trash the attached proof in Drive first. If that fails, keep the request so the file isn't orphaned.
+  if(r && r.proof_path){
+    let proofGone=false;
+    try{
+      const res=await fetch(GAS_EXEC_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'deleteLeaveProof',token:GAS_TOKEN,sbAccessToken:_soTok(),fileId:r.proof_path})});
+      const j=res.ok?await res.json():null;
+      proofGone=!!(j&&j.ok);
+    }catch(e){}
+    if(!proofGone){ showToast('Could not remove the attached proof, so the request was kept. Try again.'); return; }
+  }
   leaveRequests=leaveRequests.filter(x=>x.id!==id);
   // Also remove from Supabase so it doesn't reappear on sync
   if(r&&r.supabaseId){
@@ -10927,6 +10956,7 @@ async function syncLeaveRequests(){
         to:row.to_date,
         reason:row.reason||'',
         reason_type:row.reason_type||'',
+        proof_path:row.proof_path||'',
         status:row.status||'pending',  // use actual status from Supabase
         declineReason:row.decline_reason||'',
         supabaseId:row.id
