@@ -5254,24 +5254,10 @@ html .notif-drop .notif-drop-actions{ background:none !important; border:0 !impo
       </div>
       <div id="rsec-manager" style="display:none;">
         <div class="roster-segment" id="mgrViews" style="margin-bottom:14px;">
-          <button class="roster-seg-btn active" id="mview-hours" onclick="showMgrView('hours')">All hours</button>
-          <button class="roster-seg-btn" id="mview-breaks" onclick="showMgrView('breaks')">Breaks</button>
+          <button class="roster-seg-btn active" id="mview-breaks" onclick="showMgrView('breaks')">Breaks</button>
           <button class="roster-seg-btn" id="mview-edit" onclick="showMgrView('edit')">Edit punches</button>
         </div>
-      <div id="msec-hours">
-        <div class="card" style="margin-bottom:14px;">
-          <div class="card-title" style="margin-bottom:4px;">All staff hours</div>
-          <div style="font-size:11.5px;color:var(--ui-ink-3,#64748b);margin-bottom:12px;max-width:60ch;">Everyone's net hours for a date range, grouped by team — same figures as the timesheet (breaks deducted).</div>
-          <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;">
-            <div style="flex:1;min-width:130px;"><label style="font-size:11px;font-weight:600;color:var(--ui-ink-3,#64748b);">From</label><input type="date" id="thStart" style="width:100%;border:1.5px solid var(--ui-line,#e2e8f0);border-radius:8px;padding:8px 12px;font-size:13px;font-family:inherit;outline:none;margin-top:3px;"></div>
-            <div style="flex:1;min-width:130px;"><label style="font-size:11px;font-weight:600;color:var(--ui-ink-3,#64748b);">To</label><input type="date" id="thEnd" style="width:100%;border:1.5px solid var(--ui-line,#e2e8f0);border-radius:8px;padding:8px 12px;font-size:13px;font-family:inherit;outline:none;margin-top:3px;"></div>
-            <button onclick="runTeamHours()" class="btn btn-green" style="padding:9px 16px;font-size:12px;">Run</button>
-            <button onclick="exportTeamHoursCsv()" style="padding:9px 16px;font-size:12px;font-weight:700;background:#0f172a;color:#fff;border:none;border-radius:8px;cursor:pointer;font-family:inherit;">CSV</button>
-          </div>
-          <div id="thResults" style="margin-top:14px;"></div>
-        </div>
-      </div><!-- /msec-hours -->
-      <div id="msec-breaks" style="display:none;">
+      <div id="msec-breaks">
         <!-- Short-shift break answers (clock-outs of 5h or less) -->
         <div class="card" id="bcCard" style="margin-bottom:14px;">
           <div class="card-title" style="margin-bottom:4px;">Short-shift break answers</div>
@@ -8172,13 +8158,13 @@ html[data-sb="collapsed"] #notifDrop{ left:calc(72px + 12px); max-width:calc(100
 .field,.form-grid-2 > *{ min-width:0; }
 .f-input,.page input[type="date"]{ min-width:0; max-width:100%; }
 input[type="date"].f-input{ width:100%; }
-#reportPageStart,#reportPageEnd,#thStart,#thEnd{
+#reportPageStart,#reportPageEnd{
   min-height:44px; padding:8px 10px !important;
   border:1px solid var(--m-border-hi) !important; border-radius:var(--nx-r-sm) !important;
   background:var(--m-card) !important; color:var(--m-ink) !important;
   font-family:inherit; font-weight:500;
 }
-#reportPageStart:focus,#reportPageEnd:focus,#thStart:focus,#thEnd:focus{
+#reportPageStart:focus,#reportPageEnd:focus{
   border-color:var(--accent) !important; box-shadow:0 0 0 3px var(--accent-dim) !important; outline:none;
 }
 
@@ -8848,7 +8834,6 @@ input[type="date"].f-input{ width:100%; }
 <!-- DialTRAC (Call Log tab) — extracted module. Bump ?v= on each deploy. -->
 <script src="dialtrac.js?v=44"></script>
 <script src="quizreview.js?v=2"></script>
-<script src="teamhours.js?v=2"></script>
 <script src="availlock.js?v=10"></script>
 <script src="hubradial.js?v=3"></script>
 <script src="sessionlimit.js?v=2"></script>
@@ -9365,7 +9350,6 @@ function nxMountFortPicker(fromId, toId, runName){
 }
 function nxInitReportPeriods(){
   nxMountFortPicker('reportPageStart','reportPageEnd','runHoursReport');
-  nxMountFortPicker('thStart','thEnd','runTeamHours');
   nxMountFortPicker('mgrStart','mgrEnd','runManagerReport');
   document.querySelectorAll('.nx-fort').forEach(function(w){ if(w._nxSync) w._nxSync(); });
 }
