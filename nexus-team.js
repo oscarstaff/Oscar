@@ -999,7 +999,13 @@ async function runHoursReport(){
   const endStr = document.getElementById('reportPageEnd').value;
   const el = document.getElementById('hoursReportResults');
   if(!startStr || !endStr){ el.innerHTML = '<div style="color:#dc2626;">Pick both dates.</div>'; return; }
-  el.innerHTML = '<div style="color:var(--ui-ink-4,#94a3b8);text-align:center;padding:20px;">'+nxSkel('table',5)+'</div>';
+  /* Only swap in a skeleton when the range changed and one isn't already showing. Re-opening the
+     page keeps the old table in place while it refreshes, instead of flashing and re-sizing. */
+  const rangeKey = startStr + '|' + endStr;
+  if(el.dataset.range !== rangeKey && !el.querySelector('.nx-sk')){
+    el.innerHTML = '<div style="color:var(--ui-ink-4,#94a3b8);text-align:center;padding:20px;">'+nxSkel('table',5)+'</div>';
+  }
+  el.dataset.range = rangeKey;
   await renderHoursTable(me, startStr, endStr, el, false);
 }
 
