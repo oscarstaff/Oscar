@@ -1289,6 +1289,24 @@ body.tl-readonly #tlPill{ display:inline-flex; }
 .stats-strip .stat-value.green{ color:var(--success); }
 .stats-strip .stat-value.blue{ color:var(--accent-text); }
 .stats-strip .stat-value.orange{ color:var(--gold); }
+/* Week watch: only what needs a decision this week. */
+.week-watch{ display:flex; flex-direction:column; gap:6px; margin-bottom:16px; }
+.week-watch[hidden]{ display:none; }
+.ww-row{ display:flex; align-items:center; gap:10px; width:100%; padding:10px 14px; background:var(--surface); border:1px solid var(--border); border-radius:10px; font:inherit; color:inherit; text-align:left; cursor:pointer; transition:background .15s, transform .1s; }
+.ww-row:hover{ background:var(--surface-3, var(--surface)); }
+.ww-row:active{ transform:scale(.995); }
+.ww-dot{ width:8px; height:8px; border-radius:50%; flex:none; }
+.ww-n{ font-family:var(--mono); font-size:17px; font-weight:700; font-variant-numeric:tabular-nums; }
+.ww-l{ font-size:12.5px; font-weight:600; white-space:nowrap; }
+.ww-who{ flex:1; min-width:0; font-size:12px; color:var(--text-dim); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.ww-go{ flex:none; color:var(--text-dim); font-size:15px; line-height:1; }
+.ww-ok{ cursor:default; }
+.ww-ok:hover{ background:var(--surface); }
+.ww-ok .ww-l{ font-weight:500; color:var(--text-dim); }
+.ww-red .ww-dot{ background:var(--warn); } .ww-red .ww-n{ color:var(--warn); }
+.ww-amber .ww-dot{ background:var(--gold); } .ww-amber .ww-n{ color:var(--gold); }
+.ww-ok .ww-dot{ background:var(--success); }
+@media (max-width:640px){ .ww-who{ display:none; } }
 
 /* week controls — segmented, quiet */
 .week-btn{ background:var(--surface); border:1px solid var(--border); color:var(--text-dim); border-radius:7px; width:26px; height:26px; cursor:pointer; font-size:10px; }
@@ -3094,15 +3112,7 @@ body.avail-editing #availGrid .avail-chip.av2:hover{ background:color-mix(in srg
     <style>@keyframes soSpin{to{transform:rotate(360deg)}}</style>
 
     <div class="content">
-      <div class="stats-strip">
-        <div class="stat"><span class="stat-value green" id="statShifts">0</span><span class="stat-label">shifts this week</span></div>
-        <div class="stat-sep"></div>
-        <div class="stat"><span class="stat-value blue" id="statRostered">0</span><span class="stat-label">rostered of <span id="totalStaff">0</span></span></div>
-        <div class="stat-sep"></div>
-        <div class="stat"><span class="stat-value" id="statHours">0</span><span class="stat-label">hours scheduled</span></div>
-        <div class="stat-sep"></div>
-        <div class="stat"><span class="stat-value orange" id="statOpen">0</span><span class="stat-label">open slots</span></div>
-      </div>
+      <div class="week-watch" id="weekWatch" hidden></div>
 
       <div class="conflict-banner cb-off" id="conflictBanner" role="status"> <strong>Conflicts detected.</strong>&nbsp; Some staff are rostered on unavailable days.</div>
 
@@ -4508,18 +4518,35 @@ async function withBtnLoading(btn, fn){
 
 
 // ── STATS ─────────────────────────────────────────────────────────────────
-function updateStats(){
-  let totalShifts=0,rostered=new Set(),totalHours=0;
-  staff.forEach(s=>{
-    const sw=shifts[s.id]||{};let has=false;
-    for(let d=0;d<7;d++)if(sw[d]&&sw[d].length>0){has=true;totalShifts+=sw[d].length;sw[d].forEach(sh=>{if(sh.type!=='leave')totalHours+=shiftHours(sh);});}
-    if(has)rostered.add(s.id);
+// Week watch. Flags who is over their max hours and who has nothing rostered; hides itself when the
+// week is empty (still loading) so it never flashes a false alarm. Tapping a row opens Hours balance.
+function renderWeekWatch(){
+  const el=document.getElementById('weekWatch'); if(!el) return;
+  const people=_rtPeople(), over=[], none=[]; let total=0;
+  people.forEach(function(s){
+    const h=staffHoursWeek(s.id), mx=Number(s.maxHours)||0, sw=shifts[s.id]||{};
+    total+=h;
+    if(mx && h>mx+0.01) over.push({s:s,h:h,mx:mx});
+    let any=false; for(let d=0;d<7;d++){ if((sw[d]||[]).length){ any=true; break; } }
+    if(!any) none.push(s);
   });
-  document.getElementById('statShifts').textContent=totalShifts;
-  document.getElementById('statRostered').textContent=rostered.size;
-  document.getElementById('totalStaff').textContent=staff.length;
-  document.getElementById('statHours').textContent=Math.round(totalHours);
-  document.getElementById('statOpen').textContent=Math.max(0,staff.length*5-totalShifts);
+  if(!people.length || none.length===people.length){ el.hidden=true; el.innerHTML=''; return; }
+  const f=function(n){ return String(Math.round(n*10)/10); };
+  const list=function(arr,fn){ return arr.slice(0,3).map(fn).join(' \u00b7 ')+(arr.length>3?' \u00b7 +'+(arr.length-3)+' more':''); };
+  const row=function(cls,n,label,who){
+    return '<button type="button" class="ww-row '+cls+'" onclick="rtOpen(\'hours\')" title="Open Hours balance">'+
+      '<span class="ww-dot"></span><span class="ww-n">'+n+'</span><span class="ww-l">'+label+'</span>'+
+      '<span class="ww-who">'+who+'</span><span class="ww-go" aria-hidden="true">\u203a</span></button>';
+  };
+  over.sort(function(a,b){ return (b.h-b.mx)-(a.h-a.mx); });
+  let html='';
+  if(over.length) html+=row('ww-red',over.length,'over max hours',_rtEsc(list(over,function(o){ return (o.s.first||'')+' '+f(o.h)+'/'+f(o.mx)+'h'; })));
+  if(none.length) html+=row('ww-amber',none.length,'with no shifts this week',_rtEsc(list(none,function(s){ return _rtName(s); })));
+  if(!html) html='<div class="ww-row ww-ok"><span class="ww-dot"></span><span class="ww-l">Everyone is within their hours \u00b7 '+(people.length)+' staff rostered \u00b7 '+Math.round(total)+'h</span></div>';
+  el.innerHTML=html; el.hidden=false;
+}
+function updateStats(){
+  try{ renderWeekWatch(); }catch(e){ console.warn('weekWatch', e); }
   let conflict=false;
   staff.forEach(s=>{if(!shifts[s.id])return;for(let d=0;d<7;d++)if(shifts[s.id][d]&&shifts[s.id][d].some(sh=>sh.type!=='leave')&&getAvail(s.id,d).type==='no')conflict=true;});
   // Show straight away, but wait before hiding: while a week is loading the shifts are briefly empty, which used to
