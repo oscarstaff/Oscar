@@ -51,8 +51,8 @@ function _repTabAllowed(tab){
 function _repStore(k, v){ try{ sessionStorage.setItem(k, v); }catch(e){} }
 function _repRead(k){ try{ return sessionStorage.getItem(k); }catch(e){ return null; } }
 function showMgrView(v){
-  if(v !== 'hours' && v !== 'breaks' && v !== 'edit') v = 'hours';
-  ['hours','breaks','edit'].forEach(function(k){
+  if(v !== 'breaks' && v !== 'edit') v = 'breaks';
+  ['breaks','edit'].forEach(function(k){
     var sec = document.getElementById('msec-'+k), btn = document.getElementById('mview-'+k);
     if(sec) sec.style.display = (k === v) ? '' : 'none';
     if(btn) btn.classList.toggle('active', k === v);
@@ -76,7 +76,7 @@ function showReportsTab(tab){
   document.getElementById('rtab-manager').classList.toggle('active', tab === 'manager');
   var trTab = document.getElementById('rtab-teamreport');
   if(trTab) trTab.classList.toggle('active', tab === 'teamreport');
-  if(tab === 'manager'){ if(typeof initTeamHours === 'function') initTeamHours(); showMgrView(_repRead('nx_rep_mgr') || 'hours'); }
+  if(tab === 'manager'){ showMgrView(_repRead('nx_rep_mgr') || 'breaks'); }
   if(tab === 'teamreport' && typeof initTeamReport === 'function') initTeamReport();
 }
 
@@ -118,11 +118,11 @@ function initReportsPage(){
   const today = new Date();
   const start = new Date(today); start.setDate(today.getDate()-13);
   const fmt = function(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
-  ['reportPageStart','mgrStart','thStart'].forEach(function(id){
+  ['reportPageStart','mgrStart'].forEach(function(id){
     const el = document.getElementById(id);
     if(el && !el.value) el.value = _fr ? _fr.from : fmt(start);
   });
-  ['reportPageEnd','mgrEnd','thEnd'].forEach(function(id){
+  ['reportPageEnd','mgrEnd'].forEach(function(id){
     const el = document.getElementById(id);
     if(el && !el.value) el.value = _fr ? _fr.to : fmt(today);
   });
