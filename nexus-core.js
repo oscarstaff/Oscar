@@ -210,20 +210,40 @@ async function setAvailEmailPref(on){
   if(t) t.disabled=false;
 }
 
+/* My Time was split up: Leave is its own page, and Availability now lives on
+   My Hours (next to the hours report). showSchedTab stays as a router so the
+   many old callers (notifications, home cards, onboarding) keep working. */
 function showSchedTab(tab){
-  if(typeof setActiveNavChild === 'function') setActiveNavChild('schedule-'+tab);
-  ['leave','availability'].forEach(s=>{
-    const el=document.getElementById('ssec-'+s);
-    if(el)el.style.display=s===tab?'block':'none';
-    const t=document.getElementById('stab-'+s);
-    if(t)t.classList.toggle('active',s===tab);
+  if(tab==='availability'){
+    const hp=document.getElementById('page-myhours');
+    if(hp && hp.classList.contains('active')) showHoursTab('availability');
+    else goTo('availability');
+    return;
+  }
+  const lp=document.getElementById('page-leave');
+  if(!(lp && lp.classList.contains('active'))){ goTo('leave'); return; }
+  if(typeof setActiveNavChild === 'function') setActiveNavChild('leave');
+  loadLeaveHistory();
+}
+
+/** My Hours page: switch between the hours report and Availability. */
+function showHoursTab(tab){
+  if(tab !== 'availability') tab = 'hours';
+  const hrs=document.getElementById('rsec-hours'), av=document.getElementById('ssec-availability');
+  if(hrs) hrs.style.display = tab==='hours' ? '' : 'none';
+  if(av) av.style.display = tab==='availability' ? 'block' : 'none';
+  ['hours','availability'].forEach(function(s){
+    const b=document.getElementById('htab-'+s);
+    if(b) b.classList.toggle('active', s===tab);
   });
-  if(tab==='leave'){loadLeaveHistory();}
+  if(typeof setActiveNavChild === 'function') setActiveNavChild('myhours');
+  if(tab==='hours'){
+    if(typeof runHoursReport === 'function') setTimeout(runHoursReport, 60);
+    if(typeof loadFortLeaderboard === 'function') loadFortLeaderboard();
+  }
   if(tab==='availability'){
     if(typeof refreshAvailUnlock === 'function') refreshAvailUnlock();
     if(typeof applyAvailLock === 'function') setTimeout(applyAvailLock, 60);
-  }
-  if(tab==='availability'){
     refreshAvailPendingStatus();
     loadAvailEmailPref();
     checkLock();
@@ -990,8 +1010,8 @@ async function enterHub(){
   loadBirthdays();
   setTimeout(maybeBirthdayCelebration, 1400);
   const hash=window.location.hash.replace('#','');
-  const validPages=['home','schedule','profile','announcements','calendar','training','documents','myreports','notifs','leave','availability','hub'];
-  const hashMap={leave:'schedule',availability:'schedule',documents:'profile'};
+  const validPages=['home','schedule','profile','announcements','calendar','training','documents','myreports','notifs','leave','availability','hub','shifts','myhours','teamreport'];
+  const hashMap={documents:'profile'};
   goTo(validPages.includes(hash)?hash:(hashMap[hash]||'home'));
   showProfileSection("account");
 }
@@ -1065,8 +1085,8 @@ function openLibrary(){
 }
 
 /**
- * Mobile "Roster & Shifts" tab — the two things staff actually open a phone
- * for: what am I working, and what's going spare. Kept separate from My Time
+ * "Shifts" page (under My Time) — the two things staff actually open a phone
+ * for: what am I working, and what's going spare. Kept separate from Leave
  * (Leave / Availability), which is about requests rather than the roster.
  */
 /** Switch between the two panes on the Roster & Shifts page. */
@@ -1079,7 +1099,7 @@ function showShiftsTab(tab){
   });
   if(tab==='roster') loadMyRoster();
   if(tab==='pickup') loadShiftPickup();
-  if(typeof setActiveNavChild==='function') setActiveNavChild('shifts-'+tab);
+  if(typeof setActiveNavChild==='function') setActiveNavChild('shifts');
 }
 
 /** Open the Roster & Shifts page, defaulting to My Roster. */
@@ -1113,27 +1133,47 @@ function openRoster(){
   openSubtabChooser({
     title: 'My Time',
     navGroupId: 'navg-roster',
-    defaultTab: 'schedule',
+    defaultTab: 'myhours',
     options: [
       {
-        label: 'Leave',
-        sub: 'Request & view leave',
-        bg: '#fce7f3',
-        icon: '<svg width="18" height="18" viewBox="0 0 20 20" fill="#be185d"><path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/><path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"/></svg>',
-        action: "goTo('schedule');setTimeout(function(){if(typeof showSchedTab==='function')showSchedTab('leave');},80);"
+        label: 'Shifts',
+        sub: 'Your roster & open shifts',
+        bg: '#dbeafe',
+        icon: '<svg width="18" height="18" viewBox="0 0 20 20" fill="#1d4ed8"><path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd"/></svg>',
+        action: "openShiftsTab();"
       },
       {
-        label: 'Availability',
-        sub: 'Set when you can work',
+        label: 'My Hours',
+        sub: 'Timesheet & availability',
         bg: '#d1fae5',
-        icon: '<svg width="18" height="18" viewBox="0 0 20 20" fill="#065f46"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>',
-        action: "goTo('schedule');setTimeout(function(){if(typeof showSchedTab==='function')showSchedTab('availability');},80);"
+        icon: '<svg width="18" height="18" viewBox="0 0 20 20" fill="#065f46"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/></svg>',
+        action: "goTo('myhours');"
       }
     ]
   });
 }
 
-
+/** Mobile "Reports" tab: Timesheet Manager (admin) and/or Team Report. */
+function openReportsMenu(){
+  const opts=[];
+  if(typeof myIsAdmin!=='undefined' && myIsAdmin){
+    opts.push({
+      label: 'Timesheet Manager', sub: 'Hours, breaks & punch edits', bg: '#fef3c7',
+      icon: '<svg width="18" height="18" viewBox="0 0 20 20" fill="#d97706"><path d="M9 2a1 1 0 00-1 1v1H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V6a2 2 0 00-2-2h-2V3a1 1 0 00-1-1H9zm0 2h2v1H9V4z"/></svg>',
+      action: "goTo('myreports');"
+    });
+  }
+  if(typeof nxTeamReportAllowed==='function' && nxTeamReportAllowed()){
+    opts.push({
+      label: 'Team Report', sub: 'Your team\'s daily & weekly report', bg: '#e0e7ff',
+      icon: '<svg width="18" height="18" viewBox="0 0 20 20" fill="#4338ca"><path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zm6-4a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zm6-3a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"/></svg>',
+      action: "goTo('teamreport');"
+    });
+  }
+  if(opts.length === 1){ const m=opts[0].action.match(/goTo\('(\w+)'\)/); if(m){ goTo(m[1]); return; } }
+  if(!opts.length) return;
+  openSubtabChooser({ title: 'Reports', defaultTab: 'teamreport', options: opts });
+}
 
 function toggleNavGroup(groupId){
   const g = document.getElementById('navg-'+groupId);
@@ -1145,8 +1185,10 @@ function toggleNavGroup(groupId){
 
 function _setBottomNavActive(page){
   const groupMap = {
-    'leave':'schedule',
+    'shifts':'schedule',
+    'myhours':'schedule',
     'availability':'schedule',
+    'teamreport':'myreports',
     'training':'library',
     'documents':'library'
   };
@@ -1175,11 +1217,22 @@ function setActiveNavChild(tab){
 
 function goTo(p){
   if(p === 'diary' || p === 'tasks'){ p = 'home'; }
+  /* My Time was split: Leave is its own page; Availability + hours live on My Hours. */
+  let _hoursTab = null;
+  if(p === 'schedule') p = 'leave';
+  if(p === 'availability'){ p = 'myhours'; _hoursTab = 'availability'; }
+  if(p === 'hours' || p === 'reports'){ p = 'myhours'; _hoursTab = 'hours'; }
+  /* Report pages: Timesheet Manager is admin-only; Team Report is for people
+     whose team has one, and admins. Only enforced once the flags have loaded. */
+  if(window._nxFlagsLoaded){
+    if(p === 'myreports' && !myIsAdmin) p = 'home';
+    if(p === 'teamreport' && typeof nxTeamReportAllowed === 'function' && !nxTeamReportAllowed()) p = 'home';
+  }
   if(p === 'announcements' || p === 'engagement' || p === 'discussions'){
     p = (window.innerWidth > 900) ? 'home' : 'notifs';
   }
   const _lock=document.getElementById('onboardLockOverlay');
-  if(_lock && _lock.dataset.locked==='1' && p!=='schedule'){
+  if(_lock && _lock.dataset.locked==='1' && p!=='myhours' && p!=='leave'){
     _lock.style.display='flex';
     return;
   }
@@ -1207,23 +1260,20 @@ function goTo(p){
   }catch(e){}
   const myName = window.me || (typeof me !== 'undefined' && me) || null;
   if(myName){
-    if(p === 'myreports' || p === 'reports') localStorage.setItem('nexus_visited_reports_'+myName,'1');
+    if(p === 'myreports' || p === 'myhours') localStorage.setItem('nexus_visited_reports_'+myName,'1');
   }
   setActiveNavChild(p);
   if(typeof _setBottomNavActive==='function') _setBottomNavActive(p);
-  const titles={home:'Home',schedule:'Schedule',profile:'Profile','profile-view':'Profile',announcements:'Announcements',engagement:'Engagement',documents:'Documents',messages:'Messages',achievements:'Team Achievements'};
+  const titles={home:'Home',leave:'Leave',shifts:'Shifts',myhours:'My Hours',myreports:'Timesheet Manager',teamreport:'Team Report',schedule:'Schedule',profile:'Profile','profile-view':'Profile',announcements:'Announcements',engagement:'Engagement',documents:'Documents',messages:'Messages',achievements:'Team Achievements'};
   const appName='Nexus';
   document.title='Nexus · '+(titles[p]||'Nexus');
   if(history.replaceState)history.replaceState(null,'','#'+p);
   document.querySelectorAll(".page").forEach(pg=>pg.classList.toggle("active",pg.id==="page-"+p));
   document.querySelectorAll("[data-tab]").forEach(item=>item.classList.toggle("active",item.getAttribute("data-tab")===p));
-  if(p==="leave"||p==="availability"){
-    document.querySelectorAll(".page").forEach(pg=>pg.classList.toggle("active",pg.id==="page-schedule"));
-    document.querySelectorAll("[data-tab]").forEach(item=>item.classList.toggle("active",item.getAttribute("data-tab")==="schedule"));
-    setTimeout(function(){ if(typeof showSchedTab === 'function') showSchedTab(p); }, 80);
-  }
   if(typeof _setBottomNavActive==='function') _setBottomNavActive(p);
-  if(p==="schedule"){showSchedTab("leave");}
+  if(p==="leave"){ if(typeof setActiveNavChild==='function') setActiveNavChild('leave'); loadLeaveHistory(); }
+  if(p==="myhours"){ if(typeof initReportsPage==='function') initReportsPage(); showHoursTab(_hoursTab||'hours'); }
+  if(p==="teamreport"){ if(typeof initReportsPage==='function') initReportsPage(); if(typeof initTeamReport==='function') initTeamReport(); }
   if(p==="profile")loadProfilePage();
   if(p==="home"){loadHomeData();loadClockState();loadWhatsNew();loadHomeCalendar();loadHomeAttention();renderTodayChip();loadHomeAchievements();}
   if(p==="achievements"){loadAchievementsPage();}
@@ -1233,7 +1283,7 @@ function goTo(p){
 
   if(p==="documents"){loadDocuments();refreshQuizStrip();}
   /* Tasks feature removed */
-  if(p==="myreports"){ initReportsPage(); }
+  if(p==="myreports"){ initReportsPage(); if(typeof showMgrView==='function') showMgrView(typeof _repRead==='function' ? _repRead('nx_rep_mgr') : null); }
   
   if(p==="profile"){setTimeout(refreshPushToggleState, 100);
     setTimeout(renderNotifPanel, 50);

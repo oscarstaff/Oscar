@@ -1189,10 +1189,7 @@ async function _buildLeaderboard(fw){
 function goToOnboarding(){
   const overlay=document.getElementById('onboardLockOverlay');
   if(overlay)overlay.style.display='none';
-  goTo('schedule');
-  setTimeout(function(){
-    if(typeof showSchedTab==='function') showSchedTab('availability');
-  },60);
+  goTo('availability');
 }
 
 
