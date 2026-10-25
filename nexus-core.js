@@ -244,9 +244,14 @@ function showHoursTab(tab){
   if(tab==='availability'){
     if(typeof refreshAvailUnlock === 'function') refreshAvailUnlock();
     if(typeof applyAvailLock === 'function') setTimeout(applyAvailLock, 60);
-    refreshAvailPendingStatus();
-    loadAvailEmailPref();
-    checkLock();
+    /* First open: hold the page behind a skeleton until the form/overview decision is made,
+       so it doesn't flash the form and then swap to the overview. */
+    const sec=document.getElementById('ssec-availability');
+    const hold = sec && !window._availShownOnce;
+    if(hold) sec.classList.add('av-loading');
+    const reveal=function(){ if(sec) sec.classList.remove('av-loading'); window._availShownOnce=true; };
+    if(hold) setTimeout(reveal, 5000);   /* never leave it hidden if a request hangs */
+    Promise.allSettled([refreshAvailPendingStatus(), loadAvailEmailPref(), checkLock()]).then(reveal);
     if(myIsAdmin){
       document.getElementById('adminAvailSection').style.display='block';
       loadAdminAvailGrid();
@@ -1089,23 +1094,33 @@ function openLibrary(){
  * for: what am I working, and what's going spare. Kept separate from Leave
  * (Leave / Availability), which is about requests rather than the roster.
  */
-/** Switch between the two panes on the Roster & Shifts page. */
-function showShiftsTab(tab){
-  ['roster','pickup'].forEach(function(s){
-    const sec=document.getElementById('ssec-'+s);
-    if(sec) sec.style.display = (s===tab) ? 'block' : 'none';
-    const t=document.getElementById('ptab-'+s);
-    if(t) t.classList.toggle('active', s===tab);
-  });
-  if(tab==='roster') loadMyRoster();
-  if(tab==='pickup') loadShiftPickup();
-  if(typeof setActiveNavChild==='function') setActiveNavChild('shifts');
+/** Shifts page: your roster, with open shifts to pick up shown above it when there are any.
+ *  Both lists load together behind one skeleton, then appear in a single step so the page doesn't jump. */
+let _shiftsLoadToken = 0;
+async function loadShiftsPage(){
+  const tok = ++_shiftsLoadToken;
+  const skel=document.getElementById('shiftsSkel'), body=document.getElementById('shiftsBody');
+  const first = !body || body.dataset.loaded !== '1';
+  if(first){
+    if(skel) skel.style.display='';
+    if(body) body.style.display='none';
+  }
+  try{
+    await Promise.allSettled([
+      (typeof loadMyRoster==='function') ? loadMyRoster() : null,
+      (typeof loadShiftPickup==='function') ? loadShiftPickup() : null
+    ]);
+  }catch(e){}
+  if(tok !== _shiftsLoadToken) return;
+  if(skel) skel.style.display='none';
+  if(body){ body.style.display=''; body.dataset.loaded='1'; }
 }
+/** Kept so older callers still work — there is only one Shifts view now. */
+function showShiftsTab(){ loadShiftsPage(); }
 
-/** Open the Roster & Shifts page, defaulting to My Roster. */
+/** Open the Shifts page. */
 function openShiftsTab(){
   goTo('shifts');
-  setTimeout(function(){ showShiftsTab('roster'); }, 60);
 }
 
 /** Badge the mobile tab with how many shifts are up for grabs. */
@@ -1153,28 +1168,6 @@ function openRoster(){
   });
 }
 
-/** Mobile "Reports" tab: Timesheet Manager (admin) and/or Team Report. */
-function openReportsMenu(){
-  const opts=[];
-  if(typeof myIsAdmin!=='undefined' && myIsAdmin){
-    opts.push({
-      label: 'Timesheet Manager', sub: 'Hours, breaks & punch edits', bg: '#fef3c7',
-      icon: '<svg width="18" height="18" viewBox="0 0 20 20" fill="#d97706"><path d="M9 2a1 1 0 00-1 1v1H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V6a2 2 0 00-2-2h-2V3a1 1 0 00-1-1H9zm0 2h2v1H9V4z"/></svg>',
-      action: "goTo('myreports');"
-    });
-  }
-  if(typeof nxTeamReportAllowed==='function' && nxTeamReportAllowed()){
-    opts.push({
-      label: 'Team Report', sub: 'Your team\'s daily & weekly report', bg: '#e0e7ff',
-      icon: '<svg width="18" height="18" viewBox="0 0 20 20" fill="#4338ca"><path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zm6-4a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zm6-3a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"/></svg>',
-      action: "goTo('teamreport');"
-    });
-  }
-  if(opts.length === 1){ const m=opts[0].action.match(/goTo\('(\w+)'\)/); if(m){ goTo(m[1]); return; } }
-  if(!opts.length) return;
-  openSubtabChooser({ title: 'Reports', defaultTab: 'teamreport', options: opts });
-}
-
 function toggleNavGroup(groupId){
   const g = document.getElementById('navg-'+groupId);
   if(!g) return;
@@ -1188,7 +1181,6 @@ function _setBottomNavActive(page){
     'shifts':'schedule',
     'myhours':'schedule',
     'availability':'schedule',
-    'teamreport':'myreports',
     'training':'library',
     'documents':'library'
   };
@@ -1241,15 +1233,7 @@ function goTo(p){
     setTimeout(loadHubAccess, 50);
     setTimeout(function(){ if(typeof hubRadialLayout==='function') hubRadialLayout(); }, 60);
   }
-  if(p === 'shifts'){
-    setTimeout(function(){
-      try{
-        const r=document.getElementById('ssec-roster'), k=document.getElementById('ssec-pickup');
-        const anyOpen=(r&&r.style.display==='block')||(k&&k.style.display==='block');
-        if(!anyOpen && typeof showShiftsTab==='function') showShiftsTab('roster');
-      }catch(e){}
-    }, 50);
-  }
+  if(p === 'shifts'){ loadShiftsPage(); }
   if(p === 'calllog'){
     if(window._canCallLog === false){ p = 'home'; }
     else { setTimeout(function(){ if(typeof initCallLog==='function') initCallLog(); }, 50); }
@@ -1275,7 +1259,7 @@ function goTo(p){
   if(p==="myhours"){ if(typeof initReportsPage==='function') initReportsPage(); showHoursTab(_hoursTab||'hours'); }
   if(p==="teamreport"){ if(typeof initReportsPage==='function') initReportsPage(); if(typeof initTeamReport==='function') initTeamReport(); }
   if(p==="profile")loadProfilePage();
-  if(p==="home"){loadHomeData();loadClockState();loadWhatsNew();loadHomeCalendar();loadHomeAttention();renderTodayChip();loadHomeAchievements();}
+  if(p==="home"){if(typeof nxApplyReportMenuCache==='function') nxApplyReportMenuCache();loadHomeData();loadClockState();loadWhatsNew();loadHomeCalendar();loadHomeAttention();renderTodayChip();loadHomeAchievements();}
   if(p==="achievements"){loadAchievementsPage();}
   if(p==="notifs"){renderNotifsPage();}
   

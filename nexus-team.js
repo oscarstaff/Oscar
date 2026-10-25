@@ -47,20 +47,39 @@ let _diarySaveTimer = null;
 function nxTeamReportAllowed(){
   return !!(myIsAdmin || (myTeam && typeof trTeamHasReport === 'function' && trTeamHasReport(myTeam)));
 }
-function nxUpdateReportNav(){
-  var tr = nxTeamReportAllowed(), mgr = !!myIsAdmin;
+function nxReportNavApply(mgr, tr){
   var set = function(id, on){ var el = document.getElementById(id); if(el) el.style.display = on ? '' : 'none'; };
   set('nav-myreports', mgr);
-  set('nav-teamreport', tr);
-  set('bn-myreports', mgr || tr);
-  /* If someone is sitting on a page they can't use, send them home. */
-  if(window._nxFlagsLoaded){
-    var onMgr = document.getElementById('page-myreports'), onTr = document.getElementById('page-teamreport');
-    if((onMgr && onMgr.classList.contains('active') && !mgr) || (onTr && onTr.classList.contains('active') && !tr)){
-      if(typeof goTo === 'function') goTo('home');
-    }
+  set('homeMenuTeamReport', tr);
+  set('homeMenuTimesheet', mgr);
+  set('homeReportsMenu', mgr || tr);
+}
+function _repMenuKey(){ var n = window.me || (typeof me !== 'undefined' && me) || ''; return n ? 'nx_rep_menu_' + n : ''; }
+/* Show the last known answer straight away (before the admin/team flags load) so the Home menu doesn't pop in late. */
+function nxApplyReportMenuCache(){
+  try{
+    var k = _repMenuKey(); if(!k) return;
+    var v = localStorage.getItem(k); if(v === null) return;
+    nxReportNavApply(v.indexOf('m') >= 0, v.indexOf('t') >= 0);
+  }catch(e){}
+}
+function nxUpdateReportNav(){
+  if(!window._nxFlagsLoaded){ nxApplyReportMenuCache(); return; }
+  var tr = nxTeamReportAllowed(), mgr = !!myIsAdmin;
+  /* myTeam loads a moment after the admin flag. Until it does, keep whatever Team Report
+     state is already showing (the cached one) instead of hiding it and re-showing it. */
+  var teamUnknown = !myIsAdmin && !myTeam;
+  if(teamUnknown){
+    try{ var _k0 = _repMenuKey(), _v0 = _k0 ? localStorage.getItem(_k0) : null; tr = !!(_v0 && _v0.indexOf('t') >= 0); }catch(e){ tr = false; }
   }
-  /* myTeam loads lazily — fetch it once so the Team Report link can appear. */
+  nxReportNavApply(mgr, tr);
+  if(!teamUnknown){ try{ var k = _repMenuKey(); if(k) localStorage.setItem(k, (mgr ? 'm' : '') + (tr ? 't' : '')); }catch(e){} }
+  /* If someone is sitting on a page they can't use, send them home. */
+  var onMgr = document.getElementById('page-myreports'), onTr = document.getElementById('page-teamreport');
+  if((onMgr && onMgr.classList.contains('active') && !mgr) || (onTr && onTr.classList.contains('active') && !tr)){
+    if(typeof goTo === 'function') goTo('home');
+  }
+  /* myTeam loads lazily — fetch it once so the Team Report entry can appear. */
   if(!myTeam && !myIsAdmin && !window._navTeamFetching && (window.me || (typeof me !== 'undefined' && me))){
     window._navTeamFetching = true;
     sbGet('staff_credentials','?staff_name=eq.'+encodeURIComponent(window.me || me)+'&select=team').then(function(creds){
