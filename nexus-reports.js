@@ -163,7 +163,7 @@ async function renderNotifsPage(){
 
 function handleNotifClick(id, link){
   if(typeof NotifManager !== 'undefined' && NotifManager.markRead) NotifManager.markRead(id);
-  const validPages = ['home','schedule','leave','availability','engagement','documents','training','calendar','myreports','notifs','profile'];
+  const validPages = ['home','schedule','leave','availability','shifts','myhours','teamreport','engagement','documents','training','calendar','myreports','notifs','profile'];
   if(link && validPages.indexOf(link) >= 0){
     goTo(link);
   } else if(link){
@@ -226,10 +226,10 @@ const ONBOARDING_TASKS = [
   },
   {
     id: 'check_report',
-    title: 'Check My Report',
+    title: 'Check My Hours',
     body: 'See your fortnightly hours, breaks, and coffee allowances.',
-    cta: 'View Reports',
-    page: 'myreports',
+    cta: 'View My Hours',
+    page: 'myhours',
     check: function(){
       return localStorage.getItem('nexus_visited_reports_'+me) === '1';
     }
@@ -256,15 +256,9 @@ const TOUR_STEPS = [
     advance: 'tap'
   },
   {
-    target: '#bn-myreports',
-    title: 'My Reports',
-    body: 'Check your worked hours here — view your timesheet for any date range from your clock-ins. Tap to open My Reports.',
-    advance: 'tap'
-  },
-  {
     target: '#bn-schedule',
     title: 'My Time',
-    body: 'Tap here to open My Time. This is where you set your Availability and request Leave.',
+    body: 'Tap here to open My Time. Shifts shows your roster and open shifts. My Hours shows your timesheet for any date range, and is where you set your Availability.',
     advance: 'tap',
     afterTap: function(){ /* navigation handled by the element's own onclick */ }
   },
@@ -275,9 +269,9 @@ const TOUR_STEPS = [
     advance: 'tap'
   },
   {
-    target: '#bn-shifts',
-    title: 'Roster & Shifts',
-    body: 'See your published roster and pick up open shifts here. Tap to open Roster & Shifts.',
+    target: '#bn-leave',
+    title: 'Leave',
+    body: 'Request leave and check its status here. Tap to open Leave.',
     advance: 'tap'
   },
   {

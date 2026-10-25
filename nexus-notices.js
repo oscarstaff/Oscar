@@ -2242,7 +2242,7 @@ const NotifManager = (function(){
     const item = load().find(function(n){return n.id === id;});
     if(!item) return;
     markRead(id);
-    const validPages = ['home','schedule','engagement','documents','training','calendar','myreports','notifs','profile'];
+    const validPages = ['home','schedule','leave','availability','shifts','myhours','teamreport','engagement','documents','training','calendar','myreports','notifs','profile'];
     if(item.link && typeof goTo === 'function' && validPages.indexOf(item.link) >= 0){
       _closePanels();
       goTo(item.link);

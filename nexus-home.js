@@ -16,9 +16,8 @@ async function loadHomeAttention(){
               title:'Your availability has expired',
               sub:'Expired '+fmtF(row.valid_until)+' · tap to update it',
               action: function(){
-                goTo('schedule');
+                goTo('availability');
                 setTimeout(function(){
-                  if(typeof showSchedTab==='function') showSchedTab('availability');
                   if(typeof showAvailForm==='function') showAvailForm();
                 }, 120);
               }
@@ -1291,18 +1290,21 @@ async function loadMySettings(){
         document.querySelectorAll('[data-admin-only]').forEach(function(el){ el.style.display = myIsAdmin ? '' : 'none'; });
       }catch(e){}
       try{
-        var rp=document.getElementById('page-myreports');
-        if(rp && rp.classList.contains('active') && typeof initReportsPage==='function'){ initReportsPage(); }
+        var _rpActive=['page-myreports','page-myhours','page-teamreport'].some(function(id){ var p=document.getElementById(id); return p && p.classList.contains('active'); });
+        if(_rpActive && typeof initReportsPage==='function'){ initReportsPage(); }
       }catch(e){}
     }else{
       myIsAdmin=false;
       myCanEditAvail=true;
     }
-    try{ const _trs=document.getElementById('rsec-teamreport'); if(_trs && _trs.style.display!=='none' && typeof initTeamReport==='function') initTeamReport(); }catch(e){}
+    try{ const _trp=document.getElementById('page-teamreport'); if(_trp && _trp.classList.contains('active') && typeof initTeamReport==='function') initTeamReport(); }catch(e){}
   }catch(e){
     myIsAdmin=false;
     myCanEditAvail=true;
   }
+  /* Admin/team flags are known now: show or hide Timesheet Manager and Team Report. */
+  window._nxFlagsLoaded = true;
+  try{ if(typeof nxUpdateReportNav === 'function') nxUpdateReportNav(); }catch(e){}
 
   const locked=adminHasSetAvail&&!myCanEditAvail;
   if(locked){
