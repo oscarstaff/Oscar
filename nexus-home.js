@@ -780,7 +780,8 @@ function _filterPublished(rows, pub){
 async function loadMyRoster(){
   const host=document.getElementById('myRosterList');
   if(!host) return;
-  host.innerHTML='<div style="padding:26px 0;text-align:center;color:var(--ui-ink-4,#94a3b8);font-size:13px;">'+nxSkel('cards',3)+'</div>';
+  /* Keep what's already there while refreshing (no flash back to a skeleton) */
+  if(!host.innerHTML.trim()) host.innerHTML='<div style="padding:26px 0;text-align:center;color:var(--ui-ink-4,#94a3b8);font-size:13px;">'+nxSkel('cards',3)+'</div>';
   try{
     const today=new Date(); today.setHours(0,0,0,0);
     const iso=today.getFullYear()+'-'+String(today.getMonth()+1).padStart(2,'0')+'-'+String(today.getDate()).padStart(2,'0');
@@ -891,10 +892,15 @@ async function askReleaseShift(shiftId, btn){
   }
 }
 
+function _setPickupSection(show){
+  const s=document.getElementById('pickupSection');
+  if(s) s.style.display = show ? '' : 'none';
+}
+
 async function loadShiftPickup(){
   const host=document.getElementById('pickupList');
   if(!host) return;
-  host.innerHTML='<div style="padding:26px 0;text-align:center;color:var(--ui-ink-4,#94a3b8);font-size:13px;">'+nxSkel('cards',3)+'</div>';
+  /* The pickup box only appears when there is something to claim, so no skeleton here. */
   try{
     let team=myTeam||'';
     try{
@@ -904,7 +910,8 @@ async function loadShiftPickup(){
     }catch(e){ /* fall back to whatever we already had */ }
 
     if(!team){
-      host.innerHTML='<div style="padding:26px 0;text-align:center;color:var(--ui-ink-4,#94a3b8);font-size:13px;">No team set on your profile, so there\'s nothing to show yet.</div>';
+      host.innerHTML='';
+      _setPickupSection(false);
       updatePickupBadge(0);
       return;
     }
@@ -923,7 +930,8 @@ async function loadShiftPickup(){
     try{ refreshShiftsBadge(); }catch(e){}
   }catch(e){
     console.warn('loadShiftPickup',e);
-    host.innerHTML='<div style="padding:26px 0;text-align:center;color:var(--ui-ink-4,#94a3b8);font-size:13px;">Couldn\'t load available shifts. Pull to refresh.</div>';
+    host.innerHTML='';
+    _setPickupSection(false);
   }
 }
 
@@ -938,9 +946,11 @@ function renderShiftPickup(rows){
   if(!host) return;
   updatePickupBadge(rows.length);
   if(!rows.length){
-    host.innerHTML='<div style="padding:30px 0;text-align:center;color:var(--ui-ink-4,#94a3b8);font-size:13px;">No shifts available right now.</div>';
+    host.innerHTML='';
+    _setPickupSection(false);
     return;
   }
+  _setPickupSection(true);
   const fmtDay=function(iso){
     const d=new Date(iso+'T00:00:00');
     return d.toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short'});
@@ -987,6 +997,7 @@ async function claimShift(shiftId, btn){
     if(out&&out.ok===true){
       showToast('Shift is yours');
       loadShiftPickup();
+      loadMyRoster();
       if(typeof loadHomeData==='function') loadHomeData();
       return;
     }
