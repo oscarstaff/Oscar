@@ -95,6 +95,9 @@
     transition:width .18s ease;}
   .ag3-bar.hp i{background:#2d9d94;}
   .ag3-bar.hp.low i{background:#e05a3f;}
+  .ag3-bar.nx i{background:#3fa7e0;transition:width .08s linear;}
+  .ag3-bar.nx.full i{background:#f2a33a;}
+  .ag3-pad.nitro{color:#3fa7e0;}
   /* touch pads */
   .ag3-pads{display:none;gap:8px;}
   .ag3-pad{width:56px;height:44px;border-radius:10px;border:1px solid var(--border);
@@ -135,6 +138,10 @@
      ══════════════════════════════════════════════════════════════════ */
   var RSEG = 200, RLEN = 1600, RDRAW = 300, RW = 2000;   // road units
   var rs = null, rRAF = null, rKeys = {};
+  var R_LAP = RLEN * RSEG;                 // one lap of the track, in road units
+  var R_NITRO_SPEED = 440;                 // top speed while nitro burns
+  var R_COLS = ['#c9952e','#c24a4a','#4aa36c','#9a5fc4','#d9772b','#2f9db0'];
+  var R_NAMES = ['VIC','TARA','BRUZ','KEZ','NEV','SHAZ','DOZ','MAXX'];
 
   /* ── Sound (Web Audio) ─────────────────────────────────────────────
      A looping engine tone whose pitch tracks speed, plus one-shot thwacks
@@ -250,28 +257,42 @@
       hp: 100, score: 0, dist: 0, lap: 1, over: false,
       punchCd: 0, hitFlash: 0, shake: 0, last: 0,
       kickCd: 0, lean: 0,
-      rivals: []
+      nitro: 50, nitroOn: false,          // 0..100, burns while Shift/⚡ is held
+      combo: 0, comboT: 0, mult: 1,       // hits inside 3s of each other stack
+      pipe: 0, kos: 0, bestMult: 1,       // pipe = seconds of club left
+      banner: '', bannerT: 0,
+      rivals: [], pickups: []
     };
     // Rivals spread down the road; each has a lane, a cruise speed and hp.
-    var names = ['VIC','TARA','BRUZ','KEZ','NEV','SHAZ'];
-    for(var i=0;i<6;i++){
-      rs.rivals.push({
-        name: names[i],
-        z: 900 + i*950 + Math.random()*400,
-        x: (Math.random()*1.5 - 0.75),
-        spd: 230 + Math.random()*70,
-        hp: 60,
-        swing: 0, cd: 0, down: 0
-      });
-    }
+    for(var i=0;i<6;i++) rs.rivals.push(rNewRival(i, 900 + i*950 + Math.random()*400));
+    // Two pickups out on the road at a time, so grabbing one is a choice of
+    // line rather than something that happens to you.
+    for(var p=0;p<2;p++){ var pk = {}; rPickupSpawn(pk, 12000 + p*18000 + Math.random()*6000); rs.pickups.push(pk); }
     var st = el('rashStatus');
-    if(st) st.textContent = 'Arrows to ride \u00b7 Z punch \u00b7 X kick';
+    if(st) st.textContent = 'Arrows ride \u00b7 Z punch \u00b7 X kick \u00b7 Shift nitro';
     rEngineStart();
     rHud();
     if(rRAF) cancelAnimationFrame(rRAF);
     rs.last = 0;
     rRAF = requestAnimationFrame(rLoop);
   };
+  function rNewRival(i, z){
+    return {
+      name: R_NAMES[i % R_NAMES.length], col: R_COLS[i % R_COLS.length],
+      z: z, x: (Math.random()*1.5 - 0.75),
+      spd: 230 + Math.random()*70,
+      hp: 60, maxHp: 60, heavy: false,
+      swing: 0, cd: 0, down: 0, passed: false
+    };
+  }
+  function rPickupSpawn(p, ahead){
+    p.z = rs.pos + ahead;
+    p.x = (Math.random()*2 - 1) * 0.8;
+    var q = Math.random();
+    p.kind = q < 0.38 ? 'nitro' : (q < 0.72 ? 'pipe' : 'med');
+    p.taken = false;
+  }
+  function rSay(txt){ var st = el('rashStatus'); if(st) st.textContent = txt; }
   AG3.rashStop = function(){ if(rRAF) cancelAnimationFrame(rRAF); rRAF = null; rEngineStop(); };
   AG3.rashRestart = function(){ AG3.rashInit(); };
   AG3.rashKey = function(k,down){ rKeys[k] = !!down; };
@@ -287,6 +308,18 @@
     }
     var d = el('rashDist');
     if(d) d.textContent = Math.round(rs.dist/100) + 'm';
+    var nb = el('rashNitro');
+    if(nb){
+      nb.style.width = Math.round(rs.nitro) + '%';
+      nb.parentNode.classList.toggle('full', rs.nitro >= 99.5);
+    }
+    var cb = el('rashCombo'); if(cb) cb.textContent = rs.mult > 1 ? 'x' + rs.mult : '\u2014';
+    var lp = el('rashLap'); if(lp) lp.textContent = rs.lap;
+    var pb = el('rashPipeBox');
+    if(pb){
+      pb.style.display = rs.pipe > 0 ? '' : 'none';
+      var pt = el('rashPipe'); if(pt) pt.textContent = Math.ceil(rs.pipe) + 's';
+    }
   }
 
   function rSeg(z){
@@ -295,32 +328,54 @@
     return rs.segs[idx];
   }
 
+  /* Shared by punch and kick. Everyone in reach is hit at once; the combo
+     ticks up once per swing that connects, not once per rider, and every
+     point it scores is multiplied by the multiplier at that moment. A club
+     adds damage and a bit of sideways reach. */
+  function rStrike(o){
+    var pipe = rs.pipe > 0;
+    var dmg = o.dmg * (pipe ? 1.55 : 1);
+    var wide = o.wide + (pipe ? 0.12 : 0);
+    var hits = [], i;
+    for(i=0;i<rs.rivals.length;i++){
+      var r = rs.rivals[i];
+      if(r.down > 0) continue;
+      var dz = r.z - rs.pos;
+      if(dz > -o.back && dz < o.fwd && Math.abs(r.x - rs.playerX) < wide) hits.push(r);
+    }
+    if(!hits.length){
+      rs.score = Math.max(0, rs.score - o.miss);   // whiffing costs a little
+      return;
+    }
+    rs.combo++; rs.comboT = 3;
+    rs.mult = Math.min(5, 1 + Math.floor(rs.combo / 2));
+    if(rs.mult > rs.bestMult) rs.bestMult = rs.mult;
+    for(i=0;i<hits.length;i++){
+      var h = hits[i];
+      h.hp -= dmg;
+      h.swing = o.swing;
+      if(o.knock) h.x += Math.sign(h.x - rs.playerX || 1) * (h.heavy ? o.knock*0.5 : o.knock);
+      rs.score += o.pts * rs.mult;
+      rs.nitro = Math.min(100, rs.nitro + 6);
+      rSfx('hit');
+      if(h.hp <= 0){
+        h.down = o.ko;
+        rs.kos++;
+        var gain = 350 * rs.mult;
+        rs.score += gain;
+        rs.nitro = Math.min(100, rs.nitro + 25);
+        rSfx('ko');
+        rSay(h.name + o.word + ' +' + gain + (rs.mult > 1 ? ' (x' + rs.mult + ')' : ''));
+      }
+    }
+  }
+
   AG3.rashPunch = function(){
     if(!rs || rs.over || rs.punchCd > 0) return;
     rs.punchCd = 0.32;
     rSfx('punch');
-    var hit = false;
-    for(var i=0;i<rs.rivals.length;i++){
-      var r = rs.rivals[i];
-      if(r.down > 0) continue;
-      var dz = r.z - rs.pos;
-      // Reach: alongside (within ~1.2 bike lengths) and in the next lane.
-      if(dz > -260 && dz < 420 && Math.abs(r.x - rs.playerX) < 0.62){
-        r.hp -= 34;
-        r.swing = 0.25;
-        rs.score += 60;
-        hit = true;
-        rSfx('hit');
-        if(r.hp <= 0){
-          r.down = 2.4;
-          rs.score += 350;
-          rSfx('ko');
-          var st = el('rashStatus');
-          if(st) st.textContent = r.name + ' is down! +350';
-        }
-      }
-    }
-    if(!hit) rs.score = Math.max(0, rs.score - 5);   // whiffing costs a little
+    // Reach: alongside (within ~1.2 bike lengths) and in the next lane.
+    rStrike({ dmg:34, pts:60, back:260, fwd:420, wide:0.62, miss:5, swing:0.25, ko:2.4, knock:0, word:' is down!' });
     rHud();
   };
 
@@ -332,30 +387,44 @@
     rs.kickCd = 0.7;
     rs.lean = (rs.playerX >= 0 ? -1 : 1) * 0.4;   // recoil lean
     rSfx('kick');
-    var hit = false;
-    for(var i=0;i<rs.rivals.length;i++){
-      var r = rs.rivals[i];
-      if(r.down > 0) continue;
-      var dz = r.z - rs.pos;
-      if(dz > -320 && dz < 520 && Math.abs(r.x - rs.playerX) < 0.78){
-        r.hp -= 60;
-        r.swing = 0.3;
-        r.x += Math.sign(r.x - rs.playerX) * 0.35;   // knock them wide
-        rs.score += 90;
-        hit = true;
-        rSfx('hit');
-        if(r.hp <= 0){
-          r.down = 2.6;
-          rs.score += 350;
-          rSfx('ko');
-          var st = el('rashStatus');
-          if(st) st.textContent = r.name + ' floored! +350';
-        }
-      }
-    }
-    if(!hit) rs.score = Math.max(0, rs.score - 8);
+    rStrike({ dmg:60, pts:90, back:320, fwd:520, wide:0.78, miss:8, swing:0.3, ko:2.6, knock:0.35, word:' floored!' });
     rHud();
   };
+
+  /* Laps. Each time you complete one the pack gets quicker and hits harder,
+     a heavy joins from lap 2, and extra riders arrive on laps 2 and 3. */
+  function rLapUp(){
+    rs.score += 500;
+    rs.banner = 'LAP ' + rs.lap; rs.bannerT = 2.2;
+    rSay('Lap ' + rs.lap + ' · +500 · the pack is faster');
+    if(rs.lap === 2 || rs.lap === 3) rs.rivals.push(rNewRival(5 + rs.lap, rs.pos + 3200));
+    var heavies = rs.lap === 2 ? [2] : (rs.lap === 3 ? [5] : []);
+    for(var i=0;i<heavies.length;i++){
+      var h = rs.rivals[heavies[i]];
+      if(!h) continue;
+      h.heavy = true; h.maxHp = 100; h.hp = 100; h.col = '#7a2f2f';
+    }
+  }
+  function rRivalSpeed(r){ return Math.min(335, r.spd + (rs.lap - 1) * 14); }
+  function rRivalDamage(r){ return Math.min(14, 6 + (rs.lap - 1) * 1.5 + (r.heavy ? 4 : 0)); }
+
+  /* Pickups: club (12s of heavier hits), nitro can (+50), and a patch-up. */
+  function rPickups(){
+    for(var i=0;i<rs.pickups.length;i++){
+      var p = rs.pickups[i];
+      if(!p.taken){
+        var dz = p.z - rs.pos;
+        if(dz < 150 && dz > -320 && Math.abs(p.x - rs.playerX) < 0.4){
+          p.taken = true;
+          if(p.kind === 'pipe'){ rs.pipe = 12; rSay('Lead pipe! Heavier hits for 12s'); }
+          else if(p.kind === 'nitro'){ rs.nitro = Math.min(100, rs.nitro + 50); rSay('Nitro can +50'); }
+          else { rs.hp = Math.min(100, rs.hp + 25); rSay('Patched up +25 health'); }
+          rSfx('punch');
+        }
+      }
+      if(p.taken || p.z - rs.pos < -1500) rPickupSpawn(p, 30000 + Math.random()*30000);
+    }
+  }
 
   function rLoop(t){
     rRAF = requestAnimationFrame(rLoop);
@@ -368,10 +437,18 @@
     // --- input ---
     var accel = rKeys.up ? 1 : 0;
     var brake = rKeys.down ? 1 : 0;
-    if(accel) rs.speed += 130*dt;
+    // Nitro: burns the gauge, lifts the speed cap and pushes you up to it.
+    // Not on the dirt, and not while braking.
+    var boosting = !!(rKeys.nitro && rs.nitro > 0 && rs.speed > 40 && !brake && Math.abs(rs.playerX) <= 1);
+    if(boosting && !rs.nitroOn) rSfx('kick');
+    rs.nitroOn = boosting;
+    var cap = boosting ? R_NITRO_SPEED : rs.maxSpeed;
+    if(boosting){ rs.speed += 260*dt; rs.nitro = Math.max(0, rs.nitro - 24*dt); }
+    else if(accel) rs.speed += 130*dt;
     else if(brake) rs.speed -= 260*dt;
     else rs.speed -= 42*dt;
-    rs.speed = Math.max(0, Math.min(rs.maxSpeed, rs.speed));
+    if(!boosting && rs.speed > rs.maxSpeed) rs.speed = Math.max(rs.maxSpeed, rs.speed - 160*dt);
+    rs.speed = Math.max(0, Math.min(cap, rs.speed));
 
     var steer = (rKeys.left ? -1 : 0) + (rKeys.right ? 1 : 0);
     var grip = rs.speed / rs.maxSpeed;
@@ -392,15 +469,25 @@
       if(rs._offSfx <= 0){ rSfx('crash'); rs._offSfx = 0.5; }
     }
 
-    else if(rs.hp < 100){
+    else{
       // Clean riding heals slowly, so a good stretch can undo an early
       // mistake. Without this the run is a one-way ratchet toward death and
-      // there is nothing you can do about it.
-      rs.hp = Math.min(100, rs.hp + 2.2*dt);
+      // there is nothing you can do about it. It also trickles the nitro back.
+      if(rs.hp < 100) rs.hp = Math.min(100, rs.hp + 2.2*dt);
+      if(!boosting && rs.nitro < 100) rs.nitro = Math.min(100, rs.nitro + 3*dt);
     }
 
     rs.pos += rs.speed * dt * 12;
     rs.dist += rs.speed * dt * 12;
+    var lapNow = Math.floor(rs.dist / R_LAP) + 1;
+    if(lapNow > rs.lap){ rs.lap = lapNow; rLapUp(); }
+    rPickups();
+    if(rs.pipe > 0) rs.pipe = Math.max(0, rs.pipe - dt);
+    if(rs.bannerT > 0) rs.bannerT -= dt;
+    if(rs.comboT > 0){
+      rs.comboT -= dt;
+      if(rs.comboT <= 0){ rs.combo = 0; rs.mult = 1; }
+    }
     if(rs.punchCd > 0) rs.punchCd -= dt;
     if(rs.kickCd > 0) rs.kickCd -= dt;
     if(rs.hitFlash > 0) rs.hitFlash -= dt;
@@ -418,12 +505,12 @@
       if(r.down > 0){
         r.down -= dt;
         if(r.down <= 0){                 // they get back up, further ahead
-          r.hp = 60;
+          r.hp = r.maxHp;
           r.z = rs.pos + 2600 + Math.random()*900;
         }
         continue;
       }
-      r.z += r.spd * dt * 12;
+      r.z += rRivalSpeed(r) * dt * 12;
       if(r.swing > 0) r.swing -= dt;
       if(r.cd > 0) r.cd -= dt;
       // Drift toward the player when close, so they actually contest you.
@@ -436,7 +523,8 @@
         r.x += Math.sign(rs.playerX - r.x) * dt * 0.24;
         if(Math.abs(r.x - rs.playerX) < 0.5 && r.cd <= 0 && Math.random() < 0.45*dt*6){
           r.cd = 2.0; r.swing = 0.25;
-          rs.hp -= 6;
+          rs.hp -= rRivalDamage(r);
+          rs.combo = 0; rs.mult = 1; rs.comboT = 0;          // a clean hit on you breaks your chain
           rs.hitFlash = 0.22; rs.shake = 5;
           rs.speed *= 0.9;
           rSfx('hit');
@@ -458,7 +546,7 @@
     while(rs._distAcc >= 1000){ rs._distAcc -= 1000; rs.score += 10; }
 
     if(rs.hp <= 0){
-      rs.hp = 0; rs.over = true;
+      rs.hp = 0; rs.over = true; rs.nitroOn = false;
       rSfx('crash'); rEngineStop();
       var rec = setBest('rash', rs.score);
       var st2 = el('rashStatus');
@@ -542,6 +630,18 @@
       if(sy < 0) break;
     }
 
+    // --- pickups, drawn first so riders overlap them ---
+    for(var pi=0;pi<rs.pickups.length;pi++){
+      var pk = rs.pickups[pi];
+      var pdz = pk.z - rs.pos;
+      if(pk.taken || pdz < 0 || pdz > RDRAW*RSEG*0.5) continue;
+      var pseg = rSeg(pk.z);
+      if(pseg._sc === undefined) continue;
+      var psc = pseg._sc;
+      rPickup(g, pseg._x + (pk.x - rs.playerX) * RW * 0.5 * psc * 0.9, pseg._y,
+              Math.max(7, 250*psc), pk.kind);
+    }
+
     // --- riders, far to near so nearer ones overlap correctly ---
     var list = rs.rivals.slice().sort(function(a,b){ return b.z - a.z; });
     for(var i=0;i<list.length;i++){
@@ -556,7 +656,7 @@
       bx = seg2._x + (r.x - rs.playerX) * RW * 0.5 * scl * 0.9;
       var by = seg2._y;
       var bw = Math.max(6, 300*scl);
-      rBike(g, bx, by, bw, r.down > 0, r.swing > 0, '#c9952e', 0, false);
+      rBike(g, bx, by, bw * (r.heavy ? 1.2 : 1), r.down > 0, r.swing > 0, r.col || '#c9952e', 0, false, false, false);
     }
 
     // --- player ---
@@ -564,20 +664,25 @@
     var px = W/2, py = H - 62;
     var braking = rKeys.down && rs.speed > 20;
     rBike(g, px, py, pw, false, rs.punchCd > 0.2 || rs.kickCd > 0.5,
-          '#5a7ec9', rs.leanShown || 0, braking);
+          '#5a7ec9', rs.leanShown || 0, braking, rs.pipe > 0, rs.nitroOn);
 
     g.restore();
 
     // Speed streaks — faint lines rushing outward from the vanishing point,
     // stronger the faster you go. Cheap, but sells velocity hugely.
-    var spd01 = rs.speed / rs.maxSpeed;
+    var spd01 = Math.min(1.3, rs.speed / rs.maxSpeed);
+    if(rs.nitroOn){
+      g.fillStyle = 'rgba(70,160,255,.10)';
+      g.fillRect(0,0,W,H);
+    }
     if(spd01 > 0.45){
       g.save();
       g.strokeStyle = 'rgba(255,255,255,'+((spd01-0.45)*0.5)+')';
       g.lineWidth = 2;
       var cx = W/2, cy = H*0.46;
-      for(var q=0;q<7;q++){
-        var ang = (q/7)*Math.PI*2 + (rs.pos*0.01);
+      var nStreak = rs.nitroOn ? 14 : 7;
+      for(var q=0;q<nStreak;q++){
+        var ang = (q/nStreak)*Math.PI*2 + (rs.pos*0.01);
         var r1 = 40 + (q%3)*14, r2 = r1 + 34 + spd01*40;
         g.beginPath();
         g.moveTo(cx + Math.cos(ang)*r1, cy + Math.sin(ang)*r1*0.6);
@@ -591,6 +696,17 @@
       g.fillStyle = 'rgba(224,90,63,'+(rs.hitFlash*0.9)+')';
       g.fillRect(0,0,W,H);
     }
+    if(rs.bannerT > 0 && !rs.over){
+      g.save();
+      g.globalAlpha = Math.min(1, rs.bannerT);
+      g.fillStyle = '#fff';
+      g.strokeStyle = 'rgba(0,0,0,.45)'; g.lineWidth = 4;
+      g.font = '800 34px ui-monospace,Menlo,monospace';
+      g.textAlign = 'center';
+      g.strokeText(rs.banner, W/2, H*0.3);
+      g.fillText(rs.banner, W/2, H*0.3);
+      g.restore();
+    }
     if(rs.over){
       g.fillStyle = 'rgba(20,24,32,.72)';
       g.fillRect(0,0,W,H);
@@ -600,6 +716,10 @@
       g.fillText('WIPED OUT', W/2, H/2 - 6);
       g.font = '700 15px ui-monospace,Menlo,monospace';
       g.fillText(rs.score + ' points', W/2, H/2 + 22);
+      g.font = '600 12px ui-monospace,Menlo,monospace';
+      g.fillText('lap ' + rs.lap + ' \u00b7 ' + rs.kos + ' knockdown' + (rs.kos === 1 ? '' : 's') +
+                 ' \u00b7 best chain x' + rs.bestMult, W/2, H/2 + 44);
+      g.fillText('press R or Restart', W/2, H/2 + 62);
       g.textAlign = 'left';
     }
   }
@@ -641,9 +761,39 @@
     g.restore();
   }
 
+  /** A floating pickup badge on the road. w is its on-screen width. */
+  function rPickup(g, x, y, w, kind){
+    var r = w * 0.5;
+    var bob = Math.sin(rs.pos * 0.004) * r * 0.12;
+    var col = kind === 'nitro' ? '#3fa7e0' : (kind === 'pipe' ? '#e8b530' : '#3dbb6d');
+    g.save();
+    g.translate(x, y);
+    g.fillStyle = 'rgba(0,0,0,.25)';
+    g.beginPath(); g.ellipse(0, 0, r*0.8, r*0.18, 0, 0, 7); g.fill();
+    g.translate(0, -r*1.15 + bob);
+    g.fillStyle = col;
+    g.beginPath(); g.arc(0, 0, r, 0, 7); g.fill();
+    g.lineWidth = Math.max(1.5, r*0.16); g.strokeStyle = '#fff';
+    g.beginPath(); g.arc(0, 0, r*0.92, 0, 7); g.stroke();
+    g.fillStyle = '#fff'; g.strokeStyle = '#fff'; g.lineCap = 'round';
+    if(kind === 'med'){
+      g.fillRect(-r*0.5, -r*0.14, r, r*0.28);
+      g.fillRect(-r*0.14, -r*0.5, r*0.28, r);
+    }else if(kind === 'nitro'){
+      g.beginPath();
+      g.moveTo(r*0.12, -r*0.62); g.lineTo(-r*0.36, r*0.08); g.lineTo(-r*0.02, r*0.08);
+      g.lineTo(-r*0.14, r*0.62); g.lineTo(r*0.38, -r*0.1); g.lineTo(r*0.04, -r*0.1);
+      g.closePath(); g.fill();
+    }else{
+      g.lineWidth = Math.max(2, r*0.24);
+      g.beginPath(); g.moveTo(-r*0.45, r*0.45); g.lineTo(r*0.45, -r*0.45); g.stroke();
+    }
+    g.restore();
+  }
+
   /** One rider, drawn as a motorcycle seen from behind with a rider on it.
       Still simple enough to read at speed, but clearly a bike now. */
-  function rBike(g,x,y,w,down,swinging,col,lean,braking){
+  function rBike(g,x,y,w,down,swinging,col,lean,braking,pipe,flame){
     var h = w*0.9;
     g.save();
     g.translate(x,y);
@@ -664,6 +814,16 @@
     g.fillStyle = '#9aa0a8';
     g.fillRect(-w*0.30, -h*0.04, w*0.12, h*0.05);
     g.fillRect( w*0.18, -h*0.04, w*0.12, h*0.05);
+    // ── nitro flames out of both pipes ──
+    if(flame){
+      for(var fi=-1; fi<=1; fi+=2){
+        var fx = fi * w*0.24, fl = h*(0.16 + Math.random()*0.12);
+        g.fillStyle = 'rgba(255,150,40,.95)';
+        g.beginPath(); g.moveTo(fx - w*0.05, -h*0.02); g.lineTo(fx + w*0.05, -h*0.02); g.lineTo(fx, fl); g.closePath(); g.fill();
+        g.fillStyle = 'rgba(255,240,150,.95)';
+        g.beginPath(); g.moveTo(fx - w*0.025, -h*0.02); g.lineTo(fx + w*0.025, -h*0.02); g.lineTo(fx, fl*0.55); g.closePath(); g.fill();
+      }
+    }
 
     // ── brake light (tail), glows red when braking ──
     if(braking){
@@ -714,6 +874,14 @@
     g.moveTo( w*0.16, -h*0.50); g.lineTo( w*0.24, -h*0.54);
     g.stroke();
 
+    // ── lead pipe held in the right hand (swings with the arm) ──
+    if(pipe){
+      g.strokeStyle = '#b9bec6'; g.lineWidth = Math.max(2.5, w*0.05); g.lineCap = 'round';
+      g.beginPath();
+      if(swinging){ g.moveTo(w*0.30, -h*0.50); g.lineTo(w*0.50, -h*0.78); }
+      else{ g.moveTo(w*0.24, -h*0.52); g.lineTo(w*0.26, -h*0.90); }
+      g.stroke();
+    }
     // ── swinging punch/kick arm ──
     if(swinging){
       g.strokeStyle = '#e8b530';
@@ -1172,8 +1340,12 @@
           '<div class="ag3-hud">'+
             '<div><span>Speed</span><b id="rashSpeed">0</b></div>'+
             '<div><span>Health</span><div class="ag3-bar hp"><i id="rashHp" style="width:100%"></i></div></div>'+
+            '<div><span>Nitro</span><div class="ag3-bar nx"><i id="rashNitro" style="width:50%"></i></div></div>'+
             '<div><span>Score</span><b id="rashScore">0</b></div>'+
+            '<div><span>Chain</span><b id="rashCombo">\u2014</b></div>'+
+            '<div><span>Lap</span><b id="rashLap">1</b></div>'+
             '<div><span>Distance</span><b id="rashDist">0m</b></div>'+
+            '<div id="rashPipeBox" style="display:none"><span>Pipe</span><b id="rashPipe">0s</b></div>'+
           '</div>'+
           '<canvas class="ag-canvas" id="rashCanvas" width="480" height="320"></canvas>'+
           '<div class="ag-row ag3-pads">'+
@@ -1183,11 +1355,12 @@
             '<button class="ag3-pad" data-rk="right">\u25B6</button>'+
             '<button class="ag3-pad" data-rk="punch">\u{1F44A}</button>'+
             '<button class="ag3-pad" data-rk="kick">\u{1F9B5}</button>'+
+            '<button class="ag3-pad nitro" data-rk="nitro">\u26A1</button>'+
           '</div>'+
           '<div class="ag-row">'+
             '<button class="ag-btn primary" onclick="AG3.rashRestart()">Restart</button>'+
           '</div>'+
-          '<p class="ag-hint">Arrows to ride, Z to swing. Pull alongside a rider and knock them off \u2014 350 points a head. Steer into the bends or the camber will spit you onto the dirt.</p>'+
+          '<p class="ag-hint">Arrows to ride, Z to punch, X to kick, hold Shift for nitro. Pull alongside a rider and knock them off \u2014 350 a head, and hits inside three seconds of each other build a chain that multiplies everything. Ride over the badges: club, nitro can, first aid. Each lap the pack gets faster. Steer into the bends or the camber will spit you onto the dirt.</p>'+
         '</div>') +
       screen('belter','BELTER','belterStatus',
         '<div class="ag-stage">'+
@@ -1265,6 +1438,8 @@
       else if(k==='ArrowDown'  || lk==='s') set('down',true);
       else if(g==='rash' && (lk==='z'||k===' ')) AG3.rashPunch();
       else if(g==='rash' && lk==='x') AG3.rashKick();
+      else if(g==='rash' && (k==='Shift' || lk==='n')) AG3.rashKey('nitro', true);
+      else if(g==='rash' && lk==='r' && rs && rs.over) AG3.rashRestart();
       else if(g==='belter' && k===' ') set('fire',true);
       else hit = false;
       if(hit) e.preventDefault();
@@ -1279,6 +1454,7 @@
       if(k==='ArrowUp'    || lk==='w') set('up',false);
       if(k==='ArrowDown'  || lk==='s') set('down',false);
       if(g==='belter' && k===' ') set('fire',false);
+      if(g==='rash' && (k==='Shift' || lk==='n')) AG3.rashKey('nitro', false);
     });
 
     // Touch pads. pointerdown/up so a held button keeps the key down.
