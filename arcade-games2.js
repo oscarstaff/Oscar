@@ -101,7 +101,7 @@
   /* minesweeper */
   .ag2-mines{display:grid;gap:2px;background:var(--border);padding:5px;
     border-radius:10px;touch-action:manipulation;user-select:none;
-    -webkit-user-select:none;}
+    -webkit-user-select:none;-webkit-touch-callout:none;}
   .ag2-cell{width:100%;aspect-ratio:1;display:flex;align-items:center;
     justify-content:center;background:var(--panel);border-radius:3px;
     font-family:ui-monospace,Menlo,monospace;font-weight:800;
@@ -369,6 +369,7 @@
     tt.p = { id:id, m:SHAPES[id].m.map(function(r){ return r.slice(); }),
              r:0, x:Math.floor((COLS - SHAPES[id].m.length)/2), y:0 };
     tt.held = false;
+    tt.lockT = 0; tt.resets = 0; tt.last = performance.now();
     if(collides(tt.p.m, tt.p.x, tt.p.y)){
       tt.over = true;
       var rec = setBest('tetris', tt.score);
@@ -420,9 +421,16 @@
       var dx = table[k][0], dy = -table[k][1];   // SRS y is up; screen y is down
       if(!collides(m, p.x+dx, p.y+dy)){
         p.m = m; p.x += dx; p.y += dy; p.r = to;
+        lockTouch();
         return;
       }
     }
+  }
+  // Lock delay: a grounded piece waits half a second before it locks, and a move or
+  // rotate gives it a little longer (15 times at most, so it can't be stalled forever).
+  var LOCK_MS = 500, LOCK_RESETS = 15;
+  function lockTouch(){
+    if(tt.lockT > 0 && tt.resets < LOCK_RESETS){ tt.lockT = 0; tt.resets++; }
   }
   function ghostY(){
     var y = tt.p.y;
@@ -432,7 +440,8 @@
 
   AG2.tetrisInit = function(){
     tt = { grid:[], bag:newBag(), p:null, hold:null, held:false,
-           score:0, lines:0, level:1, over:false, last:0, acc:0, paused:false };
+           score:0, lines:0, level:1, over:false, last:0, acc:0, paused:false,
+           lockT:0, resets:0, lastT:0 };
     for(var r=0;r<ROWS;r++) tt.grid.push(new Array(COLS).fill(0));
     spawn();
     document.getElementById('tetrisStatus').textContent = '\u2190\u2192 move \u00b7 \u2191 rotate \u00b7 space drop';
@@ -453,7 +462,7 @@
   };
   AG2.tetrisMove = function(dx){
     if(!tt || tt.over) return;
-    if(!collides(tt.p.m, tt.p.x+dx, tt.p.y)) tt.p.x += dx;
+    if(!collides(tt.p.m, tt.p.x+dx, tt.p.y)){ tt.p.x += dx; lockTouch(); }
     ttDraw();
   };
   AG2.tetrisRotate = function(d){ if(tt && !tt.over){ tryRotate(d); ttDraw(); } };
@@ -474,12 +483,20 @@
   function ttLoop(t){
     ttRAF = requestAnimationFrame(ttLoop);
     if(!tt || tt.over || tt.paused) return;
+    var dt = tt.lastT ? Math.min(100, t - tt.lastT) : 0;
+    tt.lastT = t;
+    if(collides(tt.p.m, tt.p.x, tt.p.y+1)){
+      // Resting on something: count down to the lock instead of locking on the next tick.
+      tt.lockT += dt;
+      if(tt.lockT >= LOCK_MS){ lock(); ttDraw(); }
+      return;
+    }
+    tt.lockT = 0;
     // Gravity: 800ms at level 1, floor of 80ms.
     var step = Math.max(80, 800 - (tt.level-1)*70);
     if(t - tt.last < step) return;
     tt.last = t;
-    if(!collides(tt.p.m, tt.p.x, tt.p.y+1)) tt.p.y++;
-    else lock();
+    tt.p.y++;
     ttDraw();
   }
 
@@ -824,7 +841,7 @@
             '<button class="ag-btn" onclick="AG2.tetrisHold()">Hold</button>'+
             '<button class="ag-btn primary" onclick="AG2.tetrisRestart()">Restart</button>'+
           '</div>'+
-          '<p class="ag-hint">\u2190\u2192 move \u00b7 \u2191 or X rotate \u00b7 Z rotate back \u00b7 \u2193 soft drop \u00b7 space hard drop \u00b7 C hold. On touch: swipe to move, tap to rotate, swipe up to drop.</p>'+
+          '<p class="ag-hint">\u2190\u2192 move \u00b7 \u2191 or X rotate \u00b7 Z rotate back \u00b7 \u2193 soft drop \u00b7 space hard drop \u00b7 C hold. On touch: drag to move, tap to rotate, flick down to drop, flick up to hold.</p>'+
         '</div>') +
       screen('connect','CONNECT 4','connectStatus',
         '<div class="ag-stage">'+
@@ -879,7 +896,29 @@
   function bindInput(){
     /* Delegated clicks — the grids are re-rendered constantly, so per-cell
        listeners would have to be rebound on every single render. */
+    // Long-press flags on touch (iOS has no contextmenu event, and Android's fires late).
+    var lpTimer = null, lpFiredAt = 0, lpX = 0, lpY = 0;
+    function lpCancel(){ if(lpTimer){ clearTimeout(lpTimer); lpTimer = null; } }
+    document.addEventListener('pointerdown', function(e){
+      if(e.pointerType === 'mouse' || activeGame() !== 'mines') return;
+      var cell = e.target.closest ? e.target.closest('.ag2-cell') : null;
+      if(!cell) return;
+      lpCancel(); lpX = e.clientX; lpY = e.clientY;
+      var cx = +cell.dataset.x, cy = +cell.dataset.y;
+      lpTimer = setTimeout(function(){
+        lpTimer = null; lpFiredAt = Date.now();
+        try{ if(navigator.vibrate) navigator.vibrate(12); }catch(_){}
+        AG2.minesClick(cx, cy, true);
+      }, 420);
+    });
+    document.addEventListener('pointermove', function(e){
+      if(lpTimer && Math.hypot(e.clientX-lpX, e.clientY-lpY) > 10) lpCancel();
+    });
+    document.addEventListener('pointerup', lpCancel);
+    document.addEventListener('pointercancel', lpCancel);
+
     document.addEventListener('click', function(e){
+      if(Date.now() - lpFiredAt < 700) return;           // that click was the end of a long-press
       var cell = e.target.closest ? e.target.closest('.ag2-cell') : null;
       if(cell && activeGame() === 'mines'){
         AG2.minesClick(+cell.dataset.x, +cell.dataset.y, false);
@@ -894,6 +933,7 @@
       var cell = e.target.closest ? e.target.closest('.ag2-cell') : null;
       if(cell && activeGame() === 'mines'){
         e.preventDefault();
+        if(Date.now() - lpFiredAt < 900) return;         // the long-press above already flagged it
         AG2.minesClick(+cell.dataset.x, +cell.dataset.y, true);
       }
     });
@@ -910,28 +950,48 @@
       else if(k==='c' || k==='C'){ e.preventDefault(); AG2.tetrisHold(); }
     });
 
-    // Touch: swipe to move/drop, tap to rotate.
-    var sx=0, sy=0, st=0, tracking=false;
-    document.addEventListener('touchstart', function(e){
-      if(activeGame() !== 'tetris') return;
-      tracking = true; st = Date.now();
-      sx = e.touches[0].clientX; sy = e.touches[0].clientY;
-    }, {passive:true});
-    document.addEventListener('touchend', function(e){
-      if(!tracking || activeGame() !== 'tetris') return;
-      tracking = false;
-      var t = e.changedTouches[0];
-      var dx = t.clientX - sx, dy = t.clientY - sy;
-      if(Math.abs(dx) < 22 && Math.abs(dy) < 22){
-        if(Date.now() - st < 300) AG2.tetrisRotate(1);   // tap
+    // Touch, on the board only (the old document-wide handler also rotated the piece when you
+    // tapped Hold or Restart). The piece follows your finger a column at a time, a slow pull
+    // down soft-drops, a quick flick down hard-drops, a quick flick up holds, a tap rotates.
+    var gp = null;
+    function tetrisBoard(e){ return e.target.closest ? e.target.closest('#tetrisCanvas') : null; }
+    document.addEventListener('pointerdown', function(e){
+      if(e.pointerType === 'mouse' || activeGame() !== 'tetris') return;
+      var cv = tetrisBoard(e); if(!cv) return;
+      gp = { id:e.pointerId, x0:e.clientX, y0:e.clientY, t0:performance.now(),
+             cell:Math.max(14, cv.getBoundingClientRect().width / COLS),
+             cols:0, rows:0, moved:false, hist:[] };
+      try{ cv.setPointerCapture(e.pointerId); }catch(_){}
+    });
+    document.addEventListener('pointermove', function(e){
+      if(!gp || e.pointerId !== gp.id || activeGame() !== 'tetris') return;
+      var dx = e.clientX - gp.x0, dy = e.clientY - gp.y0, now = performance.now();
+      gp.hist.push({t:now, y:e.clientY});
+      while(gp.hist.length > 2 && now - gp.hist[0].t > 100) gp.hist.shift();
+      if(!gp.moved){ if(Math.hypot(dx,dy) < 10) return; gp.moved = true; }
+      var wantCols = Math.trunc(dx / (gp.cell * 0.9));
+      while(gp.cols < wantCols){ AG2.tetrisMove(1);  gp.cols++; }
+      while(gp.cols > wantCols){ AG2.tetrisMove(-1); gp.cols--; }
+      var wantRows = Math.trunc(dy / gp.cell);
+      while(gp.rows < wantRows){ AG2.tetrisSoft(); gp.rows++; }
+    });
+    function gpEnd(e){
+      if(!gp || e.pointerId !== gp.id) return;
+      var g = gp; gp = null;
+      if(e.type === 'pointercancel' || activeGame() !== 'tetris') return;
+      var now = performance.now();
+      if(!g.moved){
+        if(now - g.t0 < 300) AG2.tetrisRotate(1);             // tap
         return;
       }
-      if(Math.abs(dx) > Math.abs(dy)){
-        var steps = Math.min(4, Math.round(Math.abs(dx)/34));
-        for(var i=0;i<Math.max(1,steps);i++) AG2.tetrisMove(dx>0?1:-1);
-      }else if(dy > 0) AG2.tetrisSoft();
-      else AG2.tetrisHard();
-    }, {passive:true});
+      var h = g.hist, vy = 0;
+      if(h.length > 1){ var a2 = h[0], b2 = h[h.length-1]; vy = (b2.y - a2.y) / Math.max(16, b2.t - a2.t) * 1000; }
+      var dy = e.clientY - g.y0;
+      if(vy > 900 && dy > g.cell * 2) AG2.tetrisHard();
+      else if(vy < -900 && dy < -g.cell * 2) AG2.tetrisHold();
+    }
+    document.addEventListener('pointerup', gpEnd);
+    document.addEventListener('pointercancel', gpEnd);
   }
 
   if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mount);
