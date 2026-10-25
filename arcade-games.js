@@ -741,7 +741,7 @@
       W: cv ? cv.width : 460, H: cv ? cv.height : 460,
       ship:{ x:(cv?cv.width:460)/2, y:(cv?cv.height:460)/2, vx:0, vy:0, a:-Math.PI/2, inv:2 },
       rocks:[], shots:[], bits:[],
-      score:0, lives:3, wave:1, over:false, last:0, fireCd:0
+      score:0, lives:3, wave:1, over:false, last:0, fireCd:0, nextLife:B_EXTRA_LIFE
     };
     bSpawnWave();
     var st = el('belterStatus');
@@ -754,6 +754,24 @@
   AG3.belterRestart = function(){ AG3.belterInit(); };
   AG3.belterKey = function(k,down){ bKeys[k] = !!down; };
 
+  // An extra ship every B_EXTRA_LIFE points, so a long run is not capped at three lives.
+  var B_EXTRA_LIFE = 5000;
+  function bScore(n){
+    bs.score += n;
+    while(bs.score >= bs.nextLife){
+      bs.nextLife += B_EXTRA_LIFE; bs.lives++;
+      var st = el('belterStatus'); if(st) st.textContent = 'Extra ship! ' + bs.lives + ' now';
+    }
+  }
+  // After a crash the ship waits off-screen until the middle of the field is clear, so it
+  // never comes back on top of a rock it cannot escape.
+  function bCentreClear(){
+    for(var i=0;i<bs.rocks.length;i++){
+      var r = bs.rocks[i];
+      if(Math.hypot(r.x-bs.W/2, r.y-bs.H/2) < r.r + 70) return false;
+    }
+    return true;
+  }
   function bSpawnWave(){
     var n = Math.min(9, 3 + bs.wave);
     for(var i=0;i<n;i++){
@@ -798,16 +816,24 @@
     if(!dt) return;
     var s = bs.ship, i, j;
 
-    if(bKeys.left)  s.a -= 3.4*dt;
-    if(bKeys.right) s.a += 3.4*dt;
-    if(bKeys.up){ s.vx += Math.cos(s.a)*260*dt; s.vy += Math.sin(s.a)*260*dt; }
+    if(s.dead > 0){
+      s.dead -= dt;
+      if(s.dead <= 0){
+        if(bCentreClear()){ s.dead = 0; s.inv = 2; }
+        else s.dead = 0.12;                                   // keep waiting for a gap
+      }
+    }else{
+      if(bKeys.left)  s.a -= 3.4*dt;
+      if(bKeys.right) s.a += 3.4*dt;
+      if(bKeys.up){ s.vx += Math.cos(s.a)*260*dt; s.vy += Math.sin(s.a)*260*dt; }
+    }
     // Light drag so it is controllable without killing the drift.
     s.vx *= (1 - 0.42*dt); s.vy *= (1 - 0.42*dt);
     s.x += s.vx*dt; s.y += s.vy*dt;
     bWrap(s,12);
     if(s.inv > 0) s.inv -= dt;
     if(bs.fireCd > 0) bs.fireCd -= dt;
-    if(bKeys.fire) AG3.belterFire();
+    if(bKeys.fire && !(s.dead > 0)) AG3.belterFire();
 
     for(i=bs.shots.length-1;i>=0;i--){
       var sh = bs.shots[i];
@@ -839,13 +865,13 @@
       }
     }
     // rock vs ship
-    if(s.inv <= 0){
+    if(s.inv <= 0 && !(s.dead > 0)){
       for(i=0;i<bs.rocks.length;i++){
         var rr = bs.rocks[i];
         if(Math.hypot(rr.x-s.x, rr.y-s.y) < rr.r + 9){
           bs.lives--;
           bBits(s.x,s.y,18,'#e05a3f');
-          s.x = bs.W/2; s.y = bs.H/2; s.vx = 0; s.vy = 0; s.inv = 2.4;
+          s.x = bs.W/2; s.y = bs.H/2; s.vx = 0; s.vy = 0; s.inv = 0; s.dead = 1;
           var stt = el('belterStatus');
           if(bs.lives <= 0){
             bs.over = true;
@@ -862,7 +888,7 @@
 
     if(!bs.rocks.length){
       bs.wave++;
-      bs.score += 250;
+      bScore(250);
       bSpawnWave();
       var st3 = el('belterStatus');
       if(st3) st3.textContent = 'Wave ' + bs.wave;
@@ -876,7 +902,7 @@
   function bBreak(idx){
     var r = bs.rocks[idx];
     bs.rocks.splice(idx,1);
-    bs.score += r.tier === 3 ? 20 : r.tier === 2 ? 50 : 100;
+    bScore(r.tier === 3 ? 20 : r.tier === 2 ? 50 : 100);
     bBits(r.x, r.y, 10, '#8a94a6');
     if(r.tier <= 1) return;
     for(var k=0;k<2;k++){
@@ -925,7 +951,7 @@
     g.globalAlpha = 1;
 
     var s = bs.ship;
-    if(!(s.inv > 0 && Math.floor(s.inv*10)%2)){
+    if(!(s.dead > 0) && !(s.inv > 0 && Math.floor(s.inv*10)%2)){
       g.save(); g.translate(s.x,s.y); g.rotate(s.a);
       g.strokeStyle = '#1d2530'; g.lineWidth = 2.2; g.lineJoin = 'round';
       g.beginPath();
