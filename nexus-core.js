@@ -251,7 +251,9 @@ function showHoursTab(tab){
     if(hold) sec.classList.add('av-loading');
     const reveal=function(){ if(sec) sec.classList.remove('av-loading'); window._availShownOnce=true; };
     if(hold) setTimeout(reveal, 5000);   /* never leave it hidden if a request hangs */
-    Promise.allSettled([refreshAvailPendingStatus(), loadAvailEmailPref(), checkLock()]).then(reveal);
+    /* also wait for the one-off weeks lookup, which decides whether the "From week / One-off" switch is shown */
+    Promise.allSettled([refreshAvailPendingStatus(), loadAvailEmailPref(), checkLock()])
+      .then(function(){ return window._oneoffsP; }).catch(function(){}).then(reveal);
     if(myIsAdmin){
       document.getElementById('adminAvailSection').style.display='block';
       loadAdminAvailGrid();
@@ -1561,7 +1563,7 @@ function buildAvailForm(){
     el.appendChild(wrap);
   });
   fBuilt=true;
-  initEffDate(); loadOneoffs();
+  initEffDate(); window._oneoffsP = loadOneoffs();
   loadExistingAvail();
 }
 

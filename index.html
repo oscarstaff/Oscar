@@ -1173,9 +1173,9 @@ body.ready{visibility:visible;}
 
 /* ── Keyframes ── */
 @keyframes spin{to{transform:rotate(360deg);}}
-@keyframes fadeSlideUp{
-  from{opacity:0;transform:translateY(14px);}
-  to{opacity:1;transform:translateY(0);}
+@keyframes fadeSlideUp{ /* opacity only — sliding content up on every page change read as the page jumping */
+  from{opacity:0;}
+  to{opacity:1;}
 }
 @keyframes fadeIn{
   from{opacity:0;}
@@ -1194,16 +1194,16 @@ body.ready{visibility:visible;}
   100%{background-position:200% center;}
 }
 @keyframes navBarSlide{
-  from{transform:scaleY(0);opacity:0;}
-  to{transform:scaleY(1);opacity:1;}
+  from{opacity:0;}
+  to{opacity:1;}
 }
 @keyframes cardPop{
   from{opacity:0;transform:translateY(10px) scale(.98);}
   to{opacity:1;transform:translateY(0) scale(1);}
 }
 @keyframes statCount{
-  from{opacity:0;transform:translateY(6px);}
-  to{opacity:1;transform:translateY(0);}
+  from{opacity:0;}
+  to{opacity:1;}
 }
 
 /* ── COLD-LOAD NODES→N SPLASH ── */
@@ -2079,8 +2079,8 @@ width:none !important;
   animation:fbFadeIn .25s ease both;
 }
 @keyframes fbFadeIn{
-  from{opacity:0;transform:translateY(8px);}
-  to{opacity:1;transform:translateY(0);}
+  from{opacity:0;}
+  to{opacity:1;}
 }
 
 
@@ -3192,8 +3192,8 @@ html:not([data-sb="collapsed"]) .sidebar .nav-item{
   animation: navItemExpand .35s ease both;
 }
 @keyframes navItemExpand {
-  0% { transform: translateX(-6px); opacity: .5; }
-  100% { transform: translateX(0); opacity: 1; }
+  0% { opacity: .5; }
+  100% { opacity: 1; }
 }
 html[data-sb="collapsed"] .nav-item .nav-icon{
   font-size:16px;
@@ -6306,12 +6306,12 @@ function hideNexusBoot(){
 <button id="dmToggle" style="display:none;"></button>
 </div>
 
-<script src="nexus-core.js?v=3"></script>
+<script src="nexus-core.js?v=4"></script>
 <script src="nexus-ui.js?v=1"></script>
 <script src="nexus-profile.js?v=1"></script>
 <script src="nexus-clock.js?v=1"></script>
 <script src="nexus-reports.js?v=3"></script>
-<script src="nexus-team.js?v=3"></script>
+<script src="nexus-team.js?v=4"></script>
 <script src="nexus-hours.js?v=3"></script>
 <script src="nexus-home.js?v=3"></script>
 <script src="nexus-notices.js?v=3"></script>
@@ -9979,6 +9979,24 @@ html:not([data-theme="win95"]):not([data-theme="renaissance"]) :is(a,button,inpu
 @media (prefers-reduced-motion:reduce){
   html:not([data-theme="win95"]) :is(.btn,.cc-btn,.cc-btn3,.nav-item,.hub-card):active{transform:none !important;}
 }
+</style>
+<style id="nx-stable">
+/* ═══ NX-STABLE — stop things jumping ════════════════════════════════
+   Changes nothing about what is shown, only how it arrives:
+   · page / card / stat entrances are fades, never slides or pops
+   · sidebar + bottom-bar items don't scale, slide or change weight when selected
+   · tapping a card or the bar doesn't shrink it
+   REVERT: delete this one <style id="nx-stable"> block (and the opacity-only keyframes above). */
+.nav-item, .nav-item.active { font-weight:500 !important; }
+.nav-item.active::before { animation:none !important; }
+html:not([data-sb="collapsed"]) .sidebar .nav-item { animation:none !important; }
+.bn-item, .bn-item:active { transform:none !important; }
+.bn-item:active { opacity:.65; }
+.bn-item .bn-icon, .bn-item.active .bn-icon { transform:none !important; }
+.card:hover, .card:active, .roster-card:hover { transform:none !important; }
+.btn:active { transform:scale(.98) !important; }
+.stat-val { animation:none !important; }
+.page.active .card, .page.active .roster-card { animation:none !important; }
 </style>
 </body>
 </html>
