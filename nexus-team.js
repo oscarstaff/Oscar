@@ -42,11 +42,31 @@ let _diarySaveTimer = null;
 
 
 
-function _repTabAllowed(tab){
-  if(tab === 'hours') return true;
-  if(tab === 'manager') return !!myIsAdmin;
-  if(tab === 'teamreport'){ var b = document.getElementById('rtab-teamreport'); return !!(b && b.style.display !== 'none'); }
-  return false;
+/* Reports are now separate pages: My Hours (everyone), Timesheet Manager (admin),
+   Team Report (people whose team has one, and admins). */
+function nxTeamReportAllowed(){
+  return !!(myIsAdmin || (myTeam && typeof trTeamHasReport === 'function' && trTeamHasReport(myTeam)));
+}
+function nxUpdateReportNav(){
+  var tr = nxTeamReportAllowed(), mgr = !!myIsAdmin;
+  var set = function(id, on){ var el = document.getElementById(id); if(el) el.style.display = on ? '' : 'none'; };
+  set('nav-myreports', mgr);
+  set('nav-teamreport', tr);
+  set('bn-myreports', mgr || tr);
+  /* If someone is sitting on a page they can't use, send them home. */
+  if(window._nxFlagsLoaded){
+    var onMgr = document.getElementById('page-myreports'), onTr = document.getElementById('page-teamreport');
+    if((onMgr && onMgr.classList.contains('active') && !mgr) || (onTr && onTr.classList.contains('active') && !tr)){
+      if(typeof goTo === 'function') goTo('home');
+    }
+  }
+  /* myTeam loads lazily — fetch it once so the Team Report link can appear. */
+  if(!myTeam && !myIsAdmin && !window._navTeamFetching && (window.me || (typeof me !== 'undefined' && me))){
+    window._navTeamFetching = true;
+    sbGet('staff_credentials','?staff_name=eq.'+encodeURIComponent(window.me || me)+'&select=team').then(function(creds){
+      if(creds && creds.length && creds[0] && creds[0].team){ myTeam = creds[0].team; nxUpdateReportNav(); }
+    }).catch(function(){}).then(function(){ window._navTeamFetching = false; });
+  }
 }
 function _repStore(k, v){ try{ sessionStorage.setItem(k, v); }catch(e){} }
 function _repRead(k){ try{ return sessionStorage.getItem(k); }catch(e){ return null; } }
@@ -64,20 +84,11 @@ function showMgrView(v){
   }
   if(v === 'edit'){ try{ populateMgrStaff(); }catch(e){} }
 }
+/* Compat router: the old Reports tabs are separate pages now. */
 function showReportsTab(tab){
-  if(tab === 'payroll'){ tab = 'hours'; }
-  if(!_repTabAllowed(tab)) tab = 'hours';
-  _repStore('nx_rep_tab', tab);
-  document.getElementById('rsec-hours').style.display = tab === 'hours' ? '' : 'none';
-  document.getElementById('rsec-manager').style.display = tab === 'manager' ? '' : 'none';
-  var trSec = document.getElementById('rsec-teamreport');
-  if(trSec) trSec.style.display = tab === 'teamreport' ? '' : 'none';
-  document.getElementById('rtab-hours').classList.toggle('active', tab === 'hours');
-  document.getElementById('rtab-manager').classList.toggle('active', tab === 'manager');
-  var trTab = document.getElementById('rtab-teamreport');
-  if(trTab) trTab.classList.toggle('active', tab === 'teamreport');
-  if(tab === 'manager'){ showMgrView(_repRead('nx_rep_mgr') || 'breaks'); }
-  if(tab === 'teamreport' && typeof initTeamReport === 'function') initTeamReport();
+  if(tab === 'manager') return goTo('myreports');
+  if(tab === 'teamreport') return goTo('teamreport');
+  return goTo('myhours');
 }
 
 
@@ -100,20 +111,7 @@ function trIsLead(){
 function trCanEnter(){ return myIsAdmin || _teamKey(myTeam)===_teamKey(trActiveTeam()); }
 
 function initReportsPage(){
-  const mgrBtn = document.getElementById('rtab-manager');
-  if(mgrBtn) mgrBtn.style.display = myIsAdmin ? '' : 'none';
-  const trBtn = document.getElementById('rtab-teamreport');
-  if(trBtn) trBtn.style.display = ((myTeam && trTeamHasReport(myTeam)) || myIsAdmin) ? '' : 'none';
-  if(!myTeam && (window.me || me)){
-    (async function(){
-      try{
-        const creds = await sbGet('staff_credentials','?staff_name=eq.'+encodeURIComponent(me)+'&select=team');
-        myTeam = (creds.length && creds[0] && creds[0].team) ? creds[0].team : myTeam;
-      }catch(e){}
-      const b = document.getElementById('rtab-teamreport');
-      if(b) b.style.display = ((myTeam && trTeamHasReport(myTeam)) || myIsAdmin) ? '' : 'none';
-    })();
-  }
+  nxUpdateReportNav();
   const _fr = (typeof nxFortCurrent === 'function') ? nxFortCurrent() : null;
   const today = new Date();
   const start = new Date(today); start.setDate(today.getDate()-13);
@@ -127,17 +125,6 @@ function initReportsPage(){
     if(el && !el.value) el.value = _fr ? _fr.to : fmt(today);
   });
   if(typeof nxInitReportPeriods === 'function') nxInitReportPeriods();
-  try{
-    var _cur = ['hours','manager','teamreport'].filter(function(k){ var sec=document.getElementById('rsec-'+k); return sec && sec.style.display!=='none'; })[0] || 'hours';
-    if(!window._repTabRestored){
-      var _saved = _repRead('nx_rep_tab');
-      if(!_saved){ window._repTabRestored = true; }
-      else if(_repTabAllowed(_saved)){ window._repTabRestored = true; if(_saved !== _cur){ showReportsTab(_saved); _cur = _saved; } }
-    }
-    if(!_repTabAllowed(_cur)) showReportsTab('hours');
-  }catch(e){}
-  setTimeout(runHoursReport, 100);
-  if(typeof loadFortLeaderboard==='function') loadFortLeaderboard();
 }
 
 var TR_WEEK_DAYS = 6;
