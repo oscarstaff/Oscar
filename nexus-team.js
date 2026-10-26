@@ -52,7 +52,9 @@ function nxReportNavApply(mgr, tr){
   set('nav-myreports', mgr);
   set('homeMenuTeamReport', tr);
   set('homeMenuTimesheet', mgr);
+  set('homeMenuNotices', mgr);
   set('homeReportsMenu', mgr || tr);
+  var hd = document.getElementById('homeMenuHd'); if(hd) hd.textContent = mgr ? 'Reports & admin' : 'Reports';
 }
 function _repMenuKey(){ var n = window.me || (typeof me !== 'undefined' && me) || ''; return n ? 'nx_rep_menu_' + n : ''; }
 /* Show the last known answer straight away (before the admin/team flags load) so the Home menu doesn't pop in late. */
@@ -75,8 +77,8 @@ function nxUpdateReportNav(){
   nxReportNavApply(mgr, tr);
   if(!teamUnknown){ try{ var k = _repMenuKey(); if(k) localStorage.setItem(k, (mgr ? 'm' : '') + (tr ? 't' : '')); }catch(e){} }
   /* If someone is sitting on a page they can't use, send them home. */
-  var onMgr = document.getElementById('page-myreports'), onTr = document.getElementById('page-teamreport');
-  if((onMgr && onMgr.classList.contains('active') && !mgr) || (onTr && onTr.classList.contains('active') && !tr)){
+  var onMgr = document.getElementById('page-myreports'), onTr = document.getElementById('page-teamreport'), onSn = document.getElementById('page-staffnotices');
+  if((onMgr && onMgr.classList.contains('active') && !mgr) || (onTr && onTr.classList.contains('active') && !tr) || (onSn && onSn.classList.contains('active') && !mgr)){
     if(typeof goTo === 'function') goTo('home');
   }
   /* myTeam loads lazily — fetch it once so the Team Report entry can appear. */
