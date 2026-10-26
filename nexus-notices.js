@@ -105,6 +105,264 @@ async function _rcnAck(ids, btn){
   setInterval(function(){ if(!document.hidden) checkShiftChangeNotices(); }, 180000);
 })();
 
+/* ── STAFF NOTICES (must acknowledge) ─────────────────────────────────────
+   Admin-posted notices live in staff_notices (active=true). Each person has to
+   tap "I acknowledge", which writes a row to staff_notice_acks. Until then a
+   full-screen box covers Nexus and the app behind it is inert. Posting is done
+   in the database (see staff_notices_02_*.sql); setting active=false releases
+   everyone straight away, because the box re-checks every 2 minutes and when
+   the app comes back to the front.
+   Fails open: if either read fails (offline, table missing, no session) nothing
+   is shown and nothing already shown is removed. */
+let _snBusy=false, _snKey='';
+function _snEsc(v){ return String(v==null?'':v).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+function _snFmt(txt){
+  const lines=String(txt||'').replace(/\r/g,'').split('\n'); let h='', inList=false;
+  const close=function(){ if(inList){ h+='</ul>'; inList=false; } };
+  lines.forEach(function(raw){
+    const l=raw.replace(/\s+$/,'');
+    let m;
+    if(!l.trim()){ close(); return; }
+    if((m=/^##\s+(.*)$/.exec(l))){ close(); h+='<div style="font-size:15px;font-weight:800;margin:16px 0 4px">'+_snEsc(m[1])+'</div>'; return; }
+    if((m=/^\s*[•\-]\s+(.*)$/.exec(l))){ if(!inList){ h+='<ul style="margin:4px 0 6px;padding-left:20px">'; inList=true; } h+='<li style="margin:3px 0">'+_snEsc(m[1])+'</li>'; return; }
+    close(); h+='<p style="margin:6px 0">'+_snEsc(l)+'</p>';
+  });
+  close(); return h;
+}
+async function _snFetch(path){
+  try{
+    const r=await fetch(SB+'/rest/v1/'+path,{headers:{apikey:KEY,Authorization:'Bearer '+_sbBearer()}});
+    if(!r.ok) return null;
+    const j=await r.json();
+    return Array.isArray(j)?j:null;
+  }catch(e){ return null; }
+}
+async function checkStaffNotices(){
+  if(!me || _snBusy) return;
+  _snBusy=true;
+  try{
+    const res=await Promise.all([
+      _snFetch('staff_notices?active=eq.true&select=id,title,body,created_at&order=created_at.asc&limit=10'),
+      _snFetch('staff_notice_acks?staff_name=eq.'+encodeURIComponent(me)+'&select=notice_id&limit=500')
+    ]);
+    const notices=res[0], acks=res[1];
+    if(notices===null || acks===null) return;
+    const done=new Set(acks.map(function(a){ return a.notice_id; }));
+    const pending=notices.filter(function(n){ return !done.has(n.id); });
+    const _pv=document.getElementById('snModal');
+    if(!pending.length){ if(!(_pv && _pv.dataset.preview==='1')) _snClose(); return; }
+    const key=pending.map(function(n){ return n.id; }).join(',');
+    if(document.getElementById('snModal') && key===_snKey && !(_pv && _pv.dataset.preview==='1')) return;
+    _snRender(pending, key);
+  }catch(e){ console.warn('checkStaffNotices',e); }
+  finally{ _snBusy=false; }
+}
+function _snClose(){
+  const el=document.getElementById('snModal'); if(el) el.remove();
+  _snKey='';
+  try{ const hub=document.getElementById('hubLayer'); if(hub) hub.removeAttribute('inert'); }catch(e){}
+  try{ document.body.style.overflow=''; }catch(e){}
+}
+function _snRender(list, key, opts){
+  const preview=!!(opts&&opts.preview);
+  const old=document.getElementById('snModal'); if(old) old.remove();
+  if(!document.getElementById('snStyle')){
+    const st=document.createElement('style'); st.id='snStyle';
+    st.textContent='@keyframes snFade{from{opacity:0}to{opacity:1}}#snModal .sn-btn:focus-visible{outline:3px solid rgba(37,99,235,.45);outline-offset:2px}';
+    document.head.appendChild(st);
+  }
+  _snKey=preview?'':key;
+  const el=document.createElement('div'); el.id='snModal'; if(preview) el.dataset.preview='1'; el.setAttribute('role','alertdialog'); el.setAttribute('aria-modal','true'); el.setAttribute('aria-labelledby','snTitle0');
+  el.style.cssText='position:fixed;inset:0;z-index:100500;background:rgba(15,23,42,.78);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;padding:16px;animation:snFade .18s ease-out';
+  const cards=list.map(function(n,i){
+    let when=''; try{ when=new Date(n.created_at).toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric',timeZone:'Australia/Sydney'}); }catch(e){}
+    return '<div'+(i?' style="margin-top:20px;padding-top:18px;border-top:1px solid var(--ui-line,#e2e8f0)"':'')+'>'+
+      '<div style="font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#d97706;margin-bottom:6px">Important notice'+(when?' · '+_snEsc(when):'')+'</div>'+
+      '<div id="snTitle'+i+'" style="font-size:19px;font-weight:800;line-height:1.25;margin:0 0 6px">'+_snEsc(n.title)+'</div>'+
+      '<div style="font-size:14px;line-height:1.5">'+_snFmt(n.body)+'</div></div>';
+  }).join('');
+  el.innerHTML='<div style="width:min(520px,100%);max-height:calc(100dvh - 32px);display:flex;flex-direction:column;border-radius:18px;background:var(--ui-surface,#fff);color:var(--ui-ink,#0f172a);box-shadow:0 20px 60px rgba(0,0,0,.45);overflow:hidden">'+
+    '<div id="snScroll" tabindex="0" style="outline:none;padding:20px 20px 8px;overflow:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain">'+cards+'</div>'+
+    '<div style="padding:12px 20px 18px;border-top:1px solid var(--ui-line,#e2e8f0)">'+
+      '<div id="snErr" role="alert" style="display:none;font-size:12.5px;color:#dc2626;margin:0 0 8px"></div>'+
+      '<button id="snAck" class="sn-btn" type="button" style="width:100%;padding:13px;border:0;border-radius:12px;font-size:15px;font-weight:800;cursor:pointer;background:var(--ui-accent,#2563eb);color:#fff">'+(preview?'Close preview':'I acknowledge')+'</button>'+
+      '<div style="font-size:11.5px;opacity:.65;text-align:center;margin-top:8px">'+(preview?'Preview only. Nothing has been posted.':'You need to acknowledge this to keep using Nexus.')+'</div>'+
+    '</div></div>';
+  document.body.appendChild(el);
+  const btn=document.getElementById('snAck');
+  if(preview){
+    btn.onclick=function(){ const m=document.getElementById('snModal'); if(m) m.remove(); document.removeEventListener('keydown',_snPvKey); };
+    document.addEventListener('keydown',_snPvKey);
+    try{ btn.focus({preventScroll:true}); }catch(e){}
+    return;
+  }
+  try{ const hub=document.getElementById('hubLayer'); if(hub) hub.setAttribute('inert',''); }catch(e){}
+  try{ document.body.style.overflow='hidden'; }catch(e){}
+  btn.onclick=function(){ _snAck(list.map(function(n){ return n.id; }), btn); };
+  /* keep focus on the box; nothing behind it is reachable and Escape does nothing */
+  el.addEventListener('keydown',function(ev){
+    if(ev.key!=='Tab') return;
+    ev.preventDefault();
+    const sc=document.getElementById('snScroll');
+    if(document.activeElement===btn && sc) sc.focus(); else btn.focus();
+  });
+  try{ btn.focus({preventScroll:true}); }catch(e){}
+}
+function _snPvKey(ev){ if(ev.key==='Escape'){ const m=document.getElementById('snModal'); if(m&&m.dataset.preview==='1'){ m.remove(); } document.removeEventListener('keydown',_snPvKey); } }
+async function _snAck(ids, btn){
+  const err=document.getElementById('snErr');
+  if(err) err.style.display='none';
+  btn.disabled=true; btn.textContent='Saving…';
+  try{
+    const r=await fetch(SB+'/rest/v1/staff_notice_acks?on_conflict=notice_id,staff_name',{
+      method:'POST',
+      headers:{apikey:KEY,Authorization:'Bearer '+_sbBearer(),'Content-Type':'application/json',Prefer:'resolution=ignore-duplicates,return=minimal'},
+      body:JSON.stringify(ids.map(function(id){ return {notice_id:id, staff_name:me}; }))
+    });
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    _snClose();
+  }catch(e){
+    console.warn('staff notice ack',e);
+    btn.disabled=false; btn.textContent='I acknowledge';
+    if(err){ err.textContent='Couldn’t save your acknowledgement. Check your connection and tap again.'; err.style.display='block'; }
+  }
+}
+
+/* ── STAFF NOTICES: admin page (Home > Reports & admin > Staff notices) ────
+   Hub admins write a notice, preview it, post it, and see who has acknowledged.
+   Needs the admin policies from staff_notices_01_tables.sql; if the database
+   refuses, the page says so instead of failing quietly. */
+let _snpOpen=new Set(), _snpBusy=false;
+function _snpWhen(iso, withTime){
+  try{ return new Date(iso).toLocaleString('en-AU',withTime?{day:'numeric',month:'short',hour:'numeric',minute:'2-digit',timeZone:'Australia/Sydney'}:{day:'numeric',month:'short',year:'numeric',timeZone:'Australia/Sydney'}); }catch(e){ return ''; }
+}
+function _snpErr(msg){ const e=document.getElementById('snpErr'); if(!e) return; e.textContent=msg||''; e.style.display=msg?'block':'none'; }
+function _snpFail(status){
+  return (status===401||status===403||status===404)
+    ? 'The database didn’t allow that. Run staff_notices_01_tables.sql in Supabase (it’s safe to run again), then try again.'
+    : 'Couldn’t save. Check your connection and try again.';
+}
+function snpPreview(){
+  const t=(document.getElementById('snpTitle').value||'').trim(), b=(document.getElementById('snpBody').value||'').replace(/\s+$/,'');
+  if(!t||!b){ _snpErr('Add a title and a message first.'); return; }
+  _snpErr('');
+  _snRender([{id:'preview',title:t,body:b,created_at:new Date().toISOString()}], 'preview', {preview:true});
+}
+async function snpPost(){
+  if(_snpBusy) return;
+  const tEl=document.getElementById('snpTitle'), bEl=document.getElementById('snpBody'), btn=document.getElementById('snpPost');
+  const t=(tEl.value||'').trim(), b=(bEl.value||'').replace(/\s+$/,'');
+  if(!t||!b){ _snpErr('Add a title and a message first.'); return; }
+  if(!confirm('Post “'+t+'” to all staff?\n\nNexus will be blocked for everyone until they tap I acknowledge.')) return;
+  _snpErr(''); _snpBusy=true; btn.disabled=true; btn.textContent='Posting…';
+  try{
+    const r=await fetch(SB+'/rest/v1/staff_notices',{method:'POST',
+      headers:{apikey:KEY,Authorization:'Bearer '+_sbBearer(),'Content-Type':'application/json',Prefer:'return=representation'},
+      body:JSON.stringify({title:t,body:b,created_by:me})});
+    if(!r.ok){ _snpErr(_snpFail(r.status)); return; }
+    const out=await r.json().catch(function(){return null;});
+    const id=out&&out[0]&&out[0].id;
+    if(!id){ _snpErr('The notice may not have saved. Refresh the list to check before trying again.'); return; }
+    /* the person posting has read it, so they are not blocked by their own notice */
+    try{ await fetch(SB+'/rest/v1/staff_notice_acks?on_conflict=notice_id,staff_name',{method:'POST',
+      headers:{apikey:KEY,Authorization:'Bearer '+_sbBearer(),'Content-Type':'application/json',Prefer:'resolution=ignore-duplicates,return=minimal'},
+      body:JSON.stringify([{notice_id:id,staff_name:me}])}); }catch(e){}
+    tEl.value=''; bEl.value='';
+    try{ showToast('Notice posted. Staff will see it within about 2 minutes.','success'); }catch(e){}
+    await loadStaffNoticesAdmin(true);
+  }catch(e){ _snpErr(_snpFail(0)); }
+  finally{ _snpBusy=false; btn.disabled=false; btn.textContent='Post to all staff'; }
+}
+async function snpWithdraw(id){
+  if(!confirm('Withdraw this notice?\n\nPeople who haven’t acknowledged it will no longer be blocked. The record of who acknowledged is kept.')) return;
+  try{
+    const r=await fetch(SB+'/rest/v1/staff_notices?id=eq.'+encodeURIComponent(id),{method:'PATCH',
+      headers:{apikey:KEY,Authorization:'Bearer '+_sbBearer(),'Content-Type':'application/json',Prefer:'return=representation'},
+      body:JSON.stringify({active:false})});
+    const out=await r.json().catch(function(){return null;});
+    if(!r.ok||!Array.isArray(out)||!out.length) throw new Error('x');
+    try{ showToast('Notice withdrawn','success'); }catch(e){}
+  }catch(e){ try{ showToast('Couldn’t withdraw it. Check your connection, and that staff_notices_01_tables.sql has been run.','error'); }catch(_){} return; }
+  loadStaffNoticesAdmin(true);
+}
+async function snpDelete(id, live){
+  const msg=live
+    ? 'Delete this notice for good?\n\nIt stops blocking anyone straight away, and the record of who acknowledged it is deleted too. To keep the record, use Withdraw instead.'
+    : 'Delete this notice for good?\n\nThe record of who acknowledged it is deleted too.';
+  if(!confirm(msg)) return;
+  try{
+    const r=await fetch(SB+'/rest/v1/staff_notices?id=eq.'+encodeURIComponent(id),{method:'DELETE',
+      headers:{apikey:KEY,Authorization:'Bearer '+_sbBearer(),Prefer:'return=representation'}});
+    const out=await r.json().catch(function(){return null;});
+    if(!r.ok||!Array.isArray(out)||!out.length) throw new Error('x');
+    _snpOpen.delete(id);
+    try{ showToast('Notice deleted','success'); }catch(e){}
+  }catch(e){ try{ showToast('Couldn\u2019t delete it. Check your connection, and run staff_notices_01_tables.sql again if you haven\u2019t since this update.','error'); }catch(_){} return; }
+  loadStaffNoticesAdmin(true);
+}
+function snpToggle(id){
+  if(_snpOpen.has(id)) _snpOpen.delete(id); else _snpOpen.add(id);
+  const d=document.getElementById('snpd-'+id), b=document.getElementById('snpb-'+id);
+  const open=_snpOpen.has(id);
+  if(d) d.style.display=open?'block':'none';
+  if(b) b.textContent=open?'Hide names':'Who’s acknowledged';
+}
+async function loadStaffNoticesAdmin(quiet){
+  const host=document.getElementById('snpList'); if(!host) return;
+  if(!host.innerHTML.trim()) host.innerHTML=(typeof nxSkel==='function')?nxSkel('cards',3):'';
+  const notices=await _snFetch('staff_notices?select=id,title,active,created_at,created_by&order=created_at.desc&limit=10');
+  if(notices===null){
+    if(!host.querySelector('.snp-item')) host.innerHTML='<div class="snp-hint" style="padding:10px 0;">Couldn’t load notices. Run staff_notices_01_tables.sql in Supabase if you haven’t yet, then tap Refresh.</div>';
+    return;
+  }
+  if(!notices.length){ host.innerHTML='<div class="snp-hint" style="padding:10px 0;">No notices yet. Write one above and post it.</div>'; host.dataset.sig='empty'; return; }
+  const ids=notices.map(function(n){ return n.id; }).join(',');
+  const res=await Promise.all([
+    _snFetch('staff_notice_acks?notice_id=in.('+ids+')&select=notice_id,staff_name,acked_at&order=acked_at.asc&limit=3000'),
+    _snFetch('staff_names?select=name&order=name.asc&limit=500')
+  ]);
+  const acks=res[0]||[], staff=res[1];
+  const norm=function(v){ return String(v||'').trim().toLowerCase(); };
+  const everyone=staff?staff.map(function(r){ return r.name; }).filter(Boolean):null;
+  const html=notices.map(function(n){
+    const mine=acks.filter(function(a){ return a.notice_id===n.id; });
+    const doneSet=new Set(mine.map(function(a){ return norm(a.staff_name); }));
+    const total=everyone?everyone.length:null;
+    const doneInList=everyone?everyone.filter(function(nm){ return doneSet.has(norm(nm)); }).length:mine.length;
+    const pct=total?Math.round(100*doneInList/total):0;
+    const open=_snpOpen.has(n.id);
+    const waiting=everyone?everyone.filter(function(nm){ return !doneSet.has(norm(nm)); }):[];
+    const detail='<div class="snp-detail" id="snpd-'+_snEsc(n.id)+'" style="display:'+(open?'block':'none')+'">'+
+      (everyone?('<div class="snp-sec">Not yet ('+waiting.length+')</div>'+(waiting.length?'<div class="snp-chips">'+waiting.map(function(nm){ return '<span class="snp-chip">'+_snEsc(nm)+'</span>'; }).join('')+'</div>':'<div class="snp-hint">Everyone has acknowledged.</div>')):'')+
+      '<div class="snp-sec">Acknowledged ('+mine.length+')</div>'+
+      (mine.length?mine.map(function(a){ return '<div class="snp-row"><span>'+_snEsc(a.staff_name)+'</span><span>'+_snEsc(_snpWhen(a.acked_at,true))+'</span></div>'; }).join(''):'<div class="snp-hint">Nobody yet.</div>')+
+      '</div>';
+    return '<div class="snp-item">'+
+      '<div class="snp-top"><div class="snp-title">'+_snEsc(n.title)+'</div><span class="snp-pill '+(n.active?'live':'off')+'">'+(n.active?'Live':'Withdrawn')+'</span></div>'+
+      '<div class="snp-meta">Posted '+_snEsc(_snpWhen(n.created_at,true))+(n.created_by?' by '+_snEsc(n.created_by):'')+'</div>'+
+      (total?'<div class="snp-bar" aria-hidden="true"><i style="width:'+pct+'%"></i></div>':'')+
+      '<div class="snp-count"><b>'+doneInList+'</b>'+(total?' of '+total:'')+' acknowledged</div>'+
+      '<div class="snp-actions"><button type="button" class="btn btn-outline" id="snpb-'+_snEsc(n.id)+'" onclick="snpToggle(\''+_snEsc(n.id)+'\')">'+(open?'Hide names':'Who’s acknowledged')+'</button>'+
+      (n.active?'<button type="button" class="btn btn-outline" onclick="snpWithdraw(\''+_snEsc(n.id)+'\')">Withdraw</button>':'')+
+      '<button type="button" class="btn btn-outline snp-del" onclick="snpDelete(\''+_snEsc(n.id)+'\','+(n.active?'true':'false')+')">Delete</button></div>'+
+      detail+'</div>';
+  }).join('');
+  if(host.dataset.sig!==html){ host.innerHTML=html; host.dataset.sig=html; }
+}
+(function(){
+  if(window._snpBound) return; window._snpBound=true;
+  setInterval(function(){
+    const pg=document.getElementById('page-staffnotices');
+    if(pg && pg.classList.contains('active') && !document.hidden) loadStaffNoticesAdmin(true);
+  }, 30000);
+})();
+
+(function(){
+  if(window._snBound) return; window._snBound=true;
+  document.addEventListener('visibilitychange',function(){ if(document.visibilityState==='visible') checkStaffNotices(); });
+  setInterval(function(){ if(!document.hidden) checkStaffNotices(); }, 120000);
+})();
+
 async function checkNewNotifications(){
   if(!me) return;
   checkNewDiscussions();
