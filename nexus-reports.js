@@ -976,7 +976,7 @@ async function approveExtraBreak(id, staff, date, minutes){
     showToast('Bad date format: '+date);
     return;
   }
-  if(!confirm('Approve '+minutes+' min extra break for '+staff+' on '+date+'?')) return;
+  if(!(await nxConfirm(minutes+' min extra break for '+staff+' on '+date+'.',{title:'Approve extra break?',okText:'Approve'}))) return;
   try{
     await fetch(SB+'/rest/v1/extra_break_requests?id=eq.'+encodeURIComponent(id),{
       method:'PATCH',
@@ -1066,7 +1066,7 @@ function handleDeclineBreak(btn){
 }
 
 async function declineExtraBreak(id){
-  if(!confirm('Decline this request?')) return;
+  if(!(await nxConfirm('The staff member will see it was declined.',{title:'Decline this request?',okText:'Decline',danger:true}))) return;
   try{
     await fetch(SB+'/rest/v1/extra_break_requests?id=eq.'+encodeURIComponent(id),{
       method:'PATCH',

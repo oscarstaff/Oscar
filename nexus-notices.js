@@ -253,7 +253,7 @@ async function snpPost(){
   const tEl=document.getElementById('snpTitle'), bEl=document.getElementById('snpBody'), btn=document.getElementById('snpPost');
   const t=(tEl.value||'').trim(), b=(bEl.value||'').replace(/\s+$/,'');
   if(!t||!b){ _snpErr('Add a title and a message first.'); return; }
-  if(!confirm('Post “'+t+'” to all staff?\n\nNexus will be blocked for everyone until they tap I acknowledge.')) return;
+  if(!(await nxConfirm('Nexus will be blocked for everyone until they tap I acknowledge.',{title:'Post “'+t+'” to all staff?',okText:'Post notice'}))) return;
   _snpErr(''); _snpBusy=true; btn.disabled=true; btn.textContent='Posting…';
   try{
     const r=await fetch(SB+'/rest/v1/staff_notices',{method:'POST',
@@ -274,7 +274,7 @@ async function snpPost(){
   finally{ _snpBusy=false; btn.disabled=false; btn.textContent='Post to all staff'; }
 }
 async function snpWithdraw(id){
-  if(!confirm('Withdraw this notice?\n\nPeople who haven’t acknowledged it will no longer be blocked. The record of who acknowledged is kept.')) return;
+  if(!(await nxConfirm('People who haven’t acknowledged it will no longer be blocked. The record of who acknowledged is kept.',{title:'Withdraw this notice?',okText:'Withdraw'}))) return;
   try{
     const r=await fetch(SB+'/rest/v1/staff_notices?id=eq.'+encodeURIComponent(id),{method:'PATCH',
       headers:{apikey:KEY,Authorization:'Bearer '+_sbBearer(),'Content-Type':'application/json',Prefer:'return=representation'},
@@ -287,9 +287,9 @@ async function snpWithdraw(id){
 }
 async function snpDelete(id, live){
   const msg=live
-    ? 'Delete this notice for good?\n\nIt stops blocking anyone straight away, and the record of who acknowledged it is deleted too. To keep the record, use Withdraw instead.'
-    : 'Delete this notice for good?\n\nThe record of who acknowledged it is deleted too.';
-  if(!confirm(msg)) return;
+    ? 'It stops blocking anyone straight away, and the record of who acknowledged it is deleted too. To keep the record, use Withdraw instead.'
+    : 'The record of who acknowledged it is deleted too.';
+  if(!(await nxConfirm(msg,{title:'Delete this notice for good?',okText:'Delete',danger:true}))) return;
   try{
     const r=await fetch(SB+'/rest/v1/staff_notices?id=eq.'+encodeURIComponent(id),{method:'DELETE',
       headers:{apikey:KEY,Authorization:'Bearer '+_sbBearer(),Prefer:'return=representation'}});
@@ -657,7 +657,7 @@ async function toggleQuizAccess(staffName, quizId, grant){
 }
 
 async function resetStaffQuiz(staffName, resultId){
-  if(!confirm('Delete this quiz attempt for '+staffName+'? They will be able to retake.')) return;
+  if(!(await nxConfirm('They will be able to retake the quiz.',{title:'Delete '+staffName+'’s attempt?',okText:'Delete attempt',danger:true}))) return;
   try{
     await fetch(SB+'/rest/v1/training_quiz_results?id=eq.'+resultId, {
       method:'DELETE',
@@ -1240,7 +1240,7 @@ async function togglePerQuizAccess(staffName, quizId, grant){
 
 async function bulkAccessForQuiz(quizId, grant){
   const verb = grant ? 'GRANT access' : 'REVOKE access';
-  if(!confirm('Are you sure you want to '+verb+' for ALL staff on this quiz?')) return;
+  if(!(await nxConfirm('Are you sure you want to '+verb+' for ALL staff on this quiz?',{title:grant?'Grant everyone access?':'Revoke everyone’s access?',okText:grant?'Grant access':'Revoke access',danger:!grant}))) return;
   try{
     if(grant){
       const allStaff = await sbGet('staff_names', '?select=name');
@@ -1333,7 +1333,7 @@ async function openCustomQuizEditor(quizId){
 
 
 async function publishQuiz(quizId){
-  if(!confirm('Publish this quiz?\n\nIt will become visible to staff with access and they will get a notification.')) return;
+  if(!(await nxConfirm('It will become visible to staff with access and they will get a notification.',{title:'Publish this quiz?',okText:'Publish'}))) return;
   try{
     const pr = await fetch(SB+'/rest/v1/custom_quizzes?id=eq.'+quizId, {
       method:'PATCH',
@@ -1378,7 +1378,7 @@ async function publishQuiz(quizId){
 }
 
 async function deleteStandardQuiz(){
-  if(!confirm('Delete the Standard Knowledge Quiz?\n\nThis will:\n• Remove all staff access\n• Delete all attempt records\n• Reset any custom edits\n\nThis cannot be undone.')) return;
+  if(!(await nxConfirm('This will:\n• Remove all staff access\n• Delete all attempt records\n• Reset any custom edits\n\nThis cannot be undone.',{title:'Delete the Standard Knowledge Quiz?',okText:'Delete quiz',danger:true}))) return;
   try{
     await Promise.all([
       fetch(SB+'/rest/v1/training_quiz_results?quiz_id=eq.checklist_v1',{method:'DELETE',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}}),
@@ -1393,7 +1393,7 @@ async function deleteStandardQuiz(){
 }
 
 async function deleteQuizFromAdmin(quizId){
-  if(!confirm('Delete this quiz permanently? All attempts will also be deleted. This cannot be undone.')) return;
+  if(!(await nxConfirm('All attempts will also be deleted. This cannot be undone.',{title:'Delete this quiz permanently?',okText:'Delete quiz',danger:true}))) return;
   try{
     await Promise.all([
       fetch(SB+'/rest/v1/custom_quiz_results?quiz_id=eq.'+quizId, {method:'DELETE',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}}),
@@ -1823,7 +1823,7 @@ async function viewCustomQuizResults(quizId, quizTitle){
 }
 
 async function resetCustomQuizAttempt(resultId, quizId, quizTitle){
-  if(!confirm('Allow this staff to retake the quiz?')) return;
+  if(!(await nxConfirm('Allow this staff to retake the quiz?',{title:'Allow a retake?',okText:'Allow retake'}))) return;
   try{
     await fetch(SB+'/rest/v1/custom_quiz_results?id=eq.'+resultId,{method:'DELETE',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
     showToast('Retake allowed');
@@ -1987,7 +1987,7 @@ async function viewQuizAttemptDetail(staffName, resultId, quizId){
 
 async function bulkQuizAccess(grant){
   const action = grant ? 'GRANT access to ALL staff' : 'REVOKE access from ALL staff';
-  if(!confirm('Are you sure you want to '+action+' for the Standard Knowledge Quiz?')) return;
+  if(!(await nxConfirm('Are you sure you want to '+action+' for the Standard Knowledge Quiz?',{title:grant?'Grant everyone access?':'Revoke everyone’s access?',okText:grant?'Grant access':'Revoke access',danger:!grant}))) return;
   const btns = document.querySelectorAll('#sdQuizBulkBar button');
   btns.forEach(function(b){b.disabled=true;b.style.opacity='.5';});
   try{

@@ -1733,7 +1733,7 @@ async function clCreateContactInline(){
   if(phone){
     await clLoadContacts();
     const dup=(_clContacts||[]).find(function(c){ return c.phone_primary===phone; });
-    if(dup && !confirm('A contact with this number already exists:\n\n'+dup.name+' · '+(clFmtPhone(phone)||phone)+'\n\nCreate a separate contact anyway?')){
+    if(dup && !(await nxConfirm('A contact with this number already exists:\n\n'+dup.name+' · '+(clFmtPhone(phone)||phone)+'\n\nCreate a separate contact anyway?',{title:'Possible duplicate',okText:'Create anyway'}))){
       return;
     }
   }
@@ -1866,7 +1866,7 @@ async function clContactSave(id){
   // Soft duplicate check on primary phone (skip the record being edited)
   if(payload.phone_primary){
     const dup=(_clContacts||[]).find(function(c){ return c.phone_primary===payload.phone_primary && c.id!==id; });
-    if(dup && !confirm('Another contact already has this number:\n\n'+dup.name+'\n\nSave anyway?')) return;
+    if(dup && !(await nxConfirm('Another contact already has this number:\n\n'+dup.name+'\n\nSave anyway?',{title:'Possible duplicate',okText:'Save anyway'}))) return;
   }
   try{
     let res;
@@ -1895,7 +1895,7 @@ async function clContactDelete(id){
   if(!clIsAdmin()){ showToast('Only admins can delete contacts','error'); return; }
   const c=(_clContacts||[]).find(function(x){return x.id===id;});
   if(!c) return;
-  if(!confirm('Delete contact "'+c.name+'"?\n\nCalls already linked to them stay in the log but lose the link.')) return;
+  if(!(await nxConfirm('Calls already linked to them stay in the log but lose the link.',{title:'Delete contact “'+c.name+'”?',okText:'Delete',danger:true}))) return;
   try{
     // Null out the link on any calls first so we don't orphan a FK.
     await fetch(SB+'/rest/v1/call_log?contact_id=eq.'+encodeURIComponent(id),{
@@ -2722,12 +2722,12 @@ async function clDeleteRow(id){
   if(!r) return;
   if(!clCanDelete(r)){ showToast('Only admins can remove calls','error'); return; }
   const waiting = !r.resolved_at;
-  const msg = 'Remove this call from the log?\n\n'+
+  const msg = ''+
     r.caller_name+' · '+(clFmtPhone(r.phone_e164)||'no number')+'\n'+
     (waiting ? '\n⚠ This call is still WAITING on a callback. Removing it '+
                'means nobody will ring them back.\n' : '')+
     '\nIt stays in the database and can be restored.';
-  if(!confirm(msg)) return;
+  if(!(await nxConfirm(msg,{title:'Remove this call from the log?',okText:'Remove',danger:true}))) return;
 
   try{
     const res=await fetch(SB+'/rest/v1/call_log?id=eq.'+encodeURIComponent(id),{
@@ -2777,8 +2777,7 @@ async function clMarkCalledBack(id){
   if(!r) return;
   if(r.resolved_at){ showToast('Already handled','info'); return; }
   // Ask how the callback went — the note is the whole point of logging it.
-  const note = prompt('How did the callback go? (optional note)\n\nCalling back: '+r.caller_name+
-                      (clFmtPhone(r.phone_e164)?' · '+clFmtPhone(r.phone_e164):''));
+  const note = await nxPrompt('Calling back: '+r.caller_name+(clFmtPhone(r.phone_e164)?' · '+clFmtPhone(r.phone_e164):''),'',{title:'How did the callback go?',okText:'Mark called back',multiline:true,placeholder:'Optional note'});
   if(note === null) return; // cancelled
   const who=(window.me||me||'Unknown');
   const now=new Date().toISOString();

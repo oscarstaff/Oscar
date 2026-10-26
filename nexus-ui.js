@@ -104,8 +104,8 @@ function updateSbSwitch(){
   if(th) th.style.left = cur ? '25px' : '3px';
 }
 
-function resetAppearance(){
-  if(!confirm('Reset all appearance settings to default?')) return;
+async function resetAppearance(){
+  if(!(await nxConfirm('Theme, accent, font, sidebar and text colour go back to the defaults.',{title:'Reset appearance?',okText:'Reset',danger:true}))) return;
   const keys = ['oscars_theme','oscars_accent','oscars_font','oscars_sb','oscars_brightness','nexus_text_color'];
   keys.forEach(function(k){ localStorage.removeItem(k); });
   document.documentElement.setAttribute('data-theme', 'light');
@@ -348,7 +348,7 @@ async function saveCalEvent(){
 }
 
 async function deleteCalEvent(id){
-  if(!confirm('Delete this event?'))return;
+  if(!(await nxConfirm('This can’t be undone.',{title:'Delete this event?',okText:'Delete',danger:true}))) return;
   try{
     await fetch(SB+'/rest/v1/calendar_events?id=eq.'+id,{method:'DELETE',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
     await loadBirthdays();
@@ -707,7 +707,7 @@ function editEventFromPop(){
 async function deleteEventFromPop(){
   const ev = _currentViewEvent;
   if(!ev) return;
-  if(!confirm('Delete this event?')) return;
+  if(!(await nxConfirm('This can’t be undone.',{title:'Delete this event?',okText:'Delete',danger:true}))) return;
   closeEventQuickPop();
   try{
     await fetch(SB+'/rest/v1/calendar_events?id=eq.'+ev.id,{
@@ -777,7 +777,7 @@ async function saveEventFromModal(){
 
 async function deleteEventFromModal(){
   if(!_editingEventId) return;
-  if(!confirm('Delete this event?')) return;
+  if(!(await nxConfirm('This can’t be undone.',{title:'Delete this event?',okText:'Delete',danger:true}))) return;
   try{
     await fetch(SB+'/rest/v1/calendar_events?id=eq.'+_editingEventId, {
       method:'DELETE',
@@ -1559,7 +1559,7 @@ async function commitGeofenceChange(){
 }
 
 async function resetGeofence(){
-  if(!confirm('Reset geofence to default 15 m for all staff?')) return;
+  if(!(await nxConfirm('The clock-in geofence goes back to the default 15 m for everyone.',{title:'Reset geofence for all staff?',okText:'Reset',danger:true}))) return;
   localStorage.removeItem('oscars_geofence_m');
   _globalGeofenceM = null;
   try{

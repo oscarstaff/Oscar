@@ -857,7 +857,7 @@ function renderMyRoster(rows){
 
 async function askReleaseShift(shiftId, btn){
   if(!me) return;
-  const reason=prompt('Optional — why can\'t you make this shift?');
+  const reason=await nxPrompt('Optional — why can’t you make this shift?','',{title:'Release this shift',okText:'Send request',multiline:true,placeholder:'e.g. family commitment'});
   if(reason===null) return;
   if(btn){ btn.disabled=true; btn.textContent='Sending…'; }
   try{

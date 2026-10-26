@@ -258,9 +258,9 @@ function _trFormSnapshot(){
 }
 function _trIsDirty(){ return _trLoadedSnapshot !== null && _trFormSnapshot() !== _trLoadedSnapshot; }
 
-function trDateChanged(){
+async function trDateChanged(){
   if(_trIsDirty()){
-    var ok = confirm("You have unsaved changes for " + (_trLoadedDate||'this day') + ".\n\nSwitch day and discard them? (Cancel, then click \u201CSave\u201D first to keep them.)");
+    var ok = await nxConfirm("Switch day and discard them?\n\nChoose Cancel, then click “Save” first to keep them.",{title:"Unsaved changes for " + (_trLoadedDate||'this day'),okText:'Discard changes',danger:true});
     if(!ok){ if(_trLoadedDate) document.getElementById('trDate').value = _trLoadedDate; return; }
   }
   var d = document.getElementById('trDate').value || _trToday();
@@ -415,7 +415,7 @@ function trWeekToday(){ _trWeekOffset = 0; trRenderMyWeek(); }
 async function trEditDay(date){
   if(!trCanEnter()) return;
   if(_trIsDirty()){
-    var ok = confirm("You have unsaved changes for " + (_trLoadedDate||'this day') + ".\n\nSwitch day and discard them? (Cancel, then click \u201CSave\u201D first to keep them.)");
+    var ok = await nxConfirm("Switch day and discard them?\n\nChoose Cancel, then click “Save” first to keep them.",{title:"Unsaved changes for " + (_trLoadedDate||'this day'),okText:'Discard changes',danger:true});
     if(!ok) return;
   }
   var dp = document.getElementById('trDate'); if(dp) dp.value = date;
@@ -446,7 +446,7 @@ function trUpdateEntryHeader(){
 
 async function trNewToday(){
   if(_trIsDirty()){
-    var ok = confirm("You have unsaved changes.\n\nDiscard them and start today's log?");
+    var ok = await nxConfirm("Discard them and start today’s log?",{title:'Unsaved changes',okText:'Discard changes',danger:true});
     if(!ok) return;
   }
   _trEditingDate = null;
@@ -520,7 +520,7 @@ async function trRenameMetric(key){
   if(!myIsAdmin) return;
   var m = _trMetricsAll.find(function(x){return x.metric_key===key;});
   if(!m) return;
-  var nl = prompt('Rename metric:', m.label);
+  var nl = await nxPrompt('Enter the new name for this metric.', m.label, {title:'Rename metric',okText:'Rename',validate:function(v){ return v.trim()?'':'Name cannot be empty.'; }});
   if(nl===null) return;
   nl = nl.trim(); if(!nl){ _trMetricMsg('Name cannot be empty.', false); return; }
   try{
@@ -536,7 +536,7 @@ async function trRenameMetric(key){
 
 async function trArchiveMetric(key, archived){
   if(!myIsAdmin) return;
-  if(archived && !confirm('Archive this metric? Staff will stop logging it and it will drop out of future reports. Past data is kept.')) return;
+  if(archived && !(await nxConfirm('Staff will stop logging it and it will drop out of future reports. Past data is kept.',{title:'Archive this metric?',okText:'Archive',danger:true}))) return;
   try{
     var r = await fetch(SB + '/rest/v1/processing_metrics?team=eq.'+encodeURIComponent(trActiveTeam())+'&metric_key=eq.'+encodeURIComponent(key), {
       method:'PATCH', headers: Object.assign({ 'Prefer':'return=minimal' }, _trHeaders()),
@@ -838,7 +838,7 @@ async function trGeneratePlacementReport(){
 
 function trDownloadPlacementPdf(D){
   var JsPDF = (window.jspdf && window.jspdf.jsPDF) ? window.jspdf.jsPDF : window.jsPDF;
-  if(!JsPDF){ alert('PDF library not loaded. Please refresh and try again.'); return; }
+  if(!JsPDF){ nxAlert('Please refresh the page and try again.',{title:'PDF library not loaded'}); return; }
   var P=_trPal(), HEAD=P.head, ACC=P.accent, ZEBRA=P.zebra, LINE=P.line;
   var INK=[15,23,42], MUTED=[100,116,139];
   var doc = new JsPDF({ orientation:'portrait', unit:'mm', format:'a4' });
@@ -908,10 +908,10 @@ function trDownloadPlacementPdf(D){
 
 function trDownloadPdf(){
   var D = window._trReportData;
-  if(!D){ alert('Generate the report first.'); return; }
+  if(!D){ nxAlert('Generate the report first, then download it.',{title:'No report yet'}); return; }
   if(D.placement){ return trDownloadPlacementPdf(D); }
   var JsPDF = (window.jspdf && window.jspdf.jsPDF) ? window.jspdf.jsPDF : window.jsPDF;
-  if(!JsPDF){ alert('PDF library not loaded. Please refresh and try again.'); return; }
+  if(!JsPDF){ nxAlert('Please refresh the page and try again.',{title:'PDF library not loaded'}); return; }
   var doc = new JsPDF({ orientation:'landscape', unit:'mm', format:'a4' });
   var PW = doc.internal.pageSize.getWidth();
   var PH = doc.internal.pageSize.getHeight();
@@ -1168,7 +1168,7 @@ async function rowInspect(staff,isoDate){
     let ebr=[];
     try{ ebr=(await sbGet('extra_break_requests','?staff_name=eq.'+encodeURIComponent(staff)+'&request_date=eq.'+isoDate+'&order=created_at.asc'))||[]; }catch(e){}
     _showInspectDialog(staff, isoDate, same, ebr);
-  }catch(e){ alert('Inspect failed: '+e.message); }
+  }catch(e){ nxAlert(String((e&&e.message)||e),{title:'Inspect failed'}); }
 }
 function _showInspectDialog(staff, isoDate, rows, ebr){
   const esc=function(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
@@ -1227,13 +1227,13 @@ function _showInspectDialog(staff, isoDate, rows, ebr){
   const cb=document.getElementById('inspectCloseBtn'); if(cb) cb.addEventListener('click',function(){ bd.style.display='none'; });
   bd.style.display='flex';
 }
-function openCreateEntry(){
+async function openCreateEntry(){
   const sel = document.getElementById('mgrStaffSel');
   let staff = sel ? sel.value : '';
   if(!staff){
     const names = (STAFF||[]).filter(Boolean);
     if(!names.length){ showToast('No staff loaded'); return; }
-    const choice = prompt('Enter staff name:\n\n'+names.join(', '), me);
+    const choice = await nxPrompt('Choose who this punch is for.', names.indexOf(me)>=0?me:names[0], {title:'Add manual entry',okText:'Continue',choices:names});
     if(!choice) return;
     staff = choice;
     if(sel){
@@ -1253,11 +1253,11 @@ async function nukeDay(){
   const sel = document.getElementById('mgrStaffSel');
   const staff = sel ? sel.value : '';
   if(!staff){ showToast('Pick a staff member first'); return; }
-  if(!confirm('⚠️ DESTRUCTIVE ACTION\n\nThis will permanently delete clock-in/out records from the portal database. Use only to fix corrupted entries.\n\nGoogle Sheet data is NOT affected.\n\nContinue?')) return;
-  const date = prompt('Wipe rows for '+staff+' on which date?\n\nFormat: YYYY-MM-DD (e.g. 2026-05-06)', new Date().toISOString().split('T')[0]);
+  if(!(await nxConfirm('This will permanently delete clock-in/out records from the portal database. Use only to fix corrupted entries.\n\nGoogle Sheet data is NOT affected.',{title:'Destructive action',okText:'Continue',danger:true}))) return;
+  const date = await nxPrompt('Wipe rows for '+staff+' on which date?', new Date().toISOString().split('T')[0], {title:'Pick a date',okText:'Next',inputType:'date',validate:function(v){ return /^\d{4}-\d{2}-\d{2}$/.test(v)?'':'Pick a date (YYYY-MM-DD).'; }});
   if(!date) return;
   if(!/^\d{4}-\d{2}-\d{2}$/.test(date)){ showToast('Invalid date format. Use YYYY-MM-DD'); return; }
-  if(!confirm('FINAL CONFIRMATION\n\nDelete ALL clock-in/out rows for:\n   Staff: '+staff+'\n   Date: '+date+'\n\nThis cannot be undone. The Google Sheet will NOT be touched.\n\nProceed?')) return;
+  if(!(await nxConfirm('Delete ALL clock-in/out rows for:\n   Staff: '+staff+'\n   Date: '+date+'\n\nThis cannot be undone. The Google Sheet will NOT be touched.',{title:'Final confirmation',okText:'Delete rows',danger:true}))) return;
   try{
     const [y,mo,d] = date.split('-');
     const localMidnight = new Date(parseInt(y), parseInt(mo)-1, parseInt(d), 0, 0, 0);
@@ -1281,7 +1281,7 @@ async function nukeDay(){
     }
     showToast('Deleted '+success+' rows'+(failed?' · '+failed+' failed (RLS issue)':''));
     if(failed){
-      alert(failed+' deletes failed. Run this SQL in supabase:\n\ndrop policy if exists "anyone delete" on clock_log;\ncreate policy "anyone delete" on clock_log for delete to anon, authenticated using (true);');
+      nxAlert(failed+' deletes failed. Run this SQL in supabase:\n\ndrop policy if exists "anyone delete" on clock_log;\ncreate policy "anyone delete" on clock_log for delete to anon, authenticated using (true);',{title:'Some deletes were blocked'});
     }
     debugClockLog();
     if(typeof runManagerReport === 'function') runManagerReport();
@@ -1322,7 +1322,7 @@ async function debugClockLog(){
 }
 
 async function deleteClockLogRow(id){
-  if(!confirm('Delete this clock_log row?')) return;
+  if(!(await nxConfirm('This can’t be undone.',{title:'Delete this clock-log row?',okText:'Delete',danger:true}))) return;
   try{
     await fetch(SB+'/rest/v1/clock_log?id=eq.'+encodeURIComponent(id),{
       method:'DELETE',
@@ -1443,7 +1443,7 @@ function _pePreview(){
 async function nukeBreakOnly(){
   const staff = document.getElementById('peStaff').value;
   const isoDate = document.getElementById('peDate').value;
-  if(!confirm('Nuke ALL break data for '+staff+' on '+isoDate+'?\n\nThis:\n• Wipes break override in portal\n• Resets approved extra-break requests for this day\n• Sets sheet break cell to default auto-rule\n\nClock-in/out times are NOT touched.')) return;
+  if(!(await nxConfirm(staff+' on '+isoDate+'\n\nThis:\n• Wipes break override in portal\n• Resets approved extra-break requests for this day\n• Sets sheet break cell to default auto-rule\n\nClock-in/out times are NOT touched.',{title:'Nuke ALL break data?',okText:'Nuke break data',danger:true}))) return;
   try{
     await fetch(SB+'/rest/v1/clock_overrides?staff_name=eq.'+encodeURIComponent(staff)+'&date=eq.'+isoDate,{
       method:'DELETE',
@@ -1483,7 +1483,7 @@ async function nukeBreakOnly(){
 async function deletePunch(){
   const staff = document.getElementById('peStaff').value;
   const isoDate = document.getElementById('peDate').value;
-  if(!confirm('Delete EVERYTHING for '+staff+' on '+isoDate+'?\n\nWipes:\n• Clock-in/out times\n• Break + coffee data\n• Approved extra-break requests\n• Pending extra-break requests\n• Sheet row content\n\nCannot be undone.')) return;
+  if(!(await nxConfirm(staff+' on '+isoDate+'\n\nWipes:\n• Clock-in/out times\n• Break + coffee data\n• Approved extra-break requests\n• Pending extra-break requests\n• Sheet row content\n\nCannot be undone.',{title:'Delete EVERYTHING for this day?',okText:'Delete everything',danger:true}))) return;
   const btn = document.getElementById('peSaveBtn');
   if(btn){ btn.disabled = true; btn.textContent = 'Deleting...'; }
   try{

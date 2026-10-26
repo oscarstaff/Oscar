@@ -1,4 +1,272 @@
 /* v1778631856 */
+/* ═══ In-app dialogs: nxConfirm / nxAlert / nxPrompt ═══════════════════════
+   Promise-based, themed replacements for the browser's alert / confirm /
+   prompt (which browsers can silently suppress, and which look foreign).
+     if(!(await nxConfirm('Delete this?',{title:'Delete?',okText:'Delete',danger:true}))) return;
+     await nxAlert('Saved.');
+     const v = await nxPrompt('Why?','',{multiline:true});   // string, or null if cancelled
+   Dialogs queue, so chained prompts (confirm → prompt → confirm) just work.
+   Esc / backdrop = cancel, Enter = OK, Tab is trapped inside the card.
+   Look and feel: translucent glass card over a dimmed scrim, centred layout,
+   spring enter/exit that starts from its live on-screen value (so it can be
+   interrupted at any moment), press feedback on pointer-down, and gentler
+   fallbacks for reduced motion / transparency / more contrast.
+   The promise resolves the instant a button is pressed; the exit animation
+   plays on its own. window.alert is also routed here as a safety net. */
+(function(){
+  var Q=[], cur=null, seq=0, leaving=null;
+  var nativeConfirm=window.confirm?window.confirm.bind(window):null;
+  var nativePrompt=window.prompt?window.prompt.bind(window):null;
+  var nativeAlert=window.alert?window.alert.bind(window):null;
+  window.__nativeAlert=nativeAlert;
+
+  // Where the user last pressed: the card grows out of (and settles back toward) that spot.
+  var lastPress={x:0,y:0,t:0};
+  document.addEventListener('pointerdown',function(e){ lastPress={x:e.clientX,y:e.clientY,t:Date.now()}; },true);
+
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+  function reduceMotion(){ try{ return window.matchMedia('(prefers-reduced-motion: reduce)').matches; }catch(e){ return false; } }
+
+  function injectCss(){
+    if(document.getElementById('nxDlgCss')) return;
+    var st=document.createElement('style'); st.id='nxDlgCss';
+    st.textContent=
+      '.nxd-root{position:fixed;inset:0;z-index:100600;display:flex;align-items:center;justify-content:center;padding:16px;font-family:inherit;-webkit-font-smoothing:antialiased}'+
+      '.nxd-root,.nxd-root *{box-sizing:border-box}'+
+      '.nxd-scrim{position:absolute;inset:0;background:rgba(10,14,24,.42);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);opacity:0}'+
+      /* glass card: translucent surface + blur, bright top edge, deeper shadow because it is a big surface */
+      '.nxd-card{position:relative;width:min(380px,100%);max-height:calc(100dvh - 32px);overflow:auto;overscroll-behavior:contain;'+
+        'background:var(--ui-surface,#fff);color:var(--ui-ink,#0f172a);border:1px solid var(--ui-line,#e2e8f0);border-radius:22px;'+
+        'box-shadow:0 1px 0 rgba(255,255,255,.55) inset,0 2px 6px rgba(0,0,0,.10),0 28px 80px rgba(0,0,0,.34);padding:22px 20px 16px;text-align:center;opacity:0;will-change:transform,opacity}'+
+      '@supports (background:color-mix(in srgb,red 50%,transparent)){.nxd-card{background:color-mix(in srgb,var(--ui-surface,#fff) 80%,transparent);-webkit-backdrop-filter:blur(30px) saturate(180%);backdrop-filter:blur(30px) saturate(180%);border-color:color-mix(in srgb,var(--ui-line,#e2e8f0) 70%,transparent)}}'+
+      '.nxd-ico{width:46px;height:46px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 12px;background:var(--accent-dim,rgba(5,150,105,.12));color:var(--accent,#059669)}'+
+      '.nxd-ico.danger{background:rgba(220,38,38,.13);color:#dc2626}'+
+      '.nxd-ico.info{background:rgba(2,132,199,.13);color:#0284c7}'+
+      '.nxd-ico svg{width:23px;height:23px;display:block}'+
+      /* type: tighter tracking and leading on the larger title, body stays near 0 */
+      '.nxd-title{font-size:19px;font-weight:700;line-height:1.2;letter-spacing:-.015em;margin:0 0 6px;color:var(--ui-ink,#0f172a);text-wrap:balance}'+
+      '.nxd-msg{font-size:14px;line-height:1.45;white-space:pre-line;overflow-wrap:anywhere;color:var(--ui-ink-2,#334155);text-wrap:pretty}'+
+      '.nxd-msg:empty{display:none}'+
+      /* long multi-line bodies (bullet lists, SQL) read better left-aligned */
+      '.nxd-card.left .nxd-msg{text-align:left}'+
+      '.nxd-field{margin-top:14px;text-align:left}'+
+      '.nxd-field input,.nxd-field textarea,.nxd-field select{display:block;width:100%;padding:11px 12px;border:1.5px solid var(--ui-line-hi,#cbd5e1);border-radius:12px;background:var(--ui-surface-2,#f8fafc);color:var(--ui-ink,#0f172a);font:inherit;font-size:16px;line-height:1.35;outline:none;resize:vertical;transition:border-color .12s,box-shadow .12s}'+
+      '.nxd-field input:focus,.nxd-field textarea:focus,.nxd-field select:focus{border-color:var(--accent,#059669);box-shadow:0 0 0 3.5px var(--accent-dim,rgba(5,150,105,.18))}'+
+      '.nxd-err{color:#dc2626;font-size:12.5px;font-weight:600;margin-top:6px;text-align:left}'+
+      /* iOS-style: equal-width buttons side by side; they stack (primary on top) only if labels need the room */
+      '.nxd-btns{display:flex;flex-wrap:wrap-reverse;gap:8px;margin-top:18px}'+
+      '.nxd-btn{flex:1 1 130px;min-height:46px;padding:0 14px;border-radius:14px;font:inherit;font-size:15px;font-weight:600;letter-spacing:-.005em;cursor:pointer;border:0;'+
+        'background:var(--ui-surface-3,#f1f5f9);color:var(--ui-ink,#0f172a);-webkit-tap-highlight-color:transparent;touch-action:manipulation;transition:transform .1s ease-out,filter .12s,background-color .12s}'+
+      '.nxd-btn:hover{filter:brightness(.96)}'+
+      '.nxd-btn:active{transform:scale(.97);filter:brightness(.92)}'+   /* feedback on press, not release */
+      '.nxd-btn.ok{background:var(--accent,#059669);color:#fff;font-weight:700}'+
+      '.nxd-btn.ok.danger{background:#dc2626}'+
+      '.nxd-btn:focus-visible{outline:3px solid rgba(37,99,235,.5);outline-offset:2px}'+
+      '@media(prefers-reduced-transparency:reduce){.nxd-scrim{-webkit-backdrop-filter:none;backdrop-filter:none}.nxd-card{background:var(--ui-surface,#fff)!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important}}'+
+      '@media(prefers-contrast:more){.nxd-card{background:var(--ui-surface,#fff)!important;border:2px solid var(--ui-ink,#0f172a)!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important}.nxd-btn{border:1.5px solid var(--ui-ink,#0f172a)}}'+
+      '@media(prefers-reduced-motion:reduce){.nxd-btn,.nxd-btn:active{transition:none;transform:none}}';
+    document.head.appendChild(st);
+  }
+
+  var ICON={
+    ask:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 2.5-3 4"/><path d="M12 17.5h.01"/></svg>',
+    danger:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>',
+    info:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>'
+  };
+
+  // ── Spring: one progress value p (0 = hidden, 1 = shown). Re-targeting keeps the
+  //    live value AND velocity, so interrupting an enter with an exit never jumps.
+  function Spring(p0){ this.p=p0; this.v=0; this.target=p0; this.raf=0; this.onTick=null; this.onRest=null; }
+  Spring.prototype.go=function(target,response,damping){
+    var self=this; this.target=target;
+    var k=Math.pow(2*Math.PI/response,2), c=2*damping*Math.sqrt(k);
+    if(this.raf) cancelAnimationFrame(this.raf);
+    clearTimeout(this.guard);
+    this.guard=setTimeout(function(){ if(self.raf){ cancelAnimationFrame(self.raf); self.raf=0; self.p=self.target; self.v=0; if(self.onTick) self.onTick(self.p); if(self.onRest) self.onRest(); } },1200);
+    var last=0;
+    function step(ts){
+      if(!last) last=ts;
+      var dt=Math.min((ts-last)/1000,1/30); last=ts;
+      var n=Math.max(1,Math.ceil(dt/0.004)), h=dt/n;
+      for(var i=0;i<n;i++){ self.v+= (-k*(self.p-self.target)-c*self.v)*h; self.p+=self.v*h; }
+      if(Math.abs(self.p-self.target)<0.002&&Math.abs(self.v)<0.03){ self.p=self.target; self.v=0; self.raf=0; clearTimeout(self.guard); if(self.onTick) self.onTick(self.p); if(self.onRest) self.onRest(); return; }
+      if(self.onTick) self.onTick(self.p);
+      self.raf=requestAnimationFrame(step);
+    }
+    this.raf=requestAnimationFrame(step);
+  };
+  Spring.prototype.stop=function(){ if(this.raf) cancelAnimationFrame(this.raf); this.raf=0; clearTimeout(this.guard); };
+
+  function open(spec){
+    return new Promise(function(resolve){
+      Q.push({spec:spec,resolve:resolve});
+      if(!cur) next();
+    });
+  }
+  function next(){
+    if(cur||!Q.length) return;
+    cur=Q.shift(); build(cur);
+  }
+
+  function build(job){
+    var s=job.spec, id='nxd'+(++seq);
+    injectCss();
+    var prevFocus=document.activeElement;
+    var kind=s.kind, tone=s.danger?'danger':(kind==='alert'?'info':'ask');
+
+    // A dialog still fading out (chained confirm → prompt): drop it and carry its dimming over, so the page doesn't flash.
+    var scrim0=0;
+    if(leaving){ scrim0=leaving.scrimOpacity(); leaving.kill(); }
+
+    var el=document.createElement('div'); el.id='nxDlg'; el.className='nxd-root';
+    var scrim=document.createElement('div'); scrim.className='nxd-scrim';
+    var card=document.createElement('div'); card.className='nxd-card';
+    if(/\n[•\-] |\n.*\n.*\n/.test(String(s.message||''))) card.classList.add('left');
+    card.setAttribute('role',kind==='prompt'?'dialog':'alertdialog');
+    card.setAttribute('aria-modal','true');
+    card.setAttribute('aria-labelledby',id+'t');
+    card.setAttribute('aria-describedby',id+'m');
+
+    var field='';
+    if(kind==='prompt'){
+      var lbl=' aria-label="'+esc(s.title||'Input')+'"';
+      if(s.choices&&s.choices.length){
+        field='<div class="nxd-field"><select id="'+id+'f"'+lbl+'>'+s.choices.map(function(c){
+          return '<option value="'+esc(c)+'"'+(String(c)===String(s.value)?' selected':'')+'>'+esc(c)+'</option>';
+        }).join('')+'</select></div>';
+      }else if(s.multiline){
+        field='<div class="nxd-field"><textarea id="'+id+'f" rows="3"'+lbl+(s.placeholder?' placeholder="'+esc(s.placeholder)+'"':'')+(s.maxLength?' maxlength="'+(+s.maxLength)+'"':'')+'>'+esc(s.value||'')+'</textarea></div>';
+      }else{
+        field='<div class="nxd-field"><input id="'+id+'f" type="'+esc(s.inputType||'text')+'" value="'+esc(s.value||'')+'"'+lbl+(s.placeholder?' placeholder="'+esc(s.placeholder)+'"':'')+(s.maxLength?' maxlength="'+(+s.maxLength)+'"':'')+' autocomplete="off"></div>';
+      }
+      field+='<div class="nxd-err" id="'+id+'e" role="alert" hidden></div>';
+    }
+    // Cancel then OK (OK on the right, Apple's default-button side); wrap-reverse puts OK on top if the labels are too long to share a row.
+    card.innerHTML=
+      '<div class="nxd-ico '+tone+'" aria-hidden="true">'+ICON[tone]+'</div>'+
+      '<div class="nxd-title" id="'+id+'t">'+esc(s.title)+'</div>'+
+      '<div class="nxd-msg" id="'+id+'m">'+esc(s.message)+'</div>'+
+      field+
+      '<div class="nxd-btns">'+
+        (kind==='alert'?'':'<button type="button" class="nxd-btn cancel">'+esc(s.cancelText)+'</button>')+
+        '<button type="button" class="nxd-btn ok'+(s.danger?' danger':'')+'">'+esc(s.okText)+'</button>'+
+      '</div>';
+    el.appendChild(scrim); el.appendChild(card);
+    document.body.appendChild(el);
+
+    // Grow out of the spot the user pressed (if it was just now), else from the centre.
+    var rm=reduceMotion();
+    var r=card.getBoundingClientRect(), ox=r.width/2, oy=r.height/2;
+    if(Date.now()-lastPress.t<2500 && lastPress.t){
+      ox=Math.max(0,Math.min(r.width,lastPress.x-r.left)); oy=Math.max(0,Math.min(r.height,lastPress.y-r.top));
+      ox=r.width/2+(ox-r.width/2)*.6; oy=r.height/2+(oy-r.height/2)*.6;   // only a hint of it
+    }
+    card.style.transformOrigin=ox+'px '+oy+'px';
+    var scrimBase=scrim0, closing=false;
+    function paint(p){
+      var q=Math.max(0,Math.min(1,p));
+      scrim.style.opacity=String(closing?q:scrimBase+(1-scrimBase)*q);
+      card.style.opacity=String(Math.min(1,q*1.6));
+      card.style.transform=rm?'none':'scale('+(0.93+0.07*p).toFixed(4)+') translateY('+((1-p)*10).toFixed(2)+'px)';
+    }
+    var spring=new Spring(0); spring.onTick=paint; paint(0);
+    spring.go(1,rm?0.18:0.34,1);         // critically damped: nothing about a confirm carries momentum, so no bounce
+
+    var fld=document.getElementById(id+'f'), errEl=document.getElementById(id+'e');
+    var okBtn=card.querySelector('.ok'), cancelBtn=card.querySelector('.cancel');
+    var done=false;
+
+    function scrimOpacity(){ return parseFloat(scrim.style.opacity)||0; }
+    function kill(){ spring.stop(); if(el.parentNode) el.parentNode.removeChild(el); if(leaving&&leaving.el===el) leaving=null; }
+
+    function close(val){
+      if(done) return; done=true;
+      document.removeEventListener('keydown',onKey,true);
+      document.removeEventListener('focusin',onFocusIn,true);
+      try{ if(prevFocus&&prevFocus.focus&&document.contains(prevFocus)) prevFocus.focus({preventScroll:true}); }catch(e){}
+      // Exit mirrors the entrance (same path back), starting from wherever the spring is right now.
+      el.removeAttribute('id'); el.style.pointerEvents='none'; closing=true;
+      leaving={el:el,scrimOpacity:scrimOpacity,kill:kill};
+      spring.onRest=function(){ kill(); };
+      spring.go(0,rm?0.14:0.24,1);
+      cur=null;
+      job.resolve(val);          // answer immediately; never make the caller wait on an animation
+      next();
+    }
+    function accept(){
+      if(kind==='alert') return close(undefined);
+      if(kind==='confirm') return close(true);
+      var v=fld?fld.value:'';
+      if(s.validate){
+        var msg=''; try{ msg=s.validate(v)||''; }catch(e){}
+        if(msg){ errEl.textContent=msg; errEl.hidden=false; if(fld) fld.focus(); return; }
+      }
+      close(v);
+    }
+    function dismiss(){
+      if(kind==='alert') return close(undefined);
+      close(kind==='confirm'?false:null);
+    }
+    function focusables(){
+      return Array.prototype.slice.call(card.querySelectorAll('input,textarea,select,button')).filter(function(n){ return !n.disabled; });
+    }
+    function onKey(ev){
+      if(ev.key==='Escape'){ ev.preventDefault(); ev.stopImmediatePropagation(); dismiss(); return; }
+      if(ev.key==='Tab'){
+        var f=focusables(); if(!f.length) return;
+        var first=f[0], last=f[f.length-1], a=document.activeElement;
+        if(!card.contains(a)){ ev.preventDefault(); first.focus(); }
+        else if(ev.shiftKey&&a===first){ ev.preventDefault(); last.focus(); }
+        else if(!ev.shiftKey&&a===last){ ev.preventDefault(); first.focus(); }
+        else return;   // normal movement inside the card: let the browser do it
+        ev.stopImmediatePropagation();
+        return;
+      }
+      if(ev.key==='Enter'&&!ev.isComposing){
+        var t=ev.target;
+        if(t&&t.tagName==='BUTTON') return;          // let the focused button handle it
+        if(t&&t.tagName==='TEXTAREA'&&!ev.ctrlKey&&!ev.metaKey) return;
+        ev.preventDefault(); ev.stopImmediatePropagation(); accept();
+      }
+    }
+    function onFocusIn(ev){ if(!card.contains(ev.target)){ var f=focusables(); if(f.length) f[0].focus(); } }
+
+    okBtn.addEventListener('click',accept);
+    if(cancelBtn) cancelBtn.addEventListener('click',dismiss);
+    el.addEventListener('mousedown',function(ev){ if(ev.target===el||ev.target===scrim) dismiss(); });
+    document.addEventListener('keydown',onKey,true);
+    document.addEventListener('focusin',onFocusIn,true);
+
+    // Initial focus: the field for prompts; Cancel for destructive confirms (a stray Enter can't delete); else OK.
+    try{
+      var tgt=fld||(s.danger&&cancelBtn?cancelBtn:okBtn);
+      tgt.focus({preventScroll:true});
+      if(fld&&fld.select&&fld.tagName!=='SELECT') fld.select();
+    }catch(e){}
+  }
+
+  window.nxConfirm=function(message,opts){
+    opts=opts||{};
+    if(!document.body){ return Promise.resolve(nativeConfirm?nativeConfirm(message):false); }
+    return open({kind:'confirm',message:message,title:opts.title||(opts.danger?'Are you sure?':'Please confirm'),
+      okText:opts.okText||'OK',cancelText:opts.cancelText||'Cancel',danger:!!opts.danger});
+  };
+  window.nxAlert=function(message,opts){
+    opts=opts||{};
+    if(!document.body){ if(nativeAlert) nativeAlert(message); return Promise.resolve(); }
+    return open({kind:'alert',message:message,title:opts.title||'Heads up',okText:opts.okText||'OK',danger:!!opts.danger});
+  };
+  window.nxPrompt=function(message,value,opts){
+    opts=opts||{};
+    if(!document.body){ return Promise.resolve(nativePrompt?nativePrompt(message,value):null); }
+    return open({kind:'prompt',message:message,value:value==null?'':value,title:opts.title||'Enter a value',
+      okText:opts.okText||'OK',cancelText:opts.cancelText||'Cancel',placeholder:opts.placeholder,
+      multiline:!!opts.multiline,inputType:opts.inputType,choices:opts.choices,maxLength:opts.maxLength,validate:opts.validate});
+  };
+  window.nxDialogOpen=function(){ return !!cur; };
+  // Safety net: any alert() we missed still gets the in-app look.
+  window.alert=function(m){ nxAlert(m==null?'':String(m)); };
+})();
 const SB="https://jcfgldqrdbfkgbixszds.supabase.co";
 const AUTH_EMAIL_DOMAIN = 'oscars.local';
 const AUTH_ONLY_MODE = true;
@@ -562,7 +830,7 @@ function _docDriveId(url){
 async function deleteDocument(id){
   const d=(docsData||[]).find(function(x){ return String(x.id)===String(id); });
   const fileId=d?_docDriveId(d.url):null;
-  if(!confirm(fileId?'Delete this document?\n\nThe file is also moved to the Drive trash, where it can be restored for 30 days.':'Delete this document?')) return;
+  if(!(await nxConfirm(fileId?'The file is also moved to the Drive trash, where it can be restored for 30 days.':'This removes the document from Nexus.',{title:'Delete this document?',okText:'Delete',danger:true}))) return;
   if(fileId){
     let j=null, why0='no reply from Apps Script';
     try{
@@ -571,11 +839,11 @@ async function deleteDocument(id){
       if(res.ok){ j=await res.json(); } else { why0='Apps Script answered HTTP '+res.status; }
     }catch(e){ console.warn('deleteDoc',e); why0='could not read the reply ('+(e&&e.message||e)+')'; }
     if(!(j&&j.ok)){
-      if(j&&j.error==='forbidden'){ alert('Only hub admins can delete documents.'); return; }
+      if(j&&j.error==='forbidden'){ await nxAlert('Only hub admins can delete documents.',{title:'Admins only'}); return; }
       const why=(j&&j.error==='not found')?'The file wasn’t found in Drive (it may already be gone, or the script can’t see it).'
               :(j&&j.error==='not a document')?'That file isn’t in the Documents folder, so Nexus won’t touch it.'
               :'Drive wouldn’t remove the file.\n\nApps Script said: '+((j&&j.error)||why0);
-      if(!confirm(why+'\n\nRemove it from Nexus anyway? The file will stay in Drive.')) return;
+      if(!(await nxConfirm(why+'\n\nRemove it from Nexus anyway? The file will stay in Drive.',{title:'Couldn’t remove the file from Drive',okText:'Remove from Nexus',danger:true}))) return;
     }
   }
   try{
@@ -583,7 +851,7 @@ async function deleteDocument(id){
     const out=r.ok?await r.json().catch(function(){return null;}):null;
     if(!r.ok||!Array.isArray(out)||!out.length) throw new Error('refused '+r.status);
     await loadDocuments();
-  }catch(e){console.warn(e);alert('Failed to delete.');}
+  }catch(e){console.warn(e);nxAlert('Couldn’t delete that document. Please try again.',{title:'Delete failed'});}
 }
 
 
@@ -1448,13 +1716,13 @@ function renderOneoffs(){
   }).join('');
 }
 async function cancelOneoff(ws){
-  if(!confirm('Cancel your one-off availability for that week? Your usual hours will apply.')) return;
+  if(!(await nxConfirm('Your usual hours will apply for that week.',{title:'Cancel your one-off availability?',okText:'Yes, cancel it',cancelText:'Keep it'}))) return;
   try{
     const r=await fetch(SB+"/rest/v1/availability_oneoffs?staff_name=eq."+encodeURIComponent(me)+"&week_start=eq."+ws,
       {method:'DELETE',headers:{apikey:KEY,Authorization:"Bearer "+_sbBearer(),Prefer:'return=representation'}});
     const out=await r.json().catch(function(){return null;});
     if(!r.ok||!Array.isArray(out)||!out.length) throw new Error('x');
-  }catch(e){ alert('Could not cancel. Please try again.'); return; }
+  }catch(e){ nxAlert('Please try again.',{title:'Couldn’t cancel'}); return; }
   await loadOneoffs();
 }
 async function _saveOneoff(avail,err,btn){
