@@ -564,17 +564,17 @@ async function deleteDocument(id){
   const fileId=d?_docDriveId(d.url):null;
   if(!confirm(fileId?'Delete this document?\n\nThe file is also moved to the Drive trash, where it can be restored for 30 days.':'Delete this document?')) return;
   if(fileId){
-    let j=null;
+    let j=null, why0='no reply from Apps Script';
     try{
       const sheetUrl=localStorage.getItem('oscars_sheet_url')||'https://script.google.com/macros/s/AKfycby0Bq97bCZAsmnruXFuJuCqXQE_kOxhYE2KFuJnVzLXtT5CV0Y12k5176dxZbdaYVGE/exec';
       const res=await fetch(sheetUrl,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'deleteDoc',fileId:fileId})});
-      j=res.ok?await res.json():null;
-    }catch(e){ console.warn('deleteDoc',e); }
+      if(res.ok){ j=await res.json(); } else { why0='Apps Script answered HTTP '+res.status; }
+    }catch(e){ console.warn('deleteDoc',e); why0='could not read the reply ('+(e&&e.message||e)+')'; }
     if(!(j&&j.ok)){
       if(j&&j.error==='forbidden'){ alert('Only hub admins can delete documents.'); return; }
       const why=(j&&j.error==='not found')?'The file wasn’t found in Drive (it may already be gone, or the script can’t see it).'
               :(j&&j.error==='not a document')?'That file isn’t in the Documents folder, so Nexus won’t touch it.'
-              :'Drive wouldn’t remove the file.';
+              :'Drive wouldn’t remove the file.\n\nApps Script said: '+((j&&j.error)||why0);
       if(!confirm(why+'\n\nRemove it from Nexus anyway? The file will stay in Drive.')) return;
     }
   }
