@@ -228,7 +228,7 @@ async function _snAck(ids, btn){
   }
 }
 
-/* ── STAFF NOTICES: admin page (Home > Reports & admin > Staff notices) ────
+/* ── STAFF NOTICES: admin page (Home > Reports & admin > Manager Tools > Staff notices) ────
    Hub admins write a notice, preview it, post it, and see who has acknowledged.
    Needs the admin policies from staff_notices_01_tables.sql; if the database
    refuses, the page says so instead of failing quietly. */
@@ -352,8 +352,8 @@ async function loadStaffNoticesAdmin(quiet){
 (function(){
   if(window._snpBound) return; window._snpBound=true;
   setInterval(function(){
-    const pg=document.getElementById('page-staffnotices');
-    if(pg && pg.classList.contains('active') && !document.hidden) loadStaffNoticesAdmin(true);
+    const sec=document.getElementById('msec-notices');
+    if(sec && sec.offsetParent!==null && !document.hidden) loadStaffNoticesAdmin(true);
   }, 30000);
 })();
 

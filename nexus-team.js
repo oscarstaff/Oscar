@@ -42,7 +42,7 @@ let _diarySaveTimer = null;
 
 
 
-/* Reports are now separate pages: My Hours (everyone), Timesheet Manager (admin),
+/* Reports are now separate pages: My Hours (everyone), Manager Tools (admin),
    Team Report (people whose team has one, and admins). */
 function nxTeamReportAllowed(){
   return !!(myIsAdmin || (myTeam && typeof trTeamHasReport === 'function' && trTeamHasReport(myTeam)));
@@ -52,7 +52,6 @@ function nxReportNavApply(mgr, tr){
   set('nav-myreports', mgr);
   set('homeMenuTeamReport', tr);
   set('homeMenuTimesheet', mgr);
-  set('homeMenuNotices', mgr);
   set('homeReportsMenu', mgr || tr);
   var hd = document.getElementById('homeMenuHd'); if(hd) hd.textContent = mgr ? 'Reports & admin' : 'Reports';
 }
@@ -77,8 +76,8 @@ function nxUpdateReportNav(){
   nxReportNavApply(mgr, tr);
   if(!teamUnknown){ try{ var k = _repMenuKey(); if(k) localStorage.setItem(k, (mgr ? 'm' : '') + (tr ? 't' : '')); }catch(e){} }
   /* If someone is sitting on a page they can't use, send them home. */
-  var onMgr = document.getElementById('page-myreports'), onTr = document.getElementById('page-teamreport'), onSn = document.getElementById('page-staffnotices');
-  if((onMgr && onMgr.classList.contains('active') && !mgr) || (onTr && onTr.classList.contains('active') && !tr) || (onSn && onSn.classList.contains('active') && !mgr)){
+  var onMgr = document.getElementById('page-myreports'), onTr = document.getElementById('page-teamreport');
+  if((onMgr && onMgr.classList.contains('active') && !mgr) || (onTr && onTr.classList.contains('active') && !tr)){
     if(typeof goTo === 'function') goTo('home');
   }
   /* myTeam loads lazily — fetch it once so the Team Report entry can appear. */
@@ -92,8 +91,8 @@ function nxUpdateReportNav(){
 function _repStore(k, v){ try{ sessionStorage.setItem(k, v); }catch(e){} }
 function _repRead(k){ try{ return sessionStorage.getItem(k); }catch(e){ return null; } }
 function showMgrView(v){
-  if(v !== 'breaks' && v !== 'edit') v = 'breaks';
-  ['breaks','edit'].forEach(function(k){
+  if(v !== 'breaks' && v !== 'edit' && v !== 'notices') v = 'breaks';
+  ['breaks','edit','notices'].forEach(function(k){
     var sec = document.getElementById('msec-'+k), btn = document.getElementById('mview-'+k);
     if(sec) sec.style.display = (k === v) ? '' : 'none';
     if(btn) btn.classList.toggle('active', k === v);
@@ -104,6 +103,7 @@ function showMgrView(v){
     try{ if(typeof nxBreakCheckLoad === 'function') nxBreakCheckLoad(); }catch(e){}
   }
   if(v === 'edit'){ try{ populateMgrStaff(); }catch(e){} }
+  if(v === 'notices'){ try{ if(typeof loadStaffNoticesAdmin === 'function') loadStaffNoticesAdmin(); }catch(e){} }
 }
 /* Compat router: the old Reports tabs are separate pages now. */
 function showReportsTab(tab){

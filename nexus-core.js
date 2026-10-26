@@ -1216,11 +1216,10 @@ function goTo(p){
   if(p === 'schedule') p = 'leave';
   if(p === 'availability'){ p = 'myhours'; _hoursTab = 'availability'; }
   if(p === 'hours' || p === 'reports'){ p = 'myhours'; _hoursTab = 'hours'; }
-  /* Report pages: Timesheet Manager is admin-only; Team Report is for people
+  /* Report pages: Manager Tools is admin-only; Team Report is for people
      whose team has one, and admins. Only enforced once the flags have loaded. */
   if(window._nxFlagsLoaded){
     if(p === 'myreports' && !myIsAdmin) p = 'home';
-    if(p === 'staffnotices' && !myIsAdmin) p = 'home';
     if(p === 'teamreport' && typeof nxTeamReportAllowed === 'function' && !nxTeamReportAllowed()) p = 'home';
   }
   if(p === 'announcements' || p === 'engagement' || p === 'discussions'){
@@ -1251,7 +1250,7 @@ function goTo(p){
   }
   setActiveNavChild(p);
   if(typeof _setBottomNavActive==='function') _setBottomNavActive(p);
-  const titles={home:'Home',leave:'Leave',shifts:'Shifts',myhours:'My Hours',myreports:'Timesheet Manager',staffnotices:'Staff notices',teamreport:'Team Report',schedule:'Schedule',profile:'Profile','profile-view':'Profile',announcements:'Announcements',engagement:'Engagement',documents:'Documents',messages:'Messages',achievements:'Team Achievements'};
+  const titles={home:'Home',leave:'Leave',shifts:'Shifts',myhours:'My Hours',myreports:'Manager Tools',teamreport:'Team Report',schedule:'Schedule',profile:'Profile','profile-view':'Profile',announcements:'Announcements',engagement:'Engagement',documents:'Documents',messages:'Messages',achievements:'Team Achievements'};
   const appName='Nexus';
   document.title='Nexus · '+(titles[p]||'Nexus');
   if(history.replaceState)history.replaceState(null,'','#'+p);
@@ -1270,7 +1269,6 @@ function goTo(p){
 
   if(p==="documents"){loadDocuments();refreshQuizStrip();}
   /* Tasks feature removed */
-  if(p==="staffnotices"){ if(typeof loadStaffNoticesAdmin==='function') loadStaffNoticesAdmin(); }
     if(p==="myreports"){ initReportsPage(); if(typeof showMgrView==='function') showMgrView(typeof _repRead==='function' ? _repRead('nx_rep_mgr') : null); }
   
   if(p==="profile"){setTimeout(refreshPushToggleState, 100);

@@ -1313,7 +1313,7 @@ async function loadMySettings(){
     myIsAdmin=false;
     myCanEditAvail=true;
   }
-  /* Admin/team flags are known now: show or hide Timesheet Manager and Team Report. */
+  /* Admin/team flags are known now: show or hide Manager Tools and Team Report. */
   window._nxFlagsLoaded = true;
   try{ if(typeof nxUpdateReportNav === 'function') nxUpdateReportNav(); }catch(e){}
 
