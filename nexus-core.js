@@ -549,10 +549,39 @@ async function uploadDocument(){
   }
 }
 
+/* Drive file id from a stored document link (…/file/d/<id>/view or …?id=<id>); null when it isn't a Drive link. */
+function _docDriveId(url){
+  const s=String(url||'');
+  const m=/drive\.google\.com\/(?:file\/d\/|open\?id=|uc\?[^#]*id=)([A-Za-z0-9_-]{10,})/.exec(s);
+  return m?m[1]:null;
+}
+/* Deleting a document also moves its file to the Drive trash (recoverable there for 30 days).
+   Apps Script does the Drive part (deleteDoc in Docs.gs, hub admins only). The Nexus entry is only
+   removed once Drive has let go of the file, so a file can't be left behind with no entry pointing at it.
+   If Drive refuses, you can still remove the entry on its own. */
 async function deleteDocument(id){
-  if(!confirm('Delete this document?'))return;
+  const d=(docsData||[]).find(function(x){ return String(x.id)===String(id); });
+  const fileId=d?_docDriveId(d.url):null;
+  if(!confirm(fileId?'Delete this document?\n\nThe file is also moved to the Drive trash, where it can be restored for 30 days.':'Delete this document?')) return;
+  if(fileId){
+    let j=null;
+    try{
+      const sheetUrl=localStorage.getItem('oscars_sheet_url')||'https://script.google.com/macros/s/AKfycby0Bq97bCZAsmnruXFuJuCqXQE_kOxhYE2KFuJnVzLXtT5CV0Y12k5176dxZbdaYVGE/exec';
+      const res=await fetch(sheetUrl,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'deleteDoc',fileId:fileId})});
+      j=res.ok?await res.json():null;
+    }catch(e){ console.warn('deleteDoc',e); }
+    if(!(j&&j.ok)){
+      if(j&&j.error==='forbidden'){ alert('Only hub admins can delete documents.'); return; }
+      const why=(j&&j.error==='not found')?'The file wasn’t found in Drive (it may already be gone, or the script can’t see it).'
+              :(j&&j.error==='not a document')?'That file isn’t in the Documents folder, so Nexus won’t touch it.'
+              :'Drive wouldn’t remove the file.';
+      if(!confirm(why+'\n\nRemove it from Nexus anyway? The file will stay in Drive.')) return;
+    }
+  }
   try{
-    await fetch(SB+'/rest/v1/documents?id=eq.'+id,{method:'DELETE',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    const r=await fetch(SB+'/rest/v1/documents?id=eq.'+encodeURIComponent(id),{method:'DELETE',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Prefer':'return=representation'}});
+    const out=r.ok?await r.json().catch(function(){return null;}):null;
+    if(!r.ok||!Array.isArray(out)||!out.length) throw new Error('refused '+r.status);
     await loadDocuments();
   }catch(e){console.warn(e);alert('Failed to delete.');}
 }
