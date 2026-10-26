@@ -2990,7 +2990,8 @@ body.avail-editing #availGrid .avail-chip.av2:hover{ background:color-mix(in srg
       if(!name){fail('Could not verify your identity.');return;}
       var ar=await _rpc('is_current_user_hub_admin',{},_at);
       var isAdmin=ar.ok?(await ar.json())===true:false;
-      try{ sessionStorage.setItem('so_me', name); sessionStorage.setItem('so_is_admin', isAdmin ? '1' : '0'); }catch(e){}
+      var adminVerdict=ar.ok?(isAdmin?'1':'0'):'';   // '' = the server did not answer: unknown, never "not admin"
+      try{ sessionStorage.setItem('so_me', name); sessionStorage.setItem('so_is_admin', adminVerdict); }catch(e){}
       try{ if(typeof _renderWhoami==='function') _renderWhoami(); }catch(e){}
       // Capture Nexus' Supabase session so ShiftOps writes as an authenticated
       // user (RLS-locked tables reject the anon key). Stash for the tab session.
@@ -3726,11 +3727,11 @@ function _whoStaffRec(){
 function _whoRole(rec){
   // The label must never guess. Until the role data has really loaded, show only what
   // the launch token said (Admin) or nothing, so an admin never flashes "Team Lead".
-  let hint=false; try{ hint=sessionStorage.getItem('so_is_admin')==='1'; }catch(e){}
+  let hint=false, verdict=''; try{ verdict=sessionStorage.getItem('so_is_admin')||''; hint=verdict==='1'; }catch(e){}
+  if(verdict==='0') return 'Team Lead';           // server says: in ShiftOps, not a hub admin
   if(rec && rec.isHubAdmin) return 'Admin';
   let ok=false; try{ ok=!!_roleDataOk; }catch(e){}
   if(!ok || !rec) return hint ? 'Admin' : '';
-  if(rec.isShiftAdmin) return 'Roster admin';
   try{ if(typeof AM_TEAM_LEAD!=='undefined' && AM_TEAM_LEAD && typeof _tlResolved!=='undefined' && _tlResolved) return 'Team Lead'; }catch(e){}
   if(rec.isTeamLead && !rec.isHubAdmin) return 'Team Lead';
   return hint ? 'Admin' : '';
@@ -9585,6 +9586,20 @@ let AM_TEAM_LEAD=false;
 let MY_TEAM=null;
 let _tlResolved=false;   // once we know the signed-in user's role, latch it
 function computeTeamLeadState(){
+  // Authoritative answer first. At launch (and on every staff reload) the server was asked is_current_user_hub_admin with
+  // the person's own session, after has_app_access had already let them in. "In ShiftOps but not a hub admin" is a team
+  // lead, full stop. This does not depend on the staff_settings / app_access reads or on the name matching, so a blocked,
+  // empty or mismatched read can no longer leave a lead sitting on the admin view. Only an explicit '0' counts: '1' (admin)
+  // and '' (server did not answer) fall through to the careful logic below, so an admin is never demoted by a failed call.
+  var _v=''; try{ _v=sessionStorage.getItem('so_is_admin')||''; }catch(e){}
+  if(_v==='0'){
+    var _m=''; try{ _m=(sessionStorage.getItem('so_me')||'').trim().toLowerCase(); }catch(e){}
+    var _r=_m?(staff||[]).find(function(s){ return ((s.first||'')+' '+(s.last||'')).trim().toLowerCase()===_m; }):null;
+    AM_TEAM_LEAD=true; _tlResolved=true;
+    var _t=(_r&&_r.team)||((typeof _meProfile!=='undefined'&&_meProfile&&_meProfile.team)||null);
+    if(_t) MY_TEAM=_t;
+    return;
+  }
   // Never set or change a role from failed, partial or anonymous data: wait for a pass where the role fetches succeeded
   // with a live session and real rows (see _roleDataOk in loadStaffFromSupabase).
   if(!_roleDataOk) return;
@@ -12122,7 +12137,7 @@ async function aaSave(){
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────
-const SHIFTOPS_BUILD='2026-08-10-v46-avail-standing';
+const SHIFTOPS_BUILD='2026-10-27-v47-lead-lock';
 console.log('%c[ShiftOps build '+SHIFTOPS_BUILD+' loaded]','background:#0071e3;color:#fff;padding:2px 8px;border-radius:4px;font-weight:700;');
 // Start every session in the FULL (admin) view. The team-lead read-only lock is
 // only ever added later, and only once the role is positively confirmed as team
