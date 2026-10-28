@@ -5379,6 +5379,7 @@ html .notif-drop .notif-drop-actions{ background:none !important; border:0 !impo
           <button class="roster-seg-btn active" id="mview-breaks" onclick="showMgrView('breaks')">Breaks</button>
           <button class="roster-seg-btn" id="mview-edit" onclick="showMgrView('edit')">Edit punches</button>
           <button class="roster-seg-btn" id="mview-notices" onclick="showMgrView('notices')">Staff notices</button>
+          <button class="roster-seg-btn" id="mview-auto" onclick="showMgrView('auto')">Auto clock-outs</button>
         </div>
       <div id="msec-breaks">
         <!-- Short-shift break answers (clock-outs of 5h or less) -->
@@ -5427,6 +5428,36 @@ html .notif-drop .notif-drop-actions{ background:none !important; border:0 !impo
         <div id="debugOut" style="margin-bottom:12px;font-family:monospace;font-size:11px;color:var(--ui-ink,#0f172a);display:none;"></div>
         <div id="mgrReportResults" class="card" style="padding:16px;margin-bottom:14px;">Pick a staff member.</div>
       </div><!-- /msec-edit -->
+      <div id="msec-auto" style="display:none;">
+        <style>
+          #msec-auto .aco-top{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:4px;}
+          #msec-auto .aco-sub{font-size:12.5px;color:var(--ui-ink-3,#64748b);line-height:1.5;max-width:68ch;}
+          #msec-auto .aco-range{display:inline-flex;gap:4px;}
+          #msec-auto .aco-range button{font-family:inherit;font-size:12px;font-weight:700;padding:6px 11px;border-radius:99px;border:1px solid var(--ui-line,#e2e8f0);background:transparent;color:var(--ui-ink-2b,#475569);cursor:pointer;-webkit-tap-highlight-color:transparent;}
+          #msec-auto .aco-range button.on{background:var(--accent,#2563eb);border-color:var(--accent,#2563eb);color:#fff;}
+          #msec-auto .aco-person{padding:12px 0;border-top:1px solid var(--ui-line-soft,#f1f5f9);}
+          #msec-auto .aco-person:first-child{border-top:0;padding-top:2px;}
+          #msec-auto .aco-hd{display:flex;align-items:center;justify-content:space-between;gap:10px;}
+          #msec-auto .aco-name{font-size:15px;font-weight:800;min-width:0;overflow-wrap:anywhere;}
+          #msec-auto .aco-pill{flex-shrink:0;font-size:11px;font-weight:800;padding:3px 9px;border-radius:99px;background:#fef3c7;color:#92400e;}
+          #msec-auto .aco-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 0 0;font-size:13px;}
+          #msec-auto .aco-row .aco-t{color:var(--ui-ink-3,#64748b);}
+          #msec-auto .aco-row button{flex-shrink:0;font-family:inherit;font-size:12px;font-weight:700;padding:6px 12px;border-radius:9px;border:1px solid var(--ui-line,#e2e8f0);background:transparent;color:var(--ui-ink,#0f172a);cursor:pointer;-webkit-tap-highlight-color:transparent;}
+          #msec-auto .aco-row button:active{background:var(--ui-line-soft,#f1f5f9);}
+        </style>
+        <div class="card" style="margin-bottom:14px;">
+          <div class="aco-top">
+            <div class="card-title">Auto clocked-out staff</div>
+            <div class="aco-range" id="acoRange" role="group" aria-label="Period">
+              <button type="button" data-d="7" onclick="nxAutoOutSetDays(7)">7 days</button>
+              <button type="button" data-d="14" class="on" onclick="nxAutoOutSetDays(14)">14 days</button>
+              <button type="button" data-d="30" onclick="nxAutoOutSetDays(30)">30 days</button>
+            </div>
+          </div>
+          <div class="aco-sub">People who forgot to clock out and were clocked out automatically at 8:00pm. Tap Fix to open their punches for that day. Once you correct the punch, it drops off this list.</div>
+        </div>
+        <div class="card" id="acoResults" style="padding:16px;margin-bottom:14px;"></div>
+      </div><!-- /msec-auto -->
       <div id="msec-notices" style="display:none;">
       <style>
         #msec-notices .snp-lbl{display:block;font-size:12px;font-weight:700;color:var(--ui-ink-2b,#475569);margin:12px 0 5px;}
@@ -6360,7 +6391,7 @@ function hideNexusBoot(){
 <script src="nexus-profile.js?v=1"></script>
 <script src="nexus-clock.js?v=1"></script>
 <script src="nexus-reports.js?v=4"></script>
-<script src="nexus-team.js?v=8"></script>
+<script src="nexus-team.js?v=9"></script>
 <script src="nexus-hours.js?v=3"></script>
 <script src="nexus-home.js?v=4"></script>
 <script src="nexus-notices.js?v=8"></script>

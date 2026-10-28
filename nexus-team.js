@@ -89,8 +89,8 @@ function nxUpdateReportNav(){
 function _repStore(k, v){ try{ sessionStorage.setItem(k, v); }catch(e){} }
 function _repRead(k){ try{ return sessionStorage.getItem(k); }catch(e){ return null; } }
 function showMgrView(v){
-  if(v !== 'breaks' && v !== 'edit' && v !== 'notices') v = 'breaks';
-  ['breaks','edit','notices'].forEach(function(k){
+  if(v !== 'breaks' && v !== 'edit' && v !== 'notices' && v !== 'auto') v = 'breaks';
+  ['breaks','edit','notices','auto'].forEach(function(k){
     var sec = document.getElementById('msec-'+k), btn = document.getElementById('mview-'+k);
     if(sec) sec.style.display = (k === v) ? '' : 'none';
     if(btn) btn.classList.toggle('active', k === v);
@@ -101,8 +101,83 @@ function showMgrView(v){
     try{ if(typeof nxBreakCheckLoad === 'function') nxBreakCheckLoad(); }catch(e){}
   }
   if(v === 'edit'){ try{ populateMgrStaff(); }catch(e){} }
+  if(v === 'auto'){ try{ nxAutoOutLoad(); }catch(e){} }
   if(v === 'notices'){ try{ if(typeof loadStaffNoticesAdmin === 'function') loadStaffNoticesAdmin(); }catch(e){} }
 }
+
+/* ── Auto clock-outs (Manager Tools): staff the 8pm auto clock-out caught ─────────────────────
+   Source: clock_log rows with action 'out' and notes 'auto: 8pm missed clock-out' (written by
+   doAutoClockOut8pm in nexus-clock.js). A manual edit deletes and re-inserts the day's punches,
+   so a corrected day drops off this list by itself. */
+var _acoDays = 14, _acoSeq = 0;
+function nxAutoOutSetDays(n){
+  _acoDays = n;
+  var g = document.getElementById('acoRange');
+  if(g) Array.prototype.forEach.call(g.querySelectorAll('button'), function(b){ b.classList.toggle('on', +b.getAttribute('data-d') === n); });
+  nxAutoOutLoad();
+}
+function _acoSydDate(ts){ return new Date(ts).toLocaleDateString('en-CA', {timeZone:'Australia/Sydney'}); }
+function _acoTime(ts){ return new Date(ts).toLocaleTimeString('en-AU', {timeZone:'Australia/Sydney', hour:'numeric', minute:'2-digit', hour12:true}).replace(' ','').toLowerCase(); }
+async function nxAutoOutLoad(){
+  var box = document.getElementById('acoResults'); if(!box) return;
+  if(typeof myIsAdmin === 'undefined' || !myIsAdmin){ box.innerHTML = ''; return; }
+  var seq = ++_acoSeq;
+  if(!box.dataset.loaded) box.innerHTML = '<div style="padding:8px 0;">'+nxSkel('table',4)+'</div>';
+  var since = new Date(Date.now() - _acoDays*86400000).toISOString();
+  var inSince = new Date(Date.now() - (_acoDays+1)*86400000).toISOString();
+  var outs = [], ins = [];
+  try{
+    outs = await sbGet('clock_log','?action=eq.out&notes=like.'+encodeURIComponent('auto:*')+'&ts=gte.'+encodeURIComponent(since)+'&order=ts.desc&limit=500') || [];
+    if(outs.length) ins = await sbGet('clock_log','?action=eq.in&ts=gte.'+encodeURIComponent(inSince)+'&order=ts.desc&limit=3000') || [];
+  }catch(e){ outs = []; }
+  if(seq !== _acoSeq) return;
+  box.dataset.loaded = '1';
+  if(!outs.length){
+    box.innerHTML = '<div style="text-align:center;padding:26px 8px;color:var(--ui-ink-3,#64748b);"><div style="font-size:15px;font-weight:700;color:var(--ui-ink,#0f172a);margin-bottom:4px;">Nobody was auto clocked-out</div>in the last '+_acoDays+' days.</div>';
+    return;
+  }
+  var byStaff = {};
+  outs.forEach(function(o){
+    var o_t = new Date(o.ts).getTime(), best = null;
+    ins.forEach(function(i){
+      if(i.staff_name !== o.staff_name) return;
+      var t = new Date(i.ts).getTime();
+      if(t <= o_t && o_t - t < 24*3600*1000 && (!best || t > new Date(best.ts).getTime())) best = i;
+    });
+    (byStaff[o.staff_name] = byStaff[o.staff_name] || []).push({out:o, inn:best});
+  });
+  var names = Object.keys(byStaff).sort(function(a,b){ return byStaff[b].length - byStaff[a].length || a.localeCompare(b); });
+  var total = outs.length;
+  var h = '<div style="font-size:13px;color:var(--ui-ink-3,#64748b);margin-bottom:10px;"><b style="color:var(--ui-ink,#0f172a);">'+total+'</b> auto clock-out'+(total===1?'':'s')+' across <b style="color:var(--ui-ink,#0f172a);">'+names.length+'</b> '+(names.length===1?'person':'people')+' in the last '+_acoDays+' days</div>';
+  names.forEach(function(n){
+    var rows = byStaff[n];
+    h += '<div class="aco-person"><div class="aco-hd"><div class="aco-name">'+esc(n)+'</div><span class="aco-pill">'+rows.length+'\u00d7</span></div>';
+    rows.forEach(function(r){
+      var d = _acoSydDate(r.out.ts);
+      var label = new Date(r.out.ts).toLocaleDateString('en-AU', {timeZone:'Australia/Sydney', weekday:'short', day:'numeric', month:'short'});
+      h += '<div class="aco-row"><span>'+esc(label)+' <span class="aco-t">\u00b7 '+(r.inn ? 'in '+esc(_acoTime(r.inn.ts)) : 'no clock-in found')+' \u00b7 auto-out '+esc(_acoTime(r.out.ts))+'</span></span>'+
+           '<button type="button" data-s="'+esc(n)+'" data-d="'+d+'" onclick="nxAutoOutFix(this.getAttribute(\'data-s\'),this.getAttribute(\'data-d\'))">Fix</button></div>';
+    });
+    h += '</div>';
+  });
+  box.innerHTML = h;
+}
+/* Open Edit punches on that person and day. */
+function nxAutoOutFix(staff, isoDate){
+  showMgrView('edit');
+  try{ populateMgrStaff(); }catch(e){}
+  var sel = document.getElementById('mgrStaffSel');
+  if(sel){
+    var has = Array.prototype.some.call(sel.options, function(o){ return o.value === staff; });
+    if(!has){ var op = document.createElement('option'); op.value = staff; op.textContent = staff; sel.appendChild(op); }
+    sel.value = staff;
+  }
+  var f = document.getElementById('mgrStart'), t = document.getElementById('mgrEnd');
+  if(f) f.value = isoDate; if(t) t.value = isoDate;
+  runManagerReport();
+  try{ window.scrollTo({top:0, behavior:'smooth'}); }catch(e){}
+}
+
 /* Compat router: the old Reports tabs are separate pages now. */
 function showReportsTab(tab){
   if(tab === 'manager') return goTo('myreports');
