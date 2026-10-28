@@ -51,9 +51,7 @@ function nxReportNavApply(mgr, tr){
   var set = function(id, on){ var el = document.getElementById(id); if(el) el.style.display = on ? '' : 'none'; };
   set('nav-myreports', mgr);
   set('homeMenuTeamReport', tr);
-  set('homeMenuTimesheet', mgr);
-  set('homeReportsMenu', mgr || tr);
-  var hd = document.getElementById('homeMenuHd'); if(hd) hd.textContent = mgr ? 'Reports & admin' : 'Reports';
+  set('homeReportsMenu', tr);
 }
 function _repMenuKey(){ var n = window.me || (typeof me !== 'undefined' && me) || ''; return n ? 'nx_rep_menu_' + n : ''; }
 /* Show the last known answer straight away (before the admin/team flags load) so the Home menu doesn't pop in late. */

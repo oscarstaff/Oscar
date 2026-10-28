@@ -1240,6 +1240,8 @@ async function doLogout(){
 }
 
 async function enterHub(){
+  /* Read the deep-link hash first: nothing during boot may navigate before this. */
+  const _bootHash=window.location.hash.replace('#','');
   try{ if(typeof sessionLimitMark==='function') sessionLimitMark(); }catch(e){}
   try{ localStorage.removeItem('notif_local_anon'); }catch(e){}
   try{ startSessionExpiryWatch(); }catch(e){}
@@ -1297,7 +1299,6 @@ async function enterHub(){
   document.getElementById("leaveFrom").value=today;
   document.getElementById("leaveTo").value=today;
   buildAvailForm();
-  showSchedTab('leave');
   requestAnimationFrame(function(){ hideNexusBoot(); });
   startBackgroundLocation();ensureStaffSettingsRow();loadStaffTheme();try{ checkStaffNotices(); }catch(e){}Promise.all([loadHomeData(),loadNotifications(),loadLeaveHistory(),loadWhatsNew(),loadHomeCalendar(),loadHomeAttention(),renderTodayChip(),maybeShowOnboarding(),checkFeedbackInvites(),checkNewNotifications(),loadClockState(),loadAllClockLogs()]).then(function(){
     setTimeout(function(){
@@ -1313,7 +1314,7 @@ async function enterHub(){
   initRealtime();
   loadBirthdays();
   setTimeout(maybeBirthdayCelebration, 1400);
-  const hash=window.location.hash.replace('#','');
+  const hash=_bootHash;
   const validPages=['home','schedule','profile','announcements','calendar','training','documents','myreports','notifs','leave','availability','hub','shifts','myhours','teamreport'];
   const hashMap={documents:'profile'};
   goTo(validPages.includes(hash)?hash:(hashMap[hash]||'home'));
