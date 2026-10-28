@@ -540,15 +540,24 @@ function delLine(i){if(lineData.length===1){lineData=[{desc:'',qty:'',price:'',d
 function updLine(i,k,v){lineData[i][k]=v;renderReceipt();}
 
 function renderReceipt(){
-  if(!window._viewingSaved){
-    getNextNum().then(function(nn){
-      if(window._viewingSaved) return;
-      const disp = (nn==null) ? '…' : nn;
-      document.getElementById('r-num').textContent=disp;
-      document.getElementById('f-num').value=disp;
-    });
-  }
+  if(!window._viewingSaved) paintNextNum(0);
   _renderReceiptBody();
+}
+// Show the next invoice number (preview only). Retries a few times and waits for the sign-in,
+// so a slow or early read never leaves the number blank.
+let _numTry=0;
+function paintNextNum(attempt){
+  const rn=document.getElementById('r-num'), fn=document.getElementById('f-num');
+  if(!rn||!fn) return;
+  const seq=++_numTry;
+  if(rn.textContent==='—'||rn.textContent==='') { rn.textContent='…'; fn.value='…'; }
+  getNextNum().then(function(nn){
+    if(seq!==_numTry||window._viewingSaved) return;
+    if(nn!=null){ rn.textContent=nn; fn.value=nn; return; }
+    if(attempt<4){ setTimeout(function(){ if(seq===_numTry&&!window._viewingSaved) paintNextNum(attempt+1); }, 700*(attempt+1)); return; }
+    rn.textContent='On save'; fn.value='Assigned on save';
+    console.warn('slip: could not read slip_counter (check RLS select policy for authenticated)');
+  });
 }
 function _renderReceiptBody(){
   // Issue date comes from the field (settable). Default to today if empty.
@@ -878,7 +887,7 @@ async function renderAudit(reset){
 }
 
 renderWho();slipEnforce();setTimeout(loadMe,300);
-window.addEventListener('slip-unlocked',function(){ renderWho(); slipEnforce(); setTimeout(loadMe,100); });
+window.addEventListener('slip-unlocked',function(){ renderWho(); slipEnforce(); setTimeout(loadMe,100); try{ if(!window._viewingSaved) paintNextNum(0); }catch(e){} });
 </script>
 </body>
 </html>
