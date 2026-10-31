@@ -152,11 +152,40 @@ function _nxCsFortnights(startYmd, endYmd){
 
 function nxCopySheetsBar(staff, startStr, endStr){
   var esc = function(s){ return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;'); };
+  var data = 'data-staff="' + esc(staff) + '" data-start="' + esc(startStr) + '" data-end="' + esc(endStr) + '" ';
+  var btn = 'style="background:var(--ui-surface-3,#f1f5f9);border:1px solid var(--ui-line,#e2e8f0);font-size:12px;padding:7px 12px;border-radius:8px;cursor:pointer;font-family:inherit;font-weight:700;color:var(--accent);"';
   return '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px;">' +
-    '<span style="font-size:11.5px;color:var(--ui-ink-3,#64748b);">Copies whole fortnights in the Google Sheet tab layout, ready to paste.</span>' +
-    '<button type="button" data-staff="' + esc(staff) + '" data-start="' + esc(startStr) + '" data-end="' + esc(endStr) + '" ' +
-    'onclick="nxCopyForSheets(this)" style="background:var(--ui-surface-3,#f1f5f9);border:1px solid var(--ui-line,#e2e8f0);font-size:12px;padding:7px 12px;border-radius:8px;cursor:pointer;font-family:inherit;font-weight:700;color:var(--accent);">Copy for Sheets</button>' +
-    '</div>';
+    '<span style="font-size:11.5px;color:var(--ui-ink-3,#64748b);max-width:52ch;line-height:1.45;">Rebuild writes this person\'s whole tab in the timesheet Google Sheet straight from these records. Copy puts whole fortnights on the clipboard (paste with A3 selected).</span>' +
+    '<span style="display:flex;gap:8px;flex-wrap:wrap;">' +
+    '<button type="button" ' + data + 'onclick="nxRebuildSheetTab(this)" ' + btn + '>Rebuild sheet tab</button>' +
+    '<button type="button" ' + data + 'onclick="nxCopyForSheets(this)" ' + btn + '>Copy for Sheets</button>' +
+    '</span></div>';
+}
+
+// Rebuild one staff tab in the Google Sheet from the database (Apps Script action "rebuildTab",
+// hub admins only). Nothing is pasted, so the layout cannot land in the wrong place.
+async function nxRebuildSheetTab(btn){
+  if(!btn || btn.dataset.busy === '1') return;
+  var staff = btn.dataset.staff;
+  if(!staff){ showToast('Pick a staff member first'); return; }
+  var ok = await nxConfirm('This rewrites ' + staff + '\u2019s tab in the timesheet Google Sheet from the Nexus clock records, with the formulas. ' +
+    'Break and Coffee already in the tab are kept. The old tab is saved as a hidden backup tab in the sheet.',
+    { title: 'Rebuild ' + staff + '\u2019s sheet tab?', okText: 'Rebuild tab' });
+  if(!ok) return;
+  var label = btn.textContent;
+  btn.dataset.busy = '1'; btn.textContent = 'Rebuilding… (up to a minute)';
+  try{
+    var url = (typeof _resetExecUrl === 'function') ? _resetExecUrl() : (localStorage.getItem('oscars_sheet_url') || '');
+    var r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: 'rebuildTab', staff: staff }) });   // token + login are added by the fetch wrapper in nexus-core.js
+    var j = await r.json();
+    if(j && j.ok) showToast('Rebuilt ' + staff + '\u2019s tab (' + j.days + ' days). The old tab is saved as a hidden backup.');
+    else showToast('Rebuild failed: ' + ((j && j.error) || 'unknown error'));
+  }catch(e){
+    showToast('Rebuild failed: ' + ((e && e.message) || e));
+  }finally{
+    btn.dataset.busy = '0'; btn.textContent = label;
+  }
 }
 
 // Click handler. The clipboard write is started inside the click so Safari keeps the user gesture
