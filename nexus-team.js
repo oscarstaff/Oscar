@@ -1163,8 +1163,8 @@ async function renderHoursTable(targetStaff, startStr, endStr, el, allowEdit){
   }catch(e){}
 
   const editCol = allowEdit ? '<th style="padding:8px 6px;border-bottom:1px solid var(--ui-line,#e2e8f0);text-align:right;"></th>' : '';
-  /* Manager view only: "Copy for Sheets" (nexus-copy-timesheet.js). Guarded so a missing script never breaks the table. */
-  const copyBar = (allowEdit && typeof nxCopySheetsBar === 'function') ? nxCopySheetsBar(targetStaff, startStr, endStr) : '';
+  /* Manager view only: "Rebuild sheet tab" button (nexus-copy-timesheet.js). Guarded so a missing script never breaks the table. */
+  const copyBar = (allowEdit && typeof nxRebuildBar === 'function') ? nxRebuildBar(targetStaff) : '';
   let html = copyBar + '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;">'+
     '<thead><tr style="text-align:left;color:var(--ui-ink-4,#94a3b8);font-size:11px;text-transform:uppercase;letter-spacing:.05em;">'+
       '<th style="padding:8px 6px;border-bottom:1px solid var(--ui-line,#e2e8f0);">Date</th>'+
