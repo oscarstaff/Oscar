@@ -3,25 +3,28 @@
 // Paste target columns: A Date | B Day | C In | D Break | E Out | F Hours | G Coffee
 // Same rows as the staff tabs: WEEK-1 / 7 days / SUB-TOTAL / WEEK-2 / 7 days / SUB-TOTAL / TOTAL=
 // Several fortnights are stacked newest first, the same order the live tabs use.
+// Hours / SUB-TOTAL / TOTAL= are pasted as formulas, exactly like the live tabs.
 //
 // Runtime dependencies (all defined elsewhere in Nexus): SB, KEY, _sbBearer (nexus-ui.js), showToast (nexus-notices.js).
 
 // fortStart : 'yyyy-mm-dd' of the fortnight's first Monday
 // byDate    : { 'yyyy-mm-dd': { in:'09:45', out:'19:00', brk:0.5, coffee:5 } }  (missing day = blank row)
-// Hours are VALUES (out minus in minus break, 2 dp), not formulas. Dates are handled in UTC so the
-// browser's timezone cannot shift a day.
-function nxTimesheetTSV(fortStart, byDate){
+// startRow  : sheet row the first line (WEEK-1) will be pasted on. Default 3, because the live tabs start at row 3.
+//             Hours, SUB-TOTAL and TOTAL= are live FORMULAS (same ones the Apps Script writes), and they point at
+//             absolute rows, so the paste must start at that row (the copy message says "paste at A3").
+// A fortnight is 19 rows: WEEK-1, 7 days, SUB-TOTAL, WEEK-2, 7 days, SUB-TOTAL, TOTAL=.
+// Dates are handled in UTC so the browser's timezone cannot shift a day.
+var NX_CS_FORT_ROWS = 19;
+function nxTimesheetTSV(fortStart, byDate, startRow){
   var DAY = ['SUNDAY','MONDAY','TUESDAY','WEDNESDAY','THURSDAY','FRIDAY','SATURDAY'];
   var p2 = function(n){ return (n < 10 ? '0' : '') + n; };
   var parts = String(fortStart).split('-').map(Number);
-  var toH = function(s){ var q = String(s).split(':'); return parseInt(q[0], 10) + parseInt(q[1], 10) / 60; };
   var fmtT = function(s){ if(!s) return ''; var q = String(s).split(':'); return parseInt(q[0], 10) + ':' + q[1]; };
-  var num = function(v){ return Number((Math.round(v * 100) / 100).toFixed(2)); };
-  var rows = [], fortH = 0, fortC = 0;
+  var rows = [], r = startRow || 3, firstDay = [], lastDay = [], subRows = [];
 
   for(var w = 0; w < 2; w++){
-    rows.push(['', 'WEEK-' + (w + 1), '', '', '', '', '']);
-    var wkH = 0, wkC = 0;
+    rows.push(['', 'WEEK-' + (w + 1), '', '', '', '', '']); r++;
+    firstDay[w] = r;
     for(var d = 0; d < 7; d++){
       var dt = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2] + w * 7 + d));
       var key = dt.getUTCFullYear() + '-' + p2(dt.getUTCMonth() + 1) + '-' + p2(dt.getUTCDate());
@@ -31,20 +34,27 @@ function nxTimesheetTSV(fortStart, byDate){
         if(rec.in)  row[2] = fmtT(rec.in);
         if(rec.out) row[4] = fmtT(rec.out);
         if(rec.in && rec.out){
-          var raw = toH(rec.out) - toH(rec.in); if(raw < 0) raw += 24;
-          var brk = Number(rec.brk) || 0, hrs = num(raw - brk);
-          var coffee = (rec.coffee === '' || rec.coffee == null) ? '' : Number(rec.coffee);
-          row[3] = brk; row[5] = hrs; row[6] = coffee;
-          wkH += hrs; if(coffee !== '') wkC += coffee;
+          row[3] = Number(rec.brk) || 0;
+          row[6] = (rec.coffee === '' || rec.coffee == null) ? '' : Number(rec.coffee);
+          // Same formula as applyAutoRules, with a fallback for cells that hold real times after a paste.
+          row[5] = '=IFERROR(IF(AND(C' + r + '<>"",E' + r + '<>""),IFERROR(TIMEVALUE(E' + r + ')-TIMEVALUE(C' + r + '),E' + r + '-C' + r + ')*24-IFERROR(D' + r + ',0),""),"")';
         }
       }
-      rows.push(row);
+      rows.push(row); r++;
     }
-    rows.push(['', '', '', '', 'SUB-TOTAL', num(wkH), wkC]);
-    fortH += wkH; fortC += wkC;
+    lastDay[w] = r - 1;
+    // Same SUMIFS the Apps Script writes in recalcFortnightTotals.
+    var f = firstDay[w], l = lastDay[w];
+    rows.push(['', '', '', '', 'SUB-TOTAL',
+      '=SUMIFS(F' + f + ':F' + l + ',E' + f + ':E' + l + ',"<>SUB-TOTAL")',
+      '=SUMIFS(G' + f + ':G' + l + ',E' + f + ':E' + l + ',"<>SUB-TOTAL")']);
+    subRows[w] = r; r++;
   }
-  rows.push(['', '', '', '', 'TOTAL=', num(fortH), fortC]);
-  return rows.map(function(r){ return r.join('\t'); }).join('\n');
+  var tf = firstDay[0], tl = subRows[1];
+  rows.push(['', '', '', '', 'TOTAL=',
+    '=SUMIFS(F' + tf + ':F' + tl + ',E' + tf + ':E' + tl + ',"<>SUB-TOTAL")',
+    '=SUMIFS(G' + tf + ':G' + tl + ',E' + tf + ':E' + tl + ',"<>SUB-TOTAL")']);
+  return rows.map(function(x){ return x.join('\t'); }).join('\n');
 }
 
 /* ── Data: pair clock_log punches per Sydney day, same rules as the Apps Script rebuild ───────────
@@ -161,7 +171,7 @@ async function nxCopyForSheets(btn){
 
   var build = (async function(){
     info = await nxSheetDataFor(staff, first, last);
-    return forts.map(function(f){ return nxTimesheetTSV(f, info.byDate); }).join('\n');
+    return forts.map(function(f, i){ return nxTimesheetTSV(f, info.byDate, 3 + i * NX_CS_FORT_ROWS); }).join('\n');
   })();
 
   try{
@@ -180,7 +190,7 @@ async function nxCopyForSheets(btn){
         document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove();
       }
     }
-    var msg = 'Copied ' + forts.length + ' fortnight' + (forts.length === 1 ? '' : 's') + ' for ' + staff + '. Click cell A3 in the tab and paste.';
+    var msg = 'Copied ' + forts.length + ' fortnight' + (forts.length === 1 ? '' : 's') + ' for ' + staff + '. Paste with cell A3 selected (formulas included).';
     if(info && info.openDays) msg += ' ' + info.openDays + ' day(s) have a missing clock in/out.';
     showToast(msg);
   }catch(e){
