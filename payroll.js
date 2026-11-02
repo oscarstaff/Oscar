@@ -161,7 +161,10 @@ html.pp-so:not([data-theme="light"]) #rsec-payroll{
 .pp-seg button.on{background:var(--pp-thumb);color:var(--pp-ink);box-shadow:var(--pp-thumb-sh);}
 .pp-seg button:active{transform:scale(.95);transition-duration:70ms;}
 .pp-controls{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;}
-.pp-field{flex:1;min-width:140px;}
+.pp-controls .btn{min-height:38px;padding:0 20px !important;}
+.pp-controls .btn-ghost{margin-left:auto;}
+@media(max-width:560px){.pp-field{flex:1 1 120px;min-width:120px;}.pp-controls .btn-ghost{margin-left:0;}}
+.pp-field{flex:0 1 190px;min-width:150px;}
 .pp-lab{display:block;font-size:11px;font-weight:600;letter-spacing:.02em;color:var(--pp-mut2);margin:0 0 5px 2px;}
 .pp-in{width:100%;box-sizing:border-box;border:1px solid var(--pp-hair);border-radius:10px;padding:9px 12px;font-size:13px;font-family:inherit;font-variant-numeric:tabular-nums;
   outline:none;background:var(--pp-field);color:var(--pp-ink);transition:box-shadow .18s var(--pp-ease),border-color .18s var(--pp-ease);}
