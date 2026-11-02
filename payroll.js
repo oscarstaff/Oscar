@@ -547,6 +547,11 @@ async function _payRunInner(myRun, startStr, endStr, el){
   if(myRun!==_payRunSeq) return;
   el.innerHTML = _payLoadingHtml('Running payrun · 0 of '+roster.length);
 
+  // Current staff = staff_credentials ∪ the host's staff list. If neither could
+  // be read, don't filter at all (fail open: never hide anyone by mistake).
+  if(_payCredNames===null){ await _payLoadCredNames(); }
+  const _cur = [].concat(Array.isArray(_payCredNames)?_payCredNames:[], _pStaffNames()).map(function(n){ return String(n||'').trim().toLowerCase(); }).filter(Boolean);
+  const _currentKeys = _cur.length ? _cur.reduce(function(m,k){ m[k]=1; return m; }, {}) : null;
   const results = [];   // local until the run finishes — never shared between runs
   let _loadErrors = 0, _done = 0;
   for(const name of roster){
@@ -558,6 +563,10 @@ async function _payRunInner(myRun, startStr, endStr, el){
     // skip people with neither hours nor a rate (not on payroll this run) —
     // BUT never skip someone whose hours failed to load; show them flagged.
     if(!rate && h.net <= 0 && h.open === 0 && !h.loadError) continue;
+    // People who have left (a leftover payroll_rates row, but not in the current
+    // staff list) only appear if they actually worked in this range, so a past
+    // staff member's old rate row can't clutter the payrun with a $0 line.
+    if(_currentKeys && !_currentKeys[name.toLowerCase()] && h.net <= 0 && h.open === 0 && !h.loadError) continue;
     const calc = _payCalc(rate, h.net);
     // Keep premium and coffee as DISTINCT figures so the table can show them
     // separately AND combined:
