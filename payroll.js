@@ -126,6 +126,12 @@ function _pExtras(rawHours, customBreak, customCoffee, dateObj){
   --pp-bad:#b91c1c; --pp-bad-ink:#991b1b; --pp-bad-soft:#fef2f2; --pp-bad-bd:#fecaca;
   --pp-warn-ink:#92400e; --pp-warn-soft:#fffbeb; --pp-warn-bd:#fde68a;
   --pp-norate-bg:#fee2e2; --pp-norate-ink:#b91c1c; --pp-open-bg:#fef3c7; --pp-open-ink:#b45309;
+  /* makeover tokens: neutral tints so one rule works on every theme */
+  --pp-hair:rgba(100,116,139,.18); --pp-surf:rgba(100,116,139,.07); --pp-surf-hi:rgba(100,116,139,.12);
+  --pp-thumb:#ffffff; --pp-thumb-sh:0 1px 2px rgba(15,23,42,.14),0 0 0 .5px rgba(15,23,42,.06);
+  --pp-ring:rgba(37,99,235,.30); --pp-edge:rgba(255,255,255,.7);
+  --pp-ease:cubic-bezier(.22,1,.36,1);
+  color-scheme:light;
 }
 /* Dark palette. Applies to ALL of: ShiftOps dark (its default: no data-theme attribute; light is data-theme="light",
    flagged by the pp-so class set below) and every dark Nexus theme. Every text token is >= 5.4:1 on the darkest AND
@@ -138,92 +144,143 @@ html.pp-so:not([data-theme="light"]) #rsec-payroll{
   --pp-bad:#fca5a5; --pp-bad-ink:#fca5a5; --pp-bad-soft:rgba(239,68,68,.10); --pp-bad-bd:rgba(239,68,68,.35);
   --pp-warn-ink:#fbbf24; --pp-warn-soft:rgba(251,191,74,.08); --pp-warn-bd:rgba(251,191,74,.28);
   --pp-norate-bg:rgba(239,68,68,.16); --pp-norate-ink:#fca5a5; --pp-open-bg:rgba(251,191,36,.14); --pp-open-ink:#fcd34d;
+  --pp-hair:rgba(148,163,184,.16); --pp-surf:rgba(148,163,184,.08); --pp-surf-hi:rgba(148,163,184,.14);
+  --pp-thumb:rgba(255,255,255,.16); --pp-thumb-sh:0 1px 2px rgba(0,0,0,.4),inset 0 .5px 0 rgba(255,255,255,.18);
+  --pp-ring:rgba(96,165,250,.38); --pp-edge:rgba(255,255,255,.07);
+  color-scheme:dark;
 }
 /* Retro 95 (grey surface): darker text tokens */
-[data-theme="win95"] #rsec-payroll{ --pp-mut:#1f2937; --pp-mut2:#2b3a4d; --pp-ord:#1f2937; --pp-good:#04503a; --pp-bad:#8a2020; --pp-line:#7b7b7b; }
-/* controls */
-.pp-seg{display:inline-flex;background:var(--pp-prem-soft);border:1px solid var(--pp-prem-bd);border-radius:10px;padding:3px;gap:2px;}
-.pp-seg button{border:none;background:transparent;font-family:inherit;font-size:11.5px;font-weight:700;color:var(--pp-prem);padding:6px 12px;border-radius:7px;cursor:pointer;transition:background .15s;}
-.pp-seg button:hover{background:rgba(180,83,9,.08);}
+[data-theme="win95"] #rsec-payroll{ --pp-mut:#1f2937; --pp-mut2:#2b3a4d; --pp-ord:#1f2937; --pp-good:#04503a; --pp-bad:#8a2020; --pp-line:#7b7b7b; --pp-hair:rgba(0,0,0,.28); }
+
+/* controls ─ instant press feedback, springy release */
+#rsec-payroll button{ -webkit-tap-highlight-color:transparent; }
+.pp-seg{display:inline-flex;background:var(--pp-surf);border-radius:11px;padding:3px;gap:2px;}
+.pp-seg button{border:none;background:transparent;font-family:inherit;font-size:12px;font-weight:600;letter-spacing:.005em;color:var(--pp-mut);padding:7px 14px;border-radius:8px;cursor:pointer;
+  transition:background .2s var(--pp-ease),color .2s var(--pp-ease),box-shadow .2s var(--pp-ease),transform .18s var(--pp-ease);}
+.pp-seg button:hover{color:var(--pp-ink);}
+.pp-seg button.on{background:var(--pp-thumb);color:var(--pp-ink);box-shadow:var(--pp-thumb-sh);}
+.pp-seg button:active{transform:scale(.95);transition-duration:70ms;}
+.pp-controls{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;}
+.pp-field{flex:1;min-width:140px;}
+.pp-lab{display:block;font-size:11px;font-weight:600;letter-spacing:.02em;color:var(--pp-mut2);margin:0 0 5px 2px;}
+.pp-in{width:100%;box-sizing:border-box;border:1px solid var(--pp-hair);border-radius:10px;padding:9px 12px;font-size:13px;font-family:inherit;font-variant-numeric:tabular-nums;
+  outline:none;background:var(--pp-field);color:var(--pp-ink);transition:box-shadow .18s var(--pp-ease),border-color .18s var(--pp-ease);}
+.pp-in:focus{border-color:var(--pp-ring);box-shadow:0 0 0 3px var(--pp-ring);}
+#rsec-payroll .pp-controls .btn{transition:transform .18s var(--pp-ease),filter .15s,opacity .15s;}
+#rsec-payroll .pp-controls .btn:active{transform:scale(.96);transition-duration:70ms;}
+#rsec-payroll .pp-controls .btn[disabled]{opacity:.55;cursor:progress;}
 /* summary band — premium leads */
-.pp-summary{display:grid;grid-template-columns:1.7fr 1fr 1fr;gap:14px;margin-bottom:18px;}
-@media(max-width:660px){.pp-summary{grid-template-columns:1fr;}}
-.pp-hero{background:var(--pp-prem-soft);border:1px solid var(--pp-prem-bd);border-radius:14px;padding:18px 20px;position:relative;overflow:hidden;}
-.pp-hero .lbl{font-size:11px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:var(--pp-prem);}
-.pp-hero .val{font-size:clamp(30px,6vw,40px);font-weight:900;letter-spacing:-.025em;color:var(--pp-prem-ink);font-variant-numeric:tabular-nums;line-height:1;margin-top:6px;}
-.pp-hero .sub{font-size:12.5px;color:var(--pp-mut);margin-top:8px;font-weight:500;}
-.pp-hero .sub b{color:var(--pp-prem);font-weight:800;}
-.pp-stat{border:1px solid var(--pp-line);border-radius:14px;padding:16px 18px;display:flex;flex-direction:column;justify-content:center;}
-.pp-stat .lbl{font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--pp-mut2);}
-.pp-stat .val{font-size:23px;font-weight:800;color:var(--pp-ink);font-variant-numeric:tabular-nums;margin-top:4px;letter-spacing:-.015em;}
+.pp-summary{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(0,1fr) minmax(0,1fr);gap:12px;margin-bottom:22px;}
+@media(max-width:660px){.pp-summary{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;}.pp-hero{grid-column:1/-1;}.pp-stat{padding:15px 16px;}}
+.pp-hero{background:linear-gradient(155deg,var(--pp-prem-soft),transparent 78%),var(--pp-surf);border-radius:18px;padding:20px 22px 19px;position:relative;overflow:hidden;box-shadow:inset 0 1px 0 var(--pp-edge);}
+.pp-hero .lbl{font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--pp-prem);}
+.pp-hero .val{font-size:clamp(32px,6.4vw,44px);font-weight:800;letter-spacing:-.04em;color:var(--pp-prem-ink);font-variant-numeric:tabular-nums;line-height:1;margin-top:10px;}
+.pp-hero .sub{font-size:12.5px;color:var(--pp-mut);margin-top:11px;font-weight:500;line-height:1.5;}
+.pp-hero .sub b{color:var(--pp-prem);font-weight:700;}
+.pp-stat{background:var(--pp-surf);border-radius:18px;padding:18px 20px;display:flex;flex-direction:column;justify-content:center;box-shadow:inset 0 1px 0 var(--pp-edge);}
+.pp-stat .lbl{font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--pp-mut2);}
+.pp-stat .val{font-size:clamp(20px,5.6vw,25px);font-weight:700;color:var(--pp-ink);font-variant-numeric:tabular-nums;margin-top:8px;letter-spacing:-.03em;line-height:1.05;}
 .pp-stat .val.grand{color:var(--accent-text,var(--accent));}
-.pp-stat .note{font-size:11px;color:var(--pp-mut2);margin-top:3px;}
-/* table */
-.pp-scroll{overflow-x:auto;margin:0 -4px;}
-.pp-table{width:100%;border-collapse:collapse;font-size:13px;min-width:640px;}
-.pp-table thead th{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--pp-mut2);font-weight:700;padding:9px 10px;border-bottom:1px solid var(--pp-line);text-align:left;white-space:nowrap;}
+.pp-stat .note{font-size:11.5px;color:var(--pp-mut2);margin-top:7px;}
+/* table — hairlines only, rows are the unit */
+.pp-scroll{overflow-x:auto;margin:0 -6px;padding:0 6px;}
+.pp-table{width:100%;border-collapse:separate;border-spacing:0;font-size:13px;min-width:660px;}
+.pp-table thead th{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--pp-mut2);font-weight:600;padding:10px 12px;border-bottom:1px solid var(--pp-hair);text-align:left;white-space:nowrap;}
 .pp-table thead th.r{text-align:right;}
-.pp-table thead th.prem{color:var(--pp-prem);}
-.pp-table tbody td{padding:11px 10px;border-bottom:1px solid var(--pp-line);}
+.pp-table tbody td{padding:12px 12px;border-bottom:1px solid var(--pp-hair);transition:background .15s;}
+.pp-table tbody tr:last-child td{border-bottom:none;}
+.pp-table tbody tr:hover td{background:var(--pp-surf);}
+.pp-table tbody tr:hover td.pp-prem-cell{background:var(--pp-surf-hi);}
+.pp-table tbody tr:hover td:first-child{border-radius:10px 0 0 10px;}
+.pp-table tbody tr:hover td:last-child{border-radius:0 10px 10px 0;}
 .pp-table td.r{text-align:right;font-variant-numeric:tabular-nums;}
-.pp-name{font-weight:700;color:var(--pp-ink);}
-.pp-struct{font-size:11px;color:var(--pp-mut2);margin-top:1px;}
+.pp-name{white-space:nowrap;font-weight:600;color:var(--pp-ink);letter-spacing:-.005em;display:flex;align-items:center;flex-wrap:wrap;gap:6px;}
+.pp-struct{white-space:nowrap;font-size:11.5px;color:var(--pp-mut2);margin-top:2px;}
 .pp-ord{color:var(--pp-ord);font-size:12.5px;font-variant-numeric:tabular-nums;}
-.pp-prem-pill{display:inline-flex;align-items:baseline;gap:6px;background:var(--pp-prem-soft);border:1px solid var(--pp-prem-bd);border-radius:999px;padding:3px 11px;}
-.pp-prem-pill .h{font-size:11px;font-weight:700;color:var(--pp-prem);font-variant-numeric:tabular-nums;}
-.pp-prem-pill .d{font-size:13px;font-weight:900;color:var(--pp-prem-ink);font-variant-numeric:tabular-nums;}
-.pp-prem-zero{color:var(--pp-mut2);font-size:12px;opacity:.4;}
-.pp-flat-pill{border-style:dashed;}
-.pp-flat-pill .d{font-weight:700;}
-/* Premium emphasis — the columns Accounts scans first get a tinted band down
-   the whole column so they lock the eye, and rows WITH premium pop while
-   zero-premium cells recede. */
+.pp-prem-pill{display:inline-flex;align-items:baseline;gap:7px;background:var(--pp-prem-soft);border-radius:999px;padding:3px 11px;box-shadow:inset 0 0 0 1px var(--pp-prem-bd);}
+.pp-prem-pill .h{font-size:11px;font-weight:600;color:var(--pp-prem);font-variant-numeric:tabular-nums;}
+.pp-prem-pill .d{font-size:13px;font-weight:700;color:var(--pp-prem-ink);font-variant-numeric:tabular-nums;letter-spacing:-.01em;}
+.pp-prem-zero{color:var(--pp-mut2);font-size:12px;opacity:.45;}
+.pp-flat-pill{background:transparent;box-shadow:none;padding:3px 4px;}
+.pp-flat-pill .h{color:var(--pp-mut2);font-weight:500;}
+.pp-flat-pill .d{font-weight:600;color:var(--pp-mut);}
+/* Premium columns keep a soft tinted band so Accounts can find them at a glance. */
 .pp-table thead th.prem{color:var(--pp-prem);background:var(--pp-prem-soft);}
+.pp-table thead th.prem:first-of-type{border-radius:10px 0 0 0;}
+.pp-table thead th.prem:last-of-type{border-radius:0 10px 0 0;}
 .pp-table td.pp-prem-cell{background:var(--pp-prem-soft);}
-.pp-table thead th.prem:first-of-type,
-.pp-table td.pp-prem-cell.pp-prem-first{box-shadow:inset 1px 0 0 var(--pp-prem-bd);}
-.pp-table thead th.prem:last-of-type,
-.pp-table td.pp-prem-cell.pp-prem-last{box-shadow:inset -1px 0 0 var(--pp-prem-bd);}
-.pp-table td.pp-prem-cell.pp-prem-first.pp-prem-last{box-shadow:inset 1px 0 0 var(--pp-prem-bd),inset -1px 0 0 var(--pp-prem-bd);}
-/* A row that earned premium: give its premium pills full strength. */
-.pp-prem-pill .d{font-size:14px;}
 .pp-net{font-weight:600;color:var(--pp-ink);}
-.pp-total{font-weight:900;color:var(--pp-ink);font-size:14px;font-variant-numeric:tabular-nums;}
+.pp-total{font-weight:800;color:var(--pp-ink);font-size:14px;font-variant-numeric:tabular-nums;letter-spacing:-.015em;}
 .pp-coffee{color:var(--pp-good);font-weight:600;font-variant-numeric:tabular-nums;}
 .pp-coffee.zero{color:var(--pp-mut2);font-weight:400;}
 .pp-coffee-note{color:var(--pp-good);font-size:11px;font-weight:700;margin-left:4px;}
-.pp-drag-th{width:26px;}
-.pp-drag{width:26px;text-align:center;color:var(--pp-mut2);cursor:grab;user-select:none;font-size:15px;line-height:1;}
+.pp-drag-th{width:30px;}
+.pp-drag{width:30px;text-align:center;color:var(--pp-mut2);cursor:grab;user-select:none;font-size:15px;line-height:1;opacity:.35;transition:opacity .15s;}
+.pp-table tbody tr:hover .pp-drag{opacity:.9;}
 .pp-drag:active{cursor:grabbing;}
-.pp-table tbody tr{transition:transform .16s cubic-bezier(.22,1,.36,1), background .12s, box-shadow .18s;}
-.pp-table tbody tr.pp-dragging{opacity:.92;background:var(--pp-prem-soft);box-shadow:0 10px 26px -10px rgba(16,24,40,.4);position:relative;z-index:5;}
-.pp-flagrow{background:var(--pp-bad-soft);}
-.pp-chip{font-size:10px;font-weight:800;padding:2px 7px;border-radius:6px;margin-left:6px;white-space:nowrap;}
+.pp-table tbody tr.pp-dragging{opacity:.96;position:relative;z-index:5;transform:scale(1.008);box-shadow:0 14px 30px -12px rgba(15,23,42,.45),0 0 0 1px var(--pp-hair);}
+.pp-table tbody tr.pp-dragging td{background:var(--pp-thumb-solid,var(--pp-prem-soft));}
+.pp-table tbody tr{transition:transform .22s var(--pp-ease),box-shadow .22s var(--pp-ease);}
+.pp-flagrow td{background:var(--pp-bad-soft);}
+.pp-chip{font-size:10px;font-weight:700;letter-spacing:.03em;padding:2px 8px;border-radius:999px;white-space:nowrap;}
 .pp-chip.norate{background:var(--pp-norate-bg);color:var(--pp-norate-ink);}
 .pp-chip.open{background:var(--pp-open-bg);color:var(--pp-open-ink);}
-.pp-foot td{border-top:2px solid var(--pp-line);border-bottom:none;padding-top:15px;padding-bottom:4px;}
-.pp-foot .lbl{font-weight:800;color:var(--pp-ink);}
-.pp-foot .prem{font-weight:900;color:var(--pp-prem-ink);background:var(--pp-prem-soft);border-radius:8px;}
-.pp-foot .grand{font-weight:900;color:var(--accent-text,var(--accent));font-size:16px;}
-.pp-warn{margin-top:14px;padding:11px 14px;background:var(--pp-warn-soft);border:1px solid var(--pp-warn-bd);border-radius:10px;font-size:12px;color:var(--pp-warn-ink);line-height:1.55;}
-.pp-warn.pp-warn-err{background:var(--pp-bad-soft);border-color:var(--pp-bad-bd);color:var(--pp-bad-ink);}
-.pp-head-row{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:14px;}
-.pp-head-row .t{font-weight:800;font-size:15px;color:var(--pp-ink);letter-spacing:-.01em;}
+.pp-foot td{border-top:1px solid var(--pp-hair);border-bottom:none;padding:16px 12px 10px;}
+.pp-foot .lbl{font-weight:700;color:var(--pp-ink);}
+.pp-foot .prem{font-weight:800;color:var(--pp-prem-ink);background:var(--pp-prem-soft);}
+.pp-foot .grand{font-weight:800;color:var(--accent-text,var(--accent));font-size:17px;letter-spacing:-.02em;}
+.pp-warn{margin-top:16px;padding:12px 15px;background:var(--pp-warn-soft);border-radius:12px;font-size:12.5px;color:var(--pp-warn-ink);line-height:1.55;box-shadow:inset 0 0 0 1px var(--pp-warn-bd);}
+.pp-warn.pp-warn-err{background:var(--pp-bad-soft);color:var(--pp-bad-ink);box-shadow:inset 0 0 0 1px var(--pp-bad-bd);}
+.pp-head-row{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px 14px;margin-bottom:14px;}
+.pp-head-row .t{font-weight:700;font-size:16px;color:var(--pp-ink);letter-spacing:-.02em;}
 .pp-head-row .c{font-size:12px;color:var(--pp-mut2);}
+.pp-reset{background:none;border:none;color:var(--accent-text,var(--accent));font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;padding:2px 0 2px 8px;border-radius:6px;transition:opacity .15s,transform .15s var(--pp-ease);}
+.pp-reset:active{transform:scale(.94);transition-duration:70ms;}
+/* collapsible rates */
+#rsec-payroll details>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:8px;font-weight:700;font-size:15px;letter-spacing:-.015em;color:var(--pp-ink);}
+#rsec-payroll details>summary::-webkit-details-marker{display:none;}
+.pp-chev{display:inline-block;color:var(--pp-mut2);font-size:18px;line-height:1;transition:transform .28s var(--pp-ease);}
+#rsec-payroll details[open]>summary .pp-chev{transform:rotate(90deg);}
 /* rates editor */
 .pp-rates{width:100%;border-collapse:collapse;font-size:12.5px;}
-.pp-rates th{font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:var(--pp-mut2);font-weight:700;padding:7px 6px;border-bottom:1px solid var(--pp-line);text-align:left;}
+.pp-rates th{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--pp-mut2);font-weight:600;padding:8px 8px;border-bottom:1px solid var(--pp-hair);text-align:left;}
 .pp-rates th.prem{color:var(--pp-prem);}
-.pp-rates td{padding:6px;border-bottom:1px solid var(--pp-line);}
-.pp-rates input,.pp-rates select{border:1px solid var(--pp-line);border-radius:7px;padding:5px 7px;font-family:inherit;font-size:12px;background:var(--pp-field);color:var(--pp-ink);}
-.pp-rates .pr-prem{border-color:var(--pp-prem-bd);background:var(--pp-prem-soft);color:var(--pp-prem-ink);font-weight:800;}
-.pp-rates tr.is-flat .pr-prem{opacity:.35;}
-.pp-rates tr.unset{background:var(--pp-bad-soft);}
-/* motion */
-@keyframes ppRise{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:none;}}
-.pp-animate{animation:ppRise .5s cubic-bezier(.22,1,.36,1) both;}
-.pp-table tbody tr{animation:ppRise .42s cubic-bezier(.22,1,.36,1) both;}
-@media (prefers-reduced-motion:reduce){.pp-animate,.pp-table tbody tr{animation:none;}}
+.pp-rates td{padding:7px 8px;border-bottom:1px solid var(--pp-hair);}
+.pp-rates tbody tr:last-child td{border-bottom:none;}
+.pp-rates input,.pp-rates select{border:1px solid var(--pp-hair);border-radius:9px;padding:6px 9px;font-family:inherit;font-size:12.5px;background:var(--pp-field);color:var(--pp-ink);outline:none;font-variant-numeric:tabular-nums;transition:box-shadow .18s var(--pp-ease),border-color .18s var(--pp-ease),opacity .2s;}
+.pp-rates input:focus,.pp-rates select:focus{border-color:var(--pp-ring);box-shadow:0 0 0 3px var(--pp-ring);}
+.pp-rates .pr-prem{background:var(--pp-prem-soft);color:var(--pp-prem-ink);font-weight:700;}
+.pp-rates tr.is-flat .pr-prem,.pp-rates tr.is-flat .pr-cap{opacity:.35;}
+.pp-rates tr.unset td{background:var(--pp-bad-soft);}
+.pp-rates tr.unset td:first-child{border-radius:10px 0 0 10px;} .pp-rates tr.unset td:last-child{border-radius:0 10px 10px 0;}
+/* loading skeleton */
+.pp-load{padding:2px 0;}
+.pp-load .msg{font-size:12.5px;color:var(--pp-mut2);margin:0 0 14px 2px;font-variant-numeric:tabular-nums;}
+.pp-skel{background:var(--pp-surf);border-radius:12px;position:relative;overflow:hidden;}
+.pp-skel::after{content:'';position:absolute;inset:0;background:linear-gradient(100deg,transparent 20%,var(--pp-surf-hi) 50%,transparent 80%);transform:translateX(-100%);animation:ppShine 1.4s ease-in-out infinite;}
+.pp-load .row1{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(0,1fr) minmax(0,1fr);gap:12px;margin-bottom:12px;}
+.pp-load .row1 .pp-skel{height:104px;border-radius:18px;}
+.pp-load .row2 .pp-skel{height:38px;margin-top:8px;}
+@media(max-width:660px){.pp-load .row1{grid-template-columns:repeat(2,minmax(0,1fr));}.pp-load .row1 .pp-skel:first-child{grid-column:1/-1;}}
+/* motion — compositor-only, released after the entrance so drags can transform rows */
+@keyframes ppRise{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:none;}}
+@keyframes ppShine{to{transform:translateX(100%);}}
+.pp-animate{animation:ppRise .45s var(--pp-ease) backwards;}
+.pp-table tbody tr{animation:ppRise .4s var(--pp-ease) backwards;animation-delay:calc(var(--i,0)*16ms);}
+/* accessibility signals */
+@media (prefers-reduced-motion:reduce){
+  .pp-animate,.pp-table tbody tr{animation:ppFade .2s linear backwards;animation-delay:0s;}
+  .pp-skel::after{animation:none;}
+  .pp-seg button:active,.pp-reset:active,#rsec-payroll .pp-controls .btn:active{transform:none;}
+  .pp-table tbody tr.pp-dragging{transform:none;}
+  .pp-chev{transition:none;}
+}
+@keyframes ppFade{from{opacity:0;}to{opacity:1;}}
+@media (prefers-contrast:more){
+  #rsec-payroll{--pp-hair:rgba(100,116,139,.6);}
+  .pp-hero,.pp-stat{box-shadow:inset 0 0 0 1px var(--pp-hair);}
+  .pp-prem-pill{box-shadow:inset 0 0 0 1px var(--pp-prem);}
+}
 `;
     document.head.appendChild(st);
   }
@@ -308,6 +365,9 @@ async function _payLoadCredNames(){
 function _payMondayOf(d){ const x = new Date(d); const dow = (x.getDay()+6)%7; x.setDate(x.getDate()-dow); x.setHours(0,0,0,0); return x; }
 function _payFmt(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 
+function _paySegMark(offset){
+  try{ document.querySelectorAll('#rsec-payroll .pp-seg button').forEach(function(b){ b.classList.toggle('on', +b.getAttribute('data-off')===offset); }); }catch(e){}
+}
 function payShiftFortnight(offset){
   const today = new Date();
   const start = _payMondayOf(today);
@@ -315,6 +375,7 @@ function payShiftFortnight(offset){
   const end = new Date(start); end.setDate(start.getDate()+13);
   document.getElementById('payStart').value = _payFmt(start);
   document.getElementById('payEnd').value = _payFmt(end);
+  _paySegMark(offset);
   runPayroll();
 }
 
@@ -325,6 +386,7 @@ function initPayrollTab(){
   const s = document.getElementById('payStart'), e = document.getElementById('payEnd');
   if(s && !s.value) s.value = _payFmt(start);
   if(e && !e.value) e.value = _payFmt(end);
+  if(s && s.value===_payFmt(start)) _paySegMark(0);   // dates are on this fortnight
   // Load rates + current-staff names (from credentials) before rendering.
   Promise.all([loadPayRates(), _payLoadCredNames()]).then(renderRatesEditor).catch(function(err){
     console.error('[PAYROLL] rates editor failed', err);
@@ -426,14 +488,32 @@ function _payCalc(rate, netHours){
   return {structure:structure, ordH:ordH, premH:premH, ordG:ordG, premG:premG, gross:ordG+premG};
 }
 
+var _payRunSeq = 0;   // each run gets a ticket; a newer run makes older ones stop
+function _payBusy(on){
+  try{ document.querySelectorAll('#rsec-payroll button[onclick^="runPayroll"],#rsec-payroll .pp-seg button').forEach(function(b){ b.disabled=!!on; if(b.hasAttribute('onclick') && b.getAttribute('onclick').indexOf('runPayroll')===0) b.textContent = on?'Running…':'Run payrun'; }); }catch(e){}
+}
+function _payLoadingHtml(msg){
+  return '<div class="pp-load"><div class="msg" id="ppProg">'+msg+'</div>'+
+    '<div class="row1"><div class="pp-skel"></div><div class="pp-skel"></div><div class="pp-skel"></div></div>'+
+    '<div class="row2"><div class="pp-skel"></div><div class="pp-skel"></div><div class="pp-skel"></div><div class="pp-skel"></div></div></div>';
+}
 async function runPayroll(){
   if(!_canPayroll()){ return; }
+  // Guard against overlapping runs. Two runs used to push into the same
+  // _payResults list, so a second tap on a slow first load listed everyone twice.
+  const myRun = ++_payRunSeq;
   const startStr = document.getElementById('payStart').value;
   const endStr   = document.getElementById('payEnd').value;
   const el = document.getElementById('payResults');
   if(!startStr || !endStr){ el.innerHTML = '<div style="color:var(--pp-bad,#dc2626);">Pick both dates.</div>'; return; }
-  el.innerHTML = '<div style="color:var(--pp-mut2,#5a6a7e);text-align:center;padding:20px;">Loading…</div>';
+  el.innerHTML = _payLoadingHtml('Loading rates…');
+  _payBusy(true);
+  try{ await _payRunInner(myRun, startStr, endStr, el); }
+  catch(err){ console.error('[PAYROLL] run failed', err); if(myRun===_payRunSeq) el.innerHTML='<div style="color:var(--pp-bad,#dc2626);padding:20px;text-align:center;"><b>Payrun failed.</b><br>Refresh the page and try again.</div>'; }
+  finally{ if(myRun===_payRunSeq) _payBusy(false); }
+}
 
+async function _payRunInner(myRun, startStr, endStr, el){
   // Proactively refresh the auth token before a run so a long payrun doesn't
   // fail partway through on an expired session (the "only 3–4 staff show" bug).
   try{
@@ -447,22 +527,29 @@ async function runPayroll(){
 
   const ratesOk = await loadPayRates();
   if(!ratesOk){
+    if(myRun!==_payRunSeq) return;
     el.innerHTML = '<div style="color:var(--pp-bad,#dc2626);padding:20px;text-align:center;"><b>Couldn\'t load pay rates.</b><br>Your session may have expired — refresh the page (or log in again) and run the payrun once more.</div>';
     return;
   }
 
   // Roster = everyone with a rate OR any punches in this range (canonical STAFF).
-  const roster = Array.from(new Set([].concat(
-    Object.keys(_payRates),
-    _pStaffNames().filter(Boolean)
-  ))).sort(function(a,b){ return a.localeCompare(b); });
+  // Names are de-duplicated on trimmed, lower-cased text so stray spacing or
+  // casing can't list one person twice.
+  const _seenN = {};
+  const roster = [].concat(Object.keys(_payRates), _pStaffNames().filter(Boolean))
+    .map(function(n){ return String(n).trim(); }).filter(function(n){
+      const k = n.toLowerCase(); if(!n || _seenN[k]) return false; _seenN[k]=1; return true; })
+    .sort(function(a,b){ return a.localeCompare(b); });
 
-  el.innerHTML = '<div style="color:var(--pp-mut2,#5a6a7e);text-align:center;padding:20px;">Running payrun for '+roster.length+' staff…</div>';
+  if(myRun!==_payRunSeq) return;
+  el.innerHTML = _payLoadingHtml('Running payrun · 0 of '+roster.length);
 
-  _payResults = [];
-  let _loadErrors = 0;
+  const results = [];   // local until the run finishes — never shared between runs
+  let _loadErrors = 0, _done = 0;
   for(const name of roster){
     const h = await _payHoursFor(name, startStr, endStr);
+    if(myRun!==_payRunSeq) return;   // a newer run took over
+    _done++; const pg=document.getElementById('ppProg'); if(pg) pg.textContent='Running payrun · '+_done+' of '+roster.length;
     const rate = _payRates[name] || null;
     if(h.loadError) _loadErrors++;
     // skip people with neither hours nor a rate (not on payroll this run) —
@@ -478,7 +565,7 @@ async function runPayroll(){
     const premOnly = calc.premG;
     const premPlus = premOnly + h.coffee;
     const grossAll = calc.ordG + premPlus;
-    _payResults.push({
+    results.push({
       name:name, rate:rate, net:h.net, coffee:h.coffee, open:h.open,
       structure: rate ? rate.structure : '—',
       ordH:calc.ordH, premH:calc.premH, ordG:calc.ordG,
@@ -493,6 +580,8 @@ async function runPayroll(){
   // the bottom, alphabetically, until dragged into place. Falls back to the old
   // flag-first / total-desc sort only when no custom order has been set yet.
   await _payLoadOrder();
+  if(myRun!==_payRunSeq) return;
+  _payResults = results;
   _payApplyOrder();
 
   let totGross=0, totCoffee=0, totNet=0, totOrdG=0, totPremOnly=0, totPremPlus=0, totPremH=0, paidCount=0, premEarners=0, flatCount=0, flags=0;
@@ -517,7 +606,7 @@ async function runPayroll(){
         '<div class="pp-stat"><div class="lbl">Total pay</div><div class="val grand">$'+totGross.toFixed(2)+'</div><div class="note">'+paidCount+' paid · '+totNet.toFixed(1)+'h net</div></div>'+
         '<div class="pp-stat"><div class="lbl">Ordinary</div><div class="val">$'+totOrdG.toFixed(2)+'</div><div class="note">standard-rate hours</div></div>'+
       '</div>'+
-      '<div class="pp-head-row"><div class="t">Payrun · '+startStr+' → '+endStr+'</div><div class="c">'+_payResults.length+' listed · <span style="color:var(--pp-mut2,#5a6a7e);">drag ≡ to reorder</span> <button onclick="_payResetOrder()" style="background:none;border:none;color:var(--accent);font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;padding:0 0 0 8px;">reset</button></div></div>'+
+      '<div class="pp-head-row"><div class="t">Payrun · '+startStr+' → '+endStr+'</div><div class="c">'+_payResults.length+' listed · <span style="color:var(--pp-mut2,#5a6a7e);">drag ≡ to reorder</span> <button class="pp-reset" onclick="_payResetOrder()">reset</button></div></div>'+
       '<div class="pp-scroll"><table class="pp-table">'+
       '<thead><tr>'+
         '<th class="pp-drag-th"></th>'+
@@ -649,7 +738,7 @@ function _payRowsHtml(){
       premOnlyCell = '<span class="pp-prem-pill pp-flat-pill" title="Flat rate: every hour is paid at the standard rate, so there is no premium tier"><span class="h">Flat rate</span></span>';
       if(!(r.premPlus>0)) premPlusCell = '<span class="pp-prem-pill pp-flat-pill" title="Flat rate: no premium, no coffee"><span class="d">$0.00</span></span>';
     }
-    rows += '<tr'+(r.noRate?' class="pp-flagrow"':'')+' draggable="true" data-name="'+String(r.name).replace(/"/g,'&quot;')+'">'+
+    rows += '<tr'+(r.noRate?' class="pp-flagrow"':'')+' style="--i:'+Math.min(i,14)+'" draggable="true" data-name="'+String(r.name).replace(/"/g,'&quot;')+'">'+
       '<td class="pp-drag" title="Drag to reorder">≡</td>'+
       '<td><div class="pp-name">'+r.name+chips+'</div><div class="pp-struct">'+structTxt+'</div></td>'+
       '<td class="r pp-net">'+r.net.toFixed(2)+'h</td>'+
@@ -778,9 +867,9 @@ function renderRatesEditor(){
     html += '<tr class="'+(missing?'unset ':'')+(isFlat?'is-flat':'')+'" data-name="'+nn+'">'+
       '<td style="font-weight:600;color:var(--pp-ink,#0f172a);">'+n+(missing?' <span style="color:var(--pp-bad,#b91c1c);font-size:10px;font-weight:800;">unset</span>':'')+'</td>'+
       '<td><select class="pr-struct" onchange="this.closest(\'tr\').classList.toggle(\'is-flat\', this.value!==\'tiered\')"><option value="tiered"'+(r.structure==='tiered'?' selected':'')+'>Tiered</option><option value="flat"'+(isFlat?' selected':'')+'>Flat</option></select></td>'+
-      '<td><input class="pr-std" type="number" step="0.01" value="'+(parseFloat(r.std_rate)||0)+'" style="width:66px;"></td>'+
-      '<td><input class="pr-prem" type="number" step="0.01" value="'+(parseFloat(r.prem_rate)||0)+'" style="width:66px;"></td>'+
-      "<td>" + (function(){ var cap=parseFloat(r.pay_cap); var isPreset=(cap===48||cap===76); var isCustom=(!isNaN(cap)&&!isPreset); return '<select class="pr-cap" onchange="_prCapToggle(this)"><option value="48"'+(cap===48?' selected':'')+'>48</option><option value="76"'+(cap===76?' selected':'')+'>76</option><option value="__custom"'+(isCustom?' selected':'')+'>Custom\u2026</option></select><input class="pr-cap-custom" type="number" step="0.01" min="0" placeholder="hrs" value="'+(isCustom?cap:'')+'" style="width:66px;margin-left:6px;'+(isCustom?'':'display:none;')+'">'; })() + "</td>" +
+      '<td><input class="pr-std" type="number" step="0.01" value="'+(parseFloat(r.std_rate)||0)+'" style="width:80px;"></td>'+
+      '<td><input class="pr-prem" type="number" step="0.01" value="'+(parseFloat(r.prem_rate)||0)+'" style="width:80px;"></td>'+
+      "<td>" + (function(){ var cap=parseFloat(r.pay_cap); var isPreset=(cap===48||cap===76); var isCustom=(!isNaN(cap)&&!isPreset); return '<select class="pr-cap" onchange="_prCapToggle(this)"><option value="48"'+(cap===48?' selected':'')+'>48</option><option value="76"'+(cap===76?' selected':'')+'>76</option><option value="__custom"'+(isCustom?' selected':'')+'>Custom\u2026</option></select><input class="pr-cap-custom" type="number" step="0.01" min="0" placeholder="hrs" value="'+(isCustom?cap:'')+'" style="width:80px;margin-left:6px;'+(isCustom?'':'display:none;')+'">'; })() + "</td>" +
     '</tr>';
   });
   html += '</tbody></table></div>'+
