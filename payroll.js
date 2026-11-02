@@ -55,10 +55,34 @@ function _pEsc(s){
   return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
     .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
+/* ── Sydney day boundaries ──────────────────────────────────────────────────
+   Every timesheet day is a SYDNEY day, whatever timezone this browser is set to.
+   (Sophiya's 9:35am Sydney clock-in is 10:35pm the day before in UTC, so a browser
+   on any other clock filed it under the wrong date and the day showed no clock-in.)
+   _tzKey  ts -> 'YYYY-MM-DD' (Sydney date)
+   _tzWall ts -> Date whose local getters read the Sydney wall clock
+   _tzIso  'YYYY-MM-DD','HH:MM' (Sydney) -> UTC ISO string
+   _tzWide 'YYYY-MM-DD' -> {s,e} UTC ISO bounds wide enough to cover that Sydney day
+   Identical copy lives in payroll.js. */
+function _tzWallMs(ms){
+  var p={}; new Intl.DateTimeFormat('en-GB',{timeZone:'Australia/Sydney',hourCycle:'h23',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit'})
+    .formatToParts(new Date(ms)).forEach(function(x){ p[x.type]=x.value; });
+  return Date.UTC(+p.year,+p.month-1,+p.day,+p.hour,+p.minute,+p.second);
+}
+function _tzKey(ts){ var w=new Date(_tzWallMs(new Date(ts).getTime())); return w.getUTCFullYear()+'-'+String(w.getUTCMonth()+1).padStart(2,'0')+'-'+String(w.getUTCDate()).padStart(2,'0'); }
+function _tzWall(ts){ var w=new Date(_tzWallMs(new Date(ts).getTime())); return new Date(w.getUTCFullYear(),w.getUTCMonth(),w.getUTCDate(),w.getUTCHours(),w.getUTCMinutes(),w.getUTCSeconds()); }
+function _tzIso(dateStr,hhmm){
+  var d=String(dateStr).split('-'), t=String(hhmm||'00:00').split(':');
+  var guess=Date.UTC(+d[0],+d[1]-1,+d[2],+t[0],+t[1]||0,0);
+  var ms=guess-(_tzWallMs(guess)-guess); ms=guess-(_tzWallMs(ms)-ms);
+  return new Date(ms).toISOString();
+}
+function _tzWide(dateStr){ return { s:new Date(Date.parse(_tzIso(dateStr,'00:00'))-864e5).toISOString(), e:new Date(Date.parse(_tzIso(dateStr,'23:59'))+864e5).toISOString() }; }
+
 /** 7-minute flex rounding. Uses the host's version where there is one so the
  *  payrun can't drift from the timesheet; the fallback below is the same rule. */
 function _pFlex(date){
-  if(typeof flexClockTime === 'function') return _pFlex(date);
+  if(typeof flexClockTime === 'function') return flexClockTime(date);
   const d=new Date(date), m=d.getMinutes();
   let nm, nh=d.getHours();
   if(m<=7) nm=0; else if(m<=22) nm=15; else if(m<=37) nm=30;
@@ -69,10 +93,13 @@ function _pFlex(date){
  *  disagree, payroll and the timesheet report different hours for the same
  *  day, which is the worst possible failure for this feature. */
 function _pExtras(rawHours, customBreak, customCoffee, dateObj){
-  if(typeof calcDayExtras === 'function') return _pExtras(rawHours, customBreak, customCoffee, dateObj);
+  if(typeof calcDayExtras === 'function') return calcDayExtras(rawHours, customBreak, customCoffee, dateObj);
   let isWeekend=false;
-  if(dateObj){ const d=(dateObj instanceof Date)?dateObj:new Date(dateObj);
-    const dow=d.getDay(); isWeekend=(dow===0||dow===6); }
+  if(dateObj){
+    let dow;
+    if(typeof dateObj==='string' && /^\d{4}-\d{2}-\d{2}$/.test(dateObj)){ const q=dateObj.split('-'); dow=new Date(+q[0],+q[1]-1,+q[2]).getDay(); }
+    else { const d=(dateObj instanceof Date)?dateObj:new Date(dateObj); dow=d.getDay(); }
+    isWeekend=(dow===0||dow===6); }
   const autoBreak = isWeekend ? 0 : (rawHours>5 ? 0.5 : 0);
   let breakHrs = (customBreak!==undefined&&customBreak!==null&&customBreak!=='')?parseFloat(customBreak):autoBreak;
   let coffee   = (customCoffee!==undefined&&customCoffee!==null&&customCoffee!=='')?parseFloat(customCoffee):(rawHours>=4?5:0);
@@ -326,8 +353,6 @@ async function loadPayRates(){
 
 // Mirrors renderHoursTable pairing exactly → net hours + coffee for one staff.
 async function _payHoursFor(staff, startStr, endStr){
-  const start = new Date(startStr+'T00:00:00');
-  const end   = new Date(endStr+'T23:59:59');
   let logs = null;
   // Try up to 2 times — a single expired-token/network blip shouldn't wipe a
   // staff member's hours. If BOTH attempts fail, return an error flag so the
@@ -338,21 +363,21 @@ async function _payHoursFor(staff, startStr, endStr){
     catch(e){ logs = null; if(attempt===0){ await new Promise(function(res){ setTimeout(res, 400); }); } }
   }
   if(logs === null){ return {net:0, coffee:0, raw:0, open:0, days:0, loadError:true}; }
-  logs = (logs||[]).filter(function(r){ const t = new Date(r.ts); return t >= start && t <= end; });
+  logs = (logs||[]).filter(function(r){ const k = _tzKey(r.ts); return k >= startStr && k <= endStr; });
   if(!logs.length) return {net:0, coffee:0, raw:0, open:0, days:0};
   logs.sort(function(a,b){ return new Date(a.ts) - new Date(b.ts); });
   // dedupe same action + same minute (historical pileup)
   (function(){
     const seen = {};
     logs = logs.filter(function(r){
-      const t = new Date(r.ts);
+      const t = _tzWall(r.ts);
       const k = r.action+'|'+t.getFullYear()+'-'+(t.getMonth()+1)+'-'+t.getDate()+'|'+t.getHours()+':'+t.getMinutes();
       if(seen[k]) return false; seen[k]=1; return true;
     });
   })();
   const byDay = {}; let openIn = null; let openCount = 0;
   logs.forEach(function(r){
-    const t = new Date(r.ts);
+    const t = _tzWall(r.ts);
     const ft = _pFlex(t);
     const dayKey = t.toLocaleDateString('en-AU',{day:'2-digit',month:'2-digit',year:'numeric'});
     if(!byDay[dayKey]) byDay[dayKey] = {date:t, hours:0};
@@ -379,7 +404,7 @@ async function _payHoursFor(staff, startStr, endStr){
     const d = byDay[k]; raw += d.hours;
     const iso = d.date.getFullYear()+'-'+String(d.date.getMonth()+1).padStart(2,'0')+'-'+String(d.date.getDate()).padStart(2,'0');
     const ov = overrides[iso] || {};
-    const ex = _pExtras(d.hours, ov.break_hrs, ov.coffee, d.date);
+    const ex = _pExtras(d.hours, ov.break_hrs, ov.coffee, iso);
     net += ex.netHours; coffee += ex.coffee;
   });
   return {net:net, coffee:coffee, raw:raw, open:openCount, days:Object.keys(byDay).length};

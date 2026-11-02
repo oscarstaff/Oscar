@@ -1100,7 +1100,10 @@ function calcDayExtras(rawHours, customBreak, customCoffee, dateObj){
   if(dateObj){
     const d = (dateObj instanceof Date) ? dateObj : new Date(dateObj);
     let dow;
-    try{
+    if(typeof dateObj === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateObj)){
+      /* a Sydney calendar date: weekday from its parts, not from a timezone conversion */
+      const _q = dateObj.split('-'); dow = new Date(+_q[0], +_q[1]-1, +_q[2]).getDay();
+    } else try{
       const wd = d.toLocaleDateString('en-US', {timeZone:'Australia/Sydney', weekday:'short'});
       const map = {Sun:0, Mon:1, Tue:2, Wed:3, Thu:4, Fri:5, Sat:6};
       dow = (wd in map) ? map[wd] : d.getDay();
@@ -1116,20 +1119,42 @@ function calcDayExtras(rawHours, customBreak, customCoffee, dateObj){
   return {netHours, breakHrs, coffee};
 }
 
+/* ── Sydney day boundaries ──────────────────────────────────────────────────
+   Every timesheet day is a SYDNEY day, whatever timezone this browser is set to.
+   (Sophiya's 9:35am Sydney clock-in is 10:35pm the day before in UTC, so a browser
+   on any other clock filed it under the wrong date and the day showed no clock-in.)
+   _tzKey  ts -> 'YYYY-MM-DD' (Sydney date)
+   _tzWall ts -> Date whose local getters read the Sydney wall clock
+   _tzIso  'YYYY-MM-DD','HH:MM' (Sydney) -> UTC ISO string
+   _tzWide 'YYYY-MM-DD' -> {s,e} UTC ISO bounds wide enough to cover that Sydney day
+   Identical copy lives in payroll.js. */
+function _tzWallMs(ms){
+  var p={}; new Intl.DateTimeFormat('en-GB',{timeZone:'Australia/Sydney',hourCycle:'h23',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit'})
+    .formatToParts(new Date(ms)).forEach(function(x){ p[x.type]=x.value; });
+  return Date.UTC(+p.year,+p.month-1,+p.day,+p.hour,+p.minute,+p.second);
+}
+function _tzKey(ts){ var w=new Date(_tzWallMs(new Date(ts).getTime())); return w.getUTCFullYear()+'-'+String(w.getUTCMonth()+1).padStart(2,'0')+'-'+String(w.getUTCDate()).padStart(2,'0'); }
+function _tzWall(ts){ var w=new Date(_tzWallMs(new Date(ts).getTime())); return new Date(w.getUTCFullYear(),w.getUTCMonth(),w.getUTCDate(),w.getUTCHours(),w.getUTCMinutes(),w.getUTCSeconds()); }
+function _tzIso(dateStr,hhmm){
+  var d=String(dateStr).split('-'), t=String(hhmm||'00:00').split(':');
+  var guess=Date.UTC(+d[0],+d[1]-1,+d[2],+t[0],+t[1]||0,0);
+  var ms=guess-(_tzWallMs(guess)-guess); ms=guess-(_tzWallMs(ms)-ms);
+  return new Date(ms).toISOString();
+}
+function _tzWide(dateStr){ return { s:new Date(Date.parse(_tzIso(dateStr,'00:00'))-864e5).toISOString(), e:new Date(Date.parse(_tzIso(dateStr,'23:59'))+864e5).toISOString() }; }
+
 async function renderHoursTable(targetStaff, startStr, endStr, el, allowEdit){
-  const start = new Date(startStr+'T00:00:00');
-  const end = new Date(endStr+'T23:59:59');
   let logs = [];
   try{
     logs = await sbGet('clock_log','?staff_name=eq.'+encodeURIComponent(targetStaff)+'&order=ts.asc&limit=2000');
   }catch(e){}
-  logs = (logs||[]).filter(function(r){ const t = new Date(r.ts); return t >= start && t <= end; });
+  logs = (logs||[]).filter(function(r){ const k = _tzKey(r.ts); return k >= startStr && k <= endStr; });
   if(!logs.length){ el.innerHTML = '<div style="color:var(--ui-ink-4,#94a3b8);text-align:center;padding:30px;">No clock-ins in this range.</div>'; return; }
   logs.sort(function(a,b){return new Date(a.ts) - new Date(b.ts);});
   (function(){
     const seen = {};
     logs = logs.filter(function(r){
-      const t = new Date(r.ts);
+      const t = _tzWall(r.ts);
       const k = r.action+'|'+t.getFullYear()+'-'+(t.getMonth()+1)+'-'+t.getDate()+'|'+t.getHours()+':'+t.getMinutes();
       if(seen[k]) return false; seen[k]=1; return true;
     });
@@ -1137,7 +1162,7 @@ async function renderHoursTable(targetStaff, startStr, endStr, el, allowEdit){
   const byDay = {};
   let openIn = null;
   logs.forEach(function(r){
-    const t = new Date(r.ts);
+    const t = _tzWall(r.ts);
     const ft = flexClockTime(t);
     const dayKey = t.toLocaleDateString('en-AU',{day:'2-digit',month:'2-digit',year:'numeric'});
     if(!byDay[dayKey]) byDay[dayKey] = {date:t, in:null, out:null, hours:0, in_id:'', out_id:''};
@@ -1180,11 +1205,11 @@ async function renderHoursTable(targetStaff, startStr, endStr, el, allowEdit){
   days.forEach(function(k){
     const d = byDay[k];
     const day = d.date.toLocaleDateString('en-AU',{weekday:'short'});
-    const inS = d.in ? d.in.toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit',hour12:false,timeZone:'Australia/Sydney'}) : '—';
-    const outS = d.out ? d.out.toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit',hour12:false,timeZone:'Australia/Sydney'}) : '—';
+    const inS = d.in ? d.in.toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit',hour12:false}) : '—';
+    const outS = d.out ? d.out.toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit',hour12:false}) : '—';
     const isoDate = (function(dt){ return dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0'); })(d.date);
     const ov = overrides[isoDate] || {};
-    const extras = calcDayExtras(d.hours, ov.break_hrs, ov.coffee, d.date);
+    const extras = calcDayExtras(d.hours, ov.break_hrs, ov.coffee, isoDate);
     totalNet += extras.netHours;
     totalCoffee += extras.coffee;
     const inHHMM = d.in ? (String(d.in.getHours()).padStart(2,'0')+':'+String(d.in.getMinutes()).padStart(2,'0')) : '';
@@ -1235,11 +1260,9 @@ function rowDeletePunch(staff,isoDate){ _rowSetTarget(staff,isoDate); if(typeof 
 function rowNukeBreaks(staff,isoDate){ _rowSetTarget(staff,isoDate); if(typeof nukeBreakOnly==='function') nukeBreakOnly(); }
 async function rowInspect(staff,isoDate){
   try{
-    const [y,mo,dd]=isoDate.split('-');
-    const start=new Date(+y,+mo-1,+dd,0,0,0), end=new Date(+y,+mo-1,+dd,23,59,59);
-    const wideStart=new Date(start.getTime()-864e5).toISOString(), wideEnd=new Date(end.getTime()+864e5).toISOString();
+    const _w=_tzWide(isoDate), wideStart=_w.s, wideEnd=_w.e;
     const rows=(await sbGet('clock_log','?staff_name=eq.'+encodeURIComponent(staff)+'&ts=gte.'+wideStart+'&ts=lte.'+wideEnd+'&order=ts.asc'))||[];
-    const same=rows.filter(function(r){ const t=new Date(r.ts); return (t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0'))===isoDate; });
+    const same=rows.filter(function(r){ return _tzKey(r.ts)===isoDate; });
     let ebr=[];
     try{ ebr=(await sbGet('extra_break_requests','?staff_name=eq.'+encodeURIComponent(staff)+'&request_date=eq.'+isoDate+'&order=created_at.asc'))||[]; }catch(e){}
     _showInspectDialog(staff, isoDate, same, ebr);
@@ -1335,14 +1358,10 @@ async function nukeDay(){
   if(!(await nxConfirm('Delete ALL clock-in/out rows for:\n   Staff: '+staff+'\n   Date: '+date+'\n\nThis cannot be undone. The Google Sheet will NOT be touched.',{title:'Final confirmation',okText:'Delete rows',danger:true}))) return;
   try{
     const [y,mo,d] = date.split('-');
-    const localMidnight = new Date(parseInt(y), parseInt(mo)-1, parseInt(d), 0, 0, 0);
-    const localEnd = new Date(parseInt(y), parseInt(mo)-1, parseInt(d), 23, 59, 59);
-    const wideStart = new Date(localMidnight.getTime() - 24*60*60*1000).toISOString();
-    const wideEnd = new Date(localEnd.getTime() + 24*60*60*1000).toISOString();
+    const _w = _tzWide(date), wideStart = _w.s, wideEnd = _w.e;
     const allCandidate = await sbGet('clock_log','?staff_name=eq.'+encodeURIComponent(staff)+'&ts=gte.'+wideStart+'&ts=lte.'+wideEnd);
     const toDelete = (allCandidate||[]).filter(function(r){
-      const t = new Date(r.ts);
-      const localStr = t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0');
+      const localStr = _tzKey(r.ts);
       return localStr === date;
     });
     if(!toDelete.length){ showToast('Nothing to delete'); return; }
@@ -1563,14 +1582,10 @@ async function deletePunch(){
   if(btn){ btn.disabled = true; btn.textContent = 'Deleting...'; }
   try{
     const [y,mo,d] = isoDate.split('-');
-    const localMidnight = new Date(parseInt(y), parseInt(mo)-1, parseInt(d), 0, 0, 0);
-    const localEnd = new Date(parseInt(y), parseInt(mo)-1, parseInt(d), 23, 59, 59);
-    const wideStart = new Date(localMidnight.getTime() - 24*60*60*1000).toISOString();
-    const wideEnd = new Date(localEnd.getTime() + 24*60*60*1000).toISOString();
+    const _w = _tzWide(isoDate), wideStart = _w.s, wideEnd = _w.e;
     const allCandidate = await sbGet('clock_log','?staff_name=eq.'+encodeURIComponent(staff)+'&ts=gte.'+wideStart+'&ts=lte.'+wideEnd);
     const existing = (allCandidate||[]).filter(function(r){
-      const t = new Date(r.ts);
-      const localStr = t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0');
+      const localStr = _tzKey(r.ts);
       return localStr === isoDate;
     });
     if(existing && existing.length){
@@ -1584,8 +1599,7 @@ async function deletePunch(){
       try{
         const stillCl = await sbGet('clock_log','?staff_name=eq.'+encodeURIComponent(staff)+'&ts=gte.'+wideStart+'&ts=lte.'+wideEnd);
         const survivors = (stillCl||[]).filter(function(r){
-          const t = new Date(r.ts);
-          const localStr = t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0');
+          const localStr = _tzKey(r.ts);
           return localStr === isoDate;
         });
         if(survivors.length){
@@ -1706,15 +1720,11 @@ async function savePunchEdit(){
   const sheetDateStr = d+'/'+mo+'/'+y;
 
   try{
-    const localMidnight = new Date(parseInt(y), parseInt(mo)-1, parseInt(d), 0, 0, 0);
-    const localEnd = new Date(parseInt(y), parseInt(mo)-1, parseInt(d), 23, 59, 59);
-    const wideStart = new Date(localMidnight.getTime() - 24*60*60*1000).toISOString();
-    const wideEnd = new Date(localEnd.getTime() + 24*60*60*1000).toISOString();
+    const _w = _tzWide(isoDate), wideStart = _w.s, wideEnd = _w.e;
     const allCandidate = await sbGet('clock_log','?staff_name=eq.'+encodeURIComponent(staff)+'&ts=gte.'+wideStart+'&ts=lte.'+wideEnd);
     const targetIsoDate = isoDate;
     const toDelete = (allCandidate||[]).filter(function(r){
-      const t = new Date(r.ts);
-      const localStr = t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0');
+      const localStr = _tzKey(r.ts);
       return localStr === targetIsoDate;
     });
     if(toDelete.length){
@@ -1731,8 +1741,7 @@ async function savePunchEdit(){
       await new Promise(function(r){setTimeout(r, 300);});
       const verifyAll = await sbGet('clock_log','?staff_name=eq.'+encodeURIComponent(staff)+'&ts=gte.'+wideStart+'&ts=lte.'+wideEnd);
       const stillThere = (verifyAll||[]).filter(function(r){
-        const t = new Date(r.ts);
-        const localStr = t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0');
+        const localStr = _tzKey(r.ts);
         return localStr === targetIsoDate;
       });
       if(stillThere.length){
@@ -1747,11 +1756,11 @@ async function savePunchEdit(){
     const _editStamp = { origin:'manual', edited_at:new Date().toISOString(), edited_by: me };
     const inserts = [];
     if(timeIn){
-      const inTs = new Date(isoDate+'T'+timeIn+':00').toISOString();
+      const inTs = _tzIso(isoDate, timeIn);
       inserts.push(sbPost('clock_log', {staff_name: staff, action: 'in', ts: inTs, ..._editStamp}));
     }
     if(timeOut){
-      const outTs = new Date(isoDate+'T'+timeOut+':00').toISOString();
+      const outTs = _tzIso(isoDate, timeOut);
       inserts.push(sbPost('clock_log', {staff_name: staff, action: 'out', ts: outTs, ..._editStamp}));
     }
     if(inserts.length) await Promise.all(inserts);
