@@ -605,8 +605,12 @@ function _lpFetch(fileId){
   if(_lpCache[fileId]) return _lpCache[fileId];
   const p=(async function(){
     const r=await fetch(_leaveProofUrl(),{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'getLeaveProof',token:GAS_TOKEN,sbAccessToken:_sbBearer(),fileId:fileId})});
-    const j=r.ok?await r.json():null;
-    if(!j||!j.ok) throw new Error('get');
+    let j=null; try{ j=await r.json(); }catch(_e){}
+    if(!r.ok||!j||!j.ok){   // keep the real reason: the viewer shows it and the console logs it
+      const why=(j&&(j.error||j.message))?String(j.error||j.message):(r.ok?'the Drive gateway sent back something unreadable':'the Drive gateway returned HTTP '+r.status);
+      try{ console.warn('[leave proof]', why, j&&{ok:j.ok}); }catch(_e){}
+      throw new Error(why);
+    }
     const bin=atob(j.base64), u8=new Uint8Array(bin.length);
     for(let i=0;i<bin.length;i++) u8[i]=bin.charCodeAt(i);
     return {url:URL.createObjectURL(new Blob([u8],{type:j.mime})), mime:String(j.mime), kb:Math.max(1,Math.round(bin.length/1024))};
@@ -665,7 +669,7 @@ async function _lpView(fileId){
   }catch(e){
     if(seq!==_lpSeq) return;
     _lpHead('error');
-    _lpShowState('<div style="color:#ff9f0a;">'+_LP_IC.warn+'</div><b>Can’t open this proof</b>It may have been removed, or only the person who attached it and hub admins can open it.<div><button type="button" class="lp-glass lp-pill" onclick="_lpRetry&&_lpRetry()"><span style="display:inline">Try again</span></button></div>');
+    _lpShowState('<div style="color:#ff9f0a;">'+_LP_IC.warn+'</div><b>Can’t open this proof</b>It may have been removed, or only the person who attached it and hub admins can open it.<div style="margin-top:8px;font-size:11.5px;opacity:.75;word-break:break-word;">Reason: '+String((e&&e.message)||'unknown').replace(/[<>&]/g,'')+'</div><div><button type="button" class="lp-glass lp-pill" onclick="_lpRetry&&_lpRetry()"><span style="display:inline">Try again</span></button></div>');
   }
 }
 
