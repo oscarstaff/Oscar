@@ -141,11 +141,13 @@
   transition:opacity 200ms var(--v3-out),transform 240ms var(--v3-out),background-color 160ms ease;
 }
 :root:not([data-theme="win95"]) #page-profile .v3-save:not(.is-ready){
-  opacity:.38; pointer-events:none; filter:saturate(.35);
+  pointer-events:none; background:transparent !important; background-image:none !important; color:var(--m-ink-3) !important;
+  box-shadow:inset 0 0 0 1px var(--m-border-hi) !important; filter:none;
 }
+:root:not([data-theme="win95"]) #page-profile .v3-save.is-ready{ background:var(--accent) !important; color:#fff !important; box-shadow:none !important; }
 :root:not([data-theme="win95"]) #page-profile .card .f-input{ border-radius:14px !important; }
 :root:not([data-theme="win95"]) #page-profile .card .f-input:focus{
-  box-shadow:0 0 0 4px color-mix(in srgb,var(--accent) 16%,transparent) !important;
+  box-shadow:inset 0 0 0 1.5px var(--accent),0 0 0 4px color-mix(in srgb,var(--accent) 16%,transparent) !important;
 }
 
 /* ── 6. Bottom bar: a floating dock with a sliding lens ─────────────────── */
@@ -186,22 +188,254 @@
 
 /* ── 7. Page transitions (driven by nexus-mobile.js) ────────────────────── */
 .v3-in > .v3-blk, .v3-in .v3-blk{
-  animation:v3Rise 300ms var(--v3-out) both;
-  animation-delay:calc(var(--i,0) * 28ms);
+  animation:v3Rise 150ms var(--v3-out) both;
+  animation-delay:calc(var(--i,0) * 14ms);
 }
 /* Entrances are fades. Nexus has a standing rule against travel on page entrances (it read as the page
    jumping), so --v3-travel defaults to 0. Set it to e.g. 10px on :root to bring the rise back. */
 @keyframes v3Rise{
-  from{ opacity:0; transform:translate3d(0,var(--v3-travel,0px),0); }
+  from{ opacity:.35; transform:translate3d(0,var(--v3-travel,0px),0); }   /* never fully blank: a tab change must feel instant */
   to{ opacity:1; transform:none; }
 }
+
+
+/* ── 4b. Shared components, every page ──────────────────────────────────── */
+/* Fields: 16px (no iOS zoom), 48px tall, tinted fill held by a hairline, accent ring on focus. */
+:root:not([data-theme="win95"]) .main :is(input.f-input,select.f-input,textarea.f-input,.f-input){
+  min-height:48px; border-radius:14px; font-size:16px; padding-left:14px; padding-right:14px;
+  background-color:var(--m-card-2); border-color:transparent;
+  box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--m-border) 85%,transparent);
+  transition:box-shadow 140ms var(--v3-out,ease-out),background-color 140ms var(--v3-out,ease-out);
+}
+:root:not([data-theme="win95"]) .main textarea.f-input{ min-height:96px; padding-top:12px; line-height:1.45; }
+:root:not([data-theme="win95"]) .main :is(input.f-input,select.f-input,textarea.f-input,.f-input):focus{
+  background-color:var(--m-card); outline:none;
+  box-shadow:inset 0 0 0 1.5px var(--accent),0 0 0 4px color-mix(in srgb,var(--accent) 16%,transparent);
+}
+:root:not([data-theme="win95"]) .main input[type="file"].f-input{ padding:7px 8px; min-height:52px; font-size:13px; color:var(--m-ink-2); }
+:root:not([data-theme="win95"]) .main input[type="file"]::file-selector-button{
+  font:inherit; font-weight:650; font-size:13px; color:var(--accent-text); background:var(--accent-dim);
+  border:0; border-radius:10px; padding:9px 14px; margin-right:10px;
+}
+/* Labels: quiet, sentence case */
+:root:not([data-theme="win95"]) .main .field-label{ font-size:12.5px; font-weight:600; letter-spacing:.005em; color:var(--m-ink-2); margin-bottom:6px; }
+:root:not([data-theme="win95"]) .main .field{ margin-bottom:14px; }
+/* Buttons: one height, one radius */
+:root:not([data-theme="win95"]) .main .btn{
+  min-height:46px; border-radius:14px; font-weight:650; letter-spacing:-.005em; padding-left:18px; padding-right:18px;
+}
+:root:not([data-theme="win95"]) .main .btn-outline{ background:var(--m-card); border-color:transparent; box-shadow:inset 0 0 0 1px var(--m-border-hi); color:var(--m-ink); }
+:root:not([data-theme="win95"]) .main .btn.btn-sm,:root:not([data-theme="win95"]) .main .btn-sm{ min-height:36px; border-radius:11px; padding-left:13px; padding-right:13px; }
+/* Card headers: a title, not a ruled form section */
+:root:not([data-theme="win95"]) .main .card-hd{ border-bottom:0 !important; padding-bottom:0 !important; margin-bottom:10px !important; }
+:root:not([data-theme="win95"]) .main .card-title{ font-size:17px; font-weight:700; letter-spacing:-.015em; }
+/* Alerts */
+:root:not([data-theme="win95"]) .main .alert{ border-radius:16px; border-color:transparent; padding:12px 14px; font-size:14px; line-height:1.4; }
+/* Pills / filters */
+:root:not([data-theme="win95"]) .main :is(.hours-tab,.lrn-chip,.font-chip){
+  min-height:36px; border-radius:999px; padding:7px 15px; font-size:13px; font-weight:600; border-color:transparent;
+  background:var(--m-card); box-shadow:inset 0 0 0 1px var(--m-border);
+}
+:root:not([data-theme="win95"]) .main :is(.hours-tab,.lrn-chip).active{
+  background:var(--accent); color:var(--accent-on,#fff); box-shadow:none;
+}
+/* Segmented tab bars (Hours / Availability, Breaks / Edit punches ...): one rounded track, a raised active segment */
+:root:not([data-theme="win95"]) .main .tab-bar{
+  display:flex; gap:2px; padding:3px; margin:0 0 14px; border:0 !important; border-radius:16px;
+  background:color-mix(in srgb,var(--m-ink) 9%,var(--m-canvas)); overflow-x:auto; scrollbar-width:none;
+}
+:root:not([data-theme="win95"]) .main .tab-bar::-webkit-scrollbar{ display:none; }
+:root:not([data-theme="win95"]) .main .tab-bar > *{
+  flex:1 0 auto; white-space:nowrap; border:0 !important; border-radius:13px !important; margin:0 !important;
+  padding:9px 12px; min-height:40px; font-size:13.5px; font-weight:600; color:var(--m-ink-2); background:transparent !important;
+  text-shadow:none; box-shadow:none; transition:background-color 140ms var(--v3-out,ease-out),color 140ms var(--v3-out,ease-out);
+}
+:root:not([data-theme="win95"]) .main .tab-bar > .active{
+  background:var(--m-card) !important; color:var(--m-ink); font-weight:700;
+  box-shadow:0 1px 2px color-mix(in srgb,var(--m-ink) 14%,transparent),0 0 0 .5px color-mix(in srgb,var(--m-ink) 8%,transparent) !important;
+}
+/* Stat tiles */
+:root:not([data-theme="win95"]) .main :is(.roster-stat){ border-radius:18px; border-color:transparent; box-shadow:0 0 0 1px color-mix(in srgb,var(--m-border) 80%,transparent); }
+:root:not([data-theme="win95"]) .main :is(.roster-stat-val){ font-weight:750; letter-spacing:-.03em; font-variant-numeric:tabular-nums; }
+:root:not([data-theme="win95"]) .main :is(.roster-stat-lbl){ font-size:12px; font-weight:600; color:var(--m-ink-3); }
+/* Segmented switches (calendar Day/Week/Month/Year, roster segments) */
+:root:not([data-theme="win95"]) .main :is(.cal-view-btn,.roster-seg-btn){ border-radius:12px; min-height:36px; font-weight:600; }
+/* Tables scroll inside themselves instead of widening the page */
+:root:not([data-theme="win95"]) .main :is(.card,.roster-card) :is(table){ font-size:13.5px; }
+:root:not([data-theme="win95"]) .main :is(.card,.roster-card) > :is(div:has(> table),.tbl-wrap){ overflow-x:auto; -webkit-overflow-scrolling:touch; }
+/* Call Log header: the stat row scrolls inside itself; Nodes title matches the other pages */
+:root:not([data-theme="win95"]) #page-calllog .cl-rb-stats{ overflow-x:auto; scrollbar-width:none; }
+:root:not([data-theme="win95"]) #page-calllog .cl-rb-stats::-webkit-scrollbar{ display:none; }
+:root:not([data-theme="win95"]) #page-calllog .cl-rb-stats .cl-stat{ flex:0 0 auto; }
+:root:not([data-theme="win95"]) #page-hub .hub-hdr{ margin-bottom:18px; }
+:root:not([data-theme="win95"]):not([data-font]) #page-hub .hub-hdr h2{ font-size:clamp(28px,8.4vw,34px); font-weight:750; letter-spacing:-.036em; line-height:1.08; }
+:root:not([data-theme="win95"]) #page-hub{ padding-top:0 !important; }
+
+/* ── 5b. Profile › Appearance & notifications: fewer boxes ──────────────── */
+/* Section dividers: space, not rules */
+:root:not([data-theme="win95"]) #page-profile .card > div[style*="border-top"],
+:root:not([data-theme="win95"]) #page-profile .card > div[style*="border-bottom"]{ border:0 !important; margin-top:0 !important; padding:18px 0 0 !important; }
+:root:not([data-theme="win95"]) #page-profile .card > div > div[style*="font-size:13px"]{ font-size:15px !important; font-weight:700 !important; letter-spacing:-.01em; color:var(--m-ink) !important; margin-bottom:3px !important; }
+:root:not([data-theme="win95"]) #page-profile .card > div > div[style*="font-size:11"]{ font-size:12.5px !important; line-height:1.4; color:var(--m-ink-3) !important; margin-bottom:12px !important; }
+/* Themes: a swipeable row of swatches */
+:root:not([data-theme="win95"]) #appearanceGrid{
+  display:flex !important; gap:14px; overflow-x:auto; scroll-snap-type:x proximity; scrollbar-width:none;
+  margin:0 -18px; padding:8px 22px 10px; scroll-padding-left:22px; -webkit-overflow-scrolling:touch;
+}
+:root:not([data-theme="win95"]) #appearanceGrid::-webkit-scrollbar{ display:none; }
+:root:not([data-theme="win95"]) #appearanceGrid .appr-card{
+  flex:0 0 72px; width:72px; padding:0 !important; border:0 !important; background:transparent !important; box-shadow:none !important;
+  scroll-snap-align:start; text-align:center; display:flex; flex-direction:column; align-items:center; gap:7px;
+}
+:root:not([data-theme="win95"]) #appearanceGrid .appr-swatch{
+  width:72px; height:72px; margin:0 !important; border-radius:22px; border:0;
+  box-shadow:0 0 0 1px color-mix(in srgb,var(--m-ink) 12%,transparent),0 6px 14px -8px color-mix(in srgb,var(--m-ink) 40%,transparent);
+  transition:box-shadow 160ms var(--v3-out,ease-out);
+}
+:root:not([data-theme="win95"]) #appearanceGrid .appr-card.active .appr-swatch{
+  box-shadow:0 0 0 3px var(--m-card),0 0 0 5.5px var(--accent);
+}
+:root:not([data-theme="win95"]) #appearanceGrid .appr-name{ font-size:12.5px !important; font-weight:600; color:var(--m-ink-2) !important; }
+:root:not([data-theme="win95"]) #appearanceGrid .appr-card.active .appr-name{ color:var(--m-ink) !important; font-weight:700; }
+:root:not([data-theme="win95"]) #appearanceGrid .appr-sub{ display:none; }
+/* Text size: one segmented control */
+:root:not([data-theme="win95"]) #fontChips{
+  display:grid !important; grid-template-columns:repeat(4,1fr); gap:2px !important; padding:3px; margin-top:10px !important; border-radius:16px;
+  background:color-mix(in srgb,var(--m-ink) 9%,var(--m-canvas));
+}
+:root:not([data-theme="win95"]) #fontChips .font-chip{
+  min-height:40px; padding:8px 2px; border-radius:13px; border:0; box-shadow:none !important; background:transparent !important;
+  color:var(--m-ink-2); font-size:13px !important; font-weight:600; white-space:nowrap; text-align:center;
+}
+:root:not([data-theme="win95"]) #fontChips .font-chip.active{
+  background:var(--m-card) !important; color:var(--m-ink); font-weight:700;
+  box-shadow:0 1px 2px color-mix(in srgb,var(--m-ink) 14%,transparent),0 0 0 .5px color-mix(in srgb,var(--m-ink) 8%,transparent) !important;
+}
+/* Text colour: evenly spaced dots */
+:root:not([data-theme="win95"]) #textColorPicker > div:first-child{ font-size:15px !important; font-weight:700 !important; color:var(--m-ink) !important; }
+:root:not([data-theme="win95"]) #textColorPicker > div:last-of-type{ justify-content:space-between; gap:6px !important; padding:2px 4px 0; }
+:root:not([data-theme="win95"]) #textColorPicker .tc-swatch{ width:32px; height:32px; }
+/* Notifications: soft rows with real switches */
+:root:not([data-theme="win95"]) div:has(> #notifPermStatus) > div:first-child{ font-size:15px !important; font-weight:700 !important; color:var(--m-ink) !important; margin-bottom:10px !important; }
+:root:not([data-theme="win95"]) #notifPermStatus{ font-size:13px !important; line-height:1.45; margin-bottom:10px !important; }
+:root:not([data-theme="win95"]) #notifPermStatus:not(:empty){ padding:12px 14px; border-radius:16px; background:var(--m-card-2); }
+:root:not([data-theme="win95"]) #page-profile label[style*="justify-content:space-between"]{
+  padding:14px !important; border-radius:18px !important; border:0 !important; background:var(--m-card-2) !important; gap:14px !important; margin-bottom:8px !important;
+}
+:root:not([data-theme="win95"]) #page-profile label[style*="justify-content:space-between"] > div > div:first-child{ font-size:15px !important; font-weight:650 !important; color:var(--m-ink) !important; }
+:root:not([data-theme="win95"]) #page-profile label[style*="justify-content:space-between"] > div > div:last-child{ font-size:12.5px !important; line-height:1.4; color:var(--m-ink-3) !important; }
+:root:not([data-theme="win95"]) #notifSoundToggle{
+  -webkit-appearance:none; appearance:none; flex:0 0 auto; width:51px !important; height:31px !important; border-radius:999px; position:relative; cursor:pointer;
+  background:color-mix(in srgb,var(--m-ink) 22%,var(--m-canvas)); transition:background-color 180ms var(--v3-out,ease-out); margin:0;
+}
+:root:not([data-theme="win95"]) #notifSoundToggle::before{
+  content:""; position:absolute; top:2px; left:2px; width:27px; height:27px; border-radius:50%; background:#fff;
+  box-shadow:0 2px 4px rgba(0,0,0,.25); transition:translate 180ms var(--v3-out,ease-out);
+}
+:root:not([data-theme="win95"]) #notifSoundToggle:checked{ background:var(--accent); }
+:root:not([data-theme="win95"]) #notifSoundToggle:checked::before{ translate:20px 0; }
+:root:not([data-theme="win95"]) #notifSoundToggle:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+:root:not([data-theme="win95"]) #pushToggleBtn{ background:var(--accent) !important; color:#fff !important; border-radius:12px !important; min-height:38px; min-width:84px !important; font-size:13px !important; font-weight:700 !important; }
+/* Reset + Sign out: full-width, quiet */
+:root:not([data-theme="win95"]) #page-profile :is(button[onclick*="resetAppearance"],button[onclick*="doLogout"]){ display:flex !important; width:100% !important; justify-content:center; align-items:center; }
+:root:not([data-theme="win95"]) #page-profile button[onclick*="resetAppearance"]{ font-size:14px !important; padding:12px !important; min-height:46px; color:var(--m-ink-2); }
+:root:not([data-theme="win95"]) #page-profile button[onclick*="doLogout"]{
+  min-height:50px; margin-top:4px; border-radius:16px; background:color-mix(in srgb,#dc2626 9%,var(--m-card)) !important;
+  border-color:transparent !important; box-shadow:none; color:#dc2626 !important; font-weight:700;
+}
+
+/* ── 5c. Profile › the account cards (nickname, bio, birthday, password, security, pronouns) ── */
+:root:not([data-theme="win95"]) #page-profile .card > div[style*="font-size:12px"][style*="margin:2px"]{ font-size:13px !important; line-height:1.4; color:var(--m-ink-3) !important; margin:2px 0 12px !important; }
+:root:not([data-theme="win95"]) #profBio{ resize:none !important; min-height:116px; padding:14px !important; line-height:1.45; border-radius:18px !important; }
+:root:not([data-theme="win95"]) #page-profile .card input.f-input:not([type="checkbox"]){ min-height:50px; }
+:root:not([data-theme="win95"]) #page-profile .card div:has(> .f-input) > .btn{ min-height:50px; min-width:76px; border-radius:14px; }
+:root:not([data-theme="win95"]) #page-profile .card > div:has(> label > #profShowBio){ margin-top:12px !important; gap:12px; }
+:root:not([data-theme="win95"]) #page-profile label:has(> #profShowBio){ font-size:14px !important; color:var(--m-ink) !important; gap:12px !important; }
+:root:not([data-theme="win95"]) #page-profile .card-hd:has(+ [style*="display:none"]){ margin-bottom:0 !important; }
+:root:not([data-theme="win95"]) #page-profile .card-action{
+  background:var(--accent-dim); color:var(--accent-text); border:0; border-radius:999px; padding:7px 16px; min-height:34px; font-size:13.5px; font-weight:650;
+}
+:root:not([data-theme="win95"]) #profSqStatus,:root:not([data-theme="win95"]) #profPronounsCurrent{ font-size:14px !important; margin-top:4px !important; }
+:root:not([data-theme="win95"]) #page-profile .card[onclick*="openStaffDirectory"]{ padding-top:14px; padding-bottom:14px; }
+:root:not([data-theme="win95"]) #page-profile .card[onclick*="openStaffDirectory"] div[style*="font-size:13px"]{ font-size:15px !important; font-weight:650 !important; color:var(--m-ink) !important; }
+:root:not([data-theme="win95"]) #page-profile .card[onclick*="openStaffDirectory"] div[style*="font-size:11px"]{ font-size:12.5px !important; color:var(--m-ink-3) !important; }
+:root:not([data-theme="win95"]) #page-profile .card[onclick*="openStaffDirectory"] > div > div > div:first-child{ width:40px !important; height:40px !important; border-radius:13px !important; }
+/* the same switch for "Show my bio" */
+:root:not([data-theme="win95"]) #profShowBio{
+  -webkit-appearance:none; appearance:none; flex:0 0 auto; width:46px !important; height:28px !important; border-radius:999px; position:relative; cursor:pointer; margin:0;
+  background:color-mix(in srgb,var(--m-ink) 22%,var(--m-canvas)); transition:background-color 180ms var(--v3-out,ease-out);
+}
+:root:not([data-theme="win95"]) #profShowBio::before{
+  content:""; position:absolute; top:2px; left:2px; width:24px; height:24px; border-radius:50%; background:#fff;
+  box-shadow:0 2px 4px rgba(0,0,0,.25); transition:translate 180ms var(--v3-out,ease-out);
+}
+:root:not([data-theme="win95"]) #profShowBio:checked{ background:var(--accent); }
+:root:not([data-theme="win95"]) #profShowBio:checked::before{ translate:18px 0; }
+
+/* ── 5d. Profile, boxless: flat sections, underlined fields, hairline rows, text buttons ───────────── */
+:root:not([data-theme="win95"]) #page-profile .card{ background:transparent !important; box-shadow:none !important; border:0 !important; border-radius:0 !important; padding:0 !important; margin:0 0 30px !important; backdrop-filter:none !important; }
+:root:not([data-theme="win95"]) #page-profile .card.v3-hero{ background-image:none !important; margin:4px 0 34px !important; padding:8px 0 0 !important; overflow:visible !important; }
+/* section label: an eyebrow, not a heading in a box */
+:root:not([data-theme="win95"]) #page-profile .card-hd{ margin:0 0 4px !important; padding:0 !important; }
+:root:not([data-theme="win95"]) #page-profile .card-title{ font-size:12px !important; font-weight:700 !important; letter-spacing:.09em !important; text-transform:uppercase; color:var(--m-ink-3) !important; }
+:root:not([data-theme="win95"]) #page-profile .card > div[style*="font-size:12px"][style*="margin:2px"]{ font-size:13.5px !important; margin:0 0 6px !important; }
+/* fields: a line, not a box */
+:root:not([data-theme="win95"]) #page-profile .card .f-input,:root:not([data-theme="win95"]) #page-profile .card input.f-input:not([type="checkbox"]),:root:not([data-theme="win95"]) #page-profile .card select.f-input,:root:not([data-theme="win95"]) #page-profile #profBio{
+  background:transparent !important; box-shadow:none !important; border:0 !important; border-bottom:1.5px solid var(--m-border-hi) !important; border-radius:0 !important;
+  padding:12px 0 !important; min-height:48px; font-size:17px;
+}
+:root:not([data-theme="win95"]) #page-profile .card .f-input:focus,:root:not([data-theme="win95"]) #page-profile #profBio:focus{ box-shadow:none !important; border-bottom-color:var(--accent) !important; background:transparent !important; }
+:root:not([data-theme="win95"]) #page-profile #profBio{ min-height:92px; line-height:1.5; padding:10px 0 !important; }
+:root:not([data-theme="win95"]) #page-profile .card .f-input::placeholder,:root:not([data-theme="win95"]) #page-profile #profBio::placeholder{ color:var(--m-ink-3); opacity:.7; }
+/* Save / Update / Cancel: text buttons that sit on the line */
+:root:not([data-theme="win95"]) #page-profile .card .btn,:root:not([data-theme="win95"]) #page-profile .card div:has(> .f-input) > .btn{
+  background:transparent !important; background-image:none !important; box-shadow:none !important; border:0 !important; border-radius:10px !important;
+  min-height:44px !important; min-width:0 !important; padding:0 6px !important; color:var(--accent-text) !important; font-size:16px; font-weight:700;
+}
+:root:not([data-theme="win95"]) #page-profile .card .btn.btn-outline{ color:var(--m-ink-3) !important; font-weight:600; }
+:root:not([data-theme="win95"]) #page-profile .card .btn:disabled{ color:var(--m-ink-3) !important; opacity:.6; }
+:root:not([data-theme="win95"]) #page-profile .v3-save:not(.is-ready){ background:transparent !important; box-shadow:none !important; color:var(--m-ink-3) !important; opacity:.55; }
+:root:not([data-theme="win95"]) #page-profile .v3-save.is-ready{ background:transparent !important; color:var(--accent-text) !important; opacity:1; }
+:root:not([data-theme="win95"]) #page-profile .card > div[style*="display:flex"][style*="gap:8px"]:has(#profPassBtn,#profSqBtn){ justify-content:flex-end; }
+/* one-line rows (password, security, pronouns, directory, birthday) become a divided list */
+:root:not([data-theme="win95"]) #page-profile .card:has(#profPassSection),:root:not([data-theme="win95"]) #page-profile .card:has(#profSqSection),:root:not([data-theme="win95"]) #page-profile .card:has(#profPronounsSection),:root:not([data-theme="win95"]) #page-profile .card[onclick*="openStaffDirectory"],:root:not([data-theme="win95"]) #page-profile .card:has(#profBirthday){
+  margin:0 !important; padding:16px 0 !important; border-top:1px solid var(--m-border) !important;
+}
+:root:not([data-theme="win95"]) #page-profile .card:has(#profBirthday) .card-hd{ margin-bottom:0 !important; }
+:root:not([data-theme="win95"]) #page-profile .card[onclick*="openStaffDirectory"]{ border-top:1px solid var(--m-border) !important; }
+:root:not([data-theme="win95"]) #page-profile .card[onclick*="openStaffDirectory"] > div > div > div:first-child{ background:transparent !important; width:28px !important; height:28px !important; }
+:root:not([data-theme="win95"]) #page-profile .card:has(#profPronounsSection){ border-bottom:1px solid var(--m-border) !important; margin-bottom:34px !important; }
+:root:not([data-theme="win95"]) #page-profile .card-hd{ align-items:center; }
+:root:not([data-theme="win95"]) #page-profile .card-hd .card-title{ font-size:16px !important; font-weight:650 !important; letter-spacing:-.01em !important; text-transform:none; color:var(--m-ink) !important; }
+:root:not([data-theme="win95"]) #page-profile .card:has(#profPassSection) .card-hd .card-title,:root:not([data-theme="win95"]) #page-profile .card:has(#profSqSection) .card-hd .card-title,:root:not([data-theme="win95"]) #page-profile .card:has(#profPronounsSection) .card-hd .card-title,:root:not([data-theme="win95"]) #page-profile .card:has(#profBirthday) .card-hd .card-title{ font-size:16px !important; }
+:root:not([data-theme="win95"]) #page-profile .card-action{ background:transparent !important; padding:6px 0 6px 12px !important; min-height:0 !important; font-size:15px; font-weight:650; color:var(--accent-text) !important; }
+:root:not([data-theme="win95"]) #page-profile #profSqStatus,:root:not([data-theme="win95"]) #page-profile #profPronounsCurrent{ margin-top:2px !important; color:var(--m-ink-3) !important; }
+/* Appearance: no containers at all */
+:root:not([data-theme="win95"]) #page-profile #appearanceGrid .appr-swatch{ box-shadow:0 0 0 1px color-mix(in srgb,var(--m-ink) 10%,transparent) !important; }
+:root:not([data-theme="win95"]) #page-profile #fontChips{ background:transparent !important; padding:0 !important; display:flex !important; justify-content:space-between; gap:0 !important; border-bottom:1px solid var(--m-border); border-radius:0 !important; }
+:root:not([data-theme="win95"]) #page-profile #fontChips .font-chip{ background:transparent !important; box-shadow:none !important; border-radius:0 !important; min-height:44px; padding:8px 4px !important; color:var(--m-ink-3); border-bottom:2.5px solid transparent !important; margin-bottom:-1px; }
+:root:not([data-theme="win95"]) #page-profile #fontChips .font-chip.active{ background:transparent !important; box-shadow:none !important; color:var(--m-ink); border-bottom-color:var(--accent) !important; }
+:root:not([data-theme="win95"]) #page-profile #page-profile .tc-swatch{ box-shadow:none; }
+:root:not([data-theme="win95"]) #page-profile label[style*="justify-content:space-between"]{ background:transparent !important; border-radius:0 !important; padding:14px 0 !important; margin:0 !important; border-top:1px solid var(--m-border) !important; }
+:root:not([data-theme="win95"]) #page-profile #notifPermStatus:not(:empty){ background:transparent !important; padding:0 !important; }
+:root:not([data-theme="win95"]) #page-profile #pushToggleBtn{ background:transparent !important; color:var(--accent-text) !important; border-radius:10px !important; min-width:0 !important; font-size:16px !important; padding:0 6px !important; }
+:root:not([data-theme="win95"]) #page-profile button[onclick*="resetAppearance"]{ background:transparent !important; border:0 !important; box-shadow:none !important; color:var(--accent-text) !important; font-weight:650; margin-top:6px; }
+:root:not([data-theme="win95"]) #page-profile button[onclick*="doLogout"]{ background:transparent !important; border:0 !important; box-shadow:none !important; color:#dc2626 !important; font-weight:700; margin-top:0; }
+:root:not([data-theme="win95"]) #page-profile #profileInfoSlot .tab-bar:has(> :only-child){ display:none !important; }
+/* Empty states */
+:root:not([data-theme="win95"]) .main :is(.bc-empty,.empty-state){ color:var(--m-ink-3); }
+/* Nothing on a phone may be wider than the screen */
+:root:not([data-theme="win95"]) .page{ max-width:100%; overflow-x:clip; }
+:root:not([data-theme="win95"]) #page-teamreport :is(.tr-week-ctl){ flex-wrap:wrap; }
+:root:not([data-theme="win95"]) #page-teamreport .tr-gen-actions{ flex-wrap:wrap; }
+:root:not([data-theme="win95"]) #page-teamreport .tr-gen-actions .btn{ min-width:0; }
 
 } /* end phones */
 
 /* ── 8. Reduced motion: keep the fades, drop the travel ─────────────────── */
 @media (prefers-reduced-motion:reduce){
   .v3-in .v3-blk{ animation-duration:160ms; animation-delay:0s; }
-  @keyframes v3Rise{ from{ opacity:0; } to{ opacity:1; } }
+  @keyframes v3Rise{ from{ opacity:.5; } to{ opacity:1; } }
   .v3-press{ transform:none !important; }
   .mh-logo{ transition:opacity 120ms linear !important; }
 }
