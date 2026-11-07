@@ -16,10 +16,25 @@ async function checkGpsPermission(){
 }
 
 async function retryGpsCheck(){
+  const ban = document.getElementById('gpsBanner');
+  const msg = ban && ban.querySelector('span');
+  const b = ban && ban.querySelector('button');
+  if(b){ b.disabled = true; b.textContent = 'Checking…'; }
+  if(msg) msg.textContent = 'Checking your location…';
   navigator.geolocation.getCurrentPosition(
-    function(){ applyGpsLock(); },
-    function(){ applyGpsLock(); },
-    { timeout:5000, maximumAge:0 }
+    function(){
+      if(typeof showToast==='function') showToast('Location is on ✓','success');
+      applyGpsLock();
+    },
+    function(err){
+      if(msg){
+        msg.textContent = (err && err.code===1)
+          ? 'Still blocked. Tap the lock icon next to the address bar, set Location to Allow, then check again.'
+          : 'Couldn\u2019t get a fix yet. Turn Location on, move near a window, then check again.';
+      }
+      if(b){ b.disabled = false; b.textContent = 'Check again'; }
+    },
+    { timeout:10000, maximumAge:0 }
   );
 }
 
@@ -72,6 +87,9 @@ async function flushClockSyncQueue(){
       for(const item of sbQ){
         if(Date.now() - item.queuedAt > 3*24*3600*1000) continue;
         try{
+          let _dupe=false;
+          try{ const ex=await sbGet('clock_log','?staff_name=eq.'+encodeURIComponent(item.payload.staff_name)+'&action=eq.'+item.payload.action+'&ts=eq.'+encodeURIComponent(item.payload.ts)+'&limit=1'); _dupe=!!(ex&&ex.length); }catch(_){}
+          if(_dupe){ _anyFlushed=true; continue; }
           const res = await sbPost('clock_log', item.payload);
           if(res && res.ok === false){ throw new Error('HTTP '+res.status); }
           _anyFlushed = true;
@@ -580,6 +598,112 @@ function _fmtClockRounded15(dateObj){
     return dateObj.toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit',timeZone:'Australia/Sydney'});
   }
 }
+/* ── Clock sync strip: always-visible state of the last punch (saving / slow / saved on phone / done) ── */
+var ccSync = (function(){
+  var el=null, mode='', hideT=0, slowT=0;
+  function css(){
+    if(document.getElementById('ccSyncCss')) return;
+    var st=document.createElement('style'); st.id='ccSyncCss';
+    st.textContent=
+      '.cc-sync{display:flex;align-items:center;gap:10px;margin:10px 0 2px;padding:10px 12px;border-radius:14px;font-size:13px;line-height:1.35;'+
+        'background:var(--m-card-2,#f1f5f9);color:var(--m-ink,var(--text,#0f172a));animation:ccSyncIn .18s ease-out both}'+
+      '.cc-sync[hidden]{display:none}'+
+      '.cc-sync .cs-ic{flex:0 0 auto;width:20px;height:20px;display:grid;place-items:center}'+
+      '.cc-sync .cs-tx{flex:1 1 auto;min-width:0}'+
+      '.cc-sync .cs-tx b{display:block;font-weight:700}'+
+      '.cc-sync .cs-tx span{display:block;opacity:.75;font-size:12px}'+
+      '.cc-sync button{flex:0 0 auto;font:inherit;font-weight:700;font-size:13px;padding:8px 14px;border-radius:11px;border:0;cursor:pointer;background:#f59e0b;color:#1f1300;min-height:36px}'+
+      '.cc-sync.is-slow{background:color-mix(in srgb,#f59e0b 16%,var(--m-card-2,#f1f5f9))}'+
+      '.cc-sync.is-queued{background:color-mix(in srgb,#f59e0b 20%,var(--m-card-2,#f1f5f9));box-shadow:inset 0 0 0 1px color-mix(in srgb,#f59e0b 55%,transparent)}'+
+      '.cc-sync.is-done{background:color-mix(in srgb,#10b981 16%,var(--m-card-2,#f1f5f9))}'+
+      '.cc-sync .cs-spin{width:16px;height:16px;border-radius:50%;border:2.5px solid color-mix(in srgb,currentColor 25%,transparent);border-top-color:currentColor;animation:ccSyncSpin .8s linear infinite}'+
+      '.cc-sync.is-geo{background:color-mix(in srgb,#f59e0b 20%,var(--m-card-2,#f1f5f9));box-shadow:inset 0 0 0 1px color-mix(in srgb,#f59e0b 55%,transparent);align-items:flex-start;flex-wrap:wrap}'+
+      '.cc-sync.is-geo .cs-tx{flex:1 1 180px}'+
+      '.cc-sync.is-geo button{margin-left:30px}'+
+      '.cc-sync.is-pulse{animation:ccSyncPulse .5s ease-out}'+
+      '@keyframes ccSyncPulse{0%{box-shadow:0 0 0 0 color-mix(in srgb,#f59e0b 55%,transparent)}100%{box-shadow:0 0 0 10px transparent}}'+
+      '@keyframes ccSyncSpin{to{transform:rotate(360deg)}}'+
+      '@keyframes ccSyncIn{from{opacity:0}to{opacity:1}}'+
+      '@media (prefers-reduced-motion:reduce){.cc-sync .cs-spin{animation-duration:2s}.cc-sync{animation:none}}';
+    document.head.appendChild(st);
+  }
+  function node(){
+    if(el && document.body.contains(el)) return el;
+    var sub=document.getElementById('clockSubStatus'); if(!sub||!sub.parentNode) return null;
+    css();
+    el=document.createElement('div'); el.id='ccSyncStrip'; el.className='cc-sync'; el.hidden=true;
+    el.setAttribute('role','status'); el.setAttribute('aria-live','polite');
+    sub.parentNode.insertBefore(el,sub.nextSibling);
+    el.addEventListener('click',function(e){
+      if(e.target.closest('[data-cs-geo]')){ try{ toggleClock({resume:true}); }catch(_){} return; }
+      if(!e.target.closest('[data-cs-retry]')) return;
+      set('saving',_clockPending&&_clockPending.action);
+      var p; try{ p=retryClockQueueSafely('banner'); }catch(_){}
+      Promise.resolve(p).then(function(){ setTimeout(function(){ try{ renderClockCard(); }catch(_){} if(_clockPending) set('queued'); },400); });
+    });
+    return el;
+  }
+  var SPIN='<span class="cs-spin" aria-hidden="true"></span>';
+  var TICK='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+  var WARN='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18v.01"/></svg>';
+  var geoInfo=null, noteText='', noteSpin=false;
+  function label(a){ return a==='out'?'clock-out':'clock-in'; }
+  function whenTxt(ts){ try{ return flexClockTime(ts).toLocaleTimeString('en-AU',{hour:'numeric',minute:'2-digit',timeZone:'Australia/Sydney'}); }catch(e){ return ''; } }
+  function set(m,action){
+    var n=node(); if(!n) return;
+    clearTimeout(hideT); clearTimeout(slowT);
+    mode=m; if(m==='') { n.hidden=true; return; }
+    var a=action|| (_clockPending&&_clockPending.action) || 'out';
+    if(m!=='geo') geoInfo=m==='geo'?geoInfo:null;
+    n.hidden=false; n.className='cc-sync';
+    if(m==='saving'){
+      n.innerHTML='<span class="cs-ic">'+SPIN+'</span><div class="cs-tx"><b>Saving your '+label(a)+'…</b></div>';
+      slowT=setTimeout(function(){ if(mode==='saving'){ n.className='cc-sync is-slow';
+        n.innerHTML='<span class="cs-ic">'+SPIN+'</span><div class="cs-tx"><b>Taking longer than usual</b><span>Still trying. Your time is safe, keep this open.</span></div>'; } },4000);
+    } else if(m==='locating'){
+      n.innerHTML='<span class="cs-ic">'+SPIN+'</span><div class="cs-tx"><b>Finding your location…</b><span>Needed to '+label(a).replace('-',' ')+'. This can take a few seconds.</span></div>';
+      slowT=setTimeout(function(){ if(mode==='locating'){ n.className='cc-sync is-slow';
+        n.innerHTML='<span class="cs-ic">'+SPIN+'</span><div class="cs-tx"><b>Still looking for a signal</b><span>Standing near a window or outside helps. Waiting up to 30 seconds.</span></div>'; } },6000);
+    } else if(m==='geo'){
+      var g=geoInfo||{}; n.className='cc-sync is-geo';
+      n.innerHTML='<span class="cs-ic">'+WARN+'</span><div class="cs-tx"><b>'+g.title+'</b><span>'+g.body+'</span></div><button type="button" data-cs-geo>'+(g.btn||'Try again')+'</button>';
+    } else if(m==='note'){
+      n.className='cc-sync';
+      n.innerHTML='<span class="cs-ic">'+(noteSpin?SPIN:WARN)+'</span><div class="cs-tx"><b>'+noteText+'</b></div>';
+      hideT=setTimeout(function(){ if(mode==='note') set(''); },3200);
+    } else if(m==='queued'){
+      var w=_clockPending?whenTxt(_clockPending.ts):'';
+      n.className='cc-sync is-queued';
+      n.innerHTML='<span class="cs-ic">'+WARN+'</span><div class="cs-tx"><b>'+(a==='out'?'Clock-out':'Clock-in')+' not saved yet</b><span>Kept on your phone'+(w?' as '+w:'')+'. It will finish by itself when you’re online.</span></div><button type="button" data-cs-retry>Retry</button>';
+    } else if(m==='done'){
+      n.className='cc-sync is-done';
+      n.innerHTML='<span class="cs-ic">'+TICK+'</span><div class="cs-tx"><b>'+(a==='out'?'Clock-out':'Clock-in')+' saved</b></div>';
+      hideT=setTimeout(function(){ if(mode==='done') set(''); },2600);
+    }
+  }
+  /* classify a location failure into something a person can act on */
+  function geo(a,err,extra){
+    var code=err&&err.code, msg=String((err&&err.message)||''), act=(a==='out'?'clock out':'clock in');
+    if(extra&&extra.far){
+      geoInfo={title:'You\u2019re '+extra.far+' from the office',body:'You need to be within '+extra.radius+'m to '+act+'. Walk closer and check again.'+(a==='out'?' If you have already left, you will be clocked out automatically at 8:00pm.':''),btn:'Check again'};
+    } else if(code===1){
+      geoInfo={title:'Location is blocked',body:'Nexus can\u2019t see where you are. Tap the lock icon next to the address bar, set Location to Allow, then check again.',btn:'Check again'};
+    } else {
+      geoInfo={title:'Couldn\u2019t get your location',body:'Make sure Location is turned on and move near a window or outside, then try again.'+(a==='out'?' If it keeps failing you will be clocked out automatically at 8:00pm.':''),btn:'Try again'};
+    }
+    set('geo',a);
+  }
+  /* a tap that would otherwise do nothing: say why. If a state strip is already up, just draw the eye to it. */
+  function note(text,spin){
+    var n=node(); if(!n) return;
+    if(mode==='saving'||mode==='queued'||mode==='geo'||mode==='locating'){
+      n.classList.remove('is-pulse'); void n.offsetWidth; n.classList.add('is-pulse'); return;
+    }
+    noteText=text; noteSpin=!!spin; set('note');
+  }
+  return { set:set, geo:geo, note:note, mode:function(){ return mode; } };
+})();
+
 function renderClockCard(){
   try{ applyClockCardTheme(); }catch(e){}
   try{
@@ -595,6 +719,7 @@ function renderClockCard(){
   if(_clockPending){
     const _pAct = _clockPending.action === 'out' ? 'Clock-out' : 'Clock-in';
     status.textContent = _pAct + ' not synced yet';
+    try{ if(ccSync.mode()!=='saving') ccSync.set('queued'); }catch(_){}
     status.style.color = '#f59e0b';
     btn.textContent = (_clockPending.action === 'in') ? 'Clock Out' : 'Clock In';
     btn.style.background = (_clockPending.action === 'in') ? '#dc2626' : 'var(--accent)';
@@ -613,6 +738,7 @@ function renderClockCard(){
     return;
   }
 
+  try{ if(ccSync.mode()==='queued') ccSync.set('done'); }catch(_){}
   if(_clockState === 'in'){
     status.textContent = 'Clocked in';
     status.style.color = '#10b981';
@@ -920,22 +1046,29 @@ function _ccNudge(btn){
   setTimeout(function(){ btn.classList.remove('cc-btn--nudge'); }, 340);
 }
 
-async function toggleClock(){
+async function toggleClock(opts){
   const btn = document.getElementById('clockBtn');
   if(!btn) return;
+  const _ctx = window._ccGeoCtx || null;
+  const _nextAction = (_clockState === 'in') ? 'out' : 'in';
+  const resume = !!(opts && opts.resume === true && _ctx && _ctx.action === _nextAction && (Date.now() - _ctx.at) < 10*60*1000);
+  window._ccGeoCtx = null;
   if(window._clockSyncing){
     _ccNudge(btn);
-    showToast('One sec — checking your clock status…');
+    try{ ccSync.note('Checking your clock status, one moment…', true); }catch(_){}
     return;
   }
   const _now = Date.now();
-  const _nextAction = (_clockState === 'in') ? 'out' : 'in';
-  if(window._lastClockAnyToggle && (_now - window._lastClockAnyToggle) < 8000){
+  if(!resume && window._lastClockAnyToggle && (_now - window._lastClockAnyToggle) < 8000){
     console.warn('[clock] hard lockout — punch ignored (', _now - window._lastClockAnyToggle, 'ms since last)');
     _ccNudge(btn);
+    try{
+      var _la = window._lastClockAction === 'out' ? 'clock-out' : 'clock-in';
+      ccSync.note('Your '+_la+' is already being sent, no need to tap again.', true);
+    }catch(_){}
     return;
   }
-  if(window._lastClockToggle && window._lastClockAction === _nextAction
+  if(!resume && window._lastClockToggle && window._lastClockAction === _nextAction
      && (_now - window._lastClockToggle) < 4000){
     console.warn('[clock] ignored rapid duplicate', _nextAction, '(', _now - window._lastClockToggle, 'ms)');
     return;
@@ -945,12 +1078,13 @@ async function toggleClock(){
   window._lastClockAction = _nextAction;
   if(_clockPending){
     _ccNudge(btn);
+    try{ ccSync.set('queued'); }catch(_){}
     showToast('Still syncing your last punch — retrying now…','info');
     try{ if(typeof retryClockQueueSafely === 'function') retryClockQueueSafely('manual-retap'); }catch(_){}
     return;
   }
   const next = (_clockState === 'in') ? 'out' : 'in';
-  if(next === 'in'){
+  if(next === 'in' && !resume){
     try{
       const last = await sbGet('clock_log','?staff_name=eq.'+encodeURIComponent(me)+'&order=ts.desc&limit=1');
       if(last && last.length && last[0].action === 'in'){
@@ -963,11 +1097,12 @@ async function toggleClock(){
   }
   let _earlyNotice = null;
   let _breakNote = null;
-  if(next === 'in' && typeof nxEarlyClockCheck === 'function'){
+  if(resume){ _earlyNotice = _ctx.early || null; _breakNote = _ctx.breakNote || null; }
+  if(next === 'in' && !resume && typeof nxEarlyClockCheck === 'function'){
     try{ _earlyNotice = await nxEarlyClockCheck(); }catch(e){ _earlyNotice = null; }
-    if(_earlyNotice === false){ window._lastClockToggle = 0; window._lastClockAnyToggle = 0; return; }
+    if(_earlyNotice === false){ window._lastClockToggle = 0; window._lastClockAnyToggle = 0; window._lastClockAnyToggle = 0; return; }
   }
-  if(next === 'out'){
+  if(next === 'out' && !resume){
     try{
       const last = await sbGet('clock_log','?staff_name=eq.'+encodeURIComponent(me)+'&order=ts.desc&limit=1');
       if(last && last.length && last[0].action === 'out'){
@@ -975,14 +1110,14 @@ async function toggleClock(){
         try{ localStorage.setItem('clock_state_'+me, JSON.stringify({state:'out', ts:last[0].ts})); }catch(e){}
         renderClockCard();
         showToast("You're already clocked out");
-        window._lastClockToggle = 0;
+        window._lastClockToggle = 0; window._lastClockAnyToggle = 0;
         return;
       }
       if(last && (!last.length)){
         _clockState = 'out';
         renderClockCard();
         showToast("You're not clocked in");
-        window._lastClockToggle = 0;
+        window._lastClockToggle = 0; window._lastClockAnyToggle = 0;
         return;
       }
     }catch(e){ /* network blip — fall through, don't hard-block a genuine clock-out */ }
@@ -998,7 +1133,7 @@ async function toggleClock(){
       ok = await clockOutConfirm();
     }
     if(!ok){
-      window._lastClockToggle = 0;
+      window._lastClockToggle = 0; window._lastClockAnyToggle = 0;
       return;
     }
   }
@@ -1006,6 +1141,14 @@ async function toggleClock(){
   btn.classList.add('cc-btn--working');
   const prevText = btn.textContent;
   btn.textContent = _bgPosition ? 'Verifying...' : 'Locating GPS...';
+  try{ ccSync.set('locating', next); }catch(_){}
+  const _geoCtx = { action: next, breakNote: _breakNote, early: _earlyNotice, at: Date.now() };
+  const _geoFail = function(err, extra){
+    btn.disabled = false; btn.classList.remove('cc-btn--working'); btn.textContent = prevText;
+    window._lastClockToggle = 0; window._lastClockAnyToggle = 0;
+    window._ccGeoCtx = _geoCtx;
+    try{ ccSync.geo(next, err, extra); }catch(_){ showToast('Location needed: turn on Location and try again','warning'); }
+  };
 
   let lat = null, lng = null;
   if(next === 'out'){
@@ -1020,20 +1163,12 @@ async function toggleClock(){
         const effectiveDist = Math.max(0, near.dist - (pos.coords.accuracy || 0));
         if(effectiveDist > CLOCKOUT_RADIUS_M){
           const distFmt = near.dist > 1000 ? (near.dist/1000).toFixed(1)+'km' : Math.round(near.dist)+'m';
-          showToast('You must be within '+CLOCKOUT_RADIUS_M+'m of the office to clock out (you are '+distFmt+' away, \u00b1'+Math.round(pos.coords.accuracy||0)+'m accuracy). If you forgot, you will be clocked out at 8:00pm automatically.', 'warning');
-          btn.disabled = false;
-          btn.classList.remove('cc-btn--working');
-          btn.textContent = prevText;
-          window._lastClockToggle = 0;
+          _geoFail(null, {far:distFmt, radius:CLOCKOUT_RADIUS_M});
           return;
         }
       }catch(e){
         console.warn('GPS error (clock-out):', e);
-        showToast('Location required to clock out: enable GPS and try again. If you forgot, you will be clocked out at 8:00pm automatically.');
-        btn.disabled = false;
-        btn.classList.remove('cc-btn--working');
-        btn.textContent = prevText;
-        window._lastClockToggle = 0;
+        _geoFail(e);
         return;
       }
     }
@@ -1055,18 +1190,12 @@ async function toggleClock(){
       if(effectiveDist > near.office.radiusM){
         const distFmt = dist > 1000 ? (dist/1000).toFixed(1)+'km' : Math.round(dist)+'m';
         const accFmt = Math.round(acc)+'m';
-        showToast('Too far ('+distFmt+', ±'+accFmt+' accuracy). Move closer or wait for better GPS.', 'warning');
-        btn.disabled = false;
-        btn.classList.remove('cc-btn--working');
-        btn.textContent = prevText;
+        _geoFail(null, {far:distFmt, radius:near.office.radiusM});
         return;
       }
     }catch(e){
       console.warn('GPS error:', e);
-      showToast('Location required: enable GPS in browser settings');
-      btn.disabled = false;
-      btn.classList.remove('cc-btn--working');
-      btn.textContent = prevText;
+      _geoFail(e);
       return;
     }
   }
@@ -1102,13 +1231,19 @@ async function toggleClock(){
     if(_earlyNotice && next === 'in' && typeof nxEarlyFileNotice === 'function'){
       try{ nxEarlyFileNotice(Object.assign({}, _earlyNotice, { clock_ts: realTs })); }catch(_){}
     }
-    sbPost('clock_log', _punchRow)
+    try{ ccSync.set('saving', next); }catch(_){}
+    var _writeP = Promise.race([
+      sbPost('clock_log', _punchRow),
+      new Promise(function(_,rej){ setTimeout(function(){ rej(new Error('timed out after 10s')); }, 10000); })
+    ]);
+    _writeP
       .then(function(res){
         if(res && res.ok === false){ throw new Error('HTTP '+res.status); }
         _clockPending = null;
         showToast(next==='in' ? 'Clocked in ✓' : 'Clocked out ✓','success');
         try{ localStorage.removeItem('clock_pending_'+me); }catch(_){}
         renderClockCard();
+        try{ ccSync.set('done', next); }catch(_){}
         if(typeof loadAllClockLogs === 'function') loadAllClockLogs();
       })
       .catch(function(err){
@@ -1120,6 +1255,7 @@ async function toggleClock(){
           ? 'Clock-in saved on your phone — will finish when you\u2019re back online'
           : 'Clock-out saved on your phone — will finish when you\u2019re back online','warning');
         renderClockCard();
+        try{ ccSync.set('queued', next); }catch(_){}
         try{
           const q = JSON.parse(localStorage.getItem('clock_supabase_queue') || '[]');
           q.push({payload: Object.assign({}, _punchRow), queuedAt: Date.now()});
@@ -1177,6 +1313,8 @@ async function toggleClock(){
     
   }catch(e){
     showToast('Failed to record');
+    window._lastClockToggle = 0; window._lastClockAnyToggle = 0;
+    try{ ccSync.set(''); }catch(_){}
     btn.textContent = prevText;
     btn.disabled = false;
     btn.classList.remove('cc-btn--working');
