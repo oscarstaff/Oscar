@@ -1571,7 +1571,7 @@ function goTo(p){
   
   if(p==="profile"){setTimeout(refreshPushToggleState, 100);
     setTimeout(renderNotifPanel, 50);
-    setTimeout(populateSheetUrlField, 50);
+    setTimeout(function(){ if(typeof populateSheetUrlField === 'function') populateSheetUrlField(); }, 50);
     setTimeout(maybeShowGeofenceAdjuster, 50);
     setTimeout(function(){
       const sl = document.getElementById('brightnessSlider');

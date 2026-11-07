@@ -1,0 +1,215 @@
+/* ════════════════════════════════════════════════════════════════════════
+   NEXUS · PHONE LAYER  (v3)
+   Loaded last. Phones only (max-width:700px). Desktop is untouched.
+   Colours come from the existing theme tokens (--m-*, --accent*), so every
+   theme keeps working. The retro "win95" theme keeps its own classic look.
+   Motion lives in nexus-mobile.js; this file only styles and defines keyframes.
+   REVERT: remove the <link> to this file and the <script> for nexus-mobile.js.
+   ════════════════════════════════════════════════════════════════════════ */
+
+:root{
+  /* One motion personality: calm, decisive, no bounce on everyday UI. */
+  --v3-out:cubic-bezier(.22,1,.36,1);      /* entrances and settles (decelerate) */
+  --v3-io:cubic-bezier(.4,0,.2,1);         /* things that move across the screen */
+  --v3-press:90ms;
+  --v3-dur:240ms;
+}
+
+@media (max-width:700px){
+
+/* ── 1. Header: transparent at the top, glass once you scroll ───────────── */
+:root:not([data-theme="win95"]) .mobile-header{
+  position:fixed; top:0; left:0; right:0; z-index:60;
+  height:calc(52px + env(safe-area-inset-top,0px));
+  padding:env(safe-area-inset-top,0px) 14px 0;
+  background:transparent !important;
+  border-bottom:1px solid transparent !important;
+  box-shadow:none !important;
+  -webkit-backdrop-filter:none; backdrop-filter:none;
+  transition:background-color var(--v3-dur) var(--v3-io),border-color var(--v3-dur) var(--v3-io);
+}
+:root:not([data-theme="win95"]) .mobile-header.v3-scrolled{
+  background:color-mix(in srgb,var(--m-canvas) 74%,transparent) !important;
+  border-bottom-color:color-mix(in srgb,var(--m-border) 85%,transparent) !important;
+  -webkit-backdrop-filter:blur(22px) saturate(1.7); backdrop-filter:blur(22px) saturate(1.7);
+}
+/* Avatar only: the name pill was a webpage habit. A thin accent ring makes it feel like "you". */
+:root:not([data-theme="win95"]) #mhUser{
+  background:transparent !important; border:0 !important; padding:0 !important;
+  min-height:0 !important; border-radius:50%;
+}
+:root:not([data-theme="win95"]) #mhUser .mh-name,
+:root:not([data-theme="win95"]) #mhUser #mhNameInline{ display:none !important; }
+:root:not([data-theme="win95"]) .mh-ava{
+  width:36px; height:36px;
+  box-shadow:0 0 0 2px var(--m-canvas),0 0 0 3.5px color-mix(in srgb,var(--accent) 55%,transparent);
+}
+/* The title appears in the header only after the big one has scrolled away. */
+:root:not([data-theme="win95"]) .mh-logo{
+  font-size:15.5px !important; font-weight:650 !important; letter-spacing:-.015em !important;
+  opacity:0; transform:translate(-50%,4px) !important;
+  transition:opacity var(--v3-dur) var(--v3-out),transform var(--v3-dur) var(--v3-out);
+  pointer-events:none; white-space:nowrap; max-width:52vw; overflow:hidden; text-overflow:ellipsis;
+}
+:root:not([data-theme="win95"]) .mobile-header.v3-title .mh-logo{ opacity:1; transform:translate(-50%,0) !important; }
+
+/* ── 2. Pages: a real large title ───────────────────────────────────────── */
+:root:not([data-theme="win95"]) .main{ padding-top:calc(52px + env(safe-area-inset-top,0px)); }
+:root:not([data-theme="win95"]) .page{ padding:6px 16px 28px; }
+:root:not([data-theme="win95"]) .page-hd{ margin:0 0 18px; padding-top:2px; }
+:root:not([data-theme="win95"]):not([data-font]) .page-hd .page-title{
+  font-size:clamp(28px,8.4vw,34px) !important; font-weight:750 !important;
+  letter-spacing:-.036em !important; line-height:1.06 !important;
+  color:var(--m-ink) !important;
+}
+:root:not([data-theme="win95"]) .page-hd .page-sub{ margin-top:6px; }
+
+/* ── 3. Surfaces: softer, rounder, held by a hairline instead of a border ─ */
+:root:not([data-theme="win95"]):not([data-theme="renaissance"]) .main .card{
+  border-radius:22px;
+  border-color:transparent !important;
+  box-shadow:
+    0 0 0 1px color-mix(in srgb,var(--m-border) 80%,transparent),
+    0 1px 2px color-mix(in srgb,var(--m-ink) 4%,transparent),
+    0 10px 26px -16px color-mix(in srgb,var(--m-ink) 18%,transparent);
+}
+:root:not([data-theme="win95"]) .main .card-hd{ border-bottom:0; padding-bottom:0; margin-bottom:4px; }
+:root:not([data-theme="win95"]) .main .card-title{ font-size:16.5px; font-weight:700; letter-spacing:-.02em; }
+:root:not([data-theme="win95"]) .main .card-action{ font-weight:650; }
+
+/* Press feedback lives on the thing you touch, on pointer-down. */
+:root:not([data-theme="win95"]) :is(.btn,.cc-btn,.cc-btn2,.cc-btn3,.nx-row,.card-action,.hours-tab,.mh-user,.nx-mh-menu){
+  transition:transform 240ms var(--v3-out),background-color 160ms ease,border-color 160ms ease,
+             box-shadow 160ms ease,color 160ms ease,opacity 160ms ease;
+}
+.v3-press{ transform:scale(.97) !important; transition-duration:var(--v3-press) !important; transition-timing-function:ease-out !important; }
+:root:not([data-theme="win95"]) .nx-row{ border-radius:0; }
+:root:not([data-theme="win95"]) .nx-row.v3-press{ background:color-mix(in srgb,var(--m-ink) 5%,transparent); transform:none !important; }
+
+/* ── 4. Home: the clock is the hero ─────────────────────────────────────── */
+:root:not([data-theme="win95"]) #page-home #clockCard{
+  border-radius:28px; padding:20px 18px 12px !important;
+  background-image:linear-gradient(165deg,color-mix(in srgb,var(--accent) 14%,var(--m-card)) 0,var(--m-card) 58%) !important;
+}
+:root:not([data-theme="win95"]) #page-home #clockCard[data-nx-state="in"]{
+  background-image:linear-gradient(165deg,var(--nx-ok-dim,color-mix(in srgb,var(--accent) 14%,transparent)) 0,var(--m-card) 62%) !important;
+}
+:root:not([data-theme="win95"]) #clockCard .cc-status{ font-size:clamp(26px,7.8vw,31px); letter-spacing:-.034em; margin-top:10px; }
+:root:not([data-theme="win95"]) #clockCard .cc-now{ font-size:16px; color:var(--m-ink-3); }
+:root:not([data-theme="win95"]) #clockCard .cc-actions{ gap:10px; }
+:root:not([data-theme="win95"]) #clockCard .cc-actions .cc-btn{
+  min-height:58px; border-radius:20px; font-size:16.5px; font-weight:700;
+  box-shadow:0 12px 24px -12px color-mix(in srgb,var(--accent) 70%,transparent) !important;
+}
+:root:not([data-theme="win95"]) #clockCard .cc-actions .cc-btn[data-nx-act="out"]{
+  box-shadow:0 12px 24px -12px color-mix(in srgb,var(--nx-danger-solid,#c9372c) 70%,transparent) !important;
+}
+:root:not([data-theme="win95"]) #clockCard .cc-actions :is(.cc-btn2,.cc-btn3){
+  min-height:58px; border-radius:20px; border-color:transparent;
+  background:color-mix(in srgb,var(--m-ink) 6%,transparent) !important; color:var(--m-ink-2);
+}
+:root:not([data-theme="win95"]) #clockCard .nx-row{ min-height:54px; width:calc(100% + 16px); margin-left:-8px; margin-right:-8px; padding-left:8px; padding-right:8px; box-sizing:border-box; }
+
+/* ── 5. Profile: a person first, settings second ────────────────────────── */
+:root:not([data-theme="win95"]) #page-profile .tab-bar:has(> .prof-tab:only-child){ display:none; }
+:root:not([data-theme="win95"]) #page-profile .card.v3-hero{
+  padding:26px 18px 22px !important; text-align:center; overflow:hidden;
+  background-image:linear-gradient(180deg,color-mix(in srgb,var(--accent) 13%,var(--m-card)) 0,var(--m-card) 78%) !important;
+}
+:root:not([data-theme="win95"]) #page-profile .card.v3-hero > div{
+  flex-direction:column !important; gap:14px !important; align-items:center !important; justify-content:center;
+}
+:root:not([data-theme="win95"]) #page-profile .card.v3-hero #profAvaWrap{
+  width:96px !important; height:96px !important;
+  box-shadow:0 0 0 4px var(--m-card),0 0 0 6px color-mix(in srgb,var(--accent) 55%,transparent),0 18px 30px -14px var(--accent);
+}
+:root:not([data-theme="win95"]) #page-profile .card.v3-hero #profAva{ font-size:32px !important; }
+:root:not([data-theme="win95"]) #page-profile .card.v3-hero #profAvaWrap > div:last-child{
+  width:28px !important; height:28px !important; right:-2px !important; bottom:-2px !important;
+}
+:root:not([data-theme="win95"]) #page-profile .card.v3-hero #profName{ font-size:23px !important; letter-spacing:-.03em; }
+:root:not([data-theme="win95"]) #page-profile .card.v3-hero > div > div:last-child > div:first-child{ justify-content:center; }
+:root:not([data-theme="win95"]) #page-profile .card.v3-hero #profRole{ font-size:13px !important; font-weight:600; }
+
+/* No photo: the wrapper's inline gradient gets cleared, so give it one. An inline photo still wins. */
+:root:not([data-theme="win95"]) #profAvaWrap{
+  background-image:linear-gradient(135deg,var(--accent),color-mix(in srgb,var(--accent) 50%,#e8a85a));
+}
+
+/* Save only matters once something changed. It stays in place, so nothing jumps. */
+:root:not([data-theme="win95"]) #page-profile .v3-save{
+  transition:opacity 200ms var(--v3-out),transform 240ms var(--v3-out),background-color 160ms ease;
+}
+:root:not([data-theme="win95"]) #page-profile .v3-save:not(.is-ready){
+  opacity:.38; pointer-events:none; filter:saturate(.35);
+}
+:root:not([data-theme="win95"]) #page-profile .card .f-input{ border-radius:14px !important; }
+:root:not([data-theme="win95"]) #page-profile .card .f-input:focus{
+  box-shadow:0 0 0 4px color-mix(in srgb,var(--accent) 16%,transparent) !important;
+}
+
+/* ── 6. Bottom bar: a floating dock with a sliding lens ─────────────────── */
+:root:not([data-theme="win95"]) .bottom-nav{
+  left:12px; right:12px; bottom:calc(10px + env(safe-area-inset-bottom,0px));
+  width:auto; padding:0; border-radius:26px;
+  background:color-mix(in srgb,var(--m-card) 92%,transparent) !important;
+  -webkit-backdrop-filter:blur(28px) saturate(1.8); backdrop-filter:blur(28px) saturate(1.8);
+  border:1px solid color-mix(in srgb,var(--m-border-hi) 55%,transparent) !important;
+  box-shadow:
+    0 1px 0 color-mix(in srgb,#fff 45%,transparent) inset,
+    0 2px 6px color-mix(in srgb,var(--m-ink) 8%,transparent),
+    0 18px 40px -14px color-mix(in srgb,var(--m-ink) 38%,transparent) !important;
+}
+:root:not([data-theme="win95"]) .bn-items{ position:relative; padding:0 4px; }
+:root:not([data-theme="win95"]) .bn-item,
+:root:not([data-theme="win95"]) .bn-item.active{ height:62px; gap:3px; background:transparent !important; z-index:1; }
+:root:not([data-theme="win95"]) .bn-item:active{ opacity:.6; }
+:root:not([data-theme="win95"]) .bn-icon{ width:24px; height:24px; margin-top:0; }
+:root:not([data-theme="win95"]) .bn-label{ font-size:10.5px; font-weight:650; letter-spacing:.005em; }
+:root:not([data-theme="win95"]) .bn-badge{ top:7px; right:calc(50% - 24px); }
+/* Once the lens exists, it replaces the per-item pill. */
+.bottom-nav.v3-on .bn-item::before{ display:none !important; }
+.bn-lens{
+  position:absolute; left:0; top:6px; width:60px; height:50px; border-radius:18px;
+  background:color-mix(in srgb,var(--accent) 15%,transparent);
+  box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 12%,transparent);
+  pointer-events:none; will-change:translate,scale; z-index:0; opacity:0;
+}
+:root:not([data-theme="win95"]) .main{ padding-bottom:calc(104px + env(safe-area-inset-bottom,0px)) !important; }
+
+:root:not([data-theme="win95"]) #subtabChooserSheet{
+  /* The Library / My Time chooser was placed for the old full-width bar; float it above the dock. */
+  left:12px !important; right:12px !important; bottom:calc(84px + env(safe-area-inset-bottom,0px)) !important;
+  border:0 !important; border-radius:24px !important;
+  box-shadow:0 0 0 1px color-mix(in srgb,var(--m-border) 80%,transparent),0 24px 48px -16px color-mix(in srgb,var(--m-ink) 45%,transparent) !important;
+}
+
+/* ── 7. Page transitions (driven by nexus-mobile.js) ────────────────────── */
+.v3-in > .v3-blk, .v3-in .v3-blk{
+  animation:v3Rise 300ms var(--v3-out) both;
+  animation-delay:calc(var(--i,0) * 28ms);
+}
+/* Entrances are fades. Nexus has a standing rule against travel on page entrances (it read as the page
+   jumping), so --v3-travel defaults to 0. Set it to e.g. 10px on :root to bring the rise back. */
+@keyframes v3Rise{
+  from{ opacity:0; transform:translate3d(0,var(--v3-travel,0px),0); }
+  to{ opacity:1; transform:none; }
+}
+
+} /* end phones */
+
+/* ── 8. Reduced motion: keep the fades, drop the travel ─────────────────── */
+@media (prefers-reduced-motion:reduce){
+  .v3-in .v3-blk{ animation-duration:160ms; animation-delay:0s; }
+  @keyframes v3Rise{ from{ opacity:0; } to{ opacity:1; } }
+  .v3-press{ transform:none !important; }
+  .mh-logo{ transition:opacity 120ms linear !important; }
+}
+@media (prefers-reduced-transparency:reduce){
+  .mobile-header.v3-scrolled,.bottom-nav{ -webkit-backdrop-filter:none !important; backdrop-filter:none !important; }
+  .bottom-nav{ background:var(--m-card) !important; }
+}
+@media (prefers-contrast:more){
+  .bottom-nav{ border-color:var(--m-ink-3) !important; }
+  .main .card{ box-shadow:0 0 0 1.5px var(--m-border-hi) !important; }
+}
