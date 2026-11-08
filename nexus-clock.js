@@ -635,6 +635,8 @@ var ccSync = (function(){
     el.setAttribute('role','status'); el.setAttribute('aria-live','polite');
     sub.parentNode.insertBefore(el,sub.nextSibling);
     el.addEventListener('click',function(e){
+      if(e.target.closest('[data-cs-x]')){ set(''); return; }
+      if(e.target.closest('[data-cs-live]')){ setTimeout(function(){ if(mode==='live') set(''); },500); return; }
       if(e.target.closest('[data-cs-geo]')){ try{ toggleClock({resume:true}); }catch(_){} return; }
       if(!e.target.closest('[data-cs-retry]')) return;
       set('saving',_clockPending&&_clockPending.action);
@@ -646,11 +648,12 @@ var ccSync = (function(){
   var SPIN='<span class="cs-spin" aria-hidden="true"></span>';
   var TICK='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
   var WARN='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18v.01"/></svg>';
-  var geoInfo=null, noteText='', noteSpin=false;
+  var geoInfo=null, noteText='', noteSpin=false, liveUrl='';
   function label(a){ return a==='out'?'clock-out':'clock-in'; }
   function whenTxt(ts){ try{ return flexClockTime(ts).toLocaleTimeString('en-AU',{hour:'numeric',minute:'2-digit',timeZone:'Australia/Sydney'}); }catch(e){ return ''; } }
-  function set(m,action){
+  function set(m,action,extra){
     var n=node(); if(!n) return;
+    if(m==='live'){ var u=extra&&String(extra.url||''); if(!/^https:\/\/[a-z0-9.\-]+\//i.test(u)){ m=''; } else liveUrl=u.replace(/["<>\s]/g,''); }
     clearTimeout(hideT); clearTimeout(slowT);
     mode=m; if(m==='') { n.hidden=true; return; }
     var a=action|| (_clockPending&&_clockPending.action) || 'out';
@@ -667,6 +670,11 @@ var ccSync = (function(){
     } else if(m==='geo'){
       var g=geoInfo||{}; n.className='cc-sync is-geo';
       n.innerHTML='<span class="cs-ic">'+WARN+'</span><div class="cs-tx"><b>'+g.title+'</b><span>'+g.body+'</span></div><button type="button" data-cs-geo>'+(g.btn||'Try again')+'</button>';
+    } else if(m==='live'){
+      n.className='cc-sync is-done';
+      n.innerHTML='<span class="cs-ic">'+TICK+'</span><div class="cs-tx"><b>Show on Lock Screen</b><span>Tap Add once. The timer follows your shift until you clock out.</span></div>'+
+        '<a data-cs-live href="'+liveUrl+'" target="_blank" rel="noopener" style="flex:0 0 auto;font-weight:700;font-size:13px;padding:8px 14px;border-radius:11px;background:#10b981;color:#fff;text-decoration:none;min-height:36px;display:inline-flex;align-items:center">Add</a>'+
+        '<button type="button" data-cs-x aria-label="Not now" style="background:transparent;color:inherit;opacity:.6;padding:8px 4px;font-size:18px;line-height:1">\u00d7</button>';
     } else if(m==='note'){
       n.className='cc-sync';
       n.innerHTML='<span class="cs-ic">'+(noteSpin?SPIN:WARN)+'</span><div class="cs-tx"><b>'+noteText+'</b></div>';
@@ -1244,6 +1252,7 @@ async function toggleClock(opts){
         try{ localStorage.removeItem('clock_pending_'+me); }catch(_){}
         renderClockCard();
         try{ ccSync.set('done', next); }catch(_){}
+        try{ if(typeof nxLive!=='undefined') nxLive.onPunch(next); }catch(_){}
         if(typeof loadAllClockLogs === 'function') loadAllClockLogs();
       })
       .catch(function(err){
