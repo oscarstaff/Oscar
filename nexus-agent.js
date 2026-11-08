@@ -1,5 +1,5 @@
 /* ════════════════════════════════════════════════════════════════════════
-   NEXUS · NEXI, the helper for everyone (phones and computers)
+   NEXUS · NEXI, the helper for everyone (phones and computers); team leads and admins also get report tools
    · phones: a round button in the top bar opens a bottom sheet; computers: a round button bottom-right opens a panel. "Hi {name}, I'm Nexi"
    · Nexi ONLY answers a fixed menu of questions (no free chat, no AI service, no key, no cost). Two of them
      (hours between two dates, search documents) show a tiny form first.
@@ -84,6 +84,134 @@ var nxAgent = (function(){
       return !access || access.has(q.id);
     });
     return {quizzes:quizzes, results:res[1]||[]};
+  }
+
+  /* ── team leads and admins ─────────────────────────────────────────────── */
+  function isLead(){ try{ return (typeof trIsLead==='function') ? !!trIsLead() : amAdmin(); }catch(e){ return false; } }
+  /* who the person can report on: admins = everyone, leads = their own team */
+  async function scope(){
+    var admin=amAdmin(), team=await myTeamName();
+    var cr=await sbGet('staff_credentials','?select=staff_name,team');
+    var rows=(cr||[]).filter(function(r){ return r.staff_name && (admin || (team && r.team===team)); });
+    return {admin:admin, team:team, label: admin?'All staff':team+' team', staff:rows.map(function(r){ return r.staff_name; }), teamOf:rows.reduce(function(o,r){ o[r.staff_name]=r.team||''; return o; },{})};
+  }
+  function sydneyWeek(){
+    var has=(typeof _tzKey==='function' && typeof _tzIso==='function');
+    var base=has ? _tzKey(Date.now()) : isoOf(new Date());
+    var p=base.split('-'), dt=new Date(Date.UTC(+p[0],+p[1]-1,+p[2]));
+    dt.setUTCDate(dt.getUTCDate()-((dt.getUTCDay()+6)%7));
+    function key(d){ return d.getUTCFullYear()+'-'+pad(d.getUTCMonth()+1)+'-'+pad(d.getUTCDate()); }
+    var mon=key(dt); dt.setUTCDate(dt.getUTCDate()+6); var sun=key(dt); dt.setUTCDate(dt.getUTCDate()+1); var next=key(dt); dt.setUTCDate(dt.getUTCDate()+7); var after=key(dt);
+    var s=has ? Date.parse(_tzIso(mon,'00:00')) : dayOf(mon).getTime(), e=has ? Date.parse(_tzIso(next,'00:00')) : dayOf(next).getTime();
+    return {mon:mon,sun:sun,next:next,after:after,s:s,e:e};
+  }
+  /* pair each person's In/Out punches inside [s,e): same rules as My Hours (a span must be under 24h) */
+  function weekHours(logs, s, e, now){
+    var out={}, by={};
+    logs.forEach(function(r){ (by[r.staff_name]=by[r.staff_name]||[]).push(r); });
+    Object.keys(by).forEach(function(nm){
+      var L=by[nm].sort(function(a,b){ return new Date(a.ts)-new Date(b.ts); }), openIn=null, ms=0, sessions=0, days={}, auto=0;
+      L.forEach(function(r){
+        var t=new Date(r.ts).getTime();
+        if(r.action==='in'){ openIn=t; }
+        else if(r.action==='out' && openIn!=null){
+          if(r.notes && String(r.notes).indexOf('auto:')===0 && t>=s && t<e) auto++;
+          var a=Math.max(openIn,s), b=Math.min(t,e);
+          if(t-openIn<864e5 && b>a){ ms+=b-a; sessions++; days[(typeof _tzKey==='function')?_tzKey(a):isoOf(new Date(a))]=1; }
+          openIn=null;
+        }
+      });
+      var live=0, clockedIn=false;
+      if(openIn!=null && now-openIn<864e5){ clockedIn=true; if(now>=s && now<e){ live=now-Math.max(openIn,s); days[(typeof _tzKey==='function')?_tzKey(Math.max(openIn,s)):isoOf(new Date())]=1; } }
+      out[nm]={ms:ms+live, live:live, sessions:sessions+(live>0?1:0), days:Object.keys(days).length, clockedIn:clockedIn, since:openIn, auto:auto};
+    });
+    return out;
+  }
+  function csvCell(v){ v=String(v==null?'':v); return /[",\n]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v; }
+  function downloadText(name, text, type){
+    var blob=new Blob([text],{type:type||'text/csv;charset=utf-8'}), a=document.createElement('a');
+    a.href=URL.createObjectURL(blob); a.download=name; document.body.appendChild(a); a.click();
+    setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },1000);
+  }
+  function copyText(t){
+    if(navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(t);
+    var ta=document.createElement('textarea'); ta.value=t; document.body.appendChild(ta); ta.select(); try{ document.execCommand('copy'); }catch(e){} ta.remove(); return Promise.resolve();
+  }
+  var NOT_LEAD={text:'That one is for team leads and admins.'};
+
+  async function weeklyReport(){
+    if(!isLead()) return NOT_LEAD;
+    try{
+      var sc=await scope(); if(!sc.staff.length) return {text:'I couldn’t find anyone in your scope to report on.'};
+      var wk=sydneyWeek(), now=Date.now(), inScope=new Set(sc.staff);
+      var logs=await sbGet('clock_log','?ts=gte.'+new Date(wk.s-864e5).toISOString()+'&ts=lt.'+new Date(wk.e).toISOString()+'&order=ts.asc&limit=5000');
+      logs=(logs||[]).filter(function(r){ return inScope.has(r.staff_name); });
+      var H=weekHours(logs,wk.s,wk.e,now);
+      var rows=sc.staff.map(function(n){ var h=H[n]||{ms:0,live:0,sessions:0,days:0,clockedIn:false,auto:0}; return {name:n,team:sc.teamOf[n]||'',ms:h.ms,days:h.days,sessions:h.sessions,clockedIn:h.clockedIn,auto:h.auto}; });
+      var worked=rows.filter(function(r){ return r.ms>0; }).sort(function(a,b){ return b.ms-a.ms; });
+      var idle=rows.filter(function(r){ return r.ms<=0; }).map(function(r){ return r.name; });
+      var total=rows.reduce(function(t,r){ return t+r.ms; },0), autos=rows.reduce(function(t,r){ return t+r.auto; },0), inNow=rows.filter(function(r){ return r.clockedIn; }).length;
+      var res=await Promise.all([
+        sbGet('leave_submissions','?or=(submitted_at.gte.'+new Date(wk.s).toISOString()+',status.eq.pending)&select=staff_name,status,submitted_at&order=submitted_at.desc&limit=500'),
+        sbGet('leave_submissions','?status=eq.approved&from_date=lte.'+wk.sun+'&to_date=gte.'+wk.mon+'&select=staff_name'),
+        sbGet('roster_shifts','?status=eq.open&shift_date=gte.'+wk.mon+'&shift_date=lt.'+wk.after+'&select=shift_date,open_to_team'),
+        _publishedWeeks()
+      ]);
+      var lv=(res[0]||[]).filter(function(r){ return inScope.has(r.staff_name); });
+      var newLv=lv.filter(function(r){ return new Date(r.submitted_at).getTime()>=wk.s; }).length, pend=lv.filter(function(r){ return r.status==='pending'; }).length;
+      var onLv=new Set((res[1]||[]).filter(function(r){ return inScope.has(r.staff_name); }).map(function(r){ return r.staff_name; })).size;
+      var opn=_filterPublished((res[2]||[]).filter(function(r){ return sc.admin || !r.open_to_team || r.open_to_team===sc.team; }),res[3]);
+      var openThis=opn.filter(function(r){ return r.shift_date<wk.next; }).length, openNext=opn.length-openThis;
+      var title='Week of '+fmtShortDate(wk.mon)+' to '+fmtShortDate(wk.sun)+' · '+sc.label;
+      var lines=[];
+      lines.push(hrs(total)+' worked by '+worked.length+' of '+rows.length+' staff so far.');
+      if(worked.length) lines.push('Average '+hrs(total/worked.length)+' each for those who worked.');
+      if(worked.length) lines.push('Most hours: '+worked.slice(0,3).map(function(r){ return r.name+' '+hrs(r.ms); }).join(', ')+'.');
+      if(idle.length) lines.push('No hours yet: '+idle.slice(0,6).join(', ')+(idle.length>6?' and '+(idle.length-6)+' more':'')+'.');
+      lines.push('Clocked in right now: '+inNow+'.');
+      if(autos) lines.push('Auto clock-outs this week: '+autos+'.');
+      lines.push('Leave: '+plural(newLv,'new request')+', '+pend+' waiting for a decision, '+plural(onLv,'person').replace('persons','people')+' on approved leave this week.');
+      lines.push('Open shifts: '+openThis+' this week, '+openNext+' next week.');
+      var plain=title+'\n'+lines.join('\n');
+      var csv='Name,Team,Hours,Days worked,Shifts,Clocked in now\n'+rows.sort(function(a,b){ return b.ms-a.ms || a.name.localeCompare(b.name); }).map(function(r){ return [r.name,r.team,(r.ms/36e5).toFixed(2),r.days,r.sessions,r.clockedIn?'Yes':'No'].map(csvCell).join(','); }).join('\n')+'\n';
+      return {text:title, lines:lines, go:[
+        {label:'Download CSV', keep:true, done:'Downloaded', run:function(){ downloadText('nexus-week-'+wk.mon+'.csv',csv); }},
+        {label:'Copy summary', keep:true, done:'Copied', run:function(){ return copyText(plain); }}
+      ]};
+    }catch(e){ return sorry(); }
+  }
+  async function whoIn(){
+    if(!isLead()) return NOT_LEAD;
+    try{
+      var sc=await scope(), inScope=new Set(sc.staff), now=Date.now();
+      var logs=await sbGet('clock_log','?ts=gte.'+new Date(now-864e5).toISOString()+'&order=ts.asc&limit=2000');
+      var last={}; (logs||[]).forEach(function(r){ if(inScope.has(r.staff_name)) last[r.staff_name]=r; });
+      var ins=Object.keys(last).filter(function(n){ return last[n].action==='in'; }).sort(function(a,b){ return new Date(last[a].ts)-new Date(last[b].ts); });
+      if(!ins.length) return {text:'Nobody in '+sc.label.toLowerCase()+' is clocked in right now.'};
+      return {text:plural(ins.length,'person').replace('persons','people')+' clocked in right now ('+sc.label+').', lines:listMore(ins.map(function(n){ return n+' since '+fmtClock(new Date(last[n].ts))+' ('+hrs(now-new Date(last[n].ts).getTime())+')'; }),15)};
+    }catch(e){ return sorry(); }
+  }
+  async function leaveWaiting(){
+    if(!isLead()) return NOT_LEAD;
+    try{
+      var sc=await scope(), inScope=new Set(sc.staff);
+      var rows=(await sbGet('leave_submissions','?status=eq.pending&order=from_date.asc&select=staff_name,from_date,to_date,reason_type'))||[];
+      rows=rows.filter(function(r){ return inScope.has(r.staff_name); });
+      if(!rows.length) return {text:'No leave requests are waiting for a decision ('+sc.label+').'};
+      return {text:plural(rows.length,'leave request')+' waiting for a decision ('+sc.label+').', lines:listMore(rows.map(function(r){ return r.staff_name+' · '+fmtShortDate(r.from_date)+(r.to_date&&r.to_date!==r.from_date?' – '+fmtShortDate(r.to_date):'')+(r.reason_type?' · '+r.reason_type:''); }),8).concat(['Approve or decline in ShiftOps.'])};
+    }catch(e){ return sorry(); }
+  }
+  async function unfilled(){
+    if(!isLead()) return NOT_LEAD;
+    try{
+      var sc=await scope(), wk=sydneyWeek();
+      var iso=isoOf(new Date());
+      var rows=await sbGet('roster_shifts','?status=eq.open&shift_date=gte.'+iso+'&shift_date=lt.'+wk.after+'&select=shift_date,start_time,end_time,role,open_to_team&order=shift_date.asc,start_time.asc');
+      var pub=await _publishedWeeks();
+      var vis=_filterPublished((rows||[]).filter(function(r){ return sc.admin || !r.open_to_team || r.open_to_team===sc.team; }),pub);
+      if(!vis.length) return {text:'No open shifts from today to the end of next week.'};
+      return {text:plural(vis.length,'open shift')+' not yet picked up.', lines:listMore(vis.map(function(r){ return fmtDay(r.shift_date)+', '+fmtT(r.start_time)+(r.end_time?' – '+fmtT(r.end_time):'')+(r.role?' · '+r.role:'')+(r.open_to_team?' · '+r.open_to_team:''); }),8), go:[{label:'Open Shifts', run:function(){ goTo('shifts'); }}]};
+    }catch(e){ return sorry(); }
   }
 
   var ASK=[
@@ -233,6 +361,10 @@ var nxAgent = (function(){
         return {text:'You’ve passed '+pass+' of '+latest.length+'.', lines:lines, go:[{label:'Open Learnings', run:function(){ goTo('training'); }}]};
       }catch(e){ return sorry(); }
     }},
+    {id:'report', g:'Leads & admins', lead:true, label:'Generate this week’s report', run:weeklyReport},
+    {id:'whoin', g:'Leads & admins', lead:true, label:'Who’s clocked in now?', run:whoIn},
+    {id:'leavewait', g:'Leads & admins', lead:true, label:'Leave waiting for a decision', run:leaveWaiting},
+    {id:'unfilled', g:'Leads & admins', lead:true, label:'Unfilled shifts', run:unfilled},
     {id:'profile', g:'Help', label:'Change my photo or password', run:function(){
       return {text:'It’s all in your profile: photo, bio, password, text size and theme.', go:[{label:'Open Profile', run:function(){ goTo('profile'); }}]};
     }}
@@ -243,8 +375,8 @@ var nxAgent = (function(){
     var s=document.createElement('style'); s.id='nxAgentCss';
     s.textContent=
 '.nxa-ov,.nxa-fab,.nxa-fabd{display:none}'+
-':root:not([data-theme="win95"]) .nxa-ov{display:block;position:fixed;inset:0;z-index:2500;visibility:hidden;pointer-events:none;background:rgba(0,0,0,0);transition:background 220ms ease-out,visibility 0s linear 260ms}'+
-':root:not([data-theme="win95"]) .nxa-ov.is-open{visibility:visible;pointer-events:auto;background:rgba(0,0,0,.42);transition:background 220ms ease-out}'+
+':root:not([data-nx-off]) .nxa-ov{display:block;position:fixed;inset:0;z-index:2500;visibility:hidden;pointer-events:none;background:rgba(0,0,0,0);transition:background 220ms ease-out,visibility 0s linear 260ms}'+
+':root:not([data-nx-off]) .nxa-ov.is-open{visibility:visible;pointer-events:auto;background:rgba(0,0,0,.42);transition:background 220ms ease-out}'+
 '.nxa-sheet{position:absolute;display:flex;flex-direction:column;background:var(--m-card,var(--ui-surface,#fff));color:var(--m-ink,var(--ui-ink,#0f172a));box-shadow:0 -12px 40px -12px rgba(0,0,0,.35);will-change:transform;font-family:var(--font,system-ui,sans-serif)}'+
 '.nxa-sheet.is-drag{transition:none}'+
 '.nxa-top{touch-action:none;cursor:grab;padding:8px 18px 6px;flex:0 0 auto}'+
@@ -277,20 +409,20 @@ var nxAgent = (function(){
 '@keyframes nxaDot{0%,60%,100%{opacity:.3;transform:translateY(0)}30%{opacity:1;transform:translateY(-3px)}}'+
 /* phones: round button in the top bar, bottom sheet */
 '@media (max-width:700px){'+
- ':root:not([data-theme="win95"]) .nxa-fab{display:grid;place-items:center;position:absolute;z-index:3;top:calc(env(safe-area-inset-top,0px) + 8px);left:calc(50% - 18px);width:36px;height:36px;padding:0;border:0;border-radius:50%;'+
+ ':root:not([data-nx-off]) .nxa-fab{display:grid;place-items:center;position:absolute;z-index:3;top:calc(env(safe-area-inset-top,0px) + 8px);left:calc(50% - 18px);width:36px;height:36px;padding:0;border:0;border-radius:50%;'+
    'background:#0a0a0c;color:var(--accent,#10b981);cursor:pointer;box-shadow:0 0 0 1px rgba(255,255,255,.07),0 6px 16px -8px rgba(0,0,0,.55);-webkit-tap-highlight-color:transparent;transition:left 240ms cubic-bezier(.2,.8,.2,1),transform 120ms ease-out}'+
- ':root:not([data-theme="win95"]) .nxa-fab:active{transform:scale(.94)}.nxa-fab:focus-visible{outline:2px solid var(--accent,#10b981);outline-offset:2px}'+
- ':root:not([data-theme="win95"]) .nxa-fab.is-bubble{left:calc(100% - 106px)}'+
+ ':root:not([data-nx-off]) .nxa-fab:active{transform:scale(.94)}.nxa-fab:focus-visible{outline:2px solid var(--accent,#10b981);outline-offset:2px}'+
+ ':root:not([data-nx-off]) .nxa-fab.is-bubble{left:calc(100% - 106px)}'+
  '.nxa-sheet{left:0;right:0;bottom:0;max-height:86vh;max-height:86dvh;border-radius:22px 22px 0 0;padding-bottom:env(safe-area-inset-bottom,0px);transform:translateY(105%);transition:transform 360ms cubic-bezier(.2,.9,.25,1)}'+
  '.nxa-ov.is-open .nxa-sheet{transform:translateY(0)}'+
 '}'+
 /* computers: round button bottom-right, panel pops up above it */
 '@media (min-width:701px){'+
- ':root:not([data-theme="win95"]) .nxa-fabd.is-on{display:grid;place-items:center;position:fixed;z-index:2400;right:24px;bottom:24px;width:52px;height:52px;padding:0;border:0;border-radius:50%;'+
+ ':root:not([data-nx-off]) .nxa-fabd.is-on{display:grid;place-items:center;position:fixed;z-index:2400;right:24px;bottom:24px;width:52px;height:52px;padding:0;border:0;border-radius:50%;'+
    'background:#0a0a0c;color:var(--accent,#10b981);cursor:pointer;box-shadow:0 0 0 1px rgba(255,255,255,.08),0 10px 28px -10px rgba(0,0,0,.6);transition:transform 140ms ease-out,opacity 160ms}'+
- ':root:not([data-theme="win95"]) .nxa-fabd.is-on:hover{transform:translateY(-2px)}.nxa-fabd.is-on:active{transform:scale(.95)}.nxa-fabd.is-hide{opacity:0;pointer-events:none}'+
+ ':root:not([data-nx-off]) .nxa-fabd.is-on:hover{transform:translateY(-2px)}.nxa-fabd.is-on:active{transform:scale(.95)}.nxa-fabd.is-hide{opacity:0;pointer-events:none}'+
  '.nxa-fabd svg{width:24px;height:24px}'+
- ':root:not([data-theme="win95"]) .nxa-ov.is-open{background:rgba(0,0,0,.14)}'+
+ ':root:not([data-nx-off]) .nxa-ov.is-open{background:rgba(0,0,0,.14)}'+
  '.nxa-sheet{right:24px;bottom:24px;width:400px;max-width:calc(100vw - 48px);max-height:min(700px,calc(100vh - 48px));max-height:min(700px,calc(100dvh - 48px));border-radius:22px;box-shadow:0 24px 70px -16px rgba(0,0,0,.45),0 0 0 1px var(--m-border,rgba(120,120,128,.18));'+
    'opacity:0;transform:translateY(14px) scale(.98);transform-origin:100% 100%;transition:transform 240ms cubic-bezier(.2,.9,.25,1),opacity 180ms ease-out}'+
  '.nxa-ov.is-open .nxa-sheet{opacity:1;transform:none}'+
@@ -379,6 +511,7 @@ var nxAgent = (function(){
   function renderChips(){
     var h='', g=null;
     ASK.forEach(function(a){
+      if(a.lead && !isLead()) return;
       if(a.g!==g){ g=a.g; h+='<div class="nxa-lbl">'+esc(g)+'</div>'; }
       h+='<button type="button" class="nxa-chip" data-id="'+a.id+'">'+esc(a.label)+'</button>';
     });
@@ -394,7 +527,14 @@ var nxAgent = (function(){
   }
   function showAnswer(bubble, r){
     bubble.innerHTML=answerHtml(r);
-    bubble.querySelectorAll('.nxa-go').forEach(function(b){ b.addEventListener('click',function(){ var g=r.go[+b.getAttribute('data-i')]; close(); setTimeout(function(){ try{ g.run(); }catch(e){} },120); }); });
+    bubble.querySelectorAll('.nxa-go').forEach(function(b){ b.addEventListener('click',function(){
+      var g=r.go[+b.getAttribute('data-i')];
+      if(g.keep){                                   /* does its job right here and leaves the sheet open */
+        var label=b.firstChild; try{ Promise.resolve(g.run()).then(function(){ label.textContent=(g.done||'Done')+' '; setTimeout(function(){ label.textContent=g.label+' '; },1800); }); }catch(e){}
+        return;
+      }
+      close(); setTimeout(function(){ try{ g.run(); }catch(e){} },120);
+    }); });
     thread.scrollTo({top:thread.scrollHeight, behavior:reduce?'auto':'smooth'});
   }
   /* run an answer behind a short typing beat so it reads as a reply, not a flash */
@@ -409,7 +549,7 @@ var nxAgent = (function(){
 
   async function ask(id){
     if(busy) return;
-    var a=ASK.filter(function(x){ return x.id===id; })[0]; if(!a) return;
+    var a=ASK.filter(function(x){ return x.id===id; })[0]; if(!a || (a.lead && !isLead())) return;
     busy=true; setChips(true);
     addMsg('u',esc(a.label));
     try{
