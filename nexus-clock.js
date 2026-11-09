@@ -211,6 +211,7 @@ async function loadClockState(){
     renderClockCard();
     await maybeAutoClockOut8pm();
     try{ checkAutoClockoutNotice(); }catch(e){}
+    try{ setTimeout(function(){ checkForgetfulPopup(); }, 2500); }catch(e){}
     window._clockSyncing = false;
     try{ const _cb=document.getElementById('clockBtn'); if(_cb) _cb.classList.remove('cc-syncing'); }catch(e){}
   }catch(e){
@@ -315,6 +316,84 @@ async function checkAutoClockoutNotice(){
       el.remove();
     };
     document.body.appendChild(el);
+  }catch(e){ /* informational only */ }
+}
+
+
+/* Start-up popup for people who often miss or are late with the clock, while their push is off.
+   Nobody is listed by hand: every day Nexus scores each person's own last 4 weeks, so people come and go as their habits change.
+   Score = 2 per rostered day with no clock-in (not on approved leave) + 2 per 8pm auto clock-out + 1 per clock-in 15+ min after the start.
+   Needs at least FORGET_MIN_SHIFTS rostered days in the window. Shown at most once a day; "Not now" hides it for a week. */
+const FORGET_MIN_SCORE = 7, FORGET_MIN_SHIFTS = 5;
+async function checkForgetfulPopup(_try){
+  if(!me || document.getElementById('forgetPopup')) return;
+  try{
+    const todayK = _tzKey(Date.now());
+    let hideUntil = null, shownOn = null;
+    try{ hideUntil = localStorage.getItem('forget_hide_until_'+me); shownOn = localStorage.getItem('forget_shown_'+me); }catch(e){}
+    if(hideUntil && todayK < hideUntil) return;
+    if(shownOn === todayK) return;
+    if(typeof isPushSubscribed === 'function' && await isPushSubscribed()) return;
+    if(!('Notification' in window) || !('PushManager' in window)) return;
+    if(Notification.permission === 'denied') return;
+    /* wait for any blocking notice first, then try again */
+    if(document.getElementById('snModal') || document.getElementById('autoOutNotice')){
+      if((_try||0) < 6) setTimeout(function(){ checkForgetfulPopup((_try||0)+1); }, 5000);
+      return;
+    }
+    const d = new Date(Date.now()+10*3600*1000); /* Sydney-ish today for date math */
+    const dIso = function(n){ const x = new Date(Date.parse(todayK+'T00:00:00Z') + n*864e5); return x.toISOString().slice(0,10); };
+    const from = dIso(-28), q = encodeURIComponent(me);
+    const sinceIso = new Date(Date.parse(_tzIso(from,'00:00')) - 36e5).toISOString();
+    const res = await Promise.all([
+      sbGet('roster_shifts','?staff_name=eq.'+q+'&status=eq.assigned&shift_date=gte.'+from+'&shift_date=lt.'+todayK+'&select=staff_name,shift_date,start_time&limit=200'),
+      sbGet('clock_log','?staff_name=eq.'+q+'&action=eq.in&ts=gte.'+sinceIso+'&select=ts&order=ts.asc&limit=500'),
+      sbGet('clock_log','?staff_name=eq.'+q+'&action=eq.out&notes=like.'+encodeURIComponent('auto:*')+'&ts=gte.'+sinceIso+'&select=ts&limit=100'),
+      sbGet('leave_submissions','?staff_name=eq.'+q+'&status=eq.approved&to_date=gte.'+from+'&from_date=lt.'+todayK+'&select=from_date,to_date'),
+      (typeof _publishedWeeks === 'function') ? _publishedWeeks() : Promise.resolve(null)
+    ]);
+    let shifts = res[0] || [];
+    if(typeof _filterPublished === 'function' && res[4]) shifts = _filterPublished(shifts, res[4]);
+    const firstIn = {};
+    (res[1] || []).forEach(function(r){ const k = _tzKey(r.ts); if(!firstIn[k] || r.ts < firstIn[k]) firstIn[k] = r.ts; });
+    const leave = res[3] || [], seen = {};
+    let missed = 0, late = 0;
+    shifts.forEach(function(r){
+      if(!r.start_time || seen[r.shift_date]) return; seen[r.shift_date] = 1;
+      if(leave.some(function(l){ return l.from_date <= r.shift_date && l.to_date >= r.shift_date; })) return;
+      const t = firstIn[r.shift_date];
+      if(!t){ missed++; return; }
+      if(Date.parse(t) > Date.parse(_tzIso(r.shift_date, String(r.start_time).slice(0,5))) + 15*6e4) late++;
+    });
+    const autos = (res[2] || []).length;
+    if(Object.keys(seen).length < FORGET_MIN_SHIFTS || (2*missed + 2*autos + late) < FORGET_MIN_SCORE) return;
+    if(document.getElementById('snModal') || document.getElementById('forgetPopup')) return;
+    try{ localStorage.setItem('forget_shown_'+me, todayK); }catch(e){}
+    const bits = [];
+    if(missed) bits.push(missed + (missed === 1 ? ' shift with no clock-in' : ' shifts with no clock-in'));
+    if(late) bits.push(late + (late === 1 ? ' late clock-in' : ' late clock-ins'));
+    if(autos) bits.push(autos + (autos === 1 ? ' forgotten clock-out' : ' forgotten clock-outs'));
+    const el = document.createElement('div');
+    el.id = 'forgetPopup'; el.setAttribute('role','alertdialog'); el.setAttribute('aria-modal','true'); el.setAttribute('aria-labelledby','forgetT');
+    el.style.cssText = 'position:fixed;inset:0;z-index:100400;background:rgba(15,23,42,.6);-webkit-backdrop-filter:blur(5px);backdrop-filter:blur(5px);display:flex;align-items:center;justify-content:center;padding:16px';
+    el.innerHTML = '<div style="width:min(420px,100%);border-radius:18px;background:var(--ui-surface,#fff);color:var(--ui-ink,#0f172a);box-shadow:0 20px 60px rgba(0,0,0,.4);padding:20px">'+
+      '<div style="font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#d97706;margin-bottom:6px">Clock reminder</div>'+
+      '<div id="forgetT" style="font-size:19px;font-weight:800;line-height:1.25;margin:0 0 8px">You often miss the clock</div>'+
+      '<div style="font-size:14px;line-height:1.5">'+(bits.length ? 'In the last 4 weeks you had '+bits.join(', ')+'. ' : 'Clocking in and out is easy to forget. ')+'Turn on push and Nexus will remind you on this device when a shift starts and you have not clocked in.</div>'+
+      '<button id="forgetOn" type="button" style="width:100%;margin-top:16px;padding:13px;border:0;border-radius:12px;font-size:15px;font-weight:800;cursor:pointer;background:var(--ui-accent,#2563eb);color:#fff;font-family:inherit">Turn on push reminders</button>'+
+      '<button id="forgetNo" type="button" style="width:100%;margin-top:8px;padding:11px;border:0;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;background:transparent;color:inherit;opacity:.7;font-family:inherit">Not now</button>'+
+      '</div>';
+    document.body.appendChild(el);
+    const close = function(){ el.remove(); document.removeEventListener('keydown', onKey); };
+    const onKey = function(ev){ if(ev.key === 'Escape'){ hide(); } };
+    const hide = function(){ try{ localStorage.setItem('forget_hide_until_'+me, dIso(7)); }catch(e){} close(); };
+    document.addEventListener('keydown', onKey);
+    document.getElementById('forgetNo').onclick = hide;
+    document.getElementById('forgetOn').onclick = function(){
+      const b = this; b.disabled = true;
+      Promise.resolve(typeof subscribeToPush === 'function' ? subscribeToPush() : false).then(function(ok){ if(ok) close(); else { b.disabled = false; } });
+    };
+    try{ document.getElementById('forgetOn').focus({preventScroll:true}); }catch(e){}
   }catch(e){ /* informational only */ }
 }
 

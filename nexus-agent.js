@@ -239,6 +239,52 @@ var nxAgent = (function(){
       return {text:plural(miss.length,'person').replace('persons','people')+' rostered today and not clocked in yet.', lines:L.concat(lines)};
     }catch(e){ return sorry(); }
   }
+  async function forgetful(){
+    if(!isLead()) return NOT_LEAD;
+    try{
+      var sc=await scope(), inScope=new Set(sc.staff), today=todayIso(), from=dIso(today,-28);
+      var res=await Promise.all([
+        publishedRows('?shift_date=gte.'+from+'&shift_date=lt.'+today+'&status=eq.assigned&select=staff_name,shift_date,start_time&limit=3000'),
+        sbGet('clock_log','?action=eq.in&ts=gte.'+new Date(Date.parse(_tzIso(from,'00:00'))-36e5).toISOString()+'&select=staff_name,ts&order=ts.asc&limit=5000'),
+        sbGet('clock_log','?action=eq.out&notes=like.auto:*&ts=gte.'+new Date(Date.parse(_tzIso(from,'00:00'))).toISOString()+'&select=staff_name,ts&limit=2000'),
+        sbGet('leave_submissions','?status=eq.approved&to_date=gte.'+from+'&from_date=lt.'+today+'&select=staff_name,from_date,to_date'),
+        sbGet('push_subscriptions','?select=staff_name&limit=2000')
+      ]);
+      var shifts=(res[0]||[]).filter(function(r){ return inScope.has(r.staff_name) && r.start_time; });
+      var firstIn={}; (res[1]||[]).forEach(function(r){ var k=r.staff_name+'|'+_tzKey(r.ts); if(!firstIn[k] || r.ts<firstIn[k]) firstIn[k]=r.ts; });
+      var leave=res[3]||[], by={};
+      function row(n){ return by[n]||(by[n]={late:0,missed:0,auto:0}); }
+      var seen={};
+      shifts.forEach(function(r){
+        var k=r.staff_name+'|'+r.shift_date; if(seen[k]) return; seen[k]=1;
+        if(leave.some(function(l){ return l.staff_name===r.staff_name && l.from_date<=r.shift_date && l.to_date>=r.shift_date; })) return;
+        var t=firstIn[k];
+        if(!t){ row(r.staff_name).missed++; return; }
+        var due=Date.parse(_tzIso(r.shift_date,String(r.start_time).slice(0,5)));
+        if(Date.parse(t)>due+15*6e4) row(r.staff_name).late++;
+      });
+      (res[2]||[]).forEach(function(r){ if(inScope.has(r.staff_name)) row(r.staff_name).auto++; });
+      function sc2(b){ return 2*b.missed+2*b.auto+b.late; }
+      var minScore=(typeof FORGET_MIN_SCORE==='number')?FORGET_MIN_SCORE:7;
+      var names=Object.keys(by).filter(function(n){ return sc2(by[n])>0; });
+      names.sort(function(a,b){ return sc2(by[b])-sc2(by[a]) || a.localeCompare(b); });
+      var pushOn=new Set((res[4]||[]).map(function(r){ return r.staff_name; }));
+      var lines=names.slice(0,12).map(function(n){ var b=by[n], bits=[];
+        if(b.missed) bits.push(b.missed+' no clock-in'); if(b.late) bits.push(b.late+' late'); if(b.auto) bits.push(b.auto+' no clock-out');
+        return n+' · '+bits.join(', ')+(pushOn.has(n)?'':(sc2(b)>=minScore?' · gets the popup':' · push off')); });
+      var offCount=sc.staff.filter(function(n){ return !pushOn.has(n); }).length;
+      lines.push('Push reminders are on for '+(sc.staff.length-offCount)+' of '+sc.staff.length+' staff, so the rest never get the late clock-in nudge.');
+      if(!names.length) return {text:'Nobody in '+sc.label.toLowerCase()+' missed a clock-in or clock-out in the last 4 weeks.', lines:[lines[lines.length-1]]};
+      return {text:'Who forgets to clock in or out · '+sc.label+' · last 4 weeks (late = 15+ min after the rostered start). Anyone scoring '+minScore+'+ with push off gets the start-up popup.', lines:lines};
+    }catch(e){ return sorry(); }
+  }
+  function pushHelp(){
+    var ok=(typeof subscribeToPush==='function') && ('Notification' in window) && ('PushManager' in window);
+    if(!ok) return {text:'This browser can’t do push notifications. On an iPhone, add Nexus to the Home Screen first, then open it from there and ask me again.'};
+    if(Notification.permission==='denied') return {text:'Notifications are blocked for Nexus on this device.', lines:['Allow them in the browser or phone settings for this site, then ask me again.']};
+    return {text:'Push sends you the “Forgot to clock in?” reminder and roster updates on this device.', lines:['Tap below and allow notifications when asked.'],
+      go:[{label:'Turn on push', keep:true, done:'Done', run:function(){ return subscribeToPush(); }}]};
+  }
   async function whoOffWeek(){
     if(!isLead()) return NOT_LEAD;
     try{
@@ -565,8 +611,10 @@ var nxAgent = (function(){
     {id:'absent', g:'Leads & admins', lead:true, label:'Rostered today, not clocked in', run:absentToday},
     {id:'whooff', g:'Leads & admins', lead:true, label:'Who’s on leave this week?', run:whoOffWeek},
     {id:'teamfort', g:'Leads & admins', lead:true, label:'Team hours this fortnight', run:teamFort},
+    {id:'forgetful', g:'Leads & admins', lead:true, label:'Who forgets to clock in or out?', run:forgetful},
     {id:'autos', g:'Leads & admins', lead:true, label:'Auto clock-outs, last 14 days', run:autoOuts},
     {id:'noack', g:'Leads & admins', lead:true, admin:true, label:'Who hasn’t acknowledged the notice?', run:noAck},
+    {id:'pushon', g:'Help', label:'Turn on push reminders', run:pushHelp},
     {id:'forgot', g:'Help', label:'I forgot to clock out', run:function(){
       return {text:'Nexus clocks you out automatically at 8pm. For the real time, ask an admin to fix your punch.', lines:['The auto clock-out shows in My Hours so you can tell them which day.'], go:[goMyHours(null)]};
     }},
