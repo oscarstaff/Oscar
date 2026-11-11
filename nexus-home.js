@@ -261,16 +261,17 @@ async function loadHomeCalendar(){
   const list = document.getElementById('homeCalList');
   if(!list) return;
   try{
-    const todayStr = new Date().toISOString().slice(0,10);
+    /* Sydney today, not the UTC date: UTC is still yesterday until 11am Sydney time, which kept yesterday's event on the list. */
+    const todayStr = _nxDayKey(0);
     const rows = await sbGet('calendar_events','?event_date=gte.'+todayStr+'&order=event_date.asc&limit=4');
     if(!rows.length){
       list.innerHTML = '<div style="padding:20px;text-align:center;color:var(--ui-ink-4,#94a3b8);font-size:12px;">No upcoming events.</div>';
       return;
     }
-    const today = new Date(); today.setHours(0,0,0,0);
+    const todayMs = Date.parse(todayStr+'T00:00:00Z');
     list.innerHTML = rows.map(function(ev){
       const dd = new Date(ev.event_date+'T00:00:00');
-      const diff = Math.round((dd - today)/86400000);
+      const diff = Math.round((Date.parse(ev.event_date+'T00:00:00Z') - todayMs)/86400000);
       const when = diff===0?'Today':diff===1?'Tomorrow':dd.toLocaleDateString(undefined,{weekday:'short',day:'numeric',month:'short'});
       const dayNum = dd.getDate();
       const monShort = dd.toLocaleDateString(undefined,{month:'short'});

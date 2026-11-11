@@ -1295,7 +1295,7 @@ async function enterHub(){
   const _el_homeGreeting=document.getElementById("homeGreeting");if(_el_homeGreeting)_el_homeGreeting.textContent=(hr<12?"Good morning":hr<17?"Good afternoon":"Good evening")+", "+first;
   const _el_homeWeekSub=document.getElementById("homeWeekSub");if(_el_homeWeekSub)_el_homeWeekSub.textContent=wkL(weekStart);
   const availSubEl=document.getElementById("availSub");if(availSubEl)availSubEl.textContent="Week of "+wkL(weekStart);
-  const today=iso(new Date());
+  const today=(typeof _nxDayKey==='function')?_nxDayKey(0):iso(new Date());
   document.getElementById("leaveFrom").value=today;
   document.getElementById("leaveTo").value=today;
   buildAvailForm();

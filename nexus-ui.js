@@ -306,7 +306,7 @@ async function markReplySeen(){ /* reply notifications retired */ }
 
 
 function toggleCalEventForm(){
-  const today = new Date().toISOString().split('T')[0];
+  const today = (typeof _nxDayKey==='function') ? _nxDayKey(0) : new Date().toISOString().split('T')[0];
   if(typeof openNewEventForDate === 'function'){
     openNewEventForDate(today);
     return;
