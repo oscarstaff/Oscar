@@ -25,10 +25,11 @@ async function notifyShortNoticeLeave(from,to,reason){
     if(r.is_hub_admin===true) who[r.name] = 1;
     else if(r.is_shift_admin===true && myK && ((typeof _teamKey==='function') ? _teamKey(teamOf[r.name]) : teamOf[r.name])===myK) who[r.name] = 1;
   });
-  const when = _nxSoonWord(from);
+  const backdated = from < _nxDayKey(0);
+  const when = backdated ? 'backdated' : _nxSoonWord(from);
   const range = fmtF(from) + (to && to!==from ? ' to ' + fmtF(to) : '');
   Object.keys(who).forEach(function(n){
-    try{ sendPushTo(n, 'Short-notice leave request', me+' · '+range+' · '+when+(reason?' · '+reason:''), {url:'./', tag:'leave-soon-'+me+'-'+from}); }catch(e){}
+    try{ sendPushTo(n, backdated ? 'Backdated leave request' : 'Short-notice leave request', me+' · '+range+' · '+when+(reason?' · '+reason:''), {url:'./', tag:'leave-soon-'+me+'-'+from}); }catch(e){}
   });
 }
 
@@ -746,11 +747,26 @@ function _leaveTooLate(from,to){
   if(!from) return false;
   return from <= _nxDayKey(1) && (to||from) >= _nxDayKey(0);
 }
+/* Backdated leave (12 Nov 2026): a request whose dates have ALL passed (ends before today, Sydney) is only accepted as Sick
+   leave, up to LEAVE_BACKDATE_DAYS back. Anything else has to be passed to the team directly. Admins and the applicant's
+   team leads still get the push alert, worded "Backdated". Returns '' when allowed, otherwise the message to show.
+   An empty reason only checks the age, so the hint does not nag before a reason is picked. */
+const LEAVE_BACKDATE_DAYS = 7;
+const LEAVE_PAST_REASON_MSG = "Leave for dates that have already passed can only be requested as Sick leave. For anything else please inform your team directly (call or message your team lead).";
+const LEAVE_PAST_OLD_MSG = "Sick leave can be requested up to "+LEAVE_BACKDATE_DAYS+" days after the fact. For earlier dates please inform your team directly (call or message your team lead).";
+function _leavePastIssue(from,to,reasonType){
+  if(!from) return '';
+  if((to||from) >= _nxDayKey(0)) return '';
+  if(from < _nxDayKey(-LEAVE_BACKDATE_DAYS)) return LEAVE_PAST_OLD_MSG;
+  if(reasonType && reasonType !== 'Sick leave') return LEAVE_PAST_REASON_MSG;
+  return '';
+}
 function _leaveNoticeHint(){
   try{
-    const f=document.getElementById("leaveFrom"), t=document.getElementById("leaveTo"), err=document.getElementById("leaveErr");
+    const f=document.getElementById("leaveFrom"), t=document.getElementById("leaveTo"), err=document.getElementById("leaveErr"), rs=document.getElementById("leaveReason");
     if(!f||!err) return;
-    if(_leaveTooLate(f.value,t&&t.value)){ err.textContent=LEAVE_TOO_LATE_MSG; err.dataset.notice='1'; err.classList.add("show"); }
+    const msg = _leaveTooLate(f.value,t&&t.value) ? LEAVE_TOO_LATE_MSG : _leavePastIssue(f.value,t&&t.value,rs?rs.value:'');
+    if(msg){ err.textContent=msg; err.dataset.notice='1'; err.classList.add("show"); }
     else if(err.dataset.notice==='1'){ err.classList.remove("show"); err.dataset.notice=''; }
   }catch(e){}
 }
@@ -773,6 +789,8 @@ async function submitLeave(){
     document.getElementById("leaveReason").focus();
     return;
   }
+  const pastMsg=_leavePastIssue(from,to,sel);
+  if(pastMsg){err.textContent=pastMsg;err.dataset.notice="1";err.classList.add("show");return;}
   if(sel==="Other" && !otherTxt){
     err.textContent="Please specify your reason.";
     err.classList.add("show");
@@ -816,6 +834,7 @@ function onLeaveReasonChange(){
   const wrap=document.getElementById("leaveOtherWrap");
   if(wrap) wrap.style.display = (sel==="Other") ? "block" : "none";
   document.getElementById("leaveReason").classList.remove("error");
+  try{ _leaveNoticeHint(); }catch(e){}
 }
 /* ── Shift Pickup ─────────────────────────────────────────────────────────
    Shifts a manager has opened to your team. Claiming goes through the
@@ -1152,7 +1171,7 @@ function updateLeaveDayCount(){
     const from=new Date(f.value+'T00:00:00'), to=new Date(t.value+'T00:00:00');
     if(to>=from){
       const days=Math.round((to-from)/86400000)+1;
-      out.textContent=days+' day'+(days!==1?'s':'');
+      out.textContent=days+' day'+(days!==1?'s':'')+(t.value<_nxDayKey(0)?' · backdated':'');
       return;
     }
   }
