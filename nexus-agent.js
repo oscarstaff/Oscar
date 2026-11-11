@@ -356,7 +356,8 @@ var nxAgent = (function(){
       var rows=(await sbGet('leave_submissions','?status=eq.pending&order=from_date.asc&select=staff_name,from_date,to_date,reason_type'))||[];
       rows=rows.filter(function(r){ return inScope.has(r.staff_name); });
       if(!rows.length) return {text:'No leave requests are waiting for a decision ('+sc.label+').'};
-      return {text:plural(rows.length,'leave request')+' waiting for a decision ('+sc.label+').', lines:listMore(rows.map(function(r){ return r.staff_name+' · '+fmtShortDate(r.from_date)+(r.to_date&&r.to_date!==r.from_date?' – '+fmtShortDate(r.to_date):'')+(r.reason_type?' · '+r.reason_type:''); }),8).concat(['Approve or decline in ShiftOps.'])};
+      var soonLim=dIso(todayIso(),2), soonN=rows.filter(function(r){ return r.from_date<=soonLim; }).length;
+      return {text:plural(rows.length,'leave request')+' waiting for a decision ('+sc.label+').'+(soonN?' '+soonN+' start'+(soonN===1?'s':'')+' within 2 days.':''), lines:listMore(rows.map(function(r){ var w=r.from_date<todayIso()?' · already started':(r.from_date===todayIso()?' · starts today':(r.from_date===dIso(todayIso(),1)?' · starts tomorrow':'')); return r.staff_name+' · '+fmtShortDate(r.from_date)+(r.to_date&&r.to_date!==r.from_date?' – '+fmtShortDate(r.to_date):'')+(r.reason_type?' · '+r.reason_type:'')+w; }),8).concat(['Approve or decline in ShiftOps.'])};
     }catch(e){ return sorry(); }
   }
   async function unfilled(){

@@ -1,3 +1,37 @@
+/* Short-notice leave: a request that starts today, tomorrow or the day after is pushed to the hub admins and to the
+   applicant's team leads at the moment it is submitted, because nobody opens ShiftOps on a Sunday. Only people with push
+   turned on get it, so the Home list below also flags it for them. */
+function _nxDayKey(add){
+  const t = (typeof _tzKey==='function') ? _tzKey(Date.now()) : new Date().toISOString().slice(0,10);
+  if(!add) return t;
+  const d = new Date(Date.parse(t+'T00:00:00Z') + add*864e5); return d.toISOString().slice(0,10);
+}
+function _nxSoonWord(from){
+  const t = _nxDayKey(0);
+  if(from <= t) return from < t ? 'already started' : 'starts today';
+  return from === _nxDayKey(1) ? 'starts tomorrow' : 'starts in 2 days';
+}
+async function notifyShortNoticeLeave(from,to,reason){
+  if(!from || from > _nxDayKey(2)) return;
+  const res = await Promise.all([
+    sbGet('staff_settings','?or=(is_hub_admin.eq.true,is_shift_admin.eq.true)&select=name,is_hub_admin,is_shift_admin'),
+    sbGet('staff_credentials','?select=staff_name,team&limit=600')
+  ]);
+  const teamOf = {}; (res[1]||[]).forEach(function(r){ teamOf[r.staff_name] = r.team; });
+  const myK = (typeof _teamKey==='function') ? _teamKey(teamOf[me]||myTeam) : (teamOf[me]||myTeam||'');
+  const who = {};
+  (res[0]||[]).forEach(function(r){
+    if(!r.name || r.name===me) return;
+    if(r.is_hub_admin===true) who[r.name] = 1;
+    else if(r.is_shift_admin===true && myK && ((typeof _teamKey==='function') ? _teamKey(teamOf[r.name]) : teamOf[r.name])===myK) who[r.name] = 1;
+  });
+  const when = _nxSoonWord(from);
+  const range = fmtF(from) + (to && to!==from ? ' to ' + fmtF(to) : '');
+  Object.keys(who).forEach(function(n){
+    try{ sendPushTo(n, 'Short-notice leave request', me+' · '+range+' · '+when+(reason?' · '+reason:''), {url:'./', tag:'leave-soon-'+me+'-'+from}); }catch(e){}
+  });
+}
+
 async function loadHomeAttention(){
   const wrap = document.getElementById('homeAttention');
   if(!wrap) return;
@@ -70,6 +104,27 @@ async function loadHomeAttention(){
       }
     }catch(e){}
 
+
+    if((typeof myIsAdmin!=='undefined' && myIsAdmin) || (typeof myIsShiftAdmin!=='undefined' && myIsShiftAdmin)){
+      try{
+        let soon = await sbGet('leave_submissions','?status=eq.pending&from_date=lte.'+_nxDayKey(2)+'&select=staff_name,from_date,to_date&order=from_date.asc&limit=50');
+        soon = soon || [];
+        if(soon.length && !(typeof myIsAdmin!=='undefined' && myIsAdmin)){
+          const tc = await sbGet('staff_credentials','?select=staff_name,team&limit=600');
+          const tm = {}; (tc||[]).forEach(function(r){ tm[r.staff_name] = r.team; });
+          const k = function(t){ return (typeof _teamKey==='function') ? _teamKey(t) : String(t||'').toLowerCase(); };
+          soon = soon.filter(function(r){ return k(tm[r.staff_name]) === k(myTeam); });
+        }
+        if(soon.length){
+          items.unshift({
+            color:'#dc2626', icon:'alert',
+            title: soon.length===1 ? '1 leave request starts within 2 days and is not decided' : soon.length+' leave requests start within 2 days and are not decided',
+            sub: soon.slice(0,3).map(function(r){ return r.staff_name+' ('+_nxSoonWord(r.from_date).replace('starts ','')+')'; }).join(', ')+(soon.length>3?' and '+(soon.length-3)+' more':''),
+            action: function(){ if(typeof goTo==='function') goTo('hub'); }
+          });
+        }
+      }catch(e){}
+    }
 
     if(typeof myIsAdmin!=='undefined' && myIsAdmin){
       try{
@@ -683,6 +738,22 @@ function _lpHead(phase,o){
 function viewLeaveProof(fileId){ return _lpView(fileId); }
 
 
+/* No leave requests for today or tomorrow: those must be passed to the team directly, because nobody reviews requests out of
+   hours (a Sunday request for Monday was missed). Applies to any request that overlaps today or tomorrow (Sydney dates);
+   requests that ended before today are still allowed. */
+const LEAVE_TOO_LATE_MSG = "Leave that starts today or tomorrow can't be requested here. Please inform your team directly (call or message your team lead).";
+function _leaveTooLate(from,to){
+  if(!from) return false;
+  return from <= _nxDayKey(1) && (to||from) >= _nxDayKey(0);
+}
+function _leaveNoticeHint(){
+  try{
+    const f=document.getElementById("leaveFrom"), t=document.getElementById("leaveTo"), err=document.getElementById("leaveErr");
+    if(!f||!err) return;
+    if(_leaveTooLate(f.value,t&&t.value)){ err.textContent=LEAVE_TOO_LATE_MSG; err.dataset.notice='1'; err.classList.add("show"); }
+    else if(err.dataset.notice==='1'){ err.classList.remove("show"); err.dataset.notice=''; }
+  }catch(e){}
+}
 async function submitLeave(){
   const from=document.getElementById("leaveFrom").value;
   const to=document.getElementById("leaveTo").value;
@@ -694,6 +765,7 @@ async function submitLeave(){
   document.getElementById("leaveOther").classList.remove("error");
   if(!from||!to){err.textContent="Please select your leave dates.";err.classList.add("show");return;}
   if(from>to){err.textContent="End date must be on or after start date.";err.classList.add("show");return;}
+  if(_leaveTooLate(from,to)){err.textContent=LEAVE_TOO_LATE_MSG;err.dataset.notice="1";err.classList.add("show");return;}
   if(!sel){
     err.textContent="Please select a reason for your leave request — this is required.";
     err.classList.add("show");
@@ -729,6 +801,7 @@ async function submitLeave(){
       document.getElementById("leaveProofInfo").textContent="";
       document.getElementById("leaveOtherWrap").style.display="none";
       loadLeaveHistory();loadHomeData();
+      try{ notifyShortNoticeLeave(from,to,reason); }catch(e){}
     }else throw new Error();
   }catch(e){
     err.textContent = e && e.message==="proof"
@@ -1071,6 +1144,7 @@ function updateLeaveSummary(rows){
 }
 
 function updateLeaveDayCount(){
+  try{ _leaveNoticeHint(); }catch(e){}
   const f=document.getElementById('leaveFrom'), t=document.getElementById('leaveTo');
   const out=document.getElementById('leaveDayCount');
   if(!f||!t||!out) return;
