@@ -1,6 +1,6 @@
 /* ════════════════════════════════════════════════════════════════════════
    NEXUS · CRM v1 — Training Centre pipeline board   (crm.js + crm.css)
-   Students and employers move through editable stages (table crm_stages).
+   Students move through editable stages (table crm_stages).
 
    ACCESS is decided by the database, not by this file. Every read and write
    goes through RLS that calls crm_open(): the person has a 'crm' row in
@@ -101,6 +101,7 @@
     var win = st && st.window ? st.window.replace('-', '–') : '';
     var t = 'The CRM is closed', m = '';
     if(st.state === 'no_access'){ t = 'No CRM access'; m = 'Ask an admin to add you to the CRM.'; }
+    else if(st.state === 'preview_only'){ t = 'The CRM is not available yet'; m = 'It is still being set up and is not open to staff.'; }
     else if(st.state === 'not_clocked_in'){ t = 'Clock in to open the CRM'; m = 'The CRM only opens while you are clocked in' + (win ? ' (today ' + win + ').' : '.'); }
     else if(st.state === 'outside_hours'){ t = 'The CRM is closed right now'; m = 'It is open Monday to Friday 9am–7pm and Saturday to Sunday 9am–4pm, Sydney time' + (win ? ' (today ' + win + ').' : '.'); }
     else if(st.state === 'error'){ t = 'Could not check CRM access'; m = 'Check your connection and try again.'; }
@@ -184,10 +185,7 @@
     var win = S.status && S.status.window ? S.status.window.replace('-', '–') : '';
     root.innerHTML =
       '<div class="crm-bar">' +
-        '<div class="crm-tabs" role="tablist">' +
-          '<button type="button" role="tab" class="crm-tab" data-kind="student">Students</button>' +
-          '<button type="button" role="tab" class="crm-tab" data-kind="employer">Employers</button>' +
-        '</div>' +
+        '<div class="crm-heading">Students</div>' +
         '<input type="search" id="crmSearch" class="crm-search" placeholder="Search name, phone or email" autocomplete="off">' +
         '<button type="button" class="crm-chip" id="crmMine" aria-pressed="false">Mine</button>' +
         '<span class="crm-grow"></span>' +
@@ -197,10 +195,6 @@
       '</div>' +
       '<div id="crmBoard" class="crm-board"></div>';
 
-    var tabs = root.querySelectorAll('.crm-tab');
-    Array.prototype.forEach.call(tabs, function(t){
-      t.onclick = function(){ S.kind = t.dataset.kind; syncBar(); renderBoard(); };
-    });
     $('crmSearch').value = S.q;
     $('crmSearch').oninput = function(){ S.q = this.value; renderBoard(); };
     $('crmMine').onclick = function(){ S.mine = !S.mine; syncBar(); renderBoard(); };
@@ -209,10 +203,6 @@
     syncBar(); renderBoard();
   }
   function syncBar(){
-    Array.prototype.forEach.call(document.querySelectorAll('#crmRoot .crm-tab'), function(t){
-      var on = t.dataset.kind === S.kind;
-      t.classList.toggle('on', on); t.setAttribute('aria-selected', on ? 'true' : 'false');
-    });
     var m = $('crmMine'); if(m){ m.classList.toggle('on', S.mine); m.setAttribute('aria-pressed', S.mine ? 'true' : 'false'); }
   }
 
@@ -242,7 +232,7 @@
     }).join('');
     if(!recs.length){
       board.insertAdjacentHTML('beforeend', '<div class="crm-empty crm-empty-all">' +
-        (S.q || S.mine ? 'Nothing matches.' : 'No ' + (S.kind === 'student' ? 'students' : 'employers') + ' here yet. Tap + Add to bring one in from your contacts.') + '</div>');
+        (S.q || S.mine ? 'Nothing matches.' : 'No students here yet. Tap + Add to bring one in from your contacts.') + '</div>');
     }
     wireBoard(board);
   }
@@ -344,7 +334,7 @@
     var mail = c.email ? '<a class="crm-link" href="mailto:' + E(c.email) + '">' + E(c.email) + '</a>' : '';
     d.innerHTML =
       '<div class="crm-dr-hd"><div><div class="crm-dr-name">' + E(c.name || 'Unnamed') + '</div>' +
-        '<div class="crm-dr-sub">' + E(r.kind === 'student' ? 'Student' : 'Employer') + ' · in ' + E(stageLabel(r.kind, r.stage)) + ' for ' + E(daysIn(r.stage_changed_at)) + '</div></div>' +
+        '<div class="crm-dr-sub">' + 'Student · in ' + E(stageLabel(r.kind, r.stage)) + ' for ' + E(daysIn(r.stage_changed_at)) + '</div></div>' +
         '<button type="button" class="crm-x" id="crmDrClose" aria-label="Close">×</button></div>' +
       '<div class="crm-dr-body">' +
         '<div class="crm-lines">' + [tel, tel2, mail].filter(Boolean).join('') + (tel || tel2 || mail ? '' : '<span class="crm-muted">No contact details on file</span>') + '</div>' +
@@ -441,7 +431,7 @@
     var ownerOpts = '<option value="">No owner</option>' + S.staff.map(function(s){
       return '<option value="' + E(s.id) + '"' + (s.id === S.myId ? ' selected' : '') + '>' + E(s.staff_name) + '</option>';
     }).join('');
-    openModalShell('Add ' + (S.kind === 'student' ? 'a student' : 'an employer'),
+    openModalShell('Add a student',
       '<div class="crm-seg"><button type="button" class="crm-segb on" data-m="find">Find contact</button><button type="button" class="crm-segb" data-m="new">New contact</button></div>' +
       '<div id="crmAddFind">' +
         '<input id="crmASearch" type="search" class="crm-in" placeholder="Search your contacts by name or phone" autocomplete="off">' +
@@ -516,7 +506,7 @@
         }
         if(!contactId){
           var body = { name: name, phone_primary: phone || null, email: email || null, created_by: myName() };
-          if(S.kind === 'student') body.type = 'student';
+          body.type = 'student';
           var made = await api('POST', 'contacts', body, 'return=representation');
           contactId = made[0].id;
         }
@@ -568,21 +558,18 @@
 
   /* ── nav + routing ───────────────────────────────────────────────────── */
   function showNav(){ var n = $('nav-crm'); if(n) n.style.display = ''; }
+  /* The menu item appears only when the database says this person could ever use the CRM:
+     state open / not_clocked_in / outside_hours. no_access and preview_only stay hidden. */
   function gateNav(n){
     n = n || 0;
-    var nav = $('nav-crm'); var name = myName();
-    if(!nav || !name){ if(n < 12) setTimeout(function(){ gateNav(n + 1); }, 1500); return; }
-    if(isAdmin()){ showNav(); return; }
-    if(!S.accessChecked && window._sbAuthToken){
-      S.accessChecked = true;
-      fetch(SB + '/rest/v1/app_access?app=eq.crm&select=staff_name', { headers: hdr() })
-        .then(function(r){ return r.ok ? r.json() : []; })
-        .then(function(rows){
-          var mine = String(name).toLowerCase().trim();
-          if((rows || []).some(function(x){ return String(x.staff_name).toLowerCase().trim() === mine; })) showNav();
-        }).catch(function(){ S.accessChecked = false; });
-    }
-    if(nav.style.display === 'none' && n < 12) setTimeout(function(){ gateNav(n + 1); }, 1500);
+    var nav = $('nav-crm');
+    if(!nav || !myName() || !window._sbAuthToken){ if(n < 12) setTimeout(function(){ gateNav(n + 1); }, 1500); return; }
+    if(S.accessChecked) return;
+    S.accessChecked = true;
+    getStatus().then(function(st){
+      if(st.state === 'open' || st.state === 'not_clocked_in' || st.state === 'outside_hours') showNav();
+      else if(st.state === 'error'){ S.accessChecked = false; if(n < 12) setTimeout(function(){ gateNav(n + 1); }, 2500); }
+    });
   }
 
   if(typeof window.goTo === 'function'){
