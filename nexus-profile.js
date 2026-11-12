@@ -162,13 +162,6 @@ function _tierMedal(fill, ring){
     '<circle cx="12" cy="15" r="6.5" fill="none" stroke="'+ring+'" stroke-width="1.5"/>'+
     '<circle cx="12" cy="15" r="2.6" fill="'+ring+'" opacity=".55"/></svg>';
 }
-function _achRow(visual, title, sub, bg, bd){
-  return '<div style="display:flex;align-items:center;gap:11px;padding:9px 12px;border-radius:10px;'+
-    'background:'+(bg||'#f8fafc')+';border:1px solid '+(bd||'#eef2f7')+';">'+
-    '<div style="flex-shrink:0;display:flex;align-items:center;justify-content:center;">'+visual+'</div>'+
-    '<div style="min-width:0;"><div style="font-size:13px;font-weight:700;color:var(--ui-ink,#0f172a);line-height:1.2;">'+title+'</div>'+
-    (sub?'<div style="font-size:11px;color:var(--ui-ink-4,#94a3b8);margin-top:2px;">'+sub+'</div>':'')+'</div></div>';
-}
 
 const _ACH_ICONS = {
   cap:  '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M10 2 1 6l9 4 7.36-3.27V11a1 1 0 1 0 1 0V6L10 2Z"/><path d="M4 10.3V13c0 1.66 2.69 3 6 3s6-1.34 6-3v-2.7l-6 2.67-6-2.67Z"/></svg>',
@@ -177,87 +170,8 @@ const _ACH_ICONS = {
   star: '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M10 1.5l2.6 5.27 5.82.845-4.21 4.105.994 5.795L10 14.77l-5.204 2.735.994-5.795L1.58 7.615l5.82-.845z"/></svg>'
 };
 
-function buildAchievementBadges(p){
-  const badges=[];
-  if(window.hasEarnedGlow && window.hasEarnedGlow(p.staff_name)){
-    const skin=(window.glowSkinFor?window.glowSkinFor(p.staff_name):'gold');
-    const skinLabel=(window.GLOW_SKIN_LABELS&&window.GLOW_SKIN_LABELS[skin])||skin;
-    const elite=window.isEliteCaller && window.isEliteCaller(p.staff_name);
-    badges.push({
-      cls:'flow flow-emerald',
-      inner:_ACH_ICONS.star,
-      title: elite ? 'The Call-Handler' : 'Perfect Fortnight',
-      sub:   elite ? 'Elite glow — 1000 calls logged' : (skinLabel+' glow earned')
-    });
-  }
-  const top=Number(p.call_milestone)||0;
-  if(top>=1000){
-    badges.push({ cls:'flow flow-emerald', inner:(_ACH_ICONS.medal||_ACH_ICONS.phone), title:'The Call-Handler', sub:'Elite — 1000 calls logged' });
-  } else {
-    [{t:100, cls:'flow flow-blue', sub:'Call volume milestone'},
-     {t:500, cls:'flow flow-gold', sub:'Gold — consistent dedication'}].forEach(function(k){
-      if(top<k.t) return;
-      badges.push({ cls:k.cls, inner:_ACH_ICONS.phone, title:k.t+' Calls Logged', sub:k.sub });
-    });
-  }
-  if(p.punct && p.punct.tier){
-    const isGold=p.punct.tier==='gold';
-    badges.push({
-      cls: isGold?'solid-gold':'solid-slate',
-      inner:_ACH_ICONS.medal,
-      title:(isGold?'Gold':'Silver')+' — On-Time Club',
-      sub:_punctPeriod(p.punct.fort)+' · '+p.punct.score+'% on time ('+(p.punct.days||'?')+' days)'
-    });
-  }
-  if(p.training_count>0){
-    badges.push({
-      cls:'solid-green',
-      inner:'<span class="ach-num">'+p.training_count+'</span>',
-      title:p.training_count+' Training'+(p.training_count===1?'':'s')+' Passed',
-      sub:'Completed assigned quizzes'
-    });
-  }
-  return badges;
-}
 
-function renderProfileBadges(p){
-  const strip=document.getElementById('svProfBadges');
-  const pop=document.getElementById('svBadgePop');
-  const noAch=document.getElementById('svProfNoAch');
-  if(!strip) return;
-  const badges=buildAchievementBadges(p);
-  if(pop) pop.style.display='none';
-  if(!badges.length){
-    strip.style.display='none'; strip.innerHTML='';
-    if(noAch) noAch.style.display='block';
-    return;
-  }
-  if(noAch) noAch.style.display='none';
-  window._svBadgeData=badges;
-  strip.innerHTML=badges.map(function(b,i){
-    return '<button class="ach-badge '+b.cls+'" data-i="'+i+'" onclick="showBadgeInfo('+i+')" '+
-      'aria-label="'+(b.title||'').replace(/"/g,'')+'">'+b.inner+'</button>';
-  }).join('');
-  strip.style.display='flex';
-}
 
-function showBadgeInfo(i){
-  const badges=window._svBadgeData||[];
-  const b=badges[i]; if(!b) return;
-  const pop=document.getElementById('svBadgePop');
-  const t=document.getElementById('svBadgePopTitle');
-  const s=document.getElementById('svBadgePopSub');
-  const strip=document.getElementById('svProfBadges');
-  if(strip){ strip.querySelectorAll('.ach-badge').forEach(function(el){
-    el.classList.toggle('sel', String(el.getAttribute('data-i'))===String(i)); }); }
-  const already = pop && pop.style.display!=='none' && t && t.textContent===b.title;
-  if(already){ pop.style.display='none';
-    if(strip) strip.querySelectorAll('.ach-badge').forEach(function(el){el.classList.remove('sel');});
-    return; }
-  if(t) t.textContent=b.title||'';
-  if(s) s.textContent=b.sub||'';
-  if(pop) pop.style.display='block';
-}
 
 
 
@@ -528,32 +442,6 @@ function filterStaffDirectory(){
   renderStaffDirectory(filtered);
 }
 
-function viewStaffProfile(name){
-  const p=_staffDirData.find(function(x){return x.staff_name===name;});
-  if(!p)return;
-  const avaEl=document.getElementById('svProfAva');
-  const img=window.avatarFor&&window.avatarFor(name);
-  if(img){ avaEl.textContent=''; avaEl.style.backgroundImage='url('+img+')'; avaEl.style.backgroundSize='cover'; avaEl.style.backgroundPosition='center'; }
-  else { avaEl.style.backgroundImage=''; avaEl.textContent=name.split(' ').map(function(w){return w[0];}).join('').slice(0,2).toUpperCase(); }
-  document.getElementById('svProfName').innerHTML=renderStaffName(name, esc)+(window.achBadgesInline?window.achBadgesInline(name):'');
-  const titleEl=document.getElementById('svProfTitle');
-  if(titleEl){
-    if(window.isEliteCaller && window.isEliteCaller(name)){
-      titleEl.textContent='The Call-Handler';
-      titleEl.style.display='block';
-    }else{ titleEl.style.display='none'; }
-  }
-  const pronEl=document.getElementById('svProfPronouns');
-  if(p.pronouns){pronEl.textContent=p.pronouns;pronEl.style.display='block';}
-  else pronEl.style.display='none';
-  const teamEl=document.getElementById('svProfTeam');
-  if(p.team){teamEl.textContent=p.team+' team';teamEl.style.display='inline-block';}
-  else teamEl.style.display='none';
-  const roleEl=document.getElementById('svProfRole');
-  if(p.is_admin){roleEl.innerHTML=(window.adminIcon?window.adminIcon(14):'Admin');roleEl.style.display='inline-flex';}
-  else roleEl.style.display='none';
-  document.getElementById('staffProfileViewOverlay').style.display='flex';
-}
 
 function closeStaffProfileView(){
   document.getElementById('staffProfileViewOverlay').style.display='none';

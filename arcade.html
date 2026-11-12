@@ -640,94 +640,6 @@ function endKartRace(){
   document.getElementById('kartStatus').textContent='Race over — '+place;
 }
 
-// Generic city components per track, drawn across the FULL world (no logos/IP).
-// World size = worldW() x worldH(). Components are placed to fill space; the road
-// is drawn on top so anything under it is hidden.
-function drawScenery(g,id){
-  const W=worldW(),H=worldH();
-  g.save();
-  // seeded pseudo-random so layout is stable per track
-  let s=({shanghai:7,kathmandu:13,hongkong:21,lima:29,ulaanbaatar:37,almaty:43}[id]||1);
-  const rnd=()=>{s=(s*1664525+1013904223)>>>0;return s/4294967296;};
-  // helper: a cluster of buildings
-  function buildings(x0,y0,x1,count,palette,lit){
-    for(let i=0;i<count;i++){
-      const bx=x0+(x1-x0)*(i/count)+rnd()*12;
-      const bw=22+rnd()*26;
-      const bh=60+rnd()*180;
-      g.fillStyle=palette;
-      g.fillRect(bx,y0-bh,bw,bh);
-      // windows
-      if(lit){g.fillStyle=lit;
-        for(let wy=y0-bh+10;wy<y0-10;wy+=14)for(let wx=bx+5;wx<bx+bw-5;wx+=10){ if(rnd()>0.45)g.fillRect(wx,wy,4,6); }
-      }
-    }
-  }
-  function mountains(y0,peaks,col,snow){
-    g.fillStyle=col;g.beginPath();g.moveTo(0,y0);
-    for(let i=0;i<=peaks;i++){const px=W*i/peaks;const py=y0-(120+ (i%2?160:60)+rnd()*80);g.lineTo(px,py);}
-    g.lineTo(W,y0);g.closePath();g.fill();
-    if(snow){g.fillStyle=snow;for(let i=1;i<peaks;i+=2){const px=W*i/peaks;const py=y0-(120+160);g.beginPath();g.moveTo(px-34,py+40);g.lineTo(px,py);g.lineTo(px+34,py+40);g.closePath();g.fill();}}
-  }
-
-  if(id==='shanghai'){
-    // riverfront: water band across the bottom, dense neon skyline top + infield towers
-    g.fillStyle='rgba(20,40,75,.45)';g.fillRect(0,H-130,W,130);
-    g.fillStyle='rgba(120,180,230,.15)';for(let i=0;i<40;i++)g.fillRect(rnd()*W,H-120+rnd()*110,30,3);
-    buildings(40,260,W-40,16,'rgba(12,22,44,.7)','rgba(150,210,255,.55)');
-    // pearl-style tower in the infield
-    const tx=W*0.5,ty=H*0.52;
-    g.fillStyle='rgba(20,40,70,.8)';g.fillRect(tx-5,ty-180,10,180);
-    g.beginPath();g.arc(tx,ty-150,26,0,7);g.fill();
-    g.beginPath();g.arc(tx,ty-95,16,0,7);g.fill();
-    g.fillStyle='rgba(255,120,160,.6)';g.beginPath();g.arc(tx,ty-150,26,0,7);g.stroke();
-  }else if(id==='kathmandu'){
-    // himalaya backdrop + several stupas with prayer-flag lines + low temples
-    mountains(300,7,'rgba(95,115,135,.45)','rgba(240,245,250,.6)');
-    const stupas=[[W*0.3,H*0.55],[W*0.62,H*0.38],[W*0.5,H*0.78]];
-    stupas.forEach(([sx,sy])=>{
-      g.fillStyle='rgba(238,238,232,.7)';g.beginPath();g.arc(sx,sy,34,Math.PI,0);g.fill();
-      g.fillStyle='rgba(220,180,60,.75)';g.fillRect(sx-9,sy-58,18,26);
-      // prayer flags
-      const cols=['#d33','#3a7','#fc3','#39c','#fff'];
-      g.lineWidth=1.5;
-      for(let f=0;f<10;f++){g.fillStyle=cols[f%5];g.fillRect(sx-50+f*11,sy-66+f*2,8,6);}
-    });
-    // little temple blocks
-    buildings(60,H-60,W-60,8,'rgba(120,80,50,.5)',null);
-  }else if(id==='hongkong'){
-    // ultra-dense highrise on all sides + harbour water strip
-    g.fillStyle='rgba(15,35,52,.5)';g.fillRect(0,0,W,90);
-    buildings(20,300,W-20,28,'rgba(14,30,46,.75)','rgba(120,200,230,.5)');
-    buildings(20,H,W-20,26,'rgba(10,24,40,.6)','rgba(255,210,120,.45)');
-    // harbour
-    g.fillStyle='rgba(30,80,120,.4)';g.fillRect(0,H*0.46,W,70);
-  }else if(id==='lima'){
-    // pacific coast: big sea on one side, cliffs, sun, palms
-    g.fillStyle='rgba(36,104,150,.5)';g.fillRect(0,0,W,140);
-    g.fillStyle='rgba(255,255,255,.25)';for(let i=0;i<24;i++)g.fillRect(rnd()*W,20+rnd()*110,46,3);
-    g.fillStyle='rgba(255,220,150,.55)';g.beginPath();g.arc(W*0.8,90,46,0,7);g.fill();
-    // sandy cliffs + low buildings
-    buildings(60,H-50,W-60,12,'rgba(190,150,100,.5)','rgba(255,240,210,.4)');
-    // palms (infield)
-    for(let i=0;i<6;i++){const px=W*0.2+rnd()*W*0.6,py=H*0.5+rnd()*H*0.3;g.strokeStyle='rgba(80,60,30,.6)';g.lineWidth=5;g.beginPath();g.moveTo(px,py);g.lineTo(px,py-40);g.stroke();g.fillStyle='rgba(40,120,50,.6)';g.beginPath();g.arc(px,py-44,16,0,7);g.fill();}
-  }else if(id==='ulaanbaatar'){
-    // wide steppe: rolling hills, scattered yurts, distant mountains
-    mountains(220,6,'rgba(110,130,90,.35)',null);
-    g.fillStyle='rgba(95,125,70,.4)';
-    g.beginPath();g.moveTo(0,H*0.55);for(let i=0;i<=8;i++)g.quadraticCurveTo(W*i/8,H*0.5+ (i%2?40:-20),W*(i+0.5)/8,H*0.55);g.lineTo(W,H);g.lineTo(0,H);g.fill();
-    // yurts dotted around
-    for(let i=0;i<10;i++){const px=rnd()*W,py=H*0.35+rnd()*H*0.5;g.fillStyle='rgba(245,245,240,.7)';g.beginPath();g.arc(px,py,16,Math.PI,0);g.fill();g.fillStyle='rgba(200,120,60,.6)';g.fillRect(px-4,py-16,8,5);}
-  }else if(id==='almaty'){
-    // big snowy alpine range filling the top third + pine forest + chalets
-    mountains(330,6,'rgba(150,165,188,.55)','rgba(255,255,255,.7)');
-    // pines
-    for(let i=0;i<26;i++){const px=rnd()*W,py=H*0.45+rnd()*H*0.5;g.fillStyle='rgba(30,70,45,.55)';g.beginPath();g.moveTo(px-12,py);g.lineTo(px,py-30);g.lineTo(px+12,py);g.closePath();g.fill();}
-    // chalets
-    buildings(80,H-50,W-80,7,'rgba(120,90,60,.55)','rgba(255,230,180,.5)');
-  }
-  g.restore();
-}
 
 // ════════════ REAL 3D (Three.js) — COCKPIT VIEW ════════════
 // Physics/AI run in 2D world (x,y,a). 3D maps: world x -> X, world y -> Z, height -> Y.
@@ -1219,25 +1131,6 @@ function buildSamples(T){
     }
   }
   T._samples=out;
-}
-// place building/scenery props alongside the track (left + right of road)
-function buildProps(T){
-  const wp=T.wp;const props=[];let seed=99;
-  const rnd=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;};
-  if(!T._samples)buildSamples(T);
-  const sm=T._samples;
-  const kind=T.scenery;
-  for(let i=0;i<sm.length;i+=3){
-    const a=sm[i],b=sm[(i+1)%sm.length];
-    const dirx=b.x-a.x,diry=b.y-a.y,dl=Math.hypot(dirx,diry)||1;
-    const nx=-diry/dl,ny=dirx/dl;
-    [1,-1].forEach(side=>{
-      if(rnd()>0.62)return;
-      const off=(T.roadw*1.9+70+rnd()*150)*side;
-      props.push({x:a.x+nx*off, y:a.y+ny*off, kind:kind, h:50+rnd()*150, w:24+rnd()*30, lit:rnd()>0.4, seed:rnd()});
-    });
-  }
-  T._props=props;
 }
 // ════════════════════ 8 BALL POOL ════════════════════
 const C={W:560,H:304,R:9,POCKET:17,FRICTION:0.988,STOP:0.05,CUSHION:0.74,MAXP:18};

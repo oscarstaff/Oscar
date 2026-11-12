@@ -4487,9 +4487,7 @@ function staffRoleLabel(s){
   if(s.isManager==='office'||s.isOfficeManager)return'Office Manager';
   return s.team;
 }
-function getOfficeManager(){return staff.find(s=>s.isManager==='office'||s.isOfficeManager)||null;}
 function getUniqueTeams(){return[...teams].sort();}
-function getUniqueRoles(){return getUniqueTeams();}
 function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');clearTimeout(t._to);t._to=setTimeout(()=>t.classList.remove('show'),2800);}
 
 /**
@@ -6652,13 +6650,6 @@ let submittedAvailData=[];
 
 // Render one 7-day availability grid. When `compareTo` is supplied, any day
 // that differs from it is outlined so admins can see exactly what changed.
-function _availDayLabel(a){
-  if(!a) a={type:'unset'};
-  if(a.type==='all')    return {label:'9-7',bg:'var(--accent-dim)',col:'var(--accent)',fw:'600'};
-  if(a.type==='custom') return {label:(a.start||'?')+'–'+(a.end||'?'),bg:'rgba(79,142,247,.08)',col:'var(--accent)',fw:'600'};
-  if(a.type==='no')     return {label:'Off',bg:'rgba(220,38,38,.06)',col:'var(--warn)',fw:'600'};
-  return {label:'—',bg:'transparent',col:'var(--muted)',fw:'400'};
-}
 function _availDaysDiffer(a,b){
   a=a||{type:'unset'}; b=b||{type:'unset'};
   if(a.type!==b.type) return true;
@@ -6845,7 +6836,6 @@ async function markAvailReviewed(name,btn){
   }
 }
 
-function isAvailLocked(){return false;}
 
 // ── Download submitted availability as a PDF, grouped by team ──
 function downloadSubmittedAvailability(){
@@ -7095,123 +7085,9 @@ function renderStaffList(){
   try{ if(typeof applyTeamLeadLock==='function' && document.body.classList.contains('tl-readonly')) applyTeamLeadLock(); }catch(e){}
 }
 
-function toggleAvailEdit(id){
-  const s=staff.find(x=>x.id===id);
-  if(!s)return;
-  s.canEditAvail=s.canEditAvail===false?true:false;
-  markDirty();setTimeout(renderStaffList,0);
-  pushStaffSettings();
-  showToast(s.canEditAvail?` ${s.first} can now edit availability`:` ${s.first}'s availability editing locked`);
-}
 
-function toggleHubAdmin(id){
-  const s=staff.find(x=>x.id===id);
-  if(!s)return;
-  const newVal=!s.isHubAdmin;
-  s.isHubAdmin=newVal;
-  markDirty();renderStaffList();
-  // Admin flags are guarded by a DB trigger that rejects the anon-key PATCH the
-  // old pushStaffSettings used (that's why toggling silently did nothing). Route
-  // it through the relay's setAdminFlag action, which writes with the service
-  // key and is itself gated to hub-admin callers via sbAccessToken.
-  const name=`${s.first} ${s.last}`;
-  fetch(GAS_EXEC_URL,{
-    method:'POST',
-    headers:{'Content-Type':'text/plain;charset=utf-8'},
-    body:JSON.stringify({action:'setAdminFlag',staff:name,flag:'hub',value:newVal,
-      token:GAS_TOKEN,sbAccessToken:_soTok()})
-  }).then(r=>r.json()).then(res=>{
-    if(res && res.ok){
-      showToast(newVal?`${s.first} is now a Hub Admin`:`${s.first} is no longer a Hub Admin`);
-    }else{
-      s.isHubAdmin=!newVal; renderStaffList();
-      console.error('[setAdminFlag] relay rejected:', res);
-      showToast('Could not update admin: '+((res&&res.error)||'failed'),true);
-    }
-  }).catch(e=>{
-    s.isHubAdmin=!newVal; renderStaffList();
-    showToast('Could not update admin (network)',true);
-  });
-  // Keep can_edit_avail and other non-guarded settings syncing as before.
-  pushStaffSettings();
-}
 
-async function pushStaffSettings(){
-  try{
-    await Promise.all(staff.map(async s=>{
-      const name=`${s.first} ${s.last}`;
-      const payload={
-        name,
-        can_edit_avail:s.canEditAvail!==false
-      };
-      // Try PATCH first (update existing row)
-      const patch=await fetch(`${SUPABASE_URL}/rest/v1/staff_settings?name=eq.${encodeURIComponent(name)}`,{
-        method:'PATCH',
-        headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`,'Content-Type':'application/json','Prefer':'return=minimal'},
-        body:JSON.stringify({can_edit_avail:s.canEditAvail!==false})
-      });
-      // If no row existed (0 rows updated), INSERT instead
-      if(patch.headers.get('content-range')==='*\/0'){
-        await fetch(`${SUPABASE_URL}/rest/v1/staff_settings`,{
-          method:'POST',
-          headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`,'Content-Type':'application/json','Prefer':'return=minimal'},
-          body:JSON.stringify(payload)
-        });
-      }
-    }));
-  }catch(e){console.warn('Could not push staff settings',e);}
-}
 
-function toggleStaffMenu(id, btn){
-  const menu = document.getElementById('staffmenu-'+id);
-  if(!menu) return;
-  const isOpen = menu.style.display === 'block';
-  document.querySelectorAll('.staff-popmenu').forEach(function(m){ m.style.display='none'; });
-  if(isOpen) return;
-  // Hide off-screen first so we can measure its real size without flicker
-  menu.style.visibility = 'hidden';
-  menu.style.display = 'block';
-  menu.style.top = '-9999px';
-  menu.style.left = '-9999px';
-  // Force layout to get accurate dimensions
-  const menuRect = menu.getBoundingClientRect();
-  const rect = btn.getBoundingClientRect();
-  const PAD = 8;
-  // Default: open BELOW + RIGHT-aligned to button
-  let top = rect.bottom + 4;
-  let left = rect.right - menuRect.width;
-  // Flip ABOVE if below would clip
-  if(top + menuRect.height >window.innerHeight - PAD){
-    top = rect.top - menuRect.height - 4;
-  }
-  // Clamp top to viewport
-  if(top < PAD) top = PAD;
-  if(top + menuRect.height >window.innerHeight - PAD){
-    top = window.innerHeight - menuRect.height - PAD;
-  }
-  // Clamp left to viewport
-  if(left < PAD) left = PAD;
-  if(left + menuRect.width >window.innerWidth - PAD){
-    left = window.innerWidth - menuRect.width - PAD;
-  }
-  menu.style.top = top + 'px';
-  menu.style.left = left + 'px';
-  menu.style.visibility = 'visible';
-  // Outside click handler
-  setTimeout(function(){
-    function outsideHandler(e){
-      if(!menu.contains(e.target) && e.target !== btn && !btn.contains(e.target)){
-        menu.style.display = 'none';
-        document.removeEventListener('click', outsideHandler, true);
-      }
-    }
-    document.addEventListener('click', outsideHandler, true);
-  }, 10);
-}
-function closeStaffMenu(id){
-  const menu=document.getElementById('staffmenu-'+id);
-  if(menu)menu.style.display='none';
-}
 // Close menus when clicking outside
 document.addEventListener('click',function(e){
   if(!e.target.closest('[id^="staffmenu-"]')&&!e.target.title?.includes('More')){
@@ -8454,117 +8330,7 @@ function editStaff(id){
   openModal('staffModal');
 }
 
-// Build the read-only profile summary shown at the top of the employee modal:
-// avatar/name/role, key figures (hours, utilisation, type, max), then live
-// stats pulled in async (punctuality, leave). Reuses data ShiftOps already has.
-function renderEmpProfile(s){
-  const panel=document.getElementById('empProfilePanel');
-  if(!panel) return;
-  const hrs=staffHoursWeek(s.id);
-  const pct=Math.min(100,Math.round((hrs/s.maxHours)*100));
-  const tl={full:'Full-time',part:'Part-time',casual:'Casual'};
-  const isAdmin=!!s.isHubAdmin, isLead=!isAdmin&&!!s.isTeamLead;
-  const roleTxt=isAdmin?'Admin':(isLead?'Team Lead':'Team Member');
-  const stat=(label,val,sub)=>
-    '<div style="flex:1;min-width:82px;background:var(--card,rgba(127,127,127,.06));border:1px solid var(--border);border-radius:9px;padding:9px 11px;">'+
-      '<div style="font-family:var(--mono);font-size:8.5px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text-dim);">'+label+'</div>'+
-      '<div style="font-size:16px;font-weight:700;margin-top:3px;">'+val+'</div>'+
-      (sub?'<div style="font-size:10px;color:var(--text-dim);margin-top:1px;">'+sub+'</div>':'')+
-    '</div>';
-  panel.innerHTML=
-    '<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">'+
-      '<div class="avatar" style="background:'+s.color+';width:52px;height:52px;font-size:18px;">'+initials(s)+'</div>'+
-      '<div style="flex:1;min-width:0;">'+
-        '<div style="font-size:17px;font-weight:700;">'+_cdEsc(s.first+' '+s.last)+'</div>'+
-        '<div style="display:flex;align-items:center;gap:7px;margin-top:3px;flex-wrap:wrap;">'+
-          '<span style="font-family:var(--mono);font-size:10px;color:var(--text-dim);">'+_cdEsc(s.team||'')+'</span>'+
-          '<span style="font-size:9px;font-weight:700;font-family:var(--mono);padding:1px 7px;border-radius:4px;background:'+(isAdmin?'var(--accent-dim);color:var(--accent-text)':(isLead?'var(--accent-dim);color:var(--accent-text)':'rgba(127,127,127,.15);color:var(--text-dim)'))+';">'+roleTxt.toUpperCase()+'</span>'+
-        '</div>'+
-      '</div>'+
-    '</div>'+
-    '<div style="display:flex;gap:8px;flex-wrap:wrap;">'+
-      stat('This week', hrs.toFixed(1)+'h', pct+'% of '+s.maxHours+'h')+
-      stat('Type', tl[s.type]||s.type, '')+
-      stat('Punctuality', '<span id="empProfPunc">…</span>', 'last 30 days')+
-      stat('Leave', '<span id="empProfLeave">…</span>', 'upcoming')+
-    '</div>'+
-    '<div id="empProfPayroll" style="display:none;"></div>'+
-    '<div style="font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin:16px 0 2px;">Edit details</div>';
-  panel.style.display='';
-  // Fill the async stats (punctuality, leave) without blocking the modal.
-  _fillEmpProfileStats(s);
-}
 
-async function _fillEmpProfileStats(s){
-  const full=(s.first+' '+s.last).trim();
-  // Punctuality: count clock-ins vs lateness over the last 30 days is complex;
-  // as a light first pass, show on-time rate from clock_log 'in' punches that
-  // exist (present days) — kept simple and honest rather than precise.
-  try{
-    const puncEl=document.getElementById('empProfPunc');
-    if(puncEl){
-      const since=new Date(Date.now()-30*86400000).toISOString().slice(0,10);
-      const rows=await _cdGet('clock_log?staff_name=eq.'+encodeURIComponent(full)+'&action=eq.in&ts=gte.'+since+'&select=ts');
-      puncEl.textContent=(rows&&rows.length!=null)?(rows.length+' days'):'—';
-    }
-  }catch(e){ const p=document.getElementById('empProfPunc'); if(p)p.textContent='—'; }
-  // Leave: next upcoming approved leave.
-  try{
-    const lvEl=document.getElementById('empProfLeave');
-    if(lvEl){
-      const today=_sydToday();
-      const rows=await _cdGet('leave_submissions?staff_name=eq.'+encodeURIComponent(full)+'&status=eq.approved&to_date=gte.'+today+'&order=from_date.asc&select=from_date,to_date&limit=1');
-      if(rows&&rows.length){
-        const d=new Date(rows[0].from_date+'T00:00:00');
-        lvEl.textContent=d.toLocaleDateString('en-AU',{day:'numeric',month:'short'});
-      }else lvEl.textContent='None';
-    }
-  }catch(e){ const l=document.getElementById('empProfLeave'); if(l)l.textContent='—'; }
-
-  // Payroll breakdown — Accounts-only. Gated by _canPayroll() AND by RLS on
-  // payroll_rates (returns nothing to non-Accounts), so this is safe even if
-  // the UI check were bypassed. Renders rate, hours, premium and total.
-  try{
-    const payWrap=document.getElementById('empProfPayroll');
-    if(payWrap && typeof _canPayroll==='function' && _canPayroll()){
-      const rows=await _cdGet('payroll_rates?staff_name=eq.'+encodeURIComponent(full)+'&select=structure,std_rate,prem_rate,pay_cap&limit=1');
-      if(rows && rows.length){
-        const r=rows[0];
-        const hrs=staffHoursWeek(s.id);
-        const cap=(r.pay_cap!=null)?Number(r.pay_cap):0;
-        const std=Number(r.std_rate||0), prem=Number(r.prem_rate||0);
-        let stdHrs, premHrs, stdPay, premPay;
-        if(r.structure==='flat'){
-          stdHrs=hrs; premHrs=0; stdPay=hrs*std; premPay=0;
-        }else{
-          stdHrs=Math.min(hrs,cap); premHrs=Math.max(0,hrs-cap);
-          stdPay=stdHrs*std; premPay=premHrs*prem;
-        }
-        const total=stdPay+premPay;
-        const money=v=>'$'+v.toFixed(2);
-        const line=(l,v,accent)=>
-          '<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:12.5px;'+(accent?'color:var(--pp-prem,#b45309);font-weight:700;':'')+'">'+
-            '<span style="color:'+(accent?'inherit':'var(--text-dim)')+'">'+l+'</span><span style="font-family:var(--mono);font-weight:600;">'+v+'</span></div>';
-        payWrap.innerHTML=
-          '<div style="font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin:16px 0 6px;">Payroll (this week)</div>'+
-          '<div style="border:1px solid var(--border);border-radius:9px;padding:10px 13px;background:var(--card,rgba(127,127,127,.05));">'+
-            line((r.structure==='flat'?'Flat rate':'Standard rate')+' ('+money(std)+'/h)', stdHrs.toFixed(1)+'h · '+money(stdPay))+
-            (r.structure!=='flat'
-              ? line('Premium rate ('+money(prem)+'/h, over '+cap+'h)', premHrs>0?(premHrs.toFixed(1)+'h · '+money(premPay)):'—', true)
-              : '')+
-            '<div style="border-top:1px solid var(--border);margin-top:6px;padding-top:6px;">'+
-              line('<b>Total</b>', '<b>'+money(total)+'</b>')+
-            '</div>'+
-          '</div>';
-        payWrap.style.display='';
-      }else{
-        payWrap.innerHTML='<div style="font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin:16px 0 6px;">Payroll</div>'+
-          '<div style="font-size:12px;color:var(--text-dim);padding:8px 0;">No pay rate set for this employee.</div>';
-        payWrap.style.display='';
-      }
-    }
-  }catch(e){ /* payroll stays hidden on error — never leak a partial state */ }
-}
 
 // Multi-team ("Also on teams") removed — single team per staffer via staff_directory.
 // Kept as a no-op so existing call sites don't error.
@@ -8679,8 +8445,6 @@ function populateTeamSelect(selectedTeam){
   const sel=document.getElementById('staffTeam');
   sel.innerHTML=[...teams].sort().map(t=>`<option value="${t}"${t===selectedTeam?' selected':''}>${t}</option>`).join('');
 }
-// Multi-team chips removed — single team per staffer. No-op kept for safety.
-function buildExtraTeamChips(){ /* no-op: single-team model */ }
 /**
  * Employment type drives who gets told about an open shift, so it needs a
  * durable home rather than living in the blob. Keyed by name so it survives
@@ -8847,9 +8611,6 @@ async function addStaffToSupabase(fullName, team){
   }catch(e){ console.warn('addStaffToSupabase failed', e); }
 }
 
-// staff_teams retired — a staffer's team lives in staff_directory/staff_credentials
-// (written elsewhere). This is now a no-op kept so existing call sites don't break.
-async function saveStaffTeams(fullName, primaryTeam){ /* no-op: staff_teams retired */ }
 
 function removeStaff(id){
   const s=staff.find(x=>x.id===id);
@@ -8942,40 +8703,6 @@ function toggleTypeFilter(el){
   });
 }
 
-function applyPreset(preset){
-  const configs={
-    fulltimeWeek:  {days:[0,1,2,3,4],start:'09:00',end:'19:00',full:5,part:3,casual:2,types:['full']},
-    allStaffWeek:  {days:[0,1,2,3,4],start:'09:00',end:'19:00',full:5,part:3,casual:2,types:['full','part','casual']},
-    weekendRun:    {days:[5,6],      start:'09:00',end:'19:00',full:2,part:2,casual:2,types:['full','part','casual']},
-    fullWeek:      {days:[0,1,2,3,4,5,6],start:'09:00',end:'19:00',full:7,part:4,casual:3,types:['full','part','casual']},
-  };
-  const c=configs[preset];if(!c)return;
-
-  // Set day toggles
-  document.querySelectorAll('#allocDays .day-toggle').forEach(el=>{
-    const d=parseInt(el.dataset.day);
-    el.classList.toggle('on',c.days.includes(d));
-  });
-  document.getElementById('allocStart').value=c.start;
-  document.getElementById('allocEnd').value=c.end;
-  document.getElementById('allocFull').value=c.full;
-  document.getElementById('allocPart').value=c.part;
-  document.getElementById('allocCasual').value=c.casual;
-
-  // Set type toggles
-  document.querySelectorAll('.type-toggle').forEach(el=>{
-    el.classList.toggle('on',c.types.includes(el.dataset.type));
-  });
-
-  // Check/uncheck staff based on type
-  document.querySelectorAll('#allocStaffList input[type=checkbox]').forEach(cb=>{
-    const sid=parseInt(cb.dataset.sid);
-    const s=staff.find(x=>x.id===sid);
-    if(s)cb.checked=c.types.includes(s.type);
-  });
-
-  showToast('Preset applied');
-}
 
 function setAllocAll(checked){
   document.querySelectorAll('#allocStaffList input[type=checkbox]').forEach(cb=>cb.checked=checked);
@@ -9328,32 +9055,6 @@ async function exportPDF(dayFilter=null){
   showToast('PDF downloaded');
 }
 
-function exportTXT(){
-  let text=`ShiftOps Roster — Week of ${fmtDate(currentWeekStart)}\n${'─'.repeat(50)}\n\n`;
-  staff.forEach(s=>{
-    text+=`${s.first} ${s.last} (${s.role})\n`;
-    let had=false;
-    for(let d=0;d<7;d++){const ds=(shifts[s.id]||{})[d]||[];if(ds.length>0){ds.forEach(sh=>{text+=`  ${DAYS_FULL[d].padEnd(10)} ${sh.start}–${sh.end}  ${sh.role||sh.type}\n`;});had=true;}}
-    if(!had)text+='  (no shifts this week)\n';
-    text+='\n';
-  });
-  dlFile('roster.txt',text,'text/plain');showToast('TXT exported');
-}
-function exportCSV(){
-  let csv='Staff,Role,Day,Date,Start,End,Type,Position\n';
-  staff.forEach(s=>{
-    for(let d=0;d<7;d++){
-      const ds=(shifts[s.id]||{})[d]||[],date=fmtDate(addDays(currentWeekStart,d));
-      ds.forEach(sh=>{csv+=`"${s.first} ${s.last}","${s.role}","${DAYS_FULL[d]}","${date}","${sh.start}","${sh.end}","${sh.type}","${sh.role}"\n`;});
-    }
-  });
-  dlFile('roster.csv',csv,'text/csv');showToast('CSV exported');
-}
-function dlFile(name,text,mime){
-  const a=document.createElement('a');
-  a.href='data:'+mime+';charset=utf-8,'+encodeURIComponent(text);
-  a.download=name;document.body.appendChild(a);a.click();document.body.removeChild(a);
-}
 
 // ── TABS & NAV ────────────────────────────────────────────────────────────
 function showSubTab(id){
@@ -9691,10 +9392,6 @@ function applyTeamLeadLock(){
     card.setAttribute('data-tl-hide', (t===mine)?'0':'1');
   });
 }
-function teamsIncludes(v){
-  try{ return (teams||[]).some(function(t){return String(t).toLowerCase()===String(v).toLowerCase();}); }
-  catch(e){ return false; }
-}
 
 document.querySelectorAll('.modal-overlay').forEach(o=>{o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('open');});});
 
@@ -9717,28 +9414,6 @@ function populateShiftDeviceSelect(selectedDeviceId){
     +devices.map(d=>`<option value="${d.id}"${d.id===selectedDeviceId?' selected':''}>${d.name}</option>`).join('');
 }
 
-function openManageDevices(){
-  // Build a small inline modal for managing the device list
-  const existing=document.getElementById('devMgmtPanel');
-  if(existing){existing.remove();return;}
-  const panel=document.createElement('div');
-  panel.id='devMgmtPanel';
-  panel.style.cssText='position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:24px 28px;z-index:300;width:360px;box-shadow:0 8px 32px rgba(0,0,0,.5)';
-  panel.innerHTML=`
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-      <div style="font-weight:700;font-size:15px">Manage Devices</div>
-      <button onclick="document.getElementById('devMgmtPanel').remove()" style="background:none;border:none;color:var(--text-dim);font-size:20px;cursor:pointer">×</button>
-    </div>
-    <div id="devMgmtList" style="display:flex;flex-direction:column;gap:7px;max-height:280px;overflow-y:auto;margin-bottom:14px"></div>
-    <div style="display:flex;gap:8px">
-      <input id="devMgmtInput" type="text" class="form-input" placeholder="New device name e.g. Laptop 01" style="flex:1">
-      <button class="btn btn-primary" onclick="addDeviceFromPanel()">Add</button>
-    </div>`;
-  document.body.appendChild(panel);
-  refreshDevMgmtList();
-  // Click outside to close
-  setTimeout(()=>document.addEventListener('click',function h(e){if(!panel.contains(e.target)){panel.remove();document.removeEventListener('click',h);}},true),100);
-}
 
 function refreshDevMgmtList(){
   const list=document.getElementById('devMgmtList');
@@ -9752,19 +9427,6 @@ function refreshDevMgmtList(){
     </div>`).join('');
 }
 
-function addDeviceFromPanel(){
-  const input=document.getElementById('devMgmtInput');
-  const name=input.value.trim();
-  if(!name){showToast('Enter a device name');return;}
-  if(devices.find(d=>d.name.toLowerCase()===name.toLowerCase())){showToast('Device already exists');return;}
-  devices.push({id:nextDeviceId++,name});
-  input.value='';
-  markDirty();refreshDevMgmtList();
-  // Refresh device dropdown in shift modal if open
-  const sel=document.getElementById('shiftDevice');
-  if(sel)populateShiftDeviceSelect(parseInt(sel.value)||null);
-  showToast(` ${name} added`);
-}
 
 function removeDeviceFromPanel(id){
   devices=devices.filter(d=>d.id!==id);
@@ -9802,24 +9464,6 @@ function getDeviceConflicts(){
   return conflicts;
 }
 
-// ── SHARED FOLDER ─────────────────────────────────────────────────────────
-async function openSharedFolderSettings(){
-  if(!window.shiftops){showToast('Only available in the desktop app');return;}
-  const res=await window.shiftops.getSharedFolder();
-  const pathEl=document.getElementById('sharedFolderPath');
-  const clearBtn=document.getElementById('sharedFolderClearBtn');
-  if(res.ok&&res.folder){
-    pathEl.textContent=res.folder+'/shiftops-data.json';
-    pathEl.style.color='var(--accent)';
-    clearBtn.style.display='';
-  } else {
-    const dp=await window.shiftops.getDataPath();
-    pathEl.textContent=dp+' (local only)';
-    pathEl.style.color='var(--text-dim)';
-    clearBtn.style.display='none';
-  }
-  openModal('sharedFolderModal');
-}
 
 async function pickSharedFolder(){
   if(!window.shiftops)return;
@@ -9844,59 +9488,7 @@ async function clearSharedFolder(){
   closeModal('sharedFolderModal');
 }
 
-// ── DEVICE ALLOCATION ─────────────────────────────────────────────────────
-function openDeviceAllocation(){
-  const deviceOptions='<option value="">— No device —</option>'+devices.map(d=>`<option value="${d.id}">${d.name}</option>`).join('');
-  const sortedStaff=[...staff].sort((a,b)=>a.first.localeCompare(b.first)||a.last.localeCompare(b.last));
 
-  let html='';
-  if(!devices.length){
-    html=`<div style="text-align:center;padding:24px;color:var(--text-dim);font-size:13px">No devices set up yet.<br><br>Use <strong>Manage Devices</strong>in the sidebar to add devices first.</div>`;
-  } else {
-    sortedStaff.forEach(s=>{
-      let currentDevice='';
-      let devStart='',devEnd='';
-      for(let d=0;d<7;d++){
-        const ds=(shifts[s.id]||{})[d]||[];
-        const sh=ds.find(x=>x.deviceId);
-        if(sh){
-          currentDevice=sh.deviceId;
-          devStart=sh.deviceStart||sh.start||'';
-          devEnd=sh.deviceEnd||sh.end||'';
-          break;
-        }
-      }
-      const isOM=s.isOfficeManager||s.isManager==='office';
-      html+=`<div style="background:rgba(255,255,255,.04);border:1px solid ${isOM?'rgba(255,215,0,.3)':'var(--border)'};border-radius:8px;padding:10px 12px;margin-bottom:6px">
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
-          <div class="avatar" style="background:${isOM?'#ffd700':s.color};${isOM?'color:#3a2a00;':''}width:26px;height:26px;font-size:9px;flex-shrink:0">${initials(s)}</div>
-          <div style="flex:1">
-            <div style="font-size:13px;font-weight:700;${isOM?'color:#ffd700':''}">${s.first} ${s.last}</div>
-            <div style="font-family:var(--mono);font-size:9px;color:var(--text-dim)">${isOM?'Office Manager':s.team}</div>
-          </div>
-          <select data-dev-sid="${s.id}" class="form-input" style="font-size:12px;padding:5px 8px;width:150px;flex-shrink:0" onchange="toggleDeviceTime(${s.id},this.value)">
-            ${deviceOptions.replace(`value="${currentDevice}"`,`value="${currentDevice}" selected`)}
-          </select>
-        </div>
-        <div id="devtime-${s.id}" style="display:${currentDevice?'flex':'none'};align-items:center;gap:8px;padding:6px 0 0">
-          <span style="font-family:var(--mono);font-size:9px;color:var(--text-dim)">Device hours:</span>
-          <input type="time" data-dev-start="${s.id}" class="form-input" style="width:110px;padding:4px 8px;font-size:12px" value="${devStart}">
-          <span style="color:var(--text-dim);font-size:12px">–</span>
-          <input type="time" data-dev-end="${s.id}" class="form-input" style="width:110px;padding:4px 8px;font-size:12px" value="${devEnd}">
-          <span style="font-family:var(--mono);font-size:9px;color:var(--text-dim)">(optional — leave blank to use full shift)</span>
-        </div>
-      </div>`;
-    });
-  }
-
-  document.getElementById('deviceAllocList').innerHTML=html;
-  openModal('deviceAllocModal');
-}
-
-function toggleDeviceTime(sid,val){
-  const el=document.getElementById('devtime-'+sid);
-  if(el)el.style.display=val?'flex':'none';
-}
 
 function applyDeviceAllocation(){
   let applied=0;
@@ -11462,26 +11054,8 @@ async function syncLeaveRequests(){
 // ── PASSWORD MANAGEMENT ───────────────────────────────────────────────────
 let resetPassTarget=null;
 
-function switchResetTab(tab){
-  const ps=document.getElementById('rpanel-set');if(ps)ps.style.display='';
-  const pk=document.getElementById('rpanel-key');if(pk)pk.style.display='none';
-}
 
-async function hashPassword(pass){
-  const enc=new TextEncoder().encode(pass+'oscar_roster_salt_2024');
-  const buf=await crypto.subtle.digest('SHA-256',enc);
-  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
-}
 
-function generateKeyStr(){
-  const chars='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  let key='';
-  for(let i=0;i<8;i++){
-    if(i===4)key+='-';
-    key+=chars[Math.floor(Math.random()*chars.length)];
-  }
-  return key;
-}
 
 function resetStaffPasswordById(staffId){
   const s=staff.find(x=>x.id===staffId);
@@ -11499,53 +11073,7 @@ function resetStaffPassword(staffId,name){
   openModal('resetPassModal');
 }
 
-async function generateResetKey(){
-  const name=resetPassTarget.name;
-  const key=generateKeyStr();
-  const btn=document.getElementById('genKeyBtn');
-  btn.disabled=true;btn.textContent='Saving…';
 
-  try{
-    const keyHash=await hashPassword(key);
-    // Store the reset key hash in Supabase
-    const checkRes=await fetch(
-      `${SUPABASE_URL}/rest/v1/staff_credentials?staff_name=eq.${encodeURIComponent(name)}`,
-      {headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`}}
-    );
-    const existing=await checkRes.json();
-
-    let res;
-    if(existing.length){
-      res=await fetch(
-        `${SUPABASE_URL}/rest/v1/staff_credentials?staff_name=eq.${encodeURIComponent(name)}`,
-        {method:'PATCH',headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`,'Content-Type':'application/json','Prefer':'return=minimal'},
-         body:JSON.stringify({reset_key_hash:keyHash})}
-      );
-    } else {
-      // Create credential record with just the reset key (no password yet)
-      res=await fetch(
-        `${SUPABASE_URL}/rest/v1/staff_credentials`,
-        {method:'POST',headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`,'Content-Type':'application/json','Prefer':'return=minimal'},
-         body:JSON.stringify({staff_name:name,password_hash:'',reset_key_hash:keyHash})}
-      );
-    }
-
-    if(res.ok||res.status===201||res.status===204){
-      document.getElementById('resetKeyValue').textContent=key;
-      document.getElementById('resetKeyDisplay').style.display='block';
-      btn.textContent='Regenerate Key';
-    } else throw new Error();
-  }catch(e){
-    showToast('Failed to generate key');
-  }finally{
-    btn.disabled=false;
-  }
-}
-
-function copyResetKey(){
-  const key=document.getElementById('resetKeyValue').textContent;
-  navigator.clipboard.writeText(key).then(()=>showToast('Key copied to clipboard'));
-}
 
 async function doResetPassword(){
   const pass=document.getElementById('resetPassNew').value;
@@ -12034,30 +11562,6 @@ let aaAllStaff=[];
 let aaWork={formcraft:new Set(),slip:new Set(),dialtrac:new Set(),borekade:new Set(),shiftops:new Set(),admin:new Set()};
 let aaOrig={formcraft:new Set(),slip:new Set(),dialtrac:new Set(),borekade:new Set(),shiftops:new Set(),admin:new Set()};
 
-async function openAccessAdmin(){
-  openModal('accessAdminModal');
-  // staff list from staff_names (same as Nexus)
-  try{
-    const rows=await aaGet('staff_names?order=name.asc&select=name');
-    aaAllStaff=(rows||[]).map(r=>r.name).filter(Boolean);
-  }catch(e){ aaAllStaff=[]; }
-  // current app_access
-  aaWork={formcraft:new Set(),slip:new Set(),dialtrac:new Set(),borekade:new Set(),shiftops:new Set(),admin:new Set()};
-  try{
-    const rows=await aaGet('app_access?select=app,staff_name');
-    (rows||[]).forEach(r=>{ if(aaWork[r.app]) aaWork[r.app].add(r.staff_name); });
-  }catch(e){}
-  // current admins from staff_settings (both classes)
-  try{
-    const rows=await aaGet('staff_settings?select=name,is_hub_admin,is_shift_admin');
-    (rows||[]).forEach(r=>{
-      if((r.is_hub_admin===true || r.is_shift_admin===true) && r.name) aaWork.admin.add(r.name);
-    });
-  }catch(e){}
-  // snapshot originals for diffing
-  aaOrig={formcraft:new Set(aaWork.formcraft),slip:new Set(aaWork.slip),dialtrac:new Set(aaWork.dialtrac),borekade:new Set(aaWork.borekade),shiftops:new Set(aaWork.shiftops),admin:new Set(aaWork.admin)};
-  aaSwitch('formcraft');
-}
 function aaSwitch(app){
   aaCurrent=app;
   ['formcraft','slip','borekade','shiftops','admin'].forEach(a=>{
@@ -12922,7 +12426,7 @@ function stopMorningBoard(){
 }
 
 </script>
-<script src="payroll.js?v=9"></script>
+<script src="payroll.js?v=10"></script>
 <style id="so-early-css">
 /* Early clock-in notices (hub admins) — sits under the dashboard tiles */
 .so-early{

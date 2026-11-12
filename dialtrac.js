@@ -3459,18 +3459,6 @@ function initCallLog(){
   if(n) setTimeout(()=>n.focus(),80);
 }
 
-function switchAccessApp(app){
-  _accessCurrentApp=app;
-  ['formcraft','slip','dialtrac','shiftops'].forEach(a=>{var t=document.getElementById('acctab-'+a);if(t)t.className='acc-app-tab'+(app===a?' acc-tab-active':'');});
-  // restyle tabs
-  ['formcraft','slip','dialtrac','shiftops'].forEach(a=>{
-    const el=document.getElementById('acctab-'+a);
-    if(a===app){el.style.background='var(--accent)';el.style.color='#fff';el.style.borderColor='var(--accent)';}
-    else{el.style.background='transparent';el.style.color='var(--text,#333)';el.style.borderColor='var(--border-color,#ddd)';}
-  });
-  document.getElementById('accSearch').value='';
-  renderAccessList('');
-}
 function renderAccessList(filter){
   const c=document.getElementById('accStaffList');
   const f=(filter||'').toLowerCase();
@@ -3486,30 +3474,6 @@ function renderAccessList(filter){
     row.onclick=()=>{ if(sel.has(n))sel.delete(n); else sel.add(n); renderAccessList(filter); };
     c.appendChild(row);
   });
-}
-function filterAccessList(v){ renderAccessList(v); }
-function accSelectAll(){ _accessAllStaff.forEach(n=>_accessWorking[_accessCurrentApp].add(n)); renderAccessList(document.getElementById('accSearch').value); }
-function accClearAll(){ _accessWorking[_accessCurrentApp].clear(); renderAccessList(document.getElementById('accSearch').value); }
-async function accSelectTeam(team){
-  try{
-    const rows=await sbGet('staff_credentials','?select=staff_name&team=eq.'+encodeURIComponent(team));
-    (rows||[]).forEach(r=>{ if(r.staff_name) _accessWorking[_accessCurrentApp].add(r.staff_name); });
-  }catch(e){}
-  renderAccessList(document.getElementById('accSearch').value);
-}
-async function buildTeamButtons(){
-  const wrap=document.getElementById('accTeamButtons');
-  let teams=[];
-  try{
-    const rows=await sbGet('staff_credentials','?select=team&team=not.is.null');
-    teams=[...new Set((rows||[]).map(r=>r.team).filter(Boolean))];
-  }catch(e){}
-  wrap.innerHTML='<span style="font-size:12px;color:var(--text-dim,#888);align-self:center;margin-right:4px;">Quick add:</span>';
-  wrap.innerHTML+='<button onclick="accSelectAll()" style="padding:6px 12px;border-radius:8px;border:1.5px solid var(--accent);background:transparent;color:var(--accent);font-size:12px;font-weight:600;cursor:pointer;">Everyone</button>';
-  teams.forEach(t=>{
-    wrap.innerHTML+='<button onclick="accSelectTeam(\''+t.replace(/'/g,"\\'")+'\')" style="padding:6px 12px;border-radius:8px;border:1.5px solid var(--border-color,#ddd);background:transparent;color:var(--text,#333);font-size:12px;font-weight:600;cursor:pointer;">'+t+'</button>';
-  });
-  wrap.innerHTML+='<button onclick="accClearAll()" style="padding:6px 12px;border-radius:8px;border:1.5px solid #f5c2c2;background:transparent;color:#c0392b;font-size:12px;font-weight:600;cursor:pointer;">Clear all</button>';
 }
 
 // ── Globals restored (were removed with the discussions cut) ──

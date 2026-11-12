@@ -1415,8 +1415,6 @@ async function loadShiftsPage(){
   if(skel) skel.style.display='none';
   if(body){ body.style.display=''; body.dataset.loaded='1'; }
 }
-/** Kept so older callers still work — there is only one Shifts view now. */
-function showShiftsTab(){ loadShiftsPage(); }
 
 /** Open the Shifts page. */
 function openShiftsTab(){

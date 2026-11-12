@@ -50,11 +50,6 @@ async function _pGet(table, qs){
   }
   return r.json();
 }
-function _pEsc(s){
-  if(typeof esc === 'function') return esc(s);
-  return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
-    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
 /* ── Sydney day boundaries ──────────────────────────────────────────────────
    Every timesheet day is a SYDNEY day, whatever timezone this browser is set to.
    (Sophiya's 9:35am Sydney clock-in is 10:35pm the day before in UTC, so a browser

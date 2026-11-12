@@ -178,12 +178,6 @@ function nxAutoOutFix(staff, isoDate){
   try{ window.scrollTo({top:0, behavior:'smooth'}); }catch(e){}
 }
 
-/* Compat router: the old Reports tabs are separate pages now. */
-function showReportsTab(tab){
-  if(tab === 'manager') return goTo('myreports');
-  if(tab === 'teamreport') return goTo('teamreport');
-  return goTo('myhours');
-}
 
 
 

@@ -205,21 +205,6 @@ function _hofSort(a,b){
   return String(a.name||'').localeCompare(String(b.name||''));
 }
 
-/**
- * Snap a clock-in to the same 15-minute block the timesheet records.
- * Mirrors flexTimeStr() in the Apps Script: ≤7 → :00, ≤22 → :15, ≤37 → :30,
- * ≤52 → :45, else the next hour. Punctuality has to use this or it will
- * disagree with payroll about the very same arrival.
- */
-function _flexRound(dt){
-  const h=dt.getHours(); let m=dt.getMinutes(), hh=h;
-  if(m<=7) m=0;
-  else if(m<=22) m=15;
-  else if(m<=37) m=30;
-  else if(m<=52) m=45;
-  else { m=0; hh=h+1; }
-  return new Date(dt.getFullYear(), dt.getMonth(), dt.getDate(), hh, m, 0, 0);
-}
 
 function _flexRoundMin(mins){
   let h=Math.floor(mins/60), m=mins%60;
