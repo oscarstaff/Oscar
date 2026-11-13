@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#12201f">
 <meta name="robots" content="noindex,nofollow">
 <meta name="referrer" content="no-referrer">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-xMt/SOEgfdU+Gn6oCMTRiyC5dvvW6iRjckdXCDKOxmo=' 'sha256-YVJ1Ui78Q2aiOyiiaZVCbRT0E4y24eMoFo+tElxyF18='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data:; connect-src https://jcfgldqrdbfkgbixszds.supabase.co; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-27ysZxtg0xWjikciJnl6p9Oun6JvBpqkESCMcIdAldg=' 'sha256-Q9lquseyGWYa8Pd1KkdwHwiwhXLE3Dn/1WXoHyYbZng='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data:; connect-src https://jcfgldqrdbfkgbixszds.supabase.co; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Nex · Student management</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232fb5ad'/%3E%3Ctext x='16' y='23' text-anchor='middle' font-family='Arial' font-weight='700' font-size='20' fill='%2308201f'%3EN%3C/text%3E%3C/svg%3E">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
@@ -354,7 +354,7 @@
       sessionStorage.setItem('ngate_'+APP,'1');
       sessionStorage.setItem('nex_user',name);
       sessionStorage.setItem('nex_sb_at',at);
-      if(payload.sb_rt) sessionStorage.setItem('nex_sb_rt',payload.sb_rt);
+      /* the hub's refresh token is deliberately NOT kept: two apps rotating one refresh token ends the hub session */
       sessionStorage.setItem('nex_is_admin',isAdmin?'1':'0');
       sessionStorage.setItem('nex_t0',String(Date.now()));
       pass();
@@ -1478,146 +1478,65 @@ function agentForm(a) {
 }
 
 /* =========================================================
-   Two-step login: a 6-digit code from an authenticator app.
-   Uses Supabase's own MFA endpoints. The database enforces it
-   (nex_open() needs an aal2 session once the switch is on);
-   this file only draws the screens.
+   Two-step login, Nex side. The 6-digit code is asked in Nexus (it holds the refresh token that a code
+   check swaps), so Nex never confirms codes itself. It only (1) refuses to open without a code-verified
+   session when the switch is on, and (2) shows the admin card: switch, who has set up, reset.
+   The database enforces the rule (nex_open() needs aal2), this file only explains it.
    ========================================================= */
 function aalNow() { const c = tokenPayload(ss.get('nex_sb_at')); return (c && c.aal) || 'aal1'; }
-async function authApi(path, opt) {
-  opt = opt || {};
-  const r = await fetch(SB + '/auth/v1/' + path, {
-    method: opt.method || 'GET',
-    headers: { apikey: KEY, Authorization: 'Bearer ' + await bearer(), 'Content-Type': 'application/json' },
-    body: opt.body == null ? undefined : JSON.stringify(opt.body)
-  });
+async function authApi(path) {
+  const r = await fetch(SB + '/auth/v1/' + path, { headers: { apikey: KEY, Authorization: 'Bearer ' + await bearer() } });
   let j = null; try { j = await r.json(); } catch (e) {}
-  if (!r.ok) {
-    const e = new Error((j && (j.msg || j.message || j.error_description)) || ('Request failed (' + r.status + ')')); e.status = r.status; throw e;
-  }
+  if (!r.ok) { const e = new Error((j && (j.msg || j.message)) || ('Request failed (' + r.status + ')')); e.status = r.status; throw e; }
   return j;
 }
-function saveTokens(s) {
-  if (s && s.access_token) { ss.set('nex_sb_at', s.access_token); if (s.refresh_token) ss.set('nex_sb_rt', s.refresh_token); }
-}
-async function mfaList() { const u = await authApi('user'); return ((u && u.factors) || []).filter(f => f.factor_type === 'totp'); }
-async function mfaConfirm(factorId, code) {
-  const ch = await authApi('factors/' + encodeURIComponent(factorId) + '/challenge', { method: 'POST', body: {} });
-  const s = await authApi('factors/' + encodeURIComponent(factorId) + '/verify', { method: 'POST', body: { challenge_id: ch.id, code } });
-  saveTokens(s);
-  if (aalNow() !== 'aal2') throw new Error('The code was accepted but the session did not upgrade. Try again.');
-}
-function codeMsg(e) {
-  const m = String((e && e.message) || '');
-  if (/invalid|incorrect|expired/i.test(m)) return 'That code did not match. Wait for a new one and try again.';
-  if (/rate|too many|limit/i.test(m)) return 'Too many tries. Wait a minute and try again.';
-  return m || 'Something went wrong.';
-}
-function codeForm(btnLabel) {
-  return '<form class="mfa-f" autocomplete="off"><input class="mfa-in" inputmode="numeric" autocomplete="one-time-code" maxlength="7" placeholder="000000" aria-label="6-digit code"><button class="mfa-btn" type="submit">' + esc(btnLabel) + '</button><div class="mfa-err" role="alert" hidden></div></form>';
-}
-function wireCode(host, run) {
-  const f = $('.mfa-f', host), inp = $('.mfa-in', host), btn = $('.mfa-btn', host), err = $('.mfa-err', host);
-  inp.addEventListener('input', () => { inp.value = inp.value.replace(/\D/g, '').slice(0, 6); });
-  f.onsubmit = async e => {
-    e.preventDefault();
-    const code = inp.value.replace(/\D/g, '');
-    if (code.length !== 6) { err.textContent = 'Enter the 6 digits from your app.'; err.hidden = false; return; }
-    btn.disabled = true; err.hidden = true;
-    try { await run(code); }
-    catch (x) { if (x.message === 'session') return; err.textContent = codeMsg(x); err.hidden = false; inp.value = ''; inp.focus(); }
-    finally { btn.disabled = false; }
-  };
-  setTimeout(() => inp.focus(), 40);
-}
-/* first-time setup: shows the QR, takes the first code */
-async function mfaSetup(host, done, mandatory) {
-  host.innerHTML = '<p class="mfa-p">Getting your code ready…</p>';
-  let enr;
-  try {
-    const fs = await mfaList();
-    for (const f of fs.filter(x => x.status !== 'verified')) { try { await authApi('factors/' + encodeURIComponent(f.id), { method: 'DELETE' }); } catch (e) {} }
-    enr = await authApi('factors', { method: 'POST', body: { factor_type: 'totp', friendly_name: 'Nex ' + Date.now(), issuer: 'Oscars Nex' } });
-  } catch (e) { if (e.message === 'session') return; host.innerHTML = '<div class="mfa-err">' + esc(e.message) + '</div>'; return; }
-  const t = enr.totp || {}, secret = String(t.secret || '').replace(/(.{4})/g, '$1 ').trim();
-  host.innerHTML = '<div class="gate-t mfa-t">' + (mandatory ? 'Set up two-step login' : 'Set up two-step login') + '</div>' +
-    (mandatory ? '<p class="mfa-p">Nex now asks for a 6-digit code as well as your password.</p>' : '') +
-    '<ol class="mfa-ol"><li>Install an authenticator app (Google Authenticator, Microsoft Authenticator or Authy).</li><li>Scan this picture, or type the key under it.</li><li>Enter the 6 digits the app shows.</li></ol>' +
-    '<div class="mfa-qr"><img alt="QR code for your authenticator app" width="168" height="168"></div>' +
-    '<div class="mfa-key">' + esc(secret) + '</div>' + codeForm('Turn on');
-  const img = $('.mfa-qr img', host);
-  /* The Auth API sends the picture as raw <svg> text (supabase-js adds the data: prefix itself). */
-  const qr = String(t.qr_code || '').trim();
-  if (/^<svg[\s>]/i.test(qr)) img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(qr);
-  else if (/^data:image\/svg\+xml/i.test(qr)) img.src = qr.replace(/^(data:image\/svg\+xml[^,]*,)([\s\S]*)$/i, (m, a, b) => a + (/%3C/i.test(b) ? b : encodeURIComponent(b)));
-  else img.parentNode.hidden = true;
-  wireCode(host, async code => { await mfaConfirm(enr.id, code); done(); });
-}
-/* every later open: just the code */
-function mfaAsk(host, factor, done) {
-  host.innerHTML = '<div class="gate-t mfa-t">Enter your code</div><p class="mfa-p">Open your authenticator app and type the 6 digits for Nex.</p>' + codeForm('Continue') +
-    '<p class="mfa-p mfa-small">Lost your phone? A hub admin can reset it for you in Nex, then you set it up again.</p>';
-  wireCode(host, async code => { await mfaConfirm(factor.id, code); done(); });
-}
-/* runs once before the app is drawn */
+async function mfaList() { const u = await authApi('user'); return ((u && u.factors) || []).filter(f => f.factor_type === 'totp' && f.status === 'verified'); }
+/* runs once before the app is drawn; never resolves when a code is needed and missing */
 function mfaGate() {
   return new Promise(async resolve => {
-    const box = $('#mfa'), card = $('#mfaCard');
     try {
       const st = await (await api('rpc/nex_mfa_state', { method: 'POST', body: {} })).json();
-      const ver = (await mfaList()).filter(f => f.status === 'verified');
-      if (aalNow() === 'aal2' || (!ver.length && !(st && st.required))) return resolve(true);
-      const fin = () => { box.hidden = true; card.innerHTML = ''; resolve(true); };
-      box.hidden = false;
-      if (ver.length) mfaAsk(card, ver[0], fin); else mfaSetup(card, fin, true);
-    } catch (e) {
-      if (e.message === 'session') return;
-      box.hidden = false;
-      card.innerHTML = '<div class="gate-t mfa-t">Could not check sign-in</div><p class="mfa-p">' + esc((e.message || 'Try again').replace(/[.\s]*$/, '')) + '. Refresh this page, or go back to Nexus and open Nex again.</p>';
-    }
+      if (st && st.required && aalNow() !== 'aal2') {
+        const box = $('#mfa'), card = $('#mfaCard');
+        card.innerHTML = '<div class="gate-t mfa-t">Enter your code in Nexus</div><p class="mfa-p">Nex needs your 6-digit code. Go back to Nexus, open the Nex card on the Nodes page, and enter the code from your authenticator app (or set it up if this is your first time).</p>';
+        box.hidden = false; return;
+      }
+    } catch (e) { if (e.message === 'session') return; }
+    resolve(true);
   });
 }
 
 /* ---------- Admin page card ---------- */
 function secCard() {
-  return '<div class="nx-card"><div class="nx-card-h"><div><h3>Two-step login</h3><div class="nx-muted">A 6-digit code from an authenticator app, asked for each time Nex is opened.</div></div></div><div id="adSec" class="nx-card-b"><div class="nx-skel" style="width:50%"></div></div></div>';
+  return '<div class="nx-card"><div class="nx-card-h"><div><h3>Two-step login</h3><div class="nx-muted">A 6-digit code from an authenticator app, asked in Nexus once per sign-in when a person opens Nex.</div></div></div><div id="adSec" class="nx-card-b"><div class="nx-skel" style="width:50%"></div></div></div>';
 }
 async function bindSec() {
   const box = $('#adSec'); if (!box) return;
   try {
     const st = await (await api('rpc/nex_mfa_state', { method: 'POST', body: {} })).json();
-    const ver = (await mfaList()).filter(f => f.status === 'verified'), mine = ver[0] || null, strong = aalNow() === 'aal2';
-    let h = '<div class="nx-row-s"><div><b>Your account</b><div class="nx-muted">' + (mine ? 'Two-step login is on for you.' : 'Not set up yet.') + '</div></div><div class="nx-btnrow">' +
-      (mine ? (st.required ? '' : '<button class="nx-btn sm" id="secOff">Remove</button>') : '<button class="nx-btn primary sm" id="secOn">Set up</button>') + '</div></div>';
+    const mine = (await mfaList())[0] || null, strong = aalNow() === 'aal2';
+    let h = '<div class="nx-row-s"><div><b>Your account</b><div class="nx-muted">' + (mine ? 'Two-step login is set up for you.' : 'Not set up yet. Open Nex from the Nexus Nodes page to set it up.') + '</div></div></div>';
     if (ME.admin) {
       let roster = [];
       try { roster = await (await api('rpc/nex_mfa_roster', { method: 'POST', body: {} })).json(); } catch (e) {}
+      const unset = roster.filter(r => !r.enrolled).length;
       h += '<hr class="nx-hr"><div class="nx-row-s"><div><b>Required for everyone: ' + (st.required ? 'On' : 'Off') + '</b><div class="nx-muted">' +
-        (st.required ? 'Nex shows nothing to anyone who has not entered a code this session.' : (mine && strong ? 'Turn this on once you have tested it yourself. Each person is then walked through setup the next time they open Nex.' : 'Set up your own code first, then you can turn this on.')) +
+        (st.required ? 'Nex shows nothing to anyone who has not entered a code this sign-in.' : (mine && strong ? 'Once you turn this on, each person is walked through setup when they next open Nex from Nexus.' + (unset ? ' ' + unset + ' of ' + roster.length + ' have not set up yet.' : '') : 'Set up your own code first (open Nex from Nexus), then you can turn this on.')) +
         '</div></div><div class="nx-btnrow"><button class="nx-btn ' + (st.required ? '' : 'primary') + ' sm" id="secReq"' + (!st.required && !(mine && strong) ? ' disabled' : '') + '>' + (st.required ? 'Turn off' : 'Require for everyone') + '</button></div></div>';
       h += roster.length ? '<div class="nx-tablewrap" style="margin-top:10px"><table class="nx-table auto tight"><thead><tr><th>Staff member</th><th>Code</th><th></th></tr></thead><tbody>' +
         roster.map(r => '<tr><td>' + esc(r.staff_name) + '</td><td>' + (r.enrolled ? '<span class="nx-pill ok">Set up</span>' : '<span class="nx-pill">Not yet</span>') + '</td><td>' + (r.enrolled && r.staff_name !== ME.name ? '<button class="nx-btn sm" data-reset="' + esc(r.staff_name) + '">Reset</button>' : '') + '</td></tr>').join('') + '</tbody></table></div>' : '';
     }
     box.innerHTML = h;
     const again = () => bindSec();
-    if ($('#secOn')) $('#secOn').onclick = () => {
-      const m = openModal({ title: 'Set up two-step login', body: '<div class="mfa-light" id="secHost"></div>', footer: false, noFocus: true });
-      mfaSetup($('#secHost'), () => { m.close(); toast('Two-step login is on'); again(); });
-    };
-    if ($('#secOff')) $('#secOff').onclick = async () => {
-      if (!await confirmBox('Remove two-step login?', 'Nex will go back to asking for your password only.', 'Remove', true)) return;
-      try { await authApi('factors/' + encodeURIComponent(mine.id), { method: 'DELETE' }); toast('Removed'); } catch (e) { toast(e.message, true); }
-      again();
-    };
     if ($('#secReq')) $('#secReq').onclick = async () => {
       const on = !st.required;
-      if (!await confirmBox(on ? 'Require the 6-digit code for everyone?' : 'Stop requiring the code?', on ? 'Each person sets up an authenticator app the next time they open Nex (about a minute). Until they do, they see nothing.' : 'Nex goes back to protecting student data with passwords only.', on ? 'Require it' : 'Turn off', !on)) return;
+      if (!await confirmBox(on ? 'Require the 6-digit code for everyone?' : 'Stop requiring the code?', on ? 'Each person sets up an authenticator app the next time they open Nex from Nexus (about a minute). Until they do, they see nothing in Nex.' : 'Nex goes back to protecting student data with passwords only.', on ? 'Require it' : 'Turn off', !on)) return;
       try { await api('rpc/nex_set_mfa_required', { method: 'POST', body: { p_on: on } }); toast(on ? 'Required for everyone' : 'No longer required'); } catch (e) { toast(e.message, true); }
       again();
     };
     $$('[data-reset]', box).forEach(b => b.onclick = async () => {
       const who = b.dataset.reset;
-      if (!await confirmBox('Reset ' + who + '\'s code?', 'Use this when they have lost their phone. They set up a new code the next time they open Nex.', 'Reset', true)) return;
+      if (!await confirmBox('Reset ' + who + '\'s code?', 'Use this when they have lost their phone. They set up a new code the next time they open Nex from Nexus.', 'Reset', true)) return;
       try { await api('rpc/nex_admin_reset_mfa', { method: 'POST', body: { p_staff: who } }); toast('Reset'); } catch (e) { toast(e.message, true); }
       again();
     });
