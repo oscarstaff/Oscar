@@ -3851,11 +3851,10 @@ const GAS_EXEC_URL='https://script.google.com/macros/s/AKfycby0Bq97bCZAsmnruXFuJ
 const GAS_TOKEN='oscars_gas_83235a5f0c1f6ba32b18235e2b2d544ac137167d';
 
 // ── Leave-email relay (SEPARATE Apps Script, personal Gmail sender) ──────
-// Its own deployment + own token — deliberately NOT the main Code.gs relay.
-// After deploying LeaveEmailRelay.gs, paste its /exec URL below. The token
-// must match MAIL_TOKEN inside that script exactly.
+// Its own deployment — deliberately NOT the main Code.gs relay.
+// This page no longer holds a mail token: it sends the signed-in manager's session (sbAccessToken)
+// and the relay checks it. The server token lives only in the gateway and the edge function.
 const MAIL_EXEC_URL='https://script.google.com/macros/s/AKfycbyfr16rfoX-kj30XxJu53wkJrFz6ZixQOylpIqcfbtjVhZBJUFYpBQ_5i9lZSi8PjI-Zw/exec';
-const MAIL_TOKEN='oscars_mail_921793e91a49d14b120c9053065e94c7065ae583';
 
 // ── Shift-open notification rules ───────────────────────────────────────
 // Who hears about an open shift:
@@ -7355,7 +7354,7 @@ async function notifyShiftOpen(fromStaff, info){
       headers:{'Content-Type':'text/plain;charset=utf-8'},
       body:JSON.stringify({
         action:'sendShiftOpen',
-        token:MAIL_TOKEN,
+        sbAccessToken:_soTok(),
         recipients:to,
         team:team,
         shiftDate:info.shift_date,
@@ -10491,7 +10490,7 @@ function sendAdminLeaveEmail(staffId,from,to,reason,reasonType){
         headers:{'Content-Type':'text/plain;charset=utf-8'},
         body:JSON.stringify({
           action:'sendLeaveEmail',
-          token:MAIL_TOKEN,
+          sbAccessToken:_soTok(),
           to:to_email,
           name:nm,
           status:'approved',
@@ -10883,7 +10882,7 @@ function applyLeaveUpdate(id,status,declineReason){
               headers:{'Content-Type':'text/plain;charset=utf-8'},
               body:JSON.stringify({
                 action:'sendLeaveEmail',
-                token:MAIL_TOKEN,
+                sbAccessToken:_soTok(),
                 to:to,
                 name:nm,
                 status:status,
