@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#12201f">
 <meta name="robots" content="noindex,nofollow">
 <meta name="referrer" content="no-referrer">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-27ysZxtg0xWjikciJnl6p9Oun6JvBpqkESCMcIdAldg=' 'sha256-Q9lquseyGWYa8Pd1KkdwHwiwhXLE3Dn/1WXoHyYbZng='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data:; connect-src https://jcfgldqrdbfkgbixszds.supabase.co; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-27ysZxtg0xWjikciJnl6p9Oun6JvBpqkESCMcIdAldg=' 'sha256-ggya2+QL85P46BioIoMtS7Oe7nr1q9IwK5otyLEak/A='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data:; connect-src https://jcfgldqrdbfkgbixszds.supabase.co; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Nex · Student management</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232fb5ad'/%3E%3Ctext x='16' y='23' text-anchor='middle' font-family='Arial' font-weight='700' font-size='20' fill='%2308201f'%3EN%3C/text%3E%3C/svg%3E">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
@@ -311,6 +311,88 @@
 .nx-row-s{display:flex;align-items:center;justify-content:space-between;gap:14px}.nx-hr{border:0;border-top:1px solid var(--nx-line,#e3eae8);margin:14px 0}
 .mfa-ol{text-align:left;font-size:13px;color:#b9c9c5;line-height:1.55;margin:0 0 12px;padding-left:20px}.mfa-light .mfa-ol{color:var(--nx-ink-2,#46605b)}
 
+/* ---------- motion layer (13 Nov 2026) ----------
+   Page content fades only (no sliding, so pages never read as jumping).
+   Overlays (modal, toast, top bar) may move. All of it is off under reduced motion. */
+:root{--nx-ease:cubic-bezier(.2,.7,.2,1);--nx-ease-in:cubic-bezier(.4,0,1,1)}
+.nx-btn,.nx-chip,.nx-seg button,.nx-pick,.nx-seat,.nx-tab,.nx-nav a,.nx-kpi,.nx-tag{transition:background-color .14s var(--nx-ease),border-color .14s var(--nx-ease),color .14s var(--nx-ease),box-shadow .14s var(--nx-ease),transform .12s var(--nx-ease),opacity .14s var(--nx-ease)}
+.nx-btn:active:not(:disabled),.nx-chip:active,.nx-seg button:active,.nx-pick:active{transform:scale(.97)}
+.nx-btn.primary:hover:not(:disabled){box-shadow:0 2px 10px rgba(47,181,173,.35)}
+.nx-btn:disabled{opacity:.6;cursor:default}
+.nx-btn.busy{position:relative;color:transparent!important;pointer-events:none}
+.nx-btn.busy::after{content:"";position:absolute;left:50%;top:50%;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;border:2px solid rgba(255,255,255,.45);border-top-color:#fff;animation:nxspin .7s linear infinite}
+.nx-btn:not(.primary).busy::after{border-color:rgba(0,0,0,.15);border-top-color:var(--nx-ink-2)}
+@keyframes nxspin{to{transform:rotate(360deg)}}
+.nx-in,.nx-sel,.nx-ta{transition:border-color .14s var(--nx-ease),box-shadow .14s var(--nx-ease),background-color .14s var(--nx-ease)}
+.nx-in:focus,.nx-sel:focus,.nx-ta:focus{box-shadow:0 0 0 4px var(--nx-accent-weak)}
+
+/* top progress line while a page loads */
+body::before{content:"";position:fixed;left:0;top:0;height:2px;width:100%;z-index:99990;background:linear-gradient(90deg,transparent,var(--nx-accent),transparent);background-size:40% 100%;background-repeat:no-repeat;opacity:0;pointer-events:none;transition:opacity .2s}
+body.nx-busy::before{opacity:1;animation:nxbar 1s linear infinite}
+@keyframes nxbar{from{background-position:-40% 0}to{background-position:140% 0}}
+
+/* page content fade (opacity only) */
+@keyframes nxfade{from{opacity:0}to{opacity:1}}
+#view.nx-enter>*{animation:nxfade .22s var(--nx-ease) both}
+#view.nx-enter>*:nth-child(2){animation-delay:.04s}
+#view.nx-enter>*:nth-child(3){animation-delay:.08s}
+#view.nx-enter>*:nth-child(4){animation-delay:.12s}
+#view.nx-enter>*:nth-child(n+5){animation-delay:.16s}
+#view.nx-enter .nx-table tbody tr{animation:nxfade .24s var(--nx-ease) both}
+#view.nx-enter .nx-table tbody tr:nth-child(2){animation-delay:.03s}
+#view.nx-enter .nx-table tbody tr:nth-child(3){animation-delay:.06s}
+#view.nx-enter .nx-table tbody tr:nth-child(4){animation-delay:.09s}
+#view.nx-enter .nx-table tbody tr:nth-child(5){animation-delay:.12s}
+#view.nx-enter .nx-table tbody tr:nth-child(6){animation-delay:.15s}
+#view.nx-enter .nx-table tbody tr:nth-child(7){animation-delay:.18s}
+#view.nx-enter .nx-table tbody tr:nth-child(8){animation-delay:.21s}
+#view.nx-enter .nx-table tbody tr:nth-child(n+9){animation-delay:.24s}
+.nx-table tbody td{transition:background-color .12s var(--nx-ease)}
+.nx-table tbody tr.nx-row-click:hover td:first-child{box-shadow:inset 3px 0 0 var(--nx-accent)}
+
+/* section nav: underline draws in under the active tab */
+.nx-nav a[aria-current="page"]::after{transform-origin:left center;animation:nxline .28s var(--nx-ease) both}
+@keyframes nxline{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+
+/* KPI cards */
+.nx-kpi:hover{box-shadow:0 6px 18px rgba(18,32,31,.08)}
+.nx-big{font-variant-numeric:tabular-nums}
+
+/* seat map */
+.nx-seat:active{transform:scale(.94)}
+.nx-seat.pick{animation:nxpop .22s var(--nx-ease)}
+@keyframes nxpop{0%{transform:scale(.9)}60%{transform:scale(1.06)}100%{transform:scale(1)}}
+
+/* modal: backdrop fades, card rises, both reverse on close */
+.modal-bg{animation:nxbg .16s ease-out both}
+.modal{animation:nxmodal .22s var(--nx-ease) both}
+.modal-bg.is-closing{animation:nxbgout .14s ease-in both}
+.modal-bg.is-closing .modal{animation:nxmodalout .14s var(--nx-ease-in) both}
+@keyframes nxbg{from{opacity:0}to{opacity:1}}
+@keyframes nxbgout{to{opacity:0}}
+@keyframes nxmodal{from{opacity:0;transform:translateY(10px) scale(.98)}to{opacity:1;transform:none}}
+@keyframes nxmodalout{to{opacity:0;transform:translateY(6px) scale(.985)}}
+
+/* toasts slide up and fade out */
+.toast{animation:nxtoast .24s var(--nx-ease) both;display:flex;align-items:center;gap:8px}
+.toast::before{content:"";flex:none;width:8px;height:8px;border-radius:50%;background:#5fd6a8}
+.toast.bad::before{background:#ffd0c8}
+.toast.out{animation:nxtoastout .2s ease-in both}
+@keyframes nxtoast{from{opacity:0;transform:translateY(12px) scale(.97)}to{opacity:1;transform:none}}
+@keyframes nxtoastout{to{opacity:0;transform:translateY(6px)}}
+
+/* lock and gate screens */
+.lockov:not([hidden]),#__gate{animation:nxbg .25s ease-out both}
+.gate-card{animation:nxmodal .35s var(--nx-ease) both}
+
+/* skeleton loading: soft pulse on the whole card */
+@keyframes nxpulse{50%{opacity:.6}}
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;animation-delay:0s!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+  body.nx-busy::before{animation:none}
+}
+
 </style>
 </head>
 <body class="nx">
@@ -606,14 +688,14 @@ function selectOpts(list, cur, blank) {
 /* ---------- toast + modal + form ---------- */
 function toast(msg, bad) {
   const el = document.createElement('div'); el.className = 'toast' + (bad ? ' bad' : ''); el.textContent = msg;
-  $('#toasts').appendChild(el); setTimeout(() => el.remove(), bad ? 5000 : 2600);
+  $('#toasts').appendChild(el); const life = bad ? 5000 : 2600; setTimeout(() => el.classList.add('out'), life - 200); setTimeout(() => el.remove(), life);
 }
 let modalStack = [];
 function openModal(opt) {
   const bg = document.createElement('div'); bg.className = 'modal-bg';
   bg.innerHTML = '<div class="modal ' + (opt.wide ? 'wide' : '') + '" role="dialog" aria-modal="true" aria-label="' + esc(opt.title) + '"><div class="modal-h"><h3>' + esc(opt.title) + '</h3><button class="nx-btn icon quiet" data-x aria-label="Close">' + ico('x') + '</button></div><div class="modal-b">' + opt.body + '</div>' + (opt.footer === false ? '' : '<div class="modal-f"></div>') + '</div>';
   $('#modalRoot').appendChild(bg);
-  const m = { el: bg, close() { bg.remove(); modalStack = modalStack.filter(x => x !== m); if (opt.onClose) opt.onClose(); } };
+  const m = { el: bg, close() { if (m.gone) return; m.gone = true; modalStack = modalStack.filter(x => x !== m); bg.classList.add('is-closing'); setTimeout(() => bg.remove(), 140); if (opt.onClose) opt.onClose(); } };
   modalStack.push(m);
   bg.addEventListener('mousedown', e => { if (e.target === bg) m.close(); });
   $('[data-x]', bg).onclick = () => m.close();
@@ -623,8 +705,8 @@ function openModal(opt) {
       const btn = document.createElement('button'); btn.className = 'nx-btn ' + (b.primary ? 'primary' : ''); btn.textContent = b.label;
       btn.onclick = async () => {
         if (b.close) return m.close();
-        btn.disabled = true; const old = btn.textContent; btn.textContent = 'Saving…';
-        try { const keep = await b.run(m); if (keep !== false) m.close(); } catch (e) { showErr(m, e); } finally { btn.disabled = false; btn.textContent = old; }
+        btn.disabled = true; btn.classList.add('busy');
+        try { const keep = await b.run(m); if (keep !== false) m.close(); } catch (e) { showErr(m, e); } finally { btn.disabled = false; btn.classList.remove('busy'); }
       };
       f.appendChild(btn);
     });
@@ -709,14 +791,15 @@ let navToken = 0;
 function go(h) { if (location.hash === h) render(); else location.hash = h; }
 async function render() {
   const h = location.hash.replace(/^#/, '') || '/';
-  const tok = ++navToken; const v = $('#view');
+  const tok = ++navToken; const v = $('#view'); v.classList.remove('nx-enter'); document.body.classList.add('nx-busy');
   for (const r of ROUTES) {
     const m = h.match(r.re);
     if (m) {
       v.innerHTML = '<div class="nx-card"><div class="nx-card-b"><div class="nx-skel" style="width:40%"></div><div class="nx-skel" style="width:70%;margin-top:12px"></div><div class="nx-skel" style="width:55%;margin-top:12px"></div></div></div>';
       setNav(h);
-      try { await loadRef(); const html = await r.fn(m, tok); if (tok === navToken && html != null) { v.innerHTML = html; if (v._after) { const f = v._after; v._after = null; f(); } } }
+      try { await loadRef(); const html = await r.fn(m, tok); if (tok === navToken && html != null) { v.innerHTML = html; v.classList.add('nx-enter'); countUp(v); if (v._after) { const f = v._after; v._after = null; f(); } } }
       catch (e) { if (tok === navToken && e.message !== 'session') v.innerHTML = '<div class="nx-card"><div class="nx-empty"><b>Could not load this page</b>' + esc(e.message) + '</div></div>'; }
+      if (tok === navToken) document.body.classList.remove('nx-busy');
       window.scrollTo(0, 0); return;
     }
   }
@@ -729,6 +812,22 @@ function setNav(h) {
     const key = '/' + (href.split('/')[1] || '');
     return '<a href="' + href + '"' + (key === cur ? ' aria-current="page"' : '') + '>' + label + '</a>';
   }).join('');
+}
+/* big numbers on the overview count up once when the page opens */
+function countUp(root) {
+  if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  $$('.nx-big', root).forEach(el => {
+    const m = /^(\$?)(\d[\d,]*)(\.\d+)?$/.exec(el.textContent.trim()); if (!m) return;
+    const end = parseFloat(m[2].replace(/,/g, '') + (m[3] || '')); if (!isFinite(end) || end < 2) return;
+    const dec = m[3] ? m[3].length - 1 : 0, t0 = performance.now(), dur = 550, final = el.textContent;
+    el.textContent = m[1] + (0).toLocaleString('en-AU', { minimumFractionDigits: dec, maximumFractionDigits: dec });
+    (function step(t) {
+      const k = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - k, 3);
+      if (k >= 1 || !el.isConnected) { el.textContent = final; return; }
+      el.textContent = m[1] + (end * e).toLocaleString('en-AU', { minimumFractionDigits: dec, maximumFractionDigits: dec });
+      requestAnimationFrame(step);
+    })(t0);
+  });
 }
 function afterRender(fn) { $('#view')._after = fn; }
 function pageHead(icon, eyebrow, title, actions) {
@@ -749,6 +848,14 @@ async function boot() {
   window.addEventListener('hashchange', render);
   render();
 }
+
+/* press / to jump to search */
+document.addEventListener('keydown', e => {
+  if (e.key !== '/' || e.ctrlKey || e.metaKey || e.altKey) return;
+  const t = e.target, tag = t && t.tagName;
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (t && t.isContentEditable) || modalStack.length) return;
+  const i = document.querySelector('#gSearch input'); if (i) { e.preventDefault(); i.focus(); i.select(); }
+});
 
 /* =========================================================
    Overview, Students list, Student record
