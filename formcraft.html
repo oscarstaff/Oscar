@@ -1752,9 +1752,12 @@ window.FC_SEED_FORMS=[{"name":"Arcare Vocational Placement - Schedule 1","finger
       const body = { fields: catalogue };
       if (text) body.text = text;
       if (fileBase64) { body.file_base64 = fileBase64; body.doc_mime = docMime || ''; }
+      const _aiTok = fcAccessToken();
+      if (!_aiTok) throw new Error('Your Nexus sign-in has expired. Reopen Form Craft from Nexus and try again.');
       const r = await fetch(SB_URL + '/functions/v1/parse-enrolment', {
-        method: 'POST', headers: { ...sbHeaders, Authorization: 'Bearer ' + SB_KEY }, body: JSON.stringify(body),
+        method: 'POST', headers: { ...sbHeaders, Authorization: 'Bearer ' + _aiTok }, body: JSON.stringify(body),
       });
+      if (r.status === 401) throw new Error('Your Nexus sign-in has expired. Reopen Form Craft from Nexus and try again.');
       const data = await r.json();
       if (!r.ok || data.error) throw new Error(data.error || ('HTTP ' + r.status));
       fcLogEvent('ai_parse', fcFormLabel(), { via: fileBase64 ? 'file' : 'text', type: docMime || undefined, chars: text ? text.length : undefined });

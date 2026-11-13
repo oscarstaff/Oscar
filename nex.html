@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#12201f">
 <meta name="robots" content="noindex,nofollow">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-xMt/SOEgfdU+Gn6oCMTRiyC5dvvW6iRjckdXCDKOxmo=' 'sha256-NtDB3r48+5B07BnGE+DpS9W2GVxNLx8L6tZ8e9Xsmwk='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data:; connect-src https://jcfgldqrdbfkgbixszds.supabase.co; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Nex · Student management</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232fb5ad'/%3E%3Ctext x='16' y='23' text-anchor='middle' font-family='Arial' font-weight='700' font-size='20' fill='%2308201f'%3EN%3C/text%3E%3C/svg%3E">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
 /* Nex design system v0.1 — "Quiet ledger"
@@ -300,6 +300,17 @@
 .nx-who .nx-avatar{display:grid;flex:none;color:var(--nx-accent);font-size:12px;font-weight:600}
 .nx-who{align-items:center}
 
+.mfa-t{margin-bottom:6px}.mfa-p{font-size:13px;color:#b9c9c5;line-height:1.55;margin:0 0 12px}.mfa-small{font-size:12px;margin:14px 0 0;color:#8fa6a1}
+.mfa-qr{background:#fff;border-radius:12px;padding:10px;width:188px;margin:0 auto 10px}.mfa-qr img{display:block;width:168px;height:168px}
+.mfa-key{font-family:ui-monospace,Menlo,monospace;font-size:13px;letter-spacing:.06em;color:#e7f2ef;background:rgba(255,255,255,.07);border-radius:8px;padding:8px 10px;margin-bottom:12px;word-break:break-all}
+.mfa-f{display:flex;flex-direction:column;gap:10px}
+.mfa-in{width:100%;box-sizing:border-box;text-align:center;font-size:26px;letter-spacing:.35em;padding:10px 8px;border-radius:10px;border:1px solid #cfd9d7;background:#fff;color:#12201f;font-family:ui-monospace,Menlo,monospace}
+.mfa-btn{border:0;border-radius:10px;padding:11px;font-size:14px;font-weight:600;background:#2fb5ad;color:#08201f;cursor:pointer}.mfa-btn:disabled{opacity:.6}
+.mfa-err{font-size:13px;color:#ffb4a8}.mfa-err[hidden]{display:none}
+.mfa-light .gate-t{color:var(--nx-ink,#12201f)}.mfa-light .mfa-p{color:var(--nx-ink-2,#46605b)}.mfa-light .mfa-key{background:#eef4f3;color:#12201f}.mfa-light .mfa-err{color:#b3261e}.mfa-light{text-align:center}
+.nx-row-s{display:flex;align-items:center;justify-content:space-between;gap:14px}.nx-hr{border:0;border-top:1px solid var(--nx-line,#e3eae8);margin:14px 0}
+.mfa-ol{text-align:left;font-size:13px;color:#b9c9c5;line-height:1.55;margin:0 0 12px;padding-left:20px}.mfa-light .mfa-ol{color:var(--nx-ink-2,#46605b)}
+
 </style>
 </head>
 <body class="nx">
@@ -307,6 +318,8 @@
 <div id="__gate"><div class="gate-card"><div class="gate-ic">N</div><div class="gate-t">Nex</div><div id="__gateMsg" class="gate-m">Checking access…</div></div></div>
 <script>
 (function(){
+  /* clickjacking guard (GitHub Pages cannot send frame-ancestors): never run inside someone else's frame */
+  if(window.top!==window.self){document.documentElement.style.display='none';return;}
   var APP='nex';
   var SECRET='oscars_nexus_gate_v1_8f3a2c91';
   var SB='https://jcfgldqrdbfkgbixszds.supabase.co';
@@ -320,6 +333,7 @@
       var m=(location.hash||'').match(/t=([^&]+)/);
       if(!m){fail('No access token.');return;}
       var token=decodeURIComponent(m[1]);
+      try{history.replaceState(null,'',location.pathname+location.search);}catch(e){}   /* token never stays in the address bar or history */
       var parts=token.split('.');
       if(parts.length!==2){fail('Invalid token.');return;}
       var b64=parts[0], sig=parts[1];
@@ -342,7 +356,7 @@
       sessionStorage.setItem('nex_sb_at',at);
       if(payload.sb_rt) sessionStorage.setItem('nex_sb_rt',payload.sb_rt);
       sessionStorage.setItem('nex_is_admin',isAdmin?'1':'0');
-      try{history.replaceState(null,'',location.pathname+location.search);}catch(e){}
+      sessionStorage.setItem('nex_t0',String(Date.now()));
       pass();
     }catch(e){ fail('Access check failed.'); console.warn('gate',e); }
   })();
@@ -364,9 +378,10 @@
   <main class="nx-main" id="view" tabindex="-1"></main>
 </div>
 
+<div id="mfa" class="lockov" hidden><div class="gate-card" id="mfaCard"></div></div>
 <div id="lock" class="lockov" hidden>
   <div class="gate-card"><div class="gate-ic">N</div><div class="gate-t">Session ended</div>
-  <div class="gate-m">Your sign-in has run out. Go back to Nexus, refresh, and open Nex again.</div></div>
+  <div class="gate-m" id="lockMsg">Your sign-in has run out. Go back to Nexus, refresh, and open Nex again.</div></div>
 </div>
 <div id="modalRoot"></div>
 <div id="toasts" class="toasts" aria-live="polite"></div>
@@ -441,7 +456,7 @@ function tokenAlive(t, slack) { const c = tokenPayload(t); return !!(c && c.exp 
 let refreshing = null;
 async function refreshToken() {
   const rt = ss.get('nex_sb_rt');
-  if (!rt) return false;
+  if (!rt || locked) return false;
   if (!refreshing) {
     refreshing = (async () => {
       try {
@@ -463,7 +478,32 @@ async function bearer() {
   if (!tokenAlive(t, 0)) { endSession(); throw new Error('session'); }
   return t;
 }
-function endSession() { const l = $('#lock'); if (l) l.hidden = false; }
+/* Ending a session wipes the tokens and everything on screen, so a walk-away or shared computer shows no student data. */
+const IDLE_MS = 15 * 60 * 1000, MAX_SESSION_MS = 12 * 60 * 60 * 1000;
+let locked = false, lastActive = Date.now();
+function endSession(why) {
+  if (locked) return; locked = true;
+  ['nex_sb_at', 'nex_sb_rt', 'ngate_nex', 'nex_user', 'nex_is_admin', 'nex_t0'].forEach(k => { try { sessionStorage.removeItem(k); } catch (e) {} });
+  const v = $('#view'); if (v) v.innerHTML = '';
+  const m = $('#modalRoot'); if (m) m.innerHTML = '';
+  const d = $('#drawerRoot'); if (d) d.innerHTML = '';
+  const mf = $('#mfa'); if (mf) { mf.hidden = true; const mc = $('#mfaCard'); if (mc) mc.innerHTML = ''; }
+  const a = $('#app'); if (a) a.hidden = true;
+  const msg = $('#lockMsg');
+  if (msg) msg.textContent = why === 'idle' ? 'Nex locked after 15 minutes without activity. Go back to Nexus and open Nex again.' : why === 'old' ? 'For safety Nex closes after 12 hours. Go back to Nexus and open Nex again.' : 'Your sign-in has run out. Go back to Nexus, refresh, and open Nex again.';
+  const l = $('#lock'); if (l) l.hidden = false;
+}
+function watchSession() {
+  ['pointerdown', 'keydown', 'touchstart', 'wheel'].forEach(ev => window.addEventListener(ev, () => { lastActive = Date.now(); }, { passive: true, capture: true }));
+  const check = () => {
+    if (locked) return;
+    const t0 = Number(ss.get('nex_t0')) || 0;
+    if (Date.now() - lastActive > IDLE_MS) endSession('idle');
+    else if (t0 && Date.now() - t0 > MAX_SESSION_MS) endSession('old');
+  };
+  setInterval(check, 15000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) check(); });
+}
 async function api(path, opt) {
   opt = opt || {};
   const doFetch = async () => fetch(SB + '/rest/v1/' + path, {
@@ -697,13 +737,16 @@ function pageHead(icon, eyebrow, title, actions) {
 function empty(t, s) { return '<div class="nx-empty"><b>' + esc(t) + '</b>' + esc(s || '') + '</div>'; }
 
 /* ---------- boot ---------- */
-function boot() {
+async function boot() {
   ME.name = ss.get('nex_user'); ME.admin = ss.get('nex_is_admin') === '1';
+  watchSession();
+  setInterval(() => { const t = ss.get('nex_sb_at'); if (!locked && t && !tokenAlive(t, 120000)) refreshToken(); }, 60000);
+  await mfaGate();
+  if (locked) return;
   $('#whoName').textContent = ME.name || 'Signed in'; $('#whoAva').textContent = initials(ME.name);
   $('#app').hidden = false;
   $('#gSearch').addEventListener('submit', e => { e.preventDefault(); const q = $('#gSearchIn').value.trim(); go('#/students' + (q ? '?q=' + encodeURIComponent(q) : '')); });
   window.addEventListener('hashchange', render);
-  setInterval(() => { const t = ss.get('nex_sb_at'); if (t && !tokenAlive(t, 120000)) refreshToken(); }, 60000);
   render();
 }
 
@@ -860,14 +903,15 @@ const SR = { tab: 'details' };
 route(/^\/students\/([0-9a-f-]{36})$/, async m => {
   const id = m[1];
   const [stu, det, enr, pays, books, followups] = await Promise.all([
-    sel('nex_students', 'select=*&id=eq.' + id), sel('nex_student_details', 'select=*&student_id=eq.' + id),
+    sel('nex_students', 'select=*&id=eq.' + id), api('rpc/nex_get_details', { method: 'POST', body: { p_student: id } }).then(r => r.json()),
     sel('nex_enrolments', 'select=*&student_id=eq.' + id + '&deleted_at=is.null&order=enrolled_on.desc.nullslast'),
     sel('nex_payments', 'select=*&student_id=eq.' + id + '&order=paid_on.desc.nullslast'),
     sel('nex_class_bookings', 'select=*,nex_class_sessions(class_date,kind)&student_id=eq.' + id),
     sel('nex_followups', 'select=*&student_id=eq.' + id + '&order=created_at.desc')
   ]);
   const s = stu[0]; if (!s) return empty('Student not found', 'They may have been archived.');
-  const d = det[0] || {};
+  /* the sensitive details come through a function that logs who looked (admins see this) and stops bulk opening */
+  const limited = !!(det && det.limited), d = (det && det.details) || {};
   const eids = enr.map(e => e.id);
   const [queue, refunds, reqs, plcs, hist, aud] = await Promise.all([
     eids.length ? sel('nex_payment_queue', 'select=*&enrolment_id=in.' + inList(eids)) : [],
@@ -881,7 +925,7 @@ route(/^\/students\/([0-9a-f-]{36})$/, async m => {
   const idx = PATH.indexOf(main.stage);
   const totalFee = enr.reduce((t, e) => t + Number(e.fee || 0), 0);
   const totalPaid = pays.reduce((t, p) => t + Number(p.amount), 0) - refunds.reduce((t, r) => t + Number(r.amount), 0);
-  const ctx = { s, d, enr, pays, books, followups, queue, refunds, reqs, plcs, hist, aud };
+  const ctx = { s, d, limited, enr, pays, books, followups, queue, refunds, reqs, plcs, hist, aud };
 
   afterRender(() => bindStudent(ctx));
   const fact = (k, v) => '<div><dt>' + k + '</dt><dd>' + (v || '<span class="nx-muted">–</span>') + '</dd></div>';
@@ -933,9 +977,10 @@ function section(title, inner, action) {
 }
 function tabDetails(c) {
   const s = c.s, d = c.d;
+  const sens = c.limited ? section('Personal and sensitive', '<div class="nx-note">' + ico('lock') + ' You have opened a lot of student records in a short time, so personal details are paused for now. Try again later, or ask an admin.</div>') : section('Personal and sensitive', '<div class="nx-note">' + ico('lock') + ' Visible to all Nex staff. Every look and every change is logged.</div><dl class="nx-fields">' + field('Date of birth', esc(fmtDate(d.dob))) + field('USI', esc(d.usi)) + field('Address', esc([d.address, d.suburb, d.state, d.postcode].filter(Boolean).join(', '))) +
+      field('Emergency contact', esc([d.emergency_name, d.emergency_relation && '(' + d.emergency_relation + ')', fmtPhone(d.emergency_phone)].filter(Boolean).join(' '))) + field('Disability', esc(d.disability)) + field('Indigenous status', esc(d.indigenous_status)) + '</dl><div style="padding:0 16px 16px"><button class="nx-btn sm" data-a="editDet">' + ico('edit') + 'Edit personal details</button></div>');
   return section('Contact', '<dl class="nx-fields">' + field('First name', esc(s.first_name)) + field('Last name', esc(s.last_name)) + field('Email', esc(s.email)) + field('Phone', esc(fmtPhone(s.phone))) + field('Second phone', esc(fmtPhone(s.phone2))) + field('Agent', esc(agentName(s.agent_id))) + '</dl><div style="padding:0 16px 16px"><button class="nx-btn sm" data-a="editStu">' + ico('edit') + 'Edit contact</button></div>') +
-    section('Personal and sensitive', '<div class="nx-note">' + ico('lock') + ' Visible to all Nex staff. Every change is logged.</div><dl class="nx-fields">' + field('Date of birth', esc(fmtDate(d.dob))) + field('USI', esc(d.usi)) + field('Address', esc([d.address, d.suburb, d.state, d.postcode].filter(Boolean).join(', '))) +
-      field('Emergency contact', esc([d.emergency_name, d.emergency_relation && '(' + d.emergency_relation + ')', fmtPhone(d.emergency_phone)].filter(Boolean).join(' '))) + field('Disability', esc(d.disability)) + field('Indigenous status', esc(d.indigenous_status)) + '</dl><div style="padding:0 16px 16px"><button class="nx-btn sm" data-a="editDet">' + ico('edit') + 'Edit personal details</button></div>') +
+    sens +
     (c.s.source_note ? section('Import notes', '<div style="padding:16px">' + esc(c.s.source_note) + '</div>') : '');
 }
 function tabMoney(c) {
@@ -977,7 +1022,7 @@ async function studentAction(a, ds, c) {
       { k: 'disability', label: 'Disability', value: d.disability }, { k: 'indigenous_status', label: 'Indigenous status', value: d.indigenous_status }];
     return formModal('Edit personal details', f, async v => {
       if (v.usi) v.usi = v.usi.replace(/\s/g, '').toUpperCase();
-      if (d.student_id) await upd('nex_student_details', 'student_id=eq.' + s.id, v); else await ins('nex_student_details', Object.assign({ student_id: s.id }, v), true);
+      await api('rpc/nex_save_details', { method: 'POST', body: { p_student: s.id, p: v } });
       toast('Saved'); render();
     });
   }
@@ -1385,7 +1430,8 @@ route(/^\/admin$/, async () => {
     '<div class="nx-card"><div class="nx-card-h"><div><h3>Status lists</h3><div class="nx-muted">Each list belongs to one part of Nex, so the same word can mean different things in different places.' + (ME.admin ? '' : ' Only admins can change these.') + '</div></div>' + (ME.admin ? '<button class="nx-btn primary sm" id="adNewStatus">' + ico('plus') + 'Add status</button>' : '') + '</div><div class="nx-toolbar" style="border-top:0"><div class="nx-seg" id="adCtx">' + Object.keys(CTX_NAMES).map(k => '<button data-v="' + k + '" aria-pressed="' + (AD.ctx === k) + '">' + CTX_NAMES[k] + '</button>').join('') + '</div></div><div id="adStatus"></div></div>' +
     '<div class="nx-two"><div class="nx-card"><div class="nx-card-h"><h3>Qualifications</h3><button class="nx-btn primary sm" id="adNewQual">' + ico('plus') + 'Add</button></div><ul class="nx-list">' + REF.quals.map(q => '<li><span><b>' + esc(q.name) + '</b><small>' + esc(q.code) + (q.default_fee ? ' · usual fee ' + money(q.default_fee) : '') + (q.active ? '' : ' · hidden') + '</small></span><button class="nx-btn sm" data-q="' + q.id + '">Edit</button></li>').join('') + '</ul></div>' +
     '<div class="nx-card"><div class="nx-card-h"><h3>Agents</h3><button class="nx-btn primary sm" id="adNewAgent">' + ico('plus') + 'Add</button></div>' + (REF.agents.length ? '<ul class="nx-list">' + REF.agents.map(a => '<li><span><b>' + esc(a.name) + '</b><small>' + esc([a.phone, a.email].filter(Boolean).join(' · ') || 'No contact details') + (a.active ? '' : ' · hidden') + '</small></span><button class="nx-btn sm" data-ag="' + a.id + '">Edit</button></li>').join('') + '</ul>' : empty('No agents yet', 'Add the agents students come through.')) + '</div></div>' +
-    '<div class="nx-card"><div class="nx-card-b"><b>Who can open Nex</b><div class="nx-muted">Access is the Nex card on the Nodes page. Admins give it to staff in the Nexus access list (app name: nex).</div></div></div>';
+    secCard() + '<div class="nx-card"><div class="nx-card-b"><b>Who can open Nex</b><div class="nx-muted">Access is the Nex card on the Nodes page. Admins give it to staff with the Nex tick in ShiftOps, on each person\'s edit panel.</div></div></div>' +
+  (ME.admin ? '<div class="nx-card"><div class="nx-card-h"><div><h3>Who opened student records</h3><div class="nx-muted">The latest 100 times a staff member opened a student. A repeat look within 10 minutes is counted once. More than 150 different students in an hour (or 800 in a day) pauses a person\'s access to personal details and shows here as Blocked. Only admins can see this.</div></div></div><div id="adViews"><div class="nx-card-b"><div class="nx-skel" style="width:60%"></div></div></div></div>' : '');
 });
 function bindAdmin() {
   const showStatus = () => {
@@ -1399,7 +1445,13 @@ function bindAdmin() {
   $('#adNewQual').onclick = () => qualForm(null); $('#adNewAgent').onclick = () => agentForm(null);
   $$('[data-q]').forEach(b => b.onclick = () => qualForm(REF.quals.find(x => x.id === b.dataset.q)));
   $$('[data-ag]').forEach(b => b.onclick = () => agentForm(REF.agents.find(x => x.id === b.dataset.ag)));
-  showStatus();
+  showStatus(); bindSec();
+  if (ME.admin && $('#adViews')) {
+    sel('nex_view_log', 'select=viewed_by,viewed_at,student_id,blocked,nex_students(first_name,last_name,student_no)&order=viewed_at.desc&limit=100').then(rows => {
+      const box = $('#adViews'); if (!box) return;
+      box.innerHTML = rows.length ? '<div class="nx-tablewrap"><table class="nx-table auto tight"><thead><tr><th>When</th><th>Staff member</th><th>Student</th></tr></thead><tbody>' + rows.map(r => '<tr><td>' + esc(fmtDT(r.viewed_at)) + '</td><td>' + esc(r.viewed_by) + (r.blocked ? ' <span class="nx-tag">Blocked: opened too many</span>' : '') + '</td><td>' + (r.nex_students ? '<a href="#/students/' + esc(r.student_id) + '">' + esc(fullName(r.nex_students)) + '</a>' : '<span class="nx-muted">Removed</span>') + '</td></tr>').join('') + '</tbody></table></div>' : empty('Nothing yet', 'Student record views will appear here.');
+    }).catch(e => { const box = $('#adViews'); if (box) box.innerHTML = empty('Could not load', e.message); });
+  }
 }
 function statusForm(o) {
   o = o || {};
@@ -1423,6 +1475,149 @@ function agentForm(a) {
     if (a.id) await upd('nex_agents', 'id=eq.' + a.id, v); else await ins('nex_agents', v, true);
     toast('Saved'); await loadRef(true); render();
   });
+}
+
+/* =========================================================
+   Two-step login: a 6-digit code from an authenticator app.
+   Uses Supabase's own MFA endpoints. The database enforces it
+   (nex_open() needs an aal2 session once the switch is on);
+   this file only draws the screens.
+   ========================================================= */
+function aalNow() { const c = tokenPayload(ss.get('nex_sb_at')); return (c && c.aal) || 'aal1'; }
+async function authApi(path, opt) {
+  opt = opt || {};
+  const r = await fetch(SB + '/auth/v1/' + path, {
+    method: opt.method || 'GET',
+    headers: { apikey: KEY, Authorization: 'Bearer ' + await bearer(), 'Content-Type': 'application/json' },
+    body: opt.body == null ? undefined : JSON.stringify(opt.body)
+  });
+  let j = null; try { j = await r.json(); } catch (e) {}
+  if (!r.ok) {
+    const e = new Error((j && (j.msg || j.message || j.error_description)) || ('Request failed (' + r.status + ')')); e.status = r.status; throw e;
+  }
+  return j;
+}
+function saveTokens(s) {
+  if (s && s.access_token) { ss.set('nex_sb_at', s.access_token); if (s.refresh_token) ss.set('nex_sb_rt', s.refresh_token); }
+}
+async function mfaList() { const u = await authApi('user'); return ((u && u.factors) || []).filter(f => f.factor_type === 'totp'); }
+async function mfaConfirm(factorId, code) {
+  const ch = await authApi('factors/' + encodeURIComponent(factorId) + '/challenge', { method: 'POST', body: {} });
+  const s = await authApi('factors/' + encodeURIComponent(factorId) + '/verify', { method: 'POST', body: { challenge_id: ch.id, code } });
+  saveTokens(s);
+  if (aalNow() !== 'aal2') throw new Error('The code was accepted but the session did not upgrade. Try again.');
+}
+function codeMsg(e) {
+  const m = String((e && e.message) || '');
+  if (/invalid|incorrect|expired/i.test(m)) return 'That code did not match. Wait for a new one and try again.';
+  if (/rate|too many|limit/i.test(m)) return 'Too many tries. Wait a minute and try again.';
+  return m || 'Something went wrong.';
+}
+function codeForm(btnLabel) {
+  return '<form class="mfa-f" autocomplete="off"><input class="mfa-in" inputmode="numeric" autocomplete="one-time-code" maxlength="7" placeholder="000000" aria-label="6-digit code"><button class="mfa-btn" type="submit">' + esc(btnLabel) + '</button><div class="mfa-err" role="alert" hidden></div></form>';
+}
+function wireCode(host, run) {
+  const f = $('.mfa-f', host), inp = $('.mfa-in', host), btn = $('.mfa-btn', host), err = $('.mfa-err', host);
+  inp.addEventListener('input', () => { inp.value = inp.value.replace(/\D/g, '').slice(0, 6); });
+  f.onsubmit = async e => {
+    e.preventDefault();
+    const code = inp.value.replace(/\D/g, '');
+    if (code.length !== 6) { err.textContent = 'Enter the 6 digits from your app.'; err.hidden = false; return; }
+    btn.disabled = true; err.hidden = true;
+    try { await run(code); }
+    catch (x) { if (x.message === 'session') return; err.textContent = codeMsg(x); err.hidden = false; inp.value = ''; inp.focus(); }
+    finally { btn.disabled = false; }
+  };
+  setTimeout(() => inp.focus(), 40);
+}
+/* first-time setup: shows the QR, takes the first code */
+async function mfaSetup(host, done, mandatory) {
+  host.innerHTML = '<p class="mfa-p">Getting your code ready…</p>';
+  let enr;
+  try {
+    const fs = await mfaList();
+    for (const f of fs.filter(x => x.status !== 'verified')) { try { await authApi('factors/' + encodeURIComponent(f.id), { method: 'DELETE' }); } catch (e) {} }
+    enr = await authApi('factors', { method: 'POST', body: { factor_type: 'totp', friendly_name: 'Nex ' + Date.now(), issuer: 'Oscars Nex' } });
+  } catch (e) { if (e.message === 'session') return; host.innerHTML = '<div class="mfa-err">' + esc(e.message) + '</div>'; return; }
+  const t = enr.totp || {}, secret = String(t.secret || '').replace(/(.{4})/g, '$1 ').trim();
+  host.innerHTML = '<div class="gate-t mfa-t">' + (mandatory ? 'Set up two-step login' : 'Set up two-step login') + '</div>' +
+    (mandatory ? '<p class="mfa-p">Nex now asks for a 6-digit code as well as your password.</p>' : '') +
+    '<ol class="mfa-ol"><li>Install an authenticator app (Google Authenticator, Microsoft Authenticator or Authy).</li><li>Scan this picture, or type the key under it.</li><li>Enter the 6 digits the app shows.</li></ol>' +
+    '<div class="mfa-qr"><img alt="QR code for your authenticator app" width="168" height="168"></div>' +
+    '<div class="mfa-key">' + esc(secret) + '</div>' + codeForm('Turn on');
+  const img = $('.mfa-qr img', host);
+  if (/^data:image\/svg\+xml/.test(t.qr_code || '')) img.src = t.qr_code; else img.parentNode.hidden = true;
+  wireCode(host, async code => { await mfaConfirm(enr.id, code); done(); });
+}
+/* every later open: just the code */
+function mfaAsk(host, factor, done) {
+  host.innerHTML = '<div class="gate-t mfa-t">Enter your code</div><p class="mfa-p">Open your authenticator app and type the 6 digits for Nex.</p>' + codeForm('Continue') +
+    '<p class="mfa-p mfa-small">Lost your phone? A hub admin can reset it for you in Nex, then you set it up again.</p>';
+  wireCode(host, async code => { await mfaConfirm(factor.id, code); done(); });
+}
+/* runs once before the app is drawn */
+function mfaGate() {
+  return new Promise(async resolve => {
+    const box = $('#mfa'), card = $('#mfaCard');
+    try {
+      const st = await (await api('rpc/nex_mfa_state', { method: 'POST', body: {} })).json();
+      const ver = (await mfaList()).filter(f => f.status === 'verified');
+      if (aalNow() === 'aal2' || (!ver.length && !(st && st.required))) return resolve(true);
+      const fin = () => { box.hidden = true; card.innerHTML = ''; resolve(true); };
+      box.hidden = false;
+      if (ver.length) mfaAsk(card, ver[0], fin); else mfaSetup(card, fin, true);
+    } catch (e) {
+      if (e.message === 'session') return;
+      box.hidden = false;
+      card.innerHTML = '<div class="gate-t mfa-t">Could not check sign-in</div><p class="mfa-p">' + esc((e.message || 'Try again').replace(/[.\s]*$/, '')) + '. Refresh this page, or go back to Nexus and open Nex again.</p>';
+    }
+  });
+}
+
+/* ---------- Admin page card ---------- */
+function secCard() {
+  return '<div class="nx-card"><div class="nx-card-h"><div><h3>Two-step login</h3><div class="nx-muted">A 6-digit code from an authenticator app, asked for each time Nex is opened.</div></div></div><div id="adSec" class="nx-card-b"><div class="nx-skel" style="width:50%"></div></div></div>';
+}
+async function bindSec() {
+  const box = $('#adSec'); if (!box) return;
+  try {
+    const st = await (await api('rpc/nex_mfa_state', { method: 'POST', body: {} })).json();
+    const ver = (await mfaList()).filter(f => f.status === 'verified'), mine = ver[0] || null, strong = aalNow() === 'aal2';
+    let h = '<div class="nx-row-s"><div><b>Your account</b><div class="nx-muted">' + (mine ? 'Two-step login is on for you.' : 'Not set up yet.') + '</div></div><div class="nx-btnrow">' +
+      (mine ? (st.required ? '' : '<button class="nx-btn sm" id="secOff">Remove</button>') : '<button class="nx-btn primary sm" id="secOn">Set up</button>') + '</div></div>';
+    if (ME.admin) {
+      let roster = [];
+      try { roster = await (await api('rpc/nex_mfa_roster', { method: 'POST', body: {} })).json(); } catch (e) {}
+      h += '<hr class="nx-hr"><div class="nx-row-s"><div><b>Required for everyone: ' + (st.required ? 'On' : 'Off') + '</b><div class="nx-muted">' +
+        (st.required ? 'Nex shows nothing to anyone who has not entered a code this session.' : (mine && strong ? 'Turn this on once you have tested it yourself. Each person is then walked through setup the next time they open Nex.' : 'Set up your own code first, then you can turn this on.')) +
+        '</div></div><div class="nx-btnrow"><button class="nx-btn ' + (st.required ? '' : 'primary') + ' sm" id="secReq"' + (!st.required && !(mine && strong) ? ' disabled' : '') + '>' + (st.required ? 'Turn off' : 'Require for everyone') + '</button></div></div>';
+      h += roster.length ? '<div class="nx-tablewrap" style="margin-top:10px"><table class="nx-table auto tight"><thead><tr><th>Staff member</th><th>Code</th><th></th></tr></thead><tbody>' +
+        roster.map(r => '<tr><td>' + esc(r.staff_name) + '</td><td>' + (r.enrolled ? '<span class="nx-pill ok">Set up</span>' : '<span class="nx-pill">Not yet</span>') + '</td><td>' + (r.enrolled && r.staff_name !== ME.name ? '<button class="nx-btn sm" data-reset="' + esc(r.staff_name) + '">Reset</button>' : '') + '</td></tr>').join('') + '</tbody></table></div>' : '';
+    }
+    box.innerHTML = h;
+    const again = () => bindSec();
+    if ($('#secOn')) $('#secOn').onclick = () => {
+      const m = openModal({ title: 'Set up two-step login', body: '<div class="mfa-light" id="secHost"></div>', footer: false, noFocus: true });
+      mfaSetup($('#secHost'), () => { m.close(); toast('Two-step login is on'); again(); });
+    };
+    if ($('#secOff')) $('#secOff').onclick = async () => {
+      if (!await confirmBox('Remove two-step login?', 'Nex will go back to asking for your password only.', 'Remove', true)) return;
+      try { await authApi('factors/' + encodeURIComponent(mine.id), { method: 'DELETE' }); toast('Removed'); } catch (e) { toast(e.message, true); }
+      again();
+    };
+    if ($('#secReq')) $('#secReq').onclick = async () => {
+      const on = !st.required;
+      if (!await confirmBox(on ? 'Require the 6-digit code for everyone?' : 'Stop requiring the code?', on ? 'Each person sets up an authenticator app the next time they open Nex (about a minute). Until they do, they see nothing.' : 'Nex goes back to protecting student data with passwords only.', on ? 'Require it' : 'Turn off', !on)) return;
+      try { await api('rpc/nex_set_mfa_required', { method: 'POST', body: { p_on: on } }); toast(on ? 'Required for everyone' : 'No longer required'); } catch (e) { toast(e.message, true); }
+      again();
+    };
+    $$('[data-reset]', box).forEach(b => b.onclick = async () => {
+      const who = b.dataset.reset;
+      if (!await confirmBox('Reset ' + who + '\'s code?', 'Use this when they have lost their phone. They set up a new code the next time they open Nex.', 'Reset', true)) return;
+      try { await api('rpc/nex_admin_reset_mfa', { method: 'POST', body: { p_staff: who } }); toast('Reset'); } catch (e) { toast(e.message, true); }
+      again();
+    });
+  } catch (e) { if (e.message !== 'session') box.innerHTML = empty('Could not load', e.message); }
 }
 
 /* start only after every route is registered */

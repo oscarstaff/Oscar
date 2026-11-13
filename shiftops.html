@@ -3359,6 +3359,7 @@ body.avail-editing #availGrid .avail-chip.av2:hover{ background:color-mix(in srg
     <div style="display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap;">
       <button class="aa-tab" id="aatab-formcraft" onclick="aaSwitch('formcraft')">FormCraft</button>
       <button class="aa-tab" id="aatab-slip" onclick="aaSwitch('slip')">Slip</button>
+      <button class="aa-tab" id="aatab-nex" onclick="aaSwitch('nex')">Nex</button>
       <button class="aa-tab" id="aatab-dialtrac" onclick="aaSwitch('dialtrac')">Call Logger</button>
       <button class="aa-tab" id="aatab-borekade" onclick="aaSwitch('borekade')">Bore-KADE</button>
       <button class="aa-tab" id="aatab-shiftops" onclick="aaSwitch('shiftops')">ShiftOps</button>
@@ -3421,6 +3422,7 @@ body.avail-editing #availGrid .avail-chip.av2:hover{ background:color-mix(in srg
       <div id="staffAccessChecks" style="display:flex;flex-direction:column;gap:9px;margin-bottom:18px;">
         <label class="sa-acc-row"><input type="checkbox" id="saAccess_formcraft"><span class="sa-acc-label">FormCraft</span><span class="sa-acc-desc">PDF form filler</span></label>
         <label class="sa-acc-row"><input type="checkbox" id="saAccess_slip"><span class="sa-acc-label">Slip</span><span class="sa-acc-desc">Tax invoices</span></label>
+        <label class="sa-acc-row"><input type="checkbox" id="saAccess_nex"><span class="sa-acc-label">Nex</span><span class="sa-acc-desc">Student management</span></label>
         <label class="sa-acc-row"><input type="checkbox" id="saAccess_borekade"><span class="sa-acc-label">Bore-KADE</span><span class="sa-acc-desc">Arcade</span></label>
       </div>
 
@@ -3851,10 +3853,11 @@ const GAS_EXEC_URL='https://script.google.com/macros/s/AKfycby0Bq97bCZAsmnruXFuJ
 const GAS_TOKEN='oscars_gas_83235a5f0c1f6ba32b18235e2b2d544ac137167d';
 
 // ── Leave-email relay (SEPARATE Apps Script, personal Gmail sender) ──────
-// Its own deployment — deliberately NOT the main Code.gs relay.
-// This page no longer holds a mail token: it sends the signed-in manager's session (sbAccessToken)
-// and the relay checks it. The server token lives only in the gateway and the edge function.
+// Its own deployment + own token — deliberately NOT the main Code.gs relay.
+// After deploying LeaveEmailRelay.gs, paste its /exec URL below. The token
+// must match MAIL_TOKEN inside that script exactly.
 const MAIL_EXEC_URL='https://script.google.com/macros/s/AKfycbyfr16rfoX-kj30XxJu53wkJrFz6ZixQOylpIqcfbtjVhZBJUFYpBQ_5i9lZSi8PjI-Zw/exec';
+const MAIL_TOKEN='oscars_mail_921793e91a49d14b120c9053065e94c7065ae583';
 
 // ── Shift-open notification rules ───────────────────────────────────────
 // Who hears about an open shift:
@@ -7354,6 +7357,7 @@ async function notifyShiftOpen(fromStaff, info){
       headers:{'Content-Type':'text/plain;charset=utf-8'},
       body:JSON.stringify({
         action:'sendShiftOpen',
+        token:MAIL_TOKEN,
         recipients:to,
         team:team,
         shiftDate:info.shift_date,
@@ -8352,7 +8356,7 @@ async function loadStaffAccess(s){
     }catch(e){ console.warn('loadStaffAccess admin flag', e); window._saLeadFlag = false; }
   }
   // app access — read this person's rows from app_access
-  ['formcraft','slip','borekade','shiftops'].forEach(a=>{ const b=document.getElementById('saAccess_'+a); if(b) b.checked=false; });
+  ['formcraft','slip','nex','borekade','shiftops'].forEach(a=>{ const b=document.getElementById('saAccess_'+a); if(b) b.checked=false; });
   try{
     const rows = await aaGet('app_access?select=app&staff_name=eq.'+encodeURIComponent(full));
     (rows||[]).forEach(r=>{ const b=document.getElementById('saAccess_'+r.app); if(b) b.checked=true; });
@@ -8392,7 +8396,7 @@ async function saveStaffAccess(fullName){
   const wantLead = isAdmin || !!(document.getElementById('saAccess_shiftops')||{}).checked;
   // app_access for the 3 apps. Admin ALWAYS gets ShiftOps access, even if the
   // ShiftOps box is unticked — admin rights require it.
-  for(const app of ['formcraft','slip','borekade','shiftops']){
+  for(const app of ['formcraft','slip','nex','borekade','shiftops']){
     let want = (document.getElementById('saAccess_'+app)||{}).checked;
     if(app==='shiftops' && isAdmin) want = true;
     if(want){
@@ -10489,6 +10493,7 @@ function sendAdminLeaveEmail(staffId,from,to,reason,reasonType){
         headers:{'Content-Type':'text/plain;charset=utf-8'},
         body:JSON.stringify({
           action:'sendLeaveEmail',
+          token:MAIL_TOKEN,
           to:to_email,
           name:nm,
           status:'approved',
@@ -10849,9 +10854,9 @@ function applyLeaveUpdate(id,status,declineReason){
       const toStr = r.to || r.to_date || '';
       const dateRange = fromStr + (toStr && toStr !== fromStr ? ' to '+toStr : '');
       const msg = dateRange + (declineReason ? ' · '+declineReason : (r.reason ? ' · '+r.reason : ''));
-      fetch(`${SUPABASE_URL}/functions/v1/send-push`,{
+      _soFreshTok().catch(function(){ return _soTok(); }).then(function(_pt){ return fetch(`${SUPABASE_URL}/functions/v1/send-push`,{
         method:'POST',
-        headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`,'Content-Type':'application/json'},
+        headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${_pt||SUPABASE_KEY}`,'Content-Type':'application/json'},
         body:JSON.stringify({
           staff_name: staffName,
           title: status==='approved' ? 'Leave approved ' : 'Leave declined',
@@ -10859,7 +10864,7 @@ function applyLeaveUpdate(id,status,declineReason){
           url: './#schedule',
           tag: 'leave-'+r.supabaseId
         })
-      }).catch(function(){});
+      }); }).catch(function(){});
 
       // ── Email the staff member their leave decision ──────────────
       // Look up their address from staff_credentials, then send via the
@@ -10880,6 +10885,7 @@ function applyLeaveUpdate(id,status,declineReason){
               headers:{'Content-Type':'text/plain;charset=utf-8'},
               body:JSON.stringify({
                 action:'sendLeaveEmail',
+                token:MAIL_TOKEN,
                 to:to,
                 name:nm,
                 status:status,
@@ -11555,12 +11561,12 @@ const AA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZ
 async function aaGet(path){const r=await fetch(AA_SB+'/rest/v1/'+path,{headers:{apikey:AA_KEY,Authorization:'Bearer '+AA_KEY}});if(!r.ok)return[];return r.json();}
 let aaCurrent='formcraft';
 let aaAllStaff=[];
-let aaWork={formcraft:new Set(),slip:new Set(),dialtrac:new Set(),borekade:new Set(),shiftops:new Set(),admin:new Set()};
-let aaOrig={formcraft:new Set(),slip:new Set(),dialtrac:new Set(),borekade:new Set(),shiftops:new Set(),admin:new Set()};
+let aaWork={formcraft:new Set(),slip:new Set(),nex:new Set(),dialtrac:new Set(),borekade:new Set(),shiftops:new Set(),admin:new Set()};
+let aaOrig={formcraft:new Set(),slip:new Set(),nex:new Set(),dialtrac:new Set(),borekade:new Set(),shiftops:new Set(),admin:new Set()};
 
 function aaSwitch(app){
   aaCurrent=app;
-  ['formcraft','slip','borekade','shiftops','admin'].forEach(a=>{
+  ['formcraft','slip','nex','borekade','shiftops','admin'].forEach(a=>{
     const t=document.getElementById('aatab-'+a);
     if(t)t.className='aa-tab'+(a===app?' aa-active':'');
   });
@@ -11610,7 +11616,7 @@ async function aaSave(){
   const jobs=[];
 
   // ── app_access: formcraft, slip, dialtrac, borekade, shiftops ──
-  for(const app of ['formcraft','slip','borekade','shiftops']){
+  for(const app of ['formcraft','slip','nex','borekade','shiftops']){
     const add=[...aaWork[app]].filter(n=>!aaOrig[app].has(n));
     const del=[...aaOrig[app]].filter(n=>!aaWork[app].has(n));
     add.forEach(n=>jobs.push(
@@ -11671,13 +11677,13 @@ async function aaSave(){
   }
 
   // update originals to current so reopening reflects saved state (no false reverts)
-  aaOrig={formcraft:new Set(aaWork.formcraft),slip:new Set(aaWork.slip),dialtrac:new Set(aaWork.dialtrac),borekade:new Set(aaWork.borekade),shiftops:new Set(aaWork.shiftops),admin:new Set(aaWork.admin)};
+  aaOrig={formcraft:new Set(aaWork.formcraft),slip:new Set(aaWork.slip),nex:new Set(aaWork.nex),dialtrac:new Set(aaWork.dialtrac),borekade:new Set(aaWork.borekade),shiftops:new Set(aaWork.shiftops),admin:new Set(aaWork.admin)};
   // re-render current tab so ticks reflect the (possibly cascaded) state
   aaRender(document.getElementById('aaSearch').value);
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────
-const SHIFTOPS_BUILD='2026-10-27-v48-leave-trail';
+const SHIFTOPS_BUILD='2026-11-13-v49-nex-access';
 console.log('%c[ShiftOps build '+SHIFTOPS_BUILD+' loaded]','background:#0071e3;color:#fff;padding:2px 8px;border-radius:4px;font-weight:700;');
 // Start every session in the FULL (admin) view. The team-lead read-only lock is
 // only ever added later, and only once the role is positively confirmed as team

@@ -1491,7 +1491,7 @@ async function autoGenerateQuizFromDoc(docId, docTitle, docUrl){
       method:'POST',
       headers:{
         'apikey':KEY,
-        'Authorization':'Bearer '+KEY,
+        'Authorization':'Bearer '+_sbBearer(),
         'Content-Type':'application/json'
       },
       body: JSON.stringify({
@@ -2124,7 +2124,7 @@ async function sendPushTo(staffName, title, body, options){
     const resp = await fetch(SEND_PUSH_URL,{
       method:'POST',
       headers:{
-        'Authorization':'Bearer '+KEY,
+        'Authorization':'Bearer '+_sbBearer(),
         'apikey':KEY,
         'Content-Type':'application/json'
       },
@@ -2251,7 +2251,7 @@ async function markNotifReadEverywhere(notifKey){
         method: 'POST',
         headers: {
           'apikey': KEY,
-          'Authorization': 'Bearer ' + KEY,
+          'Authorization': 'Bearer ' + _sbBearer(),
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
