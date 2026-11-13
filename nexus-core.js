@@ -443,41 +443,6 @@ let weekStart=gMon(new Date()),rWS=gMon(new Date()),me=null;
 
 
 
-function _availEmailPrefUI(on){
-  const t=document.getElementById('availEmailPrefToggle');
-  const s=document.getElementById('availEmailPrefSub');
-  if(t) t.checked=!!on;
-  if(s) s.textContent = on
-    ? 'We\u2019ll email you a reminder to check your availability.'
-    : 'Off. You can still update your availability here any time.';
-}
-async function loadAvailEmailPref(){
-  try{
-    const rows = await sbGet('staff_credentials','?staff_name=eq.'+encodeURIComponent(me)+'&select=avail_email_optout');
-    if(rows && rows.length) _availEmailPrefUI(!rows[0].avail_email_optout);
-  }catch(e){ /* leave the default on-state showing */ }
-}
-async function setAvailEmailPref(on){
-  const t=document.getElementById('availEmailPrefToggle');
-  if(t) t.disabled=true;
-  _availEmailPrefUI(on);
-  try{
-    const r = await fetch(SB+'/rest/v1/staff_credentials?staff_name=eq.'+encodeURIComponent(me),{
-      method:'PATCH',
-      headers:{'apikey':KEY,'Authorization':'Bearer '+_sbBearer(),'Content-Type':'application/json','Prefer':'return=minimal'},
-      body: JSON.stringify({avail_email_optout:!on})
-    });
-    if(!r.ok) throw new Error('http '+r.status);
-    const rows = await sbGet('staff_credentials','?staff_name=eq.'+encodeURIComponent(me)+'&select=avail_email_optout');
-    if(!rows || !rows.length || !!rows[0].avail_email_optout !== !on) throw new Error('not saved');
-    showToast(on ? 'Reminder emails on' : 'Reminder emails off');
-  }catch(e){
-    _availEmailPrefUI(!on);
-    showToast('Couldn\u2019t save that \u2014 please try again');
-  }
-  if(t) t.disabled=false;
-}
-
 /* My Time was split up: Leave is its own page, and Availability now lives on
    My Hours (next to the hours report). showSchedTab stays as a router so the
    many old callers (notifications, home cards, onboarding) keep working. */
@@ -520,7 +485,7 @@ function showHoursTab(tab){
     const reveal=function(){ if(sec) sec.classList.remove('av-loading'); window._availShownOnce=true; };
     if(hold) setTimeout(reveal, 5000);   /* never leave it hidden if a request hangs */
     /* also wait for the one-off weeks lookup, which decides whether the "From week / One-off" switch is shown */
-    Promise.allSettled([refreshAvailPendingStatus(), loadAvailEmailPref(), checkLock()])
+    Promise.allSettled([refreshAvailPendingStatus(), checkLock()])
       .then(function(){ return window._oneoffsP; }).catch(function(){}).then(reveal);
     if(myIsAdmin){
       document.getElementById('adminAvailSection').style.display='block';
