@@ -1,6 +1,8 @@
 /* ════════════════════════════════════════════════════════════════════════
    NEXUS · COLLAPSIBLE SIDEBAR   (nexus-sidebar.js + nexus-sidebar.css)
-   Adds a collapse/expand button at the bottom of the desktop sidebar.
+   Adds a collapse/expand button beside the profile row at the top of the desktop sidebar
+   (right end of the row when open, under the avatar when collapsed) and, when collapsed,
+   opens Library / My Time as a small flyout so their labels are not clipped.
    It drives the compact sidebar that index.html already styles:
      <html data-sb="collapsed|expanded">  +  localStorage 'oscars_sb'
    (the same key initAppearance() in nexus-ui.js reads on load and
@@ -45,7 +47,7 @@
     btn.setAttribute('aria-expanded', c ? 'false' : 'true');
     btn.setAttribute('aria-label', c ? 'Expand sidebar' : 'Collapse sidebar');
     btn.setAttribute('title', c ? 'Expand sidebar  [' : 'Collapse sidebar  [');
-    btn.innerHTML = (c ? CHEV_R : CHEV_L) + '<span class="sbc-label">Collapse</span>';
+    btn.innerHTML = c ? CHEV_R : CHEV_L;
     syncTitles();
   }
 
@@ -56,7 +58,37 @@
     document.documentElement.setAttribute('data-sb', next);
     if(sb){ sb.classList.add('sb-animating'); setTimeout(function(){ sb.classList.remove('sb-animating'); }, 450); }
     try{ if(typeof updateSbSwitch === 'function') updateSbSwitch(); }catch(e){}
+    clearFly();
     paint(btn);
+  }
+
+  function clearFly(){
+    Array.prototype.forEach.call(document.querySelectorAll('.nav-group.sb-fly'), function(g){ g.classList.remove('sb-fly'); });
+  }
+
+  /* Collapsed rail: a group parent (My Time, Library) opens its children as a flyout beside the rail. */
+  function wrapGroups(){
+    var orig = window.toggleNavGroup;
+    if(typeof orig !== 'function' || orig._sbWrapped) return;
+    var wrapped = function(id){
+      if(!isCollapsed()) return orig.apply(this, arguments);
+      var g = document.getElementById('navg-' + id);
+      if(!g) return;
+      var was = g.classList.contains('sb-fly');
+      clearFly();
+      if(was) return;
+      var parent = g.querySelector('.nav-parent'), kids = g.querySelector('.nav-children');
+      if(parent && kids){ var r = parent.getBoundingClientRect(); kids.style.top = Math.max(8, r.top) + 'px'; }
+      g.classList.add('sb-fly');
+    };
+    wrapped._sbWrapped = true;
+    window.toggleNavGroup = wrapped;
+    document.addEventListener('click', function(e){
+      if(!isCollapsed()) return;
+      if(e.target.closest && e.target.closest('.nav-parent')) return;
+      clearFly();
+    });
+    window.addEventListener('resize', clearFly);
   }
 
   function mount(){
@@ -64,10 +96,12 @@
     if(!sb || document.getElementById('sbCollapseBtn')) return;
     var btn = document.createElement('button');
     btn.type = 'button'; btn.id = 'sbCollapseBtn'; btn.className = 'sb-collapse-btn';
-    btn.onclick = function(){ toggle(btn); };
-    var foot = sb.querySelector('.sb-foot');
-    if(foot) sb.insertBefore(btn, foot); else sb.appendChild(btn);
+    btn.onclick = function(e){ e.stopPropagation(); toggle(btn); };   /* the profile row opens Profile; this must not */
+    var who = sb.querySelector('.sb-user');
+    if(who){ who.classList.add('has-sbc'); who.appendChild(btn); }
+    else{ var nav0 = sb.querySelector('.sb-nav'); sb.insertBefore(btn, nav0 || null); }
     paint(btn);
+    wrapGroups();
     document.addEventListener('keydown', function(e){
       if(e.key !== '[' || e.ctrlKey || e.metaKey || e.altKey) return;
       var t = e.target, tag = t && t.tagName;
@@ -75,7 +109,7 @@
       if(window.innerWidth <= 900) return;
       toggle(btn);
     });
-    /* nav items such as the CRM are revealed later; keep their tooltips in step */
+    /* nav items revealed later (e.g. Manager Tools for admins) get their tooltips too */
     var nav = sb.querySelector('.sb-nav');
     if(nav && window.MutationObserver){
       new MutationObserver(function(){ if(isCollapsed()) syncTitles(); })

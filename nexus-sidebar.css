@@ -1,30 +1,49 @@
 /* ════════════════════════════════════════════════════════════════════════
    NEXUS · COLLAPSIBLE SIDEBAR styles — pairs with nexus-sidebar.js
    The compact sidebar itself (html[data-sb="collapsed"] ...) is styled in index.html;
-   this file only styles the toggle button and adds hover labels for items that had none.
+   this file styles the toggle button (it sits inside the profile row), the collapsed
+   flyout for My Time / Library, and adds hover labels for items that had none.
    Loaded before nexus-mobile.css. REVERT: remove the <link>.
    ════════════════════════════════════════════════════════════════════════ */
 
+/* The profile row's own ">" arrow is replaced by the collapse button */
+.sb-user.has-sbc::after{ display:none !important; }
+
 .sb-collapse-btn{
-  margin:auto 10px 12px; flex:0 0 auto;
-  display:flex; align-items:center; gap:8px;
-  padding:9px 12px; border:0; border-radius:10px;
+  margin-left:auto; flex:0 0 auto;
+  width:30px; height:30px; padding:0;
+  display:grid; place-items:center;
+  border:0; border-radius:9px;
   background:transparent; color:var(--ui-ink-3,#64748b);
-  font:inherit; font-size:13px; font-weight:600; cursor:pointer; text-align:left;
+  cursor:pointer;
+  transition:background .15s, color .15s;
 }
 .sb-collapse-btn:hover{ background:var(--ui-surface-3,#f1f5f9); color:var(--ui-ink,#0f172a); }
 .sb-collapse-btn:focus-visible{ outline:2px solid var(--accent,#059669); outline-offset:1px; }
-.sb-collapse-btn svg{ flex:0 0 auto; }
+.sb-collapse-btn svg{ display:block; }
 
-html[data-sb="collapsed"] .sb-collapse-btn{
-  width:48px; height:40px; margin:auto auto 10px; padding:0; justify-content:center;
+/* collapsed: avatar on top, the expand button right under it */
+html[data-sb="collapsed"] .sb-user.has-sbc{ flex-direction:column; gap:6px; padding:8px 0 6px; }
+html[data-sb="collapsed"] .sb-collapse-btn{ margin:0; width:34px; height:24px; border-radius:8px; }
+
+/* collapsed: My Time / Library children open as a flyout beside the rail instead of being clipped inside it */
+html[data-sb="collapsed"] .nav-children{
+  display:none; position:fixed; left:80px; top:0; z-index:200;
+  max-height:none; min-width:168px; margin:0; padding:6px;
+  overflow:visible;
+  background:var(--ui-surface,#fff);
+  border:1px solid var(--ui-line,#e2e8f0); border-radius:12px;
+  box-shadow:0 8px 24px rgba(15,23,42,.14);
 }
-html[data-sb="collapsed"] .sb-collapse-btn .sbc-label{ display:none; }
+html[data-sb="collapsed"] .nav-group.sb-fly .nav-children{ display:flex; animation:sbFlyIn .14s ease both; }
+html[data-sb="collapsed"] .nav-children .nav-child{ margin:0; padding:9px 14px; white-space:nowrap; }
+@keyframes sbFlyIn{ from{ opacity:0; transform:translateX(-4px); } to{ opacity:1; transform:none; } }
 
 /* hover labels in compact mode for items index.html did not name */
 html[data-sb="collapsed"] [id="nav-hub"]:hover::after{ content:"Nodes"; }
 html[data-sb="collapsed"] [id="nav-calllog"]:hover::after{ content:"Call Log"; }
-html[data-sb="collapsed"] [id="nav-crm"]:hover::after{ content:"CRM"; }
+html[data-sb="collapsed"] [id="nav-learning"]:hover::after{ content:"Library"; }
+html[data-sb="collapsed"] .nav-group.sb-fly .nav-parent:hover::after{ display:none !important; }
 
 @media (max-width:900px){ .sb-collapse-btn{ display:none; } }
-@media (prefers-reduced-motion:reduce){ .sb-collapse-btn{ transition:none; } }
+@media (prefers-reduced-motion:reduce){ .sb-collapse-btn{ transition:none; } html[data-sb="collapsed"] .nav-group.sb-fly .nav-children{ animation:none; } }
