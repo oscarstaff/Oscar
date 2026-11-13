@@ -159,7 +159,7 @@ async function openGatedApp(ev,app,url){
   if(ev)ev.preventDefault();
   try{
     const token=await makeAppToken(app, me);
-    if(['shiftops','formcraft','slip'].indexOf(app)>=0){
+    if(['shiftops','formcraft','slip','nex'].indexOf(app)>=0){
       let hasSess=false;
       try{ const pl=JSON.parse(decodeURIComponent(escape(atob(token.split('.')[0])))); hasSess=!!pl.sb_at; }catch(e){}
       if(!hasSess){ showToast('Your sign-in has expired. Sign out and back in, then open the app again.'); return; }
@@ -237,15 +237,17 @@ async function makeAppToken(app,name){
 async function loadHubAccess(){
   try{
     const rows=await sbGet('app_access','?select=app,staff_name');
-    const _c={formcraft:[],slip:[],dialtrac:[],borekade:[],shiftops:[],vgc:[]};
+    const _c={formcraft:[],slip:[],dialtrac:[],borekade:[],shiftops:[],vgc:[],nex:[]};
     (rows||[]).forEach(r=>{ if(_c[r.app]) _c[r.app].push(r.staff_name); });
     window._accessCache=_c;
   }catch(e){ console.warn('loadHubAccess',e); }
-  const _ac = window._accessCache || { formcraft:[], slip:[], dialtrac:[], borekade:[], shiftops:[], vgc:[] };
+  const _ac = window._accessCache || { formcraft:[], slip:[], dialtrac:[], borekade:[], shiftops:[], vgc:[], nex:[] };
   const fc=document.getElementById('hubcard-formcraft');
   const sl=document.getElementById('hubcard-slip');
   if(fc) fc.style.display=(_ac.formcraft||[]).includes(me)?'':'none';
   if(sl) sl.style.display=(_ac.slip||[]).includes(me)?'':'none';
+  const nx=document.getElementById('hubcard-nex');
+  if(nx) nx.style.display=((_ac.nex||[]).includes(me)||(typeof myIsAdmin!=='undefined'&&myIsAdmin))?'':'none';
   const so=document.getElementById('hubcard-shiftops');
   if(so) so.style.display=(_ac.shiftops||[]).includes(me)?'':'none';
   const bk=document.getElementById('hubcard-borekade');

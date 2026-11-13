@@ -1,0 +1,1433 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#12201f">
+<meta name="robots" content="noindex,nofollow">
+<title>Nex · Student management</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232fb5ad'/%3E%3Ctext x='16' y='23' text-anchor='middle' font-family='Arial' font-weight='700' font-size='20' fill='%2308201f'%3EN%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+/* Nex design system v0.1 — "Quiet ledger"
+   Light, warm-neutral surfaces, one deep-teal accent, status colours that always pair a tint with a dark label. */
+:root{
+  --nx-bg:#f1f2ef; --nx-surface:#ffffff; --nx-sunken:#f7f8f6; --nx-hover:#f3f6f5;
+  --nx-line:#dcdfd9; --nx-line-strong:#c3c8c0;
+  --nx-ink:#171c1a; --nx-ink-2:#424a46; --nx-ink-3:#5d6761;
+  --nx-shell:#12201f; --nx-shell-ink:#e8efed; --nx-shell-dim:#9db3ae;
+  --nx-accent:#0e6663; --nx-accent-hover:#0a5250; --nx-accent-weak:#e1efee; --nx-accent-line:#a9cfcc;
+  --nx-ok:#1c7343; --nx-ok-weak:#e2f3e8; --nx-warn:#8a4f00; --nx-warn-weak:#fbefd9;
+  --nx-bad:#a8271f; --nx-bad-weak:#fae7e4; --nx-info:#2f4f9c; --nx-info-weak:#e6ebf8; --nx-mute-weak:#eceeea;
+  --nx-r:6px; --nx-r-lg:10px;
+  --nx-shadow:0 1px 2px rgba(23,28,26,.06),0 1px 1px rgba(23,28,26,.04);
+  --nx-shadow-pop:0 8px 24px rgba(23,28,26,.14),0 2px 6px rgba(23,28,26,.08);
+  --nx-font:"Inter",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --nx-display:"Space Grotesk","Inter",system-ui,sans-serif;
+}
+*{box-sizing:border-box}html,body{margin:0}
+.nx{font-family:var(--nx-font);font-size:13px;line-height:1.45;color:var(--nx-ink);background:var(--nx-bg);min-height:100%;-webkit-font-smoothing:antialiased}
+.nx a{color:var(--nx-accent);text-decoration:none}
+.nx a:hover{text-decoration:underline}
+.nx h1,.nx h2,.nx h3{margin:0;font-family:var(--nx-display);font-weight:600;letter-spacing:-.01em}
+.nx svg{flex:none}
+.nx-ico{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.nx-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+
+/* ---------- shell ---------- */
+.nx-top{display:flex;align-items:center;gap:20px;height:52px;padding:0 20px;background:var(--nx-shell);color:var(--nx-shell-ink)}
+.nx-brand{display:flex;align-items:center;gap:10px;font-family:var(--nx-display);font-weight:600;font-size:17px;color:#fff!important;text-decoration:none!important}
+.nx-mark{display:grid;place-items:center;width:28px;height:28px;border-radius:7px;background:#2fb5ad;color:#08201f;font-family:var(--nx-display);font-weight:700;font-size:15px}
+.nx-search{flex:1;max-width:520px;position:relative;margin:0 auto 0 12px}
+.nx-search input{width:100%;height:34px;padding:0 12px 0 34px;border:1px solid #2c4442;border-radius:var(--nx-r);background:#1b2e2c;color:#fff;font:inherit}
+.nx-search input::placeholder{color:var(--nx-shell-dim)}
+.nx-search input:focus{outline:2px solid #2fb5ad;outline-offset:1px}
+.nx-search .nx-ico{position:absolute;left:10px;top:9px;color:var(--nx-shell-dim)}
+.nx-lock{display:flex;align-items:center;gap:8px;height:30px;padding:0 12px;border-radius:99px;background:#1b2e2c;border:1px solid #2c4442;font-size:12px;color:var(--nx-shell-ink)}
+.nx-lock i{width:8px;height:8px;border-radius:50%;background:#4fd08a;box-shadow:0 0 0 3px rgba(79,208,138,.2)}
+.nx-avatar{display:grid;place-items:center;flex:none;width:32px;height:32px;border-radius:50%;background:var(--nx-accent-weak);color:var(--nx-accent);font-weight:600;font-size:12px;border:1px solid var(--nx-accent-line)}
+.nx-top .nx-avatar{background:#2fb5ad;color:#08201f;border:0}
+.nx-nav{display:flex;gap:2px;padding:0 16px;background:var(--nx-surface);border-bottom:1px solid var(--nx-line);overflow-x:auto}
+.nx-nav a{position:relative;display:flex;align-items:center;height:44px;padding:0 14px;color:var(--nx-ink-2);font-weight:500;white-space:nowrap}
+.nx-nav a:hover{color:var(--nx-ink);background:var(--nx-hover);text-decoration:none}
+.nx-nav a[aria-current="page"]{color:var(--nx-accent);font-weight:600}
+.nx-nav a[aria-current="page"]::after{content:"";position:absolute;left:10px;right:10px;bottom:0;height:3px;border-radius:3px 3px 0 0;background:var(--nx-accent)}
+.nx-count{margin-left:8px;padding:0 6px;border-radius:99px;background:var(--nx-mute-weak);color:var(--nx-ink-2);font-size:11px;font-weight:600;line-height:18px}
+
+/* ---------- page ---------- */
+.nx-main{max-width:1360px;margin:0 auto;padding:16px 20px 40px;display:flex;flex-direction:column;gap:12px}
+.nx-card{background:var(--nx-surface);border:1px solid var(--nx-line);border-radius:var(--nx-r-lg);box-shadow:var(--nx-shadow)}
+.nx-card-h{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px;border-bottom:1px solid var(--nx-line)}
+.nx-card-h h3{font-size:14px}
+.nx-card-b{padding:16px}
+.nx-pagehead{display:flex;flex-wrap:wrap;align-items:center;gap:14px;padding:14px 16px}
+.nx-objico{display:grid;place-items:center;width:40px;height:40px;border-radius:9px;background:var(--nx-accent);color:#fff}
+.nx-objico .nx-ico{width:20px;height:20px}
+.nx-eyebrow{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--nx-ink-3);font-weight:600}
+.nx-title{font-size:22px;display:flex;align-items:center;gap:6px}
+.nx-grow{flex:1}
+.nx-muted{color:var(--nx-ink-3)}
+.nx-crumbs{display:flex;gap:6px;align-items:center;color:var(--nx-ink-3);font-size:12px}
+
+/* ---------- buttons ---------- */
+.nx-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:32px;padding:0 12px;border:1px solid var(--nx-line-strong);border-radius:var(--nx-r);background:var(--nx-surface);color:var(--nx-ink);font:inherit;font-weight:500;cursor:pointer;white-space:nowrap}
+.nx-btn:hover{background:var(--nx-hover);text-decoration:none}
+.nx-btn:focus-visible,.nx-tab:focus-visible,.nx-seat:focus-visible,.nx-chip:focus-visible,.nx-seg button:focus-visible{outline:2px solid var(--nx-accent);outline-offset:2px}
+.nx-btn.primary{background:var(--nx-accent);border-color:var(--nx-accent);color:#fff}
+.nx-btn.primary:hover{background:var(--nx-accent-hover)}
+.nx-btn.quiet{border-color:transparent;background:transparent;color:var(--nx-ink-2)}
+.nx-btn.quiet:hover{background:var(--nx-mute-weak)}
+.nx-btn.icon{width:32px;padding:0}
+.nx-btn.sm{height:26px;padding:0 9px;font-size:12px}
+.nx-btnrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+
+/* ---------- pills, chips, segmented ---------- */
+.nx-pill{display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 9px;border-radius:99px;font-size:12px;font-weight:600;white-space:nowrap;background:var(--nx-mute-weak);color:var(--nx-ink-2)}
+.nx-pill::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor;opacity:.75}
+.nx-pill.ok{background:var(--nx-ok-weak);color:var(--nx-ok)}
+.nx-pill.warn{background:var(--nx-warn-weak);color:var(--nx-warn)}
+.nx-pill.bad{background:var(--nx-bad-weak);color:var(--nx-bad)}
+.nx-pill.info{background:var(--nx-info-weak);color:var(--nx-info)}
+.nx-pill.accent{background:var(--nx-accent-weak);color:var(--nx-accent)}
+.nx-chip{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;border:1px solid var(--nx-line-strong);border-radius:99px;background:var(--nx-surface);color:var(--nx-ink-2);font:inherit;font-size:12px;font-weight:500;cursor:pointer}
+.nx-chip:hover{background:var(--nx-hover)}
+.nx-chip[aria-pressed="true"]{background:var(--nx-accent-weak);border-color:var(--nx-accent-line);color:var(--nx-accent)}
+.nx-seg{display:inline-flex;padding:3px;border-radius:9px;background:var(--nx-mute-weak);gap:2px;flex-wrap:wrap}
+.nx-seg button{display:flex;align-items:center;gap:8px;height:30px;padding:0 12px;border:0;border-radius:7px;background:transparent;color:var(--nx-ink-2);font:inherit;font-weight:500;cursor:pointer}
+.nx-seg button[aria-pressed="true"]{background:var(--nx-surface);color:var(--nx-ink);box-shadow:var(--nx-shadow);font-weight:600}
+.nx-seg .nx-count{background:var(--nx-surface);margin-left:0}
+
+/* ---------- table ---------- */
+.nx-tablewrap{overflow-x:auto}
+.nx-table{width:100%;border-collapse:separate;border-spacing:0;min-width:1040px}
+.nx-table th{position:sticky;top:0;height:36px;padding:0 12px;text-align:left;font-size:11px;letter-spacing:.05em;text-transform:uppercase;font-weight:600;color:var(--nx-ink-3);background:var(--nx-sunken);border-bottom:1px solid var(--nx-line);white-space:nowrap}
+.nx-table td{height:56px;padding:0 12px;border-bottom:1px solid var(--nx-line);vertical-align:middle}
+.nx-table tr:last-child td{border-bottom:0}
+.nx-table tbody tr:hover td{background:var(--nx-hover)}
+.nx-table tr.sel td{background:var(--nx-accent-weak)}
+.nx-table .w-check{width:44px;padding-left:16px}
+.nx-table input[type=checkbox]{width:16px;height:16px;accent-color:var(--nx-accent);cursor:pointer}
+.nx-who{display:flex;align-items:center;gap:10px;min-width:0}
+.nx-who b{display:block;font-weight:600}
+.nx-who span{display:block;color:var(--nx-ink-3);font-size:12px}
+.nx-num{font-variant-numeric:tabular-nums}
+.nx-bulk{display:flex;align-items:center;gap:10px;padding:8px 16px;background:var(--nx-accent);color:#fff;border-radius:var(--nx-r-lg) var(--nx-r-lg) 0 0}
+.nx-bulk .nx-btn{background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.3);color:#fff}
+.nx-bulk .nx-btn:hover{background:rgba(255,255,255,.24)}
+.nx-foot{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-top:1px solid var(--nx-line);color:var(--nx-ink-3);font-size:12px}
+.nx-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px 16px;border-top:1px solid var(--nx-line)}
+
+/* ---------- meters ---------- */
+.nx-meter{width:120px}
+.nx-meter-bar{height:6px;border-radius:99px;background:var(--nx-mute-weak);overflow:hidden}
+.nx-meter-bar i{display:block;height:100%;border-radius:99px;background:var(--nx-accent)}
+.nx-meter-bar i.warn{background:#c47a12}
+.nx-meter small{display:block;margin-top:4px;color:var(--nx-ink-3);font-size:11px}
+
+/* ---------- stage path ---------- */
+.nx-path{display:flex;list-style:none;margin:0;padding:0;gap:0}
+.nx-path li{position:relative;flex:1;display:flex;align-items:center;justify-content:center;gap:8px;height:38px;padding:0 20px 0 26px;background:var(--nx-mute-weak);color:var(--nx-ink-2);font-weight:600;clip-path:polygon(0 0,calc(100% - 14px) 0,100% 50%,calc(100% - 14px) 100%,0 100%,14px 50%);margin-left:-6px}
+.nx-path li:first-child{margin-left:0;padding-left:16px;clip-path:polygon(0 0,calc(100% - 14px) 0,100% 50%,calc(100% - 14px) 100%,0 100%)}
+.nx-path li.done{background:var(--nx-accent-weak);color:var(--nx-accent)}
+.nx-path li.now{background:var(--nx-accent);color:#fff}
+.nx-path .nx-ico{width:14px;height:14px;stroke-width:2.2}
+.nx-mini{display:flex;gap:3px}
+.nx-mini i{width:14px;height:5px;border-radius:3px;background:var(--nx-line-strong)}
+.nx-mini i.on{background:var(--nx-accent)}
+
+/* ---------- record page ---------- */
+.nx-hl{display:flex;flex-wrap:wrap;gap:16px 28px;align-items:center;padding:16px}
+.nx-hl .nx-avatar{width:52px;height:52px;font-size:18px;font-family:var(--nx-display)}
+.nx-facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px 24px;flex:1;min-width:300px}
+.nx-facts dt,.nx-field dt{font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--nx-ink-3);font-weight:600;margin-bottom:2px}
+.nx-facts dd,.nx-field dd{margin:0;font-weight:500}
+.nx-cols{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-start}
+.nx-colmain{flex:999 1 620px;min-width:0;display:flex;flex-direction:column;gap:12px}
+.nx-colside{flex:1 1 340px;min-width:0;display:flex;flex-direction:column;gap:12px}
+.nx-tabs{display:flex;gap:4px;padding:0 12px;border-bottom:1px solid var(--nx-line);overflow-x:auto}
+.nx-tab{position:relative;height:42px;padding:0 12px;border:0;background:transparent;color:var(--nx-ink-2);font:inherit;font-weight:500;cursor:pointer;white-space:nowrap}
+.nx-tab:hover{color:var(--nx-ink)}
+.nx-tab[aria-selected="true"]{color:var(--nx-accent);font-weight:600}
+.nx-tab[aria-selected="true"]::after{content:"";position:absolute;left:8px;right:8px;bottom:-1px;height:3px;border-radius:3px 3px 0 0;background:var(--nx-accent)}
+.nx-sec{border-bottom:1px solid var(--nx-line)}
+.nx-sec:last-child{border-bottom:0}
+.nx-sec-h{display:flex;align-items:center;gap:8px;width:100%;padding:12px 16px;border:0;background:var(--nx-sunken);font:inherit;font-weight:600;color:var(--nx-ink);cursor:pointer;text-align:left}
+.nx-sec-h .nx-ico{transition:transform .15s}
+.nx-sec-h[aria-expanded="false"] .nx-ico{transform:rotate(-90deg)}
+.nx-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px 32px;padding:16px;margin:0}
+.nx-field{margin:0}
+.nx-note{display:flex;align-items:center;gap:8px;padding:8px 16px;background:var(--nx-info-weak);color:var(--nx-info);font-size:12px;font-weight:500}
+.nx-feed{list-style:none;margin:0;padding:4px 16px 8px}
+.nx-feed li{position:relative;display:flex;gap:12px;padding:12px 0;border-bottom:1px solid var(--nx-line)}
+.nx-feed li:last-child{border-bottom:0}
+.nx-feed .dot{display:grid;place-items:center;flex:none;width:28px;height:28px;border-radius:50%;background:var(--nx-accent-weak);color:var(--nx-accent)}
+.nx-feed .dot .nx-ico{width:14px;height:14px}
+.nx-feed .dot.warn{background:var(--nx-warn-weak);color:var(--nx-warn)}
+.nx-feed .dot.info{background:var(--nx-info-weak);color:var(--nx-info)}
+.nx-feed b{font-weight:600}
+.nx-feed time{display:block;color:var(--nx-ink-3);font-size:12px}
+.nx-related{display:flex;flex-direction:column}
+.nx-related > div{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px;border-bottom:1px solid var(--nx-line)}
+.nx-related > div:last-child{border-bottom:0}
+.nx-related small{display:block;color:var(--nx-ink-3);font-size:12px}
+.nx-big{font-family:var(--nx-display);font-size:26px;font-weight:600;letter-spacing:-.02em}
+
+/* ---------- payments queue ---------- */
+.nx-split{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-start}
+.nx-split > .nx-card:first-child{flex:999 1 640px;min-width:0}
+.nx-drawer{flex:1 1 360px;min-width:0;position:sticky;top:12px}
+.nx-steps{display:flex;gap:3px;align-items:center}
+.nx-steps i{width:18px;height:6px;border-radius:3px;background:var(--nx-line-strong)}
+.nx-steps i.on{background:var(--nx-accent)}
+.nx-steps i.part{background:var(--nx-accent-line)}
+.nx-match{display:flex;flex-direction:column;gap:8px;padding:12px;border:1px solid var(--nx-line);border-radius:var(--nx-r);background:var(--nx-surface)}
+.nx-match.best{border-color:var(--nx-accent-line);background:var(--nx-accent-weak)}
+.nx-why{display:flex;flex-wrap:wrap;gap:6px}
+.nx-why span{height:20px;padding:0 8px;border-radius:4px;background:var(--nx-surface);border:1px solid var(--nx-line);font-size:11px;font-weight:600;color:var(--nx-ink-2);line-height:18px}
+.nx-why span.hit{background:var(--nx-ok-weak);border-color:transparent;color:var(--nx-ok)}
+.nx-tr{cursor:pointer}
+
+/* ---------- first aid seat map ---------- */
+.nx-days{display:flex;gap:8px;flex-wrap:wrap}
+.nx-day{display:flex;flex-direction:column;gap:2px;min-width:112px;padding:8px 12px;border:1px solid var(--nx-line-strong);border-radius:var(--nx-r);background:var(--nx-surface);font:inherit;text-align:left;cursor:pointer}
+.nx-day[aria-pressed="true"]{border-color:var(--nx-accent);box-shadow:inset 0 0 0 1px var(--nx-accent);background:var(--nx-accent-weak)}
+.nx-day b{font-family:var(--nx-display);font-size:15px}
+.nx-day span{font-size:12px;color:var(--nx-ink-3)}
+.nx-cap{height:10px;border-radius:99px;background:var(--nx-mute-weak);overflow:hidden;display:flex}
+.nx-cap i{display:block;height:100%}
+.nx-cap .a{background:var(--nx-accent)}
+.nx-cap .b{background:var(--nx-accent-line)}
+.nx-day-plan{display:grid;grid-template-columns:2fr 5fr 1fr;gap:3px}
+.nx-day-plan div{padding:8px 10px;border-radius:var(--nx-r);background:var(--nx-mute-weak);font-size:12px;font-weight:600;color:var(--nx-ink-2)}
+.nx-day-plan div small{display:block;font-weight:500;color:var(--nx-ink-3)}
+.nx-day-plan div:nth-child(2){background:var(--nx-accent-weak);color:var(--nx-accent)}
+.nx-seats{display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:8px}
+.nx-seat{position:relative;display:grid;place-items:center;height:44px;border:1.5px solid var(--nx-line-strong);border-radius:var(--nx-r);background:var(--nx-surface);color:var(--nx-ink-2);font:inherit;font-size:12px;font-weight:600;cursor:pointer}
+.nx-seat:hover{border-color:var(--nx-accent)}
+.nx-seat.booked{background:var(--nx-accent-weak);border-color:var(--nx-accent-line);color:var(--nx-accent)}
+.nx-seat.here{background:var(--nx-accent);border-color:var(--nx-accent);color:#fff}
+.nx-seat.walk{border-style:dashed;border-color:var(--nx-info);background:var(--nx-info-weak);color:var(--nx-info)}
+.nx-seat.pick{box-shadow:0 0 0 3px var(--nx-surface),0 0 0 5px var(--nx-ink)}
+.nx-legend{display:flex;flex-wrap:wrap;gap:16px;color:var(--nx-ink-2);font-size:12px}
+.nx-legend span{display:flex;align-items:center;gap:6px}
+.nx-legend i{width:14px;height:14px;border-radius:4px;border:1.5px solid var(--nx-line-strong);background:var(--nx-surface)}
+.nx-legend i.booked{background:var(--nx-accent-weak);border-color:var(--nx-accent-line)}
+.nx-legend i.here{background:var(--nx-accent);border-color:var(--nx-accent)}
+.nx-legend i.walk{border-style:dashed;border-color:var(--nx-info);background:var(--nx-info-weak)}
+.nx-flags{display:flex;gap:4px}
+.nx-flag{display:grid;place-items:center;width:22px;height:22px;border-radius:5px;background:var(--nx-mute-weak);color:var(--nx-ink-3);font-size:10px;font-weight:700}
+.nx-flag.on{background:var(--nx-ok-weak);color:var(--nx-ok)}
+
+@media (max-width:760px){
+  .nx-top{gap:10px;padding:0 12px}.nx-lock span{display:none}.nx-main{padding:12px}
+  .nx-path{flex-direction:column;gap:4px}.nx-path li,.nx-path li:first-child{margin:0;clip-path:none;border-radius:var(--nx-r);justify-content:flex-start}
+  .nx-seats{grid-template-columns:repeat(5,minmax(0,1fr))}
+}
+@media (prefers-reduced-motion:reduce){.nx *{transition:none!important}}
+
+/* ---------- gate + lock ---------- */
+.lockov,#__gate{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:20px;background:radial-gradient(800px 500px at 80% -10%,rgba(47,181,173,.25),transparent 60%),linear-gradient(160deg,#12201f,#0a1413);font-family:var(--nx-font)}
+.lockov[hidden]{display:none}
+#__gate{z-index:99999}.lockov{z-index:99998}
+.gate-card{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:20px;padding:36px 32px;width:min(400px,92vw);text-align:center;box-shadow:0 30px 80px rgba(0,0,0,.45)}
+.gate-ic{display:grid;place-items:center;width:52px;height:52px;margin:0 auto 14px;border-radius:14px;background:#2fb5ad;color:#08201f;font-family:var(--nx-display);font-weight:700;font-size:26px}
+.gate-t{font-family:var(--nx-display);font-size:22px;font-weight:600;color:#fff;margin-bottom:8px}
+.gate-m{font-size:13.5px;color:#b9c9c5;line-height:1.55}
+[hidden]{display:none!important}
+
+/* ---------- forms ---------- */
+.nx-in,.nx-sel,.nx-ta{width:100%;height:34px;padding:0 10px;border:1px solid var(--nx-line-strong);border-radius:var(--nx-r);background:var(--nx-surface);color:var(--nx-ink);font:inherit}
+.nx-ta{height:auto;min-height:72px;padding:8px 10px;resize:vertical}
+.nx-in:focus,.nx-sel:focus,.nx-ta:focus{outline:2px solid var(--nx-accent);outline-offset:0;border-color:var(--nx-accent)}
+.nx-in.sm,.nx-sel.sm{height:30px;font-size:12px;width:auto;min-width:130px}
+.nx-lbl{display:block;font-size:11px;letter-spacing:.05em;text-transform:uppercase;font-weight:600;color:var(--nx-ink-3);margin-bottom:4px}
+.nx-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 16px}
+.nx-form .full{grid-column:1/-1}
+.nx-check{display:flex;align-items:center;gap:8px;height:34px;font-weight:500}
+.nx-check input{width:16px;height:16px;accent-color:var(--nx-accent)}
+.nx-help{font-size:12px;color:var(--nx-ink-3);margin-top:3px}
+.nx-err{color:var(--nx-bad);font-size:12px;margin-top:6px}
+.nx-warnbox{padding:10px 12px;border-radius:var(--nx-r);background:var(--nx-warn-weak);color:var(--nx-warn);font-size:12.5px;font-weight:500}
+
+/* ---------- modal + toast ---------- */
+.modal-bg{position:fixed;inset:0;z-index:9000;display:flex;align-items:flex-start;justify-content:center;padding:6vh 16px 16px;background:rgba(18,32,31,.45);overflow:auto}
+.modal{width:min(640px,100%);background:var(--nx-surface);border-radius:var(--nx-r-lg);box-shadow:var(--nx-shadow-pop)}
+.modal.wide{width:min(860px,100%)}
+.modal-h{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 18px;border-bottom:1px solid var(--nx-line)}
+.modal-h h3{font-size:16px}
+.modal-b{padding:18px;max-height:68vh;overflow:auto}
+.modal-f{display:flex;justify-content:flex-end;gap:8px;padding:12px 18px;border-top:1px solid var(--nx-line);background:var(--nx-sunken);border-radius:0 0 var(--nx-r-lg) var(--nx-r-lg)}
+.toasts{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:9500;display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none}
+.toast{padding:10px 16px;border-radius:var(--nx-r);background:var(--nx-shell);color:#fff;font-weight:500;box-shadow:var(--nx-shadow-pop)}
+.toast.bad{background:var(--nx-bad)}
+
+/* ---------- misc ---------- */
+.nx-empty{padding:36px 16px;text-align:center;color:var(--nx-ink-3)}
+.nx-empty b{display:block;color:var(--nx-ink);font-size:15px;margin-bottom:4px}
+.nx-skel{height:14px;border-radius:4px;background:linear-gradient(90deg,var(--nx-mute-weak),#f6f7f4,var(--nx-mute-weak));background-size:200% 100%;animation:sk 1.2s linear infinite}
+@keyframes sk{to{background-position:-200% 0}}
+.nx-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.nx-kpi{padding:14px 16px;display:flex;flex-direction:column;gap:2px;color:inherit}
+.nx-kpi:hover{text-decoration:none;border-color:var(--nx-accent-line)}
+.nx-kpi small{color:var(--nx-ink-3)}
+.nx-two{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:12px;align-items:start}
+.nx-list{list-style:none;margin:0;padding:0}
+.nx-list li{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 16px;border-bottom:1px solid var(--nx-line)}
+.nx-list li:last-child{border-bottom:0}
+.nx-list small{display:block;color:var(--nx-ink-3);font-size:12px}
+.nx-edit{margin-left:auto}
+.nx-row-click{cursor:pointer}
+.nx-tag{display:inline-block;height:20px;padding:0 7px;border-radius:4px;background:var(--nx-mute-weak);color:var(--nx-ink-2);font-size:11px;font-weight:600;line-height:20px}
+.nx-tag.walk{background:var(--nx-info-weak);color:var(--nx-info)}
+.nx-sens{display:flex;align-items:center;gap:6px}
+.nx-table.tight td{height:44px}
+.nx-table.auto{min-width:0}
+.nx-money{font-variant-numeric:tabular-nums;font-weight:600}
+.nx-neg{color:var(--nx-bad)}
+.nx-pos{color:var(--nx-ok)}
+.nx-sticky-h{position:sticky;top:0;z-index:5}
+.nx-sel-opt{display:flex;flex-direction:column;gap:6px;max-height:240px;overflow:auto;margin-top:6px}
+.nx-pick{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 10px;border:1px solid var(--nx-line);border-radius:var(--nx-r);background:var(--nx-surface);cursor:pointer;text-align:left;font:inherit;width:100%}
+.nx-pick:hover{border-color:var(--nx-accent-line);background:var(--nx-hover)}
+.nx-pick small{display:block;color:var(--nx-ink-3);font-size:12px}
+.nx-diff{font-size:12px;color:var(--nx-ink-2)}
+.nx-diff s{color:var(--nx-bad)}
+.nx-diff ins{color:var(--nx-ok);text-decoration:none;font-weight:600}
+@media (max-width:760px){.nx-form{grid-template-columns:1fr}.nx-search{display:none}}
+
+.nx-who .nx-avatar{display:grid;flex:none;color:var(--nx-accent);font-size:12px;font-weight:600}
+.nx-who{align-items:center}
+
+</style>
+</head>
+<body class="nx">
+<!-- NEXUS TOKEN GATE: app only opens when launched from the Nexus Nodes page -->
+<div id="__gate"><div class="gate-card"><div class="gate-ic">N</div><div class="gate-t">Nex</div><div id="__gateMsg" class="gate-m">Checking access…</div></div></div>
+<script>
+(function(){
+  var APP='nex';
+  var SECRET='oscars_nexus_gate_v1_8f3a2c91';
+  var SB='https://jcfgldqrdbfkgbixszds.supabase.co';
+  var KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpjZmdsZHFyZGJma2diaXhzemRzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1Nzc3NzEsImV4cCI6MjA5MDE1Mzc3MX0.Wj8cCpnlsoZOPj5sKWeEdfvgjG4Nc-UuTTYgbcrPfeI';
+  function fail(m){var el=document.getElementById('__gateMsg');if(el){el.innerHTML=m+'<br><br><span style="color:#9db3ae;font-size:12px;">Open this app from the Nodes page in Nexus.</span>';}}
+  function pass(){var g=document.getElementById('__gate');if(g)g.remove();try{window.dispatchEvent(new Event('nex-unlocked'));}catch(e){}}
+  async function hmacHex(secret,msg){var enc=new TextEncoder();var k=await crypto.subtle.importKey('raw',enc.encode(secret),{name:'HMAC',hash:'SHA-256'},false,['verify','sign']);var s=await crypto.subtle.sign('HMAC',k,enc.encode(msg));return Array.from(new Uint8Array(s)).map(function(x){return x.toString(16).padStart(2,'0');}).join('');}
+  if(sessionStorage.getItem('ngate_'+APP)==='1'){pass();return;}
+  (async function(){
+    try{
+      var m=(location.hash||'').match(/t=([^&]+)/);
+      if(!m){fail('No access token.');return;}
+      var token=decodeURIComponent(m[1]);
+      var parts=token.split('.');
+      if(parts.length!==2){fail('Invalid token.');return;}
+      var b64=parts[0], sig=parts[1];
+      if(await hmacHex(SECRET,b64)!==sig){fail('Token signature invalid.');return;}
+      var payload=JSON.parse(decodeURIComponent(escape(atob(b64))));
+      if(payload.app!==APP){fail('Token is for a different app.');return;}
+      if(Date.now()>payload.exp){fail('Token expired. Relaunch from Nexus.');return;}
+      var at=payload.sb_at||'';
+      if(!at){fail('No active session. Go back to Nexus, refresh, and launch again.');return;}
+      // The name in the launch token is never trusted: ask the database who this session belongs to.
+      async function rpc(fn){return fetch(SB+'/rest/v1/rpc/'+fn,{method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+at,'Content-Type':'application/json'},body:fn==='has_app_access'?JSON.stringify({p_app:APP}):'{}'});}
+      var r=await rpc('has_app_access');
+      if(r.status===401||r.status===403){fail('Your session expired. Go back to Nexus, refresh, and launch again.');return;}
+      if(!(r.ok&&(await r.json())===true)){fail('You do not have access to this app.');return;}
+      var nr=await rpc('current_staff_name'); var name=nr.ok?await nr.json():null;
+      if(!name){fail('Could not verify your identity.');return;}
+      var ar=await rpc('is_current_user_hub_admin'); var isAdmin=ar.ok?(await ar.json())===true:false;
+      sessionStorage.setItem('ngate_'+APP,'1');
+      sessionStorage.setItem('nex_user',name);
+      sessionStorage.setItem('nex_sb_at',at);
+      if(payload.sb_rt) sessionStorage.setItem('nex_sb_rt',payload.sb_rt);
+      sessionStorage.setItem('nex_is_admin',isAdmin?'1':'0');
+      try{history.replaceState(null,'',location.pathname+location.search);}catch(e){}
+      pass();
+    }catch(e){ fail('Access check failed.'); console.warn('gate',e); }
+  })();
+})();
+</script>
+<!-- END GATE -->
+
+<div id="app" hidden>
+  <header class="nx-top">
+    <a class="nx-brand" href="#/" aria-label="Nex home"><span class="nx-mark">N</span><span>Nex</span></a>
+    <form class="nx-search" id="gSearch" role="search" autocomplete="off">
+      <svg class="nx-ico" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input id="gSearchIn" type="search" placeholder="Search students by name, email or phone" aria-label="Search students">
+    </form>
+    <div class="nx-lock" title="Signed in through Nexus"><i></i><span id="whoName">Signed in</span></div>
+    <div class="nx-avatar" id="whoAva" aria-hidden="true">·</div>
+  </header>
+  <nav class="nx-nav" id="nav" aria-label="Sections"></nav>
+  <main class="nx-main" id="view" tabindex="-1"></main>
+</div>
+
+<div id="lock" class="lockov" hidden>
+  <div class="gate-card"><div class="gate-ic">N</div><div class="gate-t">Session ended</div>
+  <div class="gate-m">Your sign-in has run out. Go back to Nexus, refresh, and open Nex again.</div></div>
+</div>
+<div id="modalRoot"></div>
+<div id="toasts" class="toasts" aria-live="polite"></div>
+<script>
+'use strict';
+/* =========================================================
+   Nex core: api, helpers, ui kit, router
+   ========================================================= */
+const SB = 'https://jcfgldqrdbfkgbixszds.supabase.co';
+const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpjZmdsZHFyZGJma2diaXhzemRzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1Nzc3NzEsImV4cCI6MjA5MDE1Mzc3MX0.Wj8cCpnlsoZOPj5sKWeEdfvgjG4Nc-UuTTYgbcrPfeI';
+const TZ = 'Australia/Sydney';
+const ss = {
+  get(k) { try { return sessionStorage.getItem(k) || ''; } catch (e) { return ''; } },
+  set(k, v) { try { sessionStorage.setItem(k, v); } catch (e) {} }
+};
+const ME = { name: '', admin: false };
+
+/* ---------- tiny helpers ---------- */
+const $ = (s, r) => (r || document).querySelector(s);
+const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
+function esc(v) { return String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+function sydToday() { return new Date().toLocaleDateString('en-CA', { timeZone: TZ }); }
+function fmtDate(v) {
+  if (!v) return '';
+  const d = /^\d{4}-\d{2}-\d{2}$/.test(v) ? new Date(v + 'T12:00:00') : new Date(v);
+  if (isNaN(d)) return '';
+  return d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric', timeZone: TZ });
+}
+function fmtDay(v) {
+  const d = new Date(v + 'T12:00:00');
+  return { wd: d.toLocaleDateString('en-AU', { weekday: 'short', timeZone: TZ }), dm: d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', timeZone: TZ }) };
+}
+function fmtDT(v) {
+  if (!v) return '';
+  const d = new Date(v);
+  if (isNaN(d)) return '';
+  return d.toLocaleString('en-AU', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', timeZone: TZ });
+}
+function money(n) {
+  if (n == null || n === '') return '';
+  const v = Number(n);
+  return (v < 0 ? '-' : '') + '$' + Math.abs(v).toLocaleString('en-AU', { minimumFractionDigits: v % 1 ? 2 : 0, maximumFractionDigits: 2 });
+}
+function initials(s) { return String(s || '?').trim().split(/\s+/).slice(0, 2).map(w => w[0] || '').join('').toUpperCase() || '?'; }
+function fullName(s) { return [s && s.first_name, s && s.last_name].filter(Boolean).join(' ') || '(no name)'; }
+function cleanPhone(v) {
+  let d = String(v || '').replace(/\D/g, '');
+  if (d.startsWith('61') && d.length === 11) d = '0' + d.slice(2);
+  if (d.length === 9 && /^[45]/.test(d)) d = '0' + d;
+  return d;
+}
+function fmtPhone(p) { p = String(p || ''); return /^04\d{8}$/.test(p) ? p.replace(/(\d{4})(\d{3})(\d{3})/, '$1 $2 $3') : p; }
+function ico(name) {
+  const P = {
+    search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
+    plus: '<path d="M12 5v14M5 12h14"/>', check: '<path d="m5 12 5 5L20 7"/>', x: '<path d="M6 6l12 12M18 6 6 18"/>',
+    chev: '<path d="m6 9 6 6 6-6"/>', edit: '<path d="M4 20h4L19 9l-4-4L4 16z"/>', back: '<path d="M15 6l-6 6 6 6"/>',
+    user: '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/>', cash: '<rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/>',
+    heart: '<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/>', pin: '<path d="M12 21s7-6 7-11a7 7 0 0 0-14 0c0 5 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/>',
+    bell: '<path d="M6 9a6 6 0 0 1 12 0c0 6 2 7 2 7H4s2-1 2-7z"/><path d="M10 20a2 2 0 0 0 4 0"/>', clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+    list: '<path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/>', cog: '<circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/>',
+    lock: '<rect x="5" y="11" width="14" height="9" rx="2.5"/><path d="M8 11V8a4 4 0 018 0v3"/>', home: '<path d="M4 11l8-7 8 7v9H4z"/>'
+  };
+  return '<svg class="nx-ico" viewBox="0 0 24 24" aria-hidden="true">' + (P[name] || '') + '</svg>';
+}
+
+/* ---------- auth + api ---------- */
+function tokenPayload(t) {
+  try { const p = t.split('.'); let b = p[1].replace(/-/g, '+').replace(/_/g, '/'); while (b.length % 4) b += '='; return JSON.parse(atob(b)); } catch (e) { return null; }
+}
+function tokenAlive(t, slack) { const c = tokenPayload(t); return !!(c && c.exp && c.exp * 1000 > Date.now() + (slack || 30000)); }
+let refreshing = null;
+async function refreshToken() {
+  const rt = ss.get('nex_sb_rt');
+  if (!rt) return false;
+  if (!refreshing) {
+    refreshing = (async () => {
+      try {
+        const r = await fetch(SB + '/auth/v1/token?grant_type=refresh_token', { method: 'POST', headers: { apikey: KEY, 'Content-Type': 'application/json' }, body: JSON.stringify({ refresh_token: rt }) });
+        if (!r.ok) return false;
+        const s = await r.json();
+        if (!s.access_token) return false;
+        ss.set('nex_sb_at', s.access_token);
+        if (s.refresh_token) ss.set('nex_sb_rt', s.refresh_token);
+        return true;
+      } catch (e) { return false; } finally { setTimeout(() => { refreshing = null; }, 0); }
+    })();
+  }
+  return refreshing;
+}
+async function bearer() {
+  let t = ss.get('nex_sb_at');
+  if (!tokenAlive(t, 60000)) { if (await refreshToken()) t = ss.get('nex_sb_at'); }
+  if (!tokenAlive(t, 0)) { endSession(); throw new Error('session'); }
+  return t;
+}
+function endSession() { const l = $('#lock'); if (l) l.hidden = false; }
+async function api(path, opt) {
+  opt = opt || {};
+  const doFetch = async () => fetch(SB + '/rest/v1/' + path, {
+    method: opt.method || 'GET',
+    headers: Object.assign({ apikey: KEY, Authorization: 'Bearer ' + await bearer(), 'Content-Type': 'application/json' }, opt.headers || {}),
+    body: opt.body == null ? undefined : JSON.stringify(opt.body)
+  });
+  let r = await doFetch();
+  if (r.status === 401) { if (await refreshToken()) r = await doFetch(); else { endSession(); throw new Error('session'); } }
+  if (!r.ok) {
+    let m = ''; try { const j = await r.json(); m = j.message || j.hint || j.details || ''; } catch (e) {}
+    const err = new Error(m || ('Request failed (' + r.status + ')')); err.status = r.status; throw err;
+  }
+  return r;
+}
+async function sel(table, q) { const r = await api(table + (q ? '?' + q : '')); return r.json(); }
+async function selPage(table, q, from, to) {
+  const r = await api(table + (q ? '?' + q : ''), { headers: { Range: from + '-' + to, 'Range-Unit': 'items', Prefer: 'count=exact' } });
+  const cr = r.headers.get('Content-Range') || '';
+  const total = parseInt(cr.split('/')[1], 10);
+  return { rows: await r.json(), total: isNaN(total) ? null : total };
+}
+async function count(table, q) {
+  const r = await api(table + '?select=id' + (q ? '&' + q : ''), { method: 'HEAD', headers: { Prefer: 'count=exact', Range: '0-0', 'Range-Unit': 'items' } });
+  const cr = r.headers.get('Content-Range') || '';
+  const n = parseInt(cr.split('/')[1], 10);
+  return isNaN(n) ? 0 : n;
+}
+async function selAll(table, q) {
+  let out = [], from = 0; const step = 1000;
+  for (;;) {
+    const r = await api(table + (q ? '?' + q : ''), { headers: { Range: from + '-' + (from + step - 1), 'Range-Unit': 'items' } });
+    const rows = await r.json(); out = out.concat(rows);
+    if (rows.length < step) break;
+    from += step;
+  }
+  return out;
+}
+async function ins(table, row, noReturn) {
+  const r = await api(table, { method: 'POST', body: row, headers: { Prefer: noReturn ? 'return=minimal' : 'return=representation' } });
+  if (noReturn) return null;
+  const j = await r.json(); return Array.isArray(j) ? j[0] : j;
+}
+async function upd(table, match, patch) {
+  const r = await api(table + '?' + match, { method: 'PATCH', body: patch, headers: { Prefer: 'return=representation' } });
+  const j = await r.json();
+  if (!j.length) throw new Error('Nothing was changed. You may not have permission for that.');
+  return j[0];
+}
+async function del(table, match) {
+  const r = await api(table + '?' + match, { method: 'DELETE', headers: { Prefer: 'return=representation' } });
+  const j = await r.json();
+  if (!j.length) throw new Error('Nothing was deleted. Only admins can delete.');
+}
+function inList(ids) { return '(' + ids.map(i => '"' + String(i).replace(/"/g, '') + '"').join(',') + ')'; }
+function safeQ(q) { return String(q || '').replace(/[,()*%\\:"]/g, ' ').trim(); }
+
+/* ---------- reference data cache ---------- */
+const REF = { status: {}, quals: [], agents: [], staff: [], loaded: false };
+async function loadRef(force) {
+  if (REF.loaded && !force) return;
+  const [st, q, a, s] = await Promise.all([
+    sel('nex_status_options', 'select=*&order=context,position'),
+    sel('nex_qualifications', 'select=*&order=position,name'),
+    sel('nex_agents', 'select=*&order=name'),
+    sel('staff_names', 'select=name&order=name').catch(() => [])
+  ]);
+  REF.status = {}; st.forEach(o => { (REF.status[o.context] = REF.status[o.context] || []).push(o); });
+  REF.quals = q; REF.agents = a; REF.staff = s.map(x => x.name); REF.loaded = true;
+}
+function opts(ctx, activeOnly) { return (REF.status[ctx] || []).filter(o => !activeOnly || o.active); }
+function statusLabel(ctx, key) { const o = (REF.status[ctx] || []).find(x => x.key === key); return o ? o.label : (key || ''); }
+function statusObj(ctx, key) { return (REF.status[ctx] || []).find(x => x.key === key || x.label === key); }
+function qualName(id) { const q = REF.quals.find(x => x.id === id); return q ? q.name : ''; }
+function qualShort(id) {
+  const n = qualName(id); if (!n) return '';
+  return n.replace(/^Certificate /, 'Cert ').replace(/ in /, ': ').replace(/\(Ageing\/Disability\)/, '').replace(/ with Medication/, ' + Med').trim();
+}
+function agentName(id) { const a = REF.agents.find(x => x.id === id); return a ? a.name : ''; }
+
+/* ---------- status pill ---------- */
+const TONE = {
+  enrolment: { docs_completed: 'info', processed: 'accent', placement: 'accent', certificate_issued: 'ok', hold: 'warn', issue: 'bad', not_interested: '', incomplete_docs: 'warn', blended: 'info' },
+  payment_queue: { done_plc: 'ok', confirmed_no_plc: 'ok', yes_plc: 'accent', yes_plc_less_payment: 'warn', less_payment: 'warn', no_docs: 'bad', not_found: 'bad', issues: 'bad', no_plc_issues: 'bad' },
+  processing: { processed: 'ok', ready_to_process: 'accent', draft_made: 'info', draft_not_made: 'warn' },
+  placement: { replied_granted: 'ok', replied_refused: 'bad', request_sent: 'info', replied_additional_docs: 'warn', withdrawn: '' },
+  placement_stage: { started: 'ok', completed: 'ok', denied: 'bad', not_accommodated: 'bad', rejected: 'bad', withdrawn: '', cancelled: 'bad' },
+  booking: { attended: 'ok', no_show: 'bad', rescheduled: 'warn', booked: 'accent', info_only: 'info', cancelled: '' }
+};
+function pill(ctx, key) {
+  if (!key) return '<span class="nx-muted">–</span>';
+  const t = (TONE[ctx] || {})[key] || '';
+  return '<span class="nx-pill ' + t + '">' + esc(statusLabel(ctx, key)) + '</span>';
+}
+function selectOpts(list, cur, blank) {
+  return (blank != null ? '<option value="">' + esc(blank) + '</option>' : '') +
+    list.map(o => { const v = typeof o === 'string' ? o : (o.key != null ? o.key : o.id); const l = typeof o === 'string' ? o : (o.label || o.name); return '<option value="' + esc(v) + '"' + (v === cur ? ' selected' : '') + '>' + esc(l) + '</option>'; }).join('');
+}
+
+/* ---------- toast + modal + form ---------- */
+function toast(msg, bad) {
+  const el = document.createElement('div'); el.className = 'toast' + (bad ? ' bad' : ''); el.textContent = msg;
+  $('#toasts').appendChild(el); setTimeout(() => el.remove(), bad ? 5000 : 2600);
+}
+let modalStack = [];
+function openModal(opt) {
+  const bg = document.createElement('div'); bg.className = 'modal-bg';
+  bg.innerHTML = '<div class="modal ' + (opt.wide ? 'wide' : '') + '" role="dialog" aria-modal="true" aria-label="' + esc(opt.title) + '"><div class="modal-h"><h3>' + esc(opt.title) + '</h3><button class="nx-btn icon quiet" data-x aria-label="Close">' + ico('x') + '</button></div><div class="modal-b">' + opt.body + '</div>' + (opt.footer === false ? '' : '<div class="modal-f"></div>') + '</div>';
+  $('#modalRoot').appendChild(bg);
+  const m = { el: bg, close() { bg.remove(); modalStack = modalStack.filter(x => x !== m); if (opt.onClose) opt.onClose(); } };
+  modalStack.push(m);
+  bg.addEventListener('mousedown', e => { if (e.target === bg) m.close(); });
+  $('[data-x]', bg).onclick = () => m.close();
+  const f = $('.modal-f', bg);
+  if (f && opt.buttons) {
+    opt.buttons.forEach(b => {
+      const btn = document.createElement('button'); btn.className = 'nx-btn ' + (b.primary ? 'primary' : ''); btn.textContent = b.label;
+      btn.onclick = async () => {
+        if (b.close) return m.close();
+        btn.disabled = true; const old = btn.textContent; btn.textContent = 'Saving…';
+        try { const keep = await b.run(m); if (keep !== false) m.close(); } catch (e) { showErr(m, e); } finally { btn.disabled = false; btn.textContent = old; }
+      };
+      f.appendChild(btn);
+    });
+  }
+  setTimeout(() => { const i = $('input:not([type=hidden]),select,textarea', bg); if (i && !opt.noFocus) i.focus(); }, 30);
+  return m;
+}
+function showErr(m, e) {
+  let b = $('.nx-err', m.el); if (!b) { b = document.createElement('div'); b.className = 'nx-err'; $('.modal-b', m.el).appendChild(b); }
+  b.textContent = e && e.message ? e.message : 'Something went wrong.';
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && modalStack.length) modalStack[modalStack.length - 1].close(); });
+function confirmBox(title, msg, okLabel, danger) {
+  return new Promise(res => {
+    let done = false;
+    openModal({ title, body: '<p style="margin:0">' + esc(msg) + '</p>', noFocus: true, onClose() { if (!done) res(false); },
+      buttons: [{ label: 'Cancel', close: true }, { label: okLabel || 'OK', primary: true, run: () => { done = true; res(true); } }] });
+  });
+}
+/* field: {k,label,type:text|email|tel|date|number|select|textarea|check|time,options,value,full,help,required,placeholder} */
+function fieldHtml(f, prefix) {
+  const id = (prefix || 'f') + '_' + f.k, v = f.value == null ? '' : f.value;
+  let c = '';
+  if (f.type === 'select') c = '<select class="nx-sel" id="' + id + '">' + selectOpts(f.options || [], v, f.blank != null ? f.blank : '') + '</select>';
+  else if (f.type === 'textarea') c = '<textarea class="nx-ta" id="' + id + '" placeholder="' + esc(f.placeholder || '') + '">' + esc(v) + '</textarea>';
+  else if (f.type === 'check') return '<div class="' + (f.full ? 'full' : '') + '"><label class="nx-check"><input type="checkbox" id="' + id + '"' + (v ? ' checked' : '') + '> ' + esc(f.label) + '</label>' + (f.help ? '<div class="nx-help">' + esc(f.help) + '</div>' : '') + '</div>';
+  else c = '<input class="nx-in" id="' + id + '" type="' + (f.type || 'text') + '" value="' + esc(v) + '" placeholder="' + esc(f.placeholder || '') + '"' + (f.type === 'number' ? ' step="any"' : '') + '>';
+  return '<div class="' + (f.full ? 'full' : '') + '"><label class="nx-lbl" for="' + id + '">' + esc(f.label) + (f.required ? ' *' : '') + '</label>' + c + (f.help ? '<div class="nx-help">' + esc(f.help) + '</div>' : '') + '</div>';
+}
+function readFields(fields, root, prefix) {
+  const out = {};
+  for (const f of fields) {
+    const el = $('#' + (prefix || 'f') + '_' + f.k, root); if (!el) continue;
+    let v = f.type === 'check' ? el.checked : el.value.trim();
+    if (f.type === 'number') v = v === '' ? null : Number(v);
+    else if (f.type !== 'check' && v === '') v = null;
+    if (f.required && (v == null || v === '')) throw new Error(f.label + ' is required.');
+    out[f.k] = v;
+  }
+  return out;
+}
+function formModal(title, fields, onSave, saveLabel, extraTop) {
+  return openModal({
+    title, body: (extraTop || '') + '<div class="nx-form">' + fields.map(f => fieldHtml(f)).join('') + '</div>',
+    buttons: [{ label: 'Cancel', close: true }, { label: saveLabel || 'Save', primary: true, run: async m => { const v = readFields(fields, m.el); return onSave(v, m); } }]
+  });
+}
+
+/* ---------- student picker (search the database) ---------- */
+function pickStudent(title, onPick, initial) {
+  const m = openModal({
+    title: title || 'Find a student', footer: false,
+    body: '<input class="nx-in" id="psq" placeholder="Name, email or phone (at least 2 letters)" autocomplete="off"><div class="nx-sel-opt" id="psr"><div class="nx-help">Start typing to search.</div></div>'
+  });
+  let timer = 0;
+  const psq = $('#psq', m.el);
+  const runSearch = () => {
+    clearTimeout(timer);
+    timer = setTimeout(async () => {
+      const q = safeQ(psq.value); const box = $('#psr', m.el);
+      if (q.length < 2) { box.innerHTML = '<div class="nx-help">Start typing to search.</div>'; return; }
+      box.innerHTML = '<div class="nx-help">Searching…</div>';
+      try {
+        const digits = cleanPhone(q);
+        const parts = ['first_name.ilike.*' + q + '*', 'last_name.ilike.*' + q + '*', 'email.ilike.*' + q + '*'];
+        if (digits.length >= 4) parts.push('phone.ilike.*' + digits + '*');
+        const rows = await sel('nex_students', 'select=id,first_name,last_name,email,phone&deleted_at=is.null&or=(' + parts.join(',') + ')&order=first_name&limit=20');
+        box.innerHTML = rows.length ? rows.map(s => '<button type="button" class="nx-pick" data-id="' + s.id + '"><span><b>' + esc(fullName(s)) + '</b><small>' + esc([s.email, fmtPhone(s.phone)].filter(Boolean).join(' · ') || 'No contact details') + '</small></span><span class="nx-tag">Choose</span></button>').join('') : '<div class="nx-help">No student found.</div>';
+        $$('.nx-pick', box).forEach(b => b.onclick = () => { const s = rows.find(x => x.id === b.dataset.id); m.close(); onPick(s); });
+      } catch (err) { box.innerHTML = '<div class="nx-err">' + esc(err.message) + '</div>'; }
+    }, 250);
+  };
+  psq.addEventListener('input', runSearch);
+  if (initial) { psq.value = initial; runSearch(); }
+  return m;
+}
+
+/* ---------- router ---------- */
+const ROUTES = [];
+function route(re, fn) { ROUTES.push({ re, fn }); }
+let navToken = 0;
+function go(h) { if (location.hash === h) render(); else location.hash = h; }
+async function render() {
+  const h = location.hash.replace(/^#/, '') || '/';
+  const tok = ++navToken; const v = $('#view');
+  for (const r of ROUTES) {
+    const m = h.match(r.re);
+    if (m) {
+      v.innerHTML = '<div class="nx-card"><div class="nx-card-b"><div class="nx-skel" style="width:40%"></div><div class="nx-skel" style="width:70%;margin-top:12px"></div><div class="nx-skel" style="width:55%;margin-top:12px"></div></div></div>';
+      setNav(h);
+      try { await loadRef(); const html = await r.fn(m, tok); if (tok === navToken && html != null) { v.innerHTML = html; if (v._after) { const f = v._after; v._after = null; f(); } } }
+      catch (e) { if (tok === navToken && e.message !== 'session') v.innerHTML = '<div class="nx-card"><div class="nx-empty"><b>Could not load this page</b>' + esc(e.message) + '</div></div>'; }
+      window.scrollTo(0, 0); return;
+    }
+  }
+  go('#/');
+}
+const NAV = [['#/', 'Overview'], ['#/students', 'Students'], ['#/payments', 'Payments'], ['#/firstaid', 'First Aid'], ['#/placement', 'Placement'], ['#/followups', 'Follow-ups'], ['#/admin', 'Admin']];
+function setNav(h) {
+  const cur = '/' + (h.split('/')[1] || '');
+  $('#nav').innerHTML = NAV.map(([href, label]) => {
+    const key = '/' + (href.split('/')[1] || '');
+    return '<a href="' + href + '"' + (key === cur ? ' aria-current="page"' : '') + '>' + label + '</a>';
+  }).join('');
+}
+function afterRender(fn) { $('#view')._after = fn; }
+function pageHead(icon, eyebrow, title, actions) {
+  return '<div class="nx-card nx-pagehead"><div class="nx-objico">' + ico(icon) + '</div><div><div class="nx-eyebrow">' + esc(eyebrow) + '</div><h1 class="nx-title">' + esc(title) + '</h1></div><div class="nx-grow"></div><div class="nx-btnrow">' + (actions || '') + '</div></div>';
+}
+function empty(t, s) { return '<div class="nx-empty"><b>' + esc(t) + '</b>' + esc(s || '') + '</div>'; }
+
+/* ---------- boot ---------- */
+function boot() {
+  ME.name = ss.get('nex_user'); ME.admin = ss.get('nex_is_admin') === '1';
+  $('#whoName').textContent = ME.name || 'Signed in'; $('#whoAva').textContent = initials(ME.name);
+  $('#app').hidden = false;
+  $('#gSearch').addEventListener('submit', e => { e.preventDefault(); const q = $('#gSearchIn').value.trim(); go('#/students' + (q ? '?q=' + encodeURIComponent(q) : '')); });
+  window.addEventListener('hashchange', render);
+  setInterval(() => { const t = ss.get('nex_sb_at'); if (t && !tokenAlive(t, 120000)) refreshToken(); }, 60000);
+  render();
+}
+
+/* =========================================================
+   Overview, Students list, Student record
+   ========================================================= */
+const PATH = ['checklist_sent', 'docs_completed', 'processed', 'placement', 'certificate_issued'];
+
+/* ---------- Overview ---------- */
+route(/^\/$/, async () => {
+  const today = sydToday();
+  const [nStu, nOpenEnr, nQueue, nUnm, nDue, sessions, audit] = await Promise.all([
+    count('nex_students', 'deleted_at=is.null'),
+    count('nex_enrolments', 'deleted_at=is.null&stage=not.in.(certificate_issued,not_interested)'),
+    count('nex_payment_queue', 'processing_step=neq.processed'),
+    count('nex_payments', 'student_id=is.null'),
+    count('nex_followups', 'done_at=is.null&due_at=lte.' + today + 'T23:59:59'),
+    sel('nex_class_sessions', 'select=*&class_date=gte.' + today + '&order=class_date&limit=4'),
+    sel('nex_audit', 'select=*&order=changed_at.desc&limit=12')
+  ]);
+  let counts = {};
+  if (sessions.length) {
+    const bk = await sel('nex_class_bookings', 'select=session_id&session_id=in.' + inList(sessions.map(s => s.id)));
+    bk.forEach(b => counts[b.session_id] = (counts[b.session_id] || 0) + 1);
+  }
+  const kpi = (href, n, label, sub) => '<a class="nx-card nx-kpi" href="' + href + '"><span class="nx-big">' + n + '</span><b>' + label + '</b><small>' + sub + '</small></a>';
+  return pageHead('home', 'Welcome back', (ME.name || '').split(' ')[0] || 'Overview', '<a class="nx-btn primary" href="#/students?new=1">' + ico('plus') + 'New student</a>') +
+    '<div class="nx-kpis">' +
+    kpi('#/students', nStu, 'Students', 'in Nex') +
+    kpi('#/students', nOpenEnr, 'Open enrolments', 'not yet issued or closed') +
+    kpi('#/payments', nQueue, 'Payments to process', 'in the processing queue') +
+    kpi('#/payments?view=unmatched', nUnm, 'Unmatched payments', 'no student linked') +
+    kpi('#/followups', nDue, 'Follow-ups due', 'today or overdue') + '</div>' +
+    '<div class="nx-two"><div class="nx-card"><div class="nx-card-h"><h3>Upcoming classes</h3><a href="#/firstaid">All classes</a></div>' +
+    (sessions.length ? '<ul class="nx-list">' + sessions.map(s => { const d = fmtDay(s.class_date); const n = counts[s.id] || 0; return '<li><a href="#/firstaid/' + s.id + '"><b>' + d.wd + ' ' + d.dm + '</b><small>' + (s.kind === 'renewal' ? 'Renewal / signature' : 'First Aid & CPR') + (s.trainer ? ' · ' + esc(s.trainer) : '') + '</small></a><span class="nx-pill ' + (n >= s.seats ? 'bad' : n >= s.seats - 5 ? 'warn' : 'accent') + '">' + n + ' / ' + s.seats + '</span></li>'; }).join('') + '</ul>' : empty('No classes scheduled', 'Add the next class day in First Aid.')) + '</div>' +
+    '<div class="nx-card"><div class="nx-card-h"><h3>Recent changes</h3></div>' +
+    (audit.length ? '<ul class="nx-feed">' + audit.map(a => feedItem(a)).join('') + '</ul>' : empty('Nothing yet', 'Edits to students, payments and bookings show up here.')) + '</div></div>';
+});
+
+const AUD_NAMES = { nex_students: 'student', nex_student_details: 'student details', nex_enrolments: 'enrolment', nex_payments: 'payment', nex_payment_queue: 'payment queue', nex_refunds: 'refund', nex_class_sessions: 'class', nex_class_bookings: 'booking', nex_placement_requests: 'placement request', nex_placements: 'placement', nex_facilities: 'facility', nex_blacklist: 'blacklist entry' };
+const SKIP_KEYS = new Set(['updated_at', 'created_at', 'created_by', 'id', 'updated_by']);
+function diffHtml(a) {
+  if (a.action !== 'UPDATE' || !a.old_row || !a.new_row) return '';
+  const ch = Object.keys(a.new_row).filter(k => !SKIP_KEYS.has(k) && JSON.stringify(a.new_row[k]) !== JSON.stringify(a.old_row[k]));
+  return ch.slice(0, 6).map(k => '<div class="nx-diff">' + esc(k.replace(/_/g, ' ')) + ': <s>' + esc(a.old_row[k] == null ? 'empty' : a.old_row[k]) + '</s> → <ins>' + esc(a.new_row[k] == null ? 'empty' : a.new_row[k]) + '</ins></div>').join('');
+}
+function feedItem(a) {
+  const what = AUD_NAMES[a.table_name] || a.table_name;
+  const verb = a.action === 'INSERT' ? 'Added' : a.action === 'DELETE' ? 'Deleted' : 'Updated';
+  return '<li><span class="dot ' + (a.action === 'DELETE' ? 'warn' : a.action === 'INSERT' ? '' : 'info') + '">' + ico(a.action === 'INSERT' ? 'plus' : a.action === 'DELETE' ? 'x' : 'edit') + '</span><div><b>' + esc(a.changed_by || 'Someone') + '</b> ' + verb.toLowerCase() + ' a ' + esc(what) + diffHtml(a) + '<time>' + fmtDT(a.changed_at) + '</time></div></li>';
+}
+
+/* ---------- Students list ---------- */
+const SL = { q: '', stage: '', qual: '', page: 0, size: 50 };
+route(/^\/students(?:\?(.*))?$/, async m => {
+  const qs = new URLSearchParams(m[1] || '');
+  if (qs.has('q')) { SL.q = qs.get('q'); SL.page = 0; }
+  const openNew = qs.get('new') === '1';
+  afterRender(() => {
+    const body = $('#slBody');
+    const load = async () => {
+      body.innerHTML = '<div class="nx-card-b"><div class="nx-skel" style="width:60%"></div><div class="nx-skel" style="width:80%;margin-top:12px"></div></div>';
+      try {
+        const q = safeQ(SL.q); const digits = cleanPhone(q);
+        let query = 'select=id,student_no,first_name,last_name,email,phone,agent_id,created_at,nex_enrolments' + (SL.stage || SL.qual ? '!inner' : '') + '(id,stage,qualification_id,fee,year,enrolled_on)&deleted_at=is.null&order=created_at.desc';
+        if (SL.stage) query += '&nex_enrolments.stage=eq.' + encodeURIComponent(SL.stage);
+        if (SL.qual) query += '&nex_enrolments.qualification_id=eq.' + SL.qual;
+        if (q) { const parts = ['first_name.ilike.*' + q + '*', 'last_name.ilike.*' + q + '*', 'email.ilike.*' + q + '*']; if (digits.length >= 4) parts.push('phone.ilike.*' + digits + '*'); query += '&or=(' + parts.join(',') + ')'; }
+        const { rows, total } = await selPage('nex_students', query, SL.page * SL.size, SL.page * SL.size + SL.size - 1);
+        let pays = [];
+        if (rows.length) pays = await sel('nex_payments', 'select=student_id,amount&student_id=in.' + inList(rows.map(r => r.id)));
+        const paid = {}; pays.forEach(p => paid[p.student_id] = (paid[p.student_id] || 0) + Number(p.amount));
+        body.innerHTML = rows.length ? '<div class="nx-tablewrap"><table class="nx-table"><thead><tr><th>Student</th><th>Phone</th><th>Qualification</th><th>Stage</th><th>Fee and paid</th><th>Enrolled</th><th>Agent</th></tr></thead><tbody>' +
+          rows.map(s => {
+            const en = (s.nex_enrolments || []).slice().sort((a, b) => String(b.enrolled_on || '').localeCompare(String(a.enrolled_on || '')))[0] || {};
+            const fee = (s.nex_enrolments || []).reduce((t, e) => t + Number(e.fee || 0), 0), pd = paid[s.id] || 0;
+            const pct = fee ? Math.min(100, Math.round(pd / fee * 100)) : 0;
+            const idx = PATH.indexOf(en.stage);
+            return '<tr class="nx-tr" data-id="' + s.id + '"><td><div class="nx-who"><span class="nx-avatar">' + esc(initials(fullName(s))) + '</span><div><b>' + esc(fullName(s)) + '</b><span>' + esc(s.email || 'No email') + (s.nex_enrolments && s.nex_enrolments.length > 1 ? ' · ' + s.nex_enrolments.length + ' enrolments' : '') + '</span></div></div></td>' +
+              '<td class="nx-num">' + esc(fmtPhone(s.phone)) + '</td><td>' + esc(qualShort(en.qualification_id) || '–') + '</td>' +
+              '<td>' + pill('enrolment', en.stage) + (idx >= 0 ? '<div class="nx-mini" style="margin-top:6px">' + PATH.map((p, i) => '<i class="' + (i <= idx ? 'on' : '') + '"></i>').join('') + '</div>' : '') + '</td>' +
+              '<td>' + (fee || pd ? '<div class="nx-meter"><div class="nx-meter-bar"><i class="' + (pd < fee ? 'warn' : '') + '" style="width:' + pct + '%"></i></div><small>' + money(pd) + ' of ' + money(fee) + '</small></div>' : '<span class="nx-muted">–</span>') + '</td>' +
+              '<td>' + esc(fmtDate(en.enrolled_on) || '–') + '</td><td>' + esc(agentName(s.agent_id) || '–') + '</td></tr>';
+          }).join('') + '</tbody></table></div>' : empty('No students found', SL.q || SL.stage || SL.qual ? 'Try a different search or clear the filters.' : 'Add the first student with New student.');
+        const from = total ? SL.page * SL.size + 1 : 0, to = SL.page * SL.size + rows.length;
+        $('#slFoot').innerHTML = '<span>' + (total != null ? from + '–' + to + ' of ' + total.toLocaleString('en-AU') : rows.length + ' shown') + '</span><span class="nx-btnrow"><button class="nx-btn sm" id="slPrev"' + (SL.page ? '' : ' disabled') + '>Previous</button><button class="nx-btn sm" id="slNext"' + (total != null && to >= total ? ' disabled' : '') + '>Next</button></span>';
+        $('#slPrev').onclick = () => { SL.page--; load(); }; $('#slNext').onclick = () => { SL.page++; load(); };
+        $$('.nx-tr', body).forEach(tr => tr.onclick = () => go('#/students/' + tr.dataset.id));
+      } catch (e) { body.innerHTML = empty('Could not load students', e.message); }
+    };
+    let t = 0;
+    $('#slQ').addEventListener('input', e => { clearTimeout(t); t = setTimeout(() => { SL.q = e.target.value; SL.page = 0; load(); }, 300); });
+    $('#slStage').onchange = e => { SL.stage = e.target.value; SL.page = 0; load(); };
+    $('#slQual').onchange = e => { SL.qual = e.target.value; SL.page = 0; load(); };
+    $('#slClear').onclick = () => { SL.q = SL.stage = SL.qual = ''; SL.page = 0; $('#slQ').value = ''; $('#slStage').value = ''; $('#slQual').value = ''; load(); };
+    $('#slNew').onclick = () => newStudent();
+    load();
+    if (openNew) { history.replaceState(null, '', '#/students'); newStudent(); }
+  });
+  return pageHead('user', 'Students', 'All students', '<button class="nx-btn primary" id="slNew">' + ico('plus') + 'New student</button>') +
+    '<div class="nx-card"><div class="nx-toolbar" style="border-top:0"><input class="nx-in sm" style="min-width:260px" id="slQ" placeholder="Search name, email or phone" value="' + esc(SL.q) + '"><select class="nx-sel sm" id="slStage">' + selectOpts(opts('enrolment', true), SL.stage, 'Any stage') + '</select><select class="nx-sel sm" id="slQual">' + selectOpts(REF.quals.filter(q => q.active), SL.qual, 'Any qualification') + '</select><button class="nx-btn quiet sm" id="slClear">Clear</button></div>' +
+    '<div id="slBody"></div><div class="nx-foot" id="slFoot"><span></span></div></div>';
+});
+
+function studentFields(s) {
+  s = s || {};
+  return [
+    { k: 'first_name', label: 'First name', value: s.first_name, required: true }, { k: 'last_name', label: 'Last name', value: s.last_name },
+    { k: 'email', label: 'Email', type: 'email', value: s.email }, { k: 'phone', label: 'Phone', type: 'tel', value: s.phone },
+    { k: 'phone2', label: 'Second phone', type: 'tel', value: s.phone2 }, { k: 'agent_id', label: 'Agent', type: 'select', options: REF.agents.filter(a => a.active), value: s.agent_id, blank: 'Self / no agent' }
+  ];
+}
+function tidyStudent(v) {
+  if (v.email) v.email = v.email.toLowerCase();
+  if (v.phone) v.phone = cleanPhone(v.phone) || v.phone;
+  if (v.phone2) v.phone2 = cleanPhone(v.phone2) || v.phone2;
+  return v;
+}
+async function findDupes(v) {
+  const parts = [];
+  if (v.email) parts.push('email.eq.' + v.email);
+  if (v.phone && v.phone.length >= 8) parts.push('phone.eq.' + v.phone);
+  if (!parts.length) return [];
+  return sel('nex_students', 'select=id,first_name,last_name,email,phone&deleted_at=is.null&or=(' + parts.join(',') + ')&limit=5');
+}
+function newStudent() {
+  const f = studentFields().concat([
+    { k: 'qualification_id', label: 'Qualification', type: 'select', options: REF.quals.filter(q => q.active), blank: 'Add later' },
+    { k: 'fee', label: 'Agreed fee ($)', type: 'number' },
+    { k: 'stage', label: 'Stage', type: 'select', options: opts('enrolment', true), value: 'checklist_sent', blank: 'Not set' },
+    { k: 'enrolled_on', label: 'Enrolled on', type: 'date', value: sydToday() }
+  ]);
+  let warned = false;
+  formModal('New student', f, async (v, m) => {
+    tidyStudent(v);
+    if (!warned) {
+      const d = await findDupes(v);
+      if (d.length) {
+        warned = true;
+        let b = $('.nx-warnbox', m.el); if (!b) { b = document.createElement('div'); b.className = 'nx-warnbox'; b.style.marginBottom = '12px'; $('.modal-b', m.el).prepend(b); }
+        b.innerHTML = 'This looks like someone already in Nex: ' + d.map(x => '<a href="#/students/' + x.id + '">' + esc(fullName(x)) + '</a>').join(', ') + '. Press Create student again if this is a different person.';
+        return false;
+      }
+    }
+    const { qualification_id, fee, stage, enrolled_on, ...stu } = v;
+    const s = await ins('nex_students', Object.assign(stu, { created_by: ME.name }));
+    if (qualification_id || fee != null || stage) await ins('nex_enrolments', { student_id: s.id, qualification_id, fee, stage, enrolled_on, year: new Date().getFullYear(), created_by: ME.name }, true);
+    toast('Student added'); go('#/students/' + s.id);
+  }, 'Create student');
+}
+
+/* ---------- Student record ---------- */
+const SR = { tab: 'details' };
+route(/^\/students\/([0-9a-f-]{36})$/, async m => {
+  const id = m[1];
+  const [stu, det, enr, pays, books, followups] = await Promise.all([
+    sel('nex_students', 'select=*&id=eq.' + id), sel('nex_student_details', 'select=*&student_id=eq.' + id),
+    sel('nex_enrolments', 'select=*&student_id=eq.' + id + '&deleted_at=is.null&order=enrolled_on.desc.nullslast'),
+    sel('nex_payments', 'select=*&student_id=eq.' + id + '&order=paid_on.desc.nullslast'),
+    sel('nex_class_bookings', 'select=*,nex_class_sessions(class_date,kind)&student_id=eq.' + id),
+    sel('nex_followups', 'select=*&student_id=eq.' + id + '&order=created_at.desc')
+  ]);
+  const s = stu[0]; if (!s) return empty('Student not found', 'They may have been archived.');
+  const d = det[0] || {};
+  const eids = enr.map(e => e.id);
+  const [queue, refunds, reqs, plcs, hist, aud] = await Promise.all([
+    eids.length ? sel('nex_payment_queue', 'select=*&enrolment_id=in.' + inList(eids)) : [],
+    eids.length ? sel('nex_refunds', 'select=*&enrolment_id=in.' + inList(eids) + '&order=refunded_on.desc') : [],
+    eids.length ? sel('nex_placement_requests', 'select=*,nex_facilities(name)&enrolment_id=in.' + inList(eids) + '&order=created_at.desc') : [],
+    eids.length ? sel('nex_placements', 'select=*,nex_facilities(name)&enrolment_id=in.' + inList(eids) + '&order=created_at.desc') : [],
+    eids.length ? sel('nex_status_history', 'select=*&entity_id=in.' + inList(eids) + '&order=changed_at.desc&limit=40') : [],
+    sel('nex_audit', 'select=*&row_id=in.' + inList([id].concat(eids, pays.map(p => p.id))) + '&order=changed_at.desc&limit=40')
+  ]);
+  const main = enr[0] || {};
+  const idx = PATH.indexOf(main.stage);
+  const totalFee = enr.reduce((t, e) => t + Number(e.fee || 0), 0);
+  const totalPaid = pays.reduce((t, p) => t + Number(p.amount), 0) - refunds.reduce((t, r) => t + Number(r.amount), 0);
+  const ctx = { s, d, enr, pays, books, followups, queue, refunds, reqs, plcs, hist, aud };
+
+  afterRender(() => bindStudent(ctx));
+  const fact = (k, v) => '<div><dt>' + k + '</dt><dd>' + (v || '<span class="nx-muted">–</span>') + '</dd></div>';
+  return '<div class="nx-crumbs"><a href="#/students">Students</a> / <span>' + esc(fullName(s)) + '</span></div>' +
+    '<div class="nx-card"><div class="nx-hl"><span class="nx-avatar">' + esc(initials(fullName(s))) + '</span><div><div class="nx-eyebrow">Student ' + esc(String(s.student_no || '')) + '</div><h1 class="nx-title">' + esc(fullName(s)) + '</h1></div>' +
+    '<dl class="nx-facts">' + fact('Email', esc(s.email || '')) + fact('Phone', esc(fmtPhone(s.phone))) + fact('Agent', esc(agentName(s.agent_id))) + fact('Fee and paid', totalFee || totalPaid ? money(totalPaid) + ' of ' + money(totalFee) : '') + fact('Added', esc(fmtDate(s.created_at))) + '</dl>' +
+    '<div class="nx-btnrow"><button class="nx-btn" data-a="editStu">' + ico('edit') + 'Edit</button><button class="nx-btn" data-a="addEnr">' + ico('plus') + 'Enrolment</button><button class="nx-btn quiet" data-a="archive">Archive</button></div></div>' +
+    (main.id ? '<div style="padding:0 16px 16px"><ol class="nx-path">' + PATH.map((p, i) => '<li class="' + (i < idx ? 'done' : i === idx ? 'now' : '') + '">' + (i < idx ? ico('check') : '') + esc(statusLabel('enrolment', p)) + '</li>').join('') + '</ol>' + (idx < 0 && main.stage ? '<div style="margin-top:8px">Current stage: ' + pill('enrolment', main.stage) + '</div>' : '') + '</div>' : '') + '</div>' +
+    '<div class="nx-cols"><div class="nx-colmain"><div class="nx-card"><div class="nx-tabs" role="tablist">' +
+    [['details', 'Details'], ['money', 'Enrolments and payments'], ['activity', 'Activity']].map(([k, l]) => '<button class="nx-tab" role="tab" data-tab="' + k + '" aria-selected="' + (SR.tab === k) + '">' + l + '</button>').join('') + '</div><div id="srTab"></div></div></div>' +
+    '<div class="nx-colside">' + sideCards(ctx) + '</div></div>';
+});
+
+function sideCards(c) {
+  const bk = c.books.slice().sort((a, b) => String((b.nex_class_sessions || {}).class_date || '').localeCompare(String((a.nex_class_sessions || {}).class_date || '')));
+  const open = c.followups.filter(f => !f.done_at);
+  return '<div class="nx-card"><div class="nx-card-h"><h3>First Aid and CPR</h3><button class="nx-btn sm" data-a="bookFA">Book</button></div>' +
+    (bk.length ? '<div class="nx-related">' + bk.slice(0, 4).map(b => { const ss_ = b.nex_class_sessions || {}; return '<div><span><a href="#/firstaid/' + b.session_id + '"><b>' + esc(fmtDate(ss_.class_date)) + '</b></a><small>' + (ss_.kind === 'renewal' ? 'Renewal' : 'Full class') + (b.seat_no ? ' · seat ' + b.seat_no : '') + '</small></span>' + (b.status ? pill('booking', b.status) : '') + '</div>'; }).join('') + '</div>' : empty('No class booked')) + '</div>' +
+    '<div class="nx-card"><div class="nx-card-h"><h3>Placement</h3></div>' +
+    (c.plcs.length || c.reqs.length ? '<div class="nx-related">' + c.plcs.slice(0, 3).map(p => '<div><span><b>' + esc((p.nex_facilities || {}).name || p.facility_text || 'Placement') + '</b><small>' + (p.start_date ? 'Starts ' + esc(fmtDate(p.start_date)) : 'No start date') + '</small></span>' + pill('placement_stage', p.status) + '</div>').join('') +
+      c.reqs.slice(0, 3).map(r => '<div><span><b>' + esc((r.nex_facilities || {}).name || r.facility_text || 'Request') + '</b><small>' + (r.self_placement ? 'Self placement' : 'Request') + (r.emailed_on ? ' · emailed ' + esc(fmtDate(r.emailed_on)) : '') + '</small></span>' + pill('placement', r.status) + '</div>').join('') + '</div>' : empty('No placement yet')) + '</div>' +
+    '<div class="nx-card"><div class="nx-card-h"><h3>Follow-ups</h3><button class="nx-btn sm" data-a="addFu">Add</button></div>' +
+    (open.length ? '<div class="nx-related">' + open.map(f => '<div><span><b>' + esc(f.note) + '</b><small>' + (f.due_at ? 'Due ' + esc(fmtDate(f.due_at)) : 'No date') + (f.assigned_to ? ' · ' + esc(f.assigned_to) : '') + '</small></span><button class="nx-btn sm" data-a="doneFu" data-id="' + f.id + '">Done</button></div>').join('') + '</div>' : empty('Nothing to follow up')) + '</div>';
+}
+
+function bindStudent(c) {
+  const view = $('#view');
+  const tabBody = $('#srTab');
+  const showTab = () => {
+    $$('.nx-tab', view).forEach(t => t.setAttribute('aria-selected', String(t.dataset.tab === SR.tab)));
+    tabBody.innerHTML = SR.tab === 'details' ? tabDetails(c) : SR.tab === 'money' ? tabMoney(c) : tabActivity(c);
+  };
+  showTab();
+  view.onclick = async e => {
+    const tb = e.target.closest('.nx-tab'); if (tb) { SR.tab = tb.dataset.tab; showTab(); return; }
+    const sh = e.target.closest('.nx-sec-h'); if (sh) { const open = sh.getAttribute('aria-expanded') !== 'false'; sh.setAttribute('aria-expanded', String(!open)); sh.nextElementSibling.hidden = open; return; }
+    const b = e.target.closest('[data-a]'); if (!b) return;
+    try { await studentAction(b.dataset.a, b.dataset, c); } catch (err) { toast(err.message, true); }
+  };
+  view.onchange = async e => {
+    const sel_ = e.target.closest('[data-stage]'); if (!sel_) return;
+    try { await upd('nex_enrolments', 'id=eq.' + sel_.dataset.stage, { stage: sel_.value || null }); toast('Stage updated'); render(); } catch (err) { toast(err.message, true); }
+  };
+}
+
+function field(k, v) { return '<div class="nx-field"><dt>' + k + '</dt><dd>' + (v || '<span class="nx-muted">–</span>') + '</dd></div>'; }
+function section(title, inner, action) {
+  return '<div class="nx-sec"><button class="nx-sec-h" aria-expanded="true">' + ico('chev') + esc(title) + (action ? '<span class="nx-edit" role="presentation"></span>' : '') + '</button><div>' + inner + '</div></div>';
+}
+function tabDetails(c) {
+  const s = c.s, d = c.d;
+  return section('Contact', '<dl class="nx-fields">' + field('First name', esc(s.first_name)) + field('Last name', esc(s.last_name)) + field('Email', esc(s.email)) + field('Phone', esc(fmtPhone(s.phone))) + field('Second phone', esc(fmtPhone(s.phone2))) + field('Agent', esc(agentName(s.agent_id))) + '</dl><div style="padding:0 16px 16px"><button class="nx-btn sm" data-a="editStu">' + ico('edit') + 'Edit contact</button></div>') +
+    section('Personal and sensitive', '<div class="nx-note">' + ico('lock') + ' Visible to all Nex staff. Every change is logged.</div><dl class="nx-fields">' + field('Date of birth', esc(fmtDate(d.dob))) + field('USI', esc(d.usi)) + field('Address', esc([d.address, d.suburb, d.state, d.postcode].filter(Boolean).join(', '))) +
+      field('Emergency contact', esc([d.emergency_name, d.emergency_relation && '(' + d.emergency_relation + ')', fmtPhone(d.emergency_phone)].filter(Boolean).join(' '))) + field('Disability', esc(d.disability)) + field('Indigenous status', esc(d.indigenous_status)) + '</dl><div style="padding:0 16px 16px"><button class="nx-btn sm" data-a="editDet">' + ico('edit') + 'Edit personal details</button></div>') +
+    (c.s.source_note ? section('Import notes', '<div style="padding:16px">' + esc(c.s.source_note) + '</div>') : '');
+}
+function tabMoney(c) {
+  if (!c.enr.length) return empty('No enrolments', 'Add an enrolment to track the fee, stage and payments.') + '<div style="padding:0 16px 16px;text-align:center"><button class="nx-btn primary" data-a="addEnr">' + ico('plus') + 'Add enrolment</button></div>';
+  const linked = new Set();
+  const cards = c.enr.map(e => {
+    const ps = c.pays.filter(p => p.enrolment_id === e.id); ps.forEach(p => linked.add(p.id));
+    const rf = c.refunds.filter(r => r.enrolment_id === e.id);
+    const paid = ps.reduce((t, p) => t + Number(p.amount), 0) - rf.reduce((t, r) => t + Number(r.amount), 0);
+    const fee = Number(e.fee || 0); const bal = fee - paid;
+    return section((qualName(e.qualification_id) || 'Enrolment') + (e.year ? ' · ' + e.year : ''),
+      '<div style="padding:16px;display:flex;flex-wrap:wrap;gap:16px;align-items:center"><div><label class="nx-lbl">Stage</label><select class="nx-sel sm" data-stage="' + e.id + '">' + selectOpts(opts('enrolment', true), e.stage, 'Not set') + '</select></div>' +
+      '<div><div class="nx-lbl">Agreed fee</div><div class="nx-money">' + (fee ? money(fee) : '–') + '</div></div><div><div class="nx-lbl">Paid</div><div class="nx-money">' + money(paid) + '</div></div><div><div class="nx-lbl">Balance</div><div class="nx-money ' + (bal > 0 ? 'nx-neg' : 'nx-pos') + '">' + (fee ? money(bal) : '–') + '</div></div><div class="nx-grow"></div>' +
+      '<div class="nx-btnrow"><button class="nx-btn sm" data-a="addPay" data-id="' + e.id + '">' + ico('plus') + 'Payment</button><button class="nx-btn sm" data-a="refund" data-id="' + e.id + '">Refund</button><button class="nx-btn sm" data-a="editEnr" data-id="' + e.id + '">' + ico('edit') + 'Edit</button></div></div>' +
+      (e.notes || e.follow_up_note ? '<div style="padding:0 16px 12px" class="nx-muted">' + esc(e.notes || '') + '</div>' : '') +
+      (ps.length || rf.length ? '<div class="nx-tablewrap"><table class="nx-table auto tight"><thead><tr><th>Date</th><th>Amount</th><th>Method</th><th>Reference</th><th>Processing</th></tr></thead><tbody>' +
+        ps.map(p => { const q = c.queue.find(x => x.payment_id === p.id); return '<tr><td>' + esc(fmtDate(p.paid_on)) + '</td><td class="nx-money">' + money(p.amount) + '</td><td>' + esc(p.method || '–') + '</td><td>' + esc(p.reference || p.payer_name || '–') + '</td><td>' + (q ? pill('payment_queue', q.queue_status) + ' ' + pill('processing', q.processing_step) : '<span class="nx-muted">–</span>') + '</td></tr>'; }).join('') +
+        rf.map(r => '<tr><td>' + esc(fmtDate(r.refunded_on)) + '</td><td class="nx-money nx-neg">-' + money(r.amount).replace('-', '') + '</td><td>Refund</td><td>' + esc(r.reason || '–') + '</td><td>Approved by ' + esc(r.approved_by || '–') + '</td></tr>').join('') + '</tbody></table></div>' : '<div style="padding:0 16px 16px" class="nx-muted">No payments recorded.</div>'));
+  }).join('');
+  const orphan = c.pays.filter(p => !linked.has(p.id));
+  return cards + (orphan.length ? section('Payments not linked to an enrolment', '<div class="nx-tablewrap"><table class="nx-table auto tight"><tbody>' + orphan.map(p => '<tr><td>' + esc(fmtDate(p.paid_on)) + '</td><td class="nx-money">' + money(p.amount) + '</td><td>' + esc(p.reference || p.payer_name || '–') + '</td></tr>').join('') + '</tbody></table></div>') : '');
+}
+function tabActivity(c) {
+  const items = [];
+  c.hist.forEach(h => items.push({ t: h.changed_at, html: '<li><span class="dot">' + ico('list') + '</span><div><b>' + esc(h.changed_by || 'Someone') + '</b> moved ' + esc(h.context.replace(/_/g, ' ')) + (h.from_status ? ' from <b>' + esc(statusLabel(h.context, h.from_status)) + '</b>' : '') + ' to <b>' + esc(statusLabel(h.context, h.to_status)) + '</b><time>' + fmtDT(h.changed_at) + '</time></div></li>' }));
+  c.aud.forEach(a => { if (a.action === 'UPDATE' && !diffHtml(a)) return; items.push({ t: a.changed_at, html: feedItem(a) }); });
+  items.sort((a, b) => String(b.t).localeCompare(String(a.t)));
+  return items.length ? '<ul class="nx-feed">' + items.slice(0, 60).map(i => i.html).join('') + '</ul>' : empty('No activity yet');
+}
+
+async function studentAction(a, ds, c) {
+  const s = c.s;
+  if (a === 'editStu') return formModal('Edit contact', studentFields(s), async v => { tidyStudent(v); await upd('nex_students', 'id=eq.' + s.id, v); toast('Saved'); render(); });
+  if (a === 'editDet') {
+    const d = c.d;
+    const f = [{ k: 'dob', label: 'Date of birth', type: 'date', value: d.dob }, { k: 'usi', label: 'USI', value: d.usi, help: 'Unique Student Identifier, 10 characters' },
+      { k: 'address', label: 'Street address', value: d.address, full: true }, { k: 'suburb', label: 'Suburb', value: d.suburb }, { k: 'state', label: 'State', value: d.state }, { k: 'postcode', label: 'Postcode', value: d.postcode },
+      { k: 'emergency_name', label: 'Emergency contact', value: d.emergency_name }, { k: 'emergency_phone', label: 'Emergency phone', type: 'tel', value: d.emergency_phone }, { k: 'emergency_relation', label: 'Relationship', value: d.emergency_relation },
+      { k: 'disability', label: 'Disability', value: d.disability }, { k: 'indigenous_status', label: 'Indigenous status', value: d.indigenous_status }];
+    return formModal('Edit personal details', f, async v => {
+      if (v.usi) v.usi = v.usi.replace(/\s/g, '').toUpperCase();
+      if (d.student_id) await upd('nex_student_details', 'student_id=eq.' + s.id, v); else await ins('nex_student_details', Object.assign({ student_id: s.id }, v), true);
+      toast('Saved'); render();
+    });
+  }
+  if (a === 'archive') { if (await confirmBox('Archive student', fullName(s) + ' will be hidden from lists. Their records are kept.', 'Archive', true)) { await upd('nex_students', 'id=eq.' + s.id, { deleted_at: new Date().toISOString() }); toast('Archived'); go('#/students'); } return; }
+  if (a === 'addEnr') return enrolmentForm(s, null);
+  if (a === 'editEnr') return enrolmentForm(s, c.enr.find(e => e.id === ds.id));
+  if (a === 'addPay') return paymentForm({ student: s, enrolment: c.enr.find(e => e.id === ds.id) });
+  if (a === 'refund') return refundForm(c.enr.find(e => e.id === ds.id), c.pays);
+  if (a === 'addFu') return followupForm({ student: s, enrolments: c.enr });
+  if (a === 'doneFu') { await upd('nex_followups', 'id=eq.' + ds.id, { done_at: new Date().toISOString(), done_by: ME.name }); toast('Done'); return render(); }
+  if (a === 'bookFA') return go('#/firstaid');
+}
+
+function enrolmentForm(s, e) {
+  e = e || {};
+  const f = [{ k: 'qualification_id', label: 'Qualification', type: 'select', options: REF.quals.filter(q => q.active || q.id === e.qualification_id), value: e.qualification_id, blank: 'Not set' },
+    { k: 'year', label: 'Year', type: 'number', value: e.year || new Date().getFullYear() }, { k: 'stage', label: 'Stage', type: 'select', options: opts('enrolment', true), value: e.stage, blank: 'Not set' },
+    { k: 'fee', label: 'Agreed fee ($)', type: 'number', value: e.fee }, { k: 'enrolled_on', label: 'Enrolled on', type: 'date', value: e.enrolled_on || sydToday() },
+    { k: 'agent_id', label: 'Agent', type: 'select', options: REF.agents.filter(a => a.active), value: e.agent_id, blank: 'Self / no agent' },
+    { k: 'owner', label: 'Looked after by', type: 'select', options: REF.staff, value: e.owner, blank: 'Nobody yet' }, { k: 'fee_note', label: 'Fee note', value: e.fee_note },
+    { k: 'notes', label: 'Notes', type: 'textarea', value: e.notes, full: true }];
+  return formModal(e.id ? 'Edit enrolment' : 'New enrolment', f, async v => {
+    if (e.id) await upd('nex_enrolments', 'id=eq.' + e.id, v); else await ins('nex_enrolments', Object.assign({ student_id: s.id, created_by: ME.name }, v), true);
+    toast('Saved'); render();
+  });
+}
+/* shared: payment form. opts {student, enrolment} or none (global add with picker) */
+function paymentForm(o) {
+  o = o || {};
+  const f = [{ k: 'amount', label: 'Amount ($)', type: 'number', required: true }, { k: 'paid_on', label: 'Payment date', type: 'date', value: sydToday(), required: true },
+    { k: 'method', label: 'Method', type: 'select', options: ['Bank transfer', 'Cash', 'Card', 'Agent', 'Other'], blank: 'Not set' }, { k: 'reference', label: 'Reference', placeholder: 'Bank reference or receipt' },
+    { k: 'payer_name', label: 'Paid by', value: o.student ? fullName(o.student) : '' }, { k: 'note', label: 'Note', full: true }];
+  const extra = o.student ? '' : '<div class="full" style="margin-bottom:12px"><div class="nx-warnbox">You will pick the student after you save this form. You can also leave the payment unmatched and link it later.</div></div>';
+  return formModal(o.student ? 'Record payment for ' + fullName(o.student) : 'Record payment', f, async (v, m) => {
+    const row = Object.assign({ student_id: o.student ? o.student.id : null, enrolment_id: o.enrolment ? o.enrolment.id : null, created_by: ME.name }, v);
+    const p = await ins('nex_payments', row);
+    if (o.enrolment && o.addToQueue !== false) await ins('nex_payment_queue', { enrolment_id: o.enrolment.id, payment_id: p.id, processing_step: 'draft_not_made', updated_by: ME.name }, true).catch(() => {});
+    toast('Payment recorded'); render();
+  }, 'Save payment', extra);
+}
+function refundForm(e, pays) {
+  if (!e) return;
+  const mine = pays.filter(p => p.enrolment_id === e.id);
+  const f = [{ k: 'amount', label: 'Refund amount ($)', type: 'number', required: true }, { k: 'refunded_on', label: 'Refund date', type: 'date', value: sydToday(), required: true },
+    { k: 'payment_id', label: 'Payment being refunded', type: 'select', options: mine.map(p => ({ id: p.id, label: fmtDate(p.paid_on) + ' · ' + money(p.amount) })), blank: 'Not linked' },
+    { k: 'approved_by', label: 'Approved by', type: 'select', options: REF.staff, required: true, blank: 'Choose' }, { k: 'reason', label: 'Reason', type: 'textarea', full: true, required: true }];
+  return formModal('Record refund', f, async v => { await ins('nex_refunds', Object.assign({ enrolment_id: e.id, created_by: ME.name }, v), true); toast('Refund recorded'); render(); });
+}
+function followupForm(o) {
+  o = o || {};
+  const f = [{ k: 'note', label: 'What needs doing', type: 'textarea', full: true, required: true }, { k: 'due_at', label: 'Due date', type: 'date' },
+    { k: 'assigned_to', label: 'Who', type: 'select', options: REF.staff, value: ME.name, blank: 'Anyone' }];
+  if (o.enrolments && o.enrolments.length > 1) f.push({ k: 'enrolment_id', label: 'Enrolment', type: 'select', options: o.enrolments.map(e => ({ id: e.id, label: qualName(e.qualification_id) || 'Enrolment' })), blank: 'General' });
+  return formModal('New follow-up', f, async v => { if (v.due_at) v.due_at = v.due_at + 'T09:00:00+11:00'; await ins('nex_followups', Object.assign({ student_id: o.student ? o.student.id : null, created_by: ME.name }, v), true); toast('Follow-up added'); render(); });
+}
+
+/* =========================================================
+   Payments and First Aid
+   ========================================================= */
+const PY = { view: 'toprocess', q: '', page: 0, size: 50, sel: null };
+const PROBLEM = ['no_docs', 'not_found', 'issues', 'less_payment', 'no_plc_issues', 'yes_plc_less_payment', 'confirmed_no_plc_less'];
+
+route(/^\/payments(?:\?(.*))?$/, async m => {
+  const qs = new URLSearchParams(m[1] || '');
+  if (qs.get('view')) { PY.view = qs.get('view'); PY.page = 0; PY.sel = null; history.replaceState(null, '', '#/payments'); }
+  const [cTo, cProb, cDone, cUnm] = await Promise.all([
+    count('nex_payment_queue', 'processing_step=neq.processed'),
+    count('nex_payment_queue', 'queue_status=in.(' + PROBLEM.join(',') + ')'),
+    count('nex_payment_queue', 'processing_step=eq.processed'),
+    count('nex_payments', 'student_id=is.null')
+  ]);
+  afterRender(() => bindPayments());
+  const seg = [['toprocess', 'To process', cTo], ['attention', 'Needs attention', cProb], ['processed', 'Processed', cDone], ['unmatched', 'Unmatched', cUnm], ['all', 'All payments', null]];
+  return pageHead('cash', 'Payments', 'Payment queue', '<button class="nx-btn primary" id="pyAdd">' + ico('plus') + 'Record payment</button>') +
+    '<div class="nx-split"><div class="nx-card"><div class="nx-toolbar" style="border-top:0"><div class="nx-seg" id="pySeg">' + seg.map(([k, l, n]) => '<button data-v="' + k + '" aria-pressed="' + (PY.view === k) + '">' + l + (n != null ? ' <span class="nx-count">' + n + '</span>' : '') + '</button>').join('') + '</div><input class="nx-in sm" id="pyQ" style="min-width:220px" placeholder="Search name or reference" value="' + esc(PY.q) + '"></div>' +
+    '<div id="pyBody"></div><div class="nx-foot" id="pyFoot"><span></span></div></div><div class="nx-drawer" id="pyDrawer" hidden></div></div>';
+});
+
+function bindPayments() {
+  const body = $('#pyBody'); let rowsCache = [];
+  const load = async () => {
+    body.innerHTML = '<div class="nx-card-b"><div class="nx-skel" style="width:60%"></div><div class="nx-skel" style="width:80%;margin-top:12px"></div></div>';
+    try {
+      const q = safeQ(PY.q); let rows, total;
+      const from = PY.page * PY.size, to = from + PY.size - 1;
+      if (PY.view === 'unmatched' || PY.view === 'all') {
+        let query = 'select=*&order=paid_on.desc.nullslast,created_at.desc';
+        if (PY.view === 'unmatched') query += '&student_id=is.null';
+        if (q) query += '&or=(payer_name.ilike.*' + q + '*,reference.ilike.*' + q + '*)';
+        ({ rows, total } = await selPage('nex_payments', query, from, to));
+        rowsCache = rows;
+        body.innerHTML = rows.length ? '<div class="nx-tablewrap"><table class="nx-table tight"><thead><tr><th>Date</th><th>Paid by</th><th>Amount</th><th>Method</th><th>Reference</th><th>Student</th><th></th></tr></thead><tbody>' +
+          rows.map(p => '<tr><td>' + esc(fmtDate(p.paid_on)) + '</td><td>' + esc(p.payer_name || '–') + '</td><td class="nx-money">' + money(p.amount) + '</td><td>' + esc(p.method || '–') + '</td><td>' + esc(p.reference || '–') + '</td><td>' + (p.student_id ? '<a href="#/students/' + p.student_id + '">Open</a>' : '<span class="nx-pill warn">Unmatched</span>') + '</td><td>' + (p.student_id ? '' : '<button class="nx-btn sm" data-link="' + p.id + '">Link to student</button>') + '</td></tr>').join('') + '</tbody></table></div>' : empty(PY.view === 'unmatched' ? 'Every payment is linked to a student' : 'No payments found');
+      } else {
+        let query = 'select=*,nex_payments(id,amount,paid_on,payer_name,reference,method,student_id),nex_enrolments(id,student_id,qualification_id,fee,nex_students(id,first_name,last_name,email))&order=updated_at.desc';
+        if (PY.view === 'toprocess') query += '&processing_step=neq.processed';
+        else if (PY.view === 'attention') query += '&queue_status=in.(' + PROBLEM.join(',') + ')';
+        else query += '&processing_step=eq.processed';
+        ({ rows, total } = await selPage('nex_payment_queue', query, from, to));
+        if (q) { const lq = q.toLowerCase(); rows = rows.filter(r => JSON.stringify([(r.nex_payments || {}).payer_name, (r.nex_payments || {}).reference, ((r.nex_enrolments || {}).nex_students || {}).first_name, ((r.nex_enrolments || {}).nex_students || {}).last_name]).toLowerCase().includes(lq)); }
+        rowsCache = rows;
+        const stepIdx = k => ['draft_not_made', 'draft_made', 'ready_to_process', 'processed'].indexOf(k);
+        body.innerHTML = rows.length ? '<div class="nx-tablewrap"><table class="nx-table tight"><thead><tr><th>Student</th><th>Paid</th><th>Amount</th><th>Queue status</th><th>Processing</th><th>Updated</th></tr></thead><tbody>' +
+          rows.map(r => { const p = r.nex_payments || {}, e = r.nex_enrolments || {}, s = e.nex_students || null; const si = stepIdx(r.processing_step);
+            return '<tr class="nx-tr ' + (PY.sel === r.id ? 'sel' : '') + '" data-id="' + r.id + '"><td><div class="nx-who"><span class="nx-avatar">' + esc(initials(s ? fullName(s) : p.payer_name)) + '</span><div><b>' + esc(s ? fullName(s) : (p.payer_name || 'Unknown')) + '</b><span>' + esc(s ? s.email || '' : 'Not matched') + '</span></div></div></td><td>' + esc(fmtDate(p.paid_on)) + '</td><td class="nx-money">' + money(p.amount) + '</td><td>' + pill('payment_queue', r.queue_status) + '</td><td>' + pill('processing', r.processing_step) + '<div class="nx-steps" style="margin-top:6px">' + [0, 1, 2, 3].map(i => '<i class="' + (i <= si ? 'on' : '') + '"></i>').join('') + '</div></td><td>' + esc(fmtDT(r.updated_at)) + '</td></tr>'; }).join('') + '</tbody></table></div>' : empty('Nothing here', PY.view === 'toprocess' ? 'The queue is clear.' : 'No entries in this list.');
+        $$('.nx-tr', body).forEach(tr => tr.onclick = () => openQueueDrawer(rowsCache.find(x => x.id === tr.dataset.id), load));
+      }
+      const fromN = total ? from + 1 : 0, toN = from + rows.length;
+      $('#pyFoot').innerHTML = '<span>' + (total != null ? fromN + '–' + toN + ' of ' + total.toLocaleString('en-AU') : rows.length + ' shown') + '</span><span class="nx-btnrow"><button class="nx-btn sm" id="pyPrev"' + (PY.page ? '' : ' disabled') + '>Previous</button><button class="nx-btn sm" id="pyNext"' + (total != null && toN >= total ? ' disabled' : '') + '>Next</button></span>';
+      $('#pyPrev').onclick = () => { PY.page--; load(); }; $('#pyNext').onclick = () => { PY.page++; load(); };
+      $$('[data-link]', body).forEach(b => b.onclick = () => linkPayment(rowsCache.find(x => x.id === b.dataset.link)));
+    } catch (e) { body.innerHTML = empty('Could not load payments', e.message); }
+  };
+  $$('#pySeg button').forEach(b => b.onclick = () => { PY.view = b.dataset.v; PY.page = 0; PY.sel = null; $('#pyDrawer').hidden = true; $$('#pySeg button').forEach(x => x.setAttribute('aria-pressed', String(x === b))); load(); });
+  let t = 0; $('#pyQ').addEventListener('input', e => { clearTimeout(t); t = setTimeout(() => { PY.q = e.target.value; PY.page = 0; load(); }, 300); });
+  $('#pyAdd').onclick = () => globalAddPayment();
+  load();
+}
+
+function openQueueDrawer(r, reload) {
+  if (!r) return;
+  PY.sel = r.id; $$('#pyBody .nx-tr').forEach(tr => tr.classList.toggle('sel', tr.dataset.id === r.id));
+  const p = r.nex_payments || {}, e = r.nex_enrolments || {}, s = e.nex_students || null;
+  const d = $('#pyDrawer'); d.hidden = false;
+  d.innerHTML = '<div class="nx-card"><div class="nx-card-h"><h3>' + esc(s ? fullName(s) : (p.payer_name || 'Payment')) + '</h3><button class="nx-btn quiet icon" id="pdX" aria-label="Close">' + ico('x') + '</button></div><div class="nx-card-b" style="display:flex;flex-direction:column;gap:14px">' +
+    '<div><div class="nx-lbl">Payment</div><div class="nx-big">' + money(p.amount) + '</div><div class="nx-muted">' + esc(fmtDate(p.paid_on)) + (p.method ? ' · ' + esc(p.method) : '') + (p.reference ? ' · ' + esc(p.reference) : '') + '</div></div>' +
+    (e.fee ? '<div class="nx-muted">Agreed fee ' + money(e.fee) + (Number(p.amount) < Number(e.fee) ? ' · this payment is ' + money(Number(e.fee) - Number(p.amount)) + ' short' : '') + '</div>' : '') +
+    '<div><label class="nx-lbl" for="pdQs">Queue status</label><select class="nx-sel" id="pdQs">' + selectOpts(opts('payment_queue', true), r.queue_status, 'Not set') + '</select></div>' +
+    '<div><label class="nx-lbl" for="pdSt">Processing step</label><select class="nx-sel" id="pdSt">' + selectOpts(opts('processing', true), r.processing_step) + '</select></div>' +
+    '<div><label class="nx-lbl" for="pdAs">Assigned to</label><select class="nx-sel" id="pdAs">' + selectOpts(REF.staff, r.assigned_to, 'Nobody') + '</select></div>' +
+    '<div><label class="nx-lbl" for="pdNote">Note</label><textarea class="nx-ta" id="pdNote">' + esc(r.note || '') + '</textarea></div>' +
+    '<div class="nx-btnrow"><button class="nx-btn primary" id="pdSave">Save</button>' + (s ? '<a class="nx-btn" href="#/students/' + s.id + '">Open student</a>' : '<button class="nx-btn" id="pdLink">Link to student</button>') + '</div><div class="nx-err" id="pdErr"></div></div></div>';
+  $('#pdX').onclick = () => { d.hidden = true; PY.sel = null; $$('#pyBody .nx-tr').forEach(tr => tr.classList.remove('sel')); };
+  $('#pdSave').onclick = async () => {
+    try { await upd('nex_payment_queue', 'id=eq.' + r.id, { queue_status: $('#pdQs').value || null, processing_step: $('#pdSt').value || null, assigned_to: $('#pdAs').value || null, note: $('#pdNote').value.trim() || null, updated_by: ME.name }); toast('Saved'); d.hidden = true; PY.sel = null; render(); }
+    catch (err) { $('#pdErr').textContent = err.message; }
+  };
+  const lk = $('#pdLink'); if (lk) lk.onclick = () => linkPayment(p, r);
+}
+
+function linkPayment(p, queueRow) {
+  if (!p) return;
+  pickStudent('Link payment to a student', async st => {
+    try {
+      const en = await sel('nex_enrolments', 'select=id,qualification_id,year,stage&student_id=eq.' + st.id + '&deleted_at=is.null&order=enrolled_on.desc.nullslast');
+      const finish = async enrId => {
+        await upd('nex_payments', 'id=eq.' + p.id, { student_id: st.id, enrolment_id: enrId });
+        if (queueRow) await upd('nex_payment_queue', 'id=eq.' + queueRow.id, { enrolment_id: enrId, updated_by: ME.name });
+        toast('Linked to ' + fullName(st)); render();
+      };
+      if (en.length <= 1) return finish(en[0] ? en[0].id : null);
+      const m = openModal({ title: 'Which enrolment?', footer: false, body: '<div class="nx-sel-opt">' + en.map(e => '<button type="button" class="nx-pick" data-id="' + e.id + '"><span><b>' + esc(qualName(e.qualification_id) || 'Enrolment') + '</b><small>' + esc(e.year || '') + ' · ' + esc(statusLabel('enrolment', e.stage)) + '</small></span><span class="nx-tag">Choose</span></button>').join('') + '</div>' });
+      $$('.nx-pick', m.el).forEach(b => b.onclick = async () => { m.close(); try { await finish(b.dataset.id); } catch (err) { toast(err.message, true); } });
+    } catch (err) { toast(err.message, true); }
+  }, p.payer_name || '');
+}
+
+function globalAddPayment() {
+  pickStudent('Who is the payment for?', async st => {
+    const en = await sel('nex_enrolments', 'select=*&student_id=eq.' + st.id + '&deleted_at=is.null&order=enrolled_on.desc.nullslast');
+    if (en.length <= 1) return paymentForm({ student: st, enrolment: en[0] });
+    const m = openModal({ title: 'Which enrolment?', footer: false, body: '<div class="nx-sel-opt">' + en.map(e => '<button type="button" class="nx-pick" data-id="' + e.id + '"><span><b>' + esc(qualName(e.qualification_id) || 'Enrolment') + '</b><small>' + esc(e.year || '') + ' · fee ' + esc(money(e.fee) || 'not set') + '</small></span><span class="nx-tag">Choose</span></button>').join('') + '</div>' });
+    $$('.nx-pick', m.el).forEach(b => b.onclick = () => { m.close(); paymentForm({ student: st, enrolment: en.find(x => x.id === b.dataset.id) }); });
+  });
+}
+
+/* =========================================================
+   First Aid and CPR
+   ========================================================= */
+route(/^\/firstaid(?:\/([0-9a-f-]{36}))?$/, async m => {
+  const today = sydToday();
+  const back = new Date(Date.now() - 21 * 864e5).toLocaleDateString('en-CA', { timeZone: TZ });
+  let sessions = await sel('nex_class_sessions', 'select=*&class_date=gte.' + back + '&order=class_date.asc,kind.asc&limit=60');
+  let want = m[1];
+  if (want && !sessions.find(s => s.id === want)) { const one = await sel('nex_class_sessions', 'select=*&id=eq.' + want); if (one[0]) sessions = [one[0]].concat(sessions).sort((a, b) => a.class_date.localeCompare(b.class_date)); }
+  const cur = sessions.find(s => s.id === want) || sessions.find(s => s.class_date >= today) || sessions[sessions.length - 1] || null;
+  const cnt = {};
+  if (sessions.length) { const rows = await selAll('nex_class_bookings', 'select=session_id,status&session_id=in.' + inList(sessions.map(s => s.id))); rows.forEach(b => { if (b.status !== 'cancelled') cnt[b.session_id] = (cnt[b.session_id] || 0) + 1; }); }
+  let books = [];
+  if (cur) books = await sel('nex_class_bookings', 'select=*,nex_students(id,first_name,last_name)&session_id=eq.' + cur.id + '&order=seat_no.asc.nullslast,created_at.asc');
+  afterRender(() => bindFirstAid(cur, books));
+  const head = pageHead('heart', 'Evershine', 'First Aid and CPR', '<button class="nx-btn" id="faJump">Past classes</button><button class="nx-btn primary" id="faNew">' + ico('plus') + 'New class day</button>');
+  if (!cur) return head + '<div class="nx-card">' + empty('No classes scheduled', 'Add the next class day to start taking bookings.') + '</div>';
+  const live = books.filter(b => b.status !== 'cancelled');
+  const d = fmtDay(cur.class_date);
+  const seated = live.filter(b => b.seat_no);
+  const walk = live.filter(b => b.booking_type !== 'student').length;
+  return head + '<div class="nx-card"><div class="nx-card-b"><div class="nx-days" id="faDays">' + sessions.map(s => { const dd = fmtDay(s.class_date); const n = cnt[s.id] || 0; return '<button class="nx-day" data-id="' + s.id + '" aria-pressed="' + (s.id === cur.id) + '"><b>' + dd.wd + ' ' + dd.dm + '</b><span>' + (s.kind === 'renewal' ? 'Renewal' : 'Full class') + ' · ' + n + ' / ' + s.seats + '</span></button>'; }).join('') + '</div></div></div>' +
+    '<div class="nx-card"><div class="nx-card-h"><div><div class="nx-eyebrow">' + (cur.kind === 'renewal' ? 'Renewal and signature day' : 'Full class day') + '</div><h3 style="font-size:18px">' + d.wd + ' ' + d.dm + (cur.trainer ? ' · ' + esc(cur.trainer) : '') + '</h3></div><div class="nx-btnrow"><button class="nx-btn sm" id="faEdit">' + ico('edit') + 'Edit class</button></div></div><div class="nx-card-b" style="display:flex;flex-direction:column;gap:12px">' +
+    '<div style="display:flex;justify-content:space-between;align-items:baseline"><span class="nx-big">' + live.length + ' <span class="nx-muted" style="font-size:16px">of ' + cur.seats + ' seats</span></span><span class="nx-muted">' + (cur.seats - seated.length) + ' seats free' + (walk ? ' · ' + walk + ' walk-in or agent' : '') + (cur.start_time ? ' · ' + esc(cur.start_time) + (cur.end_time ? '–' + esc(cur.end_time) : '') : '') + '</span></div>' +
+    '<div class="nx-cap"><i class="a" style="width:' + Math.min(100, seated.length / cur.seats * 100) + '%"></i></div>' +
+    (live.length > cur.seats ? '<div class="nx-warnbox">This class has more bookings than seats. Move some people to another day.</div>' : '') +
+    '<div class="nx-seats" id="faSeats">' + Array.from({ length: cur.seats }, (_, i) => { const n = i + 1; const b = live.find(x => x.seat_no === n); return '<button class="nx-seat ' + (b ? (b.booking_type !== 'student' ? 'walk' : 'booked') : '') + '" data-seat="' + n + '" title="' + esc(b ? b.name : 'Free seat') + '"><span>' + (b ? esc((b.name || '').split(' ')[0].slice(0, 7)) : n) + '</span></button>'; }).join('') + '</div>' +
+    '<div class="nx-legend"><span><i></i>Free</span><span><i class="booked"></i>Student</span><span><i class="walk"></i>Walk-in or agent group</span></div></div></div>' +
+    '<div class="nx-card"><div class="nx-card-h"><h3>Bookings</h3><button class="nx-btn primary sm" id="faAdd">' + ico('plus') + 'Add booking</button></div>' +
+    (books.length ? '<div class="nx-tablewrap"><table class="nx-table tight"><thead><tr><th>Seat</th><th>Name</th><th>Phone</th><th>Type</th><th>Booked by</th><th>Status</th><th>Flags</th><th></th></tr></thead><tbody>' +
+      books.map(b => '<tr class="nx-tr" data-b="' + b.id + '"><td class="nx-num">' + (b.seat_no || '<span class="nx-muted">–</span>') + '</td><td><b>' + (b.nex_students ? '<a href="#/students/' + b.nex_students.id + '">' + esc(b.name) + '</a>' : esc(b.name)) + '</b><div class="nx-muted" style="font-size:12px">' + esc(b.email || '') + '</div></td><td class="nx-num">' + esc(fmtPhone(b.phone)) + '</td><td>' + (b.booking_type === 'student' ? '<span class="nx-tag">Student</span>' : '<span class="nx-tag walk">' + (b.booking_type === 'walk_in' ? 'Walk-in' : 'Agent group') + '</span>') + (b.agent_id ? ' <span class="nx-muted">' + esc(agentName(b.agent_id)) + '</span>' : '') + '</td><td>' + esc(b.created_by || '') + '</td><td>' + pill('booking', b.status) + '</td>' +
+        '<td><div class="nx-flags"><span class="nx-flag ' + (b.quiz_sent ? 'on' : '') + '" title="Quiz sent">QS</span><span class="nx-flag ' + (b.quiz_done ? 'on' : '') + '" title="Quiz done">QD</span><span class="nx-flag ' + (b.paid ? 'on' : '') + '" title="Paid">$</span>' + (cur.kind === 'renewal' ? '<span class="nx-flag ' + (b.signature_done ? 'on' : '') + '" title="Signature done">SG</span>' : '') + '</div></td><td><button class="nx-btn sm" data-edit="' + b.id + '">Edit</button></td></tr>').join('') + '</tbody></table></div>' : empty('No bookings yet', 'Press Add booking or choose a free seat above.')) + '</div>';
+});
+
+function bindFirstAid(cur, books) {
+  const view = $('#view');
+  if ($('#faNew')) $('#faNew').onclick = () => classForm(null);
+  if ($('#faJump')) $('#faJump').onclick = () => formModal('Go to a past class', [{ k: 'd', label: 'Class date', type: 'date', required: true }], async v => {
+    const r = await sel('nex_class_sessions', 'select=id&class_date=eq.' + v.d + '&limit=1'); if (!r[0]) throw new Error('No class on that date.'); go('#/firstaid/' + r[0].id); }, 'Go');
+  if (!cur) return;
+  $$('#faDays .nx-day').forEach(b => b.onclick = () => go('#/firstaid/' + b.dataset.id));
+  $('#faEdit').onclick = () => classForm(cur);
+  $('#faAdd').onclick = () => bookingForm(cur, null, books);
+  $$('#faSeats .nx-seat').forEach(b => b.onclick = () => { const n = Number(b.dataset.seat); const ex = books.find(x => x.seat_no === n && x.status !== 'cancelled'); bookingForm(cur, ex || null, books, n); });
+  $$('[data-edit]').forEach(b => b.onclick = e => { e.stopPropagation(); bookingForm(cur, books.find(x => x.id === b.dataset.edit), books); });
+}
+
+function classForm(c) {
+  c = c || {};
+  const f = [{ k: 'class_date', label: 'Class date', type: 'date', value: c.class_date, required: true }, { k: 'kind', label: 'Type', type: 'select', options: [{ id: 'full', label: 'Full class (First Aid and CPR)' }, { id: 'renewal', label: 'Renewal and signature' }], value: c.kind || 'full' },
+    { k: 'trainer', label: 'Trainer', value: c.trainer }, { k: 'seats', label: 'Seats', type: 'number', value: c.seats || 50, required: true },
+    { k: 'start_time', label: 'Starts', type: 'time', value: c.start_time }, { k: 'end_time', label: 'Ends', type: 'time', value: c.end_time }, { k: 'note', label: 'Note', type: 'textarea', value: c.note, full: true }];
+  return formModal(c.id ? 'Edit class day' : 'New class day', f, async v => {
+    if (c.id) { await upd('nex_class_sessions', 'id=eq.' + c.id, v); toast('Saved'); render(); }
+    else { const s = await ins('nex_class_sessions', v); toast('Class added'); go('#/firstaid/' + s.id); }
+  });
+}
+
+function bookingForm(cur, b, books, seat) {
+  b = b || {}; let studentId = b.student_id || null;
+  const takenBy = n => books.find(x => x.seat_no === n && x.status !== 'cancelled' && x.id !== b.id);
+  const f = [{ k: 'name', label: 'Name', value: b.name, required: true }, { k: 'phone', label: 'Phone', type: 'tel', value: b.phone }, { k: 'email', label: 'Email', type: 'email', value: b.email },
+    { k: 'seat_no', label: 'Seat', type: 'number', value: b.seat_no || seat || '', help: 'Leave empty for the waiting list' },
+    { k: 'booking_type', label: 'Booking type', type: 'select', options: [{ id: 'student', label: 'Student' }, { id: 'walk_in', label: 'Walk-in' }, { id: 'agent_group', label: 'Agent group' }], value: b.booking_type || 'student' },
+    { k: 'agent_id', label: 'Agent', type: 'select', options: REF.agents.filter(a => a.active), value: b.agent_id, blank: 'None' },
+    { k: 'status', label: 'Status', type: 'select', options: opts('booking', true), value: b.status || 'booked', blank: 'Not set' },
+    { k: 'quiz_sent', label: 'Quiz link sent', type: 'check', value: b.quiz_sent }, { k: 'quiz_done', label: 'Quiz done', type: 'check', value: b.quiz_done }, { k: 'paid', label: 'Paid', type: 'check', value: b.paid }];
+  if (cur.kind === 'renewal') f.push({ k: 'signature_done', label: 'Signature done', type: 'check', value: b.signature_done });
+  f.push({ k: 'note', label: 'Note', type: 'textarea', value: b.note, full: true });
+  const top = b.id ? '' : '<div style="margin-bottom:14px"><button type="button" class="nx-btn" id="bkFind">' + ico('search') + 'Find an existing student</button><div class="nx-help">Walk-ins and agent groups can be typed in directly without a student record.</div></div>';
+  const m = formModal(b.id ? 'Edit booking' : 'Add booking', f, async v => {
+    if (v.seat_no != null) { v.seat_no = Math.round(v.seat_no); if (v.seat_no < 1 || v.seat_no > cur.seats) throw new Error('Seat must be between 1 and ' + cur.seats + '.'); const t = takenBy(v.seat_no); if (t) throw new Error('Seat ' + v.seat_no + ' is already taken by ' + t.name + '.'); }
+    if (v.phone) v.phone = cleanPhone(v.phone) || v.phone; if (v.email) v.email = v.email.toLowerCase();
+    if (v.status === 'cancelled') v.seat_no = null;
+    try {
+      if (b.id) await upd('nex_class_bookings', 'id=eq.' + b.id, Object.assign(v, { student_id: studentId }));
+      else await ins('nex_class_bookings', Object.assign({ session_id: cur.id, student_id: studentId, created_by: ME.name }, v), true);
+    } catch (e) { if (/duplicate|unique/i.test(e.message)) throw new Error('That seat was just taken. Choose another.'); throw e; }
+    toast('Booking saved'); render();
+  }, 'Save booking', top);
+  if (b.id) {
+    const foot = $('.modal-f', m.el); const cb = document.createElement('button'); cb.className = 'nx-btn'; cb.style.marginRight = 'auto'; cb.textContent = 'Cancel booking';
+    cb.onclick = async () => { try { await upd('nex_class_bookings', 'id=eq.' + b.id, { status: 'cancelled', seat_no: null }); m.close(); toast('Booking cancelled'); render(); } catch (e) { showErr(m, e); } };
+    foot.prepend(cb);
+  } else {
+    const fb = $('#bkFind', m.el);
+    if (fb) fb.onclick = () => pickStudent('Find a student', s => { studentId = s.id; $('#f_name', m.el).value = fullName(s); $('#f_phone', m.el).value = s.phone || ''; $('#f_email', m.el).value = s.email || ''; $('#f_booking_type', m.el).value = 'student'; toast('Student attached: ' + fullName(s)); });
+  }
+}
+
+/* =========================================================
+   Placement, Follow-ups, Admin
+   ========================================================= */
+const PL = { tab: 'requests', status: '', q: '', page: 0, size: 50 };
+
+route(/^\/placement$/, async () => {
+  afterRender(() => bindPlacement());
+  const seg = [['requests', 'Requests'], ['placements', 'Placements'], ['facilities', 'Facilities'], ['blacklist', 'Blacklist']];
+  return pageHead('pin', 'Placement team', 'Placement', '<button class="nx-btn primary" id="plAdd">' + ico('plus') + '<span id="plAddL">New request</span></button>') +
+    '<div class="nx-card"><div class="nx-toolbar" style="border-top:0"><div class="nx-seg" id="plSeg">' + seg.map(([k, l]) => '<button data-v="' + k + '" aria-pressed="' + (PL.tab === k) + '">' + l + '</button>').join('') + '</div><select class="nx-sel sm" id="plStatus"></select><input class="nx-in sm" id="plQ" style="min-width:220px" placeholder="Search" value="' + esc(PL.q) + '"></div><div id="plBody"></div><div class="nx-foot" id="plFoot"><span></span></div></div>';
+});
+
+function bindPlacement() {
+  const body = $('#plBody');
+  const labels = { requests: 'New request', placements: 'New placement', facilities: 'New facility', blacklist: 'Add to blacklist' };
+  const load = async () => {
+    $('#plAddL').textContent = labels[PL.tab];
+    const sf = $('#plStatus'); sf.hidden = !(PL.tab === 'requests' || PL.tab === 'placements');
+    if (!sf.hidden) sf.innerHTML = selectOpts(opts(PL.tab === 'requests' ? 'placement' : 'placement_stage', true), PL.status, 'Any status');
+    body.innerHTML = '<div class="nx-card-b"><div class="nx-skel" style="width:60%"></div><div class="nx-skel" style="width:80%;margin-top:12px"></div></div>';
+    try {
+      const q = safeQ(PL.q), from = PL.page * PL.size, to = from + PL.size - 1; let rows, total, html;
+      if (PL.tab === 'requests') {
+        let query = 'select=*,nex_facilities(name),nex_enrolments(student_id,nex_students(id,first_name,last_name))&order=created_at.desc'; if (PL.status) query += '&status=eq.' + PL.status; if (q) query += '&facility_text=ilike.*' + q + '*';
+        ({ rows, total } = await selPage('nex_placement_requests', query, from, to));
+        html = rows.length ? '<div class="nx-tablewrap"><table class="nx-table tight"><thead><tr><th>Student</th><th>Facility</th><th>Type</th><th>Emailed</th><th>Status</th><th>Note</th><th></th></tr></thead><tbody>' + rows.map(r => { const s = (r.nex_enrolments || {}).nex_students; return '<tr><td>' + (s ? '<a href="#/students/' + s.id + '"><b>' + esc(fullName(s)) + '</b></a>' : '–') + '</td><td>' + esc((r.nex_facilities || {}).name || r.facility_text || '–') + '</td><td>' + (r.self_placement ? '<span class="nx-tag walk">Self placement</span>' : '<span class="nx-tag">Arranged</span>') + '</td><td>' + esc(fmtDate(r.emailed_on) || '–') + '</td><td>' + pill('placement', r.status) + '</td><td class="nx-muted">' + esc((r.note || '').slice(0, 60)) + '</td><td><button class="nx-btn sm" data-ed="' + r.id + '">Update</button></td></tr>'; }).join('') + '</tbody></table></div>' : empty('No placement requests');
+        body._rows = rows; $$('[data-ed]', body).forEach(b => b.onclick = () => requestForm(rows.find(x => x.id === b.dataset.ed)));
+      } else if (PL.tab === 'placements') {
+        let query = 'select=*,nex_facilities(name),nex_enrolments(student_id,nex_students(id,first_name,last_name))&order=start_date.desc.nullslast,created_at.desc'; if (PL.status) query += '&status=eq.' + PL.status; if (q) query += '&facility_text=ilike.*' + q + '*';
+        ({ rows, total } = await selPage('nex_placements', query, from, to));
+        html = rows.length ? '<div class="nx-tablewrap"><table class="nx-table tight"><thead><tr><th>Student</th><th>Facility</th><th>Starts</th><th>Ends</th><th>Hours</th><th>Status</th><th></th></tr></thead><tbody>' + rows.map(r => { const s = (r.nex_enrolments || {}).nex_students; return '<tr><td>' + (s ? '<a href="#/students/' + s.id + '"><b>' + esc(fullName(s)) + '</b></a>' : '–') + '</td><td>' + esc((r.nex_facilities || {}).name || r.facility_text || '–') + '</td><td>' + esc(fmtDate(r.start_date) || '–') + '</td><td>' + esc(fmtDate(r.end_date) || '–') + '</td><td class="nx-num">' + esc(r.hours || '–') + '</td><td>' + pill('placement_stage', r.status) + '</td><td><button class="nx-btn sm" data-ed="' + r.id + '">Update</button></td></tr>'; }).join('') + '</tbody></table></div>' : empty('No placements yet');
+        $$('[data-ed]', body).forEach(b => b.onclick = () => placementForm(rows.find(x => x.id === b.dataset.ed)));
+      } else if (PL.tab === 'facilities') {
+        let query = 'select=*&order=name.asc'; if (q) query += '&name=ilike.*' + q + '*';
+        ({ rows, total } = await selPage('nex_facilities', query, from, to));
+        html = rows.length ? '<div class="nx-tablewrap"><table class="nx-table tight"><thead><tr><th>Facility</th><th>Suburb</th><th>Contact</th><th>Phone</th><th>Email</th><th></th></tr></thead><tbody>' + rows.map(r => '<tr><td><b>' + esc(r.name) + '</b></td><td>' + esc(r.suburb || '–') + '</td><td>' + esc(r.contact_name || '–') + '</td><td>' + esc(r.phone || '–') + '</td><td>' + esc(r.email || '–') + '</td><td><button class="nx-btn sm" data-ed="' + r.id + '">Edit</button></td></tr>').join('') + '</tbody></table></div>' : empty('No facilities', 'Add the homes you place students with.');
+        $$('[data-ed]', body).forEach(b => b.onclick = () => facilityForm(rows.find(x => x.id === b.dataset.ed)));
+      } else {
+        let query = 'select=*,nex_facilities(name)&order=added_at.desc'; if (q) query += '&or=(student_name.ilike.*' + q + '*,facility_text.ilike.*' + q + '*)';
+        ({ rows, total } = await selPage('nex_blacklist', query, from, to));
+        html = rows.length ? '<div class="nx-tablewrap"><table class="nx-table tight"><thead><tr><th>Student or facility</th><th>Where allocated</th><th>Reason</th><th>Added</th><th></th></tr></thead><tbody>' + rows.map(r => '<tr><td><b>' + esc(r.student_name || (r.nex_facilities || {}).name || r.facility_text || '–') + '</b><div class="nx-muted" style="font-size:12px">' + esc(r.email || '') + '</div></td><td>' + esc(r.allocated_at || '–') + '</td><td>' + esc(r.reason || '–') + '</td><td>' + esc(fmtDate(r.added_at)) + '<div class="nx-muted" style="font-size:12px">' + esc(r.added_by || '') + '</div></td><td>' + (ME.admin ? '<button class="nx-btn sm" data-rm="' + r.id + '">Remove</button>' : '') + '</td></tr>').join('') + '</tbody></table></div>' : empty('Blacklist is empty');
+        body.innerHTML = html; $$('[data-rm]', body).forEach(b => b.onclick = async () => { if (await confirmBox('Remove from blacklist', 'Remove this entry?', 'Remove', true)) { try { await del('nex_blacklist', 'id=eq.' + b.dataset.rm); toast('Removed'); load(); } catch (e) { toast(e.message, true); } } });
+      }
+      if (PL.tab !== 'blacklist') body.innerHTML = html;
+      if (PL.tab === 'blacklist') { /* already set */ }
+      const fromN = total ? from + 1 : 0, toN = from + rows.length;
+      $('#plFoot').innerHTML = '<span>' + (total != null ? fromN + '–' + toN + ' of ' + total.toLocaleString('en-AU') : rows.length + ' shown') + '</span><span class="nx-btnrow"><button class="nx-btn sm" id="plPrev"' + (PL.page ? '' : ' disabled') + '>Previous</button><button class="nx-btn sm" id="plNext"' + (total != null && toN >= total ? ' disabled' : '') + '>Next</button></span>';
+      $('#plPrev').onclick = () => { PL.page--; load(); }; $('#plNext').onclick = () => { PL.page++; load(); };
+    } catch (e) { body.innerHTML = empty('Could not load', e.message); }
+  };
+  $$('#plSeg button').forEach(b => b.onclick = () => { PL.tab = b.dataset.v; PL.page = 0; PL.status = ''; $$('#plSeg button').forEach(x => x.setAttribute('aria-pressed', String(x === b))); load(); });
+  $('#plStatus').onchange = e => { PL.status = e.target.value; PL.page = 0; load(); };
+  let t = 0; $('#plQ').addEventListener('input', e => { clearTimeout(t); t = setTimeout(() => { PL.q = e.target.value; PL.page = 0; load(); }, 300); });
+  $('#plAdd').onclick = () => {
+    if (PL.tab === 'requests') return pickEnrolment('New placement request', en => requestForm(null, en));
+    if (PL.tab === 'placements') return pickEnrolment('New placement', en => placementForm(null, en));
+    if (PL.tab === 'facilities') return facilityForm(null);
+    return blacklistForm();
+  };
+  load();
+}
+
+function pickEnrolment(title, cb) {
+  pickStudent(title, async st => {
+    const en = await sel('nex_enrolments', 'select=*&student_id=eq.' + st.id + '&deleted_at=is.null&order=enrolled_on.desc.nullslast');
+    if (!en.length) { toast(fullName(st) + ' has no enrolment yet. Add one on their record first.', true); return; }
+    if (en.length === 1) return cb(en[0], st);
+    const m = openModal({ title: 'Which enrolment?', footer: false, body: '<div class="nx-sel-opt">' + en.map(e => '<button type="button" class="nx-pick" data-id="' + e.id + '"><span><b>' + esc(qualName(e.qualification_id) || 'Enrolment') + '</b><small>' + esc(e.year || '') + ' · ' + esc(statusLabel('enrolment', e.stage)) + '</small></span><span class="nx-tag">Choose</span></button>').join('') + '</div>' });
+    $$('.nx-pick', m.el).forEach(b => b.onclick = () => { m.close(); cb(en.find(x => x.id === b.dataset.id), st); });
+  });
+}
+async function facilityOptions() { const f = await sel('nex_facilities', 'select=id,name&active=eq.true&order=name&limit=1000'); return f.map(x => ({ id: x.id, label: x.name })); }
+
+async function requestForm(r, en) {
+  r = r || {}; const fac = await facilityOptions();
+  const f = [{ k: 'facility_id', label: 'Facility', type: 'select', options: fac, value: r.facility_id, blank: 'Type a name instead', full: true }, { k: 'facility_text', label: 'Facility name (if not in the list)', value: r.facility_text, full: true },
+    { k: 'self_placement', label: 'Self placement (student found it)', type: 'check', value: r.self_placement }, { k: 'emailed_on', label: 'Email sent on', type: 'date', value: r.emailed_on, help: 'Recorded only. Nex does not send the email.' },
+    { k: 'status', label: 'Status', type: 'select', options: opts('placement', true), value: r.status || 'request_sent', blank: 'Not set' }, { k: 'note', label: 'Note', type: 'textarea', value: r.note, full: true }];
+  formModal(r.id ? 'Update placement request' : 'New placement request', f, async v => {
+    if (r.id) await upd('nex_placement_requests', 'id=eq.' + r.id, v); else await ins('nex_placement_requests', Object.assign({ enrolment_id: en.id, created_by: ME.name }, v), true);
+    toast('Saved'); render();
+  });
+}
+async function placementForm(p, en) {
+  p = p || {}; const fac = await facilityOptions();
+  const f = [{ k: 'facility_id', label: 'Facility', type: 'select', options: fac, value: p.facility_id, blank: 'Type a name instead', full: true }, { k: 'facility_text', label: 'Facility name (if not in the list)', value: p.facility_text, full: true },
+    { k: 'start_date', label: 'Start date', type: 'date', value: p.start_date }, { k: 'end_date', label: 'End date', type: 'date', value: p.end_date }, { k: 'hours', label: 'Hours', type: 'number', value: p.hours },
+    { k: 'status', label: 'Stage', type: 'select', options: opts('placement_stage', true), value: p.status, blank: 'Not set' }, { k: 'note', label: 'Note', type: 'textarea', value: p.note, full: true }];
+  formModal(p.id ? 'Update placement' : 'New placement', f, async v => {
+    if (p.id) await upd('nex_placements', 'id=eq.' + p.id, v); else await ins('nex_placements', Object.assign({ enrolment_id: en.id, created_by: ME.name }, v), true);
+    toast('Saved'); render();
+  });
+}
+function facilityForm(r) {
+  r = r || {};
+  formModal(r.id ? 'Edit facility' : 'New facility', [{ k: 'name', label: 'Name', value: r.name, required: true, full: true }, { k: 'address', label: 'Address', value: r.address, full: true }, { k: 'suburb', label: 'Suburb', value: r.suburb },
+    { k: 'contact_name', label: 'Contact person', value: r.contact_name }, { k: 'phone', label: 'Phone', type: 'tel', value: r.phone }, { k: 'email', label: 'Email', type: 'email', value: r.email },
+    { k: 'active', label: 'Still placing students here', type: 'check', value: r.id ? r.active : true }, { k: 'notes', label: 'Notes', type: 'textarea', value: r.notes, full: true }], async v => {
+    if (r.id) await upd('nex_facilities', 'id=eq.' + r.id, v); else await ins('nex_facilities', v, true);
+    toast('Saved'); render();
+  });
+}
+function blacklistForm() {
+  let studentId = null;
+  const m = formModal('Add to blacklist', [{ k: 'student_name', label: 'Student name', required: true }, { k: 'email', label: 'Email', type: 'email' }, { k: 'allocated_at', label: 'Where they were allocated', full: true }, { k: 'reason', label: 'Reason', type: 'textarea', required: true, full: true }], async v => {
+    await ins('nex_blacklist', Object.assign({ student_id: studentId, added_by: ME.name }, v), true); toast('Added'); render();
+  }, 'Add', '<div style="margin-bottom:14px"><button type="button" class="nx-btn" id="blFind">' + ico('search') + 'Find an existing student</button></div>');
+  $('#blFind', m.el).onclick = () => pickStudent('Find a student', s => { studentId = s.id; $('#f_student_name', m.el).value = fullName(s); $('#f_email', m.el).value = s.email || ''; });
+}
+
+/* ---------- Follow-ups ---------- */
+const FU = { who: 'mine', done: false };
+route(/^\/followups$/, async () => {
+  afterRender(() => bindFollowups());
+  return pageHead('bell', 'Follow-ups', 'Things to follow up', '<button class="nx-btn primary" id="fuAdd">' + ico('plus') + 'New follow-up</button>') +
+    '<div class="nx-card"><div class="nx-toolbar" style="border-top:0"><div class="nx-seg" id="fuWho"><button data-v="mine" aria-pressed="' + (FU.who === 'mine') + '">Mine</button><button data-v="all" aria-pressed="' + (FU.who === 'all') + '">Everyone</button></div><div class="nx-seg" id="fuDone"><button data-v="open" aria-pressed="' + (!FU.done) + '">Open</button><button data-v="done" aria-pressed="' + FU.done + '">Done</button></div></div><div id="fuBody"></div></div>';
+});
+function bindFollowups() {
+  const body = $('#fuBody');
+  const load = async () => {
+    body.innerHTML = '<div class="nx-card-b"><div class="nx-skel" style="width:60%"></div></div>';
+    try {
+      let q = 'select=*,nex_students(id,first_name,last_name)&order=due_at.asc.nullslast&limit=200';
+      q += FU.done ? '&done_at=not.is.null' : '&done_at=is.null';
+      if (FU.who === 'mine') q += '&assigned_to=eq.' + encodeURIComponent(ME.name);
+      const rows = await sel('nex_followups', q); const today = sydToday();
+      body.innerHTML = rows.length ? '<ul class="nx-list">' + rows.map(f => { const od = !f.done_at && f.due_at && f.due_at.slice(0, 10) < today; return '<li><span><b>' + esc(f.note) + '</b><small>' + (f.nex_students ? '<a href="#/students/' + f.nex_students.id + '">' + esc(fullName(f.nex_students)) + '</a> · ' : '') + (f.due_at ? (od ? '<span class="nx-neg">Overdue · </span>' : '') + 'Due ' + esc(fmtDate(f.due_at)) : 'No date') + (f.assigned_to ? ' · ' + esc(f.assigned_to) : '') + (f.done_at ? ' · done ' + esc(fmtDate(f.done_at)) + (f.done_by ? ' by ' + esc(f.done_by) : '') : '') + '</small></span>' + (f.done_at ? '' : '<button class="nx-btn sm" data-d="' + f.id + '">Done</button>') + '</li>'; }).join('') + '</ul>' : empty(FU.done ? 'Nothing completed yet' : 'All clear', FU.done ? '' : 'No open follow-ups' + (FU.who === 'mine' ? ' for you.' : '.'));
+      $$('[data-d]', body).forEach(b => b.onclick = async () => { try { await upd('nex_followups', 'id=eq.' + b.dataset.d, { done_at: new Date().toISOString(), done_by: ME.name }); toast('Done'); load(); } catch (e) { toast(e.message, true); } });
+    } catch (e) { body.innerHTML = empty('Could not load', e.message); }
+  };
+  $$('#fuWho button').forEach(b => b.onclick = () => { FU.who = b.dataset.v; $$('#fuWho button').forEach(x => x.setAttribute('aria-pressed', String(x === b))); load(); });
+  $$('#fuDone button').forEach(b => b.onclick = () => { FU.done = b.dataset.v === 'done'; $$('#fuDone button').forEach(x => x.setAttribute('aria-pressed', String(x === b))); load(); });
+  $('#fuAdd').onclick = () => pickStudentOptional();
+  load();
+}
+function pickStudentOptional() {
+  const m = openModal({ title: 'New follow-up', footer: false, body: '<p style="margin-top:0">Is this about a student?</p><div class="nx-btnrow"><button class="nx-btn primary" id="fuS">Pick a student</button><button class="nx-btn" id="fuN">No, general</button></div>' });
+  $('#fuS', m.el).onclick = () => { m.close(); pickStudent('Follow-up for', async st => { followupForm({ student: st, enrolments: await sel('nex_enrolments', 'select=id,qualification_id&student_id=eq.' + st.id) }); }); };
+  $('#fuN', m.el).onclick = () => { m.close(); followupForm({}); };
+}
+
+/* ---------- Admin ---------- */
+const AD = { ctx: 'enrolment' };
+const CTX_NAMES = { enrolment: 'Enrolment stages', payment_queue: 'Payment queue statuses', processing: 'Processing steps', placement: 'Placement request statuses', placement_stage: 'Placement stages', booking: 'First Aid booking statuses' };
+route(/^\/admin$/, async () => {
+  await loadRef(true);
+  afterRender(() => bindAdmin());
+  return pageHead('cog', 'Admin', 'Lists and settings', '') +
+    '<div class="nx-card"><div class="nx-card-h"><div><h3>Status lists</h3><div class="nx-muted">Each list belongs to one part of Nex, so the same word can mean different things in different places.' + (ME.admin ? '' : ' Only admins can change these.') + '</div></div>' + (ME.admin ? '<button class="nx-btn primary sm" id="adNewStatus">' + ico('plus') + 'Add status</button>' : '') + '</div><div class="nx-toolbar" style="border-top:0"><div class="nx-seg" id="adCtx">' + Object.keys(CTX_NAMES).map(k => '<button data-v="' + k + '" aria-pressed="' + (AD.ctx === k) + '">' + CTX_NAMES[k] + '</button>').join('') + '</div></div><div id="adStatus"></div></div>' +
+    '<div class="nx-two"><div class="nx-card"><div class="nx-card-h"><h3>Qualifications</h3><button class="nx-btn primary sm" id="adNewQual">' + ico('plus') + 'Add</button></div><ul class="nx-list">' + REF.quals.map(q => '<li><span><b>' + esc(q.name) + '</b><small>' + esc(q.code) + (q.default_fee ? ' · usual fee ' + money(q.default_fee) : '') + (q.active ? '' : ' · hidden') + '</small></span><button class="nx-btn sm" data-q="' + q.id + '">Edit</button></li>').join('') + '</ul></div>' +
+    '<div class="nx-card"><div class="nx-card-h"><h3>Agents</h3><button class="nx-btn primary sm" id="adNewAgent">' + ico('plus') + 'Add</button></div>' + (REF.agents.length ? '<ul class="nx-list">' + REF.agents.map(a => '<li><span><b>' + esc(a.name) + '</b><small>' + esc([a.phone, a.email].filter(Boolean).join(' · ') || 'No contact details') + (a.active ? '' : ' · hidden') + '</small></span><button class="nx-btn sm" data-ag="' + a.id + '">Edit</button></li>').join('') + '</ul>' : empty('No agents yet', 'Add the agents students come through.')) + '</div></div>' +
+    '<div class="nx-card"><div class="nx-card-b"><b>Who can open Nex</b><div class="nx-muted">Access is the Nex card on the Nodes page. Admins give it to staff in the Nexus access list (app name: nex).</div></div></div>';
+});
+function bindAdmin() {
+  const showStatus = () => {
+    $$('#adCtx button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === AD.ctx)));
+    const list = REF.status[AD.ctx] || [];
+    $('#adStatus').innerHTML = list.length ? '<div class="nx-tablewrap"><table class="nx-table auto tight"><thead><tr><th>Order</th><th>Status</th><th>What it means</th><th>Closes the item</th><th></th></tr></thead><tbody>' + list.map(o => '<tr><td class="nx-num">' + o.position + '</td><td><b>' + esc(o.label) + '</b>' + (o.active ? '' : ' <span class="nx-tag">Hidden</span>') + '<div class="nx-muted" style="font-size:12px">' + esc(o.key) + '</div></td><td>' + (o.meaning ? esc(o.meaning) : '<span class="nx-muted">Not written yet</span>') + '</td><td>' + (o.is_closed ? 'Yes' : 'No') + '</td><td>' + (ME.admin ? '<button class="nx-btn sm" data-s="' + o.id + '">Edit</button>' : '') + '</td></tr>').join('') + '</tbody></table></div>' : empty('No statuses in this list');
+    $$('[data-s]', $('#adStatus')).forEach(b => b.onclick = () => statusForm(list.find(x => x.id === b.dataset.s)));
+  };
+  $$('#adCtx button').forEach(b => b.onclick = () => { AD.ctx = b.dataset.v; showStatus(); });
+  if ($('#adNewStatus')) $('#adNewStatus').onclick = () => statusForm(null);
+  $('#adNewQual').onclick = () => qualForm(null); $('#adNewAgent').onclick = () => agentForm(null);
+  $$('[data-q]').forEach(b => b.onclick = () => qualForm(REF.quals.find(x => x.id === b.dataset.q)));
+  $$('[data-ag]').forEach(b => b.onclick = () => agentForm(REF.agents.find(x => x.id === b.dataset.ag)));
+  showStatus();
+}
+function statusForm(o) {
+  o = o || {};
+  formModal(o.id ? 'Edit status' : 'Add status to ' + CTX_NAMES[AD.ctx], [{ k: 'label', label: 'Name', value: o.label, required: true }, { k: 'position', label: 'Order', type: 'number', value: o.position != null ? o.position : ((REF.status[AD.ctx] || []).length + 1) },
+    { k: 'meaning', label: 'What it means', type: 'textarea', value: o.meaning, full: true, help: 'Written by the team that uses it.' }, { k: 'is_closed', label: 'This status closes the item', type: 'check', value: o.is_closed }, { k: 'active', label: 'Show in lists', type: 'check', value: o.id ? o.active : true }], async v => {
+    if (o.id) await upd('nex_status_options', 'id=eq.' + o.id, v);
+    else await ins('nex_status_options', Object.assign({ context: AD.ctx, key: v.label.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') }, v), true);
+    toast('Saved'); await loadRef(true); render();
+  });
+}
+function qualForm(q) {
+  q = q || {};
+  formModal(q.id ? 'Edit qualification' : 'Add qualification', [{ k: 'name', label: 'Name', value: q.name, required: true, full: true }, { k: 'code', label: 'Code', value: q.code, required: true, help: 'The national course code, for example CHC33021' }, { k: 'default_fee', label: 'Usual fee ($)', type: 'number', value: q.default_fee, help: 'A hint only. Fees are agreed per student.' }, { k: 'active', label: 'Show in lists', type: 'check', value: q.id ? q.active : true }], async v => {
+    if (q.id) await upd('nex_qualifications', 'id=eq.' + q.id, v); else await ins('nex_qualifications', v, true);
+    toast('Saved'); await loadRef(true); render();
+  });
+}
+function agentForm(a) {
+  a = a || {};
+  formModal(a.id ? 'Edit agent' : 'Add agent', [{ k: 'name', label: 'Name', value: a.name, required: true, full: true }, { k: 'phone', label: 'Phone', type: 'tel', value: a.phone }, { k: 'email', label: 'Email', type: 'email', value: a.email }, { k: 'notes', label: 'Notes', type: 'textarea', value: a.notes, full: true }, { k: 'active', label: 'Show in lists', type: 'check', value: a.id ? a.active : true }], async v => {
+    if (a.id) await upd('nex_agents', 'id=eq.' + a.id, v); else await ins('nex_agents', v, true);
+    toast('Saved'); await loadRef(true); render();
+  });
+}
+
+/* start only after every route is registered */
+if (ss.get('ngate_nex') === '1') boot(); else window.addEventListener('nex-unlocked', boot, { once: true });
+
+</script>
+</body>
+</html>
