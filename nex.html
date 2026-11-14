@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#12201f">
 <meta name="robots" content="noindex,nofollow">
 <meta name="referrer" content="no-referrer">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-27ysZxtg0xWjikciJnl6p9Oun6JvBpqkESCMcIdAldg=' 'sha256-fwQt64KSc1Ny81g7vv4scLwbr6z0NiNU5tGfl5bQY+Q='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data:; connect-src https://jcfgldqrdbfkgbixszds.supabase.co; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-27ysZxtg0xWjikciJnl6p9Oun6JvBpqkESCMcIdAldg=' 'sha256-wJPHmf3aq1Z99EnbRI1M0HOeLt7dvR2/sFMtgqFrl5A='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data:; connect-src https://jcfgldqrdbfkgbixszds.supabase.co; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Nex · Student management</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232fb5ad'/%3E%3Ctext x='16' y='23' text-anchor='middle' font-family='Arial' font-weight='700' font-size='20' fill='%2308201f'%3EN%3C/text%3E%3C/svg%3E">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
@@ -393,7 +393,6 @@ body.nx-busy::before{opacity:1;animation:nxbar 1s linear infinite}
   body.nx-busy::before{animation:none}
 }
 
-/* LearnForge card */
 .nx-empty-s{padding:12px 16px;color:var(--nx-ink-3);font-size:13px;line-height:1.45}
 .nx-empty-s small{font-size:12px}
 
@@ -1050,55 +1049,11 @@ route(/^\/students\/([0-9a-f-]{36})$/, async m => {
     '<div class="nx-colside">' + sideCards(ctx) + '</div></div>';
 });
 
-/* LearnForge: read-only lookup through the learnforge-lookup function (the API key stays on the server). Results are kept in memory only. */
-const LF = {};
-const lfPick = (o, keys) => { for (const k of keys) { if (o && o[k] != null && o[k] !== '') return o[k]; } return ''; };
-function lfPct(v) { const n = Number(v); return isFinite(n) ? Math.max(0, Math.min(100, Math.round(n <= 1 && String(v).indexOf('.') >= 0 ? n * 100 : n))) : null; }
-function lfCard(id) {
-  const st = LF[id];
-  let body;
-  if (!st) body = '<div class="nx-empty-s">Not checked yet. This reads their course progress from LearnForge by email.</div>';
-  else if (st.loading) body = '<div class="nx-empty-s">Checking LearnForge…</div>';
-  else if (st.error) body = '<div class="nx-empty-s">' + esc(st.error) + '</div>';
-  else if (!st.found) body = '<div class="nx-empty-s">' + esc(st.message || 'No LearnForge account uses this email.') + '</div>';
-  else {
-    const p = st.profile || {};
-    const courses = (st.courses || []).map(c => {
-      const nm = lfPick(c, ['name', 'title', 'courseName', 'courseTitle']) || 'Course';
-      const pc = lfPct(lfPick(c, ['progress', 'progressPercent', 'progressPercentage', 'percentComplete', 'completionPercentage', 'completion']));
-      const stt = lfPick(c, ['status', 'state']);
-      const done = lfPick(c, ['completedAt', 'completionDate', 'completedOn']);
-      return '<div><span><b>' + esc(nm) + '</b><small>' + esc([stt, done ? 'Completed ' + fmtDate(done) : ''].filter(Boolean).join(' · ')) + '</small></span><span class="nx-muted">' + (pc == null ? '' : pc + '%') + '</span></div>';
-    }).join('');
-    const quals = (st.qualifications || []).map(q => {
-      const nm = lfPick(q, ['name', 'title', 'qualificationName']) || 'Qualification';
-      const code = lfPick(q, ['code', 'qualificationCode']);
-      const done = lfPick(q, ['completedAt', 'completionDate', 'awardedAt', 'issuedAt', 'completedOn']);
-      return '<div><span><b>' + esc(nm) + '</b><small>' + esc([code, done ? 'Completed ' + fmtDate(done) : ''].filter(Boolean).join(' · ')) + '</small></span></div>';
-    }).join('');
-    const sum = [p.enrollmentCount != null ? p.enrollmentCount + ' enrolled' : '', p.completedCourseCount != null ? p.completedCourseCount + ' completed' : '', p.isActive === false ? 'inactive' : ''].filter(Boolean).join(' · ');
-    body = (sum ? '<div class="nx-empty-s">' + esc(sum) + '</div>' : '') +
-      '<div class="nx-related">' + (courses || '<div><span class="nx-muted">No courses yet</span></div>') + '</div>' +
-      (quals ? '<div class="nx-eyebrow" style="padding:10px 16px 0">Qualifications</div><div class="nx-related">' + quals + '</div>' : '');
-  }
-  const when = st && st.checked_at && !st.loading ? '<div class="nx-empty-s"><small>Checked ' + esc(fmtDT(st.checked_at)) + '</small></div>' : '';
-  return '<div class="nx-card" id="lfCard"><div class="nx-card-h"><h3>LearnForge</h3><button class="nx-btn sm' + (st && st.loading ? ' busy' : '') + '" data-a="lf">' + (st && !st.loading ? 'Refresh' : 'Check') + '</button></div>' + body + when + '</div>';
-}
-async function lfCheck(id, force) {
-  LF[id] = { loading: true }; lfPaint(id);
-  try {
-    const r = await fetch(SB + '/functions/v1/learnforge-lookup', { method: 'POST', headers: { apikey: KEY, Authorization: 'Bearer ' + await bearer(), 'Content-Type': 'application/json' }, body: JSON.stringify({ student_id: id, force: !!force }) });
-    let j = {}; try { j = await r.json(); } catch (e) {}
-    LF[id] = r.ok && j.ok ? j : { error: j.error || ('LearnForge check failed (' + r.status + ')') };
-  } catch (e) { LF[id] = { error: e.message === 'session' ? 'Your session ended. Sign in again.' : 'Could not reach LearnForge. Try again shortly.' }; }
-  lfPaint(id);
-}
-function lfPaint(id) { const el = document.getElementById('lfCard'); if (el) el.outerHTML = lfCard(id); }
 
 function sideCards(c) {
   const bk = c.books.slice().sort((a, b) => String((b.nex_class_sessions || {}).class_date || '').localeCompare(String((a.nex_class_sessions || {}).class_date || '')));
   const open = c.followups.filter(f => !f.done_at);
-  return lfCard(c.s.id) + '<div class="nx-card"><div class="nx-card-h"><h3>First Aid and CPR</h3><button class="nx-btn sm" data-a="bookFA">Book</button></div>' +
+  return '<div class="nx-card"><div class="nx-card-h"><h3>First Aid and CPR</h3><button class="nx-btn sm" data-a="bookFA">Book</button></div>' +
     (bk.length ? '<div class="nx-related">' + bk.slice(0, 4).map(b => { const ss_ = b.nex_class_sessions || {}; return '<div><span><a href="#/firstaid/' + b.session_id + '"><b>' + esc(fmtDate(ss_.class_date)) + '</b></a><small>' + (ss_.kind === 'renewal' ? 'Renewal' : 'Full class') + (b.seat_no ? ' · seat ' + b.seat_no : '') + '</small></span>' + (b.status ? pill('booking', b.status) : '') + '</div>'; }).join('') + '</div>' : empty('No class booked')) + '</div>' +
     '<div class="nx-card"><div class="nx-card-h"><h3>Placement</h3></div>' +
     (c.plcs.length || c.reqs.length ? '<div class="nx-related">' + c.plcs.slice(0, 3).map(p => '<div><span><b>' + esc((p.nex_facilities || {}).name || p.facility_text || 'Placement') + '</b><small>' + (p.start_date ? 'Starts ' + esc(fmtDate(p.start_date)) : 'No start date') + '</small></span>' + pill('placement_stage', p.status) + '</div>').join('') +
@@ -1189,7 +1144,6 @@ async function studentAction(a, ds, c) {
   if (a === 'refund') return refundForm(c.enr.find(e => e.id === ds.id), c.pays);
   if (a === 'addFu') return followupForm({ student: s, enrolments: c.enr });
   if (a === 'doneFu') { await upd('nex_followups', 'id=eq.' + ds.id, { done_at: new Date().toISOString(), done_by: ME.name }); toast('Done'); return render(); }
-  if (a === 'lf') return lfCheck(s.id, !!(LF[s.id] && LF[s.id].found === false));
   if (a === 'bookFA') return go('#/firstaid');
 }
 
