@@ -4186,6 +4186,13 @@ async function loadStaffFromSupabase(){
     };
   }).filter(Boolean);
 
+  // The saved team list can fall behind the real teams (a team created in the directory, e.g. Follow-Up, that
+  // nobody added under Manage Teams). Every team someone is actually in must be pickable, or the Team dropdown
+  // shows the first option for them and a Save would quietly move them. 'Office' is handled separately.
+  built.forEach(function(s){
+    if(s.team && s.team!=='Office' && teams.indexOf(s.team)<0) teams.push(s.team);
+  });
+
   // Keep ids unique/co-herent for any preserved ids that collided with idc.
   const seen={};
   built.forEach(function(s){
@@ -8418,7 +8425,9 @@ function modalSetPassword(){
 
 function populateTeamSelect(selectedTeam){
   const sel=document.getElementById('staffTeam');
-  sel.innerHTML=[...teams].sort().map(t=>`<option value="${t}"${t===selectedTeam?' selected':''}>${t}</option>`).join('');
+  const list=[...teams];
+  if(selectedTeam && list.indexOf(selectedTeam)<0) list.push(selectedTeam);   // never show someone as another team
+  sel.innerHTML=list.sort().map(t=>`<option value="${t}"${t===selectedTeam?' selected':''}>${t}</option>`).join('');
 }
 /**
  * Employment type drives who gets told about an open shift, so it needs a
@@ -11656,7 +11665,7 @@ async function aaSave(){
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────
-const SHIFTOPS_BUILD='2026-11-14-v50-avail-grid-pdf';
+const SHIFTOPS_BUILD='2026-11-14-v51-team-list';
 console.log('%c[ShiftOps build '+SHIFTOPS_BUILD+' loaded]','background:#0071e3;color:#fff;padding:2px 8px;border-radius:4px;font-weight:700;');
 // Start every session in the FULL (admin) view. The team-lead read-only lock is
 // only ever added later, and only once the role is positively confirmed as team
