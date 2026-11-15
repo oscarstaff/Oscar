@@ -4123,7 +4123,14 @@ html .notif-drop .notif-drop-actions{ background:none !important; border:0 !impo
      <div class="nx-sk" data-sk="kind" data-n="n"></div>, filled on load.
      Kinds: list (avatar + 2 lines), cards, table, lines, inline. -->
 <style>
-#clockBtn.cc-syncing{opacity:.55;cursor:progress;}
+/* Clock button is locked until the clock status has been confirmed with the server (nexus-clock.js _ccBusy).
+   cc-loading = first load: grey, spinner, clearly not a button yet. cc-syncing = later re-check: taps are blocked at once,
+   and it only dims if the check takes longer than a quarter of a second, so returning to Home does not flicker. */
+:root #clockCard #clockBtn.cc-syncing{pointer-events:none;cursor:progress;opacity:.5 !important;transition:opacity .15s ease .25s;}
+:root #clockCard #clockBtn.cc-loading{opacity:1 !important;transition:none;color:var(--ui-ink-3,var(--m-ink-3,#64748b)) !important;background:color-mix(in srgb,currentColor 14%,transparent) !important;box-shadow:none !important;filter:none !important;animation:none !important;transform:none !important;}
+:root #clockCard #clockBtn.cc-loading::before{content:"";display:inline-block;width:14px;height:14px;margin-right:9px;vertical-align:-2px;border-radius:50%;border:2px solid currentColor;border-top-color:transparent;animation:ccBtnSpin .8s linear infinite;}
+@keyframes ccBtnSpin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){:root #clockCard #clockBtn.cc-loading::before{animation-duration:2.4s;}}
 .nx-sk-wrap{display:flex;flex-direction:column;gap:10px;width:100%;text-align:left;}
 .nx-sk-wrap .skel{display:block;}
 .nx-sk-row{display:flex;align-items:center;gap:11px;padding:6px 2px;}
@@ -4725,7 +4732,7 @@ html .notif-drop .notif-drop-actions{ background:none !important; border:0 !impo
           <div class="cc-head-right">
             <div id="clockNow" class="cc-now"></div>
             <div class="cc-actions">
-              <button id="clockBtn" onclick="toggleClock()" class="cc-btn">Clock In</button>
+              <button id="clockBtn" onclick="toggleClock()" class="cc-btn cc-syncing cc-loading" aria-busy="true">Checking…</button>
               <button id="pwaInstallBtn" onclick="triggerPwaInstall()" class="cc-btn2" style="display:none;"> Install</button>
               <button onclick="openExtraBreakRequest()" class="cc-btn3" aria-label="Request an extra break" title="Request an extra break">+ Extra break</button>
             </div>
@@ -6408,7 +6415,7 @@ function hideNexusBoot(){
 <script src="nexus-core.js?v=14"></script>
 <script src="nexus-ui.js?v=5"></script>
 <script src="nexus-profile.js?v=2"></script>
-<script src="nexus-clock.js?v=5"></script>
+<script src="nexus-clock.js?v=6"></script>
 <script src="nexus-live.js?v=1"></script>
 <script src="nexus-agent.js?v=10"></script>
 <script src="nexus-reports.js?v=4"></script>

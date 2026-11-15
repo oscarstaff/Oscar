@@ -23,7 +23,8 @@ async function retryGpsCheck(){
   if(msg) msg.textContent = 'Checking your location…';
   navigator.geolocation.getCurrentPosition(
     function(){
-      if(typeof showToast==='function') showToast('Location is on ✓','success');
+      /* dark info toast, and it says what is still to do: the green tick toast is reserved for an actual clock-in or clock-out */
+      if(typeof showToast==='function') showToast('Location is on. You are not clocked in yet, tap Clock In.','info');
       applyGpsLock();
     },
     function(err){
@@ -77,15 +78,47 @@ async function applyGpsLock(){
 }
 
 
+/* A punch that could not be sent waits on the phone and is retried. The server only accepts a punch time
+   within about 15 minutes of now and re-stamps anything older to the moment it arrives, so a punch that
+   has waited for hours would be saved at the wrong time (16 Nov 2026: a Thursday 5:54pm clock-out landed
+   as a Sunday 9:43am clock-out). Anything older than this is dropped and the person is told. */
+var CLOCK_QUEUE_MAX_AGE_MS = 3*3600*1000;
+function _ccQueueAge(item){
+  var now = Date.now(), q = Number(item && item.queuedAt) || 0, t = 0;
+  try{ t = new Date(item && item.payload && item.payload.ts).getTime() || 0; }catch(_){}
+  var from = Math.min(q || t || 0, t || q || 0);
+  return from ? now - from : Infinity;
+}
+function _ccTellDropped(rows){
+  try{
+    var mine = (rows||[]).filter(function(r){ return r && (typeof me==='undefined' || !me || r.staff_name === me); });
+    if(!mine.length) return;
+    var lines = mine.map(function(r){
+      var when = '';
+      try{ when = new Date(r.ts).toLocaleString('en-AU',{weekday:'short',day:'numeric',month:'short',hour:'numeric',minute:'2-digit',timeZone:'Australia/Sydney'}); }catch(_){}
+      return (r.action === 'out' ? 'Clock-out' : 'Clock-in') + (when ? ' from ' + when : '');
+    });
+    var msg = (mine.length === 1 ? lines[0] + ' never reached the server, so it was not recorded.' : 'These never reached the server, so they were not recorded: ' + lines.join('; ') + '.') +
+      ' Please ask your team lead or an admin to add ' + (mine.length === 1 ? 'it' : 'them') + '.';
+    if(typeof nxAlert === 'function') nxAlert(msg, {title:'A punch was not recorded', okText:'OK'});
+    else if(typeof showToast === 'function') showToast(msg, 'warning');
+  }catch(e){ console.warn('[clock] tell dropped:', e); }
+}
+
 async function flushClockSyncQueue(){
   try{
     const sbQ = JSON.parse(localStorage.getItem('clock_supabase_queue') || '[]');
     if(sbQ.length){
       console.log('[clock] retrying '+sbQ.length+' queued supabase writes');
       const remSb = [];
+      const _dropped = [];
       let _anyFlushed = false;
       for(const item of sbQ){
-        if(Date.now() - item.queuedAt > 3*24*3600*1000) continue;
+        if(_ccQueueAge(item) > CLOCK_QUEUE_MAX_AGE_MS){
+          console.warn('[clock] dropped a queued punch that waited too long', item && item.payload);
+          if(item && item.payload) _dropped.push(item.payload);
+          continue;
+        }
         try{
           let _dupe=false;
           try{ const ex=await sbGet('clock_log','?staff_name=eq.'+encodeURIComponent(item.payload.staff_name)+'&action=eq.'+item.payload.action+'&ts=eq.'+encodeURIComponent(item.payload.ts)+'&limit=1'); _dupe=!!(ex&&ex.length); }catch(_){}
@@ -99,6 +132,7 @@ async function flushClockSyncQueue(){
         }
       }
       localStorage.setItem('clock_supabase_queue', JSON.stringify(remSb));
+      if(_dropped.length){ _anyFlushed = true; _ccTellDropped(_dropped); }
       if(_anyFlushed){
         if(remSb.length === 0) _clockPending = null;
         if(typeof loadClockState === 'function'){ try{ loadClockState(); }catch(_){} }
@@ -115,7 +149,7 @@ async function flushClockSyncQueue(){
     const sheetUrl = localStorage.getItem('oscars_sheet_url') || DEFAULT_SHEET_URL;
     const remaining = [];
     for(const item of queue){
-      if(Date.now() - item.queuedAt > 3*24*3600*1000) continue;
+      if(Date.now() - (Number(item.queuedAt)||0) > CLOCK_QUEUE_MAX_AGE_MS) continue;   /* same limit as the punch itself, so the sheet never gets a punch the database refused */
       try{
         const r = await fetch(sheetUrl, {
           method:'POST',
@@ -154,11 +188,30 @@ document.addEventListener('visibilitychange', function(){
 });
 setInterval(function(){ retryClockQueueSafely('interval'); }, 60000);
 
+/* The Clock In / Clock Out button is locked while the clock status is being fetched: greyed, a spinner, and taps do nothing.
+   cc-loading is the first load of a session (nothing confirmed yet); cc-syncing is a later re-check.
+   A watchdog releases it after 12 seconds so a hung request can never leave someone unable to clock in. */
+var _ccBusyTok = 0, _ccBusyT = 0;
+function _ccBusy(on){
+  window._clockSyncing = !!on;
+  clearTimeout(_ccBusyT);
+  if(on) _ccBusyT = setTimeout(function(){ _ccBusy(false); }, 12000);
+  var b = document.getElementById('clockBtn'); if(!b) return;
+  if(on){
+    b.classList.add('cc-syncing');
+    if(!window._clockReady) b.classList.add('cc-loading');
+    b.setAttribute('aria-busy','true');
+  } else {
+    b.classList.remove('cc-syncing'); b.classList.remove('cc-loading');
+    b.removeAttribute('aria-busy');
+  }
+}
+
 async function loadClockState(){
   if(!me) return;
-  window._clockSyncing = true;
-  try{ const _cb=document.getElementById('clockBtn'); if(_cb) _cb.classList.add('cc-syncing'); }catch(e){}
-  applyGpsLock();
+  const _busyTok = ++_ccBusyTok;
+  _ccBusy(true);
+  const _gpsP = Promise.resolve().then(applyGpsLock).catch(function(){});
   try{
     const cached = localStorage.getItem('clock_state_'+me);
     if(cached){
@@ -212,13 +265,14 @@ async function loadClockState(){
     await maybeAutoClockOut8pm();
     try{ checkAutoClockoutNotice(); }catch(e){}
     try{ setTimeout(function(){ checkForgetfulPopup(); }, 2500); }catch(e){}
-    window._clockSyncing = false;
-    try{ const _cb=document.getElementById('clockBtn'); if(_cb) _cb.classList.remove('cc-syncing'); }catch(e){}
+    await _gpsP;                      /* location permission decided as well, before the button unlocks */
+    window._clockReady = true;
+    if(_busyTok === _ccBusyTok) _ccBusy(false);
   }catch(e){
     console.warn('loadClock:',e);
     if(_clockState === null){ _clockState='out'; renderClockCard(); }
-    window._clockSyncing = false;
-    try{ const _cb=document.getElementById('clockBtn'); if(_cb) _cb.classList.remove('cc-syncing'); }catch(e){}
+    try{ await _gpsP; }catch(_){}
+    if(_busyTok === _ccBusyTok) _ccBusy(false);
   }
 }
 
