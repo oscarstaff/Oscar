@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#12201f">
 <meta name="robots" content="noindex,nofollow">
 <meta name="referrer" content="no-referrer">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-27ysZxtg0xWjikciJnl6p9Oun6JvBpqkESCMcIdAldg=' 'sha256-Np1DGILvgIb6BnU18dfShS4FN0uOKr0ICObLYHGV1iQ='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data: https://jcfgldqrdbfkgbixszds.supabase.co; connect-src https://jcfgldqrdbfkgbixszds.supabase.co; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-27ysZxtg0xWjikciJnl6p9Oun6JvBpqkESCMcIdAldg=' 'sha256-6FLYyy2IUpqhIsGxgVWJETGz/A56gcNxvXHEEpP/ato='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data: https://jcfgldqrdbfkgbixszds.supabase.co; connect-src https://jcfgldqrdbfkgbixszds.supabase.co; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Nex · Student management</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232fb5ad'/%3E%3Cpath d='M9.5 9.5 16 16l-6.5 6.5M17 9.5l6.5 6.5-6.5 6.5' fill='none' stroke='%2308201f' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -759,6 +759,14 @@ body.nx-busy::before{opacity:1;animation:nxbar 1s linear infinite}
 .nx-idpick .nx-pick{padding:6px 10px}
 .nx-idnew{color:var(--nx-ink-3);font-size:12px}
 
+/* ===== Document checklist ===== */
+.nx-doclist li{padding:6px 12px;gap:16px}
+.nx-doclist .nx-check{display:flex;align-items:flex-start;gap:10px;flex:1;min-width:0;cursor:pointer}
+.nx-doclist .nx-check input{margin-top:3px;flex:none}
+.nx-doclist .nx-check span{display:flex;flex-direction:column}
+.nx-doclist .nx-check small{display:block;color:var(--nx-ink-3);font-size:12px}
+.nx-doclist li>.nx-muted{white-space:nowrap;font-size:12px}
+
 </style>
 </head>
 <body class="nx">
@@ -1032,14 +1040,15 @@ function safeQ(q) { return String(q || '').replace(/[,()*%\\:"]/g, ' ').trim(); 
 const REF = { status: {}, quals: [], agents: [], staff: [], loaded: false };
 async function loadRef(force) {
   if (REF.loaded && !force) return;
-  const [st, q, a, s] = await Promise.all([
+  const [st, q, a, s, dt] = await Promise.all([
     sel('nex_status_options', 'select=*&order=context,position'),
     sel('nex_qualifications', 'select=*&order=position,name'),
     sel('nex_agents', 'select=*&order=name'),
-    sel('staff_names', 'select=name&order=name').catch(() => [])
+    sel('staff_names', 'select=name&order=name').catch(() => []),
+    sel('nex_doc_types', 'select=*&active=eq.true&order=group_key,position').catch(() => [])
   ]);
   REF.status = {}; st.forEach(o => { (REF.status[o.context] = REF.status[o.context] || []).push(o); });
-  REF.quals = q; REF.agents = a; REF.staff = s.map(x => x.name); REF.loaded = true;
+  REF.quals = q; REF.agents = a; REF.staff = s.map(x => x.name); REF.docTypes = dt; REF.loaded = true;
 }
 function opts(ctx, activeOnly) { return (REF.status[ctx] || []).filter(o => !activeOnly || o.active); }
 function statusLabel(ctx, key) { const o = (REF.status[ctx] || []).find(x => x.key === key); return o ? o.label : (key || ''); }
@@ -1473,6 +1482,14 @@ function feedItem(a) {
 
 /* ---------- Leads, Students and Search (one list, three pages) ----------
    Leads: paid under $200 in total. Students: paid $200 or more. Search: everyone, labelled. */
+/* when the next follow-up is due: today in bold, overdue in red */
+function nextFuHtml(f) {
+  if (!f || !f.due_at) return '<span class="nx-muted">–</span>';
+  const today = sydToday(), day = new Date(f.due_at).toLocaleDateString('en-CA', { timeZone: TZ });
+  const cls = day < today ? 'nx-neg' : day === today ? 'nx-money' : '';
+  const nth = f.kind === 'lead_cycle' && f.step ? ['', '1st', '2nd', '3rd'][f.step] + ' · ' : '';
+  return '<span class="' + cls + '">' + nth + esc(fmtDate(f.due_at)) + (day < today ? ' (overdue)' : day === today ? ' (today)' : '') + '</span>';
+}
 const SL = { q: '', stage: '', qual: '', kind: 'student', page: 0, size: 50 };
 route(/^\/(students|leads|search)(?:\?(.*))?$/, async m => {
   const mode = m[1], qs = new URLSearchParams(m[2] || '');
@@ -1487,7 +1504,7 @@ route(/^\/(students|leads|search)(?:\?(.*))?$/, async m => {
       holdBody(body);
       try {
         const q = safeQ(SL.q); const digits = cleanPhone(q);
-        let query = 'select=id,student_no,first_name,last_name,email,phone,agent_id,created_at,nex_student_paid!inner(paid_total),nex_enrolments' + (SL.stage || SL.qual ? '!inner' : '') + '(id,stage,qualification_id,fee,year,enrolled_on)&deleted_at=is.null&order=created_at.desc';
+        let query = 'select=id,student_no,first_name,last_name,email,phone,agent_id,created_at,nex_student_paid!inner(paid_total),nex_enrolments' + (SL.stage || SL.qual ? '!inner' : '') + '(id,stage,qualification_id,fee,year,enrolled_on)' + (kind === 'lead' ? ',nex_followups(due_at,step,kind)' : '') + '&deleted_at=is.null&order=created_at.desc' + (kind === 'lead' ? '&nex_followups.done_at=is.null&nex_followups.order=due_at.asc&nex_followups.limit=1' : '');
         if (kind !== 'all') query += '&nex_student_paid.paid_total=' + (kind === 'lead' ? 'lt.' : 'gte.') + STUDENT_MIN;
         if (SL.stage) query += '&nex_enrolments.stage=eq.' + encodeURIComponent(SL.stage);
         if (SL.qual) query += '&nex_enrolments.qualification_id=eq.' + SL.qual;
@@ -1497,7 +1514,7 @@ route(/^\/(students|leads|search)(?:\?(.*))?$/, async m => {
         if (rows.length) pays = await sel('nex_payments', 'select=student_id,amount&student_id=in.' + inList(rows.map(r => r.id)));
         const paid = {}; pays.forEach(p => paid[p.student_id] = (paid[p.student_id] || 0) + Number(p.amount));
         const filtered = SL.q || SL.stage || SL.qual;
-        body.innerHTML = rows.length ? '<div class="nx-tablewrap"><table class="nx-table"><thead><tr><th>' + (kind === 'lead' ? 'Lead' : kind === 'student' ? 'Student' : 'Name') + '</th><th>Phone</th><th>Qualification</th><th>Stage</th><th>Fee and paid</th><th>Enrolled</th><th>Agent</th></tr></thead><tbody>' +
+        body.innerHTML = rows.length ? '<div class="nx-tablewrap"><table class="nx-table"><thead><tr><th>' + (kind === 'lead' ? 'Lead' : kind === 'student' ? 'Student' : 'Name') + '</th><th>Phone</th><th>Qualification</th><th>Stage</th><th>Fee and paid</th>' + (kind === 'lead' ? '<th>Next follow-up</th>' : '') + '<th>Enrolled</th><th>Agent</th></tr></thead><tbody>' +
           rows.map(s => {
             const en = (s.nex_enrolments || []).slice().sort((a, b) => String(b.enrolled_on || '').localeCompare(String(a.enrolled_on || '')))[0] || {};
             const fee = (s.nex_enrolments || []).reduce((t, e) => t + Number(e.fee || 0), 0), pd = paid[s.id] || 0;
@@ -1507,6 +1524,7 @@ route(/^\/(students|leads|search)(?:\?(.*))?$/, async m => {
               '<td class="nx-num">' + esc(fmtPhone(s.phone)) + '</td><td>' + esc(qualShort(en.qualification_id) || '–') + '</td>' +
               '<td>' + (en.stage ? '<div class="nx-stagecell">' + pill('enrolment', en.stage) + '<div class="nx-mini">' + PATH.map((p, i) => '<i class="' + (idx >= 0 && i <= idx ? 'on' : '') + '"></i>').join('') + '</div></div>' : '<span class="nx-muted">–</span>') + '</td>' +
               '<td>' + (fee || pd ? '<div class="nx-meter"><div class="nx-meter-bar"><i class="' + (pd < fee ? 'warn' : '') + '" style="width:' + pct + '%"></i></div><small>' + money(pd) + ' of ' + money(fee) + '</small></div>' : '<span class="nx-muted">–</span>') + '</td>' +
+              (kind === 'lead' ? '<td>' + nextFuHtml((s.nex_followups || [])[0]) + '</td>' : '') +
               '<td>' + esc(fmtDate(en.enrolled_on) || '–') + '</td><td>' + esc(agentName(s.agent_id) || '–') + '</td></tr>';
           }).join('') + '</tbody></table></div>' :
           empty('No ' + noun + ' found', filtered ? 'Try a different search or clear the filters.' : kind === 'lead' ? 'Everyone in Nex has paid $200 or more.' : kind === 'student' ? 'Nobody has paid $200 yet. New people start as leads.' : 'Nobody is in Nex yet.', kind === 'lead' && !filtered ? '<a class="nx-btn primary" href="#/leads?new=1">' + ico('plus') + 'New lead</a>' : '');
@@ -1562,7 +1580,8 @@ function newStudent() {
     { k: 'qualification_id', label: 'Qualification', type: 'select', options: REF.quals.filter(q => q.active), blank: 'Add later' },
     { k: 'fee', label: 'Agreed fee ($)', type: 'number' },
     { k: 'stage', label: 'Stage', type: 'select', options: opts('enrolment', true), value: 'checklist_sent', blank: 'Not set' },
-    { k: 'enrolled_on', label: 'Enrolled on', type: 'date', value: sydToday() }
+    { k: 'enrolled_on', label: 'Enrolled on', type: 'date', value: sydToday() },
+    { k: 'first_contact_on', label: 'First contact', type: 'date', value: sydToday(), help: 'Follow-ups are set for 2, 4 and 6 days after this date.' }
   ]);
   let warned = false, existing = null, lk = null;
   const save = async (v, m) => {
@@ -1586,7 +1605,9 @@ function newStudent() {
     }
     const s = await ins('nex_students', Object.assign(stu, { created_by: ME.name }));
     if (qualification_id || fee != null || stage) await ins('nex_enrolments', { student_id: s.id, qualification_id, fee, stage, enrolled_on, year: new Date().getFullYear(), created_by: ME.name }, true);
-    toast('Lead added'); go('#/students/' + s.id);
+    let cycleErr = false;
+    try { await api('rpc/nex_start_lead_cycle', { method: 'POST', body: { p_student: s.id, p_first: stu.first_contact_on || null } }); } catch (e) { cycleErr = true; }
+    toast(cycleErr ? 'Lead added, but the follow-ups could not be set. Open the lead and press Start follow-ups.' : 'Lead added with 3 follow-ups', cycleErr); go('#/students/' + s.id);
   };
   /* first name is checked in save() so that picking an existing person does not need it */
   f.find(x => x.k === 'first_name').required = false; f.find(x => x.k === 'first_name').label = 'First name *';
@@ -1611,13 +1632,14 @@ route(/^\/students\/([0-9a-f-]{36})$/, async m => {
   /* the sensitive details come through a function that logs who looked (admins see this) and stops bulk opening */
   const limited = !!(det && det.limited), d = (det && det.details) || {};
   const eids = enr.map(e => e.id);
-  const [queue, refunds, reqs, plcs, hist, aud] = await Promise.all([
+  const [queue, refunds, reqs, plcs, hist, aud, docs] = await Promise.all([
     eids.length ? sel('nex_payment_queue', 'select=*&enrolment_id=in.' + inList(eids)) : [],
     eids.length ? sel('nex_refunds', 'select=*&enrolment_id=in.' + inList(eids) + '&order=refunded_on.desc') : [],
     eids.length ? sel('nex_placement_requests', 'select=*,nex_facilities(name)&enrolment_id=in.' + inList(eids) + '&order=created_at.desc') : [],
     eids.length ? sel('nex_placements', 'select=*,nex_facilities(name)&enrolment_id=in.' + inList(eids) + '&order=created_at.desc') : [],
     eids.length ? sel('nex_status_history', 'select=*&entity_id=in.' + inList(eids) + '&order=changed_at.desc&limit=40') : [],
-    sel('nex_audit', 'select=*&row_id=in.' + inList([id].concat(eids, pays.map(p => p.id))) + '&order=changed_at.desc&limit=40')
+    sel('nex_audit', 'select=*&row_id=in.' + inList([id].concat(eids, pays.map(p => p.id))) + '&order=changed_at.desc&limit=40'),
+    eids.length ? sel('nex_enrolment_docs', 'select=*&enrolment_id=in.' + inList(eids)).catch(() => []) : []
   ]);
   const main = enr[0] || {};
   const idx = PATH.indexOf(main.stage);
@@ -1625,7 +1647,7 @@ route(/^\/students\/([0-9a-f-]{36})$/, async m => {
   const grossPaid = pays.reduce((t, p) => t + Number(p.amount), 0);
   const isStudent = grossPaid >= STUDENT_MIN;
   const totalPaid = grossPaid - refunds.reduce((t, r) => t + Number(r.amount), 0);
-  const ctx = { s, d, limited, enr, pays, books, followups, queue, refunds, reqs, plcs, hist, aud, isStudent };
+  const ctx = { s, d, limited, enr, pays, books, followups, queue, refunds, reqs, plcs, hist, aud, docs, isStudent };
 
   afterRender(() => { bindStudent(ctx); setNav(isStudent ? '!/students' : '!/leads'); });
   const fact = (k, v) => '<div><dt>' + k + '</dt><dd>' + (v || '<span class="nx-muted">–</span>') + '</dd></div>';
@@ -1635,7 +1657,7 @@ route(/^\/students\/([0-9a-f-]{36})$/, async m => {
     '<div class="nx-btnrow"><button class="nx-btn" data-a="editStu">' + ico('edit') + 'Edit</button><button class="nx-btn" data-a="addEnr">' + ico('plus') + 'Enrolment</button><button class="nx-btn quiet" data-a="archive">Archive</button></div></div>' +
     (main.id ? '<div style="padding:0 16px 16px"><ol class="nx-path">' + PATH.map((p, i) => '<li class="' + (i < idx ? 'done' : i === idx ? 'now' : '') + '">' + (i < idx ? ico('check') : '') + esc(statusLabel('enrolment', p)) + '</li>').join('') + '</ol>' + (idx < 0 && main.stage ? '<div style="margin-top:8px">Current stage: ' + pill('enrolment', main.stage) + '</div>' : '') + '</div>' : '') + '</div>' +
     '<div class="nx-cols"><div class="nx-colmain"><div class="nx-card"><div class="nx-tabs" role="tablist">' +
-    [['details', 'Details'], ['money', 'Enrolments and payments'], ['activity', 'Activity']].map(([k, l]) => '<button class="nx-tab" role="tab" data-tab="' + k + '" aria-selected="' + (SR.tab === k) + '">' + l + '</button>').join('') + '</div><div id="srTab"></div></div></div>' +
+    [['details', 'Details'], ['money', 'Enrolments and payments'], ['docs', 'Documents' + docsBadge(ctx)], ['activity', 'Activity']].map(([k, l]) => '<button class="nx-tab" role="tab" data-tab="' + k + '" aria-selected="' + (SR.tab === k) + '">' + l + '</button>').join('') + '</div><div id="srTab"></div></div></div>' +
     '<div class="nx-colside">' + sideCards(ctx) + '</div></div>';
 });
 
@@ -1648,16 +1670,16 @@ function sideCards(c) {
     '<div class="nx-card"><div class="nx-card-h"><h3>Placement</h3></div>' +
     (c.plcs.length || c.reqs.length ? '<div class="nx-related">' + c.plcs.slice(0, 3).map(p => '<div><span><b>' + esc((p.nex_facilities || {}).name || p.facility_text || 'Placement') + '</b><small>' + (p.start_date ? 'Starts ' + esc(fmtDate(p.start_date)) : 'No start date') + '</small></span>' + pill('placement_stage', p.status) + '</div>').join('') +
       c.reqs.slice(0, 3).map(r => '<div><span><b>' + esc((r.nex_facilities || {}).name || r.facility_text || 'Request') + '</b><small>' + (r.self_placement ? 'Self placement' : 'Request') + (r.emailed_on ? ' · emailed ' + esc(fmtDate(r.emailed_on)) : '') + '</small></span>' + pill('placement', r.status) + '</div>').join('') + '</div>' : empty('No placement yet')) + '</div>' +
-    '<div class="nx-card"><div class="nx-card-h"><h3>Follow-ups</h3><button class="nx-btn sm" data-a="addFu">Add</button></div>' +
-    (open.length ? '<div class="nx-related">' + open.map(f => '<div><span><b>' + esc(f.note) + '</b><small>' + (f.due_at ? 'Due ' + esc(fmtDate(f.due_at)) : 'No date') + (f.assigned_to ? ' · ' + esc(f.assigned_to) : '') + '</small></span><button class="nx-btn sm" data-a="doneFu" data-id="' + f.id + '">Done</button></div>').join('') + '</div>' : empty('Nothing to follow up')) + '</div>';
+    '<div class="nx-card"><div class="nx-card-h"><h3>Follow-ups</h3><span class="nx-btnrow">' + (!c.isStudent && !c.followups.some(f => f.kind === 'lead_cycle') ? '<button class="nx-btn sm" data-a="startCycle">Start follow-ups</button>' : '') + '<button class="nx-btn sm" data-a="addFu">Add</button></span></div>' +
+    (open.length ? '<div class="nx-related">' + open.slice().sort((a, b) => String(a.due_at || '9').localeCompare(String(b.due_at || '9'))).map(f => { const late = f.due_at && new Date(f.due_at).toLocaleDateString('en-CA', { timeZone: TZ }) < sydToday(); return '<div><span><b>' + esc(f.note) + '</b><small' + (late ? ' class="nx-neg"' : '') + '>' + (f.due_at ? 'Due ' + esc(fmtDate(f.due_at)) + (late ? ' (overdue)' : '') : 'No date') + (f.assigned_to ? ' · ' + esc(f.assigned_to) : '') + '</small></span><button class="nx-btn sm" data-a="doneFu" data-id="' + f.id + '">Done</button></div>'; }).join('') + '</div>' : empty('Nothing to follow up')) + '</div>';
 }
 
 function bindStudent(c) {
   const view = $('#view');
   const tabBody = $('#srTab');
   const showTab = () => {
-    $$('.nx-tab', view).forEach(t => t.setAttribute('aria-selected', String(t.dataset.tab === SR.tab)));
-    tabBody.innerHTML = SR.tab === 'details' ? tabDetails(c) : SR.tab === 'money' ? tabMoney(c) : tabActivity(c);
+    $$('.nx-tab', view).forEach(t => { t.setAttribute('aria-selected', String(t.dataset.tab === SR.tab)); if (t.dataset.tab === 'docs') t.textContent = 'Documents' + docsBadge(c); });
+    tabBody.innerHTML = SR.tab === 'details' ? tabDetails(c) : SR.tab === 'money' ? tabMoney(c) : SR.tab === 'docs' ? tabDocs(c) : tabActivity(c);
   };
   showTab();
   view.onclick = async e => {
@@ -1667,6 +1689,15 @@ function bindStudent(c) {
     try { await studentAction(b.dataset.a, b.dataset, c); } catch (err) { toast(err.message, true); }
   };
   view.onchange = async e => {
+    const dc = e.target.closest('[data-doc]');
+    if (dc) {
+      dc.disabled = true;
+      try {
+        if (dc.checked) c.docs.push(await ins('nex_enrolment_docs', { enrolment_id: dc.dataset.enr, doc_type_id: dc.dataset.doc, created_by: ME.name }));
+        else { await del('nex_enrolment_docs', 'enrolment_id=eq.' + dc.dataset.enr + '&doc_type_id=eq.' + dc.dataset.doc); c.docs = c.docs.filter(x => !(x.enrolment_id === dc.dataset.enr && x.doc_type_id === dc.dataset.doc)); }
+      } catch (err) { toast(err.message, true); }
+      showTab(); return;
+    }
     const sel_ = e.target.closest('[data-stage]'); if (!sel_) return;
     try { await upd('nex_enrolments', 'id=eq.' + sel_.dataset.stage, { stage: sel_.value || null }); toast('Stage updated'); render(); } catch (err) { toast(err.message, true); }
   };
@@ -1683,6 +1714,29 @@ function tabDetails(c) {
   return section('Contact', '<dl class="nx-fields">' + field('First name', esc(s.first_name)) + field('Last name', esc(s.last_name)) + field('Email', esc(s.email)) + field('Phone', esc(fmtPhone(s.phone))) + field('Second phone', esc(fmtPhone(s.phone2))) + field('Agent', esc(agentName(s.agent_id))) + '</dl><div style="padding:0 16px 16px"><button class="nx-btn sm" data-a="editStu">' + ico('edit') + 'Edit contact</button></div>') +
     sens +
     (c.s.source_note ? section('Import notes', '<div style="padding:16px">' + esc(c.s.source_note) + '</div>') : '');
+}
+/* the document list for an enrolment comes from its course (nex_qualifications.doc_group) */
+function docTypesFor(e) {
+  const q = REF.quals.find(x => x.id === e.qualification_id);
+  return q && q.doc_group ? (REF.docTypes || []).filter(t => t.group_key === q.doc_group) : [];
+}
+function docsBadge(c) {
+  let miss = 0, any = false;
+  c.enr.forEach(e => { const ts = docTypesFor(e); if (!ts.length) return; any = true; const got = new Set(c.docs.filter(d => d.enrolment_id === e.id).map(d => d.doc_type_id)); miss += ts.filter(t => !got.has(t.id)).length; });
+  return any ? (miss ? ' · ' + miss + ' missing' : ' · complete') : '';
+}
+function tabDocs(c) {
+  if (!c.enr.length) return empty('No enrolments', 'Add an enrolment to track the documents it needs.');
+  return c.enr.map(e => {
+    const types = docTypesFor(e), title = (qualName(e.qualification_id) || 'Enrolment') + (e.year ? ' · ' + e.year : '');
+    if (!types.length) return section(title, '<div style="padding:16px" class="nx-muted">' + (e.qualification_id ? 'There is no document list for this course yet.' : 'Choose a qualification on this enrolment to see its document list.') + '</div>');
+    const got = {}; c.docs.filter(d => d.enrolment_id === e.id).forEach(d => { got[d.doc_type_id] = d; });
+    const n = types.filter(t => got[t.id]).length;
+    return section(title + ' · ' + n + ' of ' + types.length + ' received',
+      '<ul class="nx-list nx-doclist">' + types.map(t => { const g = got[t.id];
+        return '<li><label class="nx-check"><input type="checkbox" data-doc="' + t.id + '" data-enr="' + e.id + '"' + (g ? ' checked' : '') + '> <span><b>' + esc(t.name) + '</b>' + (t.note ? '<small>' + esc(t.note) + '</small>' : '') + '</span></label>' +
+          (g ? '<span class="nx-muted">' + esc(fmtDate(g.received_on)) + (g.created_by ? ' · ' + esc(g.created_by) : '') + '</span>' : '<span class="nx-pill warn">Missing</span>') + '</li>'; }).join('') + '</ul>');
+  }).join('');
 }
 function tabMoney(c) {
   if (!c.enr.length) return empty('No enrolments', 'Add an enrolment to track the fee, stage and payments.') + '<div style="padding:0 16px 16px;text-align:center"><button class="nx-btn primary" data-a="addEnr">' + ico('plus') + 'Add enrolment</button></div>';
@@ -1733,6 +1787,7 @@ async function studentAction(a, ds, c) {
   if (a === 'addPay') return paymentForm({ student: s, enrolment: c.enr.find(e => e.id === ds.id) });
   if (a === 'refund') return refundForm(c.enr.find(e => e.id === ds.id), c.pays);
   if (a === 'addFu') return followupForm({ student: s, enrolments: c.enr });
+  if (a === 'startCycle') return formModal('Start follow-ups', [{ k: 'first', label: 'First contact', type: 'date', value: s.first_contact_on || new Date(s.created_at).toLocaleDateString('en-CA', { timeZone: TZ }), required: true, full: true, help: 'The 1st follow-up is 2 days after this date, the 2nd 4 days after, the 3rd 6 days after.' }], async v => { await api('rpc/nex_start_lead_cycle', { method: 'POST', body: { p_student: s.id, p_first: v.first } }); toast('3 follow-ups set'); render(); }, 'Start');
   if (a === 'doneFu') { await upd('nex_followups', 'id=eq.' + ds.id, { done_at: new Date().toISOString(), done_by: ME.name }); toast('Done'); return render(); }
   if (a === 'bookFA') return go('#/firstaid');
 }
@@ -2914,6 +2969,7 @@ const NEXI_FAQ = [
     ['How do I remove someone?', 'Open the person and press Archive. They disappear from the lists but their records are kept. Only hub admins can delete records for good.', null]
   ]],
   ['Payments', [
+    ['How do I tick off documents someone has sent?', 'Open the person and go to the Documents tab. Each enrolment shows the documents its course needs. Tick a document when you have received it. The tab title shows how many are still missing.', ['#/students', 'Open Students']],
     ['How do I record a payment?', 'Open Payments and press Record payment. Type the phone or email of the student and their details and enrolment fill in. Or open the person, go to Enrolments and payments, and press Payment on the right enrolment.', ['#/payments', 'Open Payments']],
     ['What is an unmatched payment?', 'A payment that is not linked to a person yet. It does not count towards anyone\'s $200 until you match it. The Unmatched view in Payments lists them.', ['#/payments?view=unmatched', 'Show unmatched']],
     ['How do refunds work?', 'Open the person, go to Enrolments and payments, and press Refund on the enrolment. The refund is recorded against that enrolment and shows in their history.', null],
