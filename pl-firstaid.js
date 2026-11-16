@@ -1,0 +1,121 @@
+'use strict';
+/* pl-firstaid.js · Pipe-Line · First Aid and CPR class days and the seat map.
+   One of the Pipe-Line files loaded by nex.html (list and order: PL_FILES in the loader). All of them share one global scope. */
+/* =========================================================
+   First Aid and CPR
+   ========================================================= */
+route(/^\/firstaid(?:\/([0-9a-f-]{36}))?$/, async m => {
+  const today = sydToday();
+  const back = new Date(Date.now() - 21 * 864e5).toLocaleDateString('en-CA', { timeZone: TZ });
+  let sessions = await sel('nex_class_sessions', 'select=*&class_date=gte.' + back + '&order=class_date.asc,kind.asc&limit=60');
+  let want = m[1];
+  if (want && !sessions.find(s => s.id === want)) { const one = await sel('nex_class_sessions', 'select=*&id=eq.' + want); if (one[0]) sessions = [one[0]].concat(sessions).sort((a, b) => a.class_date.localeCompare(b.class_date)); }
+  const cur = sessions.find(s => s.id === want) || sessions.find(s => s.class_date >= today) || sessions[sessions.length - 1] || null;
+  const cnt = {};
+  if (sessions.length) { const rows = await selAll('nex_class_bookings', 'select=session_id,status&session_id=in.' + inList(sessions.map(s => s.id))); rows.forEach(b => { if (!bkOff(b.status)) cnt[b.session_id] = (cnt[b.session_id] || 0) + 1; }); }
+  let books = [];
+  if (cur) books = await sel('nex_class_bookings', 'select=*,nex_students(id,first_name,last_name)&session_id=eq.' + cur.id + '&order=seat_no.asc.nullslast,created_at.asc');
+  afterRender(() => bindFirstAid(cur, books));
+  const head = pageHead('aid', 'Evershine', 'First Aid and CPR', '<button class="nx-btn" id="faJump">Past classes</button><button class="nx-btn primary" id="faNew">' + ico('plus') + 'New class day</button>');
+  if (!cur) return head + '<div class="nx-card">' + empty('No classes scheduled', 'Add the next class day to start taking bookings.') + '</div>';
+  const live = books.filter(b => !bkOff(b.status));
+  const offs = books.filter(b => bkOff(b.status));
+  const moved = offs.length ? await bkMovedMap(offs).catch(() => ({})) : {};
+  const d = fmtDay(cur.class_date);
+  const seated = live.filter(b => b.seat_no);
+  const walk = live.filter(b => b.booking_type !== 'student').length;
+  return head + '<div class="nx-card"><div class="nx-card-b"><div class="nx-days" id="faDays">' + sessions.map(s => { const dd = fmtDay(s.class_date); const n = cnt[s.id] || 0; return '<button class="nx-day" data-id="' + s.id + '" aria-pressed="' + (s.id === cur.id) + '"><b>' + dd.wd + ' ' + dd.dm + '</b><span>' + (s.kind === 'renewal' ? 'Renewal' : 'Full class') + ' · ' + n + ' / ' + s.seats + '</span></button>'; }).join('') + '</div></div></div>' +
+    '<div class="nx-card"><div class="nx-card-h"><div><div class="nx-eyebrow">' + (cur.kind === 'renewal' ? 'Renewal and signature day' : 'Full class day') + '</div><h3 style="font-size:18px">' + d.wd + ' ' + d.dm + (cur.trainer ? ' · ' + esc(cur.trainer) : '') + '</h3></div><div class="nx-btnrow"><button class="nx-btn sm" id="faEdit">' + ico('edit') + 'Edit class</button></div></div><div class="nx-card-b" style="display:flex;flex-direction:column;gap:12px">' +
+    '<div style="display:flex;justify-content:space-between;align-items:baseline"><span class="nx-big">' + live.length + ' <span class="nx-muted" style="font-size:16px">of ' + cur.seats + ' seats</span></span><span class="nx-muted">' + (cur.seats - seated.length) + ' seats free' + (walk ? ' · ' + walk + ' walk-in or agent' : '') + (cur.start_time ? ' · ' + esc(cur.start_time) + (cur.end_time ? '–' + esc(cur.end_time) : '') : '') + '</span></div>' +
+    '<div class="nx-cap"><i class="a" style="width:' + Math.min(100, seated.length / cur.seats * 100) + '%"></i></div>' +
+    (live.length > cur.seats ? '<div class="nx-warnbox">This class has more bookings than seats. Move some people to another day.</div>' : '') +
+    '<div class="nx-seats" id="faSeats">' + Array.from({ length: cur.seats }, (_, i) => { const n = i + 1; const b = live.find(x => x.seat_no === n); return '<button class="nx-seat ' + (b ? (b.booking_type !== 'student' ? 'walk' : 'booked') : '') + '" data-seat="' + n + '" title="' + esc(b ? b.name : 'Free seat') + '"><span>' + (b ? esc((b.name || '').split(' ')[0].slice(0, 7)) : n) + '</span></button>'; }).join('') + '</div>' +
+    '<div class="nx-legend"><span><i></i>Free</span><span><i class="booked"></i>Student</span><span><i class="walk"></i>Walk-in or agent group</span></div></div></div>' +
+    '<div class="nx-card" id="faBook"><div class="nx-card-h"><h3>Bookings</h3><button class="nx-btn primary sm" id="faAdd">' + ico('plus') + 'Add booking</button></div>' +
+    (live.length ? '<div class="nx-tablewrap"><table class="nx-table tight"><thead><tr><th>Seat</th><th>Name</th><th>Phone</th><th>Type</th><th>Booked by</th><th>Attendance</th><th>Flags</th><th></th></tr></thead><tbody>' +
+      live.map(b => '<tr class="nx-tr" data-b="' + b.id + '"><td class="nx-num">' + (b.seat_no || '<span class="nx-muted">–</span>') + '</td><td><b>' + (b.nex_students ? '<a href="#/students/' + b.nex_students.id + '">' + esc(b.name) + '</a>' : esc(b.name)) + '</b><div class="nx-muted" style="font-size:12px">' + esc(b.email || '') + '</div></td><td class="nx-num">' + esc(fmtPhone(b.phone)) + '</td><td>' + (b.booking_type === 'student' ? '<span class="nx-tag">Student</span>' : '<span class="nx-tag walk">' + (b.booking_type === 'walk_in' ? 'Walk-in' : 'Agent group') + '</span>') + (b.agent_id ? ' <span class="nx-muted">' + esc(agentName(b.agent_id)) + '</span>' : '') + '</td><td>' + esc(b.created_by || '') + '</td><td>' + attCell(b) + '</td>' +
+        '<td><div class="nx-flags">' + bookingFlags(cur, b) + '</div></td><td><button class="nx-btn sm" data-edit="' + b.id + '">Edit</button></td></tr>').join('') + '</tbody></table></div>' : empty('No bookings yet', 'Press Add booking or choose a free seat above.')) + (live.length ? '<div class="nx-legend nx-flaglegend"><span><b>QS</b> quiz sent</span><span><b>QD</b> quiz done</span><span><b>$</b> paid</span>' + (cur.kind !== 'renewal' ? '<span><b>PP</b> placement plan yes or done</span><span><b>EP</b> education plan yes or RTO done</span>' : '<span><b>SG</b> signature done</span>') + '</div>' : '') + '</div>' +
+    (offs.length ? '<div class="nx-card" id="faOff"><div class="nx-card-h"><div><h3>No show, cancelled and rescheduled <span class="nx-count">' + offs.length + '</span></h3><div class="nx-muted">Not counted in the seats. Each one has a follow-up task for the next working day.</div></div></div>' + bkFollowTable(offs, moved) + '</div>' : '');
+});
+
+function attCell(b) {
+  if (b.status === 'attended') return '<div class="nx-att-cell"><span class="nx-pill ok">Attended</span><span class="nx-att-by">' + esc(b.attendance_by || '') + (b.attendance_at ? ' · ' + esc(fmtDT(b.attendance_at)) : '') + '</span><button class="nx-btn sm quiet" data-ud="' + b.id + '">Undo</button></div>';
+  return '<div class="nx-att-cell">' + (b.status === 'booked' || !b.status ? '' : pill('booking', b.status)) + '<button class="nx-btn sm" data-at="' + b.id + '">Attended</button><button class="nx-btn sm quiet" data-mk="' + b.id + '">No show or cancelled</button></div>';
+}
+
+function bindFirstAid(cur, books) {
+  const view = $('#view');
+  if ($('#faNew')) $('#faNew').onclick = () => classForm(null);
+  if ($('#faJump')) $('#faJump').onclick = () => formModal('Go to a past class', [{ k: 'd', label: 'Class date', type: 'date', required: true }], async v => {
+    const r = await sel('nex_class_sessions', 'select=id&class_date=eq.' + v.d + '&limit=1'); if (!r[0]) throw new Error('No class on that date.'); go('#/firstaid/' + r[0].id); }, 'Go');
+  if (!cur) return;
+  $$('#faDays .nx-day').forEach(b => b.onclick = () => go('#/firstaid/' + b.dataset.id));
+  $('#faEdit').onclick = () => classForm(cur);
+  $('#faAdd').onclick = () => bookingForm(cur, null, books);
+  $$('#faSeats .nx-seat').forEach(b => b.onclick = () => { const n = Number(b.dataset.seat); const ex = books.find(x => x.seat_no === n && !bkOff(x.status)); bookingForm(cur, ex || null, books, n); });
+  $$('[data-edit]').forEach(b => b.onclick = e => { e.stopPropagation(); bookingForm(cur, books.find(x => x.id === b.dataset.edit), books); });
+  const by = id => books.find(x => x.id === id);
+  $$('[data-at]').forEach(b => b.onclick = e => { e.stopPropagation(); bkAttended(by(b.dataset.at)); });
+  $$('[data-mk]').forEach(b => b.onclick = e => { e.stopPropagation(); attendanceModal(by(b.dataset.mk)); });
+  $$('#faBook [data-ud]').forEach(b => b.onclick = e => { e.stopPropagation(); bkUndo(by(b.dataset.ud)); });
+  const off = $('#faOff'); if (off) bkBindFollow(off, books.filter(x => bkOff(x.status)), render);
+}
+
+function classForm(c) {
+  c = c || {};
+  const f = [{ k: 'class_date', label: 'Class date', type: 'date', value: c.class_date, required: true }, { k: 'kind', label: 'Type', type: 'select', options: [{ id: 'full', label: 'Full class (First Aid and CPR)' }, { id: 'renewal', label: 'Renewal and signature' }], value: c.kind || 'full' },
+    { k: 'trainer', label: 'Trainer', value: c.trainer }, { k: 'seats', label: 'Seats', type: 'number', value: c.seats || 50, required: true },
+    { k: 'start_time', label: 'Starts', type: 'time', value: c.start_time }, { k: 'end_time', label: 'Ends', type: 'time', value: c.end_time }, { k: 'note', label: 'Note', type: 'textarea', value: c.note, full: true }];
+  return formModal(c.id ? 'Edit class day' : 'New class day', f, async v => {
+    if (c.id) { await upd('nex_class_sessions', 'id=eq.' + c.id, v); toast('Saved'); render(); }
+    else { const s = await ins('nex_class_sessions', v); toast('Class added'); go('#/firstaid/' + s.id); }
+  });
+}
+
+/* one small marker per yes/no on a booking; screen readers get the full words, sighted users get a hover title and the legend under the table */
+function flagHtml(on, abbr, label, value) {
+  const v = value || (on ? 'yes' : 'no');
+  return '<span class="nx-flag ' + (on ? 'on' : '') + '" role="img" aria-label="' + esc(label + ': ' + v) + '" title="' + esc(label + ': ' + v) + '">' + abbr + '</span>';
+}
+function bookingFlags(cur, b) {
+  let h = flagHtml(b.quiz_sent, 'QS', 'Quiz sent') + flagHtml(b.quiz_done, 'QD', 'Quiz done') + flagHtml(b.paid, '$', 'Paid');
+  if (cur.kind !== 'renewal') {
+    h += flagHtml(b.placement_plan === 'yes' || b.placement_plan === 'done', 'PP', 'Placement plan', PLAN_PL[b.placement_plan] ? PLAN_PL[b.placement_plan].toLowerCase() : 'not set');
+    h += flagHtml(b.education_plan === 'yes' || b.education_plan === 'rto_done', 'EP', 'Education plan', PLAN_ED[b.education_plan] ? PLAN_ED[b.education_plan].toLowerCase() : 'not set');
+  } else h += flagHtml(b.signature_done, 'SG', 'Signature done');
+  return h;
+}
+const PLAN_PL = { yes: 'Yes', done: 'Done', no: 'No' }, PLAN_ED = { yes: 'Yes', rto_done: 'RTO done', no: 'No' };
+function bookingForm(cur, b, books, seat) {
+  b = b || {}; let studentId = b.student_id || null;
+  const takenBy = n => books.find(x => x.seat_no === n && !bkOff(x.status) && x.id !== b.id);
+  const f = [{ k: 'name', label: 'Name', value: b.name, required: true }, { k: 'phone', label: 'Phone', type: 'tel', value: b.phone }, { k: 'email', label: 'Email', type: 'email', value: b.email },
+    { k: 'seat_no', label: 'Seat', type: 'number', value: b.seat_no || seat || '', help: 'Leave empty for the waiting list' },
+    { k: 'booking_type', label: 'Booking type', type: 'select', options: [{ id: 'student', label: 'Student' }, { id: 'walk_in', label: 'Walk-in' }, { id: 'agent_group', label: 'Agent group' }], value: b.booking_type || 'student' },
+    { k: 'agent_id', label: 'Agent', type: 'select', options: REF.agents.filter(a => a.active), value: b.agent_id, blank: 'None' },
+    { k: 'status', label: 'Status', type: 'select', options: opts('booking', true), value: b.status || 'booked', blank: 'Not set' },
+    { k: 'quiz_sent', label: 'Quiz link sent', type: 'check', value: b.quiz_sent }, { k: 'quiz_done', label: 'Quiz done', type: 'check', value: b.quiz_done }, { k: 'paid', label: 'Paid', type: 'check', value: b.paid }];
+  if (cur.kind !== 'renewal') f.push({ k: 'placement_plan', label: 'Placement plan', type: 'select', options: Object.keys(PLAN_PL).map(k => ({ id: k, label: PLAN_PL[k] })), value: b.placement_plan, blank: 'Not set', help: 'Yes = going ahead with placement. Done = placement sorted. No = not doing placement.' },
+    { k: 'education_plan', label: 'Education plan', type: 'select', options: Object.keys(PLAN_ED).map(k => ({ id: k, label: PLAN_ED[k] })), value: b.education_plan, blank: 'Not set', help: 'Yes = needs visa counselling. RTO done = RTO profile created. No = no counselling needed.' });
+  if (cur.kind === 'renewal') f.push({ k: 'signature_done', label: 'Signature done', type: 'check', value: b.signature_done });
+  if (!canFlag()) for (let i = f.length - 1; i >= 0; i--) if (['quiz_sent', 'quiz_done', 'paid', 'placement_plan', 'education_plan', 'signature_done'].includes(f[i].k)) f.splice(i, 1);   /* the flags are Evershine's */
+  f.push({ k: 'note', label: 'Note', type: 'textarea', value: b.note, full: true });
+  const top = b.id ? '' : idBoxHtml('Type a phone number or email. If they are already a student, their details fill in. Walk-ins and agent groups can be typed in without a record.');
+  const m = formModal(b.id ? 'Edit booking' : 'Add booking', f, async v => {
+    if (v.seat_no != null) { v.seat_no = Math.round(v.seat_no); if (v.seat_no < 1 || v.seat_no > cur.seats) throw new Error('Seat must be between 1 and ' + cur.seats + '.'); const t = takenBy(v.seat_no); if (t) throw new Error('Seat ' + v.seat_no + ' is already taken by ' + t.name + '.'); }
+    if (v.phone) v.phone = cleanPhone(v.phone) || v.phone; if (v.email) v.email = v.email.toLowerCase();
+    const newSt = v.status; if (b.id && newSt !== (b.status || '') && (bkOff(newSt) || newSt === 'attended' || (newSt === 'booked' && (bkOff(b.status) || b.status === 'attended')))) { delete v.status; v.seat_no = bkOff(newSt) ? null : v.seat_no; } else if (bkOff(v.status)) v.seat_no = null;
+    try {
+      if (b.id) { await upd('nex_class_bookings', 'id=eq.' + b.id, Object.assign(v, { student_id: studentId })); if (newSt !== (b.status || '') && newSt && (bkOff(newSt) || newSt === 'attended' || (newSt === 'booked' && (bkOff(b.status) || b.status === 'attended')))) await bkMark(b, newSt); }
+      else await ins('nex_class_bookings', Object.assign({ session_id: cur.id, student_id: studentId, created_by: ME.name }, v), true);
+    } catch (e) { if (/duplicate|unique/i.test(e.message)) throw new Error('That seat was just taken. Choose another.'); throw e; }
+    toast('Booking saved'); render();
+  }, 'Save booking', top);
+  if (b.id) {
+    const foot = $('.modal-f', m.el); const cb = document.createElement('button'); cb.className = 'nx-btn'; cb.style.marginRight = 'auto'; cb.textContent = 'Cancel booking';
+    cb.onclick = async () => { try { await bkMark(b, 'cancelled'); m.close(); toast('Booking cancelled. Follow-up task added.'); render(); } catch (e) { showErr(m, e); } };
+    foot.prepend(cb);
+  } else {
+    identityLookup(m, { ids: { name: 'f_name', phone: 'f_phone', email: 'f_email' }, onChange: st => { studentId = st ? st.id : null; if (st) { const bt = $('#f_booking_type', m.el); if (bt) bt.value = 'student'; } } });
+  }
+}

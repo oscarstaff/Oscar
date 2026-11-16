@@ -1,0 +1,112 @@
+'use strict';
+/* pl-placement.js · Pipe-Line · Placement requests, placements, facilities, blacklist.
+   One of the Pipe-Line files loaded by nex.html (list and order: PL_FILES in the loader). All of them share one global scope. */
+/* =========================================================
+   Placement, Follow-ups, Admin
+   ========================================================= */
+const PL = { tab: 'requests', status: '', q: '', page: 0, size: 50 };
+
+route(/^\/placement$/, async () => {
+  afterRender(() => bindPlacement());
+  const seg = [['requests', 'Requests'], ['placements', 'Placements'], ['facilities', 'Facilities'], ['blacklist', 'Blacklist']];
+  return pageHead('pin', 'Placement team', 'Placement', '<button class="nx-btn primary" id="plAdd">' + ico('plus') + '<span id="plAddL">New request</span></button>') +
+    '<div class="nx-card"><div class="nx-toolbar" style="border-top:0"><div class="nx-seg" id="plSeg">' + seg.map(([k, l]) => '<button data-v="' + k + '" aria-pressed="' + (PL.tab === k) + '">' + l + '</button>').join('') + '</div><select class="nx-sel sm" id="plStatus"></select><input class="nx-in sm" id="plQ" style="min-width:220px" placeholder="Search" value="' + esc(PL.q) + '"></div><div id="plBody"></div><div class="nx-foot" id="plFoot"><span></span></div></div>';
+});
+
+function bindPlacement() {
+  const body = $('#plBody');
+  const labels = { requests: 'New request', placements: 'New placement', facilities: 'New facility', blacklist: 'Add to blacklist' };
+  const load = async () => {
+    $('#plAddL').textContent = labels[PL.tab];
+    const sf = $('#plStatus'); sf.hidden = !(PL.tab === 'requests' || PL.tab === 'placements');
+    if (!sf.hidden) sf.innerHTML = selectOpts(opts(PL.tab === 'requests' ? 'placement' : 'placement_stage', true), PL.status, 'Any status');
+    holdBody(body);
+    try {
+      const q = safeQ(PL.q), from = PL.page * PL.size, to = from + PL.size - 1; let rows, total, html;
+      if (PL.tab === 'requests') {
+        let query = 'select=*,nex_facilities(name),nex_enrolments(student_id,nex_students(id,first_name,last_name))&order=created_at.desc'; if (PL.status) query += '&status=eq.' + PL.status; if (q) query += '&facility_text=ilike.*' + q + '*';
+        ({ rows, total } = await selPage('nex_placement_requests', query, from, to));
+        html = rows.length ? '<div class="nx-tablewrap"><table class="nx-table tight"><thead><tr><th>Student</th><th>Facility</th><th>Type</th><th>Emailed</th><th>Status</th><th>Note</th><th></th></tr></thead><tbody>' + rows.map(r => { const s = (r.nex_enrolments || {}).nex_students; return '<tr><td>' + (s ? '<a href="#/students/' + s.id + '"><b>' + esc(fullName(s)) + '</b></a>' : '–') + '</td><td>' + esc((r.nex_facilities || {}).name || r.facility_text || '–') + '</td><td>' + (r.self_placement ? '<span class="nx-tag walk">Self placement</span>' : '<span class="nx-tag">Arranged</span>') + '</td><td>' + esc(fmtDate(r.emailed_on) || '–') + '</td><td>' + pill('placement', r.status) + '</td><td class="nx-muted">' + esc((r.note || '').slice(0, 60)) + '</td><td><button class="nx-btn sm" data-ed="' + r.id + '">Update</button></td></tr>'; }).join('') + '</tbody></table></div>' : empty('No placement requests');
+        body._rows = rows; $$('[data-ed]', body).forEach(b => b.onclick = () => requestForm(rows.find(x => x.id === b.dataset.ed)));
+      } else if (PL.tab === 'placements') {
+        let query = 'select=*,nex_facilities(name),nex_enrolments(student_id,nex_students(id,first_name,last_name))&order=start_date.desc.nullslast,created_at.desc'; if (PL.status) query += '&status=eq.' + PL.status; if (q) query += '&facility_text=ilike.*' + q + '*';
+        ({ rows, total } = await selPage('nex_placements', query, from, to));
+        html = rows.length ? '<div class="nx-tablewrap"><table class="nx-table tight"><thead><tr><th>Student</th><th>Facility</th><th>Starts</th><th>Ends</th><th>Hours</th><th>Status</th><th></th></tr></thead><tbody>' + rows.map(r => { const s = (r.nex_enrolments || {}).nex_students; return '<tr><td>' + (s ? '<a href="#/students/' + s.id + '"><b>' + esc(fullName(s)) + '</b></a>' : '–') + '</td><td>' + esc((r.nex_facilities || {}).name || r.facility_text || '–') + '</td><td>' + esc(fmtDate(r.start_date) || '–') + '</td><td>' + esc(fmtDate(r.end_date) || '–') + '</td><td class="nx-num">' + esc(r.hours || '–') + '</td><td>' + pill('placement_stage', r.status) + '</td><td><button class="nx-btn sm" data-ed="' + r.id + '">Update</button></td></tr>'; }).join('') + '</tbody></table></div>' : empty('No placements yet');
+        $$('[data-ed]', body).forEach(b => b.onclick = () => placementForm(rows.find(x => x.id === b.dataset.ed)));
+      } else if (PL.tab === 'facilities') {
+        let query = 'select=*&order=name.asc'; if (q) query += '&name=ilike.*' + q + '*';
+        ({ rows, total } = await selPage('nex_facilities', query, from, to));
+        html = rows.length ? '<div class="nx-tablewrap"><table class="nx-table tight"><thead><tr><th>Facility</th><th>Suburb</th><th>Contact</th><th>Phone</th><th>Email</th><th></th></tr></thead><tbody>' + rows.map(r => '<tr><td><b>' + esc(r.name) + '</b></td><td>' + esc(r.suburb || '–') + '</td><td>' + esc(r.contact_name || '–') + '</td><td>' + esc(r.phone || '–') + '</td><td>' + esc(r.email || '–') + '</td><td><button class="nx-btn sm" data-ed="' + r.id + '">Edit</button></td></tr>').join('') + '</tbody></table></div>' : empty('No facilities', 'Add the homes you place students with.');
+        $$('[data-ed]', body).forEach(b => b.onclick = () => facilityForm(rows.find(x => x.id === b.dataset.ed)));
+      } else {
+        let query = 'select=*,nex_facilities(name)&order=added_at.desc'; if (q) query += '&or=(student_name.ilike.*' + q + '*,facility_text.ilike.*' + q + '*)';
+        ({ rows, total } = await selPage('nex_blacklist', query, from, to));
+        html = rows.length ? '<div class="nx-tablewrap"><table class="nx-table tight"><thead><tr><th>Student or facility</th><th>Where allocated</th><th>Reason</th><th>Added</th><th></th></tr></thead><tbody>' + rows.map(r => '<tr><td><b>' + esc(r.student_name || (r.nex_facilities || {}).name || r.facility_text || '–') + '</b><div class="nx-muted" style="font-size:12px">' + esc(r.email || '') + '</div></td><td>' + esc(r.allocated_at || '–') + '</td><td>' + esc(r.reason || '–') + '</td><td>' + esc(fmtDate(r.added_at)) + '<div class="nx-muted" style="font-size:12px">' + esc(r.added_by || '') + '</div></td><td>' + (ME.admin ? '<button class="nx-btn sm" data-rm="' + r.id + '">Remove</button>' : '') + '</td></tr>').join('') + '</tbody></table></div>' : empty('Blacklist is empty');
+        body.innerHTML = html; $$('[data-rm]', body).forEach(b => b.onclick = async () => { if (await confirmBox('Remove from blacklist', 'Remove this entry?', 'Remove', true)) { try { await del('nex_blacklist', 'id=eq.' + b.dataset.rm); toast('Removed'); load(); } catch (e) { toast(e.message, true); } } });
+      }
+      if (PL.tab !== 'blacklist') body.innerHTML = html;
+      if (PL.tab === 'blacklist') { /* already set */ }
+      const fromN = total ? from + 1 : 0, toN = from + rows.length;
+      $('#plFoot').innerHTML = '<span>' + (total != null ? (total ? fromN + '–' + toN + ' of ' + total.toLocaleString('en-AU') : '') : rows.length + ' shown') + '</span><span class="nx-btnrow"><button class="nx-btn sm" id="plPrev"' + (PL.page ? '' : ' disabled') + '>Previous</button><button class="nx-btn sm" id="plNext"' + (total != null && toN >= total ? ' disabled' : '') + '>Next</button></span>';
+      $('#plPrev').onclick = () => { PL.page--; load(); }; $('#plNext').onclick = () => { PL.page++; load(); };
+    } catch (e) { body.innerHTML = empty('Could not load', e.message); }
+  };
+  $$('#plSeg button').forEach(b => b.onclick = () => { PL.tab = b.dataset.v; PL.page = 0; PL.status = ''; $$('#plSeg button').forEach(x => x.setAttribute('aria-pressed', String(x === b))); load(); });
+  $('#plStatus').onchange = e => { PL.status = e.target.value; PL.page = 0; load(); };
+  let t = 0; $('#plQ').addEventListener('input', e => { clearTimeout(t); t = setTimeout(() => { PL.q = e.target.value; PL.page = 0; load(); }, 300); });
+  $('#plAdd').onclick = () => {
+    if (PL.tab === 'requests') return pickEnrolment('New placement request', en => requestForm(null, en));
+    if (PL.tab === 'placements') return pickEnrolment('New placement', en => placementForm(null, en));
+    if (PL.tab === 'facilities') return facilityForm(null);
+    return blacklistForm();
+  };
+  viewWait(load());
+}
+
+function pickEnrolment(title, cb) {
+  pickStudent(title, async st => {
+    const en = await sel('nex_enrolments', 'select=*&student_id=eq.' + st.id + '&deleted_at=is.null&order=enrolled_on.desc.nullslast');
+    if (!en.length) { toast(fullName(st) + ' has no enrolment yet. Add one on their record first.', true); return; }
+    if (en.length === 1) return cb(en[0], st);
+    const m = openModal({ title: 'Which enrolment?', footer: false, body: '<div class="nx-sel-opt">' + en.map(e => '<button type="button" class="nx-pick" data-id="' + e.id + '"><span><b>' + esc(qualName(e.qualification_id) || 'Enrolment') + '</b><small>' + esc(e.year || '') + ' · ' + esc(statusLabel('enrolment', e.stage)) + '</small></span><span class="nx-tag">Choose</span></button>').join('') + '</div>' });
+    $$('.nx-pick', m.el).forEach(b => b.onclick = () => { m.close(); cb(en.find(x => x.id === b.dataset.id), st); });
+  });
+}
+async function facilityOptions() { const f = await sel('nex_facilities', 'select=id,name&active=eq.true&order=name&limit=1000'); return f.map(x => ({ id: x.id, label: x.name })); }
+
+async function requestForm(r, en) {
+  r = r || {}; const fac = await facilityOptions();
+  const f = [{ k: 'facility_id', label: 'Facility', type: 'select', options: fac, value: r.facility_id, blank: 'Type a name instead', full: true }, { k: 'facility_text', label: 'Facility name (if not in the list)', value: r.facility_text, full: true },
+    { k: 'self_placement', label: 'Self placement (student found it)', type: 'check', value: r.self_placement }, { k: 'emailed_on', label: 'Email sent on', type: 'date', value: r.emailed_on, help: 'Recorded only. Pipe-Line does not send the email.' },
+    { k: 'status', label: 'Status', type: 'select', options: opts('placement', true), value: r.status || 'request_sent', blank: 'Not set' }, { k: 'note', label: 'Note', type: 'textarea', value: r.note, full: true }];
+  formModal(r.id ? 'Update placement request' : 'New placement request', f, async v => {
+    if (r.id) await upd('nex_placement_requests', 'id=eq.' + r.id, v); else await ins('nex_placement_requests', Object.assign({ enrolment_id: en.id, created_by: ME.name }, v), true);
+    toast('Saved'); render();
+  });
+}
+async function placementForm(p, en) {
+  p = p || {}; const fac = await facilityOptions();
+  const f = [{ k: 'facility_id', label: 'Facility', type: 'select', options: fac, value: p.facility_id, blank: 'Type a name instead', full: true }, { k: 'facility_text', label: 'Facility name (if not in the list)', value: p.facility_text, full: true },
+    { k: 'start_date', label: 'Start date', type: 'date', value: p.start_date }, { k: 'end_date', label: 'End date', type: 'date', value: p.end_date }, { k: 'hours', label: 'Hours', type: 'number', value: p.hours },
+    { k: 'status', label: 'Stage', type: 'select', options: opts('placement_stage', true), value: p.status, blank: 'Not set' }, { k: 'note', label: 'Note', type: 'textarea', value: p.note, full: true }];
+  formModal(p.id ? 'Update placement' : 'New placement', f, async v => {
+    if (p.id) await upd('nex_placements', 'id=eq.' + p.id, v); else await ins('nex_placements', Object.assign({ enrolment_id: en.id, created_by: ME.name }, v), true);
+    toast('Saved'); render();
+  });
+}
+function facilityForm(r) {
+  r = r || {};
+  formModal(r.id ? 'Edit facility' : 'New facility', [{ k: 'name', label: 'Name', value: r.name, required: true, full: true }, { k: 'address', label: 'Address', value: r.address, full: true }, { k: 'suburb', label: 'Suburb', value: r.suburb },
+    { k: 'contact_name', label: 'Contact person', value: r.contact_name }, { k: 'phone', label: 'Phone', type: 'tel', value: r.phone }, { k: 'email', label: 'Email', type: 'email', value: r.email },
+    { k: 'active', label: 'Still placing students here', type: 'check', value: r.id ? r.active : true }, { k: 'notes', label: 'Notes', type: 'textarea', value: r.notes, full: true }], async v => {
+    if (r.id) await upd('nex_facilities', 'id=eq.' + r.id, v); else await ins('nex_facilities', v, true);
+    toast('Saved'); render();
+  });
+}
+function blacklistForm() {
+  let studentId = null;
+  const m = formModal('Add to blacklist', [{ k: 'student_name', label: 'Student name', required: true }, { k: 'email', label: 'Email', type: 'email' }, { k: 'allocated_at', label: 'Where they were allocated', full: true }, { k: 'reason', label: 'Reason', type: 'textarea', required: true, full: true }], async v => {
+    await ins('nex_blacklist', Object.assign({ student_id: studentId, added_by: ME.name }, v), true); toast('Added'); render();
+  }, 'Add', '<div style="margin-bottom:14px"><button type="button" class="nx-btn" id="blFind">' + ico('search') + 'Find an existing student</button></div>');
+  $('#blFind', m.el).onclick = () => pickStudent('Find a student', s => { studentId = s.id; $('#f_student_name', m.el).value = fullName(s); $('#f_email', m.el).value = s.email || ''; });
+}
