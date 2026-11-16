@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#12201f">
 <meta name="robots" content="noindex,nofollow">
 <meta name="referrer" content="no-referrer">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-27ysZxtg0xWjikciJnl6p9Oun6JvBpqkESCMcIdAldg=' 'sha256-3hyP/yazKUFap168+PkUZUSqyIjlVN2ZKx3kL+UScL4='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data: https://jcfgldqrdbfkgbixszds.supabase.co; connect-src https://jcfgldqrdbfkgbixszds.supabase.co; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-27ysZxtg0xWjikciJnl6p9Oun6JvBpqkESCMcIdAldg=' 'sha256-s7wSREM7juKFs1RoXnQT2OdQdGKmp67yl4aYSNq+Mlo='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data: https://jcfgldqrdbfkgbixszds.supabase.co; connect-src https://jcfgldqrdbfkgbixszds.supabase.co; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Nex · Student management</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232fb5ad'/%3E%3Cpath d='M9.5 9.5 16 16l-6.5 6.5M17 9.5l6.5 6.5-6.5 6.5' fill='none' stroke='%2308201f' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -850,7 +850,7 @@ body{font-variant-numeric:tabular-nums;text-rendering:optimizeLegibility}
 /* loading rows are the size of real rows, so the page does not shrink when data arrives */
 .nx-skrow{height:33px;padding:0 20px}
 .nx-skel{animation-duration:1.6s}
-#viewSkel,.nx-main.nx-enter>*:not(.nx-pagehead){animation-duration:.14s}
+#viewSkel{animation-duration:.14s}
 .nx-reloading{opacity:.6;transition:opacity var(--nx-t-fast) linear}
 
 /* things that appear do so by fading, with at most a few pixels of travel */
@@ -885,6 +885,46 @@ body{font-variant-numeric:tabular-nums;text-rendering:optimizeLegibility}
   .nx-skel{animation:none}
   body.nx-busy::before{animation:none}
 }
+
+/* =====================================================================================================
+   v30 MOTION. Corporate personality: ease-out, no bounce. Quick 110ms (leaving), standard 260-320ms (arriving, gliding).
+   ===================================================================================================== */
+:root{--nx-move:cubic-bezier(.2,0,0,1);--nx-in:cubic-bezier(.4,0,1,1)}
+
+/* the tab indicators are one element that glides. The old per-tab underlines are retired. */
+.nx-nav a[aria-current="page"]::after,.nx-navbtn.on::after,.nx-tab[aria-selected="true"]::after{content:none;display:none}
+.nx-nav,.nx-tabs,.nx-seg{position:relative}
+.nx-nav[data-ink]::after,.nx-tabs[data-ink]::after{content:"";position:absolute;left:0;bottom:0;height:3px;width:var(--ink-w,0);transform:translateX(var(--ink-x,0));background:var(--nx-accent);border-radius:3px 3px 0 0;pointer-events:none;will-change:transform,width}
+.nx-tabs[data-ink]::after{bottom:0}
+.nx-seg[data-ink]::before{content:"";position:absolute;left:0;top:0;width:var(--ink-w,0);height:var(--ink-h,0);transform:translate(var(--ink-x,0),var(--ink-y,0));background:var(--nx-surface);border-radius:7px;box-shadow:0 0 0 1px var(--nx-line) inset,0 1px 2px rgba(23,28,26,.07);pointer-events:none;will-change:transform,width}
+.nx-seg[data-ink=on]::before,.nx-nav[data-ink=on]::after,.nx-tabs[data-ink=on]::after{transition:transform .32s var(--nx-move),width .32s var(--nx-move),height .32s var(--nx-move)}
+.nx-ink-still [data-ink]::before,.nx-ink-still [data-ink]::after{transition:none!important}
+.nx-seg[data-ink] button{position:relative;z-index:1}
+.nx-seg[data-ink] button[aria-pressed="true"]{background:transparent;box-shadow:none}
+.nx-seg[data-ink] button[aria-pressed="true"]:hover{background:transparent}
+.nx-seg button{transition:color .2s var(--nx-move)}
+.nx-tab{transition:color .2s var(--nx-move)}
+
+/* a page leaves quickly and the next one rises into place, top to bottom, 45ms apart */
+.nx-leaving{opacity:0;transform:translateY(-3px);transition:opacity .11s var(--nx-in),transform .11s var(--nx-in);pointer-events:none}
+@keyframes nxrise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.nx-main.nx-enter>*,.nx-main.nx-enter>*:not(.nx-pagehead){animation:nxrise .28s var(--nx-move) both;animation-delay:calc(var(--i,3) * 45ms)}
+.nx-main.nx-enter>:nth-child(1){--i:0}.nx-main.nx-enter>:nth-child(2){--i:1}.nx-main.nx-enter>:nth-child(3){--i:2}
+.nx-main.nx-enter-sk>.nx-pagehead,.nx-main.nx-enter-sk>.nx-pagehead:not(.x){animation:none}
+.nx-main.nx-enter-sk>:nth-child(2){--i:0}.nx-main.nx-enter-sk>:nth-child(3){--i:1}.nx-main.nx-enter-sk>:nth-child(n+4){--i:2}
+#viewSkel{animation-duration:.24s}
+.nx-reloading{opacity:.55}
+
+/* content that changes inside a page (record tabs, pill-button lists) does the same short rise */
+@keyframes nxswapin{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.nx-swapin{animation:nxswapin .26s var(--nx-move) both}
+
+@media (prefers-reduced-motion:reduce){
+  .nx-leaving{transform:none}
+  .nx-main.nx-enter>*,.nx-swapin{animation:nxfade .12s linear both;animation-delay:0s}
+  [data-ink]::before,[data-ink]::after{transition:none!important}
+}
+.nx-lbcomment{white-space:normal;min-width:220px;max-width:46ch}
 
 </style>
 </head>
@@ -1044,6 +1084,7 @@ function ico(name) {
     aid: '<rect x="3" y="7" width="18" height="13" rx="2.5"/><path d="M9 7V5.5A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5V7M12 10.5v6M9 13.5h6"/>',
     admin: '<path d="M12 3 5 6v5c0 5 3 8.5 7 10 4-1.5 7-5 7-10V6z"/><circle cx="12" cy="10.5" r="2"/><path d="M8.5 16c.6-1.8 2-2.5 3.5-2.5s2.9.7 3.5 2.5"/>',
     sliders: '<path d="M4 7h9M17 7h3M4 17h3M11 17h9M4 12h5M13 12h7"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/><circle cx="11" cy="12" r="2"/>',
+    notebook: '<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 3v18M12.5 8.5h3M12.5 12.5h3"/>',
     lock: '<rect x="5" y="11" width="14" height="9" rx="2.5"/><path d="M8 11V8a4 4 0 018 0v3"/>', home: '<path d="M4 11l8-7 8 7v9H4z"/>'
   };
   return '<svg class="nx-ico" viewBox="0 0 24 24" aria-hidden="true">' + (P[name] || '') + '</svg>';
@@ -1408,10 +1449,10 @@ let navToken = 0, lastRouteH = null, afters = [], viewWaits = [];
 const NAV = [['#/', 'Overview'], ['#/leads', 'Leads'], ['#/students', 'Students'], ['#/payments', 'Payments'], ['#/firstaid', 'First Aid'], ['#/placement', 'Placement'], ['misc', 'Misc', 'menu'], ['#/admin', 'Admin', 'admin']];
 /* the staff pages copied from Nexus sit together under the Misc button */
 const NAV_ICO = { '#/': 'home', '#/leads': 'user', '#/students': 'cap', '#/payments': 'cash', '#/firstaid': 'aid', '#/placement': 'pin', '#/admin': 'admin' };
-const MISC_ICO = { '#/quizzes': 'book', '#/documents': 'doc', '#/calls': 'phone', '#/teamreport': 'users', '#/convreport': 'trend', '#/achievements': 'trophy' };
-const MISC = [['#/quizzes', 'Quizzes'], ['#/documents', 'Documents'], ['#/calls', 'Calls'], ['#/teamreport', 'Team report'], ['#/convreport', 'Conversion report'], ['#/achievements', 'Achievements']];
+const MISC_ICO = { '#/quizzes': 'book', '#/documents': 'doc', '#/calls': 'phone', '#/logbooks': 'notebook', '#/teamreport': 'users', '#/convreport': 'trend', '#/achievements': 'trophy' };
+const MISC = [['#/quizzes', 'Quizzes'], ['#/documents', 'Documents'], ['#/calls', 'Calls'], ['#/logbooks', 'Logbook receipts'], ['#/teamreport', 'Team report'], ['#/convreport', 'Conversion report'], ['#/achievements', 'Achievements']];
 /* icon and title per section, so a loading page can show its real heading straight away */
-const HEADS = { '/': ['home', 'Overview'], '/leads': ['user', 'Leads'], '/students': ['cap', 'Students'], '/search': ['search', 'Search'], '/payments': ['cash', 'Payment queue'], '/firstaid': ['aid', 'First Aid and CPR'], '/placement': ['pin', 'Placement'], '/followups': ['bell', 'Things to follow up'], '/admin': ['admin', 'Lists and settings'], '/quizzes': ['book', 'Quizzes'], '/documents': ['doc', 'Documents'], '/calls': ['phone', 'Calls'], '/teamreport': ['users', 'Team report'], '/convreport': ['trend', 'Conversion report'], '/profile': ['user', 'Profile'], '/achievements': ['trophy', 'Team achievements'], '/staff': ['user', 'Profile'] };
+const HEADS = { '/': ['home', 'Overview'], '/leads': ['user', 'Leads'], '/students': ['cap', 'Students'], '/search': ['search', 'Search'], '/payments': ['cash', 'Payment queue'], '/firstaid': ['aid', 'First Aid and CPR'], '/placement': ['pin', 'Placement'], '/followups': ['bell', 'Things to follow up'], '/admin': ['admin', 'Lists and settings'], '/quizzes': ['book', 'Quizzes'], '/documents': ['doc', 'Documents'], '/calls': ['phone', 'Calls'], '/logbooks': ['notebook', 'Logbook receipts'], '/teamreport': ['users', 'Team report'], '/convreport': ['trend', 'Conversion report'], '/profile': ['user', 'Profile'], '/achievements': ['trophy', 'Team achievements'], '/staff': ['user', 'Profile'] };
 function baseOf(h) { return '/' + ((h.split('/')[1] || '').split('?')[0]); }
 function isRecord(h) { return /^\/students\/[0-9a-f-]{36}$/.test(h); }
 /* after a page paints: name it for the browser tab and screen readers, and move keyboard focus to it when the page (not just its data) changed */
@@ -1502,7 +1543,13 @@ async function render() {
   const m = h.match(r.re), same = lastRouteH === h, sk = $('#viewSkel');
   document.body.classList.add('nx-busy'); setNav(h);
   /* the page you are on stays put for a moment; only a slow load swaps to the placeholder. A refresh of the same page never does. */
-  const skT = same ? 0 : setTimeout(() => { if (tok !== navToken) return; sk.innerHTML = skeleton(h); sk.hidden = false; $$('main.nx-main').forEach(el => { el.hidden = true; }); window.scrollTo(0, 0); }, firstPaint ? 0 : 180);
+  let skShown = false;
+  const skT = same ? 0 : setTimeout(() => {
+    if (tok !== navToken) return;
+    const cur = $$('main.nx-main').filter(el => el !== sk && !el.hidden);
+    const show = () => { if (tok !== navToken) { cur.forEach(el => el.classList.remove('nx-leaving')); return; } skShown = true; sk.innerHTML = skeleton(h); sk.hidden = false; cur.forEach(el => { el.hidden = true; el.classList.remove('nx-leaving'); }); window.scrollTo(0, 0); };
+    if (cur.length && !firstPaint) { cur.forEach(el => el.classList.add('nx-leaving')); setTimeout(show, 110); } else show();
+  }, firstPaint ? 0 : 450);
   const done = () => { clearTimeout(skT); sk.hidden = true; sk.innerHTML = ''; document.body.classList.remove('nx-busy'); firstPaint = false; };
   try {
     await loadRef();
@@ -1519,11 +1566,13 @@ async function render() {
     fs.forEach(f => { try { f(); } catch (e) { console.warn('after', e); } });
     const ws = viewWaits; viewWaits = [];
     if (ws.length) await Promise.race([Promise.all(ws), new Promise(res => setTimeout(res, 4000))]);
-    if (tok !== navToken) { nv.remove(); if (!$('#view')) { const o = $('#viewOld'); if (o) o.id = 'view'; } return; }
+    if (!same && !firstPaint && !skShown && old && !old.hidden) { old.classList.add('nx-leaving'); await new Promise(res => setTimeout(res, 110)); }
+    if (tok !== navToken) { old.classList.remove('nx-leaving'); nv.remove(); if (!$('#view')) { const o = $('#viewOld'); if (o) o.id = 'view'; } return; }
     const y = same ? window.scrollY : 0;
     done();
     $$('main.nx-main').forEach(el => { if (el !== nv && el !== sk) el.remove(); });
-    nv.hidden = false; if (!same) nv.classList.add('nx-enter');
+    nv.hidden = false; if (!same) { nv.classList.add('nx-enter'); if (skShown) nv.classList.add('nx-enter-sk'); }
+    try { motionInit(); } catch (e) {}
     window.scrollTo(0, y); pageArrived(h);
   } catch (e) {
     if (tok !== navToken || e.message === 'session') return;
@@ -1779,13 +1828,14 @@ function newStudent() {
 const SR = { tab: 'details' };
 route(/^\/students\/([0-9a-f-]{36})$/, async m => {
   const id = m[1];
-  const [stu, det, enr, pays, books, followups, calls] = await Promise.all([
+  const [stu, det, enr, pays, books, followups, calls, logs] = await Promise.all([
     sel('nex_students', 'select=*&id=eq.' + id), api('rpc/nex_get_details', { method: 'POST', body: { p_student: id } }).then(r => r.json()),
     sel('nex_enrolments', 'select=*&student_id=eq.' + id + '&deleted_at=is.null&order=enrolled_on.desc.nullslast'),
     sel('nex_payments', 'select=*&student_id=eq.' + id + '&order=paid_on.desc.nullslast'),
     sel('nex_class_bookings', 'select=*,nex_class_sessions(class_date,kind)&student_id=eq.' + id),
     sel('nex_followups', 'select=*&student_id=eq.' + id + '&order=created_at.desc'),
-    sel('call_log', 'select=id,caller_name,phone_e164,reason,note,direction,logged_by,created_at,resolved_at,for_team&student_id=eq.' + id + '&deleted_at=is.null&order=created_at.desc&limit=40').catch(() => [])
+    sel('call_log', 'select=id,caller_name,phone_e164,reason,note,direction,logged_by,created_at,resolved_at,for_team&student_id=eq.' + id + '&deleted_at=is.null&order=created_at.desc&limit=40').catch(() => []),
+    sel('nex_logbook_receipts', 'select=id,received_on,receiver,comments,created_at&student_id=eq.' + id + '&order=received_on.desc&limit=20').catch(() => [])
   ]);
   const s = stu[0]; if (!s) return empty('Student not found', 'They may have been archived.');
   /* the sensitive details come through a function that logs who looked (admins see this) and stops bulk opening */
@@ -1806,7 +1856,7 @@ route(/^\/students\/([0-9a-f-]{36})$/, async m => {
   const grossPaid = pays.reduce((t, p) => t + Number(p.amount), 0);
   const isStudent = grossPaid >= STUDENT_MIN;
   const totalPaid = grossPaid - refunds.reduce((t, r) => t + Number(r.amount), 0);
-  const ctx = { s, d, limited, enr, pays, books, followups, queue, refunds, reqs, plcs, hist, aud, docs, calls, isStudent };
+  const ctx = { s, d, limited, enr, pays, books, followups, queue, refunds, reqs, plcs, hist, aud, docs, calls, logs, isStudent };
 
   afterRender(() => { bindStudent(ctx); setNav(isStudent ? '!/students' : '!/leads'); });
   const fact = (k, v) => '<div><dt>' + k + '</dt><dd>' + (v || '<span class="nx-muted">–</span>') + '</dd></div>';
@@ -1944,6 +1994,7 @@ function tabActivity(c) {
   const items = [];
   c.hist.forEach(h => items.push({ t: h.changed_at, html: '<li><span class="dot">' + ico('list') + '</span><div><b>' + esc(h.changed_by || 'Someone') + '</b> moved ' + esc(h.context.replace(/_/g, ' ')) + (h.from_status ? ' from <b>' + esc(statusLabel(h.context, h.from_status)) + '</b>' : '') + ' to <b>' + esc(statusLabel(h.context, h.to_status)) + '</b><time>' + fmtDT(h.changed_at) + '</time></div></li>' }));
   c.aud.forEach(a => { if (a.action === 'UPDATE' && !diffHtml(a)) return; items.push({ t: a.changed_at, html: feedItem(a) }); });
+  (c.logs || []).forEach(k => items.push({ t: k.created_at, html: '<li><span class="dot ok">' + ico('notebook') + '</span><div><b>' + esc(k.receiver || 'Someone') + '</b> received their logbook on ' + esc(fmtDate(k.received_on)) + (k.comments ? '<div class="nx-diff">' + esc(k.comments) + '</div>' : '') + '<time>' + fmtDT(k.created_at) + '</time></div></li>' }));
   (c.calls || []).forEach(k => items.push({ t: k.created_at, html: '<li><span class="dot info">' + ico('bell') + '</span><div><b>' + esc(k.logged_by || 'Someone') + '</b> logged a call (' + (k.direction === 'out' ? 'out' : 'in') + '): ' + esc(k.reason) + (k.resolved_at ? '' : ' <span class="nx-pill warn">Waiting for a callback</span>') + (k.note ? '<div class="nx-diff">' + esc(k.note) + '</div>' : '') + '<time>' + fmtDT(k.created_at) + '</time></div></li>' }));
   items.sort((a, b) => String(b.t).localeCompare(String(a.t)));
   return items.length ? '<ul class="nx-feed">' + items.slice(0, 60).map(i => i.html).join('') + '</ul>' : empty('No activity yet');
@@ -3169,6 +3220,7 @@ const NEXI_FAQ = [
     ['Where are my quizzes and documents?', 'Press Misc in the tab bar and choose Quizzes or Documents. They show the same quizzes and documents as Nexus. Quiz building and document upload are still done in Nexus.', ['#/quizzes', 'Open Quizzes']],
     ['How do I log a call?', 'Press Misc in the tab bar and choose Calls. Type the phone number first. If the person is already in Nex their details fill in and the call is added to their Activity. If Nex has never seen the number, logging the call starts an unfinished lead flagged to you. Tick "Not a student" for agents or facilities so no lead is made.', ['#/calls', 'Open Calls']],
     ['What is an unfinished lead?', 'A lead that was started from a call, so Nex only has a name and a phone number. It shows an Unfinished tag in the Leads list and a banner on the record. Add the missing details, then press Mark complete.', ['#/leads?unf=mine', 'Leads flagged to me']],
+    ['How do I record a logbook I received?', 'Press Misc in the tab bar and choose Logbook receipts. Type the student\u2019s name or email, check the date and who received it, add a comment if needed, and press Save receipt. Someone already in Nex gets it on their Activity tab. A name Nex does not know is saved by name only.', ['#/logbooks', 'Open Logbook receipts']],
     ['Where are the weekly conversion numbers?', 'Press Misc in the tab bar and choose Conversion report. Pick the dates (or This week, Last week) and Nex works out the status counts, the pie chart, the follow-ups done by step and the class numbers. Use Print or save as PDF to share it. Outside Sydney comes from the tick on each person\'s record.', ['#/convreport', 'Open Conversion report']],
     ['How do I fill in the team report?', 'Press Misc in the tab bar and choose Team report. Enter your numbers or tasks for the day and press Save entry. Team leads and admins can generate the weekly report and print it or save it as a PDF.', ['#/teamreport', 'Open Team report']],
     ['Where do I see team achievements?', 'Press Misc in the tab bar and choose Achievements. It lists who passed a training quiz, who earned Glow for a perfect fortnight and who reached a call milestone, the same feed as Nexus.', ['#/achievements', 'Open Achievements']],
@@ -3529,6 +3581,176 @@ route(/^\/calls$/, async () => {
     '<input class="nx-in sm" id="clSearch" type="search" placeholder="Search name, number, reason" aria-label="Search calls" value="' + esc(CL.q) + '"><label class="nx-check"><input type="checkbox" id="clToday"' + (CL.today ? ' checked' : '') + '> Today</label><span class="nx-grow"></span><button class="nx-btn sm" id="clRefresh" type="button">' + ico('refresh') + 'Refresh</button></div>' +
     '<div id="clTable"></div></div></div>';
 });
+
+/* ---------- Logbook receipts: who received which student's logbook, and when ----------
+   Replaces the sheet with the columns DATE, STUDENT NAME, EMAIL ADDRESS, LOGBOOK RECEIVER, COMMENTS.
+   A receipt for someone in Nex is linked to them (it shows on their Activity). A name Nex does not know is saved by name only. */
+const LB = { q: '', mine: false, days: '60', rows: [], staff: null };
+async function lbStaff() {
+  if (LB.staff) return LB.staff;
+  try { LB.staff = (await sel('staff_credentials', 'select=staff_name&order=staff_name.asc')).map(r => r.staff_name).filter(Boolean); } catch (e) { LB.staff = []; }
+  return LB.staff;
+}
+async function lbLoad() {
+  let q = 'select=*&order=received_on.desc,created_at.desc&limit=500';
+  if (LB.days !== 'all') { const d = new Date(Date.now() - Number(LB.days) * 86400000).toLocaleDateString('en-CA', { timeZone: TZ }); q += '&received_on=gte.' + d; }
+  LB.rows = await sel('nex_logbook_receipts', q);
+}
+function lbVisible() {
+  const q = LB.q.trim().toLowerCase();
+  return LB.rows.filter(r => (!LB.mine || r.receiver === ME.name) && (!q || [r.student_name, r.email, r.receiver, r.comments].join(' ').toLowerCase().includes(q)));
+}
+function lbOpts(list, cur) { const l = list.slice(); if (cur && !l.includes(cur)) l.unshift(cur); return l.map(n => '<option' + (n === cur ? ' selected' : '') + '>' + esc(n) + '</option>').join(''); }
+function lbTable() {
+  const rows = lbVisible();
+  if (!rows.length) return empty('No logbook receipts to show', LB.q || LB.mine ? 'Clear the search or the Mine filter to see more.' : 'Record the first one above.');
+  return '<div class="nx-tablewrap"><table class="nx-table tight"><thead><tr><th>Date</th><th>Student name</th><th>Email address</th><th>Logbook receiver</th><th>Comments</th><th></th></tr></thead><tbody>' + rows.map(r => {
+    const nm = r.student_id ? '<a href="#/students/' + esc(r.student_id) + '">' + esc(r.student_name) + '</a>' : esc(r.student_name);
+    const acts = [];
+    if (r.created_by === ME.name || ME.admin) acts.push('<button class="nx-btn sm" data-le="' + esc(r.id) + '">' + ico('edit') + 'Edit</button>');
+    if (ME.admin) acts.push('<button class="nx-btn sm quiet" data-ld="' + esc(r.id) + '" aria-label="Delete this receipt">' + ico('trash') + '</button>');
+    return '<tr><td class="nx-nowrap">' + esc(fmtDate(r.received_on)) + '</td><td><b>' + nm + '</b></td><td>' + esc(r.email || '–') + '</td><td>' + esc(r.receiver || '–') + '</td><td class="nx-lbcomment">' + esc(r.comments || '') + '</td><td><div class="nx-btnrow">' + acts.join('') + '</div></td></tr>';
+  }).join('') + '</tbody></table></div>';
+}
+route(/^\/logbooks$/, async () => {
+  const staff = await lbStaff();
+  try { await lbLoad(); } catch (e) { LB.rows = []; }
+  afterRender(() => {
+    const f = $('#lbForm'), save = $('#lbSave');
+    const lk = identityLookup({ el: f }, { ids: { name: 'lbName', email: 'lbEmail' }, newMsg: 'Not found in Nex. The receipt will be saved by name only.' });
+    const paint = () => {
+      $('#lbTable').innerHTML = lbTable();
+      $('#lbCount').textContent = lbVisible().length + (lbVisible().length === 1 ? ' receipt' : ' receipts');
+      $$('[data-le]').forEach(b => b.onclick = () => editRow(LB.rows.find(r => String(r.id) === b.dataset.le)));
+      $$('[data-ld]').forEach(b => b.onclick = () => delRow(LB.rows.find(r => String(r.id) === b.dataset.ld)));
+    };
+    const reload = async () => { try { await lbLoad(); } catch (e) { toast(e.message, true); } paint(); };
+    const editRow = r => {
+      if (!r) return;
+      openModal({ title: 'Edit logbook receipt', body: '<div class="nx-form"><div><label class="nx-lbl" for="leDate">Date</label><input class="nx-in" type="date" id="leDate" max="' + sydToday() + '" value="' + esc(r.received_on) + '"></div><div><label class="nx-lbl" for="leRecv">Logbook receiver</label><select class="nx-sel" id="leRecv">' + lbOpts(staff, r.receiver) + '</select></div><div><label class="nx-lbl" for="leName">Student name</label><input class="nx-in" id="leName" value="' + esc(r.student_name) + '"></div><div><label class="nx-lbl" for="leEmail">Email address</label><input class="nx-in" id="leEmail" type="email" value="' + esc(r.email || '') + '"></div><div class="full"><label class="nx-lbl" for="leCom">Comments</label><textarea class="nx-ta" id="leCom">' + esc(r.comments || '') + '</textarea></div></div>',
+        buttons: [{ label: 'Cancel', close: true }, { label: 'Save', primary: true, run: async m => {
+          const nm = $('#leName', m.el).value.trim(), d = $('#leDate', m.el).value, em = $('#leEmail', m.el).value.trim();
+          if (!nm) throw new Error('Student name is required.');
+          if (!d) throw new Error('Date is required.');
+          if (d > sydToday()) throw new Error('The date cannot be in the future.');
+          if (em && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) throw new Error('That email does not look right.');
+          await upd('nex_logbook_receipts', 'id=eq.' + encodeURIComponent(r.id), { received_on: d, student_name: nm, email: em || null, receiver: $('#leRecv', m.el).value, comments: $('#leCom', m.el).value.trim() || null });
+          toast('Receipt updated'); await reload();
+        } }] });
+    };
+    const delRow = async r => {
+      if (!r || !ME.admin) return;
+      if (!(await confirmBox('Delete this receipt?', r.student_name + ' · ' + fmtDate(r.received_on) + '. This cannot be undone, but it stays in the audit history.', 'Delete', true))) return;
+      await api('nex_logbook_receipts?id=eq.' + encodeURIComponent(r.id), { method: 'DELETE' });
+      toast('Receipt deleted'); await reload();
+    };
+    f.onsubmit = async e => {
+      e.preventDefault();
+      if (save.disabled) return;
+      try {
+        const nm = $('#lbName').value.trim(), em = $('#lbEmail').value.trim(), d = $('#lbDate').value, st = lk.get();
+        if (!nm) { $('#lbName').focus(); throw new Error('Student name is required.'); }
+        if (!d) { $('#lbDate').focus(); throw new Error('Date is required.'); }
+        if (d > sydToday()) { $('#lbDate').focus(); throw new Error('The date cannot be in the future.'); }
+        if (em && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) { $('#lbEmail').focus(); throw new Error('That email does not look right.'); }
+        const dupe = LB.rows.find(r => r.received_on === d && ((st && r.student_id === st.id) || (!st && r.student_name.trim().toLowerCase() === nm.toLowerCase())));
+        if (dupe && !(await confirmBox('Already recorded', nm + ' already has a receipt on ' + fmtDate(d) + ', received by ' + (dupe.receiver || 'someone') + '. Add another?', 'Add another'))) return;
+        save.disabled = true; save.classList.add('busy');
+        await ins('nex_logbook_receipts', { received_on: d, student_id: st ? st.id : null, student_name: nm, email: em || null, receiver: $('#lbRecv').value, comments: $('#lbCom').value.trim() || null }, true);
+        toast('Logbook receipt saved' + (st ? ' and added to ' + fullName(st) + '’s activity' : ''));
+        $('#lbName').value = ''; $('#lbEmail').value = ''; $('#lbCom').value = ''; lk.clear(); $('#lbName').focus();
+        await reload();
+      } catch (err) { toast(err.message || 'Could not save the receipt.', true); }
+      finally { save.disabled = false; save.classList.remove('busy'); }
+    };
+    $('#lbSearch').oninput = e => { LB.q = e.target.value; paint(); };
+    $('#lbMine').onchange = e => { LB.mine = e.target.checked; paint(); };
+    $('#lbDays').onchange = async e => { LB.days = e.target.value; await reload(); };
+    $('#lbRefresh').onclick = reload;
+    paint();
+  });
+  const me = ME.name || '';
+  return pageHead('notebook', 'Staff', 'Logbook receipts', '') +
+    '<div class="nx-card"><div class="nx-card-h"><div><h3>Record a logbook</h3><div class="nx-muted">Type the student’s name or email. If they are in Nex the receipt is added to their Activity.</div></div></div><div class="nx-card-b">' +
+    '<form id="lbForm" novalidate><div class="nx-form">' +
+    '<div><label class="nx-lbl" for="lbName">Student name *</label><input class="nx-in" id="lbName" autocomplete="off"></div>' +
+    '<div><label class="nx-lbl" for="lbEmail">Email address</label><input class="nx-in" id="lbEmail" type="email" autocomplete="off"></div>' +
+    '<div class="full">' + idBoxHtml('') + '</div>' +
+    '<div><label class="nx-lbl" for="lbDate">Date received *</label><input class="nx-in" type="date" id="lbDate" max="' + sydToday() + '" value="' + sydToday() + '"></div>' +
+    '<div><label class="nx-lbl" for="lbRecv">Logbook receiver</label><select class="nx-sel" id="lbRecv">' + lbOpts(staff, me) + '</select></div>' +
+    '<div class="full"><label class="nx-lbl" for="lbCom">Comments</label><textarea class="nx-ta" id="lbCom" placeholder="Optional. Anything the next person should know."></textarea></div>' +
+    '</div><div class="nx-btnrow" style="margin-top:14px"><button class="nx-btn primary" id="lbSave" type="submit">' + ico('check') + 'Save receipt</button></div></form></div></div>' +
+    '<div class="nx-card"><div class="nx-toolbar" style="border-top:0"><input class="nx-in sm" id="lbSearch" type="search" placeholder="Search name, email, comments" aria-label="Search logbook receipts" value="' + esc(LB.q) + '">' +
+    '<select class="nx-sel sm" id="lbDays" aria-label="Period"><option value="30"' + (LB.days === '30' ? ' selected' : '') + '>Last 30 days</option><option value="60"' + (LB.days === '60' ? ' selected' : '') + '>Last 60 days</option><option value="180"' + (LB.days === '180' ? ' selected' : '') + '>Last 6 months</option><option value="all"' + (LB.days === 'all' ? ' selected' : '') + '>All</option></select>' +
+    '<label class="nx-check"><input type="checkbox" id="lbMine"' + (LB.mine ? ' checked' : '') + '> Received by me</label><span class="nx-muted" id="lbCount"></span><span class="nx-grow"></span><button class="nx-btn sm" id="lbRefresh" type="button">' + ico('refresh') + 'Refresh</button></div><div id="lbTable"></div></div>';
+});
+
+/* ---------- Motion: tabs slide, pages arrive, nothing snaps ----------
+   Corporate personality: one easing (ease-out, no overshoot), three speeds (quick 110, standard 260-320, slow 400).
+   - The underline under the active tab, and the thumb behind the active pill button, are ONE element that glides to the next one.
+     It starts moving on press, not on release, and it can be interrupted: a new press just re-targets it from where it is.
+   - A page leaves quickly (110ms, ease-in) and the next one rises into place (280ms, ease-out) top to bottom, 45ms apart.
+   - Content inside a page (record tabs, the pill-button lists) does the same short rise when it changes.
+   Everything here is progressive: without it, tabs and pages still work, they just do not glide. */
+const INK = [
+  { box: '.nx-nav', item: 'a[aria-current="page"], #navMisc.on', pad: 10 },
+  { box: '.nx-tabs', item: '.nx-tab[aria-selected="true"]', pad: 8 },
+  { box: '.nx-seg', item: 'button[aria-pressed="true"]', pad: 0 }
+];
+function inkPlace(box, it, pad) {
+  if (!it || !it.offsetWidth) return;
+  const x = it.offsetLeft + pad, w = Math.max(0, it.offsetWidth - pad * 2), y = it.offsetTop, h = it.offsetHeight;
+  const s = box.style;
+  if (s.getPropertyValue('--ink-x') === x + 'px' && s.getPropertyValue('--ink-w') === w + 'px' && s.getPropertyValue('--ink-y') === y + 'px') return;
+  s.setProperty('--ink-x', x + 'px'); s.setProperty('--ink-w', w + 'px'); s.setProperty('--ink-y', y + 'px'); s.setProperty('--ink-h', h + 'px');
+  if (!box.dataset.ink) {
+    /* first placement: put it there without gliding from nowhere, then allow gliding from the next change on */
+    box.dataset.ink = 'set'; void box.offsetWidth;
+    requestAnimationFrame(() => { box.dataset.ink = 'on'; });
+  }
+}
+function inkRefresh() {
+  INK.forEach(k => document.querySelectorAll(k.box).forEach(box => {
+    if (box.closest('[hidden]')) return;
+    inkPlace(box, box.querySelector(k.item), k.pad);
+  }));
+}
+/* a short rise for content that has just changed. Restarting it mid-way is fine. */
+function swapIn(el) {
+  if (!el || window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  el.classList.remove('nx-swapin'); void el.offsetWidth; el.classList.add('nx-swapin');
+  setTimeout(() => el.classList.remove('nx-swapin'), 360);
+}
+let swapWatch = null, inkQueued = false;
+function motionInit() {
+  if (document.body.dataset.motion) return; document.body.dataset.motion = '1';
+  const queue = () => { if (inkQueued) return; inkQueued = true; requestAnimationFrame(() => { inkQueued = false; inkRefresh(); }); };
+  /* press: the indicator moves now. If the press turns out not to be a click, the next refresh puts it back. */
+  document.addEventListener('pointerdown', e => {
+    const t = e.target.closest && e.target.closest('.nx-nav a, .nx-nav #navMisc, .nx-tab, .nx-seg button'); if (!t) return;
+    const k = INK.find(x => t.closest(x.box)); if (!k) return;
+    const box = t.closest(k.box); if (box.dataset.ink === 'on' || box.dataset.ink === 'set') inkPlace(box, t, k.pad);
+    if (!t.matches('.nx-nav a, .nx-nav #navMisc')) {
+      const card = t.closest('.nx-card'); if (card) swapWatch = { card, until: Date.now() + 900, seen: new WeakSet() };
+    }
+  }, true);
+  document.addEventListener('pointerup', () => setTimeout(inkRefresh, 450), true);
+  document.addEventListener('pointercancel', () => setTimeout(inkRefresh, 50), true);
+  new MutationObserver(muts => {
+    if (swapWatch && Date.now() < swapWatch.until) {
+      for (const m of muts) {
+        if (m.type !== 'childList' || !m.addedNodes.length) continue;
+        const t = m.target; if (!(t instanceof Element) || !swapWatch.card.contains(t) || t.closest('.nx-toolbar, .nx-tabs, .nx-seg, .nx-card-h')) continue;
+        if (swapWatch.seen.has(t)) continue; swapWatch.seen.add(t); swapIn(t);
+      }
+    }
+    queue();
+  }).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['aria-pressed', 'aria-selected', 'aria-current', 'class', 'hidden'] });
+  let rz = 0;
+  window.addEventListener('resize', () => { document.documentElement.classList.add('nx-ink-still'); clearTimeout(rz); rz = setTimeout(() => { inkRefresh(); document.documentElement.classList.remove('nx-ink-still'); }, 160); });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { document.documentElement.classList.add('nx-ink-still'); inkRefresh(); setTimeout(() => document.documentElement.classList.remove('nx-ink-still'), 60); });
+  queue();
+}
 
 /* =========================================================
    Two-step login, Nex side. The 6-digit code is asked in Nexus (it holds the refresh token that a code
