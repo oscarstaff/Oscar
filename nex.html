@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#12201f">
 <meta name="robots" content="noindex,nofollow">
 <meta name="referrer" content="no-referrer">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-27ysZxtg0xWjikciJnl6p9Oun6JvBpqkESCMcIdAldg=' 'sha256-6FLYyy2IUpqhIsGxgVWJETGz/A56gcNxvXHEEpP/ato='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data: https://jcfgldqrdbfkgbixszds.supabase.co; connect-src https://jcfgldqrdbfkgbixszds.supabase.co; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-27ysZxtg0xWjikciJnl6p9Oun6JvBpqkESCMcIdAldg=' 'sha256-Lxp7cl/Qx1uTFnCwOU9XTtr1A/e83Kn4zPipWHs45kQ='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data: https://jcfgldqrdbfkgbixszds.supabase.co; connect-src https://jcfgldqrdbfkgbixszds.supabase.co; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Nex · Student management</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232fb5ad'/%3E%3Cpath d='M9.5 9.5 16 16l-6.5 6.5M17 9.5l6.5 6.5-6.5 6.5' fill='none' stroke='%2308201f' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -986,6 +986,16 @@ async function api(path, opt) {
   }
   return r;
 }
+/* call a Nex edge function as the signed-in person; failures keep the function's own message and code */
+async function fn(name, body) {
+  const doFetch = async () => fetch(SB + '/functions/v1/' + name, { method: 'POST', headers: { apikey: KEY, Authorization: 'Bearer ' + await bearer(), 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
+  let r;
+  try { r = await doFetch(); } catch (e) { if (e && e.message === 'session') throw e; throw offlineError(); }
+  if (r.status === 401 && await refreshToken()) r = await doFetch();
+  let j = null; try { j = await r.json(); } catch (e) {}
+  if (!r.ok) { const err = new Error((j && (j.message || j.error)) || 'Request failed (' + r.status + ')'); err.status = r.status; err.code = j && j.error; throw err; }
+  return j;
+}
 async function sel(table, q) { const r = await api(table + (q ? '?' + q : '')); return r.json(); }
 async function selPage(table, q, from, to) {
   const r = await api(table + (q ? '?' + q : ''), { headers: { Range: from + '-' + to, 'Range-Unit': 'items', Prefer: 'count=exact' } });
@@ -1671,9 +1681,31 @@ function sideCards(c) {
     (c.plcs.length || c.reqs.length ? '<div class="nx-related">' + c.plcs.slice(0, 3).map(p => '<div><span><b>' + esc((p.nex_facilities || {}).name || p.facility_text || 'Placement') + '</b><small>' + (p.start_date ? 'Starts ' + esc(fmtDate(p.start_date)) : 'No start date') + '</small></span>' + pill('placement_stage', p.status) + '</div>').join('') +
       c.reqs.slice(0, 3).map(r => '<div><span><b>' + esc((r.nex_facilities || {}).name || r.facility_text || 'Request') + '</b><small>' + (r.self_placement ? 'Self placement' : 'Request') + (r.emailed_on ? ' · emailed ' + esc(fmtDate(r.emailed_on)) : '') + '</small></span>' + pill('placement', r.status) + '</div>').join('') + '</div>' : empty('No placement yet')) + '</div>' +
     '<div class="nx-card"><div class="nx-card-h"><h3>Follow-ups</h3><span class="nx-btnrow">' + (!c.isStudent && !c.followups.some(f => f.kind === 'lead_cycle') ? '<button class="nx-btn sm" data-a="startCycle">Start follow-ups</button>' : '') + '<button class="nx-btn sm" data-a="addFu">Add</button></span></div>' +
-    (open.length ? '<div class="nx-related">' + open.slice().sort((a, b) => String(a.due_at || '9').localeCompare(String(b.due_at || '9'))).map(f => { const late = f.due_at && new Date(f.due_at).toLocaleDateString('en-CA', { timeZone: TZ }) < sydToday(); return '<div><span><b>' + esc(f.note) + '</b><small' + (late ? ' class="nx-neg"' : '') + '>' + (f.due_at ? 'Due ' + esc(fmtDate(f.due_at)) + (late ? ' (overdue)' : '') : 'No date') + (f.assigned_to ? ' · ' + esc(f.assigned_to) : '') + '</small></span><button class="nx-btn sm" data-a="doneFu" data-id="' + f.id + '">Done</button></div>'; }).join('') + '</div>' : empty('Nothing to follow up')) + '</div>';
+    (open.length ? '<div class="nx-related">' + open.slice().sort((a, b) => String(a.due_at || '9').localeCompare(String(b.due_at || '9'))).map(f => { const late = f.due_at && new Date(f.due_at).toLocaleDateString('en-CA', { timeZone: TZ }) < sydToday(); return '<div><span><b>' + esc(f.note) + '</b><small' + (late ? ' class="nx-neg"' : '') + '>' + (f.due_at ? 'Due ' + esc(fmtDate(f.due_at)) + (late ? ' (overdue)' : '') : 'No date') + (f.assigned_to ? ' · ' + esc(f.assigned_to) : '') + '</small></span><span class="nx-btnrow">' + (f.kind === 'lead_cycle' && f.step ? '<button class="nx-btn sm" data-a="emailFu" data-step="' + f.step + '">Send email</button>' : '') + '<button class="nx-btn sm" data-a="doneFu" data-id="' + f.id + '">Done</button></span></div>'; }).join('') + '</div>' : empty('Nothing to follow up')) + '</div>';
 }
 
+
+/* send a lead follow-up email (lists the documents not received yet) through the workspace mail script */
+async function emailFollowup(s, step) {
+  if (!s.email) { toast('Add an email address on the Details tab first.', true); return; }
+  let pv;
+  try { pv = await fn('nex-send-followup', { student_id: s.id, step, preview: true }); } catch (e) { toast(e.code === 'no_email' ? 'There is no valid email address on file.' : e.message, true); return; }
+  const fields = [
+    { k: 'subject', label: 'Subject', value: pv.subject, full: true, required: true },
+    { k: 'body', label: 'Message', type: 'textarea', value: pv.body, full: true, required: true, help: 'You can edit this before it goes. Replies come to you.' }
+  ];
+  const miss = (pv.missing || []).reduce((n, g) => n + g.docs.length, 0);
+  const top = '<p class="nx-muted" style="margin:0 0 10px">To <b>' + esc(pv.to) + '</b> · ' + (miss ? miss + ' document' + (miss === 1 ? '' : 's') + ' still missing' : 'no documents missing') + (pv.last_sent ? ' · sent before by ' + esc(pv.last_sent.sent_by || 'someone') + ' on ' + esc(fmtDate(pv.last_sent.sent_at)) : '') + '</p>';
+  const send = async (v, m, force) => {
+    try { await fn('nex-send-followup', { student_id: s.id, step, subject: v.subject, body: v.body, force: !!force }); }
+    catch (e) {
+      if (e.code === 'recent' && !force) { if (await confirmBox('Send again?', e.message + ' Send it again?', 'Send again')) return send(v, m, true); return false; }
+      throw e;
+    }
+    toast('Email sent to ' + pv.to); render();
+  };
+  return formModal('Email ' + ['', '1st', '2nd', '3rd'][step] + ' follow-up', fields, (v, m) => send(v, m, false), 'Send email', top);
+}
 function bindStudent(c) {
   const view = $('#view');
   const tabBody = $('#srTab');
@@ -1789,6 +1821,7 @@ async function studentAction(a, ds, c) {
   if (a === 'addFu') return followupForm({ student: s, enrolments: c.enr });
   if (a === 'startCycle') return formModal('Start follow-ups', [{ k: 'first', label: 'First contact', type: 'date', value: s.first_contact_on || new Date(s.created_at).toLocaleDateString('en-CA', { timeZone: TZ }), required: true, full: true, help: 'The 1st follow-up is 2 days after this date, the 2nd 4 days after, the 3rd 6 days after.' }], async v => { await api('rpc/nex_start_lead_cycle', { method: 'POST', body: { p_student: s.id, p_first: v.first } }); toast('3 follow-ups set'); render(); }, 'Start');
   if (a === 'doneFu') { await upd('nex_followups', 'id=eq.' + ds.id, { done_at: new Date().toISOString(), done_by: ME.name }); toast('Done'); return render(); }
+  if (a === 'emailFu') return emailFollowup(s, Number(ds.step));
   if (a === 'bookFA') return go('#/firstaid');
 }
 
@@ -3058,7 +3091,7 @@ async function bindSec() {
     let h = '<div class="nx-row-s"><div><b>Your account</b><div class="nx-muted">' + (mine ? 'Two-step login is set up for you.' : 'Not set up yet. Open Nex from the Nexus Nodes page to set it up.') + '</div></div></div>';
     if (ME.admin) {
       let roster = [];
-      try { roster = await (await api('rpc/nex_mfa_roster', { method: 'POST', body: {} })).json(); } catch (e) {}
+      try { roster = await (await api('rpc/nex_mfa_roster', { method: 'POST', body: {} })).json(); } catch (e) {} if (!Array.isArray(roster)) roster = [];
       const unset = roster.filter(r => !r.enrolled).length;
       h += '<hr class="nx-hr"><div class="nx-row-s"><div><b>Required for everyone: ' + (st.required ? 'On' : 'Off') + '</b><div class="nx-muted">' +
         (st.required ? 'Nex shows nothing to anyone who has not entered a code this sign-in.' : (mine && strong ? 'Once you turn this on, each person is walked through setup when they next open Nex from Nexus.' + (unset ? ' ' + unset + ' of ' + roster.length + ' have not set up yet.' : '') : 'Set up your own code first (open Nex from Nexus), then you can turn this on.')) +
