@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#12201f">
 <meta name="robots" content="noindex,nofollow">
 <meta name="referrer" content="no-referrer">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-27ysZxtg0xWjikciJnl6p9Oun6JvBpqkESCMcIdAldg=' 'sha256-MWkPQRbpmEa7BGHiyBWJ4d3JVrIT6Ch4LH9J7YJN7/w='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data: https://jcfgldqrdbfkgbixszds.supabase.co; connect-src https://jcfgldqrdbfkgbixszds.supabase.co; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-27ysZxtg0xWjikciJnl6p9Oun6JvBpqkESCMcIdAldg=' 'sha256-Np1DGILvgIb6BnU18dfShS4FN0uOKr0ICObLYHGV1iQ='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data: https://jcfgldqrdbfkgbixszds.supabase.co; connect-src https://jcfgldqrdbfkgbixszds.supabase.co; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Nex · Student management</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232fb5ad'/%3E%3Cpath d='M9.5 9.5 16 16l-6.5 6.5M17 9.5l6.5 6.5-6.5 6.5' fill='none' stroke='%2308201f' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -716,6 +716,49 @@ body.nx-busy::before{opacity:1;animation:nxbar 1s linear infinite}
 /* the page area takes keyboard focus after a page change so screen readers and Tab start there; it is not a control, so it gets no focus ring (Safari drew a blue one) */
 .nx-main:focus,.nx-main:focus-visible{outline:none}
 
+/* ===== Sheet look: lists read like a spreadsheet (one line per row, ruled cells, sticky header) ===== */
+.nx-tablewrap{max-height:calc(100vh - 230px);overflow:auto;border-top:1px solid var(--nx-line)}
+.nx-report .nx-tablewrap,.modal .nx-tablewrap{max-height:none}
+.nx-table{border-collapse:separate;border-spacing:0;font-size:13px;font-variant-numeric:tabular-nums}
+.nx-table th{height:30px;padding:0 10px;font-size:12px;font-weight:600;color:var(--nx-ink-2);background:var(--nx-sunken);border-right:1px solid var(--nx-line);border-bottom:1px solid var(--nx-line-strong);position:sticky;top:0;z-index:2;white-space:nowrap}
+.nx-table td{height:32px;padding:0 10px;border-right:1px solid var(--nx-line);border-bottom:1px solid var(--nx-line);white-space:nowrap;vertical-align:middle}
+.nx-table.tight td{height:32px}
+.nx-table th:last-child,.nx-table td:last-child{border-right:0;padding-right:10px}
+.nx-table th:first-child,.nx-table td:first-child{padding-left:12px}
+.nx-table tr:last-child td{border-bottom:1px solid var(--nx-line)}
+.nx-table tbody tr:nth-child(even) td{background:transparent}
+.nx-table tbody tr:hover td{background:var(--nx-hover)}
+.nx-table tbody tr.nx-tr:focus-visible td{outline:0;background:var(--nx-accent-weak)}
+.nx-table tbody tr.nx-tr:focus-visible td:first-child{box-shadow:inset 3px 0 0 var(--nx-accent)}
+.nx-table tr.sel td{background:var(--nx-accent-weak)}
+/* one line per person: name then email, no avatar */
+.nx-table .nx-who{display:flex;align-items:baseline;gap:8px}
+.nx-table .nx-who .nx-avatar{display:none}
+.nx-table .nx-who>div{display:flex;align-items:baseline;gap:8px;min-width:0}
+.nx-table .nx-who b{font-weight:600;font-size:13px}
+.nx-table .nx-who span:not(.nx-pill):not(.nx-avatar){color:var(--nx-ink-3);font-size:12px}
+.nx-table .nx-who small{display:inline;color:var(--nx-ink-3);font-size:12px}
+.nx-table .nx-who .nx-pill{margin-left:0}
+/* stage: pill only; fee: figures only */
+.nx-table .nx-stagecell{flex-direction:row;align-items:center;gap:0}
+.nx-table .nx-mini,.nx-table .nx-meter-bar{display:none}
+.nx-table .nx-meter small{font-size:13px;color:var(--nx-ink)}
+.nx-table .nx-pill{height:20px}
+.nx-table .nx-btn.sm{height:24px;padding:0 8px;font-size:12px}
+@media (max-width:760px){.nx-tablewrap{max-height:none}}
+@media print{.nx-tablewrap{max-height:none;overflow:visible}}
+
+/* ===== Existing-person lookup inside add forms (type a phone or email, details fill in) ===== */
+.nx-idbox{grid-column:1/-1;margin:2px 0 4px;min-height:0}
+.nx-idbox:empty{display:none}
+.nx-idfound{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 12px;border:1px solid var(--nx-accent-line);background:var(--nx-accent-weak);border-radius:var(--nx-r);font-size:13px}
+.nx-idfound b{font-weight:600}
+.nx-idfound .nx-grow{flex:1}
+.nx-idfound a{font-weight:600}
+.nx-idpick{display:flex;flex-direction:column;gap:6px;padding:8px 12px;border:1px solid var(--nx-line);background:var(--nx-sunken);border-radius:var(--nx-r);font-size:13px}
+.nx-idpick .nx-pick{padding:6px 10px}
+.nx-idnew{color:var(--nx-ink-3);font-size:12px}
+
 </style>
 </head>
 <body class="nx">
@@ -1140,6 +1183,66 @@ function pickStudent(title, onPick, initial) {
   return m;
 }
 
+/* ---------- existing-person lookup for add forms ----------
+   Type a phone or email (or a name) in an add form. If that person is already in Nex their details fill in,
+   the same way the call log does it, and the form saves against them instead of making a duplicate.
+   cfg.ids maps first / last / name / phone / email to the field ids in the form; cfg.onChange(student|null) fires when the choice changes. */
+function idBoxHtml(hint) { return '<div class="nx-idbox" aria-live="polite" data-hint="' + esc(hint || '') + '"></div>'; }
+function identityLookup(m, cfg) {
+  const root = m.el, box = $('.nx-idbox', root);
+  const el = k => (cfg.ids[k] ? $('#' + cfg.ids[k], root) : null);
+  const val = k => { const e = el(k); return e ? e.value.trim() : ''; };
+  const put = (k, v, force) => { const e = el(k); if (e && v != null && v !== '' && (force || !e.value.trim())) e.value = v; };
+  let chosen = null, timer = 0, token = 0; const refused = new Set();
+  const keyOf = s => (s.phone || '') + '|' + (s.email || '');
+  const show = html => { box.innerHTML = html; };
+  const choose = (s, auto) => {
+    chosen = s;
+    put('first', s.first_name); put('last', s.last_name); put('name', fullName(s)); put('phone', s.phone); put('email', s.email);
+    show('<div class="nx-idfound">' + ico('check') + '<span>' + (auto ? 'Already in Nex: ' : 'Using ') + '<b>' + esc(fullName(s)) + '</b>' + (s.phone || s.email ? ' · ' + esc([fmtPhone(s.phone), s.email].filter(Boolean).join(' · ')) : '') + '. Their details are filled in.</span><span class="nx-grow"></span><a href="#/students/' + s.id + '" target="_blank" rel="noopener">Open record</a><button type="button" class="nx-btn sm" data-notthem>Not them</button></div>');
+    $('[data-notthem]', box).onclick = () => { refused.add(keyOf(s)); chosen = null; show(''); cfg.onChange && cfg.onChange(null); };
+    cfg.onChange && cfg.onChange(s);
+  };
+  const run = async () => {
+    const my = ++token;
+    const phone = cleanPhone(val('phone')), email = val('email').toLowerCase();
+    const nameTxt = cfg.ids.name ? val('name') : [val('first'), val('last')].filter(Boolean).join(' ');
+    const goodPhone = phone.length >= 8, goodEmail = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email);
+    if (chosen && ((goodPhone && (chosen.phone === phone || chosen.phone2 === phone)) || (goodEmail && chosen.email === email))) return;
+    if (chosen) { chosen = null; show(''); cfg.onChange && cfg.onChange(null); }
+    const F = 'select=id,first_name,last_name,email,phone,phone2&deleted_at=is.null';
+    try {
+      if (goodPhone || goodEmail) {
+        const parts = []; if (goodEmail) parts.push('email.eq.' + encodeURIComponent(email)); if (goodPhone) parts.push('phone.eq.' + phone, 'phone2.eq.' + phone);
+        const rows = (await sel('nex_students', F + '&or=(' + parts.join(',') + ')&limit=6')).filter(r => !refused.has(keyOf(r)));
+        if (my !== token) return;
+        if (rows.length === 1) return choose(rows[0], true);
+        if (rows.length > 1) {
+          show('<div class="nx-idpick"><div>More than one person has this phone or email. Who is it?</div>' + rows.map(r => '<button type="button" class="nx-pick" data-id="' + r.id + '"><span><b>' + esc(fullName(r)) + '</b><small>' + esc([fmtPhone(r.phone), r.email].filter(Boolean).join(' · ')) + '</small></span><span class="nx-btn sm">Use</span></button>').join('') + '</div>');
+          $$('.nx-pick', box).forEach(b => b.onclick = () => choose(rows.find(x => x.id === b.dataset.id), false));
+          return;
+        }
+      }
+      const toks = safeQ(nameTxt).split(/\s+/).filter(t => t.length >= 2).slice(0, 2);
+      if (nameTxt.length >= 3 && toks.length && !(goodPhone || goodEmail)) {
+        const one = t => 'or(first_name.ilike.*' + encodeURIComponent(t) + '*,last_name.ilike.*' + encodeURIComponent(t) + '*)';
+        const rows = await sel('nex_students', F + '&and=(' + toks.map(one).join(',') + ')&order=first_name&limit=5');
+        if (my !== token) return;
+        if (rows.length) {
+          show('<div class="nx-idpick"><div>Already in Nex with a similar name. Tap to use their details.</div>' + rows.map(r => '<button type="button" class="nx-pick" data-id="' + r.id + '"><span><b>' + esc(fullName(r)) + '</b><small>' + esc([fmtPhone(r.phone), r.email].filter(Boolean).join(' · ') || 'No contact details') + '</small></span><span class="nx-btn sm">Use</span></button>').join('') + '</div>');
+          $$('.nx-pick', box).forEach(b => b.onclick = () => choose(rows.find(x => x.id === b.dataset.id), false));
+          return;
+        }
+      }
+      show((goodPhone || goodEmail) ? '<div class="nx-idnew">Not in Nex yet. Saving will add a new person.</div>' : (box.dataset.hint ? '<div class="nx-idnew">' + esc(box.dataset.hint) + '</div>' : ''));
+    } catch (err) { if (my === token) show(''); }
+  };
+  const kick = () => { clearTimeout(timer); timer = setTimeout(run, 350); };
+  ['first', 'last', 'name', 'phone', 'email'].forEach(k => { const e = el(k); if (e) { e.addEventListener('input', kick); e.addEventListener('change', kick); } });
+  if (box.dataset.hint) show('<div class="nx-idnew">' + esc(box.dataset.hint) + '</div>');
+  return { get: () => chosen, clear: () => { chosen = null; show(''); } };
+}
+
 /* ---------- router ---------- */
 const ROUTES = [];
 function route(re, fn) { ROUTES.push({ re, fn }); }
@@ -1454,17 +1557,26 @@ async function findDupes(v) {
   return sel('nex_students', 'select=id,first_name,last_name,email,phone&deleted_at=is.null&or=(' + parts.join(',') + ')&limit=5');
 }
 function newStudent() {
-  const f = studentFields().concat([
+  const base = studentFields(), by = k => base.find(x => x.k === k);
+  const f = [by('phone'), by('email'), by('first_name'), by('last_name'), by('phone2'), by('agent_id')].concat([
     { k: 'qualification_id', label: 'Qualification', type: 'select', options: REF.quals.filter(q => q.active), blank: 'Add later' },
     { k: 'fee', label: 'Agreed fee ($)', type: 'number' },
     { k: 'stage', label: 'Stage', type: 'select', options: opts('enrolment', true), value: 'checklist_sent', blank: 'Not set' },
     { k: 'enrolled_on', label: 'Enrolled on', type: 'date', value: sydToday() }
   ]);
-  let warned = false;
-  formModal('New lead', f, async (v, m) => {
-    tidyStudent(v);
+  let warned = false, existing = null, lk = null;
+  const save = async (v, m) => {
+    existing = lk ? lk.get() : null;
+    const { qualification_id, fee, stage, enrolled_on, ...stu } = v;
+    if (existing) {
+      /* they are already in Nex: add the new enrolment to them (if one was filled in) and open their record */
+      if (qualification_id || fee != null) await ins('nex_enrolments', { student_id: existing.id, qualification_id, fee, stage, enrolled_on, year: new Date().getFullYear(), created_by: ME.name }, true);
+      toast(qualification_id || fee != null ? 'Added to ' + fullName(existing) : 'Opened ' + fullName(existing)); go('#/students/' + existing.id); return;
+    }
+    if (!stu.first_name) { const e = $('#f_first_name', m.el); if (e) { e.setAttribute('aria-invalid', 'true'); try { e.focus(); } catch (x) {} } throw new Error('First name is required.'); }
+    tidyStudent(stu);
     if (!warned) {
-      const d = await findDupes(v);
+      const d = await findDupes(stu);
       if (d.length) {
         warned = true;
         let b = $('.nx-warnbox', m.el); if (!b) { b = document.createElement('div'); b.className = 'nx-warnbox'; b.style.marginBottom = '12px'; $('.modal-b', m.el).prepend(b); }
@@ -1472,11 +1584,16 @@ function newStudent() {
         return false;
       }
     }
-    const { qualification_id, fee, stage, enrolled_on, ...stu } = v;
     const s = await ins('nex_students', Object.assign(stu, { created_by: ME.name }));
     if (qualification_id || fee != null || stage) await ins('nex_enrolments', { student_id: s.id, qualification_id, fee, stage, enrolled_on, year: new Date().getFullYear(), created_by: ME.name }, true);
     toast('Lead added'); go('#/students/' + s.id);
-  }, 'Add lead');
+  };
+  /* first name is checked in save() so that picking an existing person does not need it */
+  f.find(x => x.k === 'first_name').required = false; f.find(x => x.k === 'first_name').label = 'First name *';
+  const m = formModal('New lead', f, save, 'Add lead', idBoxHtml('Start with a phone number or email. If they are already in Nex, their details fill in.'));
+  standardFee(m, 'f_qualification_id', 'f_fee');
+  lk = identityLookup(m, { ids: { phone: 'f_phone', email: 'f_email', first: 'f_first_name', last: 'f_last_name' }, onChange: s => { const b = $('.modal-f .nx-btn.primary', m.el); if (b) b.textContent = s ? 'Add to ' + fullName(s) : 'Add lead'; } });
+  return m;
 }
 
 /* ---------- Student record ---------- */
@@ -1620,6 +1737,15 @@ async function studentAction(a, ds, c) {
   if (a === 'bookFA') return go('#/firstaid');
 }
 
+/* picking a qualification fills the agreed fee with that course's standard fee, unless someone typed a different one */
+function standardFee(m, qSel, feeSel) {
+  const q = $('#' + qSel, m.el), fe = $('#' + feeSel, m.el); if (!q || !fe) return;
+  let auto = fe.value === '' ? true : (REF.quals.some(x => x.default_fee != null && String(Number(x.default_fee)) === fe.value));
+  fe.addEventListener('input', () => { auto = false; });
+  const apply = () => { const c = REF.quals.find(x => x.id === q.value); if (c && c.default_fee != null && (auto || fe.value === '')) { fe.value = String(Number(c.default_fee)); auto = true; } };
+  q.addEventListener('change', apply);
+  if (fe.value === '') apply();
+}
 function enrolmentForm(s, e) {
   e = e || {};
   const f = [{ k: 'qualification_id', label: 'Qualification', type: 'select', options: REF.quals.filter(q => q.active || q.id === e.qualification_id), value: e.qualification_id, blank: 'Not set' },
@@ -1628,10 +1754,12 @@ function enrolmentForm(s, e) {
     { k: 'agent_id', label: 'Agent', type: 'select', options: REF.agents.filter(a => a.active), value: e.agent_id, blank: 'Self / no agent' },
     { k: 'owner', label: 'Looked after by', type: 'select', options: REF.staff, value: e.owner, blank: 'Nobody yet' }, { k: 'fee_note', label: 'Fee note', value: e.fee_note },
     { k: 'notes', label: 'Notes', type: 'textarea', value: e.notes, full: true }];
-  return formModal(e.id ? 'Edit enrolment' : 'New enrolment', f, async v => {
+  const em = formModal(e.id ? 'Edit enrolment' : 'New enrolment', f, async v => {
     if (e.id) await upd('nex_enrolments', 'id=eq.' + e.id, v); else await ins('nex_enrolments', Object.assign({ student_id: s.id, created_by: ME.name }, v), true);
     toast('Saved'); render();
   });
+  if (!e.id) standardFee(em, 'f_qualification_id', 'f_fee');
+  return em;
 }
 /* shared: payment form. opts {student, enrolment} or none (global add with picker) */
 function paymentForm(o) {
@@ -1765,12 +1893,35 @@ function linkPayment(p, queueRow) {
 }
 
 function globalAddPayment() {
-  pickStudent('Who is the payment for?', async st => {
-    const en = await sel('nex_enrolments', 'select=*&student_id=eq.' + st.id + '&deleted_at=is.null&order=enrolled_on.desc.nullslast');
-    if (en.length <= 1) return paymentForm({ student: st, enrolment: en[0] });
-    const m = openModal({ title: 'Which enrolment?', footer: false, body: '<div class="nx-sel-opt">' + en.map(e => '<button type="button" class="nx-pick" data-id="' + e.id + '"><span><b>' + esc(qualName(e.qualification_id) || 'Enrolment') + '</b><small>' + esc(e.year || '') + ' · fee ' + esc(money(e.fee) || 'not set') + '</small></span><span class="nx-tag">Choose</span></button>').join('') + '</div>' });
-    $$('.nx-pick', m.el).forEach(b => b.onclick = () => { m.close(); paymentForm({ student: st, enrolment: en.find(x => x.id === b.dataset.id) }); });
-  });
+  /* one form: type the student's phone or email (or name). If they are already in Nex their details fill in and the payment goes against their enrolment. */
+  const f = [
+    { k: 'phone', label: 'Phone', type: 'tel' }, { k: 'email', label: 'Email', type: 'email' },
+    { k: 'payer_name', label: 'Student name', placeholder: 'Or type a name to look them up' },
+    { k: 'enrolment_id', label: 'Enrolment', type: 'select', options: [], blank: 'Choose the enrolment' },
+    { k: 'amount', label: 'Amount ($)', type: 'number', required: true }, { k: 'paid_on', label: 'Payment date', type: 'date', value: sydToday(), required: true },
+    { k: 'method', label: 'Method', type: 'select', options: ['Bank transfer', 'Cash', 'Card', 'Agent', 'Other'], blank: 'Not set' }, { k: 'reference', label: 'Reference', placeholder: 'Bank reference or receipt' },
+    { k: 'note', label: 'Note', full: true }];
+  let lk = null, enr = [];
+  const m = formModal('Record payment', f, async v => {
+    const st = lk ? lk.get() : null;
+    if (!st && !v.payer_name) throw new Error('Enter the name of the person paying, or find them by phone or email.');
+    if (st && enr.length > 1 && !v.enrolment_id) { const e = $('#f_enrolment_id', m.el); if (e) e.setAttribute('aria-invalid', 'true'); throw new Error('This student has more than one enrolment. Choose which one the payment is for.'); }
+    const enrolmentId = st ? (v.enrolment_id || (enr.length === 1 ? enr[0].id : null)) : null;
+    const { phone, email, enrolment_id, ...pay } = v;
+    const p = await ins('nex_payments', Object.assign(pay, { payer_name: pay.payer_name || fullName(st), student_id: st ? st.id : null, enrolment_id: enrolmentId, created_by: ME.name }));
+    if (enrolmentId) await ins('nex_payment_queue', { enrolment_id: enrolmentId, payment_id: p.id, processing_step: 'draft_not_made', updated_by: ME.name }, true).catch(() => {});
+    toast(st ? 'Payment recorded for ' + fullName(st) : 'Payment recorded. Link it to a student later.'); render();
+  }, 'Save payment', idBoxHtml('Start with the student\'s phone or email. If they are already in Nex, their details and enrolment fill in. Otherwise the payment is saved unmatched and can be linked later.'));
+  const wrap = $('#f_enrolment_id', m.el).parentElement; wrap.hidden = true;
+  lk = identityLookup(m, { ids: { phone: 'f_phone', email: 'f_email', name: 'f_payer_name' }, onChange: async st => {
+    enr = []; const sel0 = $('#f_enrolment_id', m.el);
+    if (!st) { wrap.hidden = true; sel0.innerHTML = ''; return; }
+    try { enr = await sel('nex_enrolments', 'select=id,qualification_id,year,stage&student_id=eq.' + st.id + '&deleted_at=is.null&order=enrolled_on.desc.nullslast'); } catch (e) { enr = []; }
+    if (lk.get() !== st) return;
+    sel0.innerHTML = selectOpts(enr.map(e => ({ id: e.id, label: (qualName(e.qualification_id) || 'Enrolment') + (e.year ? ' · ' + e.year : '') })), enr.length === 1 ? enr[0].id : '', enr.length > 1 ? 'Choose the enrolment' : null);
+    wrap.hidden = !enr.length;
+  } });
+  return m;
 }
 
 /* =========================================================
@@ -1858,7 +2009,7 @@ function bookingForm(cur, b, books, seat) {
     { k: 'education_plan', label: 'Education plan', type: 'select', options: Object.keys(PLAN_ED).map(k => ({ id: k, label: PLAN_ED[k] })), value: b.education_plan, blank: 'Not set', help: 'Yes = needs visa counselling. RTO done = RTO profile created. No = no counselling needed.' });
   if (cur.kind === 'renewal') f.push({ k: 'signature_done', label: 'Signature done', type: 'check', value: b.signature_done });
   f.push({ k: 'note', label: 'Note', type: 'textarea', value: b.note, full: true });
-  const top = b.id ? '' : '<div style="margin-bottom:14px"><button type="button" class="nx-btn" id="bkFind">' + ico('search') + 'Find an existing student</button><div class="nx-help">Walk-ins and agent groups can be typed in directly without a student record.</div></div>';
+  const top = b.id ? '' : idBoxHtml('Type a phone number or email. If they are already a student, their details fill in. Walk-ins and agent groups can be typed in without a record.');
   const m = formModal(b.id ? 'Edit booking' : 'Add booking', f, async v => {
     if (v.seat_no != null) { v.seat_no = Math.round(v.seat_no); if (v.seat_no < 1 || v.seat_no > cur.seats) throw new Error('Seat must be between 1 and ' + cur.seats + '.'); const t = takenBy(v.seat_no); if (t) throw new Error('Seat ' + v.seat_no + ' is already taken by ' + t.name + '.'); }
     if (v.phone) v.phone = cleanPhone(v.phone) || v.phone; if (v.email) v.email = v.email.toLowerCase();
@@ -1874,8 +2025,7 @@ function bookingForm(cur, b, books, seat) {
     cb.onclick = async () => { try { await upd('nex_class_bookings', 'id=eq.' + b.id, { status: 'cancelled', seat_no: null }); m.close(); toast('Booking cancelled'); render(); } catch (e) { showErr(m, e); } };
     foot.prepend(cb);
   } else {
-    const fb = $('#bkFind', m.el);
-    if (fb) fb.onclick = () => pickStudent('Find a student', s => { studentId = s.id; $('#f_name', m.el).value = fullName(s); $('#f_phone', m.el).value = s.phone || ''; $('#f_email', m.el).value = s.email || ''; $('#f_booking_type', m.el).value = 'student'; toast('Student attached: ' + fullName(s)); });
+    identityLookup(m, { ids: { name: 'f_name', phone: 'f_phone', email: 'f_email' }, onChange: st => { studentId = st ? st.id : null; if (st) { const bt = $('#f_booking_type', m.el); if (bt) bt.value = 'student'; } } });
   }
 }
 
@@ -2758,13 +2908,13 @@ const NEXI_FAQ = [
   ]],
   ['Leads and students', [
     ['What is the difference between a lead and a student?', 'Someone is a lead until their payments add up to $200. From $200 they are a student. Nex moves them between the Leads and Students tabs by itself when a payment is added, matched or removed.', ['#/leads', 'Open Leads']],
-    ['How do I add a new person?', 'Open Leads and press New lead. Everyone starts as a lead. If Nex finds someone with the same email or phone it warns you before creating a duplicate.', ['#/leads?new=1', 'Add a lead']],
+    ['How do I add a new person?', 'Open Leads and press New lead. Everyone starts as a lead. Start with their phone number or email: if they are already in Nex, their details fill in and you add to that person instead of making a duplicate.', ['#/leads?new=1', 'Add a lead']],
     ['How do I add an enrolment?', 'Open the person, then press Enrolment at the top of their page. One person can have several enrolments, each with its own qualification, fee and stage.', null],
     ['How do I change contact or personal details?', 'Open the person and use Edit contact, or Edit personal details under Personal and sensitive. Every look at the sensitive details and every change is logged.', null],
     ['How do I remove someone?', 'Open the person and press Archive. They disappear from the lists but their records are kept. Only hub admins can delete records for good.', null]
   ]],
   ['Payments', [
-    ['How do I record a payment?', 'Open Payments and press Record payment, or open the person, go to Enrolments and payments, and press Payment on the right enrolment.', ['#/payments', 'Open Payments']],
+    ['How do I record a payment?', 'Open Payments and press Record payment. Type the phone or email of the student and their details and enrolment fill in. Or open the person, go to Enrolments and payments, and press Payment on the right enrolment.', ['#/payments', 'Open Payments']],
     ['What is an unmatched payment?', 'A payment that is not linked to a person yet. It does not count towards anyone\'s $200 until you match it. The Unmatched view in Payments lists them.', ['#/payments?view=unmatched', 'Show unmatched']],
     ['How do refunds work?', 'Open the person, go to Enrolments and payments, and press Refund on the enrolment. The refund is recorded against that enrolment and shows in their history.', null],
     ['What do the payment statuses mean?', 'Each status and its meaning is listed in Admin under Status lists. Ask a hub admin if you cannot see that tab.', null]
