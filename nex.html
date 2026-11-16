@@ -6,9 +6,9 @@
 <meta name="theme-color" content="#12201f">
 <meta name="robots" content="noindex,nofollow">
 <meta name="referrer" content="no-referrer">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-27ysZxtg0xWjikciJnl6p9Oun6JvBpqkESCMcIdAldg=' 'sha256-s7wSREM7juKFs1RoXnQT2OdQdGKmp67yl4aYSNq+Mlo='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data: https://jcfgldqrdbfkgbixszds.supabase.co; connect-src https://jcfgldqrdbfkgbixszds.supabase.co; base-uri 'none'; form-action 'none'; object-src 'none'">
-<title>Nex · Student management</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232fb5ad'/%3E%3Cpath d='M9.5 9.5 16 16l-6.5 6.5M17 9.5l6.5 6.5-6.5 6.5' fill='none' stroke='%2308201f' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-27ysZxtg0xWjikciJnl6p9Oun6JvBpqkESCMcIdAldg=' 'sha256-06SlwZT6boZK2DpDDPwcSA5Aw3DDJlbQ2rUbdyTKikg='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data: https://jcfgldqrdbfkgbixszds.supabase.co; connect-src https://jcfgldqrdbfkgbixszds.supabase.co; base-uri 'none'; form-action 'none'; object-src 'none'">
+<title>Pipe-Line · Student management</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%20512%20512%27%3E%3Cdefs%3E%3ClinearGradient%20id%3D%27a%27%20x1%3D%270%27%20y1%3D%270%27%20x2%3D%271%27%20y2%3D%271%27%3E%3Cstop%20offset%3D%270%27%20stop-color%3D%27%232F86FF%27%2F%3E%3Cstop%20offset%3D%271%27%20stop-color%3D%27%230A2A7A%27%2F%3E%3C%2FlinearGradient%3E%3C%2Fdefs%3E%3Crect%20width%3D%27512%27%20height%3D%27512%27%20rx%3D%27116%27%20fill%3D%27url%28%23a%29%27%2F%3E%3Crect%20x%3D%27112%27%20y%3D%27188%27%20width%3D%27288%27%20height%3D%27136%27%20fill%3D%27%23E6F1FF%27%2F%3E%3Crect%20x%3D%2776%27%20y%3D%27156%27%20width%3D%2748%27%20height%3D%27200%27%20rx%3D%2718%27%20fill%3D%27%23fff%27%2F%3E%3Crect%20x%3D%27388%27%20y%3D%27156%27%20width%3D%2748%27%20height%3D%27200%27%20rx%3D%2718%27%20fill%3D%27%23fff%27%2F%3E%3Cpath%20d%3D%27M206%20216l40%2040-40%2040%27%20fill%3D%27none%27%20stroke%3D%27%237CC4FF%27%20stroke-width%3D%2732%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27%2F%3E%3Cpath%20d%3D%27M266%20216l40%2040-40%2040%27%20fill%3D%27none%27%20stroke%3D%27%231D6BF0%27%20stroke-width%3D%2732%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27%2F%3E%3C%2Fsvg%3E">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -926,11 +926,38 @@ body{font-variant-numeric:tabular-nums;text-rendering:optimizeLegibility}
 }
 .nx-lbcomment{white-space:normal;min-width:220px;max-width:46ch}
 
+/* v31: record header facts never overlap (long emails wrap inside their own column) */
+.nx-facts{grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}
+.nx-facts>div{min-width:0}
+.nx-facts dd{overflow-wrap:anywhere;word-break:break-word}
+
+/* v31: class attendance */
+.nx-att-cell{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.nx-att-by{font-size:12px;color:var(--nx-ink-3)}
+.nx-radios{display:grid;gap:8px;margin:4px 0 12px}
+.nx-radios label{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border:1px solid var(--nx-line,#e4e4e7);border-radius:10px;cursor:pointer}
+.nx-radios label small{display:block;color:var(--nx-ink-3);font-weight:400}
+.nx-radios input{margin-top:3px}
+.nx-radios label:has(input:checked){border-color:var(--nx-accent,#2563eb);background:color-mix(in srgb,var(--nx-accent,#2563eb) 6%,transparent)}
+.nx-fuhead{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.nx-toolbar [hidden]{display:none!important}
+.nx-count[hidden]{display:none}
+
+/* v32: Pipe-Line brand tile (blue) replaces the old teal square */
+.nx-mark,.gate-ic{background:none;border-radius:0;color:inherit}
+.nx-mark{width:30px;height:30px}.nx-mark svg{width:30px;height:30px}
+.gate-ic svg{width:52px;height:52px}
+
+/* v32: Pipe-Line brand tile (blue) replaces the old teal square */
+.nx-mark,.gate-ic{background:none;border-radius:0;color:inherit}
+.nx-mark{width:30px;height:30px}.nx-mark svg{width:30px;height:30px}
+.gate-ic svg{width:52px;height:52px}
+
 </style>
 </head>
 <body class="nx">
 <!-- NEXUS TOKEN GATE: app only opens when launched from the Nexus Nodes page -->
-<div id="__gate"><div class="gate-card"><div class="gate-ic"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M9.5 9.5 16 16l-6.5 6.5M17 9.5l6.5 6.5-6.5 6.5" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div class="gate-t">Nex</div><div id="__gateMsg" class="gate-m">Checking access…</div></div></div>
+<div id="__gate"><div class="gate-card"><div class="gate-ic"><svg viewBox="0 0 512 512" aria-hidden="true"><defs><linearGradient id="plT0" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2F86FF"/><stop offset="1" stop-color="#0A2A7A"/></linearGradient><linearGradient id="plP0" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFFFFF"/><stop offset="1" stop-color="#C4E0FF"/></linearGradient><linearGradient id="plF0" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFFFFF"/><stop offset="1" stop-color="#9CCBFF"/></linearGradient></defs><rect width="512" height="512" rx="116" fill="url(#plT0)"/><rect x="112" y="188" width="288" height="136" fill="url(#plP0)"/><rect x="76" y="156" width="48" height="200" rx="18" fill="url(#plF0)"/><rect x="388" y="156" width="48" height="200" rx="18" fill="url(#plF0)"/><path d="M206 216l40 40-40 40" fill="none" stroke="#7CC4FF" stroke-width="32" stroke-linecap="round" stroke-linejoin="round"/><path d="M266 216l40 40-40 40" fill="none" stroke="#1D6BF0" stroke-width="32" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div class="gate-t">Pipe-Line</div><div id="__gateMsg" class="gate-m">Checking access…</div></div></div>
 <script>
 (function(){
   /* clickjacking guard (GitHub Pages cannot send frame-ancestors): never run inside someone else's frame */
@@ -982,7 +1009,7 @@ body{font-variant-numeric:tabular-nums;text-rendering:optimizeLegibility}
 <div id="app" hidden>
   <button class="nx-skip" id="skipLink" type="button">Skip to content</button>
   <header class="nx-top">
-    <a class="nx-brand" href="#/" aria-label="Nex home"><span class="nx-mark"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M9.5 9.5 16 16l-6.5 6.5M17 9.5l6.5 6.5-6.5 6.5" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span>Nex</span></a>
+    <a class="nx-brand" href="#/" aria-label="Pipe-Line home"><span class="nx-mark"><svg viewBox="0 0 512 512" aria-hidden="true"><defs><linearGradient id="plT1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2F86FF"/><stop offset="1" stop-color="#0A2A7A"/></linearGradient><linearGradient id="plP1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFFFFF"/><stop offset="1" stop-color="#C4E0FF"/></linearGradient><linearGradient id="plF1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFFFFF"/><stop offset="1" stop-color="#9CCBFF"/></linearGradient></defs><rect width="512" height="512" rx="116" fill="url(#plT1)"/><rect x="112" y="188" width="288" height="136" fill="url(#plP1)"/><rect x="76" y="156" width="48" height="200" rx="18" fill="url(#plF1)"/><rect x="388" y="156" width="48" height="200" rx="18" fill="url(#plF1)"/><path d="M206 216l40 40-40 40" fill="none" stroke="#7CC4FF" stroke-width="32" stroke-linecap="round" stroke-linejoin="round"/><path d="M266 216l40 40-40 40" fill="none" stroke="#1D6BF0" stroke-width="32" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span>Pipe-Line</span></a>
     <form class="nx-search" id="gSearch" role="search" autocomplete="off">
       <svg class="nx-ico" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
       <input id="gSearchIn" type="search" placeholder="Search leads and students by name, email or phone" aria-label="Search leads and students">
@@ -996,15 +1023,15 @@ body{font-variant-numeric:tabular-nums;text-rendering:optimizeLegibility}
 
 <div id="mfa" class="lockov" hidden><div class="gate-card" id="mfaCard"></div></div>
 <div id="lock" class="lockov" hidden>
-  <div class="gate-card"><div class="gate-ic"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M9.5 9.5 16 16l-6.5 6.5M17 9.5l6.5 6.5-6.5 6.5" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div class="gate-t">Session ended</div>
-  <div class="gate-m" id="lockMsg">Your sign-in has run out. Go back to Nexus, refresh, and open Nex again.</div></div>
+  <div class="gate-card"><div class="gate-ic"><svg viewBox="0 0 512 512" aria-hidden="true"><defs><linearGradient id="plT2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2F86FF"/><stop offset="1" stop-color="#0A2A7A"/></linearGradient><linearGradient id="plP2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFFFFF"/><stop offset="1" stop-color="#C4E0FF"/></linearGradient><linearGradient id="plF2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFFFFF"/><stop offset="1" stop-color="#9CCBFF"/></linearGradient></defs><rect width="512" height="512" rx="116" fill="url(#plT2)"/><rect x="112" y="188" width="288" height="136" fill="url(#plP2)"/><rect x="76" y="156" width="48" height="200" rx="18" fill="url(#plF2)"/><rect x="388" y="156" width="48" height="200" rx="18" fill="url(#plF2)"/><path d="M206 216l40 40-40 40" fill="none" stroke="#7CC4FF" stroke-width="32" stroke-linecap="round" stroke-linejoin="round"/><path d="M266 216l40 40-40 40" fill="none" stroke="#1D6BF0" stroke-width="32" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div class="gate-t">Session ended</div>
+  <div class="gate-m" id="lockMsg">Your sign-in has run out. Go back to Nexus, refresh, and open Pipe-Line again.</div></div>
 </div>
 <div id="modalRoot"></div>
 <div id="toasts" class="toasts" aria-live="polite"></div>
 <script>
 'use strict';
 /* =========================================================
-   Nex core: api, helpers, ui kit, router
+   Pipe-Line core: api, helpers, ui kit, router
    ========================================================= */
 const SB = 'https://jcfgldqrdbfkgbixszds.supabase.co';
 const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpjZmdsZHFyZGJma2diaXhzemRzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1Nzc3NzEsImV4cCI6MjA5MDE1Mzc3MX0.Wj8cCpnlsoZOPj5sKWeEdfvgjG4Nc-UuTTYgbcrPfeI';
@@ -1132,7 +1159,7 @@ function endSession(why) {
   const mf = $('#mfa'); if (mf) { mf.hidden = true; const mc = $('#mfaCard'); if (mc) mc.innerHTML = ''; }
   const a = $('#app'); if (a) a.hidden = true;
   const msg = $('#lockMsg');
-  if (msg) msg.textContent = why === 'idle' ? 'Nex locked after 15 minutes without activity. Go back to Nexus and open Nex again.' : why === 'gone' ? 'Your sign-in has ended. Go back to Nexus, sign in again and open Nex.' : why === 'old' ? 'For safety Nex closes after 12 hours. Go back to Nexus and open Nex again.' : 'Your sign-in has run out. Go back to Nexus, refresh, and open Nex again.';
+  if (msg) msg.textContent = why === 'idle' ? 'Pipe-Line locked after 15 minutes without activity. Go back to Nexus and open Pipe-Line again.' : why === 'gone' ? 'Your sign-in has ended. Go back to Nexus, sign in again and open Pipe-Line.' : why === 'old' ? 'For safety Pipe-Line closes after 12 hours. Go back to Nexus and open Pipe-Line again.' : 'Your sign-in has run out. Go back to Nexus, refresh, and open Pipe-Line again.';
   const l = $('#lock'); if (l) l.hidden = false;
 }
 function watchSession() {
@@ -1160,12 +1187,12 @@ async function api(path, opt) {
   if (!r.ok) {
     let m = ''; try { const j = await r.json(); m = j.message || j.hint || j.details || ''; } catch (e) {}
     if (/row-level security|permission denied/i.test(m)) m = "You don't have permission to do that.";
-    else if (r.status >= 500) m = 'Nex had a problem saving or loading that. Try again in a moment.';
+    else if (r.status >= 500) m = 'Pipe-Line had a problem saving or loading that. Try again in a moment.';
     const err = new Error(m || ('Request failed (' + r.status + ')')); err.status = r.status; throw err;
   }
   return r;
 }
-/* call a Nex edge function as the signed-in person; failures keep the function's own message and code */
+/* call a Pipe-Line edge function as the signed-in person; failures keep the function's own message and code */
 async function fn(name, body) {
   const doFetch = async () => fetch(SB + '/functions/v1/' + name, { method: 'POST', headers: { apikey: KEY, Authorization: 'Bearer ' + await bearer(), 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
   let r;
@@ -1382,7 +1409,7 @@ function pickStudent(title, onPick, initial) {
 }
 
 /* ---------- existing-person lookup for add forms ----------
-   Type a phone or email (or a name) in an add form. If that person is already in Nex their details fill in,
+   Type a phone or email (or a name) in an add form. If that person is already in Pipe-Line their details fill in,
    the same way the call log does it, and the form saves against them instead of making a duplicate.
    cfg.ids maps first / last / name / phone / email to the field ids in the form; cfg.onChange(student|null) fires when the choice changes. */
 function idBoxHtml(hint) { return '<div class="nx-idbox" aria-live="polite" data-hint="' + esc(hint || '') + '"></div>'; }
@@ -1397,7 +1424,7 @@ function identityLookup(m, cfg) {
   const choose = (s, auto) => {
     chosen = s;
     put('first', s.first_name); put('last', s.last_name); put('name', fullName(s)); put('phone', s.phone); put('email', s.email);
-    show('<div class="nx-idfound">' + ico('check') + '<span>' + (auto ? 'Already in Nex: ' : 'Using ') + '<b>' + esc(fullName(s)) + '</b>' + (s.phone || s.email ? ' · ' + esc([fmtPhone(s.phone), s.email].filter(Boolean).join(' · ')) : '') + '. Their details are filled in.</span><span class="nx-grow"></span><a href="#/students/' + s.id + '" target="_blank" rel="noopener">Open record</a><button type="button" class="nx-btn sm" data-notthem>Not them</button></div>');
+    show('<div class="nx-idfound">' + ico('check') + '<span>' + (auto ? 'Already in Pipe-Line: ' : 'Using ') + '<b>' + esc(fullName(s)) + '</b>' + (s.phone || s.email ? ' · ' + esc([fmtPhone(s.phone), s.email].filter(Boolean).join(' · ')) : '') + '. Their details are filled in.</span><span class="nx-grow"></span><a href="#/students/' + s.id + '" target="_blank" rel="noopener">Open record</a><button type="button" class="nx-btn sm" data-notthem>Not them</button></div>');
     $('[data-notthem]', box).onclick = () => { refused.add(keyOf(s)); chosen = null; show(''); cfg.onChange && cfg.onChange(null); };
     cfg.onChange && cfg.onChange(s);
   };
@@ -1427,12 +1454,12 @@ function identityLookup(m, cfg) {
         const rows = await sel('nex_students', F + '&and=(' + toks.map(one).join(',') + ')&order=first_name&limit=5');
         if (my !== token) return;
         if (rows.length) {
-          show('<div class="nx-idpick"><div>Already in Nex with a similar name. Tap to use their details.</div>' + rows.map(r => '<button type="button" class="nx-pick" data-id="' + r.id + '"><span><b>' + esc(fullName(r)) + '</b><small>' + esc([fmtPhone(r.phone), r.email].filter(Boolean).join(' · ') || 'No contact details') + '</small></span><span class="nx-btn sm">Use</span></button>').join('') + '</div>');
+          show('<div class="nx-idpick"><div>Already in Pipe-Line with a similar name. Tap to use their details.</div>' + rows.map(r => '<button type="button" class="nx-pick" data-id="' + r.id + '"><span><b>' + esc(fullName(r)) + '</b><small>' + esc([fmtPhone(r.phone), r.email].filter(Boolean).join(' · ') || 'No contact details') + '</small></span><span class="nx-btn sm">Use</span></button>').join('') + '</div>');
           $$('.nx-pick', box).forEach(b => b.onclick = () => choose(rows.find(x => x.id === b.dataset.id), false));
           return;
         }
       }
-      show((goodPhone || goodEmail) ? '<div class="nx-idnew">' + esc(cfg.newMsg || 'Not in Nex yet. Saving will add a new person.') + '</div>' : (box.dataset.hint ? '<div class="nx-idnew">' + esc(box.dataset.hint) + '</div>' : ''));
+      show((goodPhone || goodEmail) ? '<div class="nx-idnew">' + esc(cfg.newMsg || 'Not in Pipe-Line yet. Saving will add a new person.') + '</div>' : (box.dataset.hint ? '<div class="nx-idnew">' + esc(box.dataset.hint) + '</div>' : ''));
     } catch (err) { if (my === token) show(''); }
   };
   const kick = () => { clearTimeout(timer); timer = setTimeout(run, 350); };
@@ -1459,7 +1486,7 @@ function isRecord(h) { return /^\/students\/[0-9a-f-]{36}$/.test(h); }
 function tidyView(v) { v.querySelectorAll('th:not([scope])').forEach(th => th.setAttribute('scope', 'col')); }
 function pageArrived(h) {
   const hd = HEADS[baseOf(h)];
-  document.title = (hd && !isRecord(h) ? hd[1] + ' · ' : '') + 'Nex';
+  document.title = (hd && !isRecord(h) ? hd[1] + ' · ' : '') + 'Pipe-Line';
   if (lastRouteH !== null && lastRouteH.split('?')[0] !== h.split('?')[0]) { const v = $('#view'); if (v && !modalStack.length) { try { v.focus({ preventScroll: true }); } catch (e) {} } }
   lastRouteH = h;
 }
@@ -1693,20 +1720,28 @@ function nextFuHtml(f) {
   const nth = f.kind === 'lead_cycle' && f.step ? ['', '1st', '2nd', '3rd'][f.step] + ' · ' : '';
   return '<span class="' + cls + '">' + nth + esc(fmtDate(f.due_at)) + (day < today ? ' (overdue)' : day === today ? ' (today)' : '') + '</span>';
 }
-const SL = { q: '', stage: '', qual: '', unf: '', kind: 'student', page: 0, size: 50 };
+const SL = { q: '', stage: '', qual: '', unf: '', kind: 'student', view: 'all', page: 0, size: 50 };
 route(/^\/(students|leads|search)(?:\?(.*))?$/, async m => {
   const mode = m[1], qs = new URLSearchParams(m[2] || '');
   const kind = mode === 'leads' ? 'lead' : mode === 'students' ? 'student' : 'all';
-  if (SL.kind !== kind) { SL.kind = kind; SL.page = 0; SL.q = SL.stage = SL.qual = SL.unf = ''; }
+  if (SL.kind !== kind) { SL.kind = kind; SL.page = 0; SL.view = 'all'; SL.q = SL.stage = SL.qual = SL.unf = ''; }
+  if (qs.get('view') === 'follow' && kind === 'lead') SL.view = 'follow';
   if (qs.get('unf')) { SL.unf = qs.get('unf'); SL.page = 0; }
   if (qs.has('q')) { SL.q = qs.get('q'); SL.page = 0; }
   const openNew = qs.get('new') === '1';
   const noun = kind === 'lead' ? 'leads' : kind === 'student' ? 'students' : 'people';
   afterRender(() => {
     const body = $('#slBody');
+    const syncView = () => {
+      $$('#slSeg button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === SL.view)));
+      $$('#slQ,#slStage,#slQual,#slUnf,#slClear').forEach(x => { x.hidden = SL.view === 'follow'; });
+    };
+    const refreshN = async () => { const n = await leadsFollowupCount(); const c = $('#slFuN'); if (c && n != null) { c.textContent = n; c.hidden = !n; } };
     const load = async () => {
       holdBody(body);
       try {
+        if (kind === 'lead' && SL.view === 'follow') { syncView(); await leadsFollowupLoad(body, $('#slFoot'), () => { load(); }); refreshN(); return; }
+        if (kind === 'lead') syncView();
         const q = safeQ(SL.q); const digits = cleanPhone(q);
         let query = 'select=id,student_no,first_name,last_name,email,phone,agent_id,created_at,needs_details,flagged_to,nex_student_paid!inner(paid_total),nex_enrolments' + (SL.stage || SL.qual ? '!inner' : '') + '(id,stage,qualification_id,fee,year,enrolled_on)' + (kind === 'lead' ? ',nex_followups(due_at,step,kind)' : '') + '&deleted_at=is.null&order=created_at.desc' + (kind === 'lead' ? '&nex_followups.done_at=is.null&nex_followups.order=due_at.asc&nex_followups.limit=1' : '');
         if (kind !== 'all') query += '&nex_student_paid.paid_total=' + (kind === 'lead' ? 'lt.' : 'gte.') + STUDENT_MIN;
@@ -1719,7 +1754,7 @@ route(/^\/(students|leads|search)(?:\?(.*))?$/, async m => {
         if (rows.length) pays = await sel('nex_payments', 'select=student_id,amount&student_id=in.' + inList(rows.map(r => r.id)));
         const paid = {}; pays.forEach(p => paid[p.student_id] = (paid[p.student_id] || 0) + Number(p.amount));
         const filtered = SL.q || SL.stage || SL.qual;
-        body.innerHTML = rows.length ? '<div class="nx-tablewrap"><table class="nx-table"><thead><tr><th>' + (kind === 'lead' ? 'Lead' : kind === 'student' ? 'Student' : 'Name') + '</th><th>Phone</th><th>Qualification</th><th>Stage</th><th>Fee and paid</th>' + (kind === 'lead' ? '<th>Next follow-up</th>' : '') + '<th>Enrolled</th><th>Agent</th></tr></thead><tbody>' +
+        body.innerHTML = rows.length ? '<div class="nx-tablewrap"><table class="nx-table"><thead><tr><th>' + (kind === 'lead' ? 'Lead' : kind === 'student' ? 'Student' : 'Name') + '</th><th>Phone</th><th>Qualification</th><th>Stage</th><th>Fee and paid</th>' + (kind === 'lead' ? '<th>Next follow-up</th>' : '') + '<th>Enrolled</th><th>Agent</th>' + (kind === 'lead' ? '<th></th>' : '') + '</tr></thead><tbody>' +
           rows.map(s => {
             const en = (s.nex_enrolments || []).slice().sort((a, b) => String(b.enrolled_on || '').localeCompare(String(a.enrolled_on || '')))[0] || {};
             const fee = (s.nex_enrolments || []).reduce((t, e) => t + Number(e.fee || 0), 0), pd = paid[s.id] || 0;
@@ -1730,15 +1765,17 @@ route(/^\/(students|leads|search)(?:\?(.*))?$/, async m => {
               '<td>' + (en.stage ? '<div class="nx-stagecell">' + pill('enrolment', en.stage) + '<div class="nx-mini">' + PATH.map((p, i) => '<i class="' + (idx >= 0 && i <= idx ? 'on' : '') + '"></i>').join('') + '</div></div>' : '<span class="nx-muted">–</span>') + '</td>' +
               '<td>' + (fee || pd ? '<div class="nx-meter"><div class="nx-meter-bar"><i class="' + (pd < fee ? 'warn' : '') + '" style="width:' + pct + '%"></i></div><small>' + money(pd) + ' of ' + money(fee) + '</small></div>' : '<span class="nx-muted">–</span>') + '</td>' +
               (kind === 'lead' ? '<td>' + nextFuHtml((s.nex_followups || [])[0]) + '</td>' : '') +
-              '<td>' + esc(fmtDate(en.enrolled_on) || '–') + '</td><td>' + esc(agentName(s.agent_id) || '–') + '</td></tr>';
+              '<td>' + esc(fmtDate(en.enrolled_on) || '–') + '</td><td>' + esc(agentName(s.agent_id) || '–') + '</td>' + (kind === 'lead' ? '<td><button class="nx-btn sm" data-bk="' + s.id + '">Book class</button></td>' : '') + '</tr>';
           }).join('') + '</tbody></table></div>' :
-          empty('No ' + noun + ' found', filtered ? 'Try a different search or clear the filters.' : kind === 'lead' ? 'Everyone in Nex has paid $200 or more.' : kind === 'student' ? 'Nobody has paid $200 yet. New people start as leads.' : 'Nobody is in Nex yet.', kind === 'lead' && !filtered ? '<a class="nx-btn primary" href="#/leads?new=1">' + ico('plus') + 'New lead</a>' : '');
+          empty('No ' + noun + ' found', filtered ? 'Try a different search or clear the filters.' : kind === 'lead' ? 'Everyone in Pipe-Line has paid $200 or more.' : kind === 'student' ? 'Nobody has paid $200 yet. New people start as leads.' : 'Nobody is in Pipe-Line yet.', kind === 'lead' && !filtered ? '<a class="nx-btn primary" href="#/leads?new=1">' + ico('plus') + 'New lead</a>' : '');
         const from = total ? SL.page * SL.size + 1 : 0, to = SL.page * SL.size + rows.length;
         const more = total != null && to < total;
         $('#slFoot').innerHTML = '<span>' + (total != null ? (total ? from + '–' + to + ' of ' + total.toLocaleString('en-AU') + ' ' + noun : '') : rows.length + ' shown') + '</span>' + (SL.page || more ? '<span class="nx-btnrow"><button class="nx-btn sm" id="slPrev"' + (SL.page ? '' : ' disabled') + '>Previous</button><button class="nx-btn sm" id="slNext"' + (more ? '' : ' disabled') + '>Next</button></span>' : '');
         const pv = $('#slPrev'), nx = $('#slNext');
         if (pv) pv.onclick = () => { SL.page--; load(); }; if (nx) nx.onclick = () => { SL.page++; load(); };
         $$('.nx-tr', body).forEach(tr => tr.onclick = () => go('#/students/' + tr.dataset.id));
+        $$('[data-bk]', body).forEach(b => b.onclick = e => { e.stopPropagation(); const p = rows.find(x => x.id === b.dataset.bk); const en = ((p && p.nex_enrolments) || []).slice().sort((a, c) => String(c.enrolled_on || '').localeCompare(String(a.enrolled_on || '')))[0]; if (p) bookClassModal(p, en ? en.id : null, () => { refreshN(); load(); }); });
+        if (kind === 'lead') refreshN();
       } catch (e) { body.innerHTML = empty('Could not load ' + noun, e.message); }
     };
     let t = 0;
@@ -1746,6 +1783,7 @@ route(/^\/(students|leads|search)(?:\?(.*))?$/, async m => {
     $('#slStage').onchange = e => { SL.stage = e.target.value; SL.page = 0; load(); };
     $('#slQual').onchange = e => { SL.qual = e.target.value; SL.page = 0; load(); };
     const un = $('#slUnf'); if (un) un.onchange = e => { SL.unf = e.target.value; SL.page = 0; load(); };
+    $$('#slSeg button').forEach(b => b.onclick = () => { SL.view = b.dataset.v; SL.page = 0; load(); });
     $('#slClear').onclick = () => { SL.q = SL.stage = SL.qual = SL.unf = ''; SL.page = 0; $('#slQ').value = ''; $('#slStage').value = ''; $('#slQual').value = ''; const u2 = $('#slUnf'); if (u2) u2.value = ''; load(); };
     const nb = $('#slNew'); if (nb) nb.onclick = () => newStudent();
     viewWait(load());
@@ -1755,7 +1793,7 @@ route(/^\/(students|leads|search)(?:\?(.*))?$/, async m => {
     : kind === 'student' ? pageHead('user', 'Paid $200 or more', 'Students', '')
     : pageHead('search', 'Leads and students', 'Search', '');
   return head +
-    '<div class="nx-card"><div class="nx-toolbar" style="border-top:0"><input class="nx-in sm" style="min-width:280px" id="slQ" placeholder="Search ' + (kind === 'all' ? 'name, email or phone' : noun + ' by name, email or phone') + '" value="' + esc(SL.q) + '"><select class="nx-sel sm" id="slStage">' + selectOpts(opts('enrolment', true), SL.stage, 'Any stage') + '</select><select class="nx-sel sm" id="slQual">' + selectOpts(REF.quals.filter(q => q.active), SL.qual, 'Any qualification') + '</select>' + (kind === 'lead' ? '<select class="nx-sel sm" id="slUnf" aria-label="Unfinished leads"><option value=""' + (SL.unf ? '' : ' selected') + '>All leads</option><option value="mine"' + (SL.unf === 'mine' ? ' selected' : '') + '>Unfinished, flagged to me</option><option value="all"' + (SL.unf === 'all' ? ' selected' : '') + '>Unfinished, anyone</option></select>' : '') + '<button class="nx-btn quiet sm" id="slClear">Clear</button></div>' +
+    '<div class="nx-card"><div class="nx-toolbar" style="border-top:0">' + (kind === 'lead' ? '<div class="nx-seg" id="slSeg" role="group" aria-label="Show"><button type="button" data-v="all" aria-pressed="' + (SL.view === 'all') + '">All leads</button><button type="button" data-v="follow" aria-pressed="' + (SL.view === 'follow') + '">Needs follow-up <span class="nx-count" id="slFuN" hidden></span></button></div>' : '') + '<input class="nx-in sm" style="min-width:280px" id="slQ" placeholder="Search ' + (kind === 'all' ? 'name, email or phone' : noun + ' by name, email or phone') + '" value="' + esc(SL.q) + '"><select class="nx-sel sm" id="slStage">' + selectOpts(opts('enrolment', true), SL.stage, 'Any stage') + '</select><select class="nx-sel sm" id="slQual">' + selectOpts(REF.quals.filter(q => q.active), SL.qual, 'Any qualification') + '</select>' + (kind === 'lead' ? '<select class="nx-sel sm" id="slUnf" aria-label="Unfinished leads"><option value=""' + (SL.unf ? '' : ' selected') + '>All leads</option><option value="mine"' + (SL.unf === 'mine' ? ' selected' : '') + '>Unfinished, flagged to me</option><option value="all"' + (SL.unf === 'all' ? ' selected' : '') + '>Unfinished, anyone</option></select>' : '') + '<button class="nx-btn quiet sm" id="slClear">Clear</button></div>' +
     '<div id="slBody"></div><div class="nx-foot" id="slFoot"><span></span></div></div>';
 });
 
@@ -1795,7 +1833,7 @@ function newStudent() {
     existing = lk ? lk.get() : null;
     const { qualification_id, fee, stage, enrolled_on, ...stu } = v;
     if (existing) {
-      /* they are already in Nex: add the new enrolment to them (if one was filled in) and open their record */
+      /* they are already in Pipe-Line: add the new enrolment to them (if one was filled in) and open their record */
       if (qualification_id || fee != null) await ins('nex_enrolments', { student_id: existing.id, qualification_id, fee, stage, enrolled_on, year: new Date().getFullYear(), created_by: ME.name }, true);
       toast(qualification_id || fee != null ? 'Added to ' + fullName(existing) : 'Opened ' + fullName(existing)); go('#/students/' + existing.id); return;
     }
@@ -1806,7 +1844,7 @@ function newStudent() {
       if (d.length) {
         warned = true;
         let b = $('.nx-warnbox', m.el); if (!b) { b = document.createElement('div'); b.className = 'nx-warnbox'; b.style.marginBottom = '12px'; $('.modal-b', m.el).prepend(b); }
-        b.innerHTML = 'This looks like someone already in Nex: ' + d.map(x => '<a href="#/students/' + x.id + '">' + esc(fullName(x)) + '</a>').join(', ') + '. Press Add lead again if this is a different person.';
+        b.innerHTML = 'This looks like someone already in Pipe-Line: ' + d.map(x => '<a href="#/students/' + x.id + '">' + esc(fullName(x)) + '</a>').join(', ') + '. Press Add lead again if this is a different person.';
         return false;
       }
     }
@@ -1818,7 +1856,7 @@ function newStudent() {
   };
   /* first name is checked in save() so that picking an existing person does not need it */
   f.find(x => x.k === 'first_name').required = false; f.find(x => x.k === 'first_name').label = 'First name *';
-  const m = formModal('New lead', f, save, 'Add lead', idBoxHtml('Start with a phone number or email. If they are already in Nex, their details fill in.'));
+  const m = formModal('New lead', f, save, 'Add lead', idBoxHtml('Start with a phone number or email. If they are already in Pipe-Line, their details fill in.'));
   standardFee(m, 'f_qualification_id', 'f_fee');
   lk = identityLookup(m, { ids: { phone: 'f_phone', email: 'f_email', first: 'f_first_name', last: 'f_last_name' }, onChange: s => { const b = $('.modal-f .nx-btn.primary', m.el); if (b) b.textContent = s ? 'Add to ' + fullName(s) : 'Add lead'; } });
   return m;
@@ -1864,7 +1902,7 @@ route(/^\/students\/([0-9a-f-]{36})$/, async m => {
     (s.needs_details ? '<div class="nx-card nx-unfbar"><div class="nx-note">' + ico('bell') + '<span><b>Unfinished lead.</b> Started from a call' + (s.flagged_to ? ' logged by <b>' + esc(s.flagged_to) + '</b>' : '') + '. Add their email, course and any other details, then mark it complete.</span> <button class="nx-btn sm primary" data-a="doneDetails">' + ico('check') + 'Mark complete</button></div></div>' : '') +
     '<div class="nx-card"><div class="nx-hl"><span class="nx-avatar">' + esc(initials(fullName(s))) + '</span><div><div class="nx-eyebrow">' + (isStudent ? 'Student ' : 'Lead ') + esc(String(s.student_no || '')) + '</div><h1 class="nx-title">' + esc(fullName(s)) + ' <span class="nx-pill ' + (isStudent ? 'accent' : 'info') + '">' + (isStudent ? 'Student' : 'Lead') + '</span></h1></div>' +
     '<dl class="nx-facts">' + fact('Email', esc(s.email || '')) + fact('Phone', esc(fmtPhone(s.phone))) + fact('Agent', esc(agentName(s.agent_id))) + fact('Fee and paid', totalFee || totalPaid ? money(totalPaid) + ' of ' + money(totalFee) : '') + fact('Added', esc(fmtDate(s.created_at))) + '</dl>' +
-    '<div class="nx-btnrow"><button class="nx-btn" data-a="editStu">' + ico('edit') + 'Edit</button><button class="nx-btn" data-a="addEnr">' + ico('plus') + 'Enrolment</button><button class="nx-btn quiet" data-a="archive">' + ico('archive') + 'Archive</button></div></div>' +
+    '<div class="nx-btnrow"><button class="nx-btn" data-a="editStu">' + ico('edit') + 'Edit</button><button class="nx-btn" data-a="addEnr">' + ico('plus') + 'Enrolment</button>' + (isStudent ? '' : '<button class="nx-btn primary" data-a="bookFA">' + ico('aid') + 'Book class</button>') + '<button class="nx-btn quiet" data-a="archive">' + ico('archive') + 'Archive</button></div></div>' +
     (main.id ? '<div style="padding:0 16px 16px"><ol class="nx-path">' + PATH.map((p, i) => '<li class="' + (i < idx ? 'done' : i === idx ? 'now' : '') + '">' + (i < idx ? ico('check') : '') + esc(statusLabel('enrolment', p)) + '</li>').join('') + '</ol>' + (idx < 0 && main.stage ? '<div style="margin-top:8px">Current stage: ' + pill('enrolment', main.stage) + '</div>' : '') + '</div>' : '') + '</div>' +
     '<div class="nx-cols"><div class="nx-colmain"><div class="nx-card"><div class="nx-tabs" role="tablist">' +
     [['details', 'Details'], ['money', 'Enrolments and payments'], ['docs', 'Documents' + docsBadge(ctx)], ['activity', 'Activity']].map(([k, l]) => '<button class="nx-tab" role="tab" data-tab="' + k + '" aria-selected="' + (SR.tab === k) + '">' + l + '</button>').join('') + '</div><div id="srTab"></div></div></div>' +
@@ -1876,7 +1914,7 @@ function sideCards(c) {
   const bk = c.books.slice().sort((a, b) => String((b.nex_class_sessions || {}).class_date || '').localeCompare(String((a.nex_class_sessions || {}).class_date || '')));
   const open = c.followups.filter(f => !f.done_at);
   return '<div class="nx-card"><div class="nx-card-h"><h3>First Aid and CPR</h3><button class="nx-btn sm" data-a="bookFA">Book</button></div>' +
-    (bk.length ? '<div class="nx-related">' + bk.slice(0, 4).map(b => { const ss_ = b.nex_class_sessions || {}; return '<div><span><a href="#/firstaid/' + b.session_id + '"><b>' + esc(fmtDate(ss_.class_date)) + '</b></a><small>' + (ss_.kind === 'renewal' ? 'Renewal' : 'Full class') + (b.seat_no ? ' · seat ' + b.seat_no : '') + '</small></span>' + (b.status ? pill('booking', b.status) : '') + '</div>'; }).join('') + '</div>' : empty('No class booked')) + '</div>' +
+    (bk.length ? '<div class="nx-related">' + bk.slice(0, 4).map(b => { const ss_ = b.nex_class_sessions || {}; return '<div><span><a href="#/firstaid/' + b.session_id + '"><b>' + esc(fmtDate(ss_.class_date)) + '</b></a><small>' + (ss_.kind === 'renewal' ? 'Renewal' : 'Full class') + (b.seat_no ? ' · seat ' + b.seat_no : '') + (b.status === 'attended' && b.attendance_by ? ' · marked by ' + esc(b.attendance_by) : '') + '</small></span>' + (b.status ? pill('booking', b.status) : '') + '</div>'; }).join('') + '</div>' : empty('No class booked')) + '</div>' +
     '<div class="nx-card"><div class="nx-card-h"><h3>Placement</h3></div>' +
     (c.plcs.length || c.reqs.length ? '<div class="nx-related">' + c.plcs.slice(0, 3).map(p => '<div><span><b>' + esc((p.nex_facilities || {}).name || p.facility_text || 'Placement') + '</b><small>' + (p.start_date ? 'Starts ' + esc(fmtDate(p.start_date)) : 'No start date') + '</small></span>' + pill('placement_stage', p.status) + '</div>').join('') +
       c.reqs.slice(0, 3).map(r => '<div><span><b>' + esc((r.nex_facilities || {}).name || r.facility_text || 'Request') + '</b><small>' + (r.self_placement ? 'Self placement' : 'Request') + (r.emailed_on ? ' · emailed ' + esc(fmtDate(r.emailed_on)) : '') + '</small></span>' + pill('placement', r.status) + '</div>').join('') + '</div>' : empty('No placement yet')) + '</div>' +
@@ -1941,7 +1979,7 @@ function section(title, inner, action) {
 }
 function tabDetails(c) {
   const s = c.s, d = c.d;
-  const sens = c.limited ? section('Personal and sensitive', '<div class="nx-note">' + ico('lock') + ' You have opened a lot of student records in a short time, so personal details are paused for now. Try again later, or ask an admin.</div>') : section('Personal and sensitive', '<div class="nx-note">' + ico('lock') + ' Visible to all Nex staff. Every look and every change is logged.</div><dl class="nx-fields">' + field('Date of birth', esc(fmtDate(d.dob))) + field('USI', esc(d.usi)) + field('Address', esc([d.address, d.suburb, d.state, d.postcode].filter(Boolean).join(', '))) +
+  const sens = c.limited ? section('Personal and sensitive', '<div class="nx-note">' + ico('lock') + ' You have opened a lot of student records in a short time, so personal details are paused for now. Try again later, or ask an admin.</div>') : section('Personal and sensitive', '<div class="nx-note">' + ico('lock') + ' Visible to all Pipe-Line staff. Every look and every change is logged.</div><dl class="nx-fields">' + field('Date of birth', esc(fmtDate(d.dob))) + field('USI', esc(d.usi)) + field('Address', esc([d.address, d.suburb, d.state, d.postcode].filter(Boolean).join(', '))) +
       field('Emergency contact', esc([d.emergency_name, d.emergency_relation && '(' + d.emergency_relation + ')', fmtPhone(d.emergency_phone)].filter(Boolean).join(' '))) + field('Disability', esc(d.disability)) + field('Indigenous status', esc(d.indigenous_status)) + '</dl><div style="padding:0 16px 16px"><button class="nx-btn sm" data-a="editDet">' + ico('edit') + 'Edit personal details</button></div>');
   return section('Contact', '<dl class="nx-fields">' + field('First name', esc(s.first_name)) + field('Last name', esc(s.last_name)) + field('Email', esc(s.email)) + field('Phone', esc(fmtPhone(s.phone))) + field('Second phone', esc(fmtPhone(s.phone2))) + field('Agent', esc(agentName(s.agent_id))) + field('Outside Sydney', s.outside_sydney ? 'Yes' : 'No') + '</dl><div style="padding:0 16px 16px"><button class="nx-btn sm" data-a="editStu">' + ico('edit') + 'Edit contact</button></div>') +
     sens +
@@ -1996,6 +2034,7 @@ function tabActivity(c) {
   c.aud.forEach(a => { if (a.action === 'UPDATE' && !diffHtml(a)) return; items.push({ t: a.changed_at, html: feedItem(a) }); });
   (c.logs || []).forEach(k => items.push({ t: k.created_at, html: '<li><span class="dot ok">' + ico('notebook') + '</span><div><b>' + esc(k.receiver || 'Someone') + '</b> received their logbook on ' + esc(fmtDate(k.received_on)) + (k.comments ? '<div class="nx-diff">' + esc(k.comments) + '</div>' : '') + '<time>' + fmtDT(k.created_at) + '</time></div></li>' }));
   (c.calls || []).forEach(k => items.push({ t: k.created_at, html: '<li><span class="dot info">' + ico('bell') + '</span><div><b>' + esc(k.logged_by || 'Someone') + '</b> logged a call (' + (k.direction === 'out' ? 'out' : 'in') + '): ' + esc(k.reason) + (k.resolved_at ? '' : ' <span class="nx-pill warn">Waiting for a callback</span>') + (k.note ? '<div class="nx-diff">' + esc(k.note) + '</div>' : '') + '<time>' + fmtDT(k.created_at) + '</time></div></li>' }));
+  (c.books || []).forEach(b => { if (!b.attendance_at || !BK_WORD[b.status]) return; const cd = (b.nex_class_sessions || {}).class_date; items.push({ t: b.attendance_at, html: '<li><span class="dot ' + (b.status === 'attended' ? 'ok' : 'warn') + '">' + ico('aid') + '</span><div><b>' + esc(b.attendance_by || 'Someone') + '</b> marked <b>' + BK_WORD[b.status] + '</b> for First Aid and CPR' + (cd ? ' on ' + esc(fmtDate(cd)) : '') + '<time>' + fmtDT(b.attendance_at) + '</time></div></li>' }); });
   items.sort((a, b) => String(b.t).localeCompare(String(a.t)));
   return items.length ? '<ul class="nx-feed">' + items.slice(0, 60).map(i => i.html).join('') + '</ul>' : empty('No activity yet');
 }
@@ -2025,7 +2064,7 @@ async function studentAction(a, ds, c) {
   if (a === 'doneFu') { await upd('nex_followups', 'id=eq.' + ds.id, { done_at: new Date().toISOString(), done_by: ME.name }); toast('Done'); return render(); }
   if (a === 'emailFu') return emailFollowup(s, Number(ds.step));
   if (a === 'doneDetails') { await upd('nex_students', 'id=eq.' + s.id, { needs_details: false, flagged_to: null }); toast('Marked complete'); return render(); }
-  if (a === 'bookFA') return go('#/firstaid');
+  if (a === 'bookFA') return bookClassModal(s, (c.enr.find(e => e.id === ds.id) || c.enr[0] || {}).id || null, () => render());
 }
 
 /* picking a qualification fills the agreed fee with that course's standard fee, unless someone typed a different one */
@@ -2184,7 +2223,7 @@ function linkPayment(p, queueRow) {
 }
 
 function globalAddPayment() {
-  /* one form: type the student's phone or email (or name). If they are already in Nex their details fill in and the payment goes against their enrolment. */
+  /* one form: type the student's phone or email (or name). If they are already in Pipe-Line their details fill in and the payment goes against their enrolment. */
   const f = [
     { k: 'phone', label: 'Phone', type: 'tel' }, { k: 'email', label: 'Email', type: 'email' },
     { k: 'payer_name', label: 'Student name', placeholder: 'Or type a name to look them up' },
@@ -2202,7 +2241,7 @@ function globalAddPayment() {
     const p = await ins('nex_payments', Object.assign(pay, { payer_name: pay.payer_name || fullName(st), student_id: st ? st.id : null, enrolment_id: enrolmentId, created_by: ME.name }));
     if (enrolmentId) await ins('nex_payment_queue', { enrolment_id: enrolmentId, payment_id: p.id, processing_step: 'draft_not_made', updated_by: ME.name }, true).catch(() => {});
     toast(st ? 'Payment recorded for ' + fullName(st) : 'Payment recorded. Link it to a student later.'); render();
-  }, 'Save payment', idBoxHtml('Start with the student\'s phone or email. If they are already in Nex, their details and enrolment fill in. Otherwise the payment is saved unmatched and can be linked later.'));
+  }, 'Save payment', idBoxHtml('Start with the student\'s phone or email. If they are already in Pipe-Line, their details and enrolment fill in. Otherwise the payment is saved unmatched and can be linked later.'));
   const wrap = $('#f_enrolment_id', m.el).parentElement; wrap.hidden = true;
   lk = identityLookup(m, { ids: { phone: 'f_phone', email: 'f_email', name: 'f_payer_name' }, onChange: async st => {
     enr = []; const sel0 = $('#f_enrolment_id', m.el);
@@ -2226,13 +2265,15 @@ route(/^\/firstaid(?:\/([0-9a-f-]{36}))?$/, async m => {
   if (want && !sessions.find(s => s.id === want)) { const one = await sel('nex_class_sessions', 'select=*&id=eq.' + want); if (one[0]) sessions = [one[0]].concat(sessions).sort((a, b) => a.class_date.localeCompare(b.class_date)); }
   const cur = sessions.find(s => s.id === want) || sessions.find(s => s.class_date >= today) || sessions[sessions.length - 1] || null;
   const cnt = {};
-  if (sessions.length) { const rows = await selAll('nex_class_bookings', 'select=session_id,status&session_id=in.' + inList(sessions.map(s => s.id))); rows.forEach(b => { if (b.status !== 'cancelled') cnt[b.session_id] = (cnt[b.session_id] || 0) + 1; }); }
+  if (sessions.length) { const rows = await selAll('nex_class_bookings', 'select=session_id,status&session_id=in.' + inList(sessions.map(s => s.id))); rows.forEach(b => { if (!bkOff(b.status)) cnt[b.session_id] = (cnt[b.session_id] || 0) + 1; }); }
   let books = [];
   if (cur) books = await sel('nex_class_bookings', 'select=*,nex_students(id,first_name,last_name)&session_id=eq.' + cur.id + '&order=seat_no.asc.nullslast,created_at.asc');
   afterRender(() => bindFirstAid(cur, books));
   const head = pageHead('aid', 'Evershine', 'First Aid and CPR', '<button class="nx-btn" id="faJump">Past classes</button><button class="nx-btn primary" id="faNew">' + ico('plus') + 'New class day</button>');
   if (!cur) return head + '<div class="nx-card">' + empty('No classes scheduled', 'Add the next class day to start taking bookings.') + '</div>';
-  const live = books.filter(b => b.status !== 'cancelled');
+  const live = books.filter(b => !bkOff(b.status));
+  const offs = books.filter(b => bkOff(b.status));
+  const moved = offs.length ? await bkMovedMap(offs).catch(() => ({})) : {};
   const d = fmtDay(cur.class_date);
   const seated = live.filter(b => b.seat_no);
   const walk = live.filter(b => b.booking_type !== 'student').length;
@@ -2243,11 +2284,17 @@ route(/^\/firstaid(?:\/([0-9a-f-]{36}))?$/, async m => {
     (live.length > cur.seats ? '<div class="nx-warnbox">This class has more bookings than seats. Move some people to another day.</div>' : '') +
     '<div class="nx-seats" id="faSeats">' + Array.from({ length: cur.seats }, (_, i) => { const n = i + 1; const b = live.find(x => x.seat_no === n); return '<button class="nx-seat ' + (b ? (b.booking_type !== 'student' ? 'walk' : 'booked') : '') + '" data-seat="' + n + '" title="' + esc(b ? b.name : 'Free seat') + '"><span>' + (b ? esc((b.name || '').split(' ')[0].slice(0, 7)) : n) + '</span></button>'; }).join('') + '</div>' +
     '<div class="nx-legend"><span><i></i>Free</span><span><i class="booked"></i>Student</span><span><i class="walk"></i>Walk-in or agent group</span></div></div></div>' +
-    '<div class="nx-card"><div class="nx-card-h"><h3>Bookings</h3><button class="nx-btn primary sm" id="faAdd">' + ico('plus') + 'Add booking</button></div>' +
-    (books.length ? '<div class="nx-tablewrap"><table class="nx-table tight"><thead><tr><th>Seat</th><th>Name</th><th>Phone</th><th>Type</th><th>Booked by</th><th>Status</th><th>Flags</th><th></th></tr></thead><tbody>' +
-      books.map(b => '<tr class="nx-tr" data-b="' + b.id + '"><td class="nx-num">' + (b.seat_no || '<span class="nx-muted">–</span>') + '</td><td><b>' + (b.nex_students ? '<a href="#/students/' + b.nex_students.id + '">' + esc(b.name) + '</a>' : esc(b.name)) + '</b><div class="nx-muted" style="font-size:12px">' + esc(b.email || '') + '</div></td><td class="nx-num">' + esc(fmtPhone(b.phone)) + '</td><td>' + (b.booking_type === 'student' ? '<span class="nx-tag">Student</span>' : '<span class="nx-tag walk">' + (b.booking_type === 'walk_in' ? 'Walk-in' : 'Agent group') + '</span>') + (b.agent_id ? ' <span class="nx-muted">' + esc(agentName(b.agent_id)) + '</span>' : '') + '</td><td>' + esc(b.created_by || '') + '</td><td>' + pill('booking', b.status) + '</td>' +
-        '<td><div class="nx-flags">' + bookingFlags(cur, b) + '</div></td><td><button class="nx-btn sm" data-edit="' + b.id + '">Edit</button></td></tr>').join('') + '</tbody></table></div>' : empty('No bookings yet', 'Press Add booking or choose a free seat above.')) + (books.length ? '<div class="nx-legend nx-flaglegend"><span><b>QS</b> quiz sent</span><span><b>QD</b> quiz done</span><span><b>$</b> paid</span>' + (cur.kind !== 'renewal' ? '<span><b>PP</b> placement plan yes or done</span><span><b>EP</b> education plan yes or RTO done</span>' : '<span><b>SG</b> signature done</span>') + '</div>' : '') + '</div>';
+    '<div class="nx-card" id="faBook"><div class="nx-card-h"><h3>Bookings</h3><button class="nx-btn primary sm" id="faAdd">' + ico('plus') + 'Add booking</button></div>' +
+    (live.length ? '<div class="nx-tablewrap"><table class="nx-table tight"><thead><tr><th>Seat</th><th>Name</th><th>Phone</th><th>Type</th><th>Booked by</th><th>Attendance</th><th>Flags</th><th></th></tr></thead><tbody>' +
+      live.map(b => '<tr class="nx-tr" data-b="' + b.id + '"><td class="nx-num">' + (b.seat_no || '<span class="nx-muted">–</span>') + '</td><td><b>' + (b.nex_students ? '<a href="#/students/' + b.nex_students.id + '">' + esc(b.name) + '</a>' : esc(b.name)) + '</b><div class="nx-muted" style="font-size:12px">' + esc(b.email || '') + '</div></td><td class="nx-num">' + esc(fmtPhone(b.phone)) + '</td><td>' + (b.booking_type === 'student' ? '<span class="nx-tag">Student</span>' : '<span class="nx-tag walk">' + (b.booking_type === 'walk_in' ? 'Walk-in' : 'Agent group') + '</span>') + (b.agent_id ? ' <span class="nx-muted">' + esc(agentName(b.agent_id)) + '</span>' : '') + '</td><td>' + esc(b.created_by || '') + '</td><td>' + attCell(b) + '</td>' +
+        '<td><div class="nx-flags">' + bookingFlags(cur, b) + '</div></td><td><button class="nx-btn sm" data-edit="' + b.id + '">Edit</button></td></tr>').join('') + '</tbody></table></div>' : empty('No bookings yet', 'Press Add booking or choose a free seat above.')) + (live.length ? '<div class="nx-legend nx-flaglegend"><span><b>QS</b> quiz sent</span><span><b>QD</b> quiz done</span><span><b>$</b> paid</span>' + (cur.kind !== 'renewal' ? '<span><b>PP</b> placement plan yes or done</span><span><b>EP</b> education plan yes or RTO done</span>' : '<span><b>SG</b> signature done</span>') + '</div>' : '') + '</div>' +
+    (offs.length ? '<div class="nx-card" id="faOff"><div class="nx-card-h"><div><h3>No show, cancelled and rescheduled <span class="nx-count">' + offs.length + '</span></h3><div class="nx-muted">Not counted in the seats. Each one has a follow-up task for the next working day.</div></div></div>' + bkFollowTable(offs, moved) + '</div>' : '');
 });
+
+function attCell(b) {
+  if (b.status === 'attended') return '<div class="nx-att-cell"><span class="nx-pill ok">Attended</span><span class="nx-att-by">' + esc(b.attendance_by || '') + (b.attendance_at ? ' · ' + esc(fmtDT(b.attendance_at)) : '') + '</span><button class="nx-btn sm quiet" data-ud="' + b.id + '">Undo</button></div>';
+  return '<div class="nx-att-cell">' + (b.status === 'booked' || !b.status ? '' : pill('booking', b.status)) + '<button class="nx-btn sm" data-at="' + b.id + '">Attended</button><button class="nx-btn sm quiet" data-mk="' + b.id + '">No show or cancelled</button></div>';
+}
 
 function bindFirstAid(cur, books) {
   const view = $('#view');
@@ -2258,8 +2305,13 @@ function bindFirstAid(cur, books) {
   $$('#faDays .nx-day').forEach(b => b.onclick = () => go('#/firstaid/' + b.dataset.id));
   $('#faEdit').onclick = () => classForm(cur);
   $('#faAdd').onclick = () => bookingForm(cur, null, books);
-  $$('#faSeats .nx-seat').forEach(b => b.onclick = () => { const n = Number(b.dataset.seat); const ex = books.find(x => x.seat_no === n && x.status !== 'cancelled'); bookingForm(cur, ex || null, books, n); });
+  $$('#faSeats .nx-seat').forEach(b => b.onclick = () => { const n = Number(b.dataset.seat); const ex = books.find(x => x.seat_no === n && !bkOff(x.status)); bookingForm(cur, ex || null, books, n); });
   $$('[data-edit]').forEach(b => b.onclick = e => { e.stopPropagation(); bookingForm(cur, books.find(x => x.id === b.dataset.edit), books); });
+  const by = id => books.find(x => x.id === id);
+  $$('[data-at]').forEach(b => b.onclick = e => { e.stopPropagation(); bkAttended(by(b.dataset.at)); });
+  $$('[data-mk]').forEach(b => b.onclick = e => { e.stopPropagation(); attendanceModal(by(b.dataset.mk)); });
+  $$('#faBook [data-ud]').forEach(b => b.onclick = e => { e.stopPropagation(); bkUndo(by(b.dataset.ud)); });
+  const off = $('#faOff'); if (off) bkBindFollow(off, books.filter(x => bkOff(x.status)), render);
 }
 
 function classForm(c) {
@@ -2289,7 +2341,7 @@ function bookingFlags(cur, b) {
 const PLAN_PL = { yes: 'Yes', done: 'Done', no: 'No' }, PLAN_ED = { yes: 'Yes', rto_done: 'RTO done', no: 'No' };
 function bookingForm(cur, b, books, seat) {
   b = b || {}; let studentId = b.student_id || null;
-  const takenBy = n => books.find(x => x.seat_no === n && x.status !== 'cancelled' && x.id !== b.id);
+  const takenBy = n => books.find(x => x.seat_no === n && !bkOff(x.status) && x.id !== b.id);
   const f = [{ k: 'name', label: 'Name', value: b.name, required: true }, { k: 'phone', label: 'Phone', type: 'tel', value: b.phone }, { k: 'email', label: 'Email', type: 'email', value: b.email },
     { k: 'seat_no', label: 'Seat', type: 'number', value: b.seat_no || seat || '', help: 'Leave empty for the waiting list' },
     { k: 'booking_type', label: 'Booking type', type: 'select', options: [{ id: 'student', label: 'Student' }, { id: 'walk_in', label: 'Walk-in' }, { id: 'agent_group', label: 'Agent group' }], value: b.booking_type || 'student' },
@@ -2304,16 +2356,16 @@ function bookingForm(cur, b, books, seat) {
   const m = formModal(b.id ? 'Edit booking' : 'Add booking', f, async v => {
     if (v.seat_no != null) { v.seat_no = Math.round(v.seat_no); if (v.seat_no < 1 || v.seat_no > cur.seats) throw new Error('Seat must be between 1 and ' + cur.seats + '.'); const t = takenBy(v.seat_no); if (t) throw new Error('Seat ' + v.seat_no + ' is already taken by ' + t.name + '.'); }
     if (v.phone) v.phone = cleanPhone(v.phone) || v.phone; if (v.email) v.email = v.email.toLowerCase();
-    if (v.status === 'cancelled') v.seat_no = null;
+    const newSt = v.status; if (b.id && newSt !== (b.status || '') && (bkOff(newSt) || newSt === 'attended' || (newSt === 'booked' && (bkOff(b.status) || b.status === 'attended')))) { delete v.status; v.seat_no = bkOff(newSt) ? null : v.seat_no; } else if (bkOff(v.status)) v.seat_no = null;
     try {
-      if (b.id) await upd('nex_class_bookings', 'id=eq.' + b.id, Object.assign(v, { student_id: studentId }));
+      if (b.id) { await upd('nex_class_bookings', 'id=eq.' + b.id, Object.assign(v, { student_id: studentId })); if (newSt !== (b.status || '') && newSt && (bkOff(newSt) || newSt === 'attended' || (newSt === 'booked' && (bkOff(b.status) || b.status === 'attended')))) await bkMark(b, newSt); }
       else await ins('nex_class_bookings', Object.assign({ session_id: cur.id, student_id: studentId, created_by: ME.name }, v), true);
     } catch (e) { if (/duplicate|unique/i.test(e.message)) throw new Error('That seat was just taken. Choose another.'); throw e; }
     toast('Booking saved'); render();
   }, 'Save booking', top);
   if (b.id) {
     const foot = $('.modal-f', m.el); const cb = document.createElement('button'); cb.className = 'nx-btn'; cb.style.marginRight = 'auto'; cb.textContent = 'Cancel booking';
-    cb.onclick = async () => { try { await upd('nex_class_bookings', 'id=eq.' + b.id, { status: 'cancelled', seat_no: null }); m.close(); toast('Booking cancelled'); render(); } catch (e) { showErr(m, e); } };
+    cb.onclick = async () => { try { await bkMark(b, 'cancelled'); m.close(); toast('Booking cancelled. Follow-up task added.'); render(); } catch (e) { showErr(m, e); } };
     foot.prepend(cb);
   } else {
     identityLookup(m, { ids: { name: 'f_name', phone: 'f_phone', email: 'f_email' }, onChange: st => { studentId = st ? st.id : null; if (st) { const bt = $('#f_booking_type', m.el); if (bt) bt.value = 'student'; } } });
@@ -2396,7 +2448,7 @@ async function facilityOptions() { const f = await sel('nex_facilities', 'select
 async function requestForm(r, en) {
   r = r || {}; const fac = await facilityOptions();
   const f = [{ k: 'facility_id', label: 'Facility', type: 'select', options: fac, value: r.facility_id, blank: 'Type a name instead', full: true }, { k: 'facility_text', label: 'Facility name (if not in the list)', value: r.facility_text, full: true },
-    { k: 'self_placement', label: 'Self placement (student found it)', type: 'check', value: r.self_placement }, { k: 'emailed_on', label: 'Email sent on', type: 'date', value: r.emailed_on, help: 'Recorded only. Nex does not send the email.' },
+    { k: 'self_placement', label: 'Self placement (student found it)', type: 'check', value: r.self_placement }, { k: 'emailed_on', label: 'Email sent on', type: 'date', value: r.emailed_on, help: 'Recorded only. Pipe-Line does not send the email.' },
     { k: 'status', label: 'Status', type: 'select', options: opts('placement', true), value: r.status || 'request_sent', blank: 'Not set' }, { k: 'note', label: 'Note', type: 'textarea', value: r.note, full: true }];
   formModal(r.id ? 'Update placement request' : 'New placement request', f, async v => {
     if (r.id) await upd('nex_placement_requests', 'id=eq.' + r.id, v); else await ins('nex_placement_requests', Object.assign({ enrolment_id: en.id, created_by: ME.name }, v), true);
@@ -2469,10 +2521,10 @@ route(/^\/admin$/, async () => {
   await loadRef(true);
   afterRender(() => bindAdmin());
   return pageHead('admin', 'Admin', 'Lists and settings', '') +
-    '<div class="nx-card"><div class="nx-card-h"><div><h3>Status lists</h3><div class="nx-muted">Each list belongs to one part of Nex, so the same word can mean different things in different places.' + (ME.admin ? '' : ' Only admins can change these.') + '</div></div>' + (ME.admin ? '<button class="nx-btn primary sm" id="adNewStatus">' + ico('plus') + 'Add status</button>' : '') + '</div><div class="nx-toolbar" style="border-top:0"><div class="nx-seg" id="adCtx">' + Object.keys(CTX_NAMES).map(k => '<button data-v="' + k + '" aria-pressed="' + (AD.ctx === k) + '">' + CTX_NAMES[k] + '</button>').join('') + '</div></div><div id="adStatus"></div></div>' +
+    '<div class="nx-card"><div class="nx-card-h"><div><h3>Status lists</h3><div class="nx-muted">Each list belongs to one part of Pipe-Line, so the same word can mean different things in different places.' + (ME.admin ? '' : ' Only admins can change these.') + '</div></div>' + (ME.admin ? '<button class="nx-btn primary sm" id="adNewStatus">' + ico('plus') + 'Add status</button>' : '') + '</div><div class="nx-toolbar" style="border-top:0"><div class="nx-seg" id="adCtx">' + Object.keys(CTX_NAMES).map(k => '<button data-v="' + k + '" aria-pressed="' + (AD.ctx === k) + '">' + CTX_NAMES[k] + '</button>').join('') + '</div></div><div id="adStatus"></div></div>' +
     '<div class="nx-two"><div class="nx-card"><div class="nx-card-h"><h3>Qualifications</h3><button class="nx-btn primary sm" id="adNewQual">' + ico('plus') + 'Add</button></div><ul class="nx-list">' + REF.quals.map(q => '<li><span><b>' + esc(q.name) + '</b><small>' + esc(q.code) + (q.default_fee ? ' · usual fee ' + money(q.default_fee) : '') + (q.active ? '' : ' · hidden') + '</small></span><button class="nx-btn sm" data-q="' + q.id + '">Edit</button></li>').join('') + '</ul></div>' +
     '<div class="nx-card"><div class="nx-card-h"><h3>Agents</h3><button class="nx-btn primary sm" id="adNewAgent">' + ico('plus') + 'Add</button></div>' + (REF.agents.length ? '<ul class="nx-list">' + REF.agents.map(a => '<li><span><b>' + esc(a.name) + '</b><small>' + esc([a.phone, a.email].filter(Boolean).join(' · ') || 'No contact details') + (a.active ? '' : ' · hidden') + '</small></span><button class="nx-btn sm" data-ag="' + a.id + '">Edit</button></li>').join('') + '</ul>' : empty('No agents yet', 'Add the agents students come through.')) + '</div></div>' +
-    secCard() + '<div class="nx-card"><div class="nx-card-b"><b>Who can open Nex</b><div class="nx-muted">Access is the Nex card on the Nodes page. Admins give it to staff with the Nex tick in ShiftOps, on each person\'s edit panel.</div></div></div>' +
+    secCard() + '<div class="nx-card"><div class="nx-card-b"><b>Who can open Pipe-Line</b><div class="nx-muted">Access is the Pipe-Line card on the Nodes page. Admins give it to staff with the Pipe-Line tick in ShiftOps, on each person\'s edit panel.</div></div></div>' +
   (ME.admin ? '<div class="nx-card"><div class="nx-card-h"><div><h3>Who opened student records</h3><div class="nx-muted">The latest 100 times a staff member opened a student. A repeat look within 10 minutes is counted once. More than 150 different students in an hour (or 800 in a day) pauses a person\'s access to personal details and shows here as Blocked. Only admins can see this.</div></div></div><div id="adViews"><div class="nx-card-b"><div class="nx-skel" style="width:60%"></div></div></div></div>' : '');
 });
 function bindAdmin() {
@@ -2520,7 +2572,7 @@ function agentForm(a) {
 }
 
 /* =========================================================
-   Nex staff pages, copied from Nexus (15 Nov 2026): Quizzes, Documents, Profile.
+   Pipe-Line staff pages, copied from Nexus (15 Nov 2026): Quizzes, Documents, Profile.
    Nexus keeps its own versions and stays the place for quiz building, document upload,
    passwords, themes and notifications. Same Supabase tables, so both apps show the same data.
    ========================================================= */
@@ -2842,7 +2894,7 @@ route(/^\/profile$/, async () => {
 /* shrink the photo to 320px JPEG in the browser, store it in the avatars bucket under the person's own folder, then point staff_avatars at it */
 async function savePhoto(file) {
   const dataUrl = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = () => rej(new Error('Could not read that file.')); r.readAsDataURL(file); });
-  const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error('That file is not a photo Nex can open.')); i.src = dataUrl; });
+  const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error('That file is not a photo Pipe-Line can open.')); i.src = dataUrl; });
   const S = 320, c = document.createElement('canvas'); c.width = c.height = S;
   const side = Math.min(img.naturalWidth, img.naturalHeight), sx = (img.naturalWidth - side) / 2, sy = (img.naturalHeight - side) / 2;
   c.getContext('2d').drawImage(img, sx, sy, side, side, 0, 0, S, S);
@@ -3008,7 +3060,7 @@ route(/^\/staff\/(.+)$/, async m => {
 });
 
 /* =========================================================
-   Nex staff pages, copied from Nexus (15 Nov 2026): Team report and the Nexi FAQ helper.
+   Pipe-Line staff pages, copied from Nexus (15 Nov 2026): Team report and the Pip FAQ helper.
    Team report reads and writes the same tables as Nexus (processing_reports, processing_metrics,
    placement_weekly), so an entry made in either app shows in both.
    ========================================================= */
@@ -3188,18 +3240,18 @@ async function teamReportHtml(team, shape, M, mon) {
   return h + '</div>';
 }
 
-/* ---------- Nexi: fixed questions about using Nex. No typing, no AI, nothing about Nexus rosters or hours. ---------- */
+/* ---------- Pip: fixed questions about using Pipe-Line. No typing, no AI, nothing about Nexus rosters or hours. ---------- */
 const NEXI_IMG = 'data:image/png;base64,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';
 const NEXI_FAQ = [
   ['Getting around', [
-    ['What is Nex?', 'Nex is where Oscars keeps track of leads and students: their enrolments, payments, First Aid bookings and placements. Rosters, clock-ins and leave are still in Nexus.', null],
+    ['What is Pipe-Line?', 'Pipe-Line is where Oscars keeps track of leads and students: their enrolments, payments, First Aid bookings and placements. Rosters, clock-ins and leave are still in Nexus.', null],
     ['How do I find someone?', 'Type a name, email or phone number in the bar at the top and press Enter. Search covers leads and students together and labels each result.', ['#/search', 'Open search']],
     ['Where is the Admin tab?', 'Admin is only shown to hub admins. It holds the status lists, qualifications, agents and the two-step sign-in settings.', null],
-    ['Why did Nex lock me out?', 'Nex locks after 15 minutes without activity, and your sign-in from Nexus lasts about an hour. Go back to Nexus and open Nex again from the Nodes page.', null]
+    ['Why did Pipe-Line lock me out?', 'Pipe-Line locks after 15 minutes without activity, and your sign-in from Nexus lasts about an hour. Go back to Nexus and open Pipe-Line again from the Nodes page.', null]
   ]],
   ['Leads and students', [
-    ['What is the difference between a lead and a student?', 'Someone is a lead until their payments add up to $200. From $200 they are a student. Nex moves them between the Leads and Students tabs by itself when a payment is added, matched or removed.', ['#/leads', 'Open Leads']],
-    ['How do I add a new person?', 'Open Leads and press New lead. Everyone starts as a lead. Start with their phone number or email: if they are already in Nex, their details fill in and you add to that person instead of making a duplicate.', ['#/leads?new=1', 'Add a lead']],
+    ['What is the difference between a lead and a student?', 'Someone is a lead until their payments add up to $200. From $200 they are a student. Pipe-Line moves them between the Leads and Students tabs by itself when a payment is added, matched or removed.', ['#/leads', 'Open Leads']],
+    ['How do I add a new person?', 'Open Leads and press New lead. Everyone starts as a lead. Start with their phone number or email: if they are already in Pipe-Line, their details fill in and you add to that person instead of making a duplicate.', ['#/leads?new=1', 'Add a lead']],
     ['How do I add an enrolment?', 'Open the person, then press Enrolment at the top of their page. One person can have several enrolments, each with its own qualification, fee and stage.', null],
     ['How do I change contact or personal details?', 'Open the person and use Edit contact, or Edit personal details under Personal and sensitive. Every look at the sensitive details and every change is logged.', null],
     ['How do I remove someone?', 'Open the person and press Archive. They disappear from the lists but their records are kept. Only hub admins can delete records for good.', null]
@@ -3218,10 +3270,10 @@ const NEXI_FAQ = [
   ]],
   ['Staff pages', [
     ['Where are my quizzes and documents?', 'Press Misc in the tab bar and choose Quizzes or Documents. They show the same quizzes and documents as Nexus. Quiz building and document upload are still done in Nexus.', ['#/quizzes', 'Open Quizzes']],
-    ['How do I log a call?', 'Press Misc in the tab bar and choose Calls. Type the phone number first. If the person is already in Nex their details fill in and the call is added to their Activity. If Nex has never seen the number, logging the call starts an unfinished lead flagged to you. Tick "Not a student" for agents or facilities so no lead is made.', ['#/calls', 'Open Calls']],
-    ['What is an unfinished lead?', 'A lead that was started from a call, so Nex only has a name and a phone number. It shows an Unfinished tag in the Leads list and a banner on the record. Add the missing details, then press Mark complete.', ['#/leads?unf=mine', 'Leads flagged to me']],
-    ['How do I record a logbook I received?', 'Press Misc in the tab bar and choose Logbook receipts. Type the student\u2019s name or email, check the date and who received it, add a comment if needed, and press Save receipt. Someone already in Nex gets it on their Activity tab. A name Nex does not know is saved by name only.', ['#/logbooks', 'Open Logbook receipts']],
-    ['Where are the weekly conversion numbers?', 'Press Misc in the tab bar and choose Conversion report. Pick the dates (or This week, Last week) and Nex works out the status counts, the pie chart, the follow-ups done by step and the class numbers. Use Print or save as PDF to share it. Outside Sydney comes from the tick on each person\'s record.', ['#/convreport', 'Open Conversion report']],
+    ['How do I log a call?', 'Press Misc in the tab bar and choose Calls. Type the phone number first. If the person is already in Pipe-Line their details fill in and the call is added to their Activity. If Pipe-Line has never seen the number, logging the call starts an unfinished lead flagged to you. Tick "Not a student" for agents or facilities so no lead is made.', ['#/calls', 'Open Calls']],
+    ['What is an unfinished lead?', 'A lead that was started from a call, so Pipe-Line only has a name and a phone number. It shows an Unfinished tag in the Leads list and a banner on the record. Add the missing details, then press Mark complete.', ['#/leads?unf=mine', 'Leads flagged to me']],
+    ['How do I record a logbook I received?', 'Press Misc in the tab bar and choose Logbook receipts. Type the student\u2019s name or email, check the date and who received it, add a comment if needed, and press Save receipt. Someone already in Pipe-Line gets it on their Activity tab. A name Pipe-Line does not know is saved by name only.', ['#/logbooks', 'Open Logbook receipts']],
+    ['Where are the weekly conversion numbers?', 'Press Misc in the tab bar and choose Conversion report. Pick the dates (or This week, Last week) and Pipe-Line works out the status counts, the pie chart, the follow-ups done by step and the class numbers. Use Print or save as PDF to share it. Outside Sydney comes from the tick on each person\'s record.', ['#/convreport', 'Open Conversion report']],
     ['How do I fill in the team report?', 'Press Misc in the tab bar and choose Team report. Enter your numbers or tasks for the day and press Save entry. Team leads and admins can generate the weekly report and print it or save it as a PDF.', ['#/teamreport', 'Open Team report']],
     ['Where do I see team achievements?', 'Press Misc in the tab bar and choose Achievements. It lists who passed a training quiz, who earned Glow for a perfect fortnight and who reached a call milestone, the same feed as Nexus.', ['#/achievements', 'Open Achievements']],
     ['How do I change my photo, nickname or bio?', 'Press your name at the top right to open Profile. Your password, themes and notification settings are changed in Nexus.', ['#/profile', 'Open Profile']],
@@ -3230,19 +3282,19 @@ const NEXI_FAQ = [
 ];
 function nexiInit() {
   if ($('#nexiFab')) return;
-  const fab = document.createElement('button'); fab.id = 'nexiFab'; fab.type = 'button'; fab.className = 'nx-nexifab nx-noprint'; fab.setAttribute('aria-label', 'Ask Nexi how to use Nex'); fab.setAttribute('aria-expanded', 'false');
+  const fab = document.createElement('button'); fab.id = 'nexiFab'; fab.type = 'button'; fab.className = 'nx-nexifab nx-noprint'; fab.setAttribute('aria-label', 'Ask Pip how to use Pipe-Line'); fab.setAttribute('aria-expanded', 'false');
   fab.innerHTML = '<img alt="" src="' + NEXI_IMG + '">';
-  const panel = document.createElement('section'); panel.id = 'nexiPanel'; panel.className = 'nx-nexi nx-noprint'; panel.hidden = true; panel.setAttribute('aria-label', 'Nexi help');
+  const panel = document.createElement('section'); panel.id = 'nexiPanel'; panel.className = 'nx-nexi nx-noprint'; panel.hidden = true; panel.setAttribute('aria-label', 'Pip help');
   document.body.appendChild(fab); document.body.appendChild(panel);
   const first = (ME.name || '').split(' ')[0];
   const home = () => {
-    panel.innerHTML = '<header><img alt="" src="' + NEXI_IMG + '"><div><b>Hi' + (first ? ' ' + esc(first) : '') + ', I\'m Nexi</b><span>Pick a question about using Nex.</span></div><button class="nx-btn icon quiet" data-x aria-label="Close help">' + ico('x') + '</button></header><div class="nx-nexibody">' +
+    panel.innerHTML = '<header><img alt="" src="' + NEXI_IMG + '"><div><b>Hi' + (first ? ' ' + esc(first) : '') + ', I\'m Pip</b><span>Pick a question about using Pipe-Line.</span></div><button class="nx-btn icon quiet" data-x aria-label="Close help">' + ico('x') + '</button></header><div class="nx-nexibody">' +
       NEXI_FAQ.map((g, gi) => '<h4>' + esc(g[0]) + '</h4><div class="nx-nexiqs">' + g[1].map((q, qi) => '<button type="button" class="nx-chip" data-q="' + gi + '.' + qi + '">' + esc(q[0]) + '</button>').join('') + '</div>').join('') + '</div>';
     bind();
   };
   const answer = (gi, qi) => {
     const q = NEXI_FAQ[gi][1][qi];
-    panel.innerHTML = '<header><img alt="" src="' + NEXI_IMG + '"><div><b>Nexi</b><span>' + esc(NEXI_FAQ[gi][0]) + '</span></div><button class="nx-btn icon quiet" data-x aria-label="Close help">' + ico('x') + '</button></header><div class="nx-nexibody"><div class="nx-nexiq">' + esc(q[0]) + '</div><div class="nx-nexia" tabindex="-1">' + esc(q[1]) + '</div><div class="nx-btnrow" style="margin-top:14px">' + (q[2] ? '<a class="nx-btn primary sm" data-go href="' + esc(q[2][0]) + '">' + esc(q[2][1]) + '</a>' : '') + '<button type="button" class="nx-btn sm" data-back>All questions</button></div></div>';
+    panel.innerHTML = '<header><img alt="" src="' + NEXI_IMG + '"><div><b>Pip</b><span>' + esc(NEXI_FAQ[gi][0]) + '</span></div><button class="nx-btn icon quiet" data-x aria-label="Close help">' + ico('x') + '</button></header><div class="nx-nexibody"><div class="nx-nexiq">' + esc(q[0]) + '</div><div class="nx-nexia" tabindex="-1">' + esc(q[1]) + '</div><div class="nx-btnrow" style="margin-top:14px">' + (q[2] ? '<a class="nx-btn primary sm" data-go href="' + esc(q[2][0]) + '">' + esc(q[2][1]) + '</a>' : '') + '<button type="button" class="nx-btn sm" data-back>All questions</button></div></div>';
     bind(); const a = $('.nx-nexia', panel); if (a) a.focus();
   };
   const close = () => { if (panel.hidden) return; panel.hidden = true; fab.setAttribute('aria-expanded', 'false'); fab.focus(); };
@@ -3257,7 +3309,7 @@ function nexiInit() {
   document.addEventListener('pointerdown', e => { if (!panel.hidden && !panel.contains(e.target) && !fab.contains(e.target)) { panel.hidden = true; fab.setAttribute('aria-expanded', 'false'); } });
 }
 
-/* ---------- Conversion report: the enrolment team's weekly numbers, worked out from Nex ----------
+/* ---------- Conversion report: the enrolment team's weekly numbers, worked out from Pipe-Line ----------
    Status table and pie: enrolments created in the range (enrolment date, else the day it was added), by stage now.
    Follow-ups: follow-ups marked done in the range, by step. Class: see the note printed under the block. */
 const CR = { from: '', to: '' };
@@ -3335,7 +3387,7 @@ function crHtml(d, from, to) {
   const cls = '<tr><td>Without First Aid and CPR</td><td class="nx-num">' + d.without + '</td></tr><tr><td>Class booked</td><td class="nx-num">' + d.classBooked + '</td></tr><tr><td>Outside Sydney</td><td class="nx-num">' + d.outside + '</td></tr>';
   return '<div class="nx-report nx-crep">' +
     '<div class="nx-crhead"><div><span class="nx-muted">From</span><b>' + esc(crLong(from)) + '</b></div><div><span class="nx-muted">To</span><b>' + esc(crLong(to)) + '</b></div></div>' +
-    (d.capped ? '<div class="nx-note">This range has more rows than Nex can count in one go (1,000). Pick a shorter range for exact numbers.</div>' : '') +
+    (d.capped ? '<div class="nx-note">This range has more rows than Pipe-Line can count in one go (1,000). Pick a shorter range for exact numbers.</div>' : '') +
     '<div class="nx-crgrid"><div><h3>Student conversion</h3>' + statusTable + '</div><div class="nx-crpie">' + crPie(rows, d.total) + '</div></div>' +
     '<div class="nx-crgrid2"><div><h3>Follow-ups</h3><div class="nx-tablewrap"><table class="nx-table auto tight"><thead><tr><th>Follow-up</th><th class="nx-num">Number</th></tr></thead><tbody>' + fu + '</tbody></table></div></div>' +
     '<div><h3>Class status</h3><div class="nx-tablewrap"><table class="nx-table auto tight"><thead><tr><th>Class status</th><th class="nx-num">Number</th></tr></thead><tbody>' + cls + '</tbody></table></div>' +
@@ -3363,13 +3415,13 @@ route(/^\/convreport$/, async () => {
   });
   const today = sydToday();
   return pageHead('chart', 'Enrolment team', 'Conversion report', '') +
-    '<div class="nx-card nx-noprint"><div class="nx-card-h"><div><h3>Dates</h3><div class="nx-muted">Numbers are worked out from Nex for the dates you pick.</div></div><span class="nx-btnrow"><button class="nx-btn sm" data-crp="week">This week</button><button class="nx-btn sm" data-crp="last">Last week</button><button class="nx-btn sm" data-crp="7">Last 7 days</button><button class="nx-btn sm" data-crp="month">This month</button></span></div>' +
+    '<div class="nx-card nx-noprint"><div class="nx-card-h"><div><h3>Dates</h3><div class="nx-muted">Numbers are worked out from Pipe-Line for the dates you pick.</div></div><span class="nx-btnrow"><button class="nx-btn sm" data-crp="week">This week</button><button class="nx-btn sm" data-crp="last">Last week</button><button class="nx-btn sm" data-crp="7">Last 7 days</button><button class="nx-btn sm" data-crp="month">This month</button></span></div>' +
     '<div class="nx-card-b"><div class="nx-form"><div><label class="nx-lbl" for="crFrom">From</label><input class="nx-in" type="date" id="crFrom" max="' + today + '" value="' + esc(CR.from) + '"></div><div><label class="nx-lbl" for="crTo">To</label><input class="nx-in" type="date" id="crTo" max="' + today + '" value="' + esc(CR.to) + '"></div></div></div></div>' +
     '<div class="nx-card nx-printwrap"><div class="nx-card-h nx-noprint"><div><h3>Report</h3></div><span class="nx-btnrow"><button class="nx-btn sm" id="crPrint" hidden>' + ico('print') + 'Print or save as PDF</button></span></div><div id="crOut"><div class="nx-skel" style="height:240px;margin:16px"></div></div></div>';
 });
 
-/* ---------- Calls: the Nexus Call Log, copied into Nex ----------
-   Logging a call for someone already in Nex adds it to their Activity. A number Nex has never seen starts an UNFINISHED lead,
+/* ---------- Calls: the Nexus Call Log, copied into Pipe-Line ----------
+   Logging a call for someone already in Pipe-Line adds it to their Activity. A number Pipe-Line has never seen starts an UNFINISHED lead,
    flagged to whoever logged the call. All of that happens in the database function nex_log_call, so it is one step.
    The "clocked in and inside office hours" lock is a convenience on this page only. The database does not enforce it. */
 const CL = { view: 'wait', scope: 'team', q: '', today: false, rows: [], teams: null, gate: null };
@@ -3461,7 +3513,7 @@ route(/^\/calls$/, async () => {
     const root = $('#clPage'); if (!root) return;
     const f = $('#clForm', root), phone = $('#clPhone'), name = $('#clName'), email = $('#clEmail'), reason = $('#clReason'), note = $('#clNote');
     const forTeam = $('#clFor'), plcBox = $('#clPlc'), notStu = $('#clNotStu'), save = $('#clSave'), cnt = $('#clWords');
-    const lk = identityLookup({ el: f }, { ids: { phone: 'clPhone', name: 'clName', email: 'clEmail' }, newMsg: 'Not in Nex yet. Logging this will start an unfinished lead flagged to you.' });
+    const lk = identityLookup({ el: f }, { ids: { phone: 'clPhone', name: 'clName', email: 'clEmail' }, newMsg: 'Not in Pipe-Line yet. Logging this will start an unfinished lead flagged to you.' });
     const sync = () => {
       const plc = callIsPlc(forTeam.value);
       plcBox.hidden = !plc;
@@ -3562,7 +3614,7 @@ route(/^\/calls$/, async () => {
   const teamOpts = ['<option value=""' + (my ? '' : ' selected') + '>Not sure</option>'].concat(teams.map(t => '<option' + (t.toLowerCase() === my.toLowerCase() ? ' selected' : '') + '>' + esc(t) + '</option>')).join('');
   return pageHead('phone', 'Staff', 'Calls', '') +
     '<div id="clPage">' +
-    '<div class="nx-card"><div class="nx-card-h"><div><h3>Log a call</h3><div class="nx-muted">Someone already in Nex gets the call on their Activity. A new number starts an unfinished lead flagged to you.</div></div></div><div class="nx-card-b">' +
+    '<div class="nx-card"><div class="nx-card-h"><div><h3>Log a call</h3><div class="nx-muted">Someone already in Pipe-Line gets the call on their Activity. A new number starts an unfinished lead flagged to you.</div></div></div><div class="nx-card-b">' +
     '<div class="nx-note nx-calllock" id="clLock"' + (g.ok ? ' hidden' : '') + ' role="status">' + esc(g.ok ? '' : g.why) + '</div>' +
     '<form id="clForm" class="nx-callform" novalidate><fieldset class="nx-fs" ' + (g.ok ? '' : 'disabled') + '><div class="nx-form">' +
     '<div><label class="nx-lbl" for="clPhone">Phone<span id="clPhoneReq"> *</span></label><input class="nx-in" id="clPhone" type="tel" inputmode="tel" autocomplete="off" placeholder="0412 345 678"></div>' +
@@ -3584,7 +3636,7 @@ route(/^\/calls$/, async () => {
 
 /* ---------- Logbook receipts: who received which student's logbook, and when ----------
    Replaces the sheet with the columns DATE, STUDENT NAME, EMAIL ADDRESS, LOGBOOK RECEIVER, COMMENTS.
-   A receipt for someone in Nex is linked to them (it shows on their Activity). A name Nex does not know is saved by name only. */
+   A receipt for someone in Pipe-Line is linked to them (it shows on their Activity). A name Pipe-Line does not know is saved by name only. */
 const LB = { q: '', mine: false, days: '60', rows: [], staff: null };
 async function lbStaff() {
   if (LB.staff) return LB.staff;
@@ -3617,7 +3669,7 @@ route(/^\/logbooks$/, async () => {
   try { await lbLoad(); } catch (e) { LB.rows = []; }
   afterRender(() => {
     const f = $('#lbForm'), save = $('#lbSave');
-    const lk = identityLookup({ el: f }, { ids: { name: 'lbName', email: 'lbEmail' }, newMsg: 'Not found in Nex. The receipt will be saved by name only.' });
+    const lk = identityLookup({ el: f }, { ids: { name: 'lbName', email: 'lbEmail' }, newMsg: 'Not found in Pipe-Line. The receipt will be saved by name only.' });
     const paint = () => {
       $('#lbTable').innerHTML = lbTable();
       $('#lbCount').textContent = lbVisible().length + (lbVisible().length === 1 ? ' receipt' : ' receipts');
@@ -3671,7 +3723,7 @@ route(/^\/logbooks$/, async () => {
   });
   const me = ME.name || '';
   return pageHead('notebook', 'Staff', 'Logbook receipts', '') +
-    '<div class="nx-card"><div class="nx-card-h"><div><h3>Record a logbook</h3><div class="nx-muted">Type the student’s name or email. If they are in Nex the receipt is added to their Activity.</div></div></div><div class="nx-card-b">' +
+    '<div class="nx-card"><div class="nx-card-h"><div><h3>Record a logbook</h3><div class="nx-muted">Type the student’s name or email. If they are in Pipe-Line the receipt is added to their Activity.</div></div></div><div class="nx-card-b">' +
     '<form id="lbForm" novalidate><div class="nx-form">' +
     '<div><label class="nx-lbl" for="lbName">Student name *</label><input class="nx-in" id="lbName" autocomplete="off"></div>' +
     '<div><label class="nx-lbl" for="lbEmail">Email address</label><input class="nx-in" id="lbEmail" type="email" autocomplete="off"></div>' +
@@ -3684,6 +3736,127 @@ route(/^\/logbooks$/, async () => {
     '<select class="nx-sel sm" id="lbDays" aria-label="Period"><option value="30"' + (LB.days === '30' ? ' selected' : '') + '>Last 30 days</option><option value="60"' + (LB.days === '60' ? ' selected' : '') + '>Last 60 days</option><option value="180"' + (LB.days === '180' ? ' selected' : '') + '>Last 6 months</option><option value="all"' + (LB.days === 'all' ? ' selected' : '') + '>All</option></select>' +
     '<label class="nx-check"><input type="checkbox" id="lbMine"' + (LB.mine ? ' checked' : '') + '> Received by me</label><span class="nx-muted" id="lbCount"></span><span class="nx-grow"></span><button class="nx-btn sm" id="lbRefresh" type="button">' + ico('refresh') + 'Refresh</button></div><div id="lbTable"></div></div>';
 });
+
+/* =========================================================
+   Class attendance, booking a lead into a class, and the no show follow-up list
+   ========================================================= */
+const BK_OFF = ['no_show', 'cancelled', 'rescheduled'];
+const bkOff = s => BK_OFF.indexOf(s) >= 0;
+const BK_WORD = { no_show: 'No show', cancelled: 'Cancelled', rescheduled: 'Rescheduled', attended: 'Attended', booked: 'Booked' };
+
+async function bkUpcoming(excludeSession) {
+  const today = sydToday();
+  const ss = await sel('nex_class_sessions', 'select=id,class_date,kind,seats&class_date=gte.' + today + '&order=class_date.asc,kind.asc&limit=40');
+  if (!ss.length) return [];
+  const rows = await selAll('nex_class_bookings', 'select=session_id,status&session_id=in.' + inList(ss.map(s => s.id)));
+  const n = {}; rows.forEach(b => { if (!bkOff(b.status)) n[b.session_id] = (n[b.session_id] || 0) + 1; });
+  return ss.filter(s => s.id !== excludeSession).map(s => Object.assign({ taken: n[s.id] || 0 }, s));
+}
+function bkDayLabel(s) { const d = fmtDay(s.class_date); return d.wd + ' ' + d.dm + ' · ' + (s.kind === 'renewal' ? 'Renewal' : 'Full class') + ' · ' + Math.max(0, s.seats - s.taken) + ' seats left'; }
+function bkMark(b, status, newSession, note) {
+  return api('rpc/nex_mark_attendance', { method: 'POST', body: { p_booking: b.id, p_status: status, p_new_session: newSession || null, p_note: note || null } });
+}
+
+/* No show, cancelled or rescheduled. Rescheduled can pick the new class day straight away. */
+async function attendanceModal(b, preset, after) {
+  let days = []; try { days = await bkUpcoming(b.session_id); } catch (e) { days = []; }
+  const radio = (v, l, hint) => '<label><input type="radio" name="bkSt" value="' + v + '"' + (v === (preset || 'no_show') ? ' checked' : '') + '><span><b>' + l + '</b><small>' + hint + '</small></span></label>';
+  const body = '<div class="nx-radios" role="radiogroup" aria-label="Attendance">' +
+    radio('no_show', 'No show', 'Did not come. Goes on the follow-up list.') +
+    radio('cancelled', 'Cancelled', 'Told us they cannot come. Goes on the follow-up list.') +
+    radio('rescheduled', 'Rescheduled', 'Moving to another class day.') + '</div>' +
+    '<div id="bkNewWrap"><label class="nx-lbl" for="bkNew">New class day</label><select class="nx-sel" id="bkNew">' + selectOpts(days.map(s => ({ id: s.id, label: bkDayLabel(s) })), '', 'Not decided yet (follow up)') + '</select></div>' +
+    '<div style="margin-top:12px"><label class="nx-lbl" for="bkNote">Note</label><input class="nx-in" id="bkNote" autocomplete="off" placeholder="Optional"></div>' +
+    '<div class="nx-help" style="margin-top:10px">A follow-up task is created for the next working day. Your name is kept as the person who marked it.</div>';
+  const m = openModal({ title: 'Mark ' + esc(b.name || 'booking'), body, buttons: [{ label: 'Cancel', close: true }, { label: 'Save', primary: true, run: async mm => {
+    const st = ($('input[name=bkSt]:checked', mm.el) || {}).value || 'no_show';
+    const ns = st === 'rescheduled' ? $('#bkNew', mm.el).value : '';
+    await bkMark(b, st, ns, $('#bkNote', mm.el).value.trim());
+    toast(st === 'rescheduled' && ns ? 'Moved to the new class day' : BK_WORD[st] + ' saved'); if (after) after(); else render();
+  } }] });
+  const sync = () => { const st = ($('input[name=bkSt]:checked', m.el) || {}).value; $('#bkNewWrap', m.el).hidden = st !== 'rescheduled'; };
+  $$('input[name=bkSt]', m.el).forEach(r => r.onchange = sync); sync();
+  return m;
+}
+async function bkAttended(b, after) {
+  try { await bkMark(b, 'attended'); toast('Marked attended'); if (after) after(); else render(); } catch (e) { toast(e.message, true); }
+}
+async function bkUndo(b, after) {
+  try { await bkMark(b, 'booked'); toast('Back to booked'); if (after) after(); else render(); } catch (e) { toast(e.message, true); }
+}
+async function bkHandled(b, after) {
+  try { await upd('nex_class_bookings', 'id=eq.' + b.id, { followup_done_at: new Date().toISOString(), followup_done_by: ME.name }); toast('Marked handled'); if (after) after(); else render(); } catch (e) { toast(e.message, true); }
+}
+
+/* Put a person into a class day. Leads become students on their own once they pay $200 or more. */
+async function bookClassModal(p, enrolmentId, after) {
+  let days = []; try { days = await bkUpcoming(null); } catch (e) { days = []; }
+  if (!days.length) return openModal({ title: 'Book class', body: '<p>No upcoming class days yet. Add a class day on the First Aid and CPR page first.</p>', buttons: [{ label: 'Close', close: true }, { label: 'Go to First Aid and CPR', primary: true, run: async () => { go('#/firstaid'); } }] });
+  const body = '<div class="nx-help" style="margin-bottom:10px">' + esc(fullName(p)) + (p.phone ? ' · ' + esc(fmtPhone(p.phone)) : '') + '</div>' +
+    '<label class="nx-lbl" for="bkDay">Class day</label><select class="nx-sel" id="bkDay">' + selectOpts(days.map(s => ({ id: s.id, label: bkDayLabel(s) })), days.find(s => s.seats > s.taken) ? days.find(s => s.seats > s.taken).id : days[0].id) + '</select>' +
+    '<div style="margin-top:12px"><label class="nx-lbl" for="bkNote">Note</label><input class="nx-in" id="bkNote" autocomplete="off" placeholder="Optional"></div>' +
+    '<div class="nx-help" style="margin-top:10px">After the class, mark them Attended, No show, Cancelled or Rescheduled. Paying $200 or more makes them a student automatically.</div>';
+  return openModal({ title: 'Book class', body, buttons: [{ label: 'Cancel', close: true }, { label: 'Book', primary: true, run: async mm => {
+    const sid = $('#bkDay', mm.el).value; if (!sid) throw new Error('Choose a class day.');
+    const dup = await sel('nex_class_bookings', 'select=id,status&session_id=eq.' + sid + '&student_id=eq.' + p.id + '&limit=5');
+    if (dup.some(x => !bkOff(x.status))) throw new Error(fullName(p) + ' is already booked on that day.');
+    const day = days.find(s => s.id === sid); if (day && day.taken >= day.seats && !(await confirmBox('Class is full', 'All ' + day.seats + ' seats are taken. Book them on the waiting list anyway?', 'Book anyway'))) return false;
+    const row = { session_id: sid, student_id: p.id, name: fullName(p), phone: p.phone || null, email: p.email || null, booking_type: 'student', status: 'booked', note: $('#bkNote', mm.el).value.trim() || null, created_by: ME.name };
+    if (enrolmentId) row.enrolment_id = enrolmentId;
+    await ins('nex_class_bookings', row, true);
+    toast('Booked into class'); if (after) after(); else render();
+  } }] });
+}
+/* off-status booking: book a fresh class day, the old one is closed off as handled */
+async function rebookModal(b, after) {
+  let days = []; try { days = await bkUpcoming(null); } catch (e) { days = []; }
+  if (!days.length) { toast('No upcoming class days. Add one on the First Aid and CPR page.', true); return; }
+  return openModal({ title: 'Rebook ' + esc(b.name || ''), body: '<label class="nx-lbl" for="bkDay">New class day</label><select class="nx-sel" id="bkDay">' + selectOpts(days.map(s => ({ id: s.id, label: bkDayLabel(s) })), days[0].id) + '</select>', buttons: [{ label: 'Cancel', close: true }, { label: 'Rebook', primary: true, run: async mm => {
+    const sid = $('#bkDay', mm.el).value; if (!sid) throw new Error('Choose a class day.');
+    await bkMark(b, 'rescheduled', sid, null);
+    toast('Rebooked'); if (after) after(); else render();
+  } }] });
+}
+
+/* the follow-up rows: a booking card line used on the First Aid section and the Leads tab */
+function bkFollowRow(b, opt) {
+  opt = opt || {}; const ss_ = b.nex_class_sessions || {}; const st = b.nex_students || {};
+  const moved = b.rescheduled_to ? (opt.movedTo && opt.movedTo[b.rescheduled_to]) : null;
+  const handled = !!b.followup_done_at;
+  return '<tr class="nx-tr" data-bk="' + b.id + '"><td><b>' + (b.student_id ? '<a href="#/students/' + b.student_id + '">' + esc(b.name) + '</a>' : esc(b.name)) + '</b><div class="nx-muted" style="font-size:12px">' + esc(fmtPhone(b.phone) || b.email || '') + '</div></td>' +
+    '<td>' + pill('booking', b.status) + '</td><td>' + (ss_.class_date ? esc(fmtDate(ss_.class_date)) : '') + '<div class="nx-muted" style="font-size:12px">' + (ss_.kind === 'renewal' ? 'Renewal' : 'Full class') + '</div></td>' +
+    '<td><span class="nx-att-by">' + esc(b.attendance_by || '') + (b.attendance_at ? ' · ' + esc(fmtDT(b.attendance_at)) : '') + '</span></td>' +
+    '<td>' + (moved ? '<span class="nx-pill ok">Moved to ' + esc(fmtDate(moved)) + '</span>' : handled ? '<span class="nx-pill ok">Handled' + (b.followup_done_by ? ' · ' + esc(b.followup_done_by) : '') + '</span>' : '<span class="nx-pill warn">To follow up</span>') + '</td>' +
+    '<td><div class="nx-btnrow">' + (handled || moved ? '' : '<button class="nx-btn sm primary" data-rb="' + b.id + '">Rebook</button><button class="nx-btn sm" data-hd="' + b.id + '">Mark handled</button>') + '<button class="nx-btn sm quiet" data-ud="' + b.id + '">Undo</button></div></td></tr>';
+}
+async function bkMovedMap(rows) {
+  const ids = rows.map(b => b.rescheduled_to).filter(Boolean); const out = {};
+  if (!ids.length) return out;
+  const r = await sel('nex_class_bookings', 'select=id,nex_class_sessions(class_date)&id=in.' + inList(ids));
+  r.forEach(x => { out[x.id] = (x.nex_class_sessions || {}).class_date; });
+  return out;
+}
+function bkFollowTable(rows, moved) {
+  return '<div class="nx-tablewrap"><table class="nx-table tight"><thead><tr><th>Name</th><th>Status</th><th>Class day</th><th>Marked by</th><th>Follow-up</th><th></th></tr></thead><tbody>' + rows.map(b => bkFollowRow(b, { movedTo: moved })).join('') + '</tbody></table></div>';
+}
+function bkBindFollow(root, rows, after) {
+  const by = id => rows.find(x => x.id === id);
+  $$('[data-rb]', root).forEach(b => b.onclick = e => { e.stopPropagation(); rebookModal(by(b.dataset.rb), after); });
+  $$('[data-hd]', root).forEach(b => b.onclick = e => { e.stopPropagation(); bkHandled(by(b.dataset.hd), after); });
+  $$('[data-ud]', root).forEach(b => b.onclick = e => { e.stopPropagation(); bkUndo(by(b.dataset.ud), after); });
+}
+
+/* Leads, "Needs follow-up" tab: people still on the lead side (under $200) who missed or moved a class */
+async function leadsFollowupLoad(body, foot, after) {
+  const rows = await selAll('nex_class_bookings', 'select=*,nex_class_sessions(class_date,kind),nex_students!inner(id,deleted_at,nex_student_paid!inner(paid_total))&status=in.(no_show,cancelled,rescheduled)&followup_done_at=is.null&rescheduled_to=is.null&nex_students.deleted_at=is.null&nex_students.nex_student_paid.paid_total=lt.200&order=attendance_at.desc.nullslast');
+  if (!rows.length) { body.innerHTML = empty('Nobody to follow up', 'No shows, cancellations and reschedules without a new class day show up here.'); foot.innerHTML = '<span></span>'; return 0; }
+  body.innerHTML = bkFollowTable(rows, {}); foot.innerHTML = '<span>' + rows.length + ' to follow up</span>';
+  bkBindFollow(body, rows, after); $$('.nx-tr', body).forEach(tr => tr.onclick = e => { const b = rows.find(x => x.id === tr.dataset.bk); if (b && b.student_id) go('#/students/' + b.student_id); });
+  return rows.length;
+}
+async function leadsFollowupCount() {
+  try { const r = await sel('nex_class_bookings', 'select=id,nex_students!inner(deleted_at,nex_student_paid!inner(paid_total))&status=in.(no_show,cancelled,rescheduled)&followup_done_at=is.null&rescheduled_to=is.null&nex_students.deleted_at=is.null&nex_students.nex_student_paid.paid_total=lt.200&limit=500'); return r.length; } catch (e) { return null; }
+}
 
 /* ---------- Motion: tabs slide, pages arrive, nothing snaps ----------
    Corporate personality: one easing (ease-out, no overshoot), three speeds (quick 110, standard 260-320, slow 400).
@@ -3753,8 +3926,8 @@ function motionInit() {
 }
 
 /* =========================================================
-   Two-step login, Nex side. The 6-digit code is asked in Nexus (it holds the refresh token that a code
-   check swaps), so Nex never confirms codes itself. It only (1) refuses to open without a code-verified
+   Two-step login, Pipe-Line side. The 6-digit code is asked in Nexus (it holds the refresh token that a code
+   check swaps), so Pipe-Line never confirms codes itself. It only (1) refuses to open without a code-verified
    session when the switch is on, and (2) shows the admin card: switch, who has set up, reset.
    The database enforces the rule (nex_open() needs aal2), this file only explains it.
    ========================================================= */
@@ -3776,7 +3949,7 @@ function mfaGate() {
       const st = await (await api('rpc/nex_mfa_state', { method: 'POST', body: {} })).json();
       if (st && st.required && aalNow() !== 'aal2') {
         const box = $('#mfa'), card = $('#mfaCard');
-        card.innerHTML = '<div class="gate-t mfa-t">Enter your code in Nexus</div><p class="mfa-p">Nex needs your 6-digit code. Go back to Nexus, open the Nex card on the Nodes page, and enter the code from your authenticator app (or set it up if this is your first time).</p>';
+        card.innerHTML = '<div class="gate-t mfa-t">Enter your code in Nexus</div><p class="mfa-p">Pipe-Line needs your 6-digit code. Go back to Nexus, open the Pipe-Line card on the Nodes page, and enter the code from your authenticator app (or set it up if this is your first time).</p>';
         box.hidden = false; return;
       }
     } catch (e) { if (e.message === 'session') return; }
@@ -3786,20 +3959,20 @@ function mfaGate() {
 
 /* ---------- Admin page card ---------- */
 function secCard() {
-  return '<div class="nx-card"><div class="nx-card-h"><div><h3>Two-step login</h3><div class="nx-muted">A 6-digit code from an authenticator app, asked in Nexus once per sign-in when a person opens Nex.</div></div></div><div id="adSec" class="nx-card-b"><div class="nx-skel" style="width:50%"></div></div></div>';
+  return '<div class="nx-card"><div class="nx-card-h"><div><h3>Two-step login</h3><div class="nx-muted">A 6-digit code from an authenticator app, asked in Nexus once per sign-in when a person opens Pipe-Line.</div></div></div><div id="adSec" class="nx-card-b"><div class="nx-skel" style="width:50%"></div></div></div>';
 }
 async function bindSec() {
   const box = $('#adSec'); if (!box) return;
   try {
     const st = await (await api('rpc/nex_mfa_state', { method: 'POST', body: {} })).json();
     const mine = (await mfaList())[0] || null, strong = aalNow() === 'aal2';
-    let h = '<div class="nx-row-s"><div><b>Your account</b><div class="nx-muted">' + (mine ? 'Two-step login is set up for you.' : 'Not set up yet. Open Nex from the Nexus Nodes page to set it up.') + '</div></div></div>';
+    let h = '<div class="nx-row-s"><div><b>Your account</b><div class="nx-muted">' + (mine ? 'Two-step login is set up for you.' : 'Not set up yet. Open Pipe-Line from the Nexus Nodes page to set it up.') + '</div></div></div>';
     if (ME.admin) {
       let roster = [];
       try { roster = await (await api('rpc/nex_mfa_roster', { method: 'POST', body: {} })).json(); } catch (e) {} if (!Array.isArray(roster)) roster = [];
       const unset = roster.filter(r => !r.enrolled).length;
       h += '<hr class="nx-hr"><div class="nx-row-s"><div><b>Required for everyone: ' + (st.required ? 'On' : 'Off') + '</b><div class="nx-muted">' +
-        (st.required ? 'Nex shows nothing to anyone who has not entered a code this sign-in.' : (mine && strong ? 'Once you turn this on, each person is walked through setup when they next open Nex from Nexus.' + (unset ? ' ' + unset + ' of ' + roster.length + ' have not set up yet.' : '') : 'Set up your own code first (open Nex from Nexus), then you can turn this on.')) +
+        (st.required ? 'Pipe-Line shows nothing to anyone who has not entered a code this sign-in.' : (mine && strong ? 'Once you turn this on, each person is walked through setup when they next open Pipe-Line from Nexus.' + (unset ? ' ' + unset + ' of ' + roster.length + ' have not set up yet.' : '') : 'Set up your own code first (open Pipe-Line from Nexus), then you can turn this on.')) +
         '</div></div><div class="nx-btnrow"><button class="nx-btn ' + (st.required ? '' : 'primary') + ' sm" id="secReq"' + (!st.required && !(mine && strong) ? ' disabled' : '') + '>' + (st.required ? 'Turn off' : 'Require for everyone') + '</button></div></div>';
       h += roster.length ? '<div class="nx-tablewrap" style="margin-top:10px"><table class="nx-table auto tight"><thead><tr><th>Staff member</th><th>Code</th><th></th></tr></thead><tbody>' +
         roster.map(r => '<tr><td>' + esc(r.staff_name) + '</td><td>' + (r.enrolled ? '<span class="nx-pill ok">Set up</span>' : '<span class="nx-pill">Not yet</span>') + '</td><td>' + (r.enrolled && r.staff_name !== ME.name ? '<button class="nx-btn sm" data-reset="' + esc(r.staff_name) + '">Reset</button>' : '') + '</td></tr>').join('') + '</tbody></table></div>' : '';
@@ -3808,13 +3981,13 @@ async function bindSec() {
     const again = () => bindSec();
     if ($('#secReq')) $('#secReq').onclick = async () => {
       const on = !st.required;
-      if (!await confirmBox(on ? 'Require the 6-digit code for everyone?' : 'Stop requiring the code?', on ? 'Each person sets up an authenticator app the next time they open Nex from Nexus (about a minute). Until they do, they see nothing in Nex.' : 'Nex goes back to protecting student data with passwords only.', on ? 'Require it' : 'Turn off', !on)) return;
+      if (!await confirmBox(on ? 'Require the 6-digit code for everyone?' : 'Stop requiring the code?', on ? 'Each person sets up an authenticator app the next time they open Pipe-Line from Nexus (about a minute). Until they do, they see nothing in Pipe-Line.' : 'Pipe-Line goes back to protecting student data with passwords only.', on ? 'Require it' : 'Turn off', !on)) return;
       try { await api('rpc/nex_set_mfa_required', { method: 'POST', body: { p_on: on } }); toast(on ? 'Required for everyone' : 'No longer required'); } catch (e) { toast(e.message, true); }
       again();
     };
     $$('[data-reset]', box).forEach(b => b.onclick = async () => {
       const who = b.dataset.reset;
-      if (!await confirmBox('Reset ' + who + '\'s code?', 'Use this when they have lost their phone. They set up a new code the next time they open Nex from Nexus.', 'Reset', true)) return;
+      if (!await confirmBox('Reset ' + who + '\'s code?', 'Use this when they have lost their phone. They set up a new code the next time they open Pipe-Line from Nexus.', 'Reset', true)) return;
       try { await api('rpc/nex_admin_reset_mfa', { method: 'POST', body: { p_staff: who } }); toast('Reset'); } catch (e) { toast(e.message, true); }
       again();
     });
