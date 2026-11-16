@@ -7,7 +7,7 @@
    - a student needs at least the "placement_min_paid" amount received (default $500) before going in a batch; hub admins are exempt
    - one live place per person per batch; withdrawing frees the place
    - quotas are a guide: going over shows in red but does not block
-   - the 3-week wait counts from the day the enrolment was marked "Docs completed" (the day the email was checked)
+   - all placement documents must be received (nex_placement_docs); the 3-week wait counts from the day the last one arrived
    - only hub admins can delete a batch or a card */
 const BT = { id: null, min: null };
 const BT_OFF = ['withdrawn', 'cancelled', 'denied', 'not_accommodated', 'rejected'];   /* placements that no longer use a place */
@@ -180,7 +180,7 @@ async function batchAddStudent(batch, card, places, done) {
     body: '<div class="nx-form"><div><label class="nx-lbl" for="ba_shift">Shift</label><select class="nx-sel" id="ba_shift">' + BT_SHIFTS.map(([k, l]) => '<option value="' + k + '">' + l + (card.is_others ? '' : ' (' + btCount(places, card.id, k) + ' of ' + (card['quota_' + k] || 0) + ')') + '</option>').join('') + '</select></div>' +
       (card.is_others ? '<div><label class="nx-lbl" for="ba_other">Aged care they found *</label><input class="nx-in" id="ba_other" placeholder="Name of the aged care"></div>' : '') +
       '<div class="full"><label class="nx-lbl" for="ba_q">Find in the ready list</label><input class="nx-in" id="ba_q" placeholder="Type a name" autocomplete="off"></div></div>' +
-      '<div class="nx-help" style="margin:8px 0">Ready means documents complete and at least ' + esc(money(need)) + ' received. Ordered: waited the 3 weeks first, then most calls.</div><div id="ba_list"><div class="nx-help">Loading…</div></div>' +
+      '<div class="nx-help" style="margin:8px 0">Ready means all placement documents received and at least ' + esc(money(need)) + ' received. Ordered: waited the 3 weeks first, then most calls. Students still missing documents are last and cannot be added until their documents are ticked.</div><div id="ba_list"><div class="nx-help">Loading…</div></div>' +
       '<div style="margin-top:12px"><button type="button" class="nx-btn sm" id="ba_find">' + ico('search') + 'Find someone who is not on this list</button></div>' });
   const assign = async (enrolmentId, who) => {
     const shift = $('#ba_shift', m.el).value; let other = null;
@@ -195,14 +195,14 @@ async function batchAddStudent(batch, card, places, done) {
     const shown = rows.filter(r => !q || fullName(r).toLowerCase().includes(q)).slice(0, 60);
     box.innerHTML = shown.length ? '<ul class="nx-list">' + shown.map(r => {
       const due = r.docs_complete_on ? btAddDays(r.docs_complete_on, BT_WAIT_DAYS) : null;
-      const st = !due ? '<span class="nx-pill">Docs date not recorded</span>' : (due <= today ? '<span class="nx-pill ok">Ready</span>' : '<span class="nx-pill warn">From ' + esc(fmtDate(due)) + '</span>');
-      return '<li><div><b>' + esc(fullName(r)) + '</b> ' + st + '<small>' + esc([qualName(r.qualification_id), money(r.paid_total) + ' received', r.docs_complete_on ? 'docs complete ' + fmtDate(r.docs_complete_on) : '', r.calls + (r.calls === 1 ? ' call' : ' calls')].filter(Boolean).join(' · ')) + '</small></div>' +
+      const st = !due ? '<span class="nx-pill bad">' + (r.placement_docs_missing > 0 ? 'Missing ' + r.placement_docs_missing + (r.placement_docs_missing === 1 ? ' document' : ' documents') : 'No documents recorded') + '</span>' : (due <= today ? '<span class="nx-pill ok">Ready</span>' : '<span class="nx-pill warn">From ' + esc(fmtDate(due)) + '</span>');
+      return '<li><div><b>' + esc(fullName(r)) + '</b> ' + st + '<small>' + esc([qualName(r.qualification_id), money(r.paid_total) + ' received', r.docs_complete_on ? 'documents complete ' + fmtDate(r.docs_complete_on) : '', r.calls + (r.calls === 1 ? ' call' : ' calls')].filter(Boolean).join(' · ')) + '</small></div>' +
         '<button type="button" class="nx-btn sm primary" data-add="' + r.enrolment_id + '">Add</button></li>'; }).join('') + '</ul>' : '<div class="nx-help">' + (rows.length ? 'Nobody matches.' : 'Nobody is ready and unplaced right now.') + '</div>';
     $$('[data-add]', box).forEach(b => b.onclick = async () => { const r = rows.find(x => x.enrolment_id === b.dataset.add); b.disabled = true; if (await assign(r.enrolment_id, fullName(r))) { rows = rows.filter(x => x !== r); draw(); } else b.disabled = false; });
   };
   try {
     rows = await sel('nex_placement_ready', 'select=*&has_placement=eq.false&stage=in.(docs_completed,processed,placement)&limit=1000');
-    const rank = r => { const due = r.docs_complete_on ? btAddDays(r.docs_complete_on, BT_WAIT_DAYS) : null; return due && due <= today ? 0 : (!due ? 1 : 2); };
+    const rank = r => { const due = r.docs_complete_on ? btAddDays(r.docs_complete_on, BT_WAIT_DAYS) : null; return due && due <= today ? 0 : (due ? 1 : 2); };
     rows.sort((a, b) => rank(a) - rank(b) || b.calls - a.calls || String(a.docs_complete_on || '9').localeCompare(String(b.docs_complete_on || '9')) || fullName(a).localeCompare(fullName(b)));
     draw();
   } catch (e) { $('#ba_list', m.el).innerHTML = '<div class="nx-err">' + esc(e.message) + '</div>'; }
