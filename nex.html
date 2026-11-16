@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#12201f">
 <meta name="robots" content="noindex,nofollow">
 <meta name="referrer" content="no-referrer">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-27ysZxtg0xWjikciJnl6p9Oun6JvBpqkESCMcIdAldg=' 'sha256-Lxp7cl/Qx1uTFnCwOU9XTtr1A/e83Kn4zPipWHs45kQ='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data: https://jcfgldqrdbfkgbixszds.supabase.co; connect-src https://jcfgldqrdbfkgbixszds.supabase.co; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-27ysZxtg0xWjikciJnl6p9Oun6JvBpqkESCMcIdAldg=' 'sha256-vRmdni8Irxm4zkFXC6BX1UyN3N1gHmwcj1eN6YMzk+c='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data: https://jcfgldqrdbfkgbixszds.supabase.co; connect-src https://jcfgldqrdbfkgbixszds.supabase.co; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Nex · Student management</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232fb5ad'/%3E%3Cpath d='M9.5 9.5 16 16l-6.5 6.5M17 9.5l6.5 6.5-6.5 6.5' fill='none' stroke='%2308201f' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -767,6 +767,36 @@ body.nx-busy::before{opacity:1;animation:nxbar 1s linear infinite}
 .nx-doclist .nx-check small{display:block;color:var(--nx-ink-3);font-size:12px}
 .nx-doclist li>.nx-muted{white-space:nowrap;font-size:12px}
 
+/* Conversion report */
+.nx-crep{padding:20px}
+.nx-crhead{display:flex;gap:32px;flex-wrap:wrap;margin-bottom:16px}
+.nx-crhead div{display:flex;flex-direction:column}
+.nx-crhead b{font-family:var(--nx-display);font-size:28px;font-weight:700;letter-spacing:-.01em}
+.nx-crgrid{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:24px;align-items:start;margin-bottom:24px}
+.nx-crgrid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:24px;align-items:start}
+.nx-crep h3{margin:0 0 8px;font-size:15px}
+.nx-crpie{display:flex;justify-content:center;align-items:center;min-height:200px}
+.nx-pie{width:100%;max-width:300px;height:auto}
+.nx-pie path,.nx-pie circle{stroke:var(--nx-surface);stroke-width:1.5}
+.nx-swatch{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:8px;vertical-align:baseline}
+.nx-crnote{margin:10px 0 0;font-size:12.5px;line-height:1.5;max-width:60ch}
+@media(max-width:760px){.nx-crgrid{grid-template-columns:1fr}}
+@media print{.nx-crgrid{grid-template-columns:1.1fr 1fr}.nx-swatch,.nx-pie path,.nx-pie circle{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+
+/* ---------- Calls page ---------- */
+.nx-callform .nx-fs{border:0;margin:0;padding:0;min-width:0}
+.nx-callform .nx-fs:disabled{opacity:.55}
+.nx-callform.nostu .nx-idnew{display:none}
+.nx-callform .nx-help.over{color:var(--nx-warn)}
+.nx-callchecks{display:flex;flex-wrap:wrap;gap:8px 24px}
+.nx-calllock{margin:0 0 14px;padding:10px 14px;border-radius:10px;background:var(--nx-warn-bg,#fff4e0);color:var(--nx-ink)}
+.nx-dirtag{display:inline-block;min-width:28px;padding:1px 6px;margin-right:4px;border-radius:6px;background:var(--nx-surface-2,#eef1f6);color:var(--nx-ink-2);font-size:11px;font-weight:600;text-align:center}
+.nx-callnote{margin-top:2px;max-width:46ch}
+.nx-calltable .nx-btnrow{justify-content:flex-end;flex-wrap:nowrap}
+.nx-unfbar{margin-bottom:12px}
+.nx-unfbar .nx-note{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding-top:10px;padding-bottom:10px}
+.nx-unfbar .nx-note span{flex:1;min-width:200px}
+
 </style>
 </head>
 <body class="nx">
@@ -953,7 +983,7 @@ function endSession(why) {
   const mf = $('#mfa'); if (mf) { mf.hidden = true; const mc = $('#mfaCard'); if (mc) mc.innerHTML = ''; }
   const a = $('#app'); if (a) a.hidden = true;
   const msg = $('#lockMsg');
-  if (msg) msg.textContent = why === 'idle' ? 'Nex locked after 15 minutes without activity. Go back to Nexus and open Nex again.' : why === 'old' ? 'For safety Nex closes after 12 hours. Go back to Nexus and open Nex again.' : 'Your sign-in has run out. Go back to Nexus, refresh, and open Nex again.';
+  if (msg) msg.textContent = why === 'idle' ? 'Nex locked after 15 minutes without activity. Go back to Nexus and open Nex again.' : why === 'gone' ? 'Your sign-in has ended. Go back to Nexus, sign in again and open Nex.' : why === 'old' ? 'For safety Nex closes after 12 hours. Go back to Nexus and open Nex again.' : 'Your sign-in has run out. Go back to Nexus, refresh, and open Nex again.';
   const l = $('#lock'); if (l) l.hidden = false;
 }
 function watchSession() {
@@ -1253,7 +1283,7 @@ function identityLookup(m, cfg) {
           return;
         }
       }
-      show((goodPhone || goodEmail) ? '<div class="nx-idnew">Not in Nex yet. Saving will add a new person.</div>' : (box.dataset.hint ? '<div class="nx-idnew">' + esc(box.dataset.hint) + '</div>' : ''));
+      show((goodPhone || goodEmail) ? '<div class="nx-idnew">' + esc(cfg.newMsg || 'Not in Nex yet. Saving will add a new person.') + '</div>' : (box.dataset.hint ? '<div class="nx-idnew">' + esc(box.dataset.hint) + '</div>' : ''));
     } catch (err) { if (my === token) show(''); }
   };
   const kick = () => { clearTimeout(timer); timer = setTimeout(run, 350); };
@@ -1269,9 +1299,9 @@ let navToken = 0, lastRouteH = null, afters = [], viewWaits = [];
 /* tabs: Admin is only listed for hub admins. Follow-ups has a page but no tab. */
 const NAV = [['#/', 'Overview'], ['#/leads', 'Leads'], ['#/students', 'Students'], ['#/payments', 'Payments'], ['#/firstaid', 'First Aid'], ['#/placement', 'Placement'], ['misc', 'Misc', 'menu'], ['#/admin', 'Admin', 'admin']];
 /* the staff pages copied from Nexus sit together under the Misc button */
-const MISC = [['#/quizzes', 'Quizzes'], ['#/documents', 'Documents'], ['#/teamreport', 'Team report'], ['#/achievements', 'Achievements']];
+const MISC = [['#/quizzes', 'Quizzes'], ['#/documents', 'Documents'], ['#/calls', 'Calls'], ['#/teamreport', 'Team report'], ['#/convreport', 'Conversion report'], ['#/achievements', 'Achievements']];
 /* icon and title per section, so a loading page can show its real heading straight away */
-const HEADS = { '/': ['home', 'Overview'], '/leads': ['user', 'Leads'], '/students': ['user', 'Students'], '/search': ['search', 'Search'], '/payments': ['cash', 'Payment queue'], '/firstaid': ['heart', 'First Aid and CPR'], '/placement': ['pin', 'Placement'], '/followups': ['bell', 'Things to follow up'], '/admin': ['cog', 'Lists and settings'], '/quizzes': ['book', 'Quizzes'], '/documents': ['doc', 'Documents'], '/teamreport': ['chart', 'Team report'], '/profile': ['user', 'Profile'], '/achievements': ['star', 'Team achievements'], '/staff': ['user', 'Profile'] };
+const HEADS = { '/': ['home', 'Overview'], '/leads': ['user', 'Leads'], '/students': ['user', 'Students'], '/search': ['search', 'Search'], '/payments': ['cash', 'Payment queue'], '/firstaid': ['heart', 'First Aid and CPR'], '/placement': ['pin', 'Placement'], '/followups': ['bell', 'Things to follow up'], '/admin': ['cog', 'Lists and settings'], '/quizzes': ['book', 'Quizzes'], '/documents': ['doc', 'Documents'], '/calls': ['bell', 'Calls'], '/teamreport': ['chart', 'Team report'], '/convreport': ['chart', 'Conversion report'], '/profile': ['user', 'Profile'], '/achievements': ['star', 'Team achievements'], '/staff': ['user', 'Profile'] };
 function baseOf(h) { return '/' + ((h.split('/')[1] || '').split('?')[0]); }
 function isRecord(h) { return /^\/students\/[0-9a-f-]{36}$/.test(h); }
 /* after a page paints: name it for the browser tab and screen readers, and move keyboard focus to it when the page (not just its data) changed */
@@ -1416,6 +1446,10 @@ async function boot() {
   ME.name = ss.get('nex_user'); ME.admin = ss.get('nex_is_admin') === '1';
   watchSession();
   setInterval(() => { const t = ss.get('nex_sb_at'); if (!locked && t && !tokenAlive(t, 120000)) refreshToken(); }, 60000);
+  await sessionAlive();
+  if (locked) return;
+  setInterval(sessionAlive, 60000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) sessionAlive(); });
   await mfaGate();
   if (locked) return;
   $('#whoName').textContent = ME.name || 'Signed in'; $('#whoAva').textContent = initials(ME.name);
@@ -1500,11 +1534,12 @@ function nextFuHtml(f) {
   const nth = f.kind === 'lead_cycle' && f.step ? ['', '1st', '2nd', '3rd'][f.step] + ' · ' : '';
   return '<span class="' + cls + '">' + nth + esc(fmtDate(f.due_at)) + (day < today ? ' (overdue)' : day === today ? ' (today)' : '') + '</span>';
 }
-const SL = { q: '', stage: '', qual: '', kind: 'student', page: 0, size: 50 };
+const SL = { q: '', stage: '', qual: '', unf: '', kind: 'student', page: 0, size: 50 };
 route(/^\/(students|leads|search)(?:\?(.*))?$/, async m => {
   const mode = m[1], qs = new URLSearchParams(m[2] || '');
   const kind = mode === 'leads' ? 'lead' : mode === 'students' ? 'student' : 'all';
-  if (SL.kind !== kind) { SL.kind = kind; SL.page = 0; SL.q = SL.stage = SL.qual = ''; }
+  if (SL.kind !== kind) { SL.kind = kind; SL.page = 0; SL.q = SL.stage = SL.qual = SL.unf = ''; }
+  if (qs.get('unf')) { SL.unf = qs.get('unf'); SL.page = 0; }
   if (qs.has('q')) { SL.q = qs.get('q'); SL.page = 0; }
   const openNew = qs.get('new') === '1';
   const noun = kind === 'lead' ? 'leads' : kind === 'student' ? 'students' : 'people';
@@ -1514,8 +1549,9 @@ route(/^\/(students|leads|search)(?:\?(.*))?$/, async m => {
       holdBody(body);
       try {
         const q = safeQ(SL.q); const digits = cleanPhone(q);
-        let query = 'select=id,student_no,first_name,last_name,email,phone,agent_id,created_at,nex_student_paid!inner(paid_total),nex_enrolments' + (SL.stage || SL.qual ? '!inner' : '') + '(id,stage,qualification_id,fee,year,enrolled_on)' + (kind === 'lead' ? ',nex_followups(due_at,step,kind)' : '') + '&deleted_at=is.null&order=created_at.desc' + (kind === 'lead' ? '&nex_followups.done_at=is.null&nex_followups.order=due_at.asc&nex_followups.limit=1' : '');
+        let query = 'select=id,student_no,first_name,last_name,email,phone,agent_id,created_at,needs_details,flagged_to,nex_student_paid!inner(paid_total),nex_enrolments' + (SL.stage || SL.qual ? '!inner' : '') + '(id,stage,qualification_id,fee,year,enrolled_on)' + (kind === 'lead' ? ',nex_followups(due_at,step,kind)' : '') + '&deleted_at=is.null&order=created_at.desc' + (kind === 'lead' ? '&nex_followups.done_at=is.null&nex_followups.order=due_at.asc&nex_followups.limit=1' : '');
         if (kind !== 'all') query += '&nex_student_paid.paid_total=' + (kind === 'lead' ? 'lt.' : 'gte.') + STUDENT_MIN;
+        if (kind === 'lead' && SL.unf) query += '&needs_details=eq.true' + (SL.unf === 'mine' ? '&flagged_to=eq.' + encodeURIComponent(ME.name) : '');
         if (SL.stage) query += '&nex_enrolments.stage=eq.' + encodeURIComponent(SL.stage);
         if (SL.qual) query += '&nex_enrolments.qualification_id=eq.' + SL.qual;
         if (q) { const parts = ['first_name.ilike.*' + q + '*', 'last_name.ilike.*' + q + '*', 'email.ilike.*' + q + '*']; if (digits.length >= 4) parts.push('phone.ilike.*' + digits + '*'); query += '&or=(' + parts.join(',') + ')'; }
@@ -1530,7 +1566,7 @@ route(/^\/(students|leads|search)(?:\?(.*))?$/, async m => {
             const fee = (s.nex_enrolments || []).reduce((t, e) => t + Number(e.fee || 0), 0), pd = paid[s.id] || 0;
             const pct = fee ? Math.min(100, Math.round(pd / fee * 100)) : 0;
             const idx = PATH.indexOf(en.stage), isStu = kindOf(s.nex_student_paid) === 'student';
-            return '<tr class="nx-tr" data-id="' + s.id + '"><td><div class="nx-who"><span class="nx-avatar">' + esc(initials(fullName(s))) + '</span><div><b>' + esc(fullName(s)) + (kind === 'all' ? ' <span class="nx-pill ' + (isStu ? 'accent' : 'info') + '">' + (isStu ? 'Student' : 'Lead') + '</span>' : '') + '</b><span>' + esc(s.email || 'No email') + (s.nex_enrolments && s.nex_enrolments.length > 1 ? ' · ' + s.nex_enrolments.length + ' enrolments' : '') + '</span></div></div></td>' +
+            return '<tr class="nx-tr" data-id="' + s.id + '"><td><div class="nx-who"><span class="nx-avatar">' + esc(initials(fullName(s))) + '</span><div><b>' + esc(fullName(s)) + (s.needs_details ? ' <span class="nx-pill warn" title="Started from a call; details still needed. Flagged to ' + esc(s.flagged_to || 'the logger') + '">Unfinished' + (s.flagged_to ? ' · ' + esc(s.flagged_to) : '') + '</span>' : '') + (kind === 'all' ? ' <span class="nx-pill ' + (isStu ? 'accent' : 'info') + '">' + (isStu ? 'Student' : 'Lead') + '</span>' : '') + '</b><span>' + esc(s.email || 'No email') + (s.nex_enrolments && s.nex_enrolments.length > 1 ? ' · ' + s.nex_enrolments.length + ' enrolments' : '') + '</span></div></div></td>' +
               '<td class="nx-num">' + esc(fmtPhone(s.phone)) + '</td><td>' + esc(qualShort(en.qualification_id) || '–') + '</td>' +
               '<td>' + (en.stage ? '<div class="nx-stagecell">' + pill('enrolment', en.stage) + '<div class="nx-mini">' + PATH.map((p, i) => '<i class="' + (idx >= 0 && i <= idx ? 'on' : '') + '"></i>').join('') + '</div></div>' : '<span class="nx-muted">–</span>') + '</td>' +
               '<td>' + (fee || pd ? '<div class="nx-meter"><div class="nx-meter-bar"><i class="' + (pd < fee ? 'warn' : '') + '" style="width:' + pct + '%"></i></div><small>' + money(pd) + ' of ' + money(fee) + '</small></div>' : '<span class="nx-muted">–</span>') + '</td>' +
@@ -1550,7 +1586,8 @@ route(/^\/(students|leads|search)(?:\?(.*))?$/, async m => {
     $('#slQ').addEventListener('input', e => { clearTimeout(t); t = setTimeout(() => { SL.q = e.target.value; SL.page = 0; load(); }, 300); });
     $('#slStage').onchange = e => { SL.stage = e.target.value; SL.page = 0; load(); };
     $('#slQual').onchange = e => { SL.qual = e.target.value; SL.page = 0; load(); };
-    $('#slClear').onclick = () => { SL.q = SL.stage = SL.qual = ''; SL.page = 0; $('#slQ').value = ''; $('#slStage').value = ''; $('#slQual').value = ''; load(); };
+    const un = $('#slUnf'); if (un) un.onchange = e => { SL.unf = e.target.value; SL.page = 0; load(); };
+    $('#slClear').onclick = () => { SL.q = SL.stage = SL.qual = SL.unf = ''; SL.page = 0; $('#slQ').value = ''; $('#slStage').value = ''; $('#slQual').value = ''; const u2 = $('#slUnf'); if (u2) u2.value = ''; load(); };
     const nb = $('#slNew'); if (nb) nb.onclick = () => newStudent();
     viewWait(load());
     if (openNew) { history.replaceState(null, '', '#/leads'); newStudent(); }
@@ -1559,7 +1596,7 @@ route(/^\/(students|leads|search)(?:\?(.*))?$/, async m => {
     : kind === 'student' ? pageHead('user', 'Paid $200 or more', 'Students', '')
     : pageHead('search', 'Leads and students', 'Search', '');
   return head +
-    '<div class="nx-card"><div class="nx-toolbar" style="border-top:0"><input class="nx-in sm" style="min-width:280px" id="slQ" placeholder="Search ' + (kind === 'all' ? 'name, email or phone' : noun + ' by name, email or phone') + '" value="' + esc(SL.q) + '"><select class="nx-sel sm" id="slStage">' + selectOpts(opts('enrolment', true), SL.stage, 'Any stage') + '</select><select class="nx-sel sm" id="slQual">' + selectOpts(REF.quals.filter(q => q.active), SL.qual, 'Any qualification') + '</select><button class="nx-btn quiet sm" id="slClear">Clear</button></div>' +
+    '<div class="nx-card"><div class="nx-toolbar" style="border-top:0"><input class="nx-in sm" style="min-width:280px" id="slQ" placeholder="Search ' + (kind === 'all' ? 'name, email or phone' : noun + ' by name, email or phone') + '" value="' + esc(SL.q) + '"><select class="nx-sel sm" id="slStage">' + selectOpts(opts('enrolment', true), SL.stage, 'Any stage') + '</select><select class="nx-sel sm" id="slQual">' + selectOpts(REF.quals.filter(q => q.active), SL.qual, 'Any qualification') + '</select>' + (kind === 'lead' ? '<select class="nx-sel sm" id="slUnf" aria-label="Unfinished leads"><option value=""' + (SL.unf ? '' : ' selected') + '>All leads</option><option value="mine"' + (SL.unf === 'mine' ? ' selected' : '') + '>Unfinished, flagged to me</option><option value="all"' + (SL.unf === 'all' ? ' selected' : '') + '>Unfinished, anyone</option></select>' : '') + '<button class="nx-btn quiet sm" id="slClear">Clear</button></div>' +
     '<div id="slBody"></div><div class="nx-foot" id="slFoot"><span></span></div></div>';
 });
 
@@ -1568,7 +1605,8 @@ function studentFields(s) {
   return [
     { k: 'first_name', label: 'First name', value: s.first_name, required: true }, { k: 'last_name', label: 'Last name', value: s.last_name },
     { k: 'email', label: 'Email', type: 'email', value: s.email }, { k: 'phone', label: 'Phone', type: 'tel', value: s.phone },
-    { k: 'phone2', label: 'Second phone', type: 'tel', value: s.phone2 }, { k: 'agent_id', label: 'Agent', type: 'select', options: REF.agents.filter(a => a.active), value: s.agent_id, blank: 'Self / no agent' }
+    { k: 'phone2', label: 'Second phone', type: 'tel', value: s.phone2 }, { k: 'agent_id', label: 'Agent', type: 'select', options: REF.agents.filter(a => a.active), value: s.agent_id, blank: 'Self / no agent' },
+    { k: 'outside_sydney', type: 'check', label: 'Outside Sydney', value: s.outside_sydney, full: true, help: 'Counted in the Outside Sydney row of the Conversion report.' }
   ];
 }
 function tidyStudent(v) {
@@ -1631,12 +1669,13 @@ function newStudent() {
 const SR = { tab: 'details' };
 route(/^\/students\/([0-9a-f-]{36})$/, async m => {
   const id = m[1];
-  const [stu, det, enr, pays, books, followups] = await Promise.all([
+  const [stu, det, enr, pays, books, followups, calls] = await Promise.all([
     sel('nex_students', 'select=*&id=eq.' + id), api('rpc/nex_get_details', { method: 'POST', body: { p_student: id } }).then(r => r.json()),
     sel('nex_enrolments', 'select=*&student_id=eq.' + id + '&deleted_at=is.null&order=enrolled_on.desc.nullslast'),
     sel('nex_payments', 'select=*&student_id=eq.' + id + '&order=paid_on.desc.nullslast'),
     sel('nex_class_bookings', 'select=*,nex_class_sessions(class_date,kind)&student_id=eq.' + id),
-    sel('nex_followups', 'select=*&student_id=eq.' + id + '&order=created_at.desc')
+    sel('nex_followups', 'select=*&student_id=eq.' + id + '&order=created_at.desc'),
+    sel('call_log', 'select=id,caller_name,phone_e164,reason,note,direction,logged_by,created_at,resolved_at,for_team&student_id=eq.' + id + '&deleted_at=is.null&order=created_at.desc&limit=40').catch(() => [])
   ]);
   const s = stu[0]; if (!s) return empty('Student not found', 'They may have been archived.');
   /* the sensitive details come through a function that logs who looked (admins see this) and stops bulk opening */
@@ -1657,11 +1696,12 @@ route(/^\/students\/([0-9a-f-]{36})$/, async m => {
   const grossPaid = pays.reduce((t, p) => t + Number(p.amount), 0);
   const isStudent = grossPaid >= STUDENT_MIN;
   const totalPaid = grossPaid - refunds.reduce((t, r) => t + Number(r.amount), 0);
-  const ctx = { s, d, limited, enr, pays, books, followups, queue, refunds, reqs, plcs, hist, aud, docs, isStudent };
+  const ctx = { s, d, limited, enr, pays, books, followups, queue, refunds, reqs, plcs, hist, aud, docs, calls, isStudent };
 
   afterRender(() => { bindStudent(ctx); setNav(isStudent ? '!/students' : '!/leads'); });
   const fact = (k, v) => '<div><dt>' + k + '</dt><dd>' + (v || '<span class="nx-muted">–</span>') + '</dd></div>';
   return '<div class="nx-crumbs"><a href="' + (isStudent ? '#/students">Students' : '#/leads">Leads') + '</a> / <span>' + esc(fullName(s)) + '</span></div>' +
+    (s.needs_details ? '<div class="nx-card nx-unfbar"><div class="nx-note">' + ico('bell') + '<span><b>Unfinished lead.</b> Started from a call' + (s.flagged_to ? ' logged by <b>' + esc(s.flagged_to) + '</b>' : '') + '. Add their email, course and any other details, then mark it complete.</span> <button class="nx-btn sm primary" data-a="doneDetails">Mark complete</button></div></div>' : '') +
     '<div class="nx-card"><div class="nx-hl"><span class="nx-avatar">' + esc(initials(fullName(s))) + '</span><div><div class="nx-eyebrow">' + (isStudent ? 'Student ' : 'Lead ') + esc(String(s.student_no || '')) + '</div><h1 class="nx-title">' + esc(fullName(s)) + ' <span class="nx-pill ' + (isStudent ? 'accent' : 'info') + '">' + (isStudent ? 'Student' : 'Lead') + '</span></h1></div>' +
     '<dl class="nx-facts">' + fact('Email', esc(s.email || '')) + fact('Phone', esc(fmtPhone(s.phone))) + fact('Agent', esc(agentName(s.agent_id))) + fact('Fee and paid', totalFee || totalPaid ? money(totalPaid) + ' of ' + money(totalFee) : '') + fact('Added', esc(fmtDate(s.created_at))) + '</dl>' +
     '<div class="nx-btnrow"><button class="nx-btn" data-a="editStu">' + ico('edit') + 'Edit</button><button class="nx-btn" data-a="addEnr">' + ico('plus') + 'Enrolment</button><button class="nx-btn quiet" data-a="archive">Archive</button></div></div>' +
@@ -1743,7 +1783,7 @@ function tabDetails(c) {
   const s = c.s, d = c.d;
   const sens = c.limited ? section('Personal and sensitive', '<div class="nx-note">' + ico('lock') + ' You have opened a lot of student records in a short time, so personal details are paused for now. Try again later, or ask an admin.</div>') : section('Personal and sensitive', '<div class="nx-note">' + ico('lock') + ' Visible to all Nex staff. Every look and every change is logged.</div><dl class="nx-fields">' + field('Date of birth', esc(fmtDate(d.dob))) + field('USI', esc(d.usi)) + field('Address', esc([d.address, d.suburb, d.state, d.postcode].filter(Boolean).join(', '))) +
       field('Emergency contact', esc([d.emergency_name, d.emergency_relation && '(' + d.emergency_relation + ')', fmtPhone(d.emergency_phone)].filter(Boolean).join(' '))) + field('Disability', esc(d.disability)) + field('Indigenous status', esc(d.indigenous_status)) + '</dl><div style="padding:0 16px 16px"><button class="nx-btn sm" data-a="editDet">' + ico('edit') + 'Edit personal details</button></div>');
-  return section('Contact', '<dl class="nx-fields">' + field('First name', esc(s.first_name)) + field('Last name', esc(s.last_name)) + field('Email', esc(s.email)) + field('Phone', esc(fmtPhone(s.phone))) + field('Second phone', esc(fmtPhone(s.phone2))) + field('Agent', esc(agentName(s.agent_id))) + '</dl><div style="padding:0 16px 16px"><button class="nx-btn sm" data-a="editStu">' + ico('edit') + 'Edit contact</button></div>') +
+  return section('Contact', '<dl class="nx-fields">' + field('First name', esc(s.first_name)) + field('Last name', esc(s.last_name)) + field('Email', esc(s.email)) + field('Phone', esc(fmtPhone(s.phone))) + field('Second phone', esc(fmtPhone(s.phone2))) + field('Agent', esc(agentName(s.agent_id))) + field('Outside Sydney', s.outside_sydney ? 'Yes' : 'No') + '</dl><div style="padding:0 16px 16px"><button class="nx-btn sm" data-a="editStu">' + ico('edit') + 'Edit contact</button></div>') +
     sens +
     (c.s.source_note ? section('Import notes', '<div style="padding:16px">' + esc(c.s.source_note) + '</div>') : '');
 }
@@ -1794,6 +1834,7 @@ function tabActivity(c) {
   const items = [];
   c.hist.forEach(h => items.push({ t: h.changed_at, html: '<li><span class="dot">' + ico('list') + '</span><div><b>' + esc(h.changed_by || 'Someone') + '</b> moved ' + esc(h.context.replace(/_/g, ' ')) + (h.from_status ? ' from <b>' + esc(statusLabel(h.context, h.from_status)) + '</b>' : '') + ' to <b>' + esc(statusLabel(h.context, h.to_status)) + '</b><time>' + fmtDT(h.changed_at) + '</time></div></li>' }));
   c.aud.forEach(a => { if (a.action === 'UPDATE' && !diffHtml(a)) return; items.push({ t: a.changed_at, html: feedItem(a) }); });
+  (c.calls || []).forEach(k => items.push({ t: k.created_at, html: '<li><span class="dot info">' + ico('bell') + '</span><div><b>' + esc(k.logged_by || 'Someone') + '</b> logged a call (' + (k.direction === 'out' ? 'out' : 'in') + '): ' + esc(k.reason) + (k.resolved_at ? '' : ' <span class="nx-pill warn">Waiting for a callback</span>') + (k.note ? '<div class="nx-diff">' + esc(k.note) + '</div>' : '') + '<time>' + fmtDT(k.created_at) + '</time></div></li>' }));
   items.sort((a, b) => String(b.t).localeCompare(String(a.t)));
   return items.length ? '<ul class="nx-feed">' + items.slice(0, 60).map(i => i.html).join('') + '</ul>' : empty('No activity yet');
 }
@@ -1822,6 +1863,7 @@ async function studentAction(a, ds, c) {
   if (a === 'startCycle') return formModal('Start follow-ups', [{ k: 'first', label: 'First contact', type: 'date', value: s.first_contact_on || new Date(s.created_at).toLocaleDateString('en-CA', { timeZone: TZ }), required: true, full: true, help: 'The 1st follow-up is 2 days after this date, the 2nd 4 days after, the 3rd 6 days after.' }], async v => { await api('rpc/nex_start_lead_cycle', { method: 'POST', body: { p_student: s.id, p_first: v.first } }); toast('3 follow-ups set'); render(); }, 'Start');
   if (a === 'doneFu') { await upd('nex_followups', 'id=eq.' + ds.id, { done_at: new Date().toISOString(), done_by: ME.name }); toast('Done'); return render(); }
   if (a === 'emailFu') return emailFollowup(s, Number(ds.step));
+  if (a === 'doneDetails') { await upd('nex_students', 'id=eq.' + s.id, { needs_details: false, flagged_to: null }); toast('Marked complete'); return render(); }
   if (a === 'bookFA') return go('#/firstaid');
 }
 
@@ -3015,6 +3057,9 @@ const NEXI_FAQ = [
   ]],
   ['Staff pages', [
     ['Where are my quizzes and documents?', 'Press Misc in the tab bar and choose Quizzes or Documents. They show the same quizzes and documents as Nexus. Quiz building and document upload are still done in Nexus.', ['#/quizzes', 'Open Quizzes']],
+    ['How do I log a call?', 'Press Misc in the tab bar and choose Calls. Type the phone number first. If the person is already in Nex their details fill in and the call is added to their Activity. If Nex has never seen the number, logging the call starts an unfinished lead flagged to you. Tick "Not a student" for agents or facilities so no lead is made.', ['#/calls', 'Open Calls']],
+    ['What is an unfinished lead?', 'A lead that was started from a call, so Nex only has a name and a phone number. It shows an Unfinished tag in the Leads list and a banner on the record. Add the missing details, then press Mark complete.', ['#/leads?unf=mine', 'Leads flagged to me']],
+    ['Where are the weekly conversion numbers?', 'Press Misc in the tab bar and choose Conversion report. Pick the dates (or This week, Last week) and Nex works out the status counts, the pie chart, the follow-ups done by step and the class numbers. Use Print or save as PDF to share it. Outside Sydney comes from the tick on each person\'s record.', ['#/convreport', 'Open Conversion report']],
     ['How do I fill in the team report?', 'Press Misc in the tab bar and choose Team report. Enter your numbers or tasks for the day and press Save entry. Team leads and admins can generate the weekly report and print it or save it as a PDF.', ['#/teamreport', 'Open Team report']],
     ['Where do I see team achievements?', 'Press Misc in the tab bar and choose Achievements. It lists who passed a training quiz, who earned Glow for a perfect fortnight and who reached a call milestone, the same feed as Nexus.', ['#/achievements', 'Open Achievements']],
     ['How do I change my photo, nickname or bio?', 'Press your name at the top right to open Profile. Your password, themes and notification settings are changed in Nexus.', ['#/profile', 'Open Profile']],
@@ -3050,6 +3095,331 @@ function nexiInit() {
   document.addEventListener('pointerdown', e => { if (!panel.hidden && !panel.contains(e.target) && !fab.contains(e.target)) { panel.hidden = true; fab.setAttribute('aria-expanded', 'false'); } });
 }
 
+/* ---------- Conversion report: the enrolment team's weekly numbers, worked out from Nex ----------
+   Status table and pie: enrolments created in the range (enrolment date, else the day it was added), by stage now.
+   Follow-ups: follow-ups marked done in the range, by step. Class: see the note printed under the block. */
+const CR = { from: '', to: '' };
+const CR_ORDER = ['processed', 'placement', 'not_interested', 'hold', 'docs_completed', 'blended', 'incomplete_docs', 'issue', 'checklist_sent', 'certificate_issued'];
+const CR_COLORS = ['#2f6fed', '#e5484d', '#8b5e3c', '#f5a524', '#8e4ec6', '#12a594', '#d6409f', '#6e7787', '#30a46c', '#3a8eca', '#9aa3b2'];
+function crOffset(d) {
+  try {
+    const p = new Intl.DateTimeFormat('en-US', { timeZone: TZ, timeZoneName: 'longOffset' }).formatToParts(new Date(d + 'T12:00:00Z')).find(x => x.type === 'timeZoneName');
+    const m = /GMT([+-])(\d\d):?(\d\d)?/.exec(p ? p.value : '');
+    return m ? m[1] + m[2] + ':' + (m[3] || '00') : '+10:00';
+  } catch (e) { return '+10:00'; }
+}
+function crStart(d) { return d + 'T00:00:00' + crOffset(d); }
+function crNext(d) { const x = new Date(d + 'T12:00:00Z'); x.setUTCDate(x.getUTCDate() + 1); return x.toISOString().slice(0, 10); }
+function crShift(d, n) { const x = new Date(d + 'T12:00:00Z'); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); }
+function crPreset(k) {
+  const t = sydToday(), mon = trMonday(t);
+  if (k === 'week') return [mon, t];
+  if (k === 'last') return [crShift(mon, -7), crShift(mon, -1)];
+  if (k === '7') return [crShift(t, -6), t];
+  return [t.slice(0, 8) + '01', t];
+}
+function crLong(d) { const x = new Date(d + 'T12:00:00'); return x.toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' }).replace(/ /g, '-'); }
+
+async function crData(from, to) {
+  const A = crStart(from), B = crStart(crNext(to));
+  const orQ = encodeURIComponent('(and(enrolled_on.gte.' + from + ',enrolled_on.lte.' + to + '),and(enrolled_on.is.null,created_at.gte.' + A + ',created_at.lt.' + B + '))');
+  const [enr, fus, bks] = await Promise.all([
+    sel('nex_enrolments', 'select=id,stage,student_id,nex_students!inner(outside_sydney)&nex_students.deleted_at=is.null&deleted_at=is.null&or=' + orQ + '&limit=1000'),
+    sel('nex_followups', 'select=step,kind&done_at=gte.' + encodeURIComponent(A) + '&done_at=lt.' + encodeURIComponent(B) + '&limit=1000'),
+    sel('nex_class_bookings', 'select=student_id,name&created_at=gte.' + encodeURIComponent(A) + '&created_at=lt.' + encodeURIComponent(B) + '&status=not.in.(cancelled,info_only)&limit=1000')
+  ]);
+  const people = Array.from(new Set(enr.map(e => e.student_id)));
+  const booked = new Set();
+  for (let i = 0; i < people.length; i += 80) {
+    const rows = await sel('nex_class_bookings', 'select=student_id&status=not.in.(cancelled,info_only)&student_id=in.(' + people.slice(i, i + 80).join(',') + ')&limit=1000');
+    rows.forEach(r => booked.add(r.student_id));
+  }
+  const byStage = {}; enr.forEach(e => { const k = e.stage || ''; byStage[k] = (byStage[k] || 0) + 1; });
+  const steps = {}; let other = 0;
+  fus.forEach(f => { if (f.kind === 'lead_cycle' && f.step) steps[f.step] = (steps[f.step] || 0) + 1; else other++; });
+  const outside = new Set(enr.filter(e => e.nex_students && e.nex_students.outside_sydney).map(e => e.student_id)).size;
+  const classBooked = new Set(bks.map(b => b.student_id || ('n:' + String(b.name || '').toLowerCase()))).size;
+  return { total: enr.length, byStage, steps, other, fuTotal: fus.length, without: people.filter(p => !booked.has(p)).length, classBooked, outside, capped: enr.length >= 1000 || fus.length >= 1000 };
+}
+
+function crPie(rows, total) {
+  const live = rows.filter(r => r.n > 0);
+  if (!total || !live.length) return '<div class="nx-muted" style="padding:40px 0;text-align:center">Nothing in this range yet.</div>';
+  let a0 = -Math.PI / 2, out = '';
+  const pt = a => (100 + 90 * Math.cos(a)).toFixed(2) + ' ' + (100 + 90 * Math.sin(a)).toFixed(2);
+  live.forEach(r => {
+    const f = r.n / total, tip = '<title>' + esc(r.label) + ': ' + r.n + ' (' + Math.round(f * 1000) / 10 + '%)</title>';
+    if (f >= 0.9999) { out += '<circle cx="100" cy="100" r="90" fill="' + r.color + '">' + tip + '</circle>'; return; }
+    const a1 = a0 + f * 2 * Math.PI;
+    out += '<path d="M100 100 L' + pt(a0) + ' A90 90 0 ' + (f > 0.5 ? 1 : 0) + ' 1 ' + pt(a1) + ' Z" fill="' + r.color + '">' + tip + '</path>'; a0 = a1;
+  });
+  return '<svg class="nx-pie" viewBox="0 0 200 200" role="img" aria-label="Share of each stage: ' + esc(live.map(r => r.label + ' ' + r.n).join(', ')) + '">' + out + '</svg>';
+}
+
+function crHtml(d, from, to) {
+  const known = CR_ORDER.filter(k => (REF.status.enrolment || []).some(o => o.key === k));
+  const extra = (REF.status.enrolment || []).map(o => o.key).filter(k => !known.includes(k) && d.byStage[k]);
+  const keys = known.concat(extra);
+  const rows = keys.map((k, i) => ({ label: statusLabel('enrolment', k), n: d.byStage[k] || 0, color: CR_COLORS[i % CR_COLORS.length] }));
+  const none = d.byStage[''] || 0; if (none) rows.push({ label: 'No stage set', n: none, color: CR_COLORS[10] });
+  const pct = n => d.total ? (Math.round(n / d.total * 1000) / 10) + '%' : '–';
+  const statusTable = '<div class="nx-tablewrap"><table class="nx-table auto tight"><thead><tr><th>Status</th><th class="nx-num">Number</th><th class="nx-num">Share</th></tr></thead><tbody>' +
+    rows.map(r => '<tr><td><span class="nx-swatch" style="background:' + r.color + '"></span>' + esc(r.label) + '</td><td class="nx-num">' + r.n + '</td><td class="nx-num">' + (r.n ? pct(r.n) : '–') + '</td></tr>').join('') +
+    '<tr class="nx-totrow"><td>Total</td><td class="nx-num">' + d.total + '</td><td class="nx-num"></td></tr></tbody></table></div>';
+  const ord = n => n + (n % 10 === 1 && n !== 11 ? 'st' : n % 10 === 2 && n !== 12 ? 'nd' : n % 10 === 3 && n !== 13 ? 'rd' : 'th');
+  let fu = '<tr class="nx-totrow"><td>Follow-ups done</td><td class="nx-num">' + d.fuTotal + '</td></tr>';
+  for (let i = 1; i <= 9; i++) fu += '<tr><td>' + ord(i) + ' follow-up</td><td class="nx-num">' + (d.steps[i] || 0) + '</td></tr>';
+  fu += '<tr><td>Other (added by hand)</td><td class="nx-num">' + d.other + '</td></tr>';
+  const cls = '<tr><td>Without First Aid and CPR</td><td class="nx-num">' + d.without + '</td></tr><tr><td>Class booked</td><td class="nx-num">' + d.classBooked + '</td></tr><tr><td>Outside Sydney</td><td class="nx-num">' + d.outside + '</td></tr>';
+  return '<div class="nx-report nx-crep">' +
+    '<div class="nx-crhead"><div><span class="nx-muted">From</span><b>' + esc(crLong(from)) + '</b></div><div><span class="nx-muted">To</span><b>' + esc(crLong(to)) + '</b></div></div>' +
+    (d.capped ? '<div class="nx-note">This range has more rows than Nex can count in one go (1,000). Pick a shorter range for exact numbers.</div>' : '') +
+    '<div class="nx-crgrid"><div><h3>Student conversion</h3>' + statusTable + '</div><div class="nx-crpie">' + crPie(rows, d.total) + '</div></div>' +
+    '<div class="nx-crgrid2"><div><h3>Follow-ups</h3><div class="nx-tablewrap"><table class="nx-table auto tight"><thead><tr><th>Follow-up</th><th class="nx-num">Number</th></tr></thead><tbody>' + fu + '</tbody></table></div></div>' +
+    '<div><h3>Class status</h3><div class="nx-tablewrap"><table class="nx-table auto tight"><thead><tr><th>Class status</th><th class="nx-num">Number</th></tr></thead><tbody>' + cls + '</tbody></table></div>' +
+    '<p class="nx-muted nx-crnote">Status: enrolments added in these dates, by the stage they are in now. Follow-ups: marked done in these dates. Class booked: people with a First Aid and CPR booking made in these dates. Without: people added in these dates with no booking yet. Outside Sydney: added in these dates and ticked Outside Sydney on their record.</p></div></div></div>';
+}
+
+route(/^\/convreport$/, async () => {
+  if (!CR.from) { const p = crPreset('week'); CR.from = p[0]; CR.to = p[1]; }
+  afterRender(() => {
+    const out = $('#crOut'), f = $('#crFrom'), t = $('#crTo'), pr = $('#crPrint');
+    let seq = 0;
+    const run = async () => {
+      if (!f.value || !t.value) return;
+      if (f.value > t.value) { out.innerHTML = empty('Check the dates', 'The From date is after the To date.'); pr.hidden = true; return; }
+      CR.from = f.value; CR.to = t.value;
+      const my = ++seq; out.setAttribute('aria-busy', 'true');
+      try { const d = await crData(CR.from, CR.to); if (my !== seq) return; out.innerHTML = crHtml(d, CR.from, CR.to); pr.hidden = false; }
+      catch (e) { if (my === seq) { out.innerHTML = empty('Could not build the report', e.message); pr.hidden = true; } }
+      out.removeAttribute('aria-busy');
+    };
+    f.onchange = t.onchange = run;
+    $$('[data-crp]').forEach(b => { b.onclick = () => { const p = crPreset(b.dataset.crp); f.value = p[0]; t.value = p[1]; run(); }; });
+    pr.onclick = () => { document.body.classList.add('nx-print-report'); const done = () => { document.body.classList.remove('nx-print-report'); window.removeEventListener('afterprint', done); }; window.addEventListener('afterprint', done); window.print(); };
+    run();
+  });
+  const today = sydToday();
+  return pageHead('chart', 'Enrolment team', 'Conversion report', '') +
+    '<div class="nx-card nx-noprint"><div class="nx-card-h"><div><h3>Dates</h3><div class="nx-muted">Numbers are worked out from Nex for the dates you pick.</div></div><span class="nx-btnrow"><button class="nx-btn sm" data-crp="week">This week</button><button class="nx-btn sm" data-crp="last">Last week</button><button class="nx-btn sm" data-crp="7">Last 7 days</button><button class="nx-btn sm" data-crp="month">This month</button></span></div>' +
+    '<div class="nx-card-b"><div class="nx-form"><div><label class="nx-lbl" for="crFrom">From</label><input class="nx-in" type="date" id="crFrom" max="' + today + '" value="' + esc(CR.from) + '"></div><div><label class="nx-lbl" for="crTo">To</label><input class="nx-in" type="date" id="crTo" max="' + today + '" value="' + esc(CR.to) + '"></div></div></div></div>' +
+    '<div class="nx-card nx-printwrap"><div class="nx-card-h nx-noprint"><div><h3>Report</h3></div><span class="nx-btnrow"><button class="nx-btn sm" id="crPrint" hidden>' + ico('print') + 'Print or save as PDF</button></span></div><div id="crOut"><div class="nx-skel" style="height:240px;margin:16px"></div></div></div>';
+});
+
+/* ---------- Calls: the Nexus Call Log, copied into Nex ----------
+   Logging a call for someone already in Nex adds it to their Activity. A number Nex has never seen starts an UNFINISHED lead,
+   flagged to whoever logged the call. All of that happens in the database function nex_log_call, so it is one step.
+   The "clocked in and inside office hours" lock is a convenience on this page only. The database does not enforce it. */
+const CL = { view: 'wait', scope: 'team', q: '', today: false, rows: [], teams: null, gate: null };
+const CL_DAYS = 60, CL_EDIT_MIN = 15, CL_MAX_WORDS = 8;
+
+/* Australian numbers only. Same rule as the Nexus call log: +61 + nine digits, typed as 04xx, 4xx, 61 4xx or +61 4xx. */
+function callE164(v) {
+  let d = String(v || '').replace(/\D/g, '');
+  if (d.startsWith('61') && d.length >= 11) d = d.slice(2);
+  if (d.length === 9 && d[0] !== '0') d = '0' + d;
+  return /^0\d{9}$/.test(d) ? '+61' + d.slice(1) : null;
+}
+function callLocal(e) { return e && /^\+61\d{9}$/.test(e) ? '0' + e.slice(3) : (e || ''); }
+function callPhoneFmt(e) { const l = callLocal(e); return /^0[2-9]\d{8}$/.test(l) ? (l[1] === '4' ? l.replace(/(\d{4})(\d{3})(\d{3})/, '$1 $2 $3') : l.replace(/(\d{2})(\d{4})(\d{4})/, '$1 $2 $3')) : l; }
+function callWords(t) { return String(t || '').trim().split(/\s+/).filter(Boolean); }
+const callIsPlc = t => /^placement$/i.test(String(t || '').trim());
+
+/* office hours in Sydney: Mon to Fri 9:00 to 19:00, Sat and Sun 9:00 to 16:00 */
+function callOpenNow(now) {
+  const p = new Intl.DateTimeFormat('en-AU', { timeZone: TZ, weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(now || new Date());
+  const g = t => (p.find(x => x.type === t) || {}).value || '';
+  const wd = g('weekday').slice(0, 3), mins = (Number(g('hour')) % 24) * 60 + Number(g('minute'));
+  const weekend = wd === 'Sat' || wd === 'Sun';
+  return mins >= 9 * 60 && mins < (weekend ? 16 : 19) * 60;
+}
+async function callGate() {
+  if (ME.admin) return { ok: true, admin: true };
+  if (!callOpenNow()) return { ok: false, why: 'Calls are logged between 9:00 am and 7:00 pm on weekdays, and 9:00 am to 4:00 pm on weekends (Sydney time).' };
+  try {
+    const r = await sel('clock_log', 'select=action,ts&staff_name=eq.' + encodeURIComponent(ME.name) + '&order=ts.desc&limit=1');
+    if (!r.length || r[0].action !== 'in') return { ok: false, why: 'Clock in on Nexus first, then you can log calls here.' };
+  } catch (e) { return { ok: true, unsure: true }; }   /* if the clock cannot be read, do not block the work */
+  return { ok: true };
+}
+
+async function callTeams() {
+  if (CL.teams) return CL.teams;
+  try { const r = await sel('staff_credentials', 'select=team'); CL.teams = Array.from(new Set((r || []).map(x => x.team).filter(Boolean))).sort(); }
+  catch (e) { CL.teams = []; }
+  return CL.teams;
+}
+async function callLoad() {
+  const since = new Date(Date.now() - CL_DAYS * 86400000).toISOString();
+  CL.rows = await sel('call_log', 'select=*&deleted_at=is.null&created_at=gte.' + encodeURIComponent(since) + '&order=created_at.desc&limit=600');
+}
+function callMyTeam() { return STAFF.team || ''; }
+function callVisible() {
+  const my = callMyTeam().toLowerCase(), q = CL.q.trim().toLowerCase(), today = sydToday();
+  return CL.rows.filter(r => {
+    if (CL.view === 'wait' && r.resolved_at) return false;
+    if (CL.view === 'done' && !r.resolved_at) return false;
+    if (CL.scope === 'mine' && r.logged_by !== ME.name) return false;
+    if (CL.scope === 'team' && my && String(r.for_team || r.team || '').toLowerCase() !== my) return false;
+    if (CL.today && new Date(r.created_at).toLocaleDateString('en-CA', { timeZone: TZ }) !== today) return false;
+    if (q && ![r.caller_name, r.phone_e164, callLocal(r.phone_e164), r.reason, r.note, r.logged_by, r.for_team].join(' ').toLowerCase().includes(q)) return false;
+    return true;
+  });
+}
+function callCanEdit(r) { return r.logged_by === ME.name && Date.now() - new Date(r.created_at).getTime() < CL_EDIT_MIN * 60000; }
+
+function callTable() {
+  const rows = callVisible();
+  if (!rows.length) return empty(CL.view === 'wait' ? 'Nobody is waiting for a call back' : 'No calls to show', 'Change the tabs or the search above to see more. Calls from the last ' + CL_DAYS + ' days are loaded.');
+  return '<div class="nx-tablewrap"><table class="nx-table tight nx-calltable"><thead><tr><th>When</th><th>Caller</th><th>Reason</th><th>For</th><th>Logged by</th><th></th></tr></thead><tbody>' + rows.map(r => {
+    const who = r.student_id ? '<a href="#/students/' + esc(r.student_id) + '">' + esc(r.caller_name || 'Open record') + '</a>' : esc(r.caller_name || '–');
+    const acts = [];
+    if (!r.resolved_at) acts.push('<button class="nx-btn sm primary" data-cb="' + esc(r.id) + '">Called back</button>');
+    if (callCanEdit(r)) acts.push('<button class="nx-btn sm" data-ce="' + esc(r.id) + '">Edit</button>');
+    if (ME.admin) acts.push('<button class="nx-btn sm quiet" data-cd="' + esc(r.id) + '" aria-label="Delete this call">' + ico('x') + '</button>');
+    return '<tr><td class="nx-nowrap">' + esc(fmtDT(r.created_at)) + '</td>' +
+      '<td><div class="nx-who"><div><b>' + who + '</b><span>' + esc(callPhoneFmt(r.phone_e164) || 'No number') + '</span></div></div></td>' +
+      '<td><span class="nx-dirtag">' + (r.direction === 'out' ? 'Out' : 'In') + '</span> ' + esc(r.reason) + (r.note ? '<div class="nx-muted nx-callnote">' + esc(r.note) + '</div>' : '') + (r.plc_offered ? '<div class="nx-muted">PLC offered' + (r.plc_remarks ? ': ' + esc(r.plc_remarks) : '') + '</div>' : '') + '</td>' +
+      '<td>' + esc(r.for_team || r.team || '–') + '</td>' +
+      '<td>' + esc(r.logged_by || '–') + '<div class="nx-muted">' + (r.resolved_at ? 'Done · ' + esc(r.resolved_by || '') : '<span class="nx-pill warn">Waiting</span>') + '</div></td>' +
+      '<td><div class="nx-btnrow">' + acts.join('') + '</div></td></tr>';
+  }).join('') + '</tbody></table></div>';
+}
+function callCounts() {
+  const w = CL.rows.filter(r => !r.resolved_at).length;
+  return { wait: w, done: CL.rows.length - w, all: CL.rows.length };
+}
+
+route(/^\/calls$/, async () => {
+  await loadMe();
+  const teams = await callTeams();
+  CL.gate = await callGate();
+  try { await callLoad(); } catch (e) { CL.rows = []; }
+  afterRender(() => {
+    const root = $('#clPage'); if (!root) return;
+    const f = $('#clForm', root), phone = $('#clPhone'), name = $('#clName'), email = $('#clEmail'), reason = $('#clReason'), note = $('#clNote');
+    const forTeam = $('#clFor'), plcBox = $('#clPlc'), notStu = $('#clNotStu'), save = $('#clSave'), cnt = $('#clWords');
+    const lk = identityLookup({ el: f }, { ids: { phone: 'clPhone', name: 'clName', email: 'clEmail' }, newMsg: 'Not in Nex yet. Logging this will start an unfinished lead flagged to you.' });
+    const sync = () => {
+      const plc = callIsPlc(forTeam.value);
+      plcBox.hidden = !plc;
+      $('#clPhoneReq').textContent = plc ? '' : ' *';
+      f.classList.toggle('nostu', notStu.checked);
+      const n = callWords(reason.value).length;
+      cnt.textContent = n + ' of ' + CL_MAX_WORDS + ' words' + (n > CL_MAX_WORDS ? '. The rest goes into the note.' : '');
+      cnt.classList.toggle('over', n > CL_MAX_WORDS);
+    };
+    [forTeam, notStu, reason].forEach(e => { e.addEventListener('input', sync); e.addEventListener('change', sync); });
+    sync();
+    const reloadTable = async () => { try { await callLoad(); } catch (e) { toast(e.message, true); } paint(); };
+    const paint = () => {
+      const c = callCounts();
+      $$('#clSeg button').forEach(b => { b.setAttribute('aria-pressed', String(b.dataset.v === CL.view)); const n = $('.nx-count', b); if (n) n.textContent = c[b.dataset.v]; });
+      $('#clTable').innerHTML = callTable();
+      bindRows();
+    };
+    const bindRows = () => {
+      $$('[data-cb]').forEach(b => b.onclick = () => calledBack(CL.rows.find(r => String(r.id) === b.dataset.cb)));
+      $$('[data-ce]').forEach(b => b.onclick = () => editCall(CL.rows.find(r => String(r.id) === b.dataset.ce)));
+      $$('[data-cd]').forEach(b => b.onclick = () => deleteCall(CL.rows.find(r => String(r.id) === b.dataset.cd)));
+    };
+    const calledBack = r => {
+      if (!r) return;
+      const m = openModal({ title: 'Called back', body: '<p class="nx-muted" style="margin-top:0">' + esc(r.caller_name || '') + ' · ' + esc(callPhoneFmt(r.phone_e164)) + ' · ' + esc(r.reason) + '</p><label class="nx-lbl" for="cbNote">What happened? (optional)</label><textarea class="nx-ta" id="cbNote" placeholder="Spoke to them, sent the form"></textarea>', noFocus: false,
+        buttons: [{ label: 'Cancel', close: true }, { label: 'Mark as called back', primary: true, run: async mm => {
+          const n = $('#cbNote', mm.el).value.trim() || null, now = new Date().toISOString();
+          await upd('call_log', 'id=eq.' + encodeURIComponent(r.id), { resolved_at: now, resolved_by: ME.name });
+          await ins('call_log', { caller_name: r.caller_name, phone_e164: r.phone_e164, reason: 'Callback', note: n, logged_by: ME.name, direction: 'out', team: callMyTeam() || r.team, for_team: r.for_team, resolved_at: now, resolved_by: ME.name, student_id: r.student_id || null }, true);
+          toast('Marked as called back'); await reloadTable();
+        } }] });
+      return m;
+    };
+    const editCall = r => {
+      if (!r) return;
+      if (!callCanEdit(r)) { toast('You can only change your own call in the first ' + CL_EDIT_MIN + ' minutes.', true); return; }
+      openModal({ title: 'Edit call', body: '<div class="nx-form"><div class="full"><label class="nx-lbl" for="ecName">Caller name</label><input class="nx-in" id="ecName" value="' + esc(r.caller_name || '') + '"></div><div class="full"><label class="nx-lbl" for="ecReason">Reason (up to ' + CL_MAX_WORDS + ' words)</label><input class="nx-in" id="ecReason" value="' + esc(r.reason || '') + '"></div><div class="full"><label class="nx-lbl" for="ecNote">Note</label><textarea class="nx-ta" id="ecNote">' + esc(r.note || '') + '</textarea></div></div>',
+        buttons: [{ label: 'Cancel', close: true }, { label: 'Save', primary: true, run: async mm => {
+          const nm = $('#ecName', mm.el).value.trim(), ws = callWords($('#ecReason', mm.el).value);
+          if (!nm) throw new Error('Caller name is required.');
+          if (!ws.length) throw new Error('Reason is required.');
+          if (ws.length > CL_MAX_WORDS) throw new Error('Keep the reason to ' + CL_MAX_WORDS + ' words. Put the rest in the note.');
+          await upd('call_log', 'id=eq.' + encodeURIComponent(r.id), { caller_name: nm, reason: ws.join(' '), note: $('#ecNote', mm.el).value.trim() || null, edited_at: new Date().toISOString() });
+          toast('Call updated'); await reloadTable();
+        } }] });
+    };
+    const deleteCall = async r => {
+      if (!r || !ME.admin) return;
+      if (!(await confirmBox('Delete this call?', 'It is hidden from the queue and from the person’s Activity. An admin can still see it in the database.', 'Delete', true))) return;
+      await upd('call_log', 'id=eq.' + encodeURIComponent(r.id), { deleted_at: new Date().toISOString(), deleted_by: ME.name });
+      toast('Call deleted'); await reloadTable();
+    };
+
+    f.onsubmit = async e => {
+      e.preventDefault();
+      if (save.disabled) return;
+      try {
+        const g = await callGate(); CL.gate = g;
+        if (!g.ok) { $('#clLock').textContent = g.why; $('#clLock').hidden = false; throw new Error(g.why); }
+        const plc = callIsPlc(forTeam.value), raw = phone.value.trim(), e164 = raw ? callE164(raw) : null;
+        const nm = name.value.trim(), ws = callWords(reason.value), em = email.value.trim();
+        if (raw && !e164) { phone.setAttribute('aria-invalid', 'true'); phone.focus(); throw new Error('Phone must be an Australian number, like 0412 345 678.'); }
+        if (!e164 && !plc) { phone.setAttribute('aria-invalid', 'true'); phone.focus(); throw new Error('Phone number is required (only Placement calls can go without one).'); }
+        phone.removeAttribute('aria-invalid');
+        if (!nm) { name.focus(); throw new Error('Caller name is required.'); }
+        if (!ws.length) { reason.focus(); throw new Error('Reason is required.'); }
+        if (em && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) { email.focus(); throw new Error('That email does not look right.'); }
+        const rest = ws.slice(CL_MAX_WORDS).join(' ');
+        const noteTxt = [rest, note.value.trim()].filter(Boolean).join(' · ') || null;
+        const body = { p_name: nm, p_phone: e164, p_reason: ws.slice(0, CL_MAX_WORDS).join(' '), p_note: noteTxt, p_direction: $('#clDir').value, p_for_team: forTeam.value || null, p_callback: $('#clCb').checked,
+          p_plc_offered: plc ? $('#clPlcOffered').checked : false, p_plc_remarks: plc ? ($('#clPlcRemarks').value.trim() || null) : null, p_student: lk.get() ? lk.get().id : null, p_email: em || null, p_make_lead: !notStu.checked };
+        save.disabled = true; save.classList.add('busy');
+        const r = await api('rpc/nex_log_call', { method: 'POST', body });
+        const j = await r.json();
+        const who = lk.get() ? fullName(lk.get()) : nm;
+        let msg;
+        if (j && j.created_student) msg = 'Call logged. New unfinished lead started for ' + nm + ', flagged to you.';
+        else if (j && j.student_id) msg = 'Call logged and added to ' + who + '’s activity.';
+        else msg = 'Call logged.';
+        if (j && j.cleared) msg += ' ' + j.cleared + ' earlier call' + (j.cleared === 1 ? '' : 's') + ' from this number cleared.';
+        toast(msg);
+        f.reset(); lk.clear(); sync();
+        await reloadTable();
+      } catch (err) { toast(err.message || 'Could not log the call.', true); }
+      finally { save.disabled = !(CL.gate && CL.gate.ok); save.classList.remove('busy'); }
+    };
+
+    $$('#clSeg button').forEach(b => b.onclick = () => { CL.view = b.dataset.v; paint(); });
+    $('#clScope').onchange = e => { CL.scope = e.target.value; paint(); };
+    $('#clSearch').oninput = e => { CL.q = e.target.value; paint(); };
+    $('#clToday').onchange = e => { CL.today = e.target.checked; paint(); };
+    $('#clRefresh').onclick = reloadTable;
+    paint();
+  });
+
+  const c = callCounts(), g = CL.gate || { ok: true }, my = callMyTeam();
+  const teamOpts = ['<option value=""' + (my ? '' : ' selected') + '>Not sure</option>'].concat(teams.map(t => '<option' + (t.toLowerCase() === my.toLowerCase() ? ' selected' : '') + '>' + esc(t) + '</option>')).join('');
+  return pageHead('bell', 'Staff', 'Calls', '') +
+    '<div id="clPage">' +
+    '<div class="nx-card"><div class="nx-card-h"><div><h3>Log a call</h3><div class="nx-muted">Someone already in Nex gets the call on their Activity. A new number starts an unfinished lead flagged to you.</div></div></div><div class="nx-card-b">' +
+    '<div class="nx-note nx-calllock" id="clLock"' + (g.ok ? ' hidden' : '') + ' role="status">' + esc(g.ok ? '' : g.why) + '</div>' +
+    '<form id="clForm" class="nx-callform" novalidate><fieldset class="nx-fs" ' + (g.ok ? '' : 'disabled') + '><div class="nx-form">' +
+    '<div><label class="nx-lbl" for="clPhone">Phone<span id="clPhoneReq"> *</span></label><input class="nx-in" id="clPhone" type="tel" inputmode="tel" autocomplete="off" placeholder="0412 345 678"></div>' +
+    '<div><label class="nx-lbl" for="clName">Caller name *</label><input class="nx-in" id="clName" autocomplete="off"></div>' +
+    '<div class="full">' + idBoxHtml('') + '</div>' +
+    '<div><label class="nx-lbl" for="clEmail">Email</label><input class="nx-in" id="clEmail" type="email" autocomplete="off" placeholder="Optional"></div>' +
+    '<div><label class="nx-lbl" for="clDir">Direction</label><select class="nx-sel" id="clDir"><option value="in">Incoming</option><option value="out">Outgoing</option></select></div>' +
+    '<div class="full"><label class="nx-lbl" for="clReason">Reason *</label><input class="nx-in" id="clReason" autocomplete="off" placeholder="Wants to book first aid class"><div class="nx-help" id="clWords" aria-live="polite"></div></div>' +
+    '<div><label class="nx-lbl" for="clFor">For team</label><select class="nx-sel" id="clFor">' + teamOpts + '</select></div>' +
+    '<div><label class="nx-lbl" for="clNote">Note</label><input class="nx-in" id="clNote" autocomplete="off" placeholder="Optional"></div>' +
+    '<div class="full" id="clPlc" hidden><div class="nx-form"><div><label class="nx-check"><input type="checkbox" id="clPlcOffered"> PLC offered</label></div><div><label class="nx-lbl" for="clPlcRemarks">PLC remarks</label><input class="nx-in" id="clPlcRemarks"></div></div></div>' +
+    '<div class="full nx-callchecks"><label class="nx-check"><input type="checkbox" id="clCb"> Needs a call back</label><label class="nx-check"><input type="checkbox" id="clNotStu"> Not a student (agent, facility or other). Do not start a lead.</label></div>' +
+    '</div><div class="nx-btnrow" style="margin-top:14px"><button class="nx-btn primary" id="clSave" type="submit"' + (g.ok ? '' : ' disabled') + '>' + ico('check') + 'Log call</button></div></fieldset></form></div></div>' +
+    '<div class="nx-card"><div class="nx-toolbar" style="border-top:0"><div class="nx-seg" id="clSeg" role="group" aria-label="Show">' + [['wait', 'Waiting'], ['done', 'Handled'], ['all', 'All']].map(([v, l]) => '<button type="button" data-v="' + v + '" aria-pressed="' + (CL.view === v) + '">' + l + ' <span class="nx-count">' + c[v] + '</span></button>').join('') + '</div>' +
+    '<select class="nx-sel sm" id="clScope" aria-label="Whose calls"><option value="team"' + (CL.scope === 'team' ? ' selected' : '') + '>' + (my ? esc(my) + ' team' : 'My team') + '</option><option value="all"' + (CL.scope === 'all' ? ' selected' : '') + '>Everyone</option><option value="mine"' + (CL.scope === 'mine' ? ' selected' : '') + '>Only mine</option></select>' +
+    '<input class="nx-in sm" id="clSearch" type="search" placeholder="Search name, number, reason" aria-label="Search calls" value="' + esc(CL.q) + '"><label class="nx-check"><input type="checkbox" id="clToday"' + (CL.today ? ' checked' : '') + '> Today</label><span class="nx-grow"></span><button class="nx-btn sm" id="clRefresh" type="button">' + ico('refresh') + 'Refresh</button></div>' +
+    '<div id="clTable"></div></div></div>';
+});
+
 /* =========================================================
    Two-step login, Nex side. The 6-digit code is asked in Nexus (it holds the refresh token that a code
    check swaps), so Nex never confirms codes itself. It only (1) refuses to open without a code-verified
@@ -3060,9 +3430,12 @@ function aalNow() { const c = tokenPayload(ss.get('nex_sb_at')); return (c && c.
 async function authApi(path) {
   const r = await fetch(SB + '/auth/v1/' + path, { headers: { apikey: KEY, Authorization: 'Bearer ' + await bearer() } });
   let j = null; try { j = await r.json(); } catch (e) {}
+  if (!r.ok && j && (j.error_code === 'session_not_found' || /session from session_id claim.*does not exist/i.test(j.msg || j.message || ''))) { endSession('gone'); throw new Error('session'); }
   if (!r.ok) { const e = new Error((j && (j.msg || j.message)) || ('Request failed (' + r.status + ')')); e.status = r.status; throw e; }
   return j;
 }
+/* the token stays valid for up to an hour after Supabase ends the session, so ask the login service now and then */
+async function sessionAlive() { if (locked) return; try { await authApi('user'); } catch (e) { /* only a dead session locks (authApi does that); a network blip does not */ } }
 async function mfaList() { const u = await authApi('user'); return ((u && u.factors) || []).filter(f => f.factor_type === 'totp' && f.status === 'verified'); }
 /* runs once before the app is drawn; never resolves when a code is needed and missing */
 function mfaGate() {
