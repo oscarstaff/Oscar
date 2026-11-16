@@ -9,7 +9,7 @@ const PATH = ['checklist_sent', 'docs_completed', 'processed', 'placement', 'cer
 /* ---------- Overview ---------- */
 route(/^\/$/, async () => {
   const today = sydToday();
-  const [nStu, nLead, nOpenEnr, nQueue, nUnm, nDue, sessions, audit] = await Promise.all([
+  const [nStu, nLead, nOpenEnr, nQueue, nUnm, nDue, sessions, audit, pmRows] = await Promise.all([
     countKind('student'),
     countKind('lead'),
     count('nex_enrolments', 'deleted_at=is.null&stage=not.in.(certificate_issued,not_interested)'),
@@ -17,7 +17,8 @@ route(/^\/$/, async () => {
     count('nex_payments', 'student_id=is.null'),
     count('nex_followups', 'done_at=is.null&due_at=lte.' + today + 'T23:59:59'),
     sel('nex_class_sessions', 'select=*&class_date=gte.' + today + '&order=class_date&limit=4'),
-    sel('nex_audit', 'select=*&order=changed_at.desc&limit=12')
+    sel('nex_audit', 'select=*&order=changed_at.desc&limit=12'),
+    placementMailLoad().catch(() => [])
   ]);
   let counts = {};
   if (sessions.length) {
@@ -28,9 +29,10 @@ route(/^\/$/, async () => {
   const first = (ME.name || '').split(' ')[0] || 'Overview';
   let tipsGone = false; try { tipsGone = localStorage.getItem('nex_tips_v1') === '1'; } catch (e) {}
   const tips = tipsGone ? '' : '<div class="nx-card nx-tips"><div class="nx-card-h"><h3>Finding your way around</h3><button class="nx-btn quiet sm" id="tipsHide">Hide this</button></div><ul class="nx-tiplist"><li><b>Search from anywhere.</b> Type a name, email or phone number in the bar at the top.</li><li><b>Everything about a person is on their page.</b> Enrolments, payments, bookings, placement and follow-ups, with a history of every change.</li><li><b>Book First Aid seats from First Aid.</b> Pick the day, press a free seat, and the flags show what is still outstanding.</li><li><b>Leads become students at $200.</b> New people start under Leads and move to Students once their payments reach $200.</li></ul></div>';
+  afterRender(() => bindPlacementMail(pmRows));
   afterRender(() => { const h = $('#tipsHide'); if (h) h.onclick = () => { try { localStorage.setItem('nex_tips_v1', '1'); } catch (e) {} const c = h.closest('.nx-tips'); if (c) c.remove(); }; });
   return pageHead('home', nStu.toLocaleString('en-AU') + (nStu === 1 ? ' student' : ' students') + ' and ' + nLead.toLocaleString('en-AU') + (nLead === 1 ? ' lead' : ' leads'), 'Welcome back, ' + first, '<a class="nx-btn primary" href="#/leads?new=1">' + ico('plus') + 'New lead</a>') +
-    tips + '<div class="nx-two"><div class="nx-stack"><div class="nx-card"><div class="nx-card-h"><h3>Needs attention</h3></div><div class="nx-attlist">' +
+    tips + placementMailCard(pmRows) + '<div class="nx-two"><div class="nx-stack"><div class="nx-card"><div class="nx-card-h"><h3>Needs attention</h3></div><div class="nx-attlist">' +
     att('#/followups', nDue, 'Follow-ups due', 'today or overdue', 'bad') +
     att('#/payments?view=unmatched', nUnm, 'Unmatched payments', 'no student linked', 'warn') +
     att('#/payments', nQueue, 'Payments to process', 'in the processing queue', 'accent') +
@@ -41,7 +43,7 @@ route(/^\/$/, async () => {
     (audit.length ? '<ul class="nx-feed">' + audit.map(a => feedItem(a)).join('') + '</ul>' : empty('Nothing yet', 'Edits to students, payments and bookings show up here.')) + '</div></div>';
 });
 
-const AUD_NAMES = { nex_students: 'student', nex_student_details: 'student details', nex_enrolments: 'enrolment', nex_payments: 'payment', nex_payment_queue: 'payment queue', nex_refunds: 'refund', nex_class_sessions: 'class', nex_class_bookings: 'booking', nex_placement_requests: 'placement request', nex_placements: 'placement', nex_facilities: 'facility', nex_blacklist: 'blacklist entry' };
+const AUD_NAMES = { nex_students: 'student', nex_student_details: 'student details', nex_enrolments: 'enrolment', nex_payments: 'payment', nex_payment_queue: 'payment queue', nex_refunds: 'refund', nex_class_sessions: 'class', nex_class_bookings: 'booking', nex_placement_requests: 'placement request', nex_placement_doc_mail: 'placement documents email', nex_placements: 'placement', nex_facilities: 'facility', nex_blacklist: 'blacklist entry' };
 const SKIP_KEYS = new Set(['updated_at', 'created_at', 'created_by', 'id', 'updated_by']);
 function diffHtml(a) {
   if (a.action !== 'UPDATE' || !a.old_row || !a.new_row) return '';
@@ -343,14 +345,36 @@ function tabDocs(c) {
   if (!c.enr.length) return empty('No enrolments', 'Add an enrolment to track the documents it needs.');
   return c.enr.map(e => {
     const types = docTypesFor(e), title = (qualName(e.qualification_id) || 'Enrolment') + (e.year ? ' · ' + e.year : '');
-    if (!types.length) return section(title, '<div style="padding:16px" class="nx-muted">' + (e.qualification_id ? 'There is no document list for this course yet.' : 'Choose a qualification on this enrolment to see its document list.') + '</div>');
+    if (!types.length) return section(title, '<div style="padding:16px" class="nx-muted">' + (e.qualification_id ? 'There is no document list for this course yet.' : 'Choose a qualification on this enrolment to see its document list.') + '</div>') + placementDocsSection(c, e, title);
     const got = {}; c.docs.filter(d => d.enrolment_id === e.id).forEach(d => { got[d.doc_type_id] = d; });
     const n = types.filter(t => got[t.id]).length;
     return section(title + ' · ' + n + ' of ' + types.length + ' received',
       '<ul class="nx-list nx-doclist">' + types.map(t => { const g = got[t.id];
         return '<li><label class="nx-check"><input type="checkbox" data-doc="' + t.id + '" data-enr="' + e.id + '"' + (g ? ' checked' + (ME.admin ? '' : ' disabled title="Only hub admins can untick a document"') : '') + '> <span><b>' + esc(t.name) + '</b>' + (t.note ? '<small>' + esc(t.note) + '</small>' : '') + '</span></label>' +
-          (g ? '<span class="nx-muted">' + esc(fmtDate(g.received_on)) + (g.created_by ? ' · ' + esc(g.created_by) : '') + '</span>' : '<span class="nx-pill warn">Missing</span>') + '</li>'; }).join('') + '</ul>');
+          (g ? '<span class="nx-muted">' + esc(fmtDate(g.received_on)) + (g.created_by ? ' · ' + esc(g.created_by) : '') + '</span>' : '<span class="nx-pill warn">Missing</span>') + '</li>'; }).join('') + '</ul>') + placementDocsSection(c, e, title);
   }).join('');
+}
+/* the documents needed before placement (doc group 'placement'). Passport and Visa copy also count when ticked in the course list above,
+   the same way the database rule counts them */
+function placementDocState(c, e) {
+  const types = (REF.docTypes || []).filter(t => t.group_key === 'placement');
+  const nameOf = id => { const t = (REF.docTypes || []).find(x => x.id === id); return t ? t.name.trim().toLowerCase() : ''; };
+  const mine = c.docs.filter(d => d.enrolment_id === e.id);
+  const rows = types.map(t => {
+    const own = mine.find(d => d.doc_type_id === t.id), other = own ? null : mine.find(d => nameOf(d.doc_type_id) === t.name.trim().toLowerCase());
+    return { t, own, other, on: (own || other || {}).received_on || null };
+  });
+  const miss = rows.filter(r => !r.on).length, last = !miss && rows.length ? rows.map(r => r.on).sort().pop() : null;
+  return { rows, miss, last };
+}
+function placementDocsSection(c, e, title) {
+  const st = placementDocState(c, e); if (!st.rows.length) return '';
+  return section('Placement documents' + (c.enr.length > 1 ? ' (' + title + ')' : '') + ' · ' + (st.rows.length - st.miss) + ' of ' + st.rows.length + ' received' + (st.last ? ' · complete ' + fmtDate(st.last) : ''),
+    '<div class="nx-help" style="padding:10px 16px 0">All of these are needed before a placement request is sent or a student goes in a batch. The 3-week wait counts from the day the last one arrives.</div>' +
+    '<ul class="nx-list nx-doclist">' + st.rows.map(r => {
+      const dis = r.other || (r.own && !ME.admin);
+      return '<li><label class="nx-check"><input type="checkbox" data-doc="' + r.t.id + '" data-enr="' + e.id + '"' + (r.on ? ' checked' : '') + (dis ? ' disabled title="' + (r.other ? 'Ticked in the course list above' : 'Only hub admins can untick a document') + '"' : '') + '> <span><b>' + esc(r.t.name) + '</b>' + (r.t.note ? '<small>' + esc(r.t.note) + '</small>' : '') + '</span></label>' +
+        (r.on ? '<span class="nx-muted">' + esc(fmtDate(r.on)) + (r.own && r.own.created_by ? ' · ' + esc(r.own.created_by) : (r.other ? ' · from the course list' : '')) + '</span>' : '<span class="nx-pill warn">Missing</span>') + '</li>'; }).join('') + '</ul>');
 }
 function tabMoney(c) {
   if (!c.enr.length) return empty('No enrolments', 'Add an enrolment to track the fee, stage and payments.') + '<div style="padding:0 16px 16px;text-align:center"><button class="nx-btn primary" data-a="addEnr">' + ico('plus') + 'Add enrolment</button></div>';

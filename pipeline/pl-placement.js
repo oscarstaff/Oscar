@@ -114,3 +114,64 @@ function blacklistForm() {
   }, 'Add', '<div style="margin-bottom:14px"><button type="button" class="nx-btn" id="blFind">' + ico('search') + 'Find an existing student</button></div>');
   $('#blFind', m.el).onclick = () => pickStudent('Find a student', s => { studentId = s.id; $('#f_student_name', m.el).value = fullName(s); $('#f_email', m.el).value = s.email || ''; });
 }
+
+/* ---------- "Send placement documents email" box on the Overview ----------
+   Evershine sets Placement plan = Yes on a class booking; that student appears here for the Placement team to review.
+   Untick anyone to hold them back, Skip to take them off for good, then Send. The email goes from the placement mailbox
+   (edge function nex-send-placement-docs). Each send is recorded in nex_placement_doc_mail, so nobody is emailed twice by accident. */
+async function placementMailLoad() {
+  if (!(ME.admin || teamIs('Placement'))) return [];
+  const bk = await sel('nex_class_bookings', 'select=id,name,email,student_id,created_at,nex_class_sessions(class_date),nex_students(first_name,last_name,email)&placement_plan=eq.yes&order=created_at.desc&limit=200');
+  if (!bk.length) return [];
+  const done = new Set((await sel('nex_placement_doc_mail', 'select=booking_id&booking_id=in.' + inList(bk.map(b => b.id)))).map(x => x.booking_id));
+  return bk.filter(b => !done.has(b.id));
+}
+function placementMailCard(rows) {
+  if (!rows || !rows.length) return '';
+  const one = x => Array.isArray(x) ? x[0] : x;
+  return '<div class="nx-card" id="pmBox"><div class="nx-card-h"><h3>Send placement documents email</h3><span class="nx-muted">' + rows.length + (rows.length === 1 ? ' student' : ' students') + ' set to Placement plan: Yes</span></div>' +
+    '<div class="nx-card-b nx-muted" style="padding-bottom:6px">From the placement mailbox. Untick anyone you are not ready to send to.</div><ul class="nx-list">' +
+    rows.map(b => { const st = one(b.nex_students), ses = one(b.nex_class_sessions), to = (b.email || (st && st.email) || '').trim(), nm = st ? fullName(st) : (b.name || '(no name)');
+      return '<li><label class="nx-check"><input type="checkbox" data-pm="' + b.id + '"' + (to ? ' checked' : ' disabled') + '> <span><b>' + esc(nm) + '</b><small>' + esc([ses && ses.class_date ? 'Class ' + fmtDate(ses.class_date) : '', to || 'No email address'].filter(Boolean).join(' · ')) + '</small></span></label>' +
+        '<button type="button" class="nx-btn sm" data-pmskip="' + b.id + '">Skip</button></li>'; }).join('') +
+    '</ul><div class="nx-card-b nx-btnrow"><button type="button" class="nx-btn" id="pmPrev">Preview email</button><button type="button" class="nx-btn primary" id="pmSend">Send</button></div></div>';
+}
+function bindPlacementMail(rows) {
+  const box = $('#pmBox'); if (!box) return;
+  const ids = () => $$('[data-pm]', box).filter(c => c.checked).map(c => c.dataset.pm);
+  const count = () => { const n = ids().length; const b = $('#pmSend', box); b.textContent = n ? 'Send to ' + n : 'Send'; b.disabled = !n; $('#pmPrev', box).disabled = !n; };
+  box.addEventListener('change', e => { if (e.target.closest('[data-pm]')) count(); });
+  count();
+  $('#pmPrev', box).onclick = async () => {
+    const id = ids()[0]; if (!id) return;
+    try {
+      const pv = await fn('nex-send-placement-docs', { booking_id: id, preview: true });
+      openModal({ title: 'Preview: ' + pv.subject, wide: true, body: '<div class="nx-muted" style="margin-bottom:8px">To: ' + esc(pv.to) + ' (the greeting uses each student\'s own name)</div><div style="white-space:pre-wrap;line-height:1.5">' + esc(pv.body) + '</div>', buttons: [{ label: 'Close', close: true }] });
+    } catch (e) { toast(e.message, true); }
+  };
+  $$('[data-pmskip]', box).forEach(btn => btn.onclick = async () => {
+    const b = rows.find(x => x.id === btn.dataset.pmskip); if (!b) return;
+    if (!await confirmBox('Skip this email', 'Take this student off the list without emailing them? You can still email them from their record later.', 'Skip')) return;
+    try {
+      await api('nex_placement_doc_mail?on_conflict=booking_id', { method: 'POST', body: { booking_id: b.id, student_id: b.student_id || null, to_email: b.email || null, status: 'skipped' }, headers: { Prefer: 'resolution=merge-duplicates,return=minimal' } });
+      toast('Skipped'); render();
+    } catch (e) { toast(e.message, true); }
+  });
+  $('#pmSend', box).onclick = async () => {
+    const list = ids(); if (!list.length) return;
+    if (!await confirmBox('Send placement documents email', 'Send the documents email to ' + list.length + (list.length === 1 ? ' student' : ' students') + ' from the placement mailbox?', 'Send')) return;
+    const btn = $('#pmSend', box); btn.disabled = true; btn.classList.add('busy');
+    let ok = 0; const bad = [];
+    for (const id of list) {
+      try { await fn('nex-send-placement-docs', { booking_id: id }); ok++; }
+      catch (e) {
+        if (e.code === 'not_configured') { toast(e.message, true); bad.length = 0; ok = ok || 0; break; }
+        const b = rows.find(x => x.id === id), st = b && (Array.isArray(b.nex_students) ? b.nex_students[0] : b.nex_students);
+        bad.push((st ? fullName(st) : (b && b.name) || 'A student') + ': ' + e.message);
+      }
+    }
+    if (ok) toast('Sent to ' + ok + (ok === 1 ? ' student' : ' students'));
+    if (bad.length) toast(bad.slice(0, 2).join(' · ') + (bad.length > 2 ? ' · and ' + (bad.length - 2) + ' more' : ''), true);
+    render();
+  };
+}
