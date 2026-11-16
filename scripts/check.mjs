@@ -66,8 +66,8 @@ function checkPipeline() {
   if (!list.length) return fail('nex.html: loader PL_FILES not found');
   if (list[0] !== 'pl-core') fail('nex.html: pl-core must load first');
   if (list[list.length - 1] !== 'pl-start') fail('nex.html: pl-start must load last');
-  for (const n of list) if (!fs.existsSync(path.join(root, n + '.js'))) fail(`nex.html: ${n}.js is in PL_FILES but missing from the repo`);
-  for (const n of fs.readdirSync(root)) if (/^pl-.*\.js$/.test(n) && !list.includes(n.slice(0, -3))) fail(`${n} is in the repo but not in PL_FILES (it will never load)`);
+  for (const n of list) if (!fs.existsSync(path.join(root, 'pipeline', n + '.js'))) fail(`nex.html: ${n}.js is in PL_FILES but missing from the repo`);
+  for (const n of fs.existsSync(path.join(root, 'pipeline')) ? fs.readdirSync(path.join(root, 'pipeline')) : []) if (/^pl-.*\.js$/.test(n) && !list.includes(n.slice(0, -3))) fail(`pipeline/${n} is in the repo but not in PL_FILES (it will never load)`);
 }
 checkPipeline();
 if (bad) { console.error(`\n${bad} problem(s)`); process.exit(1); }
