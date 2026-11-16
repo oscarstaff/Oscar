@@ -4,29 +4,32 @@
 /* =========================================================
    Placement, Follow-ups, Admin
    ========================================================= */
-const PL = { tab: 'requests', status: '', q: '', page: 0, size: 50 };
+const PL = { tab: 'batches', status: '', q: '', page: 0, size: 50 };
 
 route(/^\/placement$/, async () => {
   afterRender(() => bindPlacement());
-  const seg = [['requests', 'Requests'], ['placements', 'Placements'], ['facilities', 'Facilities'], ['blacklist', 'Blacklist']];
+  const seg = [['batches', 'Batches'], ['requests', 'Requests'], ['placements', 'Placements'], ['facilities', 'Facilities'], ['blacklist', 'Blacklist']];
   return pageHead('pin', 'Placement team', 'Placement', '<button class="nx-btn primary" id="plAdd">' + ico('plus') + '<span id="plAddL">New request</span></button>') +
     '<div class="nx-card"><div class="nx-toolbar" style="border-top:0"><div class="nx-seg" id="plSeg">' + seg.map(([k, l]) => '<button data-v="' + k + '" aria-pressed="' + (PL.tab === k) + '">' + l + '</button>').join('') + '</div><select class="nx-sel sm" id="plStatus"></select><input class="nx-in sm" id="plQ" style="min-width:220px" placeholder="Search" value="' + esc(PL.q) + '"></div><div id="plBody"></div><div class="nx-foot" id="plFoot"><span></span></div></div>';
 });
 
 function bindPlacement() {
   const body = $('#plBody');
-  const labels = { requests: 'New request', placements: 'New placement', facilities: 'New facility', blacklist: 'Add to blacklist' };
+  const labels = { batches: '', requests: 'New request', placements: 'New placement', facilities: 'New facility', blacklist: 'Add to blacklist' };
   const load = async () => {
-    $('#plAddL').textContent = labels[PL.tab];
+    const bt = PL.tab === 'batches';
+    $('#plAdd').hidden = bt; $('#plQ').hidden = bt; $('#plFoot').hidden = bt;
+    if (!bt) $('#plAddL').textContent = labels[PL.tab];
     const sf = $('#plStatus'); sf.hidden = !(PL.tab === 'requests' || PL.tab === 'placements');
     if (!sf.hidden) sf.innerHTML = selectOpts(opts(PL.tab === 'requests' ? 'placement' : 'placement_stage', true), PL.status, 'Any status');
     holdBody(body);
     try {
+      if (bt) { await renderBatches(body); return; }
       const q = safeQ(PL.q), from = PL.page * PL.size, to = from + PL.size - 1; let rows, total, html;
       if (PL.tab === 'requests') {
         let query = 'select=*,nex_facilities(name),nex_enrolments(student_id,nex_students(id,first_name,last_name))&order=created_at.desc'; if (PL.status) query += '&status=eq.' + PL.status; if (q) query += '&facility_text=ilike.*' + q + '*';
         ({ rows, total } = await selPage('nex_placement_requests', query, from, to));
-        html = rows.length ? '<div class="nx-tablewrap"><table class="nx-table tight"><thead><tr><th>Student</th><th>Facility</th><th>Type</th><th>Emailed</th><th>Status</th><th>Note</th><th></th></tr></thead><tbody>' + rows.map(r => { const s = (r.nex_enrolments || {}).nex_students; return '<tr><td>' + (s ? '<a href="#/students/' + s.id + '"><b>' + esc(fullName(s)) + '</b></a>' : '–') + '</td><td>' + esc((r.nex_facilities || {}).name || r.facility_text || '–') + '</td><td>' + (r.self_placement ? '<span class="nx-tag walk">Self placement</span>' : '<span class="nx-tag">Arranged</span>') + '</td><td>' + esc(fmtDate(r.emailed_on) || '–') + '</td><td>' + pill('placement', r.status) + '</td><td class="nx-muted">' + esc((r.note || '').slice(0, 60)) + '</td><td><button class="nx-btn sm" data-ed="' + r.id + '">Update</button></td></tr>'; }).join('') + '</tbody></table></div>' : empty('No placement requests');
+        html = rows.length ? '<div class="nx-tablewrap"><table class="nx-table tight"><thead><tr><th>Student</th><th>Facility</th><th>Type</th><th>Emailed</th><th>Status</th><th>Note</th><th></th></tr></thead><tbody>' + rows.map(r => { const s = (r.nex_enrolments || {}).nex_students; return '<tr><td>' + (s ? '<a href="#/students/' + s.id + '"><b>' + esc(fullName(s)) + '</b></a>' : '–') + '</td><td>' + esc((r.nex_facilities || {}).name || r.facility_text || '–') + '</td><td>' + (r.self_placement ? '<span class="nx-tag walk">Self placement</span>' : '<span class="nx-tag">Arranged</span>') + (safeUrl(r.form_url) ? ' <a href="' + esc(safeUrl(r.form_url)) + '" target="_blank" rel="noopener noreferrer">Form</a>' : '') + '</td><td>' + esc(fmtDate(r.emailed_on) || '–') + '</td><td>' + pill('placement', r.status) + '</td><td class="nx-muted">' + esc((r.note || '').slice(0, 60)) + '</td><td><button class="nx-btn sm" data-ed="' + r.id + '">Update</button></td></tr>'; }).join('') + '</tbody></table></div>' : empty('No placement requests');
         body._rows = rows; $$('[data-ed]', body).forEach(b => b.onclick = () => requestForm(rows.find(x => x.id === b.dataset.ed)));
       } else if (PL.tab === 'placements') {
         let query = 'select=*,nex_facilities(name),nex_enrolments(student_id,nex_students(id,first_name,last_name))&order=start_date.desc.nullslast,created_at.desc'; if (PL.status) query += '&status=eq.' + PL.status; if (q) query += '&facility_text=ilike.*' + q + '*';
@@ -77,7 +80,8 @@ async function facilityOptions() { const f = await sel('nex_facilities', 'select
 async function requestForm(r, en) {
   r = r || {}; const fac = await facilityOptions();
   const f = [{ k: 'facility_id', label: 'Facility', type: 'select', options: fac, value: r.facility_id, blank: 'Type a name instead', full: true }, { k: 'facility_text', label: 'Facility name (if not in the list)', value: r.facility_text, full: true },
-    { k: 'self_placement', label: 'Self placement (student found it)', type: 'check', value: r.self_placement }, { k: 'emailed_on', label: 'Email sent on', type: 'date', value: r.emailed_on, help: 'Recorded only. Pipe-Line does not send the email.' },
+    { k: 'self_placement', label: 'Self placement (student found it)', type: 'check', value: r.self_placement }, { k: 'form_url', label: 'Self-sought form response (link)', type: 'url', value: r.form_url, placeholder: 'https://', full: true },
+    { k: 'emailed_on', label: 'Email sent on', type: 'date', value: r.emailed_on, help: 'Recorded only. Pipe-Line does not send the email.' },
     { k: 'status', label: 'Status', type: 'select', options: opts('placement', true), value: r.status || 'request_sent', blank: 'Not set' }, { k: 'note', label: 'Note', type: 'textarea', value: r.note, full: true }];
   formModal(r.id ? 'Update placement request' : 'New placement request', f, async v => {
     if (r.id) await upd('nex_placement_requests', 'id=eq.' + r.id, v); else await ins('nex_placement_requests', Object.assign({ enrolment_id: en.id, created_by: ME.name }, v), true);
