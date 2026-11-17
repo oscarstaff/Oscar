@@ -122,7 +122,7 @@ function globalAddPayment() {
     const p = await ins('nex_payments', Object.assign(pay, { payer_name: pay.payer_name || fullName(st), student_id: st ? st.id : null, enrolment_id: enrolmentId, created_by: ME.name }));
     if (enrolmentId) await ins('nex_payment_queue', { enrolment_id: enrolmentId, payment_id: p.id, processing_step: 'draft_not_made', updated_by: ME.name }, true).catch(() => {});
     toast(st ? 'Payment recorded for ' + fullName(st) : 'Payment recorded. Link it to a student later.'); render();
-  }, 'Save payment', idBoxHtml('Start with the student\'s phone or email. If they are already in Pipe-Line, their details and enrolment fill in. Otherwise the payment is saved unmatched and can be linked later.'));
+  }, 'Save payment', idBoxHtml('Start with the student’s phone or email. If they are already in Pipe-Line, their details and enrolment fill in. Otherwise the payment is saved unmatched and can be linked later.'));
   const wrap = $('#f_enrolment_id', m.el).parentElement; wrap.hidden = true;
   lk = identityLookup(m, { ids: { phone: 'f_phone', email: 'f_email', name: 'f_payer_name' }, onChange: async st => {
     enr = []; const sel0 = $('#f_enrolment_id', m.el);

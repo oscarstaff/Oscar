@@ -146,7 +146,7 @@ function bindPlacementMail(rows) {
     const id = ids()[0]; if (!id) return;
     try {
       const pv = await fn('nex-send-placement-docs', { booking_id: id, preview: true });
-      openModal({ title: 'Preview: ' + pv.subject, wide: true, body: '<div class="nx-muted" style="margin-bottom:8px">To: ' + esc(pv.to) + ' (the greeting uses each student\'s own name)</div><div style="white-space:pre-wrap;line-height:1.5">' + esc(pv.body) + '</div>', buttons: [{ label: 'Close', close: true }] });
+      openModal({ title: 'Preview: ' + pv.subject, wide: true, body: '<div class="nx-muted" style="margin-bottom:8px">To: ' + esc(pv.to) + ' (the greeting uses each student’s own name)</div><div style="white-space:pre-wrap;line-height:1.5">' + esc(pv.body) + '</div>', buttons: [{ label: 'Close', close: true }] });
     } catch (e) { toast(e.message, true); }
   };
   $$('[data-pmskip]', box).forEach(btn => btn.onclick = async () => {
