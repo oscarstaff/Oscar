@@ -140,7 +140,7 @@ serve(async (req) => {
 
     const date = fmtDate(ses.class_date), time = classTime(ses);
     const d = draft(first, date, time);
-    const html = classConfirmHtml(first, date, time);
+    const html = classConfirmHtml(first, date, time, { iso: ses.class_date, start: ses.start_time, end: ses.end_time });
     const prior = priorRows[0] || null;
     const attachments = list.map((a: any) => ({ file_name: a.file_name, size_bytes: a.size_bytes }));
     if (b.preview) return json({ ok: true, to, subject: d.subject, body: d.body, html, prior, attachments });
