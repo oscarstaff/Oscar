@@ -1,5 +1,5 @@
 'use strict';
-/* pl-batches.js · Pipe-Line · Placement batches: a batch is a Monday start, each aged care is a card with AM / PM / Night quotas,
+/* pl-batches.js · Pipe-Line · Placement batches: a batch is a start date, each aged care is a card with AM / PM / Night quotas,
    and students are placed on a card with a shift.
    One of the Pipe-Line files loaded by nex.html (list and order: PL_FILES in the loader). All of them share one global scope.
 
@@ -19,8 +19,6 @@ const BT_LOGBOOK = [{ id: 'not_scheduled', label: 'Not scheduled' }, { id: 'sche
 const btLive = p => !BT_OFF.includes(p.status);
 function btDate(d) { return d ? new Date(d + 'T12:00:00').toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', timeZone: TZ }) : ''; }
 function btAddDays(d, n) { const x = new Date(d + 'T12:00:00Z'); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); }
-function btNextMonday() { const t = sydToday(), dow = new Date(t + 'T12:00:00Z').getUTCDay(); return btAddDays(t, (1 - dow + 7) % 7); }
-function btIsMonday(d) { return !!d && new Date(d + 'T12:00:00Z').getUTCDay() === 1; }
 async function btMin() {
   if (BT.min != null) return BT.min;
   try { BT.min = Number(await (await api('rpc/nex_placement_min_paid', { method: 'POST', body: {} })).json()); } catch (e) { BT.min = 500; }
@@ -35,7 +33,7 @@ function btRefresh() { const b = $('#plBody'); if (b && PL.tab === 'batches') re
 async function renderBatches(body) {
   const batches = await sel('nex_batches', 'select=*&order=starts_on.desc&limit=80');
   if (!batches.length) {
-    body.innerHTML = '<div class="nx-card-b">' + empty('No batches yet', 'A batch is a Monday start. Create one, add the aged cares taking students that week, then place students on each card.', '<button class="nx-btn primary" id="btNew">' + ico('plus') + 'New batch</button>') + '</div>';
+    body.innerHTML = '<div class="nx-card-b">' + empty('No batches yet', 'A batch is a start date. Create one, add the aged cares taking students that week, then place students on each card.', '<button class="nx-btn primary" id="btNew">' + ico('plus') + 'New batch</button>') + '</div>';
     $('#btNew').onclick = () => batchNew();
     return;
   }
@@ -84,12 +82,11 @@ async function renderBatches(body) {
 async function batchNew(known) {
   const batches = known || await sel('nex_batches', 'select=*&order=starts_on.desc&limit=80');
   const used = new Set(batches.map(b => b.starts_on));
-  let d = btNextMonday(); while (used.has(d)) d = btAddDays(d, 7);
-  const f = [{ k: 'starts_on', label: 'Starts on (a Monday)', type: 'date', value: d, required: true }, { k: 'name', label: 'Name (optional)', placeholder: 'e.g. November intake' }];
+  let d = sydToday(); while (used.has(d)) d = btAddDays(d, 1);
+  const f = [{ k: 'starts_on', label: 'Starts on', type: 'date', value: d, required: true }, { k: 'name', label: 'Name (optional)', placeholder: 'e.g. November intake' }];
   if (batches.length) f.push({ k: 'copy', label: 'Copy the aged cares and quotas from the latest batch', type: 'check', value: true, full: true, help: 'Quotas change every batch, so you can edit each card afterwards. Students and checklists are not copied.' });
   f.push({ k: 'note', label: 'Note', type: 'textarea', full: true });
   formModal('New batch', f, async v => {
-    if (!btIsMonday(v.starts_on)) throw new Error('A batch starts on a Monday. Pick a Monday.');
     if (used.has(v.starts_on)) throw new Error('There is already a batch starting that day.');
     const row = await ins('nex_batches', { starts_on: v.starts_on, name: v.name, note: v.note });
     if (v.copy && batches.length) {
