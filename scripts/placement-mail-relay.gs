@@ -13,7 +13,7 @@
  *       MAIL_KEY            a long random string (this is the password YatraLine uses; make one up)
  *       ATTACHMENT_IDS      optional, and usually not needed: the help guide is uploaded in YatraLine > Admin and sent along by the app.
  *                           Only use this for extra files kept in Drive (comma separated Drive file IDs the mailbox can open).
- *  4. Pick the function  testSend_  in the toolbar and press Run. Allow the permissions (it asks to send email as you).
+ *  4. Pick the function  testSend  in the toolbar and press Run. Allow the permissions (it asks to send email as you).
  *     It emails the mailbox itself, so you can see the real email. (If you set ATTACHMENT_IDS it also asks to read Drive.)
  *  5. Deploy > New deployment > type Web app > Execute as: Me > Who has access: Anyone > Deploy.
  *  6. Copy the Web app URL. In Supabase (Edge Functions > Secrets) set
@@ -59,8 +59,9 @@ function sentFiles_(list) {
   });
 }
 
-/* Run this once from the editor (step 4): it grants the permissions and sends a real copy to the mailbox itself. */
-function testSend_() {
+/* Run this once from the editor (step 4). No trailing underscore on purpose: Apps Script hides those names from the Run menu.
+   It grants the permissions and sends a real copy to the mailbox itself. */
+function testSend() {
   var me = Session.getEffectiveUser().getEmail();
   sendViaGmailApi_(me, 'YatraLine test: documents required before your placement',
     'Dear Student,\n\nThis is a test of the placement mail relay. If you can read this, it works.\n\nThank you.',
