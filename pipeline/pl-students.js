@@ -9,7 +9,7 @@ const PATH = ['checklist_sent', 'docs_completed', 'processed', 'placement', 'cer
 /* ---------- Overview ---------- */
 route(/^\/$/, async () => {
   const today = sydToday();
-  const [nStu, nLead, nOpenEnr, nQueue, nUnm, nDue, sessions, audit, pmRows] = await Promise.all([
+  const [nStu, nLead, nOpenEnr, nQueue, nUnm, nDue, sessions, pmRows] = await Promise.all([
     countKind('student'),
     countKind('lead'),
     count('nex_enrolments', 'deleted_at=is.null&stage=not.in.(certificate_issued,not_interested)'),
@@ -17,7 +17,6 @@ route(/^\/$/, async () => {
     count('nex_payments', 'student_id=is.null'),
     count('nex_followups', 'done_at=is.null&due_at=lte.' + today + 'T23:59:59'),
     sel('nex_class_sessions', 'select=*&class_date=gte.' + today + '&order=class_date&limit=4'),
-    sel('nex_audit', 'select=*&order=changed_at.desc&limit=12'),
     placementMailLoad().catch(() => [])
   ]);
   let counts = {};
@@ -36,11 +35,10 @@ route(/^\/$/, async () => {
     att('#/followups', nDue, 'Follow-ups due', 'today or overdue', 'bad') +
     att('#/payments?view=unmatched', nUnm, 'Unmatched payments', 'no student linked', 'warn') +
     att('#/payments', nQueue, 'Payments to process', 'in the processing queue', 'accent') +
-    att('#/students', nOpenEnr, 'Open enrolments', 'not yet issued or closed', 'accent') + '</div></div>' +
-    '<div class="nx-card"><div class="nx-card-h"><h3>Upcoming classes</h3><a href="#/firstaid">All classes</a></div>' +
+    att('#/students', nOpenEnr, 'Open enrolments', 'not yet issued or closed', 'accent') + '</div></div></div>' +
+    '<div class="nx-stack"><div class="nx-card"><div class="nx-card-h"><h3>Upcoming classes</h3><a href="#/firstaid">All classes</a></div>' +
     (sessions.length ? '<ul class="nx-list">' + sessions.map(s => { const d = fmtDay(s.class_date); const n = counts[s.id] || 0; return '<li><a href="#/firstaid/' + s.id + '"><b>' + d.wd + ' ' + d.dm + '</b><small>' + (s.kind === 'renewal' ? 'Renewal / signature' : 'First Aid & CPR') + (s.trainer ? ' · ' + esc(s.trainer) : '') + '</small></a><span class="nx-pill ' + (n >= s.seats ? 'bad' : n >= s.seats - 5 ? 'warn' : 'accent') + '">' + n + ' / ' + s.seats + '</span></li>'; }).join('') + '</ul>' : empty('No classes scheduled', 'Add the next class day in First Aid.')) + '</div></div>' +
-    '<div class="nx-card"><div class="nx-card-h"><h3>Recent changes</h3></div>' +
-    (audit.length ? '<ul class="nx-feed">' + audit.map(a => feedItem(a)).join('') + '</ul>' : empty('Nothing yet', 'Edits to students, payments and bookings show up here.')) + '</div></div>';
+    '</div>';
 });
 
 const AUD_NAMES = { nex_students: 'student', nex_student_details: 'student details', nex_enrolments: 'enrolment', nex_payments: 'payment', nex_payment_queue: 'payment queue', nex_refunds: 'refund', nex_class_sessions: 'class', nex_class_bookings: 'booking', nex_placement_requests: 'placement request', nex_placement_doc_mail: 'placement documents email', nex_placements: 'placement', nex_facilities: 'facility', nex_blacklist: 'blacklist entry' };
