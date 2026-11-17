@@ -146,7 +146,7 @@ function bindPlacementMail(rows) {
     const id = ids()[0]; if (!id) return;
     try {
       const pv = await fn('nex-send-placement-docs', { booking_id: id, preview: true });
-      openModal({ title: 'Preview: ' + pv.subject, wide: true, body: '<div class="nx-muted" style="margin-bottom:8px">To: ' + esc(pv.to) + ' (the greeting uses each student’s own name)</div><div style="white-space:pre-wrap;line-height:1.5">' + esc(pv.body) + '</div><div class="nx-muted" style="margin-top:12px">' + ((pv.attachments || []).length ? 'Attached: ' + pv.attachments.map(x => esc(x.file_name)).join(', ') : '<b>No file is attached.</b> The email says “please check the attachment”. A hub admin can add the help guide in Admin.') + '</div>', buttons: [{ label: 'Close', close: true }] });
+      openModal({ title: 'Preview: ' + pv.subject, wide: true, body: '<div class="nx-muted" style="margin-bottom:8px">To: ' + esc(pv.to) + ' (the greeting uses each student’s own name)</div><div style="white-space:pre-wrap;line-height:1.5">' + esc(pv.body) + '</div><div class="nx-muted" style="margin-top:12px">' + ((pv.attachments || []).length ? 'Attached: ' + pv.attachments.map(x => esc(x.file_name)).join(', ') : '<b>No file is attached.</b> The email says “please check the attachment”. A hub admin can add the help guide in Admin.') + (typeof pv.remaining === 'number' ? '<div class="nx-muted" style="margin-top:6px">The placement mailbox can send ' + pv.remaining + ' more email' + (pv.remaining === 1 ? '' : 's') + ' today.</div>' : '') + '</div>', buttons: [{ label: 'Close', close: true }] });
     } catch (e) { toast(e.message, true); }
   };
   $$('[data-pmskip]', box).forEach(btn => btn.onclick = async () => {
@@ -159,18 +159,23 @@ function bindPlacementMail(rows) {
   });
   $('#pmSend', box).onclick = async () => {
     const list = ids(); if (!list.length) return;
-    if (!await confirmBox('Send placement documents email', 'Send the documents email to ' + list.length + (list.length === 1 ? ' student' : ' students') + ' from the placement mailbox?', 'Send')) return;
+    /* the free Gmail mailbox has a daily sending limit (about 100); ask how many are left before sending */
+    let left = null;
+    try { left = (await fn('nex-send-placement-docs', { quota: true })).remaining; } catch (e) { if (e.code === 'not_configured') { toast(e.message, true); return; } }
+    if (typeof left === 'number' && list.length > left) { toast(left <= 0 ? 'The placement mailbox has reached its daily sending limit. Try again tomorrow.' : 'The placement mailbox can only send ' + left + ' more email' + (left === 1 ? '' : 's') + ' today. Untick some students and send the rest tomorrow.', true); return; }
+    if (!await confirmBox('Send placement documents email', 'Send the documents email to ' + list.length + (list.length === 1 ? ' student' : ' students') + ' from the placement mailbox?' + (typeof left === 'number' ? ' It can send ' + left + ' more today.' : ''), 'Send')) return;
     const btn = $('#pmSend', box); btn.disabled = true; btn.classList.add('busy');
-    let ok = 0; const bad = [];
+    let ok = 0; const bad = []; let remaining = left;
     for (const id of list) {
-      try { await fn('nex-send-placement-docs', { booking_id: id }); ok++; }
+      try { const r = await fn('nex-send-placement-docs', { booking_id: id }); ok++; if (typeof r.remaining === 'number') remaining = r.remaining; }
       catch (e) {
         if (e.code === 'not_configured') { toast(e.message, true); bad.length = 0; ok = ok || 0; break; }
+        if (e.code === 'daily_limit') { remaining = 0; bad.push(e.message); break; }
         const b = rows.find(x => x.id === id), st = b && (Array.isArray(b.nex_students) ? b.nex_students[0] : b.nex_students);
         bad.push((st ? fullName(st) : (b && b.name) || 'A student') + ': ' + e.message);
       }
     }
-    if (ok) toast('Sent to ' + ok + (ok === 1 ? ' student' : ' students'));
+    if (ok) toast('Sent to ' + ok + (ok === 1 ? ' student' : ' students') + (typeof remaining === 'number' && remaining <= 20 ? '. ' + remaining + ' more can be sent today.' : ''));
     if (bad.length) toast(bad.slice(0, 2).join(' · ') + (bad.length > 2 ? ' · and ' + (bad.length - 2) + ' more' : ''), true);
     render();
   };
