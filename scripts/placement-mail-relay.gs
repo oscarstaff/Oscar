@@ -11,10 +11,10 @@
  *  2. Turn on the Gmail API: in the left sidebar next to Services press +, choose "Gmail API", Add (leave the name as Gmail).
  *  3. Project Settings > Script properties > add
  *       MAIL_KEY            a long random string (this is the password YatraLine uses; make one up)
- *       ATTACHMENT_IDS      optional. Google Drive file IDs, comma separated, of the help guide(s) to attach
- *                           (the email says "check the attachment"). The placement mailbox must be able to open them.
- *  4. Pick the function  testSend_  in the toolbar and press Run. Allow the permissions (it asks to send email as you and
- *     read the guide in Drive). It emails the mailbox itself, so you can see the real email and the attachment.
+ *       ATTACHMENT_IDS      optional, and usually not needed: the help guide is uploaded in YatraLine > Admin and sent along by the app.
+ *                           Only use this for extra files kept in Drive (comma separated Drive file IDs the mailbox can open).
+ *  4. Pick the function  testSend_  in the toolbar and press Run. Allow the permissions (it asks to send email as you).
+ *     It emails the mailbox itself, so you can see the real email. (If you set ATTACHMENT_IDS it also asks to read Drive.)
  *  5. Deploy > New deployment > type Web app > Execute as: Me > Who has access: Anyone > Deploy.
  *  6. Copy the Web app URL. In Supabase (Edge Functions > Secrets) set
  *       NEX_MAIL2_URL = that URL
@@ -40,28 +40,40 @@ function doPost(e) {
     var text = String(body.text || '').slice(0, 20000);
     if (!subject || !text) return out_({ ok: false, error: 'subject and text are required' });
 
-    sendViaGmailApi_(to, subject, text, body.html ? String(body.html).slice(0, 60000) : '', String(body.fromName || 'Oscars Training Centre').slice(0, 80));
+    sendViaGmailApi_(to, subject, text, body.html ? String(body.html).slice(0, 60000) : '', String(body.fromName || 'Oscars Training Centre').slice(0, 80), sentFiles_(body.attachments));
     return out_({ ok: true });
   } catch (err) {
     return out_({ ok: false, error: String(err && err.message || err).slice(0, 200) });
   }
 }
 
+/* Files the app sends along ({name, type, data: base64}). At most 5, each a plain file name and a base64 string. */
+function sentFiles_(list) {
+  if (!list || !list.length) return [];
+  if (list.length > 5) throw new Error('too many attachments');
+  return list.map(function (a) {
+    var name = String(a && a.name || 'attachment').replace(/[\r\n"\\\/]+/g, '_').slice(0, 120);
+    var type = /^[\w.+-]+\/[\w.+-]+$/.test(String(a && a.type || '')) ? String(a.type) : 'application/octet-stream';
+    if (!a || typeof a.data !== 'string' || !a.data) throw new Error('empty attachment ' + name);
+    return Utilities.newBlob(Utilities.base64Decode(a.data), type, name);
+  });
+}
+
 /* Run this once from the editor (step 4): it grants the permissions and sends a real copy to the mailbox itself. */
 function testSend_() {
   var me = Session.getEffectiveUser().getEmail();
   sendViaGmailApi_(me, 'YatraLine test: documents required before your placement',
-    'Dear Student,\n\nThis is a test of the placement mail relay. If you can read this, and the attachment is here, it works.\n\nThank you.',
-    '<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5">Dear Student,<br><br>This is a test of the placement mail relay. If you can read this, and the attachment is here, it works.<br><br>Thank you.</div>',
+    'Dear Student,\n\nThis is a test of the placement mail relay. If you can read this, it works.\n\nThank you.',
+    '<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5">Dear Student,<br><br>This is a test of the placement mail relay. If you can read this, it works.<br><br>Thank you.</div>',
     'Oscars Training Centre Placement Team');
 }
 
 /* Builds the message by hand (headers, text, HTML, attachments) and sends it with the Gmail API as the signed-in mailbox. */
-function sendViaGmailApi_(to, subject, text, html, fromName) {
+function sendViaGmailApi_(to, subject, text, html, fromName, extraFiles) {
   var me = Session.getEffectiveUser().getEmail();
   var props = PropertiesService.getScriptProperties();
   var ids = String(props.getProperty('ATTACHMENT_IDS') || '').split(',').map(function (s) { return s.trim(); }).filter(String);
-  var files = ids.map(function (id) { return DriveApp.getFileById(id).getBlob(); });
+  var files = (extraFiles || []).concat(ids.map(function (id) { return DriveApp.getFileById(id).getBlob(); }));
   var raw = buildMime_(me, to, subject, text, html, fromName, files);
   Gmail.Users.Messages.send({ raw: raw }, 'me');
 }
@@ -97,8 +109,8 @@ function buildMime_(from, to, subject, text, html, fromName, files) {
     var fn = String(f.getName() || 'attachment').replace(/["\r\n]+/g, '');
     var ct = f.getContentType() || 'application/octet-stream';
     L.push('--' + outer);
-    L.push('Content-Type: ' + ct + '; name="' + fn + '"');
-    L.push('Content-Disposition: attachment; filename="' + fn + '"');
+    L.push('Content-Type: ' + ct + '; name="' + word_(fn) + '"');
+    L.push('Content-Disposition: attachment; filename="' + word_(fn) + '"');
     L.push('Content-Transfer-Encoding: base64');
     L.push('');
     L.push(wrap_(Utilities.base64Encode(f.getBytes())));
