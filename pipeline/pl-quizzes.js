@@ -1,6 +1,6 @@
 'use strict';
-/* pl-quizzes.js · Pipe-Line · Quizzes (copied from Nexus).
-   One of the Pipe-Line files loaded by nex.html (list and order: PL_FILES in the loader). All of them share one global scope. */
+/* pl-quizzes.js · YatraLine · Quizzes (copied from Nexus).
+   One of the YatraLine files loaded by nex.html (list and order: PL_FILES in the loader). All of them share one global scope. */
 /* ---------- Quizzes ---------- */
 const STD_QUIZ = {
   id: 'checklist_v1',

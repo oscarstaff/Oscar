@@ -1,6 +1,6 @@
 'use strict';
-/* pl-ui.js · Pipe-Line · reference lists, status pill, toast / modal / form kit, student picker, existing-person lookup.
-   One of the Pipe-Line files loaded by nex.html (list and order: PL_FILES in the loader). All of them share one global scope. */
+/* pl-ui.js · YatraLine · reference lists, status pill, toast / modal / form kit, student picker, existing-person lookup.
+   One of the YatraLine files loaded by nex.html (list and order: PL_FILES in the loader). All of them share one global scope. */
 /* ---------- reference data cache ---------- */
 const REF = { status: {}, quals: [], agents: [], staff: [], loaded: false };
 async function loadRef(force) {
@@ -171,7 +171,7 @@ function pickStudent(title, onPick, initial) {
 }
 
 /* ---------- existing-person lookup for add forms ----------
-   Type a phone or email (or a name) in an add form. If that person is already in Pipe-Line their details fill in,
+   Type a phone or email (or a name) in an add form. If that person is already in YatraLine their details fill in,
    the same way the call log does it, and the form saves against them instead of making a duplicate.
    cfg.ids maps first / last / name / phone / email to the field ids in the form; cfg.onChange(student|null) fires when the choice changes. */
 function idBoxHtml(hint) { return '<div class="nx-idbox" aria-live="polite" data-hint="' + esc(hint || '') + '"></div>'; }
@@ -186,7 +186,7 @@ function identityLookup(m, cfg) {
   const choose = (s, auto) => {
     chosen = s;
     put('first', s.first_name); put('last', s.last_name); put('name', fullName(s)); put('phone', s.phone); put('email', s.email);
-    show('<div class="nx-idfound">' + ico('check') + '<span>' + (auto ? 'Already in Pipe-Line: ' : 'Using ') + '<b>' + esc(fullName(s)) + '</b>' + (s.phone || s.email ? ' · ' + esc([fmtPhone(s.phone), s.email].filter(Boolean).join(' · ')) : '') + '. Their details are filled in.</span><span class="nx-grow"></span><a href="#/students/' + s.id + '" target="_blank" rel="noopener">Open record</a><button type="button" class="nx-btn sm" data-notthem>Not them</button></div>');
+    show('<div class="nx-idfound">' + ico('check') + '<span>' + (auto ? 'Already in YatraLine: ' : 'Using ') + '<b>' + esc(fullName(s)) + '</b>' + (s.phone || s.email ? ' · ' + esc([fmtPhone(s.phone), s.email].filter(Boolean).join(' · ')) : '') + '. Their details are filled in.</span><span class="nx-grow"></span><a href="#/students/' + s.id + '" target="_blank" rel="noopener">Open record</a><button type="button" class="nx-btn sm" data-notthem>Not them</button></div>');
     $('[data-notthem]', box).onclick = () => { refused.add(keyOf(s)); chosen = null; show(''); cfg.onChange && cfg.onChange(null); };
     cfg.onChange && cfg.onChange(s);
   };
@@ -216,12 +216,12 @@ function identityLookup(m, cfg) {
         const rows = await sel('nex_students', F + '&and=(' + toks.map(one).join(',') + ')&order=first_name&limit=5');
         if (my !== token) return;
         if (rows.length) {
-          show('<div class="nx-idpick"><div>Already in Pipe-Line with a similar name. Tap to use their details.</div>' + rows.map(r => '<button type="button" class="nx-pick" data-id="' + r.id + '"><span><b>' + esc(fullName(r)) + '</b><small>' + esc([fmtPhone(r.phone), r.email].filter(Boolean).join(' · ') || 'No contact details') + '</small></span><span class="nx-btn sm">Use</span></button>').join('') + '</div>');
+          show('<div class="nx-idpick"><div>Already in YatraLine with a similar name. Tap to use their details.</div>' + rows.map(r => '<button type="button" class="nx-pick" data-id="' + r.id + '"><span><b>' + esc(fullName(r)) + '</b><small>' + esc([fmtPhone(r.phone), r.email].filter(Boolean).join(' · ') || 'No contact details') + '</small></span><span class="nx-btn sm">Use</span></button>').join('') + '</div>');
           $$('.nx-pick', box).forEach(b => b.onclick = () => choose(rows.find(x => x.id === b.dataset.id), false));
           return;
         }
       }
-      show((goodPhone || goodEmail) ? '<div class="nx-idnew">' + esc(cfg.newMsg || 'Not in Pipe-Line yet. Saving will add a new person.') + '</div>' : (box.dataset.hint ? '<div class="nx-idnew">' + esc(box.dataset.hint) + '</div>' : ''));
+      show((goodPhone || goodEmail) ? '<div class="nx-idnew">' + esc(cfg.newMsg || 'Not in YatraLine yet. Saving will add a new person.') + '</div>' : (box.dataset.hint ? '<div class="nx-idnew">' + esc(box.dataset.hint) + '</div>' : ''));
     } catch (err) { if (my === token) show(''); }
   };
   const kick = () => { clearTimeout(timer); timer = setTimeout(run, 350); };

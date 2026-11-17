@@ -1,6 +1,6 @@
 'use strict';
-/* pl-followups.js · Pipe-Line · Follow-ups page and the follow-up form.
-   One of the Pipe-Line files loaded by nex.html (list and order: PL_FILES in the loader). All of them share one global scope. */
+/* pl-followups.js · YatraLine · Follow-ups page and the follow-up form.
+   One of the YatraLine files loaded by nex.html (list and order: PL_FILES in the loader). All of them share one global scope. */
 /* ---------- Follow-ups ---------- */
 const FU = { who: 'mine', done: false };
 route(/^\/followups$/, async () => {

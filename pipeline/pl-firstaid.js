@@ -1,6 +1,6 @@
 'use strict';
-/* pl-firstaid.js · Pipe-Line · First Aid and CPR class days and the seat map.
-   One of the Pipe-Line files loaded by nex.html (list and order: PL_FILES in the loader). All of them share one global scope. */
+/* pl-firstaid.js · YatraLine · First Aid and CPR class days and the seat map.
+   One of the YatraLine files loaded by nex.html (list and order: PL_FILES in the loader). All of them share one global scope. */
 /* =========================================================
    First Aid and CPR
    ========================================================= */

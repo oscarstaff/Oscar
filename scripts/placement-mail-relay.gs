@@ -1,5 +1,5 @@
 /**
- * Pipe-Line placement mail relay (Google Apps Script)
+ * YatraLine placement mail relay (Google Apps Script)
  *
  * Sends the "documents required before placement" email from WHICHEVER Google account deploys this script.
  * Deploy it while signed in as the placement mailbox, not the enrolment one.
@@ -7,7 +7,7 @@
  * Setup (once)
  *  1. Signed in as the placement mailbox: script.google.com > New project > paste this file > Save.
  *  2. Project Settings > Script properties > add
- *       MAIL_KEY            a long random string (this is the password Pipe-Line uses; make one up)
+ *       MAIL_KEY            a long random string (this is the password YatraLine uses; make one up)
  *       ATTACHMENT_IDS      optional. Google Drive file IDs, comma separated, of the help guide(s) to attach
  *                           (the email says "check the attachment"). The placement mailbox must be able to open them.
  *  3. Deploy > New deployment > type Web app > Execute as: Me > Who has access: Anyone > Deploy. Allow the permissions.
@@ -16,7 +16,7 @@
  *       NEX_MAIL2_KEY = the same MAIL_KEY
  *  5. After any change to this script: Deploy > Manage deployments > edit > New version > Deploy (the URL stays the same).
  *
- * Security: every request must carry the key. The recipient list is whatever Pipe-Line sends, and Pipe-Line only ever sends to
+ * Security: every request must carry the key. The recipient list is whatever YatraLine sends, and YatraLine only ever sends to
  * the email on the student's booking or record. Nothing else is read or stored here.
  */
 var EMAIL_RE = /^[^\s@<>",;]+@[^\s@<>",;]+\.[^\s@<>",;]{2,}$/;

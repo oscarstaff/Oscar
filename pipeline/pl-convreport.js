@@ -1,7 +1,7 @@
 'use strict';
-/* pl-convreport.js · Pipe-Line · Conversion report.
-   One of the Pipe-Line files loaded by nex.html (list and order: PL_FILES in the loader). All of them share one global scope. */
-/* ---------- Conversion report: the enrolment team's weekly numbers, worked out from Pipe-Line ----------
+/* pl-convreport.js · YatraLine · Conversion report.
+   One of the YatraLine files loaded by nex.html (list and order: PL_FILES in the loader). All of them share one global scope. */
+/* ---------- Conversion report: the enrolment team's weekly numbers, worked out from YatraLine ----------
    Status table and pie: enrolments created in the range (enrolment date, else the day it was added), by stage now.
    Follow-ups: follow-ups marked done in the range, by step. Class: see the note printed under the block. */
 const CR = { from: '', to: '' };
@@ -79,7 +79,7 @@ function crHtml(d, from, to) {
   const cls = '<tr><td>Without First Aid and CPR</td><td class="nx-num">' + d.without + '</td></tr><tr><td>Class booked</td><td class="nx-num">' + d.classBooked + '</td></tr><tr><td>Outside Sydney</td><td class="nx-num">' + d.outside + '</td></tr>';
   return '<div class="nx-report nx-crep">' +
     '<div class="nx-crhead"><div><span class="nx-muted">From</span><b>' + esc(crLong(from)) + '</b></div><div><span class="nx-muted">To</span><b>' + esc(crLong(to)) + '</b></div></div>' +
-    (d.capped ? '<div class="nx-note">This range has more rows than Pipe-Line can count in one go (1,000). Pick a shorter range for exact numbers.</div>' : '') +
+    (d.capped ? '<div class="nx-note">This range has more rows than YatraLine can count in one go (1,000). Pick a shorter range for exact numbers.</div>' : '') +
     '<div class="nx-crgrid"><div><h3>Student conversion</h3>' + statusTable + '</div><div class="nx-crpie">' + crPie(rows, d.total) + '</div></div>' +
     '<div class="nx-crgrid2"><div><h3>Follow-ups</h3><div class="nx-tablewrap"><table class="nx-table auto tight"><thead><tr><th>Follow-up</th><th class="nx-num">Number</th></tr></thead><tbody>' + fu + '</tbody></table></div></div>' +
     '<div><h3>Class status</h3><div class="nx-tablewrap"><table class="nx-table auto tight"><thead><tr><th>Class status</th><th class="nx-num">Number</th></tr></thead><tbody>' + cls + '</tbody></table></div>' +
@@ -107,7 +107,7 @@ route(/^\/convreport$/, async () => {
   });
   const today = sydToday();
   return pageHead('chart', 'Enrolment team', 'Conversion report', '') +
-    '<div class="nx-card nx-noprint"><div class="nx-card-h"><div><h3>Dates</h3><div class="nx-muted">Numbers are worked out from Pipe-Line for the dates you pick.</div></div><span class="nx-btnrow"><button class="nx-btn sm" data-crp="week">This week</button><button class="nx-btn sm" data-crp="last">Last week</button><button class="nx-btn sm" data-crp="7">Last 7 days</button><button class="nx-btn sm" data-crp="month">This month</button></span></div>' +
+    '<div class="nx-card nx-noprint"><div class="nx-card-h"><div><h3>Dates</h3><div class="nx-muted">Numbers are worked out from YatraLine for the dates you pick.</div></div><span class="nx-btnrow"><button class="nx-btn sm" data-crp="week">This week</button><button class="nx-btn sm" data-crp="last">Last week</button><button class="nx-btn sm" data-crp="7">Last 7 days</button><button class="nx-btn sm" data-crp="month">This month</button></span></div>' +
     '<div class="nx-card-b"><div class="nx-form"><div><label class="nx-lbl" for="crFrom">From</label><input class="nx-in" type="date" id="crFrom" max="' + today + '" value="' + esc(CR.from) + '"></div><div><label class="nx-lbl" for="crTo">To</label><input class="nx-in" type="date" id="crTo" max="' + today + '" value="' + esc(CR.to) + '"></div></div></div></div>' +
     '<div class="nx-card nx-printwrap"><div class="nx-card-h nx-noprint"><div><h3>Report</h3></div><span class="nx-btnrow"><button class="nx-btn sm" id="crPrint" hidden>' + ico('print') + 'Print or save as PDF</button></span></div><div id="crOut"><div class="nx-skel" style="height:240px;margin:16px"></div></div></div>';
 });
