@@ -7,6 +7,8 @@ const ADDRESS = "Unit 5, 5 King Street, Rockdale, NSW 2216";
 const MAP = "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent("5 King Street, Rockdale NSW 2216");
 const PARKING = "1 Market Street Rockdale";
 const PHONE = "0402462830";
+// the OTC mark (assets/otc-logo.png in the repo), served by GitHub Pages; 252px wide for a 2x display at 84px
+const LOGO = "https://oscarstaff.github.io/Oscar/assets/otc-logo.png";
 const FEES: [string, string][] = [
   ["Certificate III in Individual Support (Ageing & Disability) including First Aid & CPR", "$1,300"],
   ["Certificate IV Ageing Support with Medication including First Aid & CPR", "$1,500"],
@@ -58,9 +60,14 @@ export function classConfirmHtml(first: string, date: string, time: string): str
 <div style="display:none;max-height:0;overflow:hidden;opacity:0;font-size:1px;line-height:1px;color:#e9eef4">Your First Aid and CPR class is confirmed for ${when}, ${esc(time)}. Please arrive 10 - 15 minutes early.</div>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#e9eef4"><tr><td align="center" style="padding:24px 12px">
 <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;background:#ffffff;border-radius:14px;overflow:hidden;border:1px solid ${LINE}">
-  <tr><td style="background:${NAVY};padding:26px 32px 22px">
-    <div style="font:700 12px ${FONT};letter-spacing:1.6px;text-transform:uppercase;color:#9fc0ee">Oscars Training Centre</div>
-    <div style="font:700 24px/1.25 ${FONT};color:#ffffff;margin-top:6px">First Aid and CPR class confirmed</div>
+  <tr><td style="background:#ffffff;padding:20px 32px 18px;border-bottom:1px solid ${LINE}">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+      <td style="vertical-align:middle;padding-right:16px"><img src="${LOGO}" width="84" height="64" alt="Oscars Training Centre" style="display:block;border:0;outline:none;width:84px;height:64px"></td>
+      <td style="vertical-align:middle"><div style="font:700 15px/1.3 ${FONT};letter-spacing:1.2px;text-transform:uppercase;color:${NAVY}">Oscars Training Centre</div><div style="font:600 13px/1.4 ${FONT};color:${MUTED};margin-top:3px">First Aid and CPR Team</div></td>
+    </tr></table>
+  </td></tr>
+  <tr><td style="background:${NAVY};padding:22px 32px 20px">
+    <div style="font:700 24px/1.25 ${FONT};color:#ffffff">First Aid and CPR class confirmed</div>
   </td></tr>
   <tr><td style="background:${RED};height:4px;line-height:4px;font-size:0">&nbsp;</td></tr>
   ${para(`Dear ${name},`, "28px 32px 10px")}
