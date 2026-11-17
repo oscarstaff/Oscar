@@ -40,6 +40,17 @@ function fmtDT(v) {
   if (isNaN(d)) return '';
   return d.toLocaleString('en-AU', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', timeZone: TZ });
 }
+/* Payments towards one fee are instalments. Number them by date and say what is still owed after each one.
+   A later payment is never "short": it is the next instalment. */
+function ordinal(n) { const s = ['th', 'st', 'nd', 'rd'], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); }
+function instalmentOf(fee, pays, id) {
+  const list = (pays || []).slice().sort((a, b) => String(a.paid_on || '').localeCompare(String(b.paid_on || '')) || String(a.created_at || '').localeCompare(String(b.created_at || '')));
+  const i = list.findIndex(p => p.id === id); if (i < 0) return null;
+  const paidTo = list.slice(0, i + 1).reduce((t, p) => t + Number(p.amount || 0), 0), f = Number(fee || 0);
+  const full = f > 0 && paidTo >= f, bal = f > 0 ? Math.max(0, f - paidTo) : null;
+  const label = full ? (i ? ordinal(i + 1) + ' instalment · paid in full' : 'Paid in full') : ordinal(i + 1) + ' instalment' + (bal != null ? ' · ' + money(bal) + ' to go' : '');
+  return { n: i + 1, paidTo, fee: f, balance: bal, full, label };
+}
 function money(n) {
   if (n == null || n === '') return '';
   const v = Number(n);
