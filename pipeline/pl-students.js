@@ -137,7 +137,7 @@ route(/^\/(students|leads|search)(?:\?(.*))?$/, async m => {
     : kind === 'student' ? pageHead('user', 'Paid $200 or more', 'Students', '')
     : pageHead('search', 'Leads and students', 'Search', '');
   return head +
-    '<div class="nx-card"><div class="nx-toolbar" style="border-top:0">' + (kind === 'lead' ? '<div class="nx-seg" id="slSeg" role="group" aria-label="Show"><button type="button" data-v="all" aria-pressed="' + (SL.view === 'all') + '">All leads</button><button type="button" data-v="follow" aria-pressed="' + (SL.view === 'follow') + '">Needs follow-up <span class="nx-count" id="slFuN" hidden></span></button></div>' : '') + '<input class="nx-in sm" style="min-width:280px" id="slQ" placeholder="Search ' + (kind === 'all' ? 'name, email or phone' : noun + ' by name, email or phone') + '" value="' + esc(SL.q) + '"><select class="nx-sel sm" id="slStage">' + selectOpts(opts('enrolment', true), SL.stage, 'Any stage') + '</select><select class="nx-sel sm" id="slQual">' + selectOpts(REF.quals.filter(q => q.active), SL.qual, 'Any qualification') + '</select>' + (kind === 'lead' ? '<select class="nx-sel sm" id="slUnf" aria-label="Unfinished leads"><option value=""' + (SL.unf ? '' : ' selected') + '>All leads</option><option value="mine"' + (SL.unf === 'mine' ? ' selected' : '') + '>Unfinished, flagged to me</option><option value="all"' + (SL.unf === 'all' ? ' selected' : '') + '>Unfinished, anyone</option></select>' : '') + '<button class="nx-btn quiet sm" id="slClear">Clear</button></div>' +
+    '<div class="nx-card"><div class="nx-toolbar" style="border-top:0">' + (kind === 'lead' ? '<div class="nx-seg" id="slSeg" role="group" aria-label="Show"><button type="button" data-v="all" aria-pressed="' + (SL.view === 'all') + '">All leads</button><button type="button" data-v="follow" aria-pressed="' + (SL.view === 'follow') + '">Needs follow-up <span class="nx-count" id="slFuN" hidden></span></button></div>' : '') + '<input class="nx-in sm" style="min-width:280px" id="slQ" placeholder="Search ' + (kind === 'all' ? 'name, email or phone' : noun + ' by name, email or phone') + '" value="' + esc(SL.q) + '"><select class="nx-sel sm" id="slStage">' + selectOpts(stageFilterOpts(kind), SL.stage, 'Any stage') + '</select><select class="nx-sel sm" id="slQual">' + selectOpts(REF.quals.filter(q => q.active), SL.qual, 'Any qualification') + '</select>' + (kind === 'lead' ? '<select class="nx-sel sm" id="slUnf" aria-label="Unfinished leads"><option value=""' + (SL.unf ? '' : ' selected') + '>All leads</option><option value="mine"' + (SL.unf === 'mine' ? ' selected' : '') + '>Unfinished, flagged to me</option><option value="all"' + (SL.unf === 'all' ? ' selected' : '') + '>Unfinished, anyone</option></select>' : '') + '<button class="nx-btn quiet sm" id="slClear">Clear</button></div>' +
     '<div id="slBody"></div><div class="nx-foot" id="slFoot"><span></span></div></div>';
 });
 
@@ -168,7 +168,7 @@ function newStudent() {
   const f = [by('phone'), by('email'), by('first_name'), by('last_name'), by('phone2'), by('agent_id')].concat([
     { k: 'qualification_id', label: 'Qualification', type: 'select', options: REF.quals.filter(q => q.active), blank: 'Add later' },
     { k: 'fee', label: 'Agreed fee ($)', type: 'number' },
-    { k: 'stage', label: 'Stage', type: 'select', options: opts('enrolment', true), value: 'checklist_sent', blank: 'Not set' },
+    { k: 'stage', label: 'Stage', type: 'select', options: stageOpts(false, 'checklist_sent'), value: 'checklist_sent', blank: 'Not set' },
     { k: 'enrolled_on', label: 'Enrolled on', type: 'date', value: sydToday() },
     { k: 'first_contact_on', label: 'First contact', type: 'date', value: sydToday(), help: 'Follow-ups are set for 2, 4 and 6 days after this date.' }
   ]);
@@ -383,7 +383,7 @@ function tabMoney(c) {
     const paid = ps.reduce((t, p) => t + Number(p.amount), 0) - rf.reduce((t, r) => t + Number(r.amount), 0);
     const fee = Number(e.fee || 0); const bal = fee - paid;
     return section((qualName(e.qualification_id) || 'Enrolment') + (e.year ? ' · ' + e.year : ''),
-      '<div style="padding:16px;display:flex;flex-wrap:wrap;gap:16px;align-items:center"><div><label class="nx-lbl">Stage</label><select class="nx-sel sm" data-stage="' + e.id + '">' + selectOpts(opts('enrolment', true), e.stage, 'Not set') + '</select></div>' +
+      '<div style="padding:16px;display:flex;flex-wrap:wrap;gap:16px;align-items:center"><div><label class="nx-lbl">Stage</label><select class="nx-sel sm" data-stage="' + e.id + '">' + selectOpts(stageOpts(c.isStudent, e.stage), e.stage, 'Not set') + '</select>' + (c.isStudent ? '<div class="nx-muted" style="margin-top:4px;font-size:11px">Incomplete docs and Placement set themselves.</div>' : '<div class="nx-muted" style="margin-top:4px;font-size:11px">Leads stay at Checklist sent until $200 is paid.</div>') + '</div>' +
       '<div><div class="nx-lbl">Agreed fee</div><div class="nx-money">' + (fee ? money(fee) : '–') + '</div></div><div><div class="nx-lbl">Paid</div><div class="nx-money">' + money(paid) + '</div></div><div><div class="nx-lbl">Balance</div><div class="nx-money ' + (bal > 0 ? 'nx-neg' : 'nx-pos') + '">' + (fee ? money(bal) : '–') + '</div></div><div class="nx-grow"></div>' +
       '<div class="nx-btnrow">' + (canPay() ? '<button class="nx-btn sm" data-a="addPay" data-id="' + e.id + '">' + ico('plus') + 'Payment</button>' : '') + '<button class="nx-btn sm" data-a="refund" data-id="' + e.id + '">Refund</button><button class="nx-btn sm" data-a="editEnr" data-id="' + e.id + '">' + ico('edit') + 'Edit</button></div></div>' +
       (e.notes || e.follow_up_note ? '<div style="padding:0 16px 12px" class="nx-muted">' + esc(e.notes || '') + '</div>' : '') +
@@ -421,8 +421,8 @@ async function studentAction(a, ds, c) {
     });
   }
   if (a === 'archive') { if (!ME.admin) return toast('Only hub admins can archive records.', true); if (await confirmBox(c.isStudent ? 'Archive student' : 'Archive lead', fullName(s) + ' will be hidden from lists. Their records are kept.', 'Archive', true)) { await upd('nex_students', 'id=eq.' + s.id, { deleted_at: new Date().toISOString() }); toast('Archived'); go(c.isStudent ? '#/students' : '#/leads'); } return; }
-  if (a === 'addEnr') return enrolmentForm(s, null);
-  if (a === 'editEnr') return enrolmentForm(s, c.enr.find(e => e.id === ds.id));
+  if (a === 'addEnr') return enrolmentForm(s, null, c.isStudent);
+  if (a === 'editEnr') return enrolmentForm(s, c.enr.find(e => e.id === ds.id), c.isStudent);
   if (a === 'addPay') return paymentForm({ student: s, enrolment: c.enr.find(e => e.id === ds.id) });
   if (a === 'refund') return refundForm(c.enr.find(e => e.id === ds.id), c.pays);
   if (a === 'addFu') return followupForm({ student: s, enrolments: c.enr });
@@ -442,10 +442,10 @@ function standardFee(m, qSel, feeSel) {
   q.addEventListener('change', apply);
   if (fe.value === '') apply();
 }
-function enrolmentForm(s, e) {
+function enrolmentForm(s, e, isStudent) {
   e = e || {};
   const f = [{ k: 'qualification_id', label: 'Qualification', type: 'select', options: REF.quals.filter(q => q.active || q.id === e.qualification_id), value: e.qualification_id, blank: 'Not set' },
-    { k: 'year', label: 'Year', type: 'number', value: e.year || new Date().getFullYear() }, { k: 'stage', label: 'Stage', type: 'select', options: opts('enrolment', true), value: e.stage, blank: 'Not set' },
+    { k: 'year', label: 'Year', type: 'number', value: e.year || new Date().getFullYear() }, { k: 'stage', label: 'Stage', type: 'select', options: stageOpts(isStudent, e.stage), value: e.stage, blank: 'Not set' },
     { k: 'fee', label: 'Agreed fee ($)', type: 'number', value: e.fee }, { k: 'enrolled_on', label: 'Enrolled on', type: 'date', value: e.enrolled_on || sydToday() },
     { k: 'agent_id', label: 'Agent', type: 'select', options: REF.agents.filter(a => a.active), value: e.agent_id, blank: 'Self / no agent' },
     { k: 'owner', label: 'Looked after by', type: 'select', options: REF.staff, value: e.owner, blank: 'Nobody yet' }, { k: 'fee_note', label: 'Fee note', value: e.fee_note },

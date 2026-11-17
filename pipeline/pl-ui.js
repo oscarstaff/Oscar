@@ -39,6 +39,19 @@ function pill(ctx, key) {
   const t = (TONE[ctx] || {})[key] || '';
   return '<span class="nx-pill ' + t + '">' + esc(statusLabel(ctx, key)) + '</span>';
 }
+/* Stages a person can be moved to by hand.
+   Leads (paid under $200) stop at Checklist sent, with Hold and Lost as ways out.
+   Incomplete docs (payment sheet Issues) and Placement (booked into a batch) are set by the system, so they are only listed
+   while a record is already on them. Retired stages stay listed only on records that still have them. */
+const STAGE_LEAD_OK = new Set(['checklist_sent', 'hold', 'blended']);
+const STAGE_AUTO = new Set(['incomplete_docs', 'placement']);
+function stageOpts(isStudent, cur) {
+  return opts('enrolment', false).filter(o => o.key === cur || (o.active && (isStudent ? !STAGE_AUTO.has(o.key) : STAGE_LEAD_OK.has(o.key))));
+}
+/* for the list filters: everything that can be searched on, retired stages marked */
+function stageFilterOpts(kind) {
+  return opts('enrolment', false).filter(o => o.active ? (kind !== 'lead' || STAGE_LEAD_OK.has(o.key)) : kind !== 'lead').map(o => o.active ? o : Object.assign({}, o, { label: o.label + ' (old)' }));
+}
 function selectOpts(list, cur, blank) {
   return (blank != null ? '<option value="">' + esc(blank) + '</option>' : '') +
     list.map(o => { const v = typeof o === 'string' ? o : (o.key != null ? o.key : o.id); const l = typeof o === 'string' ? o : (o.label || o.name); return '<option value="' + esc(v) + '"' + (v === cur ? ' selected' : '') + '>' + esc(l) + '</option>'; }).join('');
