@@ -34,7 +34,7 @@ route(/^\/firstaid(?:\/([0-9a-f-]{36}))?$/, async m => {
     '<div class="nx-card" id="faBook"><div class="nx-card-h"><h3>Bookings</h3><button class="nx-btn primary sm" id="faAdd">' + ico('plus') + 'Add booking</button></div>' +
     (live.length ? '<div class="nx-tablewrap"><table class="nx-table tight"><thead><tr><th>Seat</th><th>Name</th><th>Phone</th><th>Type</th><th>Booked by</th><th>Attendance</th><th>Flags</th><th></th></tr></thead><tbody>' +
       live.map(b => '<tr class="nx-tr" data-b="' + b.id + '"><td class="nx-num">' + (b.seat_no || '<span class="nx-muted">–</span>') + '</td><td><b>' + (b.nex_students ? '<a href="#/students/' + b.nex_students.id + '">' + esc(b.name) + '</a>' : esc(b.name)) + '</b><div class="nx-muted" style="font-size:12px">' + esc(b.email || '') + '</div></td><td class="nx-num">' + esc(fmtPhone(b.phone)) + '</td><td>' + (b.booking_type === 'student' ? '<span class="nx-tag">Student</span>' : '<span class="nx-tag walk">' + (b.booking_type === 'walk_in' ? 'Walk-in' : 'Agent group') + '</span>') + (b.agent_id ? ' <span class="nx-muted">' + esc(agentName(b.agent_id)) + '</span>' : '') + '</td><td>' + esc(b.created_by || '') + '</td><td>' + attCell(b) + '</td>' +
-        '<td><div class="nx-flags">' + bookingFlags(cur, b) + '</div></td><td><button class="nx-btn sm" data-edit="' + b.id + '">Edit</button></td></tr>').join('') + '</tbody></table></div>' : empty('No bookings yet', 'Press Add booking or choose a free seat above.')) + (live.length ? '<div class="nx-legend nx-flaglegend"><span><b>QS</b> quiz sent</span><span><b>QD</b> quiz done</span><span><b>$</b> paid</span>' + (cur.kind !== 'renewal' ? '<span><b>PP</b> placement plan yes or done</span><span><b>EP</b> education plan yes or RTO done</span>' : '<span><b>SG</b> signature done</span>') + '</div>' : '') + '</div>' +
+        '<td><div class="nx-flags">' + bookingFlags(cur, b) + '</div></td><td><div class="nx-btnrow">' + (canFlag() && !bkOff(b.status) ? '<button class="nx-btn sm" data-conf="' + b.id + '">Email confirmation</button>' : '') + '<button class="nx-btn sm" data-edit="' + b.id + '">Edit</button></div></td></tr>').join('') + '</tbody></table></div>' : empty('No bookings yet', 'Press Add booking or choose a free seat above.')) + (live.length ? '<div class="nx-legend nx-flaglegend"><span><b>QS</b> quiz sent</span><span><b>QD</b> quiz done</span><span><b>$</b> paid</span>' + (cur.kind !== 'renewal' ? '<span><b>PP</b> placement plan yes or done</span><span><b>EP</b> education plan yes or RTO done</span>' : '<span><b>SG</b> signature done</span>') + '</div>' : '') + '</div>' +
     (offs.length ? '<div class="nx-card" id="faOff"><div class="nx-card-h"><div><h3>No show, cancelled and rescheduled <span class="nx-count">' + offs.length + '</span></h3><div class="nx-muted">Not counted in the seats. Each one has a follow-up task for the next working day.</div></div></div>' + bkFollowTable(offs, moved) + '</div>' : '');
 });
 
@@ -54,6 +54,7 @@ function bindFirstAid(cur, books) {
   $('#faAdd').onclick = () => bookingForm(cur, null, books);
   $$('#faSeats .nx-seat').forEach(b => b.onclick = () => { const n = Number(b.dataset.seat); const ex = books.find(x => x.seat_no === n && !bkOff(x.status)); bookingForm(cur, ex || null, books, n); });
   $$('[data-edit]').forEach(b => b.onclick = e => { e.stopPropagation(); bookingForm(cur, books.find(x => x.id === b.dataset.edit), books); });
+  $$('[data-conf]').forEach(b => b.onclick = e => { e.stopPropagation(); const x = books.find(y => y.id === b.dataset.conf); if (x) confirmEmail(x); });
   const by = id => books.find(x => x.id === id);
   $$('[data-at]').forEach(b => b.onclick = e => { e.stopPropagation(); bkAttended(by(b.dataset.at)); });
   $$('[data-mk]').forEach(b => b.onclick = e => { e.stopPropagation(); attendanceModal(by(b.dataset.mk)); });
@@ -85,6 +86,23 @@ function bookingFlags(cur, b) {
   } else h += flagHtml(b.signature_done, 'SG', 'Signature done');
   return h;
 }
+/* "Email confirmation": preview the First Aid and CPR class confirmation, then send it from the First Aid and CPR team mailbox
+   (edge function nex-send-class-confirm). The class date and time come from the booking; the student's first name opens the email. */
+async function confirmEmail(b) {
+  let pv;
+  try { pv = await fn('nex-send-class-confirm', { booking_id: b.id, preview: true }); } catch (e) { toast(e.message, true); return; }
+  const done = !!(pv.prior && pv.prior.status === 'sent');
+  const files = pv.attachments || [];
+  const note = (done ? '<div class="nx-pill warn" style="margin-bottom:8px">A confirmation was already sent' + (pv.prior.created_by ? ' by ' + esc(pv.prior.created_by) : '') + (pv.prior.updated_at ? ' on ' + esc(fmtDate(pv.prior.updated_at)) : '') + '. Sending again emails the student a second time.</div>' : '');
+  openModal({ title: 'Email confirmation: ' + b.name, wide: true,
+    body: note + '<div class="nx-muted" style="margin-bottom:8px">To: ' + esc(pv.to) + ' · Subject: ' + esc(pv.subject) + '</div><div style="white-space:pre-wrap;line-height:1.5;max-height:50vh;overflow:auto">' + esc(pv.body) + '</div>' +
+      '<div class="nx-muted" style="margin-top:12px">' + (files.length ? 'Attached: ' + files.map(x => esc(x.file_name)).join(', ') : '<b>No file is attached.</b> The email says “check the attached PDF”. A hub admin can add the quiz guide in Admin.') + '</div>' +
+      (typeof pv.remaining === 'number' ? '<div class="nx-muted" style="margin-top:6px">The First Aid and CPR mailbox can send ' + pv.remaining + ' more email' + (pv.remaining === 1 ? '' : 's') + ' today.</div>' : ''),
+    buttons: [{ label: 'Cancel', close: true }, { label: done ? 'Send again' : 'Send', primary: true, run: async () => {
+      const r = await fn('nex-send-class-confirm', { booking_id: b.id, force: done });
+      toast('Confirmation sent to ' + b.name + (typeof r.remaining === 'number' && r.remaining <= 20 ? '. ' + r.remaining + ' more can be sent today.' : ''));
+    } }] });
+}
 const PLAN_PL = { yes: 'Yes', done: 'Done', no: 'No' }, PLAN_ED = { yes: 'Yes', rto_done: 'RTO done', no: 'No' };
 function bookingForm(cur, b, books, seat) {
   b = b || {}; let studentId = b.student_id || null;
@@ -115,6 +133,7 @@ function bookingForm(cur, b, books, seat) {
     const foot = $('.modal-f', m.el); const cb = document.createElement('button'); cb.className = 'nx-btn'; cb.style.marginRight = 'auto'; cb.textContent = 'Cancel booking';
     cb.onclick = async () => { try { await bkMark(b, 'cancelled'); m.close(); toast('Booking cancelled. Follow-up task added.'); render(); } catch (e) { showErr(m, e); } };
     foot.prepend(cb);
+    if (canFlag() && !bkOff(b.status)) { const eb = document.createElement('button'); eb.className = 'nx-btn'; eb.textContent = 'Email confirmation'; eb.onclick = () => confirmEmail(b); foot.prepend(eb); }
   } else {
     identityLookup(m, { ids: { name: 'f_name', phone: 'f_phone', email: 'f_email' }, onChange: st => { studentId = st ? st.id : null; if (st) { const bt = $('#f_booking_type', m.el); if (bt) bt.value = 'student'; } } });
   }
