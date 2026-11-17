@@ -31,10 +31,10 @@ route(/^\/firstaid(?:\/([0-9a-f-]{36}))?$/, async m => {
     (live.length > cur.seats ? '<div class="nx-warnbox">This class has more bookings than seats. Move some people to another day.</div>' : '') +
     '<div class="nx-seats" id="faSeats">' + Array.from({ length: cur.seats }, (_, i) => { const n = i + 1; const b = live.find(x => x.seat_no === n); return '<button class="nx-seat ' + (b ? (b.booking_type !== 'student' ? 'walk' : 'booked') : '') + '" data-seat="' + n + '" title="' + esc(b ? b.name : 'Free seat') + '"><span>' + (b ? esc((b.name || '').split(' ')[0].slice(0, 7)) : n) + '</span></button>'; }).join('') + '</div>' +
     '<div class="nx-legend"><span><i></i>Free</span><span><i class="booked"></i>Student</span><span><i class="walk"></i>Walk-in or agent group</span></div></div></div>' +
-    '<div class="nx-card" id="faBook"><div class="nx-card-h"><h3>Bookings</h3><button class="nx-btn primary sm" id="faAdd">' + ico('plus') + 'Add booking</button></div>' +
+    '<div class="nx-card" id="faBook"><div class="nx-card-h"><h3>Bookings</h3><div class="nx-btnrow">' + (canFlag() && cur.kind !== 'renewal' && live.length ? '<button class="nx-btn sm" id="faMail">' + ico('mail') + 'Email confirmations</button>' : '') + '<button class="nx-btn primary sm" id="faAdd">' + ico('plus') + 'Add booking</button></div></div>' +
     (live.length ? '<div class="nx-tablewrap"><table class="nx-table tight"><thead><tr><th>Seat</th><th>Name</th><th>Phone</th><th>Type</th><th>Booked by</th><th>Attendance</th><th>Flags</th><th></th></tr></thead><tbody>' +
       live.map(b => '<tr class="nx-tr" data-b="' + b.id + '"><td class="nx-num">' + (b.seat_no || '<span class="nx-muted">–</span>') + '</td><td><b>' + (b.nex_students ? '<a href="#/students/' + b.nex_students.id + '">' + esc(b.name) + '</a>' : esc(b.name)) + '</b><div class="nx-muted" style="font-size:12px">' + esc(b.email || '') + '</div></td><td class="nx-num">' + esc(fmtPhone(b.phone)) + '</td><td>' + (b.booking_type === 'student' ? '<span class="nx-tag">Student</span>' : '<span class="nx-tag walk">' + (b.booking_type === 'walk_in' ? 'Walk-in' : 'Agent group') + '</span>') + (b.agent_id ? ' <span class="nx-muted">' + esc(agentName(b.agent_id)) + '</span>' : '') + '</td><td>' + esc(b.created_by || '') + '</td><td>' + attCell(b) + '</td>' +
-        '<td><div class="nx-flags">' + bookingFlags(cur, b) + '</div></td><td><button class="nx-btn sm" data-edit="' + b.id + '">Edit</button></td></tr>').join('') + '</tbody></table></div>' : empty('No bookings yet', 'Press Add booking or choose a free seat above.')) + (live.length ? '<div class="nx-legend nx-flaglegend"><span><b>QS</b> quiz sent</span><span><b>QD</b> quiz done</span><span><b>$</b> paid</span>' + (cur.kind !== 'renewal' ? '<span><b>PP</b> placement plan yes or done</span><span><b>EP</b> education plan yes or RTO done</span>' : '<span><b>SG</b> signature done</span>') + '</div>' : '') + '</div>' +
+        '<td><div class="nx-flags">' + bookingFlags(cur, b) + '</div></td><td><div class="nx-btnrow">' + (canFlag() && cur.kind !== 'renewal' && !bkOff(b.status) ? '<button class="nx-btn sm" data-conf="' + b.id + '">Email confirmation</button>' : '') + '<button class="nx-btn sm" data-edit="' + b.id + '">Edit</button></div></td></tr>').join('') + '</tbody></table></div>' : empty('No bookings yet', 'Press Add booking or choose a free seat above.')) + (live.length ? '<div class="nx-legend nx-flaglegend"><span><b>QS</b> quiz sent</span><span><b>QD</b> quiz done</span><span><b>$</b> paid</span>' + (cur.kind !== 'renewal' ? '<span><b>PP</b> placement plan yes or done</span><span><b>EP</b> education plan yes or RTO done</span>' : '<span><b>SG</b> signature done</span>') + '</div>' : '') + '</div>' +
     (offs.length ? '<div class="nx-card" id="faOff"><div class="nx-card-h"><div><h3>No show, cancelled and rescheduled <span class="nx-count">' + offs.length + '</span></h3><div class="nx-muted">Not counted in the seats. Each one has a follow-up task for the next working day.</div></div></div>' + bkFollowTable(offs, moved) + '</div>' : '');
 });
 
@@ -54,6 +54,8 @@ function bindFirstAid(cur, books) {
   $('#faAdd').onclick = () => bookingForm(cur, null, books);
   $$('#faSeats .nx-seat').forEach(b => b.onclick = () => { const n = Number(b.dataset.seat); const ex = books.find(x => x.seat_no === n && !bkOff(x.status)); bookingForm(cur, ex || null, books, n); });
   $$('[data-edit]').forEach(b => b.onclick = e => { e.stopPropagation(); bookingForm(cur, books.find(x => x.id === b.dataset.edit), books); });
+  $$('[data-conf]').forEach(b => b.onclick = e => { e.stopPropagation(); const x = books.find(y => y.id === b.dataset.conf); if (x) confirmEmail(cur, books, x); });
+  const fm = $('#faMail'); if (fm) fm.onclick = () => confirmEmail(cur, books);
   const by = id => books.find(x => x.id === id);
   $$('[data-at]').forEach(b => b.onclick = e => { e.stopPropagation(); bkAttended(by(b.dataset.at)); });
   $$('[data-mk]').forEach(b => b.onclick = e => { e.stopPropagation(); attendanceModal(by(b.dataset.mk)); });
@@ -85,6 +87,17 @@ function bookingFlags(cur, b) {
   } else h += flagHtml(b.signature_done, 'SG', 'Signature done');
   return h;
 }
+/* "Email confirmation": one booking from its row, or everyone booked on the class day, through the shared email dialog
+   (edge function nex-send-class-confirm, from the First Aid and CPR team mailbox; Evershine team and admins only). */
+function confirmEmail(cur, books, only) {
+  const list = books.filter(b => !bkOff(b.status) && (!only || b.id === only.id));
+  mailDialog({ title: only ? 'Email confirmation: ' + only.name : 'Email class confirmations', fn: 'nex-send-class-confirm', empty: 'No bookings on this class day.', onDone: () => render(),
+    load: async () => {
+      const sent = list.length ? await sel('nex_class_confirm_mail', 'select=booking_id,created_by,updated_at&booking_id=in.' + inList(list.map(b => b.id))) : [];
+      const by = {}; sent.forEach(x => { by[x.booking_id] = x; });
+      return list.map(b => { const x = by[b.id]; return { id: b.id, name: b.name, sub: (b.seat_no ? 'Seat ' + b.seat_no + ' · ' : '') + (b.email || 'Email from their student record'), off: !b.email && !b.student_id, offNote: 'No email address', sentNote: x ? 'Already sent' + (x.created_by ? ' by ' + x.created_by : '') + ' on ' + fmtDate(x.updated_at) : '' }; });
+    } });
+}
 const PLAN_PL = { yes: 'Yes', done: 'Done', no: 'No' }, PLAN_ED = { yes: 'Yes', rto_done: 'RTO done', no: 'No' };
 function bookingForm(cur, b, books, seat) {
   b = b || {}; let studentId = b.student_id || null;
@@ -115,6 +128,7 @@ function bookingForm(cur, b, books, seat) {
     const foot = $('.modal-f', m.el); const cb = document.createElement('button'); cb.className = 'nx-btn'; cb.style.marginRight = 'auto'; cb.textContent = 'Cancel booking';
     cb.onclick = async () => { try { await bkMark(b, 'cancelled'); m.close(); toast('Booking cancelled. Follow-up task added.'); render(); } catch (e) { showErr(m, e); } };
     foot.prepend(cb);
+    if (canFlag() && cur.kind !== 'renewal' && !bkOff(b.status)) { const eb = document.createElement('button'); eb.className = 'nx-btn'; eb.textContent = 'Email confirmation'; eb.onclick = () => { m.close(); confirmEmail(cur, books, b); }; foot.prepend(eb); }
   } else {
     identityLookup(m, { ids: { name: 'f_name', phone: 'f_phone', email: 'f_email' }, onChange: st => { studentId = st ? st.id : null; if (st) { const bt = $('#f_booking_type', m.el); if (bt) bt.value = 'student'; } } });
   }

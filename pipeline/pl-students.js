@@ -267,27 +267,44 @@ function sideCards(c) {
 }
 
 
-/* send a lead follow-up email (lists the documents not received yet) through the workspace mail script */
+/* send a lead follow-up email (lists the documents not received yet) through the workspace mail script.
+   The dialog opens at once at a fixed size and everything happens inside it: the preview loads in place, the mailbox's remaining sends
+   load in the background, and "already sent" is a line in the dialog, not another dialog on top. */
 async function emailFollowup(s, step) {
   if (!s.email) { toast('Add an email address on the Details tab first.', true); return; }
-  let pv;
-  try { pv = await fn('nex-send-followup', { student_id: s.id, step, preview: true }); } catch (e) { toast(e.code === 'no_email' ? 'There is no valid email address on file.' : e.message, true); return; }
-  const fields = [
-    { k: 'subject', label: 'Subject', value: pv.subject, full: true, required: true },
-    { k: 'body', label: 'Message', type: 'textarea', value: pv.body, full: true, required: true, help: 'You can edit this before it goes. Replies come to you.' }
-  ];
+  let force = false, sending = false;
+  const m = openModal({ title: 'Email ' + ['', '1st', '2nd', '3rd'][step] + ' follow-up', wide: true, noFocus: true,
+    body: '<div class="nx-md"><div class="nx-muted" data-ef="top">Preparing the email…</div><div data-ef="note"></div><div><label class="nx-lbl" for="efSub">Subject</label><input class="nx-in" id="efSub" disabled></div><div style="flex:1;display:flex;flex-direction:column"><label class="nx-lbl" for="efBody">Message</label><textarea class="nx-ta" id="efBody" style="flex:1;min-height:250px" disabled></textarea><div class="nx-help">You can edit this before it goes. Replies come to you.</div></div><div class="nx-err" data-ef="err" role="alert" hidden></div></div>' });
+  const q = k => $('[data-ef="' + k + '"]', m.el), foot = $('.modal-f', m.el);
+  const cancel = document.createElement('button'); cancel.className = 'nx-btn'; cancel.textContent = 'Cancel'; cancel.onclick = () => m.close();
+  const go = document.createElement('button'); go.className = 'nx-btn primary'; go.textContent = 'Send email'; go.disabled = true;
+  foot.appendChild(cancel); foot.appendChild(go);
+  let pv, left = null;
+  try { pv = await fn('nex-send-followup', { student_id: s.id, step, preview: true }); }
+  catch (e) { if (!m.gone) { q('top').textContent = e.code === 'no_email' ? 'There is no valid email address on file.' : e.message; q('top').classList.add('nx-neg'); } return; }
+  if (m.gone) return;
   const miss = (pv.missing || []).reduce((n, g) => n + g.docs.length, 0);
-  const top = '<p class="nx-muted" style="margin:0 0 10px">To <b>' + esc(pv.to) + '</b> · ' + (miss ? miss + ' document' + (miss === 1 ? '' : 's') + ' still missing' : 'no documents missing') + (pv.last_sent ? ' · sent before by ' + esc(pv.last_sent.sent_by || 'someone') + ' on ' + esc(fmtDate(pv.last_sent.sent_at)) : '') + (typeof pv.remaining === 'number' ? ' · ' + pv.remaining + ' more can be sent today' : '') + '</p>';
-  const send = async (v, m, force) => {
-    let r;
-    try { r = await fn('nex-send-followup', { student_id: s.id, step, subject: v.subject, body: v.body, force: !!force }); }
-    catch (e) {
-      if (e.code === 'recent' && !force) { if (await confirmBox('Send again?', e.message + ' Send it again?', 'Send again')) return send(v, m, true); return false; }
-      throw e;
+  const topText = () => 'To ' + pv.to + ' · ' + (miss ? miss + ' document' + (miss === 1 ? '' : 's') + ' still missing' : 'no documents missing') + (pv.last_sent ? ' · sent before by ' + (pv.last_sent.sent_by || 'someone') + ' on ' + fmtDate(pv.last_sent.sent_at) : '') + (typeof left === 'number' ? ' · ' + left + ' more can be sent today' : '');
+  q('top').textContent = topText();
+  $('#efSub', m.el).value = pv.subject; $('#efBody', m.el).value = pv.body;
+  $('#efSub', m.el).disabled = false; $('#efBody', m.el).disabled = false; go.disabled = false;
+  fn('nex-send-followup', { quota: true }).then(r => { if (typeof r.remaining === 'number') { left = r.remaining; if (!m.gone) { q('top').textContent = topText(); if (left <= 0) { go.disabled = true; q('err').hidden = false; q('err').textContent = 'The enrolment mailbox has reached its daily sending limit. Try again tomorrow.'; } } } }).catch(() => {});
+  go.onclick = async () => {
+    if (sending) return;
+    const subject = $('#efSub', m.el).value.trim(), body = $('#efBody', m.el).value.trim();
+    q('err').hidden = true;
+    if (!subject || !body) { q('err').hidden = false; q('err').textContent = 'The subject and message cannot be empty.'; return; }
+    sending = true; go.disabled = true; cancel.disabled = true; go.classList.add('busy'); go.textContent = 'Sending…';
+    try {
+      const r = await fn('nex-send-followup', { student_id: s.id, step, subject, body, force });
+      toast('Email sent to ' + pv.to + (r && typeof r.remaining === 'number' && r.remaining <= 20 ? '. ' + r.remaining + ' more can be sent today.' : ''));
+      m.close(); render();
+    } catch (e) {
+      if (e.code === 'recent' && !force) { force = true; q('note').innerHTML = '<div class="nx-pill warn" style="white-space:normal;height:auto;padding:6px 10px">' + esc(e.message) + ' Press Send again to send it anyway.</div>'; go.textContent = 'Send again'; }
+      else { q('err').hidden = false; q('err').textContent = e.message; go.textContent = force ? 'Send again' : 'Send email'; }
+      sending = false; go.disabled = false; cancel.disabled = false; go.classList.remove('busy');
     }
-    toast('Email sent to ' + pv.to + (r && typeof r.remaining === 'number' && r.remaining <= 20 ? '. ' + r.remaining + ' more can be sent today.' : '')); render();
   };
-  return formModal('Email ' + ['', '1st', '2nd', '3rd'][step] + ' follow-up', fields, (v, m) => send(v, m, false), 'Send email', top);
 }
 function bindStudent(c) {
   const view = $('#view');
@@ -384,7 +401,7 @@ function tabMoney(c) {
     const paid = ps.reduce((t, p) => t + Number(p.amount), 0) - rf.reduce((t, r) => t + Number(r.amount), 0);
     const fee = Number(e.fee || 0); const bal = fee - paid;
     return section((qualName(e.qualification_id) || 'Enrolment') + (e.year ? ' · ' + e.year : ''),
-      '<div style="padding:16px;display:flex;flex-wrap:wrap;gap:16px;align-items:center"><div><label class="nx-lbl">Stage</label><select class="nx-sel sm" data-stage="' + e.id + '">' + selectOpts(stageOpts(c.isStudent, e.stage), e.stage, 'Not set') + '</select>' + (c.isStudent ? '<div class="nx-muted" style="margin-top:4px;font-size:11px">Incomplete docs and Placement set themselves.</div>' : '<div class="nx-muted" style="margin-top:4px;font-size:11px">Leads stay at Checklist sent until $200 is paid.</div>') + '</div>' +
+      '<div style="padding:16px;display:flex;flex-wrap:wrap;gap:16px;align-items:center"><div><label class="nx-lbl">Stage</label><select class="nx-sel sm" data-stage="' + e.id + '">' + selectOpts(stageOpts(c.isStudent, e.stage), e.stage, 'Not set') + '</select>' + (c.isStudent ? '<div class="nx-muted" style="margin-top:4px;font-size:11px">Incomplete docs and Placement set themselves.</div>' : '<div class="nx-muted" style="margin-top:4px;font-size:11px">Leads can be at Checklist sent or Docs completed until $200 is paid.</div>') + '</div>' +
       '<div><div class="nx-lbl">Agreed fee</div><div class="nx-money">' + (fee ? money(fee) : '–') + '</div></div><div><div class="nx-lbl">Paid</div><div class="nx-money">' + money(paid) + '</div></div><div><div class="nx-lbl">Balance</div><div class="nx-money ' + (bal > 0 ? 'nx-neg' : 'nx-pos') + '">' + (fee ? money(bal) : '–') + '</div></div><div class="nx-grow"></div>' +
       '<div class="nx-btnrow">' + (canPay() ? '<button class="nx-btn sm" data-a="addPay" data-id="' + e.id + '">' + ico('plus') + 'Payment</button>' : '') + '<button class="nx-btn sm" data-a="refund" data-id="' + e.id + '">Refund</button><button class="nx-btn sm" data-a="editEnr" data-id="' + e.id + '">' + ico('edit') + 'Edit</button></div></div>' +
       (e.notes || e.follow_up_note ? '<div style="padding:0 16px 12px" class="nx-muted">' + esc(e.notes || '') + '</div>' : '') +
