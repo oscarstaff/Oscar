@@ -120,7 +120,7 @@ function mailDialog(cfg) {
   let didSend = false, sending = false, rows = [], quota = null, quotaErr = '';
   const picked = new Set(), previews = {};
   const m = openModal({ title: cfg.title, wide: true, noFocus: true, onClose() { if (didSend && cfg.onDone) cfg.onDone(); },
-    body: '<div class="nx-md"><div class="nx-md-top nx-muted" data-md="top">Loading…</div><ul class="nx-list nx-md-list" data-md="list"></ul><div class="nx-md-prev" data-md="prev"><span class="nx-muted">Press Preview next to a name to read the email.</span></div></div>' });
+    body: '<div class="nx-md"><div class="nx-md-top nx-muted" data-md="top">Loading…</div><ul class="nx-list nx-md-list" data-md="list"></ul><div class="nx-md-prev' + (cfg.htmlPreview ? ' nx-md-html' : '') + '" data-md="prev"><span class="nx-muted">Press Preview next to a name to read the email.</span></div></div>' });
   const q = k => $('[data-md="' + k + '"]', m.el);
   const foot = $('.modal-f', m.el);
   const cancel = document.createElement('button'); cancel.className = 'nx-btn'; cancel.textContent = 'Cancel'; cancel.onclick = () => m.close();
@@ -152,7 +152,15 @@ function mailDialog(cfg) {
     try {
       const pv = previews[id] || (previews[id] = await fn(cfg.fn, { booking_id: id, preview: true }));
       const files = pv.attachments || [];
-      box.innerHTML = '<div class="nx-muted" style="margin-bottom:6px">To ' + esc(pv.to) + ' · ' + esc(pv.subject) + '</div>' + esc(pv.body) + '<div class="nx-muted" style="margin-top:10px">' + (files.length ? 'Attached: ' + files.map(x => esc(x.file_name)).join(', ') : '<b>No file is attached.</b> A hub admin can add one in Admin.') + '</div>';
+      const head = '<div class="nx-muted nx-md-ph">To ' + esc(pv.to) + ' · ' + esc(pv.subject) + '</div>';
+      const foot2 = '<div class="nx-muted nx-md-pf">' + (files.length ? 'Attached: ' + files.map(x => esc(x.file_name)).join(', ') : '<b>No file is attached.</b> A hub admin can add one in Admin.') + '</div>';
+      if (pv.html) {
+        /* the designed email, shown as the student will see it: a sandboxed frame (no scripts, no links followed) */
+        box.innerHTML = head + '<iframe class="nx-md-frame" sandbox="" title="Email preview"></iframe>' + foot2;
+        $('iframe', box).srcdoc = pv.html;
+      } else {
+        box.innerHTML = head.replace('nx-md-ph', 'nx-md-ph" style="margin-bottom:6px') + esc(pv.body) + foot2.replace('nx-md-pf', 'nx-md-pf" style="margin-top:10px');
+      }
       box.scrollTop = 0;
     } catch (err) { box.textContent = err.message; }
   });

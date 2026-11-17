@@ -91,7 +91,7 @@ function bookingFlags(cur, b) {
    (edge function nex-send-class-confirm, from the First Aid and CPR team mailbox; Evershine team and admins only). */
 function confirmEmail(cur, books, only) {
   const list = books.filter(b => !bkOff(b.status) && (!only || b.id === only.id));
-  mailDialog({ title: only ? 'Email confirmation: ' + only.name : 'Email class confirmations', fn: 'nex-send-class-confirm', empty: 'No bookings on this class day.', onDone: () => render(),
+  mailDialog({ title: only ? 'Email confirmation: ' + only.name : 'Email class confirmations', fn: 'nex-send-class-confirm', htmlPreview: true, empty: 'No bookings on this class day.', onDone: () => render(),
     load: async () => {
       const sent = list.length ? await sel('nex_class_confirm_mail', 'select=booking_id,created_by,updated_at&booking_id=in.' + inList(list.map(b => b.id))) : [];
       const by = {}; sent.forEach(x => { by[x.booking_id] = x; });
