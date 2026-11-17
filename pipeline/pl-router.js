@@ -103,14 +103,14 @@ async function render() {
   const m = h.match(r.re), same = lastRouteH === h, sk = $('#viewSkel');
   document.body.classList.add('nx-busy'); setNav(h);
   /* the page you are on stays put for a moment; only a slow load swaps to the placeholder. A refresh of the same page never does. */
-  let skShown = false;
+  let skShown = false, fin = false;   /* fin: this render is over, so a placeholder that was still waiting its 110ms must not appear */
   const skT = same ? 0 : setTimeout(() => {
     if (tok !== navToken) return;
     const cur = $$('main.nx-main').filter(el => el !== sk && !el.hidden);
-    const show = () => { if (tok !== navToken) { cur.forEach(el => el.classList.remove('nx-leaving')); return; } skShown = true; sk.innerHTML = skeleton(h); sk.hidden = false; cur.forEach(el => { el.hidden = true; el.classList.remove('nx-leaving'); }); window.scrollTo(0, 0); };
+    const show = () => { if (tok !== navToken || fin) { cur.forEach(el => el.classList.remove('nx-leaving')); return; } skShown = true; sk.innerHTML = skeleton(h); sk.hidden = false; cur.forEach(el => { el.hidden = true; el.classList.remove('nx-leaving'); }); window.scrollTo(0, 0); };
     if (cur.length && !firstPaint) { cur.forEach(el => el.classList.add('nx-leaving')); setTimeout(show, 110); } else show();
   }, firstPaint ? 0 : 450);
-  const done = () => { clearTimeout(skT); sk.hidden = true; sk.innerHTML = ''; document.body.classList.remove('nx-busy'); firstPaint = false; };
+  const done = () => { fin = true; clearTimeout(skT); sk.hidden = true; sk.innerHTML = ''; document.body.classList.remove('nx-busy'); firstPaint = false; };
   try {
     await loadRef();
     afters = []; viewWaits = [];
