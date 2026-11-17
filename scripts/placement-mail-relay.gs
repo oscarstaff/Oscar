@@ -8,7 +8,8 @@
  *
  * Setup (once)
  *  1. Signed in as the placement mailbox: script.google.com > New project > paste this file > Save.
- *  2. Turn on the Gmail API: in the left sidebar next to Services press +, choose "Gmail API", Add (leave the name as Gmail).
+ *  2. Optional: turn on the Gmail API: in the left sidebar next to Services press +, choose "Gmail API", Add (leave the name as Gmail).
+ *     If it is on, the Gmail API sends the email; if it is not, the script falls back to GmailApp. Either way the email is the same.
  *  3. Project Settings > Script properties > add
  *       MAIL_KEY            a long random string (this is the password YatraLine uses; make one up)
  *       ATTACHMENT_IDS      optional, and usually not needed: the help guide is uploaded in YatraLine > Admin and sent along by the app.
@@ -75,8 +76,16 @@ function sendViaGmailApi_(to, subject, text, html, fromName, extraFiles) {
   var props = PropertiesService.getScriptProperties();
   var ids = String(props.getProperty('ATTACHMENT_IDS') || '').split(',').map(function (s) { return s.trim(); }).filter(String);
   var files = (extraFiles || []).concat(ids.map(function (id) { return DriveApp.getFileById(id).getBlob(); }));
-  var raw = buildMime_(me, to, subject, text, html, fromName, files);
-  Gmail.Users.Messages.send({ raw: raw }, 'me');
+  /* Gmail API when the Gmail service is switched on in this project (and the deployment is on a version that has it);
+     otherwise Google's built-in sender, which needs no setup. Same mailbox, same email either way. */
+  if (typeof Gmail !== 'undefined' && Gmail.Users && Gmail.Users.Messages) {
+    Gmail.Users.Messages.send({ raw: buildMime_(me, to, subject, text, html, fromName, files) }, 'me');
+    return;
+  }
+  var opts = { name: String(fromName || '').replace(/[\r\n"<>]+/g, ' ').trim() };
+  if (html) opts.htmlBody = html;
+  if (files.length) opts.attachments = files;
+  GmailApp.sendEmail(to, subject, text, opts);
 }
 
 function buildMime_(from, to, subject, text, html, fromName, files) {
