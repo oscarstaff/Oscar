@@ -1043,6 +1043,7 @@ sub,sup{line-height:0}
    ===================================================================================================== */
 :root{--nx-spring:cubic-bezier(.34,1.56,.64,1);--nx-inout:cubic-bezier(.65,0,.35,1);--nx-snap:cubic-bezier(.2,.9,.3,1)}
 @keyframes nxm2{0%{opacity:0;transform:translateY(14px) scale(.95)}22%{opacity:1;transform:translateY(18px) scale(.94)}62%{transform:translateY(-4px) scale(1.012)}82%{transform:translateY(1px) scale(.998)}100%{opacity:1;transform:none}}
+@keyframes nxmcalm{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 @keyframes nxm2out{to{opacity:0;transform:translateY(8px) scale(.97)}}
 @keyframes nxfollow{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 @keyframes nxt2{0%{opacity:0;transform:translateY(14px) scale(.96)}22%{opacity:1;transform:translateY(18px) scale(.97,.92)}62%{transform:translateY(-5px) scale(1.02,1.05)}82%{transform:translateY(1px) scale(.995,.99)}100%{opacity:1;transform:none}}
@@ -1052,27 +1053,18 @@ sub,sup{line-height:0}
 @keyframes nxtick{from{opacity:0;transform:scale(0) rotate(-35deg)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:no-preference){
   /* squash and stretch, with overshoot on release */
-  body .nx-btn,body .nx-chip,body .nx-att,body .nx-pick,body .nx-day{transition:transform .42s var(--nx-spring),background-color .12s var(--nx-out),border-color .12s var(--nx-out),color .12s var(--nx-out),box-shadow .2s var(--nx-out),filter .12s;transform-origin:50% 62%}
+  body .nx-btn,body .nx-chip,body .nx-att,body .nx-pick,body .nx-day{transition:transform .12s var(--nx-out),background-color .12s var(--nx-out),border-color .12s var(--nx-out),color .12s var(--nx-out),box-shadow .2s var(--nx-out),filter .12s;transform-origin:50% 62%}
   body .nx-btn.is-down:not(:disabled),body .nx-chip.is-down,body .nx-att.is-down,body .nx-pick.is-down,body .nx-day.is-down,
-  body .nx-btn:active:not(:disabled),body .nx-chip:active,body .nx-att:active,body .nx-pick:active,body .nx-day:active{transform:scale(1.035,.9);transition:transform .07s ease-out,background-color .12s var(--nx-out),border-color .12s var(--nx-out),color .12s var(--nx-out),filter .12s}
+  body .nx-btn:active:not(:disabled),body .nx-chip:active,body .nx-att:active,body .nx-pick:active,body .nx-day:active{transform:scale(.97);transition:transform .06s ease-out,background-color .12s var(--nx-out),border-color .12s var(--nx-out),color .12s var(--nx-out),filter .12s}
   /* anticipation and pose to pose: dialogs, with the backdrop doing the staging */
   .modal-bg{backdrop-filter:blur(2.5px);-webkit-backdrop-filter:blur(2.5px)}
-  .modal{animation:nxm2 .38s var(--nx-snap) both}
-  .modal-bg.is-closing .modal{animation:nxm2out .14s var(--nx-ease-in) both}
+  .modal{animation:nxmcalm .16s ease-out both}
+  .modal-bg.is-closing .modal{animation:nxm2out .12s ease-in both}
   /* follow-through: header leads, body and footer follow */
-  .modal-b{animation:nxfollow .34s var(--nx-snap) .05s both}
-  .modal-f{animation:nxfollow .34s var(--nx-snap) .1s both}
-  .modal-bg.is-closing .modal-b,.modal-bg.is-closing .modal-f{animation:none}
-  .modal-b .nx-list li,.modal-b .nx-sel-opt>*{animation:nxfollow .3s var(--nx-snap) both}
-  .modal-b .nx-list li:nth-child(2),.modal-b .nx-sel-opt>:nth-child(2){animation-delay:.04s}
-  .modal-b .nx-list li:nth-child(3),.modal-b .nx-sel-opt>:nth-child(3){animation-delay:.08s}
-  .modal-b .nx-list li:nth-child(4),.modal-b .nx-sel-opt>:nth-child(4){animation-delay:.12s}
-  .modal-b .nx-list li:nth-child(5),.modal-b .nx-sel-opt>:nth-child(5){animation-delay:.16s}
-  .modal-b .nx-list li:nth-child(n+6),.modal-b .nx-sel-opt>:nth-child(n+6){animation-delay:.2s}
   /* arcs and anticipation: toasts dip, then travel along a curve; failures shake, successes ring */
-  .toast{animation:nxt2 .46s var(--nx-snap) both,nxarcx .46s var(--nx-snap) both}
-  .toast:not(.bad){animation:nxt2 .46s var(--nx-snap) both,nxarcx .46s var(--nx-snap) both,nxring .7s ease-out .38s both}
-  .toast.bad{animation:nxt2 .46s var(--nx-snap) both,nxshakex .42s ease-in-out .4s both}
+  .toast{animation:nxfollow .18s ease-out both}
+  .toast:not(.bad){animation:nxfollow .18s ease-out both}
+  .toast.bad{animation:nxfollow .18s ease-out both}
   .toast.out{animation:nxtoastout .2s ease-in both}
   /* exaggerated feedback */
   .nx-in[aria-invalid="true"],.nx-sel[aria-invalid="true"],.nx-ta[aria-invalid="true"]{animation:nxshakex .4s ease-in-out both;border-color:var(--nx-bad)}
@@ -1104,6 +1096,18 @@ body.nx-busy{cursor:progress}
 .nx-calltable .nx-callnote{white-space:normal;max-width:none;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden;line-height:1.4}
 .nx-calltable .nx-callnote:hover{-webkit-line-clamp:unset;line-clamp:unset}
 .nx-calltable td:nth-child(4),.nx-calltable td:nth-child(5){vertical-align:top;padding-top:8px}
+
+/* email dialog: fixed size so nothing jumps while it loads, previews and sends */
+.nx-md{display:flex;flex-direction:column;gap:12px;min-height:440px}
+.nx-md-top{min-height:20px}
+.nx-md-list{height:230px;overflow:auto;border:1px solid var(--nx-line);border-radius:8px;flex:none}
+.nx-md-list li{padding:8px 12px}
+.nx-md-list .nx-check{height:auto;min-height:34px;align-items:flex-start;padding:4px 0}
+.nx-md-list .nx-check input{margin-top:3px;flex:none}
+.nx-md-list small{display:block;color:var(--nx-ink-3);font-weight:400}
+.nx-md-list .nx-pill[hidden]{display:none}
+.nx-md-prev{height:170px;overflow:auto;flex:none;white-space:pre-wrap;line-height:1.5;border:1px solid var(--nx-line);border-radius:8px;padding:10px 12px;background:var(--nx-sunken)}
+@media (max-width:640px){.nx-md{min-height:0}.nx-md-list{height:200px}.nx-md-prev{height:150px}}
 </style>
 </head>
 <body class="nx">

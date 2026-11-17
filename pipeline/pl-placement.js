@@ -130,25 +130,15 @@ function placementMailCard(rows) {
   if (!rows || !rows.length) return '';
   const one = x => Array.isArray(x) ? x[0] : x;
   return '<div class="nx-card" id="pmBox"><div class="nx-card-h"><h3>Send placement documents email</h3><span class="nx-muted">' + rows.length + (rows.length === 1 ? ' student' : ' students') + ' set to Placement plan: Yes</span></div>' +
-    '<div class="nx-card-b nx-muted" style="padding-bottom:6px">From the placement mailbox. Untick anyone you are not ready to send to.</div><ul class="nx-list">' +
+    '<div class="nx-card-b nx-muted" style="padding-bottom:6px">From the placement mailbox. Review and send to everyone, or untick anyone you are not ready to send to. Skip takes someone off the list.</div><ul class="nx-list">' +
     rows.map(b => { const st = one(b.nex_students), ses = one(b.nex_class_sessions), to = (b.email || (st && st.email) || '').trim(), nm = st ? fullName(st) : (b.name || '(no name)');
-      return '<li><label class="nx-check"><input type="checkbox" data-pm="' + b.id + '"' + (to ? ' checked' : ' disabled') + '> <span><b>' + esc(nm) + '</b><small>' + esc([ses && ses.class_date ? 'Class ' + fmtDate(ses.class_date) : '', to || 'No email address'].filter(Boolean).join(' · ')) + '</small></span></label>' +
+      return '<li><span><b>' + esc(nm) + '</b><small class="nx-muted" style="display:block">' + esc([ses && ses.class_date ? 'Class ' + fmtDate(ses.class_date) : '', to || 'No email address'].filter(Boolean).join(' · ')) + '</small></span>' +
         '<button type="button" class="nx-btn sm" data-pmskip="' + b.id + '">Skip</button></li>'; }).join('') +
-    '</ul><div class="nx-card-b nx-btnrow"><button type="button" class="nx-btn" id="pmPrev">Preview email</button><button type="button" class="nx-btn primary" id="pmSend">Send</button></div></div>';
+    '</ul><div class="nx-card-b nx-btnrow"><button type="button" class="nx-btn primary" id="pmSend">' + ico('mail') + 'Review and send</button></div></div>';
 }
 function bindPlacementMail(rows) {
   const box = $('#pmBox'); if (!box) return;
-  const ids = () => $$('[data-pm]', box).filter(c => c.checked).map(c => c.dataset.pm);
-  const count = () => { const n = ids().length; const b = $('#pmSend', box); b.textContent = n ? 'Send to ' + n : 'Send'; b.disabled = !n; $('#pmPrev', box).disabled = !n; };
-  box.addEventListener('change', e => { if (e.target.closest('[data-pm]')) count(); });
-  count();
-  $('#pmPrev', box).onclick = async () => {
-    const id = ids()[0]; if (!id) return;
-    try {
-      const pv = await fn('nex-send-placement-docs', { booking_id: id, preview: true });
-      openModal({ title: 'Preview: ' + pv.subject, wide: true, body: '<div class="nx-muted" style="margin-bottom:8px">To: ' + esc(pv.to) + ' (the greeting uses each student’s own name)</div><div style="white-space:pre-wrap;line-height:1.5">' + esc(pv.body) + '</div><div class="nx-muted" style="margin-top:12px">' + ((pv.attachments || []).length ? 'Attached: ' + pv.attachments.map(x => esc(x.file_name)).join(', ') : '<b>No file is attached.</b> The email says “please check the attachment”. A hub admin can add the help guide in Admin.') + (typeof pv.remaining === 'number' ? '<div class="nx-muted" style="margin-top:6px">The placement mailbox can send ' + pv.remaining + ' more email' + (pv.remaining === 1 ? '' : 's') + ' today.</div>' : '') + '</div>', buttons: [{ label: 'Close', close: true }] });
-    } catch (e) { toast(e.message, true); }
-  };
+  const one = x => Array.isArray(x) ? x[0] : x;
   $$('[data-pmskip]', box).forEach(btn => btn.onclick = async () => {
     const b = rows.find(x => x.id === btn.dataset.pmskip); if (!b) return;
     if (!await confirmBox('Skip this email', 'Take this student off the list without emailing them? You can still email them from their record later.', 'Skip')) return;
@@ -157,26 +147,7 @@ function bindPlacementMail(rows) {
       toast('Skipped'); render();
     } catch (e) { toast(e.message, true); }
   });
-  $('#pmSend', box).onclick = async () => {
-    const list = ids(); if (!list.length) return;
-    /* the free Gmail mailbox has a daily sending limit (about 100); ask how many are left before sending */
-    let left = null;
-    try { left = (await fn('nex-send-placement-docs', { quota: true })).remaining; } catch (e) { if (e.code === 'not_configured') { toast(e.message, true); return; } }
-    if (typeof left === 'number' && list.length > left) { toast(left <= 0 ? 'The placement mailbox has reached its daily sending limit. Try again tomorrow.' : 'The placement mailbox can only send ' + left + ' more email' + (left === 1 ? '' : 's') + ' today. Untick some students and send the rest tomorrow.', true); return; }
-    if (!await confirmBox('Send placement documents email', 'Send the documents email to ' + list.length + (list.length === 1 ? ' student' : ' students') + ' from the placement mailbox?' + (typeof left === 'number' ? ' It can send ' + left + ' more today.' : ''), 'Send')) return;
-    const btn = $('#pmSend', box); btn.disabled = true; btn.classList.add('busy');
-    let ok = 0; const bad = []; let remaining = left;
-    for (const id of list) {
-      try { const r = await fn('nex-send-placement-docs', { booking_id: id }); ok++; if (typeof r.remaining === 'number') remaining = r.remaining; }
-      catch (e) {
-        if (e.code === 'not_configured') { toast(e.message, true); bad.length = 0; ok = ok || 0; break; }
-        if (e.code === 'daily_limit') { remaining = 0; bad.push(e.message); break; }
-        const b = rows.find(x => x.id === id), st = b && (Array.isArray(b.nex_students) ? b.nex_students[0] : b.nex_students);
-        bad.push((st ? fullName(st) : (b && b.name) || 'A student') + ': ' + e.message);
-      }
-    }
-    if (ok) toast('Sent to ' + ok + (ok === 1 ? ' student' : ' students') + (typeof remaining === 'number' && remaining <= 20 ? '. ' + remaining + ' more can be sent today.' : ''));
-    if (bad.length) toast(bad.slice(0, 2).join(' · ') + (bad.length > 2 ? ' · and ' + (bad.length - 2) + ' more' : ''), true);
-    render();
-  };
+  $('#pmSend', box).onclick = () => mailDialog({ title: 'Send placement documents email', fn: 'nex-send-placement-docs', empty: 'Nobody is waiting for this email.', onDone: () => render(),
+    load: async () => rows.map(b => { const st = one(b.nex_students), ses = one(b.nex_class_sessions), to = (b.email || (st && st.email) || '').trim();
+      return { id: b.id, name: st ? fullName(st) : (b.name || '(no name)'), sub: [ses && ses.class_date ? 'Class ' + fmtDate(ses.class_date) : '', to].filter(Boolean).join(' · '), off: !to, offNote: 'No email address' }; }) });
 }

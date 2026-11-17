@@ -40,10 +40,10 @@ function pill(ctx, key) {
   return '<span class="nx-pill ' + t + '">' + esc(statusLabel(ctx, key)) + '</span>';
 }
 /* Stages a person can be moved to by hand.
-   Leads (paid under $200) stop at Checklist sent, with Hold and Lost as ways out.
+   Leads (paid under $200) can be at Checklist sent or Docs completed (documents can come in before any payment), with Hold and Lost as ways out.
    Incomplete docs (payment sheet Issues) and Placement (booked into a batch) are set by the system, so they are only listed
    while a record is already on them. Retired stages stay listed only on records that still have them. */
-const STAGE_LEAD_OK = new Set(['checklist_sent', 'hold', 'blended']);
+const STAGE_LEAD_OK = new Set(['checklist_sent', 'docs_completed', 'hold', 'blended']);
 const STAGE_AUTO = new Set(['incomplete_docs', 'placement']);
 function stageOpts(isStudent, cur) {
   return opts('enrolment', false).filter(o => o.key === cur || (o.active && (isStudent ? !STAGE_AUTO.has(o.key) : STAGE_LEAD_OK.has(o.key))));
@@ -110,6 +110,87 @@ function confirmBox(title, msg, okLabel, danger) {
     openModal({ title, body: '<p style="margin:0">' + esc(msg) + '</p>', noFocus: true, onClose() { if (!done) res(false); },
       buttons: [{ label: 'Cancel', close: true }, { label: okLabel || 'OK', primary: true, run: () => { done = true; res(true); } }] });
   });
+}
+/* ---------- Email dialog: one person or many ----------
+   Opens at once at a fixed size (nothing resizes or stacks on top of it), loads the list and the mailbox's remaining sends in the
+   background, previews inline, and sends with progress shown in place. A few emails go out at the same time, so a bulk send is not one slow wait.
+   cfg: { title, fn: edge function name, load: async () => [{ id, name, sub, off, offNote, sentNote }], onDone, empty }
+   The function is called as { booking_id, preview }, { booking_id, force } and { quota: true }. */
+function mailDialog(cfg) {
+  let didSend = false, sending = false, rows = [], quota = null, quotaErr = '';
+  const picked = new Set(), previews = {};
+  const m = openModal({ title: cfg.title, wide: true, noFocus: true, onClose() { if (didSend && cfg.onDone) cfg.onDone(); },
+    body: '<div class="nx-md"><div class="nx-md-top nx-muted" data-md="top">Loading…</div><ul class="nx-list nx-md-list" data-md="list"></ul><div class="nx-md-prev" data-md="prev"><span class="nx-muted">Press Preview next to a name to read the email.</span></div></div>' });
+  const q = k => $('[data-md="' + k + '"]', m.el);
+  const foot = $('.modal-f', m.el);
+  const cancel = document.createElement('button'); cancel.className = 'nx-btn'; cancel.textContent = 'Cancel'; cancel.onclick = () => m.close();
+  const go = document.createElement('button'); go.className = 'nx-btn primary'; go.textContent = 'Send'; go.disabled = true;
+  foot.appendChild(cancel); foot.appendChild(go);
+  const live = () => !m.gone && q('top');
+  function chip(id, text, tone, title) { const c = $('[data-st="' + id + '"]', m.el); if (c) { c.className = 'nx-pill ' + (tone || ''); c.textContent = text; c.title = title || ''; c.hidden = !text; } }
+  function top() {
+    if (!live()) return;
+    const n = picked.size;
+    let t = rows.length ? n + ' of ' + rows.length + ' selected' : '';
+    let warn = false;
+    if (quotaErr) { t += (t ? ' · ' : '') + quotaErr; warn = true; }
+    else if (typeof quota === 'number') { t += (t ? ' · ' : '') + 'The mailbox can send ' + quota + ' more email' + (quota === 1 ? '' : 's') + ' today'; if (n > quota) { t += '. Untick ' + (n - quota) + ' to send the rest tomorrow'; warn = true; } }
+    q('top').textContent = t || 'Nothing to send.'; q('top').classList.toggle('nx-neg', warn);
+    go.textContent = n ? 'Send to ' + n : 'Send'; go.disabled = sending || !n || (typeof quota === 'number' && n > quota) || !!quotaErr;
+  }
+  function draw() {
+    if (!live()) return;
+    q('list').innerHTML = rows.length ? rows.map(r => '<li><label class="nx-check"><input type="checkbox" data-pick="' + esc(r.id) + '"' + (picked.has(r.id) ? ' checked' : '') + (r.off ? ' disabled' : '') + '> <span><b>' + esc(r.name) + '</b><small data-sub="' + esc(r.id) + '">' + esc(r.off ? r.offNote || '' : r.sub || '') + (r.sentNote ? ' · ' + esc(r.sentNote) : '') + '</small></span></label><span class="nx-btnrow"><span class="nx-pill" data-st="' + esc(r.id) + '" hidden></span><button type="button" class="nx-btn sm quiet" data-pv="' + esc(r.id) + '">Preview</button></span></li>').join('')
+      : '<li class="nx-muted">' + esc(cfg.empty || 'Nobody to email.') + '</li>';
+    top();
+  }
+  q('list').addEventListener('change', e => { const c = e.target.closest('[data-pick]'); if (!c || sending) return; if (c.checked) picked.add(c.dataset.pick); else picked.delete(c.dataset.pick); top(); });
+  q('list').addEventListener('click', async e => {
+    const b = e.target.closest('[data-pv]'); if (!b) return;
+    const id = b.dataset.pv, box = q('prev');
+    box.textContent = 'Loading preview…';
+    try {
+      const pv = previews[id] || (previews[id] = await fn(cfg.fn, { booking_id: id, preview: true }));
+      const files = pv.attachments || [];
+      box.innerHTML = '<div class="nx-muted" style="margin-bottom:6px">To ' + esc(pv.to) + ' · ' + esc(pv.subject) + '</div>' + esc(pv.body) + '<div class="nx-muted" style="margin-top:10px">' + (files.length ? 'Attached: ' + files.map(x => esc(x.file_name)).join(', ') : '<b>No file is attached.</b> A hub admin can add one in Admin.') + '</div>';
+      box.scrollTop = 0;
+    } catch (err) { box.textContent = err.message; }
+  });
+  async function run() {
+    const ids = rows.filter(r => picked.has(r.id)).map(r => r.id); if (!ids.length) return;
+    sending = true; go.disabled = true; cancel.disabled = true; $$('input[type=checkbox]', m.el).forEach(c => c.disabled = true);
+    let next = 0, ok = 0, bad = 0, stop = '';
+    const done = () => ok + bad;
+    const tick = () => { if (live()) q('top').textContent = 'Sending ' + Math.min(done() + 1, ids.length) + ' of ' + ids.length + '…'; };
+    tick();
+    const worker = async () => {
+      while (!stop) {
+        const i = next++; if (i >= ids.length) return;
+        const id = ids[i], row = rows.find(r => r.id === id); chip(id, 'Sending…', 'info');
+        try { const r = await fn(cfg.fn, { booking_id: id, force: !!(row && row.sentNote) }); ok++; didSend = true; chip(id, 'Sent', 'ok'); if (typeof r.remaining === 'number') quota = r.remaining; }
+        catch (err) {
+          if (err.code === 'daily_limit' || err.code === 'not_configured') { stop = err.message; chip(id, 'Not sent', 'bad', err.message); }
+          else { bad++; chip(id, 'Failed', 'bad', err.message); const sub = $('[data-sub="' + id + '"]', m.el); if (sub) { sub.textContent = err.message; sub.classList.add('nx-neg'); } }
+        }
+        tick();
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(3, ids.length) }, worker));
+    ids.slice(Math.min(next, ids.length)).forEach(id => chip(id, 'Not sent', 'bad', stop));
+    sending = false; cancel.disabled = false; cancel.textContent = 'Close'; go.hidden = true;
+    const msg = (ok ? 'Sent ' + ok + (ok === 1 ? ' email' : ' emails') : 'Nothing was sent') + (bad ? ' · ' + bad + ' failed' : '') + (stop ? ' · ' + stop : '') + (typeof quota === 'number' ? ' · ' + quota + ' more can be sent today' : '');
+    if (live()) { q('top').textContent = msg; q('top').classList.toggle('nx-neg', !!(bad || stop)); } else toast(msg, !!(bad || stop));
+  }
+  go.onclick = run;
+  (async () => {
+    try { rows = await cfg.load(); } catch (err) { if (live()) { q('top').textContent = err.message; q('top').classList.add('nx-neg'); } return; }
+    rows.forEach(r => { if (!r.off && !r.sentNote) picked.add(r.id); });
+    draw();
+    try { const r = await fn(cfg.fn, { quota: true }); if (typeof r.remaining === 'number') quota = r.remaining; }
+    catch (err) { if (err.code === 'not_configured') quotaErr = err.message; }
+    top();
+  })();
+  return m;
 }
 /* field: {k,label,type:text|email|tel|date|number|select|textarea|check|time,options,value,full,help,required,placeholder} */
 function fieldHtml(f, prefix) {
