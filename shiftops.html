@@ -2957,27 +2957,8 @@ body.avail-editing #availGrid .avail-chip.av2:hover{ background:color-mix(in srg
           body:JSON.stringify(body||{})});
       }
       var r=await _rpc('has_app_access',{p_app:APP},_at);
-      // Stale access token → spend the refresh token and retry before reporting a lock-out.
-      if((r.status===401||r.status===403) && payload.sb_rt){
-        try{
-          var rf=await fetch(SB+'/auth/v1/token?grant_type=refresh_token',{
-            method:'POST',
-            headers:{apikey:KEY,'Content-Type':'application/json'},
-            body:JSON.stringify({refresh_token:payload.sb_rt})
-          });
-          if(rf.ok){
-            var s=await rf.json();
-            if(s && s.access_token){
-              _at=s.access_token;
-              payload.sb_at=s.access_token;
-              if(s.refresh_token) payload.sb_rt=s.refresh_token;
-              r=await _rpc('has_app_access',{p_app:APP},_at);
-            }
-          }
-        }catch(e){ console.warn('[gate] refresh failed', e); }
-      }
       if(r.status===401||r.status===403){
-        fail('Your session expired. Go back to Nexus, refresh, and launch again.');
+        fail('Your Nexus session had already ended. Go back to Nexus, sign in again if it asks, then open ShiftOps.');
         return;
       }
       var allowed=r.ok?await r.json():false;
@@ -2990,12 +2971,12 @@ body.avail-editing #availGrid .avail-chip.av2:hover{ background:color-mix(in srg
       var adminVerdict=ar.ok?(isAdmin?'1':'0'):'';   // '' = the server did not answer: unknown, never "not admin"
       try{ sessionStorage.setItem('so_me', name); sessionStorage.setItem('so_is_admin', adminVerdict); }catch(e){}
       try{ if(typeof _renderWhoami==='function') _renderWhoami(); }catch(e){}
+      try{ sessionStorage.removeItem('so_sb_rt'); }catch(e){}   // leftover from older versions
       // Capture Nexus' Supabase session so ShiftOps writes as an authenticated
       // user (RLS-locked tables reject the anon key). Stash for the tab session.
       try{
         if(payload.sb_at){
-          sessionStorage.setItem('so_sb_at', payload.sb_at);
-          if(payload.sb_rt) sessionStorage.setItem('so_sb_rt', payload.sb_rt);
+          sessionStorage.setItem('so_sb_at', payload.sb_at);   // access token only: the Nexus refresh token is never handed to an app
         }
       }catch(e){}
       // success — strip token from URL + unlock for session
@@ -10542,7 +10523,7 @@ function syncLeaveToPortal(staffId,from,to,reason,reasonType){
       // fresh one, tell the admin plainly instead of a vague sync failure.
       _soRefreshToken(function(ok){
         if(ok){ _send(); }
-        else { showToast('Session expired — reopen ShiftOps from Nexus, then re-add this leave','error'); }
+        else { _soSessionBanner(true); showToast('Your session ended, so the portal was not updated. Open ShiftOps again from Nexus, then re-add this leave.','error'); }
       });
     }
   }catch(e){ /* never block the local save */ }
@@ -10550,19 +10531,7 @@ function syncLeaveToPortal(staffId,from,to,reason,reasonType){
 
 // Refresh the inherited Supabase session token via supabase-js, then continue.
 function _soRefreshToken(cb){
-  try{
-    const _c = window._soSbClient || null;
-    if(_c && _c.auth && _c.auth.refreshSession){
-      _c.auth.refreshSession().then(function(r){
-        const sess = r && r.data && r.data.session;
-        if(sess && sess.access_token){
-          _soAuthToken = sess.access_token;
-          try{ sessionStorage.setItem('so_sb_at', _soAuthToken); }catch(_){}
-          cb(true);
-        } else { cb(false); }
-      }).catch(function(){ cb(false); });
-    } else { cb(false); }
-  }catch(e){ cb(false); }
+  _soFreshTok().then(function(){ cb(_soTokAlive(15000)); }).catch(function(){ cb(false); });
 }
 
 function updateLeave(id,status){
@@ -10583,8 +10552,9 @@ function updateLeave(id,status){
 
 let pendingDeclineId=null;
 
-function confirmDecline(){
+async function confirmDecline(){
   const reason=document.getElementById('declineReasonInput').value.trim();
+  if(!(await _soEnsureSession())){ showToast('Your session ended, so this was not saved. Open ShiftOps again from Nexus and redo it.','error'); return; }
   closeModal('declineModal');
   applyLeaveUpdate(pendingDeclineId,'declined',reason);
   pendingDeclineId=null;
@@ -10758,7 +10728,16 @@ async function releaseShiftsForLeave(s, fromStr, toStr){
   }catch(e){ console.warn('releaseShiftsForLeave',e); }
 }
 
-function applyLeaveUpdate(id,status,declineReason){
+// Approving or declining leave records WHO decided, taken from the signed-in session. With an ended session the save used to
+// go through anonymously and showed "approver not recorded", so it is refused here with a clear message instead.
+async function applyLeaveUpdate(id,status,declineReason){
+  if(!(await _soEnsureSession())){
+    showToast('Your session ended, so this was not saved. Open ShiftOps again from Nexus and redo it.','error');
+    return;
+  }
+  _applyLeaveUpdateNow(id,status,declineReason);
+}
+function _applyLeaveUpdateNow(id,status,declineReason){
   const r=leaveRequests.find(x=>x.id===id);
   if(!r)return;
 
@@ -11129,7 +11108,7 @@ function _soTok(){
  * token. Every admin action then returns a bare "forbidden", which reads as
  * "you don't have permission" when it actually means "your session aged out".
  */
-function _soTokAlive(){
+function _soTokAlive(margin){
   var t = _soTok();
   if(!t) return false;
   try{
@@ -11138,27 +11117,66 @@ function _soTokAlive(){
     var b = p[1].replace(/-/g,'+').replace(/_/g,'/');
     while(b.length % 4) b += '=';
     var c = JSON.parse(atob(b));
-    return !!(c.exp && (c.exp * 1000) > Date.now() + 30000);   // 30s margin
+    return !!(c.exp && (c.exp * 1000) > Date.now() + (margin==null ? 30000 : margin));   // default 30s margin
   }catch(e){ return false; }
 }
 
 /** Persistent notice when the inherited session is missing/expired: without it every read is anonymous and comes back
  *  empty, which used to look like "no admins" (admin shown as Team Lead) and a blank roster. */
-function _soSessionBanner(show){
+function _soSessionBanner(show, msg){
   var el=document.getElementById('soSessionBanner');
   if(!show){ if(el) el.remove(); return; }
-  if(el) return;
-  el=document.createElement('div'); el.id='soSessionBanner'; el.setAttribute('role','alert');
-  el.style.cssText='position:fixed;top:0;left:0;right:0;z-index:99999;padding:10px 16px;text-align:center;font-size:13px;font-weight:700;'+
-    'background:#2a1620;color:#fda4af;border-bottom:1px solid #fb7185;';
-  el.textContent='Your session has expired, so ShiftOps cannot confirm your role or load data. Close this tab and reopen ShiftOps from Nexus.';
-  document.body.appendChild(el);
+  var text = msg || 'Your session ended, so ShiftOps cannot load or save anything. Nothing you do now will be saved. Open Nexus (sign in again if it asks), then open ShiftOps from there.';
+  if(!el){
+    el=document.createElement('div'); el.id='soSessionBanner'; el.setAttribute('role','alert');
+    el.style.cssText='position:fixed;top:0;left:0;right:0;z-index:99999;padding:10px 16px;text-align:center;font-size:13px;font-weight:700;'+
+      'background:#2a1620;color:#fda4af;border-bottom:1px solid #fb7185;';
+    document.body.appendChild(el);
+  }
+  el.innerHTML='<span></span> <a href="./" style="margin-left:10px;padding:3px 12px;border-radius:7px;background:#fda4af;color:#2a1620;text-decoration:none;white-space:nowrap">Go to Nexus</a>';
+  el.firstChild.textContent=text;
+}
+
+/* ---- Session: ShiftOps only ever holds an access token (about an hour). It never holds the Nexus refresh token:
+   two tabs spending one refresh token ends the whole Nexus sign-in. To renew, it asks the open Nexus tab over a
+   same-origin BroadcastChannel; if Nexus is closed or signed out, the session ends and says so. */
+var _soBC=null; try{ if(typeof BroadcastChannel!=='undefined') _soBC=new BroadcastChannel('nexus-auth'); }catch(e){ _soBC=null; }
+var _soHubWhy='', _soAsking=null;
+function _soAskHub(minLife){
+  return new Promise(function(resolve){
+    if(!_soBC) return resolve({why:'silent'});
+    var id=Math.random().toString(36).slice(2)+Date.now().toString(36), done=false, to=null;
+    function finish(r){ if(done) return; done=true; clearTimeout(to); try{ _soBC.removeEventListener('message',on); }catch(e){} resolve(r); }
+    function on(ev){ var m=ev&&ev.data; if(m&&m.id===id) finish(m.t==='tok'?{at:m.at}:{why:m.why||'failed'}); }
+    to=setTimeout(function(){ finish({why:'silent'}); },5000);
+    _soBC.addEventListener('message',on);
+    try{ _soBC.postMessage({t:'req',id:id,app:'shiftops',minLife:minLife||0}); }catch(e){ finish({why:'silent'}); }
+  });
+}
+function _soTakeToken(at){
+  if(!at) return;
+  _soAuthToken=at;
+  try{ sessionStorage.setItem('so_sb_at',at); }catch(e){}
+  _soHubWhy=''; _soSessionBanner(false);
+}
+if(_soBC) _soBC.addEventListener('message',function(ev){
+  var m=ev&&ev.data; if(!m||m.id) return;
+  if(m.t==='out'){ _soHubWhy='signed_out'; _soAuthToken=null; try{ sessionStorage.removeItem('so_sb_at'); }catch(e){} _soSessionBanner(true,'You were signed out of Nexus, so this ShiftOps session has ended. Nothing you do now will be saved. Sign in to Nexus again, then open ShiftOps from there.'); }
+  else if(m.t==='tok' && m.at){ _soTakeToken(m.at); }
+});
+/** True when there is a live token to write with, renewing from Nexus if it is running low. Shows the ended notice when not. */
+async function _soEnsureSession(){
+  if(_soTokAlive(60000)) return true;
+  await _soFreshTok();
+  if(_soTokAlive(15000)) return true;
+  _soSessionBanner(true);
+  return false;
 }
 
 /** Guard admin actions with a message that says what to actually do. */
 function _soAdminReady(){
   if(_soTokAlive()) return true;
-  showToast('Session expired — close this tab and reopen ShiftOps from Nexus');
+  _soSessionBanner(true); showToast('Your session ended. Open ShiftOps again from Nexus.','error');
   return false;
 }
 
@@ -11182,34 +11200,24 @@ function _soAdminReady(){
 function _relayErrMsg(err){
   const e = String(err||'').toLowerCase();
   if(e.indexOf('forbidden')>=0 || e.indexOf('session')>=0 || e.indexOf('unauthorized')>=0){
-    return 'Session expired — close this tab and reopen ShiftOps from Nexus, then try again.';
+    return 'Your session ended. Open ShiftOps again from Nexus, then try again.';
   }
   if(!e || e==='failed') return 'Something went wrong on the server. Try again.';
   return err;
 }
 
 async function _soFreshTok(){
-  if(_soTokAlive()) return _soTok();          // still good, no work needed
-  try{
-    let c = window._soSbClient;
-    const rt = sessionStorage.getItem('so_sb_rt');
-    if(!c && window.supabase && rt){
-      c = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-      window._soSbClient = c;
-      await c.auth.setSession({ access_token:_soTok()||'', refresh_token:rt });
-    }
-    if(c){
-      // getSession() auto-refreshes when the access token is near/after expiry.
-      const { data } = await c.auth.getSession();
-      if(data && data.session && data.session.access_token){
-        _soAuthToken = data.session.access_token;
-        try{
-          sessionStorage.setItem('so_sb_at', _soAuthToken);
-          if(data.session.refresh_token) sessionStorage.setItem('so_sb_rt', data.session.refresh_token);
-        }catch(e){}
-      }
-    }
-  }catch(e){ console.warn('[auth] _soFreshTok refresh failed', e); }
+  if(_soTokAlive(5*60*1000)) return _soTok();   // plenty of life left, no work needed
+  if(!_soAsking){
+    _soAsking=(async function(){
+      try{
+        var r=await _soAskHub(20*60*1000);
+        if(r.at){ _soTakeToken(r.at); } else { _soHubWhy=r.why||'failed'; }
+      }catch(e){ console.warn('[auth] token request failed',e); }
+      finally{ setTimeout(function(){ _soAsking=null; },0); }
+    })();
+  }
+  await _soAsking;
   return _soTok();
 }
 
@@ -11229,6 +11237,7 @@ async function _soFreshTok(){
           return (async function(){
             let ftok = tok;
             try{ ftok = await _soFreshTok(); }catch(e){}
+            if(!_soTokAlive(0)){ try{ _soSessionBanner(true); }catch(e){} }   // an ended session must be visible, not a silent failed save
             init = init || {};
             const h = new Headers((init && init.headers) || (typeof input!=='string' && input.headers) || {});
             if(ftok) h.set('Authorization', 'Bearer ' + ftok);
@@ -11284,34 +11293,27 @@ async function _soFreshTok(){
     return _origFetch(input, init);
   };
 })();
-// Keep the inherited session alive (tokens expire ~1h). Use supabase-js to
-// refresh from the refresh token and update the cached access token.
-(async function(){
-  try{
-    const rt = sessionStorage.getItem('so_sb_rt');
-    if(window.supabase && _soAuthToken && rt){
-      const _c = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-      window._soSbClient = _c;   // expose so on-demand refresh (leave sync) can reuse it
-      await _c.auth.setSession({ access_token: _soAuthToken, refresh_token: rt });
-      _c.auth.onAuthStateChange(function(evt, sess){
-        if(sess && sess.access_token){
-          _soAuthToken = sess.access_token;
-          try{ sessionStorage.setItem('so_sb_at', sess.access_token); if(sess.refresh_token) sessionStorage.setItem('so_sb_rt', sess.refresh_token); }catch(e){}
-        }
-      });
-      setInterval(async function(){
-        try{ const { data } = await _c.auth.getSession(); if(data && data.session && data.session.access_token){ _soAuthToken = data.session.access_token; sessionStorage.setItem('so_sb_at', _soAuthToken); } }catch(e){}
-      }, 5*60*1000);
-      // setInterval is throttled/paused while a tab is backgrounded or the laptop
-      // sleeps, so also refresh whenever the tab regains focus — this is what
-      // keeps a long-idle session from lapsing and returning partial data.
-      document.addEventListener('visibilitychange', async function(){
-        if(document.visibilityState === 'visible'){
-          try{ const { data } = await _c.auth.getSession(); if(data && data.session && data.session.access_token){ _soAuthToken = data.session.access_token; sessionStorage.setItem('so_sb_at', _soAuthToken); } }catch(e){}
-        }
-      });
-    }
-  }catch(e){ console.warn('so session init', e); }
+// Keep the session alive (access tokens last ~1h): top up from the Nexus tab while it is open, and say so clearly if it can't.
+(function(){
+  async function tick(){
+    try{
+      if(!_soTok()) return;
+      if(_soTokAlive(10*60*1000)){ _soSessionBanner(false); return; }
+      await _soFreshTok();
+      if(_soTokAlive(10*60*1000)){ _soSessionBanner(false); return; }
+      var left=0; try{ var p=_soTok().split('.')[1].replace(/-/g,'+').replace(/_/g,'/'); while(p.length%4) p+='='; left=JSON.parse(atob(p)).exp*1000-Date.now(); }catch(e){}
+      if(left>30000){
+        var mins=Math.max(1,Math.ceil(left/60000));
+        _soSessionBanner(true,'Your session ends in about '+mins+' minute'+(mins===1?'':'s')+'. '+(_soHubWhy==='signed_out'?'Nexus has been signed out. ':'Nexus is not open in another tab. ')+'Finish what you are saving, then open ShiftOps again from Nexus.');
+      }else{
+        _soSessionBanner(true);
+      }
+    }catch(e){ console.warn('so session keeper',e); }
+  }
+  setInterval(tick, 60*1000);
+  // Timers are throttled while a tab is in the background or the laptop sleeps, so also check when the tab comes back.
+  document.addEventListener('visibilitychange', function(){ if(document.visibilityState==='visible') tick(); });
+  setTimeout(tick, 4000);
 })();
 
 // Rename a staff member IN PLACE across the DB so renaming doesn't create a
