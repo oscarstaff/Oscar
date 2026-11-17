@@ -21,25 +21,25 @@ const NEXI_FAQ = [
   ['Payments', [
     ['How do I tick off documents someone has sent?', 'Open the person and go to the Documents tab. Each enrolment shows the documents its course needs. Tick a document when you have received it. The tab title shows how many are still missing.', ['#/students', 'Open Students']],
     ['How do I record a payment?', 'Open Payments and press Record payment. Type the phone or email of the student and their details and enrolment fill in. Or open the person, go to Enrolments and payments, and press Payment on the right enrolment.', ['#/payments', 'Open Payments']],
-    ['What is an unmatched payment?', 'A payment that is not linked to a person yet. It does not count towards anyone\'s $200 until you match it. The Unmatched view in Payments lists them.', ['#/payments?view=unmatched', 'Show unmatched']],
+    ['What is an unmatched payment?', 'A payment that is not linked to a person yet. It does not count towards anyone’s $200 until you match it. The Unmatched view in Payments lists them.', ['#/payments?view=unmatched', 'Show unmatched']],
     ['How do refunds work?', 'Open the person, go to Enrolments and payments, and press Refund on the enrolment. The refund is recorded against that enrolment and shows in their history.', null],
     ['What do the payment statuses mean?', 'Each status and its meaning is listed in Admin under Status lists. Ask a hub admin if you cannot see that tab.', null]
   ]],
   ['First Aid and placement', [
-    ['How do I book a First Aid seat?', 'Open First Aid, pick the class day, then press a free seat and choose the student. You can also press Book on the First Aid card on a person\'s page.', ['#/firstaid', 'Open First Aid']],
+    ['How do I book a First Aid seat?', 'Open First Aid, pick the class day, then press a free seat and choose the student. You can also press Book on the First Aid card on a person’s page.', ['#/firstaid', 'Open First Aid']],
     ['What do QS, QD, $, PP, EP and SG mean?', 'They are the booking flags. QS quiz sent, QD quiz done, $ paid, PP placement plan (yes or done), EP education plan (yes or RTO done). Renewal classes show SG, signature done, in place of PP and EP.', null],
     ['How do I add a placement request or facility?', 'Open Placement, choose Requests, Placements, Facilities or Blacklist, and press the New button at the top right. It changes to match the list you are on.', ['#/placement', 'Open Placement']]
   ]],
   ['Staff pages', [
     ['Where are my quizzes and documents?', 'Press Misc in the tab bar and choose Quizzes or Documents. They show the same quizzes and documents as Nexus. Quiz building and document upload are still done in Nexus.', ['#/quizzes', 'Open Quizzes']],
-    ['How do I log a call?', 'Press Misc in the tab bar and choose Calls. Type the phone number first. If the person is already in Pipe-Line their details fill in and the call is added to their Activity. If Pipe-Line has never seen the number, logging the call starts an unfinished lead flagged to you. Tick "Not a student" for agents or facilities so no lead is made.', ['#/calls', 'Open Calls']],
+    ['How do I log a call?', 'Press Misc in the tab bar and choose Calls. Type the phone number first. If the person is already in Pipe-Line their details fill in and the call is added to their Activity. If Pipe-Line has never seen the number, logging the call starts an unfinished lead flagged to you. Tick “Not a student” for agents or facilities so no lead is made.', ['#/calls', 'Open Calls']],
     ['What is an unfinished lead?', 'A lead that was started from a call, so Pipe-Line only has a name and a phone number. It shows an Unfinished tag in the Leads list and a banner on the record. Add the missing details, then press Mark complete.', ['#/leads?unf=mine', 'Leads flagged to me']],
     ['How do I record a logbook I received?', 'Press Misc in the tab bar and choose Logbook receipts. Type the student\u2019s name or email, check the date and who received it, add a comment if needed, and press Save receipt. Someone already in Pipe-Line gets it on their Activity tab. A name Pipe-Line does not know is saved by name only.', ['#/logbooks', 'Open Logbook receipts']],
-    ['Where are the weekly conversion numbers?', 'Press Misc in the tab bar and choose Conversion report. Pick the dates (or This week, Last week) and Pipe-Line works out the status counts, the pie chart, the follow-ups done by step and the class numbers. Use Print or save as PDF to share it. Outside Sydney comes from the tick on each person\'s record.', ['#/convreport', 'Open Conversion report']],
+    ['Where are the weekly conversion numbers?', 'Press Misc in the tab bar and choose Conversion report. Pick the dates (or This week, Last week) and Pipe-Line works out the status counts, the pie chart, the follow-ups done by step and the class numbers. Use Print or save as PDF to share it. Outside Sydney comes from the tick on each person’s record.', ['#/convreport', 'Open Conversion report']],
     ['How do I fill in the team report?', 'Press Misc in the tab bar and choose Team report. Enter your numbers or tasks for the day and press Save entry. Team leads and admins can generate the weekly report and print it or save it as a PDF.', ['#/teamreport', 'Open Team report']],
     ['Where do I see team achievements?', 'Press Misc in the tab bar and choose Achievements. It lists who passed a training quiz, who earned Glow for a perfect fortnight and who reached a call milestone, the same feed as Nexus.', ['#/achievements', 'Open Achievements']],
     ['How do I change my photo, nickname or bio?', 'Press your name at the top right to open Profile. Your password, themes and notification settings are changed in Nexus.', ['#/profile', 'Open Profile']],
-    ['How do I see someone else\'s profile?', 'Press a name in Achievements (under Misc), or pick someone from the Team directory at the bottom of your Profile page. You see their team, what they are known for, their stats, bio and achievements.', ['#/achievements', 'Open Achievements']]
+    ['How do I see someone else’s profile?', 'Press a name in Achievements (under Misc), or pick someone from the Team directory at the bottom of your Profile page. You see their team, what they are known for, their stats, bio and achievements.', ['#/achievements', 'Open Achievements']]
   ]]
 ];
 function nexiInit() {
@@ -50,7 +50,7 @@ function nexiInit() {
   document.body.appendChild(fab); document.body.appendChild(panel);
   const first = (ME.name || '').split(' ')[0];
   const home = () => {
-    panel.innerHTML = '<header>' + pipSVG('pip-mini') + '<div><b>Hi' + (first ? ' ' + esc(first) : '') + ', I\'m Pip</b><span>Pick a question about using Pipe-Line.</span></div><button class="nx-btn icon quiet" data-x aria-label="Close help">' + ico('x') + '</button></header><div class="nx-nexibody">' +
+    panel.innerHTML = '<header>' + pipSVG('pip-mini') + '<div><b>Hi' + (first ? ' ' + esc(first) : '') + ', I’m Pip</b><span>Pick a question about using Pipe-Line.</span></div><button class="nx-btn icon quiet" data-x aria-label="Close help">' + ico('x') + '</button></header><div class="nx-nexibody">' +
       NEXI_FAQ.map((g, gi) => '<h4>' + esc(g[0]) + '</h4><div class="nx-nexiqs">' + g[1].map((q, qi) => '<button type="button" class="nx-chip" data-q="' + gi + '.' + qi + '">' + esc(q[0]) + '</button>').join('') + '</div>').join('') + '</div>';
     bind();
   };

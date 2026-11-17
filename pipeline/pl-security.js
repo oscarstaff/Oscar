@@ -63,7 +63,7 @@ async function bindSec() {
     };
     $$('[data-reset]', box).forEach(b => b.onclick = async () => {
       const who = b.dataset.reset;
-      if (!await confirmBox('Reset ' + who + '\'s code?', 'Use this when they have lost their phone. They set up a new code the next time they open Pipe-Line from Nexus.', 'Reset', true)) return;
+      if (!await confirmBox('Reset ' + who + '’s code?', 'Use this when they have lost their phone. They set up a new code the next time they open Pipe-Line from Nexus.', 'Reset', true)) return;
       try { await api('rpc/nex_admin_reset_mfa', { method: 'POST', body: { p_staff: who } }); toast('Reset'); } catch (e) { toast(e.message, true); }
       again();
     });

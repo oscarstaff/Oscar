@@ -94,7 +94,7 @@ const STD_QUIZ = {
       correct: 2
     },
     {
-      q: 'When is "conversion" considered complete for a lead?',
+      q: 'When is “conversion” considered complete for a lead?',
       type: 'single',
       options: [
         'When they reply to the email',
