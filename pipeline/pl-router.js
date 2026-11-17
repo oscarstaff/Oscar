@@ -164,7 +164,8 @@ function pressFeedback() {
 async function boot() {
   ME.name = ss.get('nex_user'); ME.admin = ss.get('nex_is_admin') === '1';
   watchSession();
-  setInterval(() => { const t = ss.get('nex_sb_at'); if (!locked && t && !tokenAlive(t, 120000)) refreshToken(); }, 60000);
+  setInterval(keepToken, 60000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) keepToken(); });
   await sessionAlive();
   if (locked) return;
   setInterval(sessionAlive, 60000);

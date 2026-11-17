@@ -262,7 +262,7 @@ async function openGatedApp(ev,app,url){
     if(['shiftops','formcraft','slip','nex'].indexOf(app)>=0){
       let hasSess=false;
       try{ const pl=JSON.parse(decodeURIComponent(escape(atob(token.split('.')[0])))); hasSess=!!pl.sb_at; }catch(e){}
-      if(!hasSess){ showToast('Your sign-in has expired. Sign out and back in, then open the app again.'); return; }
+      if(!hasSess){ showToast('Your Nexus session has ended. Sign in again, then open the app.','error'); return; }
     }
     window.open(url+'#t='+encodeURIComponent(token),'_blank','noopener,noreferrer');
   }catch(e){
@@ -276,6 +276,19 @@ function showAuth(s){
   const pg=document.getElementById("pg-"+s);
   pg.style.display = (s==="login") ? "" : "block";
   try{ document.getElementById("authLayer").classList.toggle("login-edge", s==="login"); }catch(e){}
+  /* If the last session ended on its own (not a deliberate sign-out), say so on the sign-in page. */
+  try{
+    if(s==="login" && sessionStorage.getItem('nx_session_ended')){
+      sessionStorage.removeItem('nx_session_ended');
+      if(!document.getElementById('nxEndedNote')){
+        const n=document.createElement('div');
+        n.id='nxEndedNote'; n.setAttribute('role','alert');
+        n.style.cssText='margin:0 0 14px;padding:11px 14px;border-radius:10px;font-size:13px;line-height:1.45;font-weight:600;background:#fff7ed;color:#9a3412;border:1px solid #fdba74;';
+        n.textContent='Your Nexus session ended, so you were signed out. Sign in again to carry on. Any app tabs you had open need to be opened again from here.';
+        pg.insertBefore(n, pg.firstChild);
+      }
+    }
+  }catch(e){}
 }
 
 async function sbGet(t,f){
@@ -311,21 +324,20 @@ async function makeAppToken(app,name){
   const payload={app:app,name:name||'',is_admin:(typeof myIsAdmin!=='undefined'&&myIsAdmin===true),exp:Date.now()+1000*60*5};
   try{
     const ac = getAuthClient();
-    if(ac){
-      let session=null;
-      try{
-        if(ac.refreshSession){
-          const { data, error } = await ac.refreshSession();
-          if(!error && data && data.session) session=data.session;
-        }
-      }catch(e){ /* fall through to the cached session */ }
-      if(!session && ac.getSession){
-        const { data } = await ac.getSession();
-        session = (data && data.session) ? data.session : null;
+    if(ac && ac.getSession){
+      let { data } = await ac.getSession();
+      let session = (data && data.session) ? data.session : null;
+      // Only spend a refresh when the token is running low; an app is useful for a while, so give it a decent hour.
+      const left = session && session.expires_at ? (session.expires_at*1000 - Date.now()) : 0;
+      if(ac.refreshSession && (!session || left < 15*60*1000)){
+        try{
+          const r = await ac.refreshSession();
+          if(r && !r.error && r.data && r.data.session) session = r.data.session;
+        }catch(e){ /* fall through to the cached session */ }
       }
-      if(session){
-        payload.sb_at = session.access_token || null;
-        payload.sb_rt = (app==='nex') ? null : (session.refresh_token || null);   // Nex never gets the refresh token
+      // No refresh token ever leaves this tab. Apps ask this tab for fresh access tokens (startAuthBroker in nexus-core.js).
+      if(session && session.access_token && (!session.expires_at || session.expires_at*1000 > Date.now()+30000)){
+        payload.sb_at = session.access_token;
       }
     }
   }catch(e){}
