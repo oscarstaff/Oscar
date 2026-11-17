@@ -1,6 +1,6 @@
 'use strict';
-/* pl-payments.js · Pipe-Line · Payments and the payment queue.
-   One of the Pipe-Line files loaded by nex.html (list and order: PL_FILES in the loader). All of them share one global scope. */
+/* pl-payments.js · YatraLine · Payments and the payment queue.
+   One of the YatraLine files loaded by nex.html (list and order: PL_FILES in the loader). All of them share one global scope. */
 /* =========================================================
    Payments and First Aid
    ========================================================= */
@@ -112,7 +112,7 @@ function linkPayment(p, queueRow) {
 }
 
 function globalAddPayment() {
-  /* one form: type the student's phone or email (or name). If they are already in Pipe-Line their details fill in and the payment goes against their enrolment. */
+  /* one form: type the student's phone or email (or name). If they are already in YatraLine their details fill in and the payment goes against their enrolment. */
   const f = [
     { k: 'phone', label: 'Phone', type: 'tel' }, { k: 'email', label: 'Email', type: 'email' },
     { k: 'payer_name', label: 'Student name', placeholder: 'Or type a name to look them up' },
@@ -130,7 +130,7 @@ function globalAddPayment() {
     const p = await ins('nex_payments', Object.assign(pay, { payer_name: pay.payer_name || fullName(st), student_id: st ? st.id : null, enrolment_id: enrolmentId, created_by: ME.name }));
     if (enrolmentId) await queuePayment(enrolmentId, p.id);
     toast(st ? 'Payment recorded for ' + fullName(st) : 'Payment recorded. Link it to a student later.'); render();
-  }, 'Save payment', idBoxHtml('Start with the student’s phone or email. If they are already in Pipe-Line, their details and enrolment fill in. Otherwise the payment is saved unmatched and can be linked later.'));
+  }, 'Save payment', idBoxHtml('Start with the student’s phone or email. If they are already in YatraLine, their details and enrolment fill in. Otherwise the payment is saved unmatched and can be linked later.'));
   const wrap = $('#f_enrolment_id', m.el).parentElement; wrap.hidden = true;
   lk = identityLookup(m, { ids: { phone: 'f_phone', email: 'f_email', name: 'f_payer_name' }, onChange: async st => {
     enr = []; const sel0 = $('#f_enrolment_id', m.el);

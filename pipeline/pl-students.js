@@ -1,6 +1,6 @@
 'use strict';
-/* pl-students.js · Pipe-Line · Overview, Leads / Students / Search lists, the student record.
-   One of the Pipe-Line files loaded by nex.html (list and order: PL_FILES in the loader). All of them share one global scope. */
+/* pl-students.js · YatraLine · Overview, Leads / Students / Search lists, the student record.
+   One of the YatraLine files loaded by nex.html (list and order: PL_FILES in the loader). All of them share one global scope. */
 /* =========================================================
    Overview, Students list, Student record
    ========================================================= */
@@ -111,7 +111,7 @@ route(/^\/(students|leads|search)(?:\?(.*))?$/, async m => {
               (kind === 'lead' ? '<td>' + nextFuHtml((s.nex_followups || [])[0]) + '</td>' : '') +
               '<td>' + esc(fmtDate(en.enrolled_on) || '–') + '</td><td>' + esc(agentName(s.agent_id) || '–') + '</td>' + (kind === 'lead' ? '<td><button class="nx-btn sm" data-bk="' + s.id + '">Book class</button></td>' : '') + '</tr>';
           }).join('') + '</tbody></table></div>' :
-          empty('No ' + noun + ' found', filtered ? 'Try a different search or clear the filters.' : kind === 'lead' ? 'Everyone in Pipe-Line has paid $200 or more.' : kind === 'student' ? 'Nobody has paid $200 yet. New people start as leads.' : 'Nobody is in Pipe-Line yet.', kind === 'lead' && !filtered ? '<a class="nx-btn primary" href="#/leads?new=1">' + ico('plus') + 'New lead</a>' : '');
+          empty('No ' + noun + ' found', filtered ? 'Try a different search or clear the filters.' : kind === 'lead' ? 'Everyone in YatraLine has paid $200 or more.' : kind === 'student' ? 'Nobody has paid $200 yet. New people start as leads.' : 'Nobody is in YatraLine yet.', kind === 'lead' && !filtered ? '<a class="nx-btn primary" href="#/leads?new=1">' + ico('plus') + 'New lead</a>' : '');
         const from = total ? SL.page * SL.size + 1 : 0, to = SL.page * SL.size + rows.length;
         const more = total != null && to < total;
         $('#slFoot').innerHTML = '<span>' + (total != null ? (total ? from + '–' + to + ' of ' + total.toLocaleString('en-AU') + ' ' + noun : '') : rows.length + ' shown') + '</span>' + (SL.page || more ? '<span class="nx-btnrow"><button class="nx-btn sm" id="slPrev"' + (SL.page ? '' : ' disabled') + '>Previous</button><button class="nx-btn sm" id="slNext"' + (more ? '' : ' disabled') + '>Next</button></span>' : '');
@@ -177,7 +177,7 @@ function newStudent() {
     existing = lk ? lk.get() : null;
     const { qualification_id, fee, stage, enrolled_on, ...stu } = v;
     if (existing) {
-      /* they are already in Pipe-Line: add the new enrolment to them (if one was filled in) and open their record */
+      /* they are already in YatraLine: add the new enrolment to them (if one was filled in) and open their record */
       if (qualification_id || fee != null) await ins('nex_enrolments', { student_id: existing.id, qualification_id, fee, stage, enrolled_on, year: new Date().getFullYear(), created_by: ME.name }, true);
       toast(qualification_id || fee != null ? 'Added to ' + fullName(existing) : 'Opened ' + fullName(existing)); go('#/students/' + existing.id); return;
     }
@@ -188,7 +188,7 @@ function newStudent() {
       if (d.length) {
         warned = true;
         let b = $('.nx-warnbox', m.el); if (!b) { b = document.createElement('div'); b.className = 'nx-warnbox'; b.style.marginBottom = '12px'; $('.modal-b', m.el).prepend(b); }
-        b.innerHTML = 'This looks like someone already in Pipe-Line: ' + d.map(x => '<a href="#/students/' + x.id + '">' + esc(fullName(x)) + '</a>').join(', ') + '. Press Add lead again if this is a different person.';
+        b.innerHTML = 'This looks like someone already in YatraLine: ' + d.map(x => '<a href="#/students/' + x.id + '">' + esc(fullName(x)) + '</a>').join(', ') + '. Press Add lead again if this is a different person.';
         return false;
       }
     }
@@ -200,7 +200,7 @@ function newStudent() {
   };
   /* first name is checked in save() so that picking an existing person does not need it */
   f.find(x => x.k === 'first_name').required = false; f.find(x => x.k === 'first_name').label = 'First name *';
-  const m = formModal('New lead', f, save, 'Add lead', idBoxHtml('Start with a phone number or email. If they are already in Pipe-Line, their details fill in.'));
+  const m = formModal('New lead', f, save, 'Add lead', idBoxHtml('Start with a phone number or email. If they are already in YatraLine, their details fill in.'));
   standardFee(m, 'f_qualification_id', 'f_fee');
   lk = identityLookup(m, { ids: { phone: 'f_phone', email: 'f_email', first: 'f_first_name', last: 'f_last_name' }, onChange: s => { const b = $('.modal-f .nx-btn.primary', m.el); if (b) b.textContent = s ? 'Add to ' + fullName(s) : 'Add lead'; } });
   return m;
@@ -323,7 +323,7 @@ function section(title, inner, action) {
 }
 function tabDetails(c) {
   const s = c.s, d = c.d;
-  const sens = c.limited ? section('Personal and sensitive', '<div class="nx-note">' + ico('lock') + ' You have opened a lot of student records in a short time, so personal details are paused for now. Try again later, or ask an admin.</div>') : section('Personal and sensitive', '<div class="nx-note">' + ico('lock') + ' Visible to all Pipe-Line staff. Every look and every change is logged.</div><dl class="nx-fields">' + field('Date of birth', esc(fmtDate(d.dob))) + field('USI', esc(d.usi)) + field('Address', esc([d.address, d.suburb, d.state, d.postcode].filter(Boolean).join(', '))) +
+  const sens = c.limited ? section('Personal and sensitive', '<div class="nx-note">' + ico('lock') + ' You have opened a lot of student records in a short time, so personal details are paused for now. Try again later, or ask an admin.</div>') : section('Personal and sensitive', '<div class="nx-note">' + ico('lock') + ' Visible to all YatraLine staff. Every look and every change is logged.</div><dl class="nx-fields">' + field('Date of birth', esc(fmtDate(d.dob))) + field('USI', esc(d.usi)) + field('Address', esc([d.address, d.suburb, d.state, d.postcode].filter(Boolean).join(', '))) +
       field('Emergency contact', esc([d.emergency_name, d.emergency_relation && '(' + d.emergency_relation + ')', fmtPhone(d.emergency_phone)].filter(Boolean).join(' '))) + field('Disability', esc(d.disability)) + field('Indigenous status', esc(d.indigenous_status)) + '</dl><div style="padding:0 16px 16px"><button class="nx-btn sm" data-a="editDet">' + ico('edit') + 'Edit personal details</button></div>');
   return section('Contact', '<dl class="nx-fields">' + field('First name', esc(s.first_name)) + field('Last name', esc(s.last_name)) + field('Email', esc(s.email)) + field('Phone', esc(fmtPhone(s.phone))) + field('Second phone', esc(fmtPhone(s.phone2))) + field('Agent', esc(agentName(s.agent_id))) + field('Outside Sydney', s.outside_sydney ? 'Yes' : 'No') + '</dl><div style="padding:0 16px 16px"><button class="nx-btn sm" data-a="editStu">' + ico('edit') + 'Edit contact</button></div>') +
     sens +

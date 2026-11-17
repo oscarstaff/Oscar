@@ -43,7 +43,7 @@ function check(p) {
 }
 walk(root);
 
-// Pipe-Line (nex.html): every inline script must be listed in its Content-Security-Policy by sha256, and the
+// YatraLine (nex.html): every inline script must be listed in its Content-Security-Policy by sha256, and the
 // loader's file list must match the pl-*.js files on disk (pl-core first, pl-start last).
 function checkPipeline() {
   const f = path.join(root, 'nex.html');

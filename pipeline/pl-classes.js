@@ -1,6 +1,6 @@
 'use strict';
-/* pl-classes.js · Pipe-Line · Class attendance, booking a lead into a class, no-show follow-ups.
-   One of the Pipe-Line files loaded by nex.html (list and order: PL_FILES in the loader). All of them share one global scope. */
+/* pl-classes.js · YatraLine · Class attendance, booking a lead into a class, no-show follow-ups.
+   One of the YatraLine files loaded by nex.html (list and order: PL_FILES in the loader). All of them share one global scope. */
 /* =========================================================
    Class attendance, booking a lead into a class, and the no show follow-up list
    ========================================================= */

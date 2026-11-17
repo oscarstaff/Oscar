@@ -1,6 +1,6 @@
 'use strict';
-/* pl-profile.js · Pipe-Line · Documents, Profile, Team achievements, Staff profile view.
-   One of the Pipe-Line files loaded by nex.html (list and order: PL_FILES in the loader). All of them share one global scope. */
+/* pl-profile.js · YatraLine · Documents, Profile, Team achievements, Staff profile view.
+   One of the YatraLine files loaded by nex.html (list and order: PL_FILES in the loader). All of them share one global scope. */
 /* ---------- Documents (read and open; upload and delete stay in Nexus) ---------- */
 const DC = { q: '' };
 route(/^\/documents$/, async () => {
@@ -70,7 +70,7 @@ route(/^\/profile$/, async () => {
 /* shrink the photo to 320px JPEG in the browser, store it in the avatars bucket under the person's own folder, then point staff_avatars at it */
 async function savePhoto(file) {
   const dataUrl = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = () => rej(new Error('Could not read that file.')); r.readAsDataURL(file); });
-  const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error('That file is not a photo Pipe-Line can open.')); i.src = dataUrl; });
+  const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error('That file is not a photo YatraLine can open.')); i.src = dataUrl; });
   const S = 320, c = document.createElement('canvas'); c.width = c.height = S;
   const side = Math.min(img.naturalWidth, img.naturalHeight), sx = (img.naturalWidth - side) / 2, sy = (img.naturalHeight - side) / 2;
   c.getContext('2d').drawImage(img, sx, sy, side, side, 0, 0, S, S);

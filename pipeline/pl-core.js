@@ -1,8 +1,8 @@
 'use strict';
-/* pl-core.js · Pipe-Line · consts, team rules, helpers, sign-in and the api().
-   One of the Pipe-Line files loaded by nex.html (list and order: PL_FILES in the loader). All of them share one global scope. */
+/* pl-core.js · YatraLine · consts, team rules, helpers, sign-in and the api().
+   One of the YatraLine files loaded by nex.html (list and order: PL_FILES in the loader). All of them share one global scope. */
 /* =========================================================
-   Pipe-Line core: api, helpers, ui kit, router
+   YatraLine core: api, helpers, ui kit, router
    ========================================================= */
 const SB = 'https://jcfgldqrdbfkgbixszds.supabase.co';
 const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpjZmdsZHFyZGJma2diaXhzemRzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1Nzc3NzEsImV4cCI6MjA5MDE1Mzc3MX0.Wj8cCpnlsoZOPj5sKWeEdfvgjG4Nc-UuTTYgbcrPfeI';
@@ -147,7 +147,7 @@ function endSession(why) {
   const mf = $('#mfa'); if (mf) { mf.hidden = true; const mc = $('#mfaCard'); if (mc) mc.innerHTML = ''; }
   const a = $('#app'); if (a) a.hidden = true;
   const msg = $('#lockMsg');
-  if (msg) msg.textContent = why === 'idle' ? 'Pipe-Line locked after 1 hour without activity. Go back to Nexus and open Pipe-Line again.' : why === 'gone' ? 'Your sign-in has ended. Go back to Nexus, sign in again and open Pipe-Line.' : why === 'old' ? 'For safety Pipe-Line closes after 12 hours. Go back to Nexus and open Pipe-Line again.' : 'Your sign-in has run out. Go back to Nexus, refresh, and open Pipe-Line again.';
+  if (msg) msg.textContent = why === 'idle' ? 'YatraLine locked after 1 hour without activity. Go back to Nexus and open YatraLine again.' : why === 'gone' ? 'Your sign-in has ended. Go back to Nexus, sign in again and open YatraLine.' : why === 'old' ? 'For safety YatraLine closes after 12 hours. Go back to Nexus and open YatraLine again.' : 'Your sign-in has run out. Go back to Nexus, refresh, and open YatraLine again.';
   const l = $('#lock'); if (l) l.hidden = false;
 }
 function watchSession() {
@@ -175,12 +175,12 @@ async function api(path, opt) {
   if (!r.ok) {
     let m = ''; try { const j = await r.json(); m = j.message || j.hint || j.details || ''; } catch (e) {}
     if (/row-level security|permission denied/i.test(m)) m = "You don't have permission to do that.";
-    else if (r.status >= 500) m = 'Pipe-Line had a problem saving or loading that. Try again in a moment.';
+    else if (r.status >= 500) m = 'YatraLine had a problem saving or loading that. Try again in a moment.';
     const err = new Error(m || ('Request failed (' + r.status + ')')); err.status = r.status; throw err;
   }
   return r;
 }
-/* call a Pipe-Line edge function as the signed-in person; failures keep the function's own message and code */
+/* call a YatraLine edge function as the signed-in person; failures keep the function's own message and code */
 async function fn(name, body) {
   const doFetch = async () => fetch(SB + '/functions/v1/' + name, { method: 'POST', headers: { apikey: KEY, Authorization: 'Bearer ' + await bearer(), 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
   let r;
