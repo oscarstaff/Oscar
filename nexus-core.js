@@ -283,14 +283,17 @@ function getAuthClient(){
         _authClient.onAuthStateChange(function(event, session){
           if(event === 'TOKEN_REFRESHED' && session){
             window._sbAuthToken = session.access_token || window._sbAuthToken;
+            try{ _authBroadcast({t:'tok', at:session.access_token, exp:session.expires_at}); }catch(e){}
             try{ if(typeof _realtimeClient!=='undefined' && _realtimeClient && _realtimeClient.realtime && _realtimeClient.realtime.setAuth) _realtimeClient.realtime.setAuth(session.access_token); }catch(e){}
             return;
           }
           if(event === 'SIGNED_OUT' || (event === 'TOKEN_REFRESHED' && !session)){
+            try{ _authBroadcast({t:'out'}); }catch(e){}
             if(window.me || sessionStorage.getItem('ou')){
               if(!window._authExpiredHandled){
                 window._authExpiredHandled = true;
-                try{ if(typeof showToast === 'function') showToast('Your session expired — signing you out.', 'info'); }catch(e){}
+                try{ sessionStorage.setItem('nx_session_ended','1'); }catch(e){}
+                try{ if(typeof showToast === 'function') showToast('Your session ended. Please sign in again.', 'info'); }catch(e){}
                 setTimeout(function(){ try{ doLogout(); }catch(e){ window.location.reload(); } }, 600);
               }
             }
@@ -300,6 +303,40 @@ function getAuthClient(){
     }catch(e){ console.warn('[auth] onAuthStateChange wire failed', e); }
   }
   return _authClient;
+}
+/* ---- Token broker for the apps (ShiftOps, YatraLine, ...) -------------------------------------------------------
+   Only this tab holds the Nexus sign-in (access + refresh token). Apps never get the refresh token: two tabs spending the same
+   refresh token trips Supabase's reuse detection and ends the whole session, which is what signed people out of Nexus.
+   Instead an app asks this tab over a same-origin BroadcastChannel and is handed a current access token (about an hour of life). */
+let _authBC = null;
+function _authBroadcast(msg){ try{ if(_authBC) _authBC.postMessage(msg); }catch(e){} }
+function startAuthBroker(){
+  if(_authBC || typeof BroadcastChannel === 'undefined') return;
+  try{ _authBC = new BroadcastChannel('nexus-auth'); }catch(e){ _authBC = null; return; }
+  _authBC.onmessage = async function(ev){
+    const m = ev && ev.data;
+    if(!m || m.t !== 'req' || !m.id) return;
+    const reply = function(o){ o.id = m.id; _authBroadcast(o); };
+    try{
+      const a = getAuthClient();
+      if(!a || !a.getSession){ reply({t:'none', why:'failed'}); return; }
+      const g = await a.getSession();
+      let s = g && g.data && g.data.session;
+      if(!s){ reply({t:'none', why:'signed_out'}); return; }
+      const need = Math.max(60000, Number(m.minLife) || 0);
+      if(s.expires_at && (s.expires_at * 1000 - Date.now()) < need && a.refreshSession){
+        try{
+          const r = await a.refreshSession();
+          if(r && r.data && r.data.session) s = r.data.session;
+        }catch(e){ /* keep whatever we have; checked below */ }
+      }
+      if(s && s.access_token && (!s.expires_at || s.expires_at * 1000 > Date.now() + 30000)){
+        reply({t:'tok', at:s.access_token, exp:s.expires_at || 0});
+      }else{
+        reply({t:'none', why:'failed'});
+      }
+    }catch(e){ reply({t:'none', why:'failed'}); }
+  };
 }
 function synthEmailFromName(name){
   const local = String(name).trim().toLowerCase()
@@ -1170,7 +1207,9 @@ async function _checkSessionAlive(){
         return;
       }
       window._authExpiredHandled = true;
-      try{ if(typeof showToast === 'function') showToast('Your session expired — signing you out.', 'info'); }catch(e){}
+      try{ sessionStorage.setItem('nx_session_ended','1'); }catch(e){}
+      try{ _authBroadcast({t:'out'}); }catch(e){}
+      try{ if(typeof showToast === 'function') showToast('Your session ended. Please sign in again.', 'info'); }catch(e){}
       setTimeout(function(){ try{ doLogout(); }catch(e){ window.location.reload(); } }, 600);
     }
   }catch(e){ /* network hiccup — leave it for the next tick */ }
@@ -1190,6 +1229,7 @@ async function doLogout(){
   if(typeof _clockTickTimer !== 'undefined' && _clockTickTimer){ clearInterval(_clockTickTimer); _clockTickTimer=null; }
   sessionStorage.removeItem("ou");
   window._sbAuthToken = null;
+  try{ _authBroadcast({t:'out'}); }catch(e){}
   try{
     const a=getAuthClient();
     if(a && a.signOut){ await a.signOut(); }
@@ -1210,6 +1250,7 @@ async function enterHub(){
   try{ if(typeof sessionLimitMark==='function') sessionLimitMark(); }catch(e){}
   try{ localStorage.removeItem('notif_local_anon'); }catch(e){}
   try{ startSessionExpiryWatch(); }catch(e){}
+  try{ startAuthBroker(); }catch(e){}
   try{
     for(let i = sessionStorage.length - 1; i >= 0; i--){
       const k = sessionStorage.key(i);

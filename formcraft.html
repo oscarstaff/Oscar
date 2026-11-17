@@ -743,8 +743,8 @@ body{ font-size:14px; letter-spacing:-.006em; }
 <div id="fcLock" role="alertdialog" aria-modal="true" aria-labelledby="fcLockT" aria-describedby="fcLockM" style="display:none;position:fixed;inset:0;z-index:99998;align-items:center;justify-content:center;padding:20px;background:linear-gradient(135deg,#0f1117,#1a1d27);font-family:system-ui,sans-serif;">
   <div style="background:#1e2230;border:1px solid #2e3344;border-radius:18px;padding:38px 34px;width:min(400px,92vw);text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.5);">
     <div style="font-size:40px;margin-bottom:12px;">🔒</div>
-    <div id="fcLockT" style="font-size:20px;font-weight:700;color:#fff;margin-bottom:8px;">Session expired</div>
-    <div id="fcLockM" style="font-size:13.5px;color:#8b94a8;line-height:1.55;margin-bottom:22px;">Your sign-in has expired, so FormCraft has locked. Reopen FormCraft from Nodes in Nexus to continue.</div>
+    <div id="fcLockT" style="font-size:20px;font-weight:700;color:#fff;margin-bottom:8px;">Your session ended</div>
+    <div id="fcLockM" style="font-size:13.5px;color:#8b94a8;line-height:1.55;margin-bottom:22px;">Your session ended, so FormCraft has locked and nothing more will be saved. Open Nexus (sign in again if it asks), then open FormCraft from Nodes.</div>
     <button type="button" id="fcLockBtn" style="background:#4f46e5;color:#fff;border:0;border-radius:11px;padding:11px 22px;font-weight:600;font-size:14px;cursor:pointer;">Close this tab</button>
   </div>
 </div>
@@ -776,6 +776,29 @@ body{ font-size:14px; letter-spacing:-.006em; }
   document.addEventListener('visibilitychange',function(){ if(!document.hidden) enforce(); });
   window.addEventListener('focus',enforce);
   setInterval(enforce,1000);
+})();
+/* Renewal: this app only holds an access token (about an hour). While Nexus is open in another tab it hands over a fresh one;
+   the Nexus refresh token is never given to an app (two tabs spending one refresh token ends the Nexus sign-in). */
+(function(){
+  var bc=null; try{ if(typeof BroadcastChannel!=='undefined') bc=new BroadcastChannel('nexus-auth'); }catch(e){}
+  if(!bc) return;
+  function exp(t){ try{ var b=t.split('.')[1].replace(/-/g,'+').replace(/_/g,'/'); while(b.length%4) b+='='; return JSON.parse(atob(b)).exp*1000; }catch(e){ return 0; } }
+  function cur(){ return (window.NEXUS_AT||sessionStorage.getItem('ngate_at_formcraft')||'').trim(); }
+  function put(t){ window.NEXUS_AT=t; try{ sessionStorage.setItem('ngate_at_formcraft',t); }catch(e){} try{ if(window.fcEnforce) window.fcEnforce(); }catch(e){} }
+  var busy=false;
+  function ask(){
+    if(busy) return; var t=cur(); if(!t || exp(t)-Date.now()>10*60*1000) return; busy=true;
+    var id=Math.random().toString(36).slice(2)+Date.now().toString(36);
+    function on(ev){ var m=ev&&ev.data; if(!m||m.id!==id) return; cleanup(); if(m.t==='tok'&&m.at&&exp(m.at)>Date.now()+30000) put(m.at); }
+    function cleanup(){ busy=false; clearTimeout(to); bc.removeEventListener('message',on); }
+    var to=setTimeout(cleanup,5000);
+    bc.addEventListener('message',on);
+    bc.postMessage({t:'req',id:id,app:'formcraft',minLife:20*60*1000});
+  }
+  bc.addEventListener('message',function(ev){ var m=ev&&ev.data; if(m&&!m.id&&m.t==='tok'&&m.at&&cur()&&exp(m.at)>exp(cur())) put(m.at); });
+  setInterval(ask,60*1000);
+  document.addEventListener('visibilitychange',function(){ if(!document.hidden) ask(); });
+  setTimeout(ask,4000);
 })();
 </script>
 <!-- END SESSION LOCK -->

@@ -483,8 +483,8 @@ textarea{min-height:84px;line-height:1.5;}
 
 <div class="toast" id="toast"></div>
 <div id="slipLock" role="alertdialog" aria-modal="true" aria-labelledby="lkT" aria-describedby="lkM">
-  <div class="lk"><div class="lk-ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2.5"/><path d="M8 11V8a4 4 0 018 0v3"/></svg></div><div class="lk-t" id="lkT">Session expired</div>
-  <div class="lk-m" id="lkM">Your sign-in has expired, so Slip has locked. Reopen Slip from Nodes in Nexus to continue.</div>
+  <div class="lk"><div class="lk-ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2.5"/><path d="M8 11V8a4 4 0 018 0v3"/></svg></div><div class="lk-t" id="lkT">Your session ended</div>
+  <div class="lk-m" id="lkM">Your session ended, so Slip has locked and nothing more will be saved. Open Nexus (sign in again if it asks), then open Slip from Nodes.</div>
   <button type="button" onclick="try{window.close()}catch(e){}">Close this tab</button></div>
 </div>
 
@@ -501,6 +501,30 @@ function slipTokAlive(){
     const c=JSON.parse(atob(b)); return !!(c.exp && c.exp*1000>Date.now()+30000); }catch(e){ return false; }
 }
 function slipHdr(){ return {apikey:SLIP_KEY,Authorization:'Bearer '+(slipTokAlive()?slipTok():SLIP_KEY),'Content-Type':'application/json'}; }
+/* Renewal: this app only holds an access token (about an hour). While Nexus is open in another tab it hands over a fresh one;
+   the Nexus refresh token is never given to an app (two tabs spending one refresh token ends the Nexus sign-in). */
+(function(){
+  var bc=null; try{ if(typeof BroadcastChannel!=='undefined') bc=new BroadcastChannel('nexus-auth'); }catch(e){}
+  if(!bc) return;
+  function exp(t){ try{ var b=t.split('.')[1].replace(/-/g,'+').replace(/_/g,'/'); while(b.length%4) b+='='; return JSON.parse(atob(b)).exp*1000; }catch(e){ return 0; } }
+  function cur(){ return slipTok(); }
+  function put(t){ try{ sessionStorage.setItem('slip_sb_at',t); }catch(e){} try{ slipEnforce(); }catch(e){} }
+  var busy=false;
+  function ask(){
+    if(busy) return; var t=cur(); if(!t || exp(t)-Date.now()>10*60*1000) return; busy=true;
+    var id=Math.random().toString(36).slice(2)+Date.now().toString(36);
+    function on(ev){ var m=ev&&ev.data; if(!m||m.id!==id) return; cleanup(); if(m.t==='tok'&&m.at&&exp(m.at)>Date.now()+30000) put(m.at); }
+    function cleanup(){ busy=false; clearTimeout(to); bc.removeEventListener('message',on); }
+    var to=setTimeout(cleanup,5000);
+    bc.addEventListener('message',on);
+    bc.postMessage({t:'req',id:id,app:'slip',minLife:20*60*1000});
+  }
+  bc.addEventListener('message',function(ev){ var m=ev&&ev.data; if(m&&!m.id&&m.t==='tok'&&m.at&&cur()&&exp(m.at)>exp(cur())) put(m.at); });
+  setInterval(ask,60*1000);
+  document.addEventListener('visibilitychange',function(){ if(!document.hidden) ask(); });
+  setTimeout(ask,4000);
+})();
+
 // Slip only works with a live sign-in: without one nothing can be tied to a person, so lock the whole page.
 let _lockWarned=false;
 function slipEnforce(){

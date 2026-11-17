@@ -515,10 +515,12 @@ async function _payRunInner(myRun, startStr, endStr, el){
   // Proactively refresh the auth token before a run so a long payrun doesn't
   // fail partway through on an expired session (the "only 3–4 staff show" bug).
   try{
-    if(window._soSbClient && window._soSbClient.auth){
-      const sess = await window._soSbClient.auth.getSession();
-      if(sess && sess.data && sess.data.session && sess.data.session.access_token){
-        try{ sessionStorage.setItem('so_sb_at', sess.data.session.access_token); }catch(_e){}
+    if(typeof _soFreshTok === 'function'){
+      await _soFreshTok();
+      if(typeof _soTokAlive === 'function' && !_soTokAlive(60000)){
+        if(typeof _soSessionBanner === 'function') _soSessionBanner(true);
+        el.innerHTML = '<div style="color:var(--pp-bad,#dc2626);padding:20px;text-align:center;"><b>Your session ended, so the payrun did not run.</b><br>Open Nexus (sign in again if it asks), open ShiftOps from there, and run the payrun again.</div>';
+        return;
       }
     }
   }catch(_e){}
@@ -526,7 +528,7 @@ async function _payRunInner(myRun, startStr, endStr, el){
   const ratesOk = await loadPayRates();
   if(!ratesOk){
     if(myRun!==_payRunSeq) return;
-    el.innerHTML = '<div style="color:var(--pp-bad,#dc2626);padding:20px;text-align:center;"><b>Couldn\'t load pay rates.</b><br>Your session may have expired — refresh the page (or log in again) and run the payrun once more.</div>';
+    el.innerHTML = '<div style="color:var(--pp-bad,#dc2626);padding:20px;text-align:center;"><b>Couldn\'t load pay rates.</b><br>Your session may have ended — open ShiftOps again from Nexus and run the payrun once more.</div>';
     return;
   }
 
@@ -599,7 +601,7 @@ async function _payRunInner(myRun, startStr, endStr, el){
   const rows = _payRowsHtml();
 
   const warn = flags ? '<div class="pp-warn"><strong>'+flags+' row(s) need a look.</strong> NO RATE = excluded from totals until you set a rate below. ⚠ OPEN = clocked in with no matching clock-out, so hours may read low — fix the punch in Timesheet Manager, then re-run.</div>' : '';
-  const loadWarn = _loadErrors ? '<div class="pp-warn pp-warn-err"><strong>⚠ '+_loadErrors+' staff member(s) failed to load</strong> — their hours may be missing or wrong. This is usually an expired session. <b>Refresh the page and run the payrun again</b> before using these figures.</div>' : '';
+  const loadWarn = _loadErrors ? '<div class="pp-warn pp-warn-err"><strong>⚠ '+_loadErrors+' staff member(s) failed to load</strong> — their hours may be missing or wrong. This is usually an expired session. <b>Open ShiftOps again from Nexus and run the payrun again</b> before using these figures.</div>' : '';
 
   el.innerHTML =
     '<div class="pp-animate">'+

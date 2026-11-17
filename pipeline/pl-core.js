@@ -110,29 +110,69 @@ function tokenPayload(t) {
   try { const p = t.split('.'); let b = p[1].replace(/-/g, '+').replace(/_/g, '/'); while (b.length % 4) b += '='; return JSON.parse(atob(b)); } catch (e) { return null; }
 }
 function tokenAlive(t, slack) { const c = tokenPayload(t); return !!(c && c.exp && c.exp * 1000 > Date.now() + (slack || 30000)); }
+/* YatraLine never holds the Nexus refresh token (two tabs spending one refresh token ends the whole Nexus session).
+   When the access token runs low it asks the open Nexus tab for a fresh one over a same-origin BroadcastChannel. */
+let hubBC = null;
+try { if (typeof BroadcastChannel !== 'undefined') hubBC = new BroadcastChannel('nexus-auth'); } catch (e) { hubBC = null; }
+let hubWhy = '';   /* why the last refresh failed: 'signed_out' (Nexus says so), 'silent' (no Nexus tab answered), 'failed' */
+function askHub(minLife) {
+  return new Promise(resolve => {
+    if (!hubBC) return resolve({ why: 'silent' });
+    const id = Math.random().toString(36).slice(2) + Date.now().toString(36);
+    let done = false;
+    const finish = r => { if (done) return; done = true; clearTimeout(to); hubBC.removeEventListener('message', on); resolve(r); };
+    const on = ev => { const m = ev && ev.data; if (m && m.id === id) finish(m.t === 'tok' ? { at: m.at } : { why: m.why || 'failed' }); };
+    const to = setTimeout(() => finish({ why: 'silent' }), 5000);
+    hubBC.addEventListener('message', on);
+    try { hubBC.postMessage({ t: 'req', id, app: 'nex', minLife: minLife || 0 }); } catch (e) { finish({ why: 'silent' }); }
+  });
+}
+if (hubBC) hubBC.addEventListener('message', ev => {
+  const m = ev && ev.data; if (!m || m.id) return;
+  if (m.t === 'out') { if (!locked) endSession('gone'); }                                  /* signed out of Nexus: lock straight away */
+  else if (m.t === 'tok' && m.at && tokenAlive(m.at, 30000) && !locked) { ss.set('nex_sb_at', m.at); sessionWarn(false); }   /* Nexus refreshed: take the new token */
+});
 let refreshing = null;
 async function refreshToken() {
-  const rt = ss.get('nex_sb_rt');
-  if (!rt || locked) return false;
+  if (locked) return false;
   if (!refreshing) {
     refreshing = (async () => {
       try {
-        const r = await fetch(SB + '/auth/v1/token?grant_type=refresh_token', { method: 'POST', headers: { apikey: KEY, 'Content-Type': 'application/json' }, body: JSON.stringify({ refresh_token: rt }) });
-        if (!r.ok) return false;
-        const s = await r.json();
-        if (!s.access_token) return false;
-        ss.set('nex_sb_at', s.access_token);
-        if (s.refresh_token) ss.set('nex_sb_rt', s.refresh_token);
+        const r = await askHub(20 * 60 * 1000);
+        if (!r.at || !tokenAlive(r.at, 30000)) { hubWhy = r.why || 'failed'; return false; }
+        ss.set('nex_sb_at', r.at); hubWhy = ''; sessionWarn(false);
         return true;
-      } catch (e) { return false; } finally { setTimeout(() => { refreshing = null; }, 0); }
+      } catch (e) { hubWhy = 'failed'; return false; } finally { setTimeout(() => { refreshing = null; }, 0); }
     })();
   }
   return refreshing;
 }
+/* A banner while the sign-in is about to run out and Nexus can't hand over a fresh one (Nexus tab closed or signed out). */
+function sessionWarn(on, mins) {
+  let el = document.getElementById('sessWarn');
+  if (!on) { if (el) el.remove(); return; }
+  if (!el) {
+    el = document.createElement('div'); el.id = 'sessWarn'; el.setAttribute('role', 'alert');
+    el.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99990;padding:9px 16px;text-align:center;font-size:13px;font-weight:700;background:#3a2410;color:#fdba74;border-bottom:1px solid #f59e0b';
+    document.body.appendChild(el);
+  }
+  el.textContent = 'Your YatraLine sign-in ends in about ' + Math.max(1, mins) + ' minute' + (mins === 1 ? '' : 's') + '. ' +
+    (hubWhy === 'signed_out' ? 'Nexus has been signed out. ' : 'Nexus is not open in another tab. ') + 'Finish what you are saving, then open YatraLine again from Nexus.';
+}
+/* checked every minute: top up the token early, warn if it can't be topped up */
+async function keepToken() {
+  if (locked) return;
+  const t = ss.get('nex_sb_at'); if (!t) return;
+  if (tokenAlive(t, 10 * 60 * 1000)) { sessionWarn(false); return; }
+  const ok = await refreshToken();
+  if (ok || locked) return;
+  const c = tokenPayload(ss.get('nex_sb_at')), left = c && c.exp ? c.exp * 1000 - Date.now() : 0;
+  if (left > 0 && left < 5 * 60 * 1000) sessionWarn(true, Math.ceil(left / 60000)); else if (left <= 0) endSession(hubWhy === 'signed_out' ? 'gone' : 'ran_out');
+}
 async function bearer() {
   let t = ss.get('nex_sb_at');
   if (!tokenAlive(t, 60000)) { if (await refreshToken()) t = ss.get('nex_sb_at'); }
-  if (!tokenAlive(t, 0)) { endSession(); throw new Error('session'); }
+  if (!tokenAlive(t, 0)) { endSession(hubWhy === 'signed_out' ? 'gone' : 'ran_out'); throw new Error('session'); }
   return t;
 }
 /* Ending a session wipes the tokens and everything on screen, so a walk-away or shared computer shows no student data. */
@@ -146,8 +186,17 @@ function endSession(why) {
   const d = $('#drawerRoot'); if (d) d.innerHTML = '';
   const mf = $('#mfa'); if (mf) { mf.hidden = true; const mc = $('#mfaCard'); if (mc) mc.innerHTML = ''; }
   const a = $('#app'); if (a) a.hidden = true;
-  const msg = $('#lockMsg');
-  if (msg) msg.textContent = why === 'idle' ? 'YatraLine locked after 1 hour without activity. Go back to Nexus and open YatraLine again.' : why === 'gone' ? 'Your sign-in has ended. Go back to Nexus, sign in again and open YatraLine.' : why === 'old' ? 'For safety YatraLine closes after 12 hours. Go back to Nexus and open YatraLine again.' : 'Your sign-in has run out. Go back to Nexus, refresh, and open YatraLine again.';
+  const msg = $('#lockMsg'), head = $('#lockHead');
+  const M = {
+    idle: ['YatraLine locked', 'YatraLine locked after 1 hour without activity, so student details are hidden. Open Nexus and launch YatraLine again.'],
+    gone: ['Your session ended', 'You were signed out of Nexus, so YatraLine closed and hid student details. Sign in to Nexus again, then open YatraLine.'],
+    old: ['Your session ended', 'For safety YatraLine closes after 12 hours. Open Nexus and launch YatraLine again.'],
+    ran_out: ['Your session ended', 'Your sign-in lasts about an hour and Nexus was not open to renew it. Open Nexus (sign in again if it asks), then launch YatraLine.']
+  };
+  const mm = M[why] || ['Your session ended', 'Your sign-in has run out. Open Nexus (sign in again if it asks), then launch YatraLine.'];
+  if (head) head.textContent = mm[0];
+  if (msg) msg.textContent = mm[1];
+  sessionWarn(false);
   const l = $('#lock'); if (l) l.hidden = false;
 }
 function watchSession() {
