@@ -41,21 +41,21 @@ function doPost(e) {
     if (!p.key || !safeEq_(String(p.key), String(secret))) return out_({ ok: false, error: 'Wrong key' });
 
     /* how many emails can this mailbox still send today? (YatraLine shows it and refuses to send at 0) */
-    if (p.action === 'quota') return out_({ ok: true, remaining: MailApp.getRemainingDailyQuota() });
+    if (p.action === 'quota') return out_({ ok: true, remaining: quotaLeft_() });
 
     var to = String(p.to || '').trim();
     if (!EMAIL_RE_.test(to)) return out_({ ok: false, error: 'Invalid recipient' });
     var subject = String(p.subject || '').replace(/[\r\n]+/g, ' ').trim().slice(0, 200);
     var text = String(p.text || '').replace(/\r\n/g, '\n').slice(0, 8000);
     if (!subject || !text) return out_({ ok: false, error: 'Subject and text are required' });
-    if (MailApp.getRemainingDailyQuota() < 1) return out_({ ok: false, error: 'daily_limit', remaining: 0 });
+    if (quotaLeft_() === 0) return out_({ ok: false, error: 'daily_limit', remaining: 0 });
 
     var reply = String(p.replyTo || '').trim();
     var fromName = String(p.fromName || 'Oscars Training Centre').replace(/[\r\n"<>]+/g, ' ').trim().slice(0, 80);
     var alias = String(props.getProperty('NEX_MAIL_FROM') || '').trim();
 
     send_({ to: to, subject: subject, text: text, replyTo: EMAIL_RE_.test(reply) ? reply : '', fromName: fromName, fromAddr: EMAIL_RE_.test(alias) ? alias : '' });
-    return out_({ ok: true, remaining: MailApp.getRemainingDailyQuota() });
+    return out_({ ok: true, remaining: quotaLeft_() });
   } catch (err) {
     return out_({ ok: false, error: String(err && err.message ? err.message : err).slice(0, 200) });
   }
@@ -120,7 +120,7 @@ function doGet() { return out_({ ok: true, service: 'nex-mail', via: (typeof Gma
 // Run this once from the editor: sends a test email to yourself.
 function testSend() {
   var me = Session.getEffectiveUser().getEmail();
-  Logger.log('Emails this mailbox can still send today: ' + MailApp.getRemainingDailyQuota());
+  Logger.log('Emails this mailbox can still send today: ' + quotaLeft_());
   send_({ to: me, subject: 'Nex mail test', text: 'If you can read this, Nex can send email.\n\nAccents and dashes: café – ok', replyTo: '', fromName: 'Oscars Training Centre', fromAddr: '' });
   Logger.log('Sent a test to ' + me);
 }
@@ -135,4 +135,9 @@ function safeEq_(a, b) {
   var r = 0;
   for (var i = 0; i < a.length; i++) r |= a.charCodeAt(i) ^ b.charCodeAt(i);
   return r === 0;
+}
+
+/* Emails this mailbox can still send today, or null when Google has not been given the permission yet (sending still works then). */
+function quotaLeft_() {
+  try { return MailApp.getRemainingDailyQuota(); } catch (err) { return null; }
 }

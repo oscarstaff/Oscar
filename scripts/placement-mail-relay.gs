@@ -35,17 +35,17 @@ function doPost(e) {
     if (!key || key.length < 16) return out_({ ok: false, error: 'MAIL_KEY is not set (use at least 16 characters)' });
     if (!safeEqual_(String(body.key || ''), key)) return out_({ ok: false, error: 'bad key' });
     /* "how many emails can this mailbox still send today?" (free Gmail: about 100 recipients a day) */
-    if (body.action === 'quota') return out_({ ok: true, remaining: MailApp.getRemainingDailyQuota() });
+    if (body.action === 'quota') return out_({ ok: true, remaining: quotaLeft_() });
 
     var to = String(body.to || '').trim();
     if (!EMAIL_RE.test(to)) return out_({ ok: false, error: 'invalid recipient' });
     var subject = String(body.subject || '').replace(/[\r\n]+/g, ' ').slice(0, 200);
     var text = String(body.text || '').slice(0, 20000);
     if (!subject || !text) return out_({ ok: false, error: 'subject and text are required' });
-    if (MailApp.getRemainingDailyQuota() < 1) return out_({ ok: false, error: 'daily_limit', remaining: 0 });
+    if (quotaLeft_() === 0) return out_({ ok: false, error: 'daily_limit', remaining: 0 });
 
     sendViaGmailApi_(to, subject, text, body.html ? String(body.html).slice(0, 60000) : '', String(body.fromName || 'Oscars Training Centre').slice(0, 80), sentFiles_(body.attachments));
-    return out_({ ok: true, remaining: MailApp.getRemainingDailyQuota() });
+    return out_({ ok: true, remaining: quotaLeft_() });
   } catch (err) {
     return out_({ ok: false, error: String(err && err.message || err).slice(0, 200) });
   }
@@ -66,7 +66,7 @@ function sentFiles_(list) {
 /* Run this once from the editor (step 4). No trailing underscore on purpose: Apps Script hides those names from the Run menu.
    It grants the permissions and sends a real copy to the mailbox itself. */
 function testSend() {
-  Logger.log('Emails this mailbox can still send today: ' + MailApp.getRemainingDailyQuota());
+  Logger.log('Emails this mailbox can still send today: ' + quotaLeft_());
   var me = Session.getEffectiveUser().getEmail();
   sendViaGmailApi_(me, 'YatraLine test: documents required before your placement',
     'Dear Student,\n\nThis is a test of the placement mail relay. If you can read this, it works.\n\nThank you.',
@@ -139,3 +139,8 @@ function word_(s) { return /^[\x20-\x7e]*$/.test(s) ? s : '=?UTF-8?B?' + Utiliti
 function wrap_(b64) { return b64.replace(/(.{76})/g, '$1\r\n'); }
 function out_(o) { return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON); }
 function safeEqual_(a, b) { if (a.length !== b.length) return false; var d = 0; for (var i = 0; i < a.length; i++) d |= a.charCodeAt(i) ^ b.charCodeAt(i); return d === 0; }
+
+/* Emails this mailbox can still send today, or null when Google has not been given the permission yet (sending still works then). */
+function quotaLeft_() {
+  try { return MailApp.getRemainingDailyQuota(); } catch (err) { return null; }
+}
