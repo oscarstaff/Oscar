@@ -52,7 +52,7 @@ function calendarUrl(pp: { y: number; mo: number; d: number }, c: ClassInfo, tim
   return "https://calendar.google.com/calendar/render?" + q.toString();
 }
 const btn = (href: string, label: string, primary: boolean) =>
-  `<td style="border-radius:10px;background:${primary ? BLUE : "#ffffff"};${primary ? "" : `border:2px solid ${BLUE};`}"><a href="${href}" style="display:inline-block;padding:${primary ? "13px 24px" : "11px 22px"};font:700 15px ${FONT};color:${primary ? "#ffffff" : BLUE};text-decoration:none">${label}</a></td>`;
+  `<td style="border-radius:10px;background:${primary ? BLUE : "#ffffff"};${primary ? "" : `border:2px solid ${BLUE};`}"><a class="bt" href="${href}" style="display:inline-block;padding:${primary ? "13px 24px" : "11px 22px"};font:700 15px ${FONT};color:${primary ? "#ffffff" : BLUE};text-decoration:none">${label}</a></td>`;
 const eyebrow = (t: string) => `<div style="font:700 12px ${FONT};letter-spacing:1.6px;text-transform:uppercase;color:${MID};margin-bottom:6px">${esc(t)}</div>`;
 
 export function classConfirmHtml(first: string, date: string, time: string, c: ClassInfo = {}): string {
@@ -76,43 +76,59 @@ export function classConfirmHtml(first: string, date: string, time: string, c: C
     "<b>Arrive 10 - 15 minutes early</b> for your registration to avoid lining up.",
   ];
   const stepRows = steps.map((t, i) =>
-    `<tr><td valign="top" style="padding:0 14px 14px 0;width:34px"><table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr><td align="center" width="30" height="30" style="width:30px;height:30px;border-radius:15px;background:${SKYSOFT};border:1px solid ${SKY};font:800 14px/30px ${FONT};color:${BLUE}">${i + 1}</td></tr></table></td>` +
+    `<tr><td class="sn" valign="top" style="padding:0 14px 14px 0;width:34px"><table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr><td align="center" width="30" height="30" style="width:30px;height:30px;border-radius:15px;background:${SKYSOFT};border:1px solid ${SKY};font:800 14px/30px ${FONT};color:${BLUE}">${i + 1}</td></tr></table></td>` +
     `<td valign="top" style="padding:3px 0 14px;font:15px/1.55 ${FONT};color:${INK}">${t}</td></tr>`).join("");
 
   const fees = FEES.map(([n, p], i) => {
     const b = i < FEES.length - 1 ? `border-bottom:1px solid ${LINE};` : "";
-    return `<tr><td style="padding:11px 16px;${b}font:14px/1.45 ${FONT};color:${INK}">${esc(n)}</td><td align="right" style="padding:11px 16px;${b}font:800 15px ${FONT};color:${BLUE};white-space:nowrap;vertical-align:top">${esc(p)}</td></tr>`;
+    return `<tr><td class="fc" style="padding:11px 16px;${b}font:14px/1.45 ${FONT};color:${INK}">${esc(n)}</td><td class="fc" align="right" style="padding:11px 16px;${b}font:800 15px ${FONT};color:${BLUE};white-space:nowrap;vertical-align:top">${esc(p)}</td></tr>`;
   }).join("");
   const pay = PAY.map(([k, v], i) => {
     const b = i < PAY.length - 1 ? `border-bottom:1px solid rgba(255,255,255,.18);` : "";
     const big = k === "BSB" || k === "Account Number";
-    return `<tr><td style="padding:10px 0;${b}font:600 11px ${FONT};letter-spacing:.8px;text-transform:uppercase;color:#b9dcf7;width:112px;vertical-align:top">${esc(k)}</td><td style="padding:10px 0;${b}font:${big ? "800 19px" : "600 15px"}/1.4 ${FONT};${big ? "letter-spacing:1.2px;" : ""}color:#ffffff;vertical-align:top">${esc(v)}</td></tr>`;
+    return `<tr><td class="pl" style="padding:10px 10px 10px 0;${b}font:600 11px ${FONT};letter-spacing:.8px;text-transform:uppercase;color:#b9dcf7;width:112px;vertical-align:top">${esc(k)}</td><td style="padding:10px 0;${b}font:${big ? "800 19px" : "600 15px"}/1.4 ${FONT};${big ? "letter-spacing:1.2px;" : ""}color:#ffffff;vertical-align:top">${esc(v)}</td></tr>`;
   }).join("");
 
   return `<!DOCTYPE html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light only"><meta name="supported-color-schemes" content="light only"><title>First Aid and CPR class confirmation</title></head>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light only"><meta name="supported-color-schemes" content="light only"><style>
+@media only screen and (max-width:480px){
+  .ow{padding:10px 8px !important}
+  .px{padding-left:20px !important;padding-right:20px !important}
+  .hero{padding-top:24px !important;padding-bottom:26px !important}
+  .h1{font-size:26px !important}
+  .lead{font-size:15px !important;margin-top:8px !important}
+  .tile{display:none !important}
+  .card{padding:6px 16px !important}
+  .sec{padding-top:22px !important}
+  .fc{padding:9px 12px !important;font-size:13.5px !important}
+  .pc{padding:16px 16px 6px !important}
+  .pl{width:92px !important}
+  .sn{width:30px !important;padding-right:10px !important}
+  .bt{padding-left:16px !important;padding-right:16px !important;font-size:14px !important}
+}
+</style><title>First Aid and CPR class confirmation</title></head>
 <body style="margin:0;padding:0;background:#e6eef6;-webkit-text-size-adjust:100%">
 <div style="display:none;max-height:0;overflow:hidden;opacity:0;font-size:1px;line-height:1px;color:#e6eef6">You're booked in: ${dateLine}, ${esc(time)} at Rockdale. Please arrive 10 - 15 minutes early.</div>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#e6eef6"><tr><td align="center" style="padding:24px 12px">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#e6eef6"><tr><td align="center" class="ow" style="padding:24px 12px">
 <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;background:#ffffff;border-radius:18px;overflow:hidden;border:1px solid ${LINE}">
 
-  <tr><td style="background:#ffffff;padding:18px 32px 16px">
+  <tr><td class="px" style="background:#ffffff;padding:18px 32px 16px">
     <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
       <td style="vertical-align:middle;padding-right:14px"><img src="${LOGO}" width="84" height="64" alt="Oscars Training Centre" style="display:block;border:0;outline:none;width:84px;height:64px"></td>
       <td style="vertical-align:middle"><div style="font:700 14px/1.3 ${FONT};letter-spacing:1.3px;text-transform:uppercase;color:${BLUE}">Oscars Training Centre</div><div style="font:600 13px/1.4 ${FONT};color:${MUTED};margin-top:2px">First Aid and CPR Team</div></td>
     </tr></table>
   </td></tr>
 
-  <tr><td style="background:${BLUE};background-image:linear-gradient(135deg,${BLUE} 0%,${MID} 62%,${SKY} 100%);padding:34px 32px 36px">
+  <tr><td class="px hero" style="background:${BLUE};background-image:linear-gradient(135deg,${BLUE} 0%,${MID} 62%,${SKY} 100%);padding:34px 32px 36px">
     <div style="font:700 12px ${FONT};letter-spacing:1.8px;text-transform:uppercase;color:#bfe3fa">Class confirmed</div>
-    <div style="font:800 30px/1.2 ${FONT};color:#ffffff;margin-top:8px">You're booked in, ${name}!</div>
-    <div style="font:16px/1.6 ${FONT};color:#e4f3fd;margin-top:12px">Thank you for choosing us for your training certificate. As discussed, your class is confirmed. We look forward to seeing you at the centre.</div>
+    <div class="h1" style="font:800 30px/1.2 ${FONT};color:#ffffff;margin-top:8px">You're booked in, ${name}!</div>
+    <div class="lead" style="font:16px/1.6 ${FONT};color:#e4f3fd;margin-top:12px">Thank you for choosing us for your training certificate. As discussed, your class is confirmed. We look forward to seeing you at the centre.</div>
   </td></tr>
 
-  <tr><td style="padding:28px 32px 4px">
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${SOFT};border:1px solid ${LINE};border-radius:16px"><tr><td style="padding:20px">
+  <tr><td class="px" style="padding:28px 32px 4px">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${SOFT};border:1px solid ${LINE};border-radius:16px"><tr><td class="card" style="padding:20px">
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
-        ${tile ? `<td valign="top" width="88" style="width:88px;padding-right:18px">${tile}</td>` : ""}
+        ${tile ? `<td class="tile" valign="top" width="88" style="width:88px;padding-right:18px">${tile}</td>` : ""}
         <td valign="top"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
           ${kv("Date", dateLine)}
           ${kv("Time", esc(time))}
@@ -122,23 +138,23 @@ export function classConfirmHtml(first: string, date: string, time: string, c: C
       </tr></table>
     </td></tr></table>
   </td></tr>
-  <tr><td style="padding:16px 32px 4px">
+  <tr><td class="px" style="padding:16px 32px 4px">
     <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
       ${cal ? btn(cal, "Add to calendar", true) + `<td width="10" style="width:10px;font-size:0">&nbsp;</td>` : ""}${btn(DIRECTIONS, "Get directions", !cal)}
     </tr></table>
   </td></tr>
 
-  <tr><td style="padding:34px 32px 6px">${eyebrow("Before your class")}<div style="font:800 21px/1.3 ${FONT};color:${BLUE};margin-bottom:16px">Four quick things</div>
+  <tr><td class="px sec" style="padding:34px 32px 6px">${eyebrow("Before your class")}<div style="font:800 21px/1.3 ${FONT};color:${BLUE};margin-bottom:16px">Four quick things</div>
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">${stepRows}</table>
   </td></tr>
 
-  <tr><td style="padding:22px 32px 6px">${eyebrow("Fees")}<div style="font:800 21px/1.3 ${FONT};color:${BLUE};margin-bottom:6px">Course fees</div>
+  <tr><td class="px sec" style="padding:22px 32px 6px">${eyebrow("Fees")}<div style="font:800 21px/1.3 ${FONT};color:${BLUE};margin-bottom:6px">Course fees</div>
     <div style="font:14px/1.5 ${FONT};color:${MUTED};margin-bottom:12px">Please make the payment the day before coming to the class for your easiness.</div>
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid ${LINE};border-radius:14px">${fees}</table>
   </td></tr>
 
-  <tr><td style="padding:24px 32px 6px">
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${BLUE};background-image:linear-gradient(135deg,${BLUE} 0%,${MID} 100%);border-radius:16px"><tr><td style="padding:20px 22px 12px">
+  <tr><td class="px sec" style="padding:24px 32px 6px">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${BLUE};background-image:linear-gradient(135deg,${BLUE} 0%,${MID} 100%);border-radius:16px"><tr><td class="pc" style="padding:20px 22px 12px">
       <div style="font:700 12px ${FONT};letter-spacing:1.6px;text-transform:uppercase;color:#bfe3fa">Payment details</div>
       <div style="font:800 17px/1.3 ${FONT};color:#ffffff;margin:4px 0 8px">COMMONWEALTH Bank</div>
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">${pay}</table>
@@ -146,13 +162,13 @@ export function classConfirmHtml(first: string, date: string, time: string, c: C
     <div style="font:13px/1.55 ${FONT};color:${MUTED};padding:12px 2px 0">Kindly, send us a screenshot of the payment before you attend the classes once made.</div>
   </td></tr>
 
-  <tr><td style="padding:26px 32px 32px">
+  <tr><td class="px sec" style="padding:26px 32px 32px">
     <div style="font:800 19px/1.3 ${FONT};color:${BLUE}">Need a hand?</div>
     <div style="font:15px/1.6 ${FONT};color:${INK};margin:6px 0 16px">For any assistance please do not hesitate to contact us at <a href="tel:${PHONE}" style="color:${MID};font-weight:700;text-decoration:none">${PHONE}</a>.</div>
     <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>${btn("tel:" + PHONE, "Call " + PHONE, false)}</tr></table>
   </td></tr>
 
-  <tr><td style="background:${BLUE};padding:18px 32px;font:12px/1.6 ${FONT};color:#bcd9f2">Oscars Training Centre First Aid and CPR Team<br>${esc(ADDRESS)}</td></tr>
+  <tr><td class="px" style="background:${BLUE};padding:18px 32px;font:12px/1.6 ${FONT};color:#bcd9f2">Oscars Training Centre First Aid and CPR Team<br>${esc(ADDRESS)}</td></tr>
 </table>
 </td></tr></table>
 </body></html>`;
