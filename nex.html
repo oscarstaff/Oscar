@@ -1024,6 +1024,81 @@ sub,sup{line-height:0}
 .nx-table th{font-size:11.5px}
 .nx-table td .nx-muted,.nx-table td small{font-size:11px}
 .nx-table th,.nx-table td{padding:0 8px}
+/* =====================================================================================================
+   v45 MOTION PASS: the 12 principles of animation and the UX laws, applied to a working tool.
+   Everything here is transform / opacity only (no layout shift) and sits inside prefers-reduced-motion:no-preference,
+   so anyone who asks their device for less motion gets none of it.
+   Squash and stretch  buttons, cards and chips flatten on press and spring back past rest (the pointer handler adds .is-down)
+   Anticipation        dialogs and toasts dip a little before they rise
+   Staging             the dialog backdrop blurs the page so the one thing that matters is in focus
+   Pose to pose        the entrances below are keyframed poses (dip, overshoot, settle), not one tween
+   Follow-through      a dialog's header leads, its body and footer follow 50ms apart; list rows settle in turn
+   Slow in, slow out   moves that travel use ease-in-out; entrances ease out; exits ease in
+   Arcs                toasts travel along a curve: x eases out while y springs, on separate properties
+   Secondary action    arrows nudge, icons lean in, the all-clear tick pops, while the main action happens
+   Timing              nothing over .46s; hovers .12 to .3s
+   Exaggeration        invalid fields, errors and failed toasts shake; saved toasts send out a ring
+   Solid drawing       one elevation system: clickable cards lift on hover and sink on press
+   Appeal              the spring is shared, so everything moves like it belongs to the same family
+   UX laws             Fitts: small buttons get a larger invisible hit area. Doherty: the busy bar starts at once and the cursor says so.
+   ===================================================================================================== */
+:root{--nx-spring:cubic-bezier(.34,1.56,.64,1);--nx-inout:cubic-bezier(.65,0,.35,1);--nx-snap:cubic-bezier(.2,.9,.3,1)}
+@keyframes nxm2{0%{opacity:0;transform:translateY(14px) scale(.95)}22%{opacity:1;transform:translateY(18px) scale(.94)}62%{transform:translateY(-4px) scale(1.012)}82%{transform:translateY(1px) scale(.998)}100%{opacity:1;transform:none}}
+@keyframes nxm2out{to{opacity:0;transform:translateY(8px) scale(.97)}}
+@keyframes nxfollow{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes nxt2{0%{opacity:0;transform:translateY(14px) scale(.96)}22%{opacity:1;transform:translateY(18px) scale(.97,.92)}62%{transform:translateY(-5px) scale(1.02,1.05)}82%{transform:translateY(1px) scale(.995,.99)}100%{opacity:1;transform:none}}
+@keyframes nxarcx{from{translate:-26px 0}to{translate:0 0}}
+@keyframes nxshakex{0%,100%{translate:0 0}18%{translate:-7px 0}38%{translate:6px 0}58%{translate:-4px 0}78%{translate:3px 0}}
+@keyframes nxring{from{box-shadow:0 0 0 0 rgba(90,169,255,.55)}to{box-shadow:0 0 0 12px rgba(90,169,255,0)}}
+@keyframes nxtick{from{opacity:0;transform:scale(0) rotate(-35deg)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:no-preference){
+  /* squash and stretch, with overshoot on release */
+  body .nx-btn,body .nx-chip,body .nx-att,body .nx-pick,body .nx-day{transition:transform .42s var(--nx-spring),background-color .12s var(--nx-out),border-color .12s var(--nx-out),color .12s var(--nx-out),box-shadow .2s var(--nx-out),filter .12s;transform-origin:50% 62%}
+  body .nx-btn.is-down:not(:disabled),body .nx-chip.is-down,body .nx-att.is-down,body .nx-pick.is-down,body .nx-day.is-down,
+  body .nx-btn:active:not(:disabled),body .nx-chip:active,body .nx-att:active,body .nx-pick:active,body .nx-day:active{transform:scale(1.035,.9);transition:transform .07s ease-out,background-color .12s var(--nx-out),border-color .12s var(--nx-out),color .12s var(--nx-out),filter .12s}
+  /* anticipation and pose to pose: dialogs, with the backdrop doing the staging */
+  .modal-bg{backdrop-filter:blur(2.5px);-webkit-backdrop-filter:blur(2.5px)}
+  .modal{animation:nxm2 .38s var(--nx-snap) both}
+  .modal-bg.is-closing .modal{animation:nxm2out .14s var(--nx-ease-in) both}
+  /* follow-through: header leads, body and footer follow */
+  .modal-b{animation:nxfollow .34s var(--nx-snap) .05s both}
+  .modal-f{animation:nxfollow .34s var(--nx-snap) .1s both}
+  .modal-bg.is-closing .modal-b,.modal-bg.is-closing .modal-f{animation:none}
+  .modal-b .nx-list li,.modal-b .nx-sel-opt>*{animation:nxfollow .3s var(--nx-snap) both}
+  .modal-b .nx-list li:nth-child(2),.modal-b .nx-sel-opt>:nth-child(2){animation-delay:.04s}
+  .modal-b .nx-list li:nth-child(3),.modal-b .nx-sel-opt>:nth-child(3){animation-delay:.08s}
+  .modal-b .nx-list li:nth-child(4),.modal-b .nx-sel-opt>:nth-child(4){animation-delay:.12s}
+  .modal-b .nx-list li:nth-child(5),.modal-b .nx-sel-opt>:nth-child(5){animation-delay:.16s}
+  .modal-b .nx-list li:nth-child(n+6),.modal-b .nx-sel-opt>:nth-child(n+6){animation-delay:.2s}
+  /* arcs and anticipation: toasts dip, then travel along a curve; failures shake, successes ring */
+  .toast{animation:nxt2 .46s var(--nx-snap) both,nxarcx .46s var(--nx-snap) both}
+  .toast:not(.bad){animation:nxt2 .46s var(--nx-snap) both,nxarcx .46s var(--nx-snap) both,nxring .7s ease-out .38s both}
+  .toast.bad{animation:nxt2 .46s var(--nx-snap) both,nxshakex .42s ease-in-out .4s both}
+  .toast.out{animation:nxtoastout .2s ease-in both}
+  /* exaggerated feedback */
+  .nx-in[aria-invalid="true"],.nx-sel[aria-invalid="true"],.nx-ta[aria-invalid="true"]{animation:nxshakex .4s ease-in-out both;border-color:var(--nx-bad)}
+  .modal .nx-err{animation:nxshakex .4s ease-in-out both}
+  /* solid drawing: one elevation system. clickable cards lift on hover, sink on press */
+  .nx-bcard{transition:transform .3s var(--nx-spring),box-shadow .2s var(--nx-out),border-color .14s var(--nx-out)}
+  .nx-bcard:hover{transform:translateY(-2px);box-shadow:var(--nx-shadow-pop)}
+  .nx-bcard:active{transform:translateY(0) scale(.985,.965);box-shadow:none;transition-duration:.07s}
+  body .nx-att:hover{transform:translateY(-1px)}
+  /* secondary action */
+  .nx-att>svg:last-child,.nx-btn svg{transition:transform .3s var(--nx-spring)}
+  .nx-att:hover>svg:last-child{transform:translateX(4px)}
+  .nx-btn:hover:not(:disabled) svg{transform:scale(1.12) translateY(-1px)}
+  .nx-main.nx-enter .nx-att.zero .nx-big svg{animation:nxtick .5s var(--nx-spring) .18s both}
+  /* slow in, slow out for things that travel */
+  .nx-meter-bar i,.nx-cap i{transition:width .6s var(--nx-inout)}
+}
+/* Fitts's law: a larger invisible target around the small buttons (mouse only; touch already has 36 to 44px minimums) */
+@media (pointer:fine){
+  .nx-btn.sm,.nx-btn.icon{position:relative}
+  .nx-btn.sm::before,.nx-btn.icon::before{content:"";position:absolute;inset:-4px}
+  .nx-check input{width:18px;height:18px}
+}
+/* Doherty threshold: the response starts at once, and the cursor says the app is working */
+body.nx-busy{cursor:progress}
 </style>
 </head>
 <body class="nx">
