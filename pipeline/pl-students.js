@@ -387,9 +387,9 @@ function tabMoney(c) {
       '<div><div class="nx-lbl">Agreed fee</div><div class="nx-money">' + (fee ? money(fee) : '–') + '</div></div><div><div class="nx-lbl">Paid</div><div class="nx-money">' + money(paid) + '</div></div><div><div class="nx-lbl">Balance</div><div class="nx-money ' + (bal > 0 ? 'nx-neg' : 'nx-pos') + '">' + (fee ? money(bal) : '–') + '</div></div><div class="nx-grow"></div>' +
       '<div class="nx-btnrow">' + (canPay() ? '<button class="nx-btn sm" data-a="addPay" data-id="' + e.id + '">' + ico('plus') + 'Payment</button>' : '') + '<button class="nx-btn sm" data-a="refund" data-id="' + e.id + '">Refund</button><button class="nx-btn sm" data-a="editEnr" data-id="' + e.id + '">' + ico('edit') + 'Edit</button></div></div>' +
       (e.notes || e.follow_up_note ? '<div style="padding:0 16px 12px" class="nx-muted">' + esc(e.notes || '') + '</div>' : '') +
-      (ps.length || rf.length ? '<div class="nx-tablewrap"><table class="nx-table auto tight"><thead><tr><th>Date</th><th>Amount</th><th>Method</th><th>Reference</th><th>Processing</th></tr></thead><tbody>' +
-        ps.map(p => { const q = c.queue.find(x => x.payment_id === p.id); return '<tr><td>' + esc(fmtDate(p.paid_on)) + '</td><td class="nx-money">' + money(p.amount) + '</td><td>' + esc(p.method || '–') + '</td><td>' + esc(p.reference || p.payer_name || '–') + '</td><td>' + (q ? pill('payment_queue', q.queue_status) + ' ' + pill('processing', q.processing_step) : '<span class="nx-muted">–</span>') + '</td></tr>'; }).join('') +
-        rf.map(r => '<tr><td>' + esc(fmtDate(r.refunded_on)) + '</td><td class="nx-money nx-neg">-' + money(r.amount).replace('-', '') + '</td><td>Refund</td><td>' + esc(r.reason || '–') + '</td><td>Approved by ' + esc(r.approved_by || '–') + '</td></tr>').join('') + '</tbody></table></div>' : '<div style="padding:0 16px 16px" class="nx-muted">No payments recorded.</div>'));
+      (ps.length || rf.length ? '<div class="nx-tablewrap"><table class="nx-table auto tight"><thead><tr><th>Date</th><th>Amount</th><th>Instalment</th><th>Method</th><th>Reference</th><th>Processing</th></tr></thead><tbody>' +
+        ps.map(p => { const q = c.queue.find(x => x.payment_id === p.id); return '<tr><td>' + esc(fmtDate(p.paid_on)) + '</td><td class="nx-money">' + money(p.amount) + '</td><td>' + (x => x ? esc(x.label) : '–')(instalmentOf(e.fee, ps, p.id)) + '</td><td>' + esc(p.method || '–') + '</td><td>' + esc(p.reference || p.payer_name || '–') + '</td><td>' + (q ? pill('payment_queue', q.queue_status) + ' ' + pill('processing', q.processing_step) : '<span class="nx-muted">–</span>') + '</td></tr>'; }).join('') +
+        rf.map(r => '<tr><td>' + esc(fmtDate(r.refunded_on)) + '</td><td class="nx-money nx-neg">-' + money(r.amount).replace('-', '') + '</td><td></td><td>Refund</td><td>' + esc(r.reason || '–') + '</td><td>Approved by ' + esc(r.approved_by || '–') + '</td></tr>').join('') + '</tbody></table></div>' : '<div style="padding:0 16px 16px" class="nx-muted">No payments recorded.</div>'));
   }).join('');
   const orphan = c.pays.filter(p => !linked.has(p.id));
   return cards + (orphan.length ? section('Payments not linked to an enrolment', '<div class="nx-tablewrap"><table class="nx-table auto tight"><tbody>' + orphan.map(p => '<tr><td>' + esc(fmtDate(p.paid_on)) + '</td><td class="nx-money">' + money(p.amount) + '</td><td>' + esc(p.reference || p.payer_name || '–') + '</td></tr>').join('') + '</tbody></table></div>') : '');
@@ -467,7 +467,7 @@ function paymentForm(o) {
   return formModal(o.student ? 'Record payment for ' + fullName(o.student) : 'Record payment', f, async (v, m) => {
     const row = Object.assign({ student_id: o.student ? o.student.id : null, enrolment_id: o.enrolment ? o.enrolment.id : null, created_by: ME.name }, v);
     const p = await ins('nex_payments', row);
-    if (o.enrolment && o.addToQueue !== false) await ins('nex_payment_queue', { enrolment_id: o.enrolment.id, payment_id: p.id, processing_step: 'draft_not_made', updated_by: ME.name }, true).catch(() => {});
+    if (o.enrolment && o.addToQueue !== false) await queuePayment(o.enrolment.id, p.id);
     toast('Payment recorded'); render();
   }, 'Save payment', extra);
 }
