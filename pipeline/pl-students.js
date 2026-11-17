@@ -277,14 +277,15 @@ async function emailFollowup(s, step) {
     { k: 'body', label: 'Message', type: 'textarea', value: pv.body, full: true, required: true, help: 'You can edit this before it goes. Replies come to you.' }
   ];
   const miss = (pv.missing || []).reduce((n, g) => n + g.docs.length, 0);
-  const top = '<p class="nx-muted" style="margin:0 0 10px">To <b>' + esc(pv.to) + '</b> · ' + (miss ? miss + ' document' + (miss === 1 ? '' : 's') + ' still missing' : 'no documents missing') + (pv.last_sent ? ' · sent before by ' + esc(pv.last_sent.sent_by || 'someone') + ' on ' + esc(fmtDate(pv.last_sent.sent_at)) : '') + '</p>';
+  const top = '<p class="nx-muted" style="margin:0 0 10px">To <b>' + esc(pv.to) + '</b> · ' + (miss ? miss + ' document' + (miss === 1 ? '' : 's') + ' still missing' : 'no documents missing') + (pv.last_sent ? ' · sent before by ' + esc(pv.last_sent.sent_by || 'someone') + ' on ' + esc(fmtDate(pv.last_sent.sent_at)) : '') + (typeof pv.remaining === 'number' ? ' · ' + pv.remaining + ' more can be sent today' : '') + '</p>';
   const send = async (v, m, force) => {
-    try { await fn('nex-send-followup', { student_id: s.id, step, subject: v.subject, body: v.body, force: !!force }); }
+    let r;
+    try { r = await fn('nex-send-followup', { student_id: s.id, step, subject: v.subject, body: v.body, force: !!force }); }
     catch (e) {
       if (e.code === 'recent' && !force) { if (await confirmBox('Send again?', e.message + ' Send it again?', 'Send again')) return send(v, m, true); return false; }
       throw e;
     }
-    toast('Email sent to ' + pv.to); render();
+    toast('Email sent to ' + pv.to + (r && typeof r.remaining === 'number' && r.remaining <= 20 ? '. ' + r.remaining + ' more can be sent today.' : '')); render();
   };
   return formModal('Email ' + ['', '1st', '2nd', '3rd'][step] + ' follow-up', fields, (v, m) => send(v, m, false), 'Send email', top);
 }
