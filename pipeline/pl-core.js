@@ -18,6 +18,28 @@ const ME = { name: '', admin: false, team: '' };
 const teamIs = (...t) => { const mine = String(ME.team || '').trim().toLowerCase(); return t.some(x => x.toLowerCase() === mine); };
 const canFlag = () => !!ME.admin || teamIs('Evershine');
 const canPay = () => !!ME.admin || teamIs('Processing', 'Accounts');
+const canVerify = () => !!ME.admin || teamIs('Accounts');        /* Accounts check a bank payment against the bank statement (admins can too) */
+const canCash = () => canPay() || teamIs('Evershine');            /* the Evershine team takes cash on the class day, so they may enter cash (nothing else) */
+/* Only confirmed money counts as received. A bank transfer is Pending verification until Accounts verify it; cash is confirmed as soon as it is entered. */
+const payConfirmed = p => !p || !p.verify_status || p.verify_status === 'confirmed';
+const sumPaid = list => (list || []).reduce((t, p) => t + (payConfirmed(p) ? Number(p.amount || 0) : 0), 0);
+const sumPending = list => (list || []).reduce((t, p) => t + (p && p.verify_status === 'pending_verification' ? Number(p.amount || 0) : 0), 0);
+function payStatusHtml(p) {
+  if (!p) return '';
+  let h = p.verify_status === 'pending_verification' ? '<span class="nx-pill warn">Pending verification</span>'
+    : p.verify_status === 'rejected' ? '<span class="nx-pill bad" title="' + esc(p.verify_note || '') + '">Not received</span>' : '<span class="nx-pill ok">Confirmed</span>';
+  if (p.handover_status === 'awaiting') h += ' <span class="nx-pill warn" title="An admin checks the cash handover">Cash: admin to check</span>';
+  else if (p.handover_status === 'verified') h += ' <span class="nx-pill ok" title="' + esc('Checked by ' + (p.handover_by || 'an admin')) + '">Cash handover checked</span>';
+  return h;
+}
+const PAY_METHODS = ['Bank transfer', 'Cash', 'Card', 'Agent', 'Other'];
+const payMethodOpts = () => canPay() ? PAY_METHODS : ['Cash'];
+const PAY_METHOD_HELP = 'Bank transfer waits as Pending verification until Accounts check it against the bank statement. Cash is confirmed straight away and goes to the admins to check the handover.';
+function payDoneMsg(method) {
+  const m = String(method || '').toLowerCase();
+  return m.indexOf('bank') >= 0 ? 'Payment recorded. It stays Pending verification until Accounts check the bank statement.'
+    : m === 'cash' ? 'Cash recorded and confirmed. The admins have it in their cash receipts to check the handover.' : 'Payment recorded';
+}
 
 /* ---------- tiny helpers ---------- */
 const $ = (s, r) => (r || document).querySelector(s);
@@ -44,7 +66,7 @@ function fmtDT(v) {
    A later payment is never "short": it is the next instalment. */
 function ordinal(n) { const s = ['th', 'st', 'nd', 'rd'], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); }
 function instalmentOf(fee, pays, id) {
-  const list = (pays || []).slice().sort((a, b) => String(a.paid_on || '').localeCompare(String(b.paid_on || '')) || String(a.created_at || '').localeCompare(String(b.created_at || '')));
+  const list = (pays || []).filter(payConfirmed).sort((a, b) => String(a.paid_on || '').localeCompare(String(b.paid_on || '')) || String(a.created_at || '').localeCompare(String(b.created_at || '')));
   const i = list.findIndex(p => p.id === id); if (i < 0) return null;
   const paidTo = list.slice(0, i + 1).reduce((t, p) => t + Number(p.amount || 0), 0), f = Number(fee || 0);
   const full = f > 0 && paidTo >= f, bal = f > 0 ? Math.max(0, f - paidTo) : null;
