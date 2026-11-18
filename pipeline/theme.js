@@ -17,7 +17,14 @@
     var b = e.target.closest && e.target.closest('[data-theme-set]'); if (!b) return;
     var mode = b.getAttribute('data-theme-set'); if (MODES.indexOf(mode) < 0) return;
     try { localStorage.setItem(KEY, mode); } catch (er) {}
-    apply(mode);
+    if (root.getAttribute('data-theme') === mode) return;
+    var calm = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (calm) { apply(mode); return; }
+    /* Cross-fade the whole page so a gradient or backdrop blur never pops. View Transitions where supported,
+       otherwise a short colour transition on everything. */
+    if (document.startViewTransition) { document.startViewTransition(function () { apply(mode); }); return; }
+    root.classList.add('yl-fade'); apply(mode);
+    setTimeout(function () { root.classList.remove('yl-fade'); }, 520);
   });
   window.addEventListener('storage', function (e) { if (e.key === KEY) apply(saved()); }); /* other tab changed it */
 })();
