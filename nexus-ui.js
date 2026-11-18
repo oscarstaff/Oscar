@@ -157,9 +157,23 @@ setTimeout(function(){
 
 /* ---------- Two-step login for Nex ----------
    The 6-digit code is asked here, in Nexus, because confirming a code swaps the session's refresh token and
-   Nexus is the one app that holds it. It is asked once per Nexus sign-in, only when someone opens the Nex card
+   Nexus is the one app that holds it. It is asked when someone opens the Nex card and no code was entered in the last 2 hours
    (never at login, clock-in or any other page). Nex receives the code-verified (aal2) access token and no refresh token. */
 function _mfaAal(){ try{ const t=window._sbAuthToken||''; return JSON.parse(atob(t.split('.')[1].replace(/-/g,'+').replace(/_/g,'/'))).aal||'aal1'; }catch(e){ return 'aal1'; } }
+/* A code stays good for MFA_RECHECK_MS. After that, opening Nex asks for a fresh code (like a uni login timing out).
+   When the last code was entered comes from the session token itself (its amr list stamps every sign-in method),
+   and from this page's own clock right after a code is accepted, so a token without a stamp can never cause a loop. */
+const MFA_RECHECK_MS=2*60*60*1000;
+let _mfaOkAt=0;
+function _mfaCodeAt(){
+  let at=_mfaOkAt;
+  try{
+    const c=JSON.parse(atob((window._sbAuthToken||'').split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));
+    (c.amr||[]).forEach(function(a){ if(a&&a.method==='totp'&&Number(a.timestamp)>0) at=Math.max(at,Number(a.timestamp)*1000); });
+  }catch(e){}
+  return at;
+}
+function _mfaCodeFresh(){ const at=_mfaCodeAt(); return at>0 && Date.now()-at<MFA_RECHECK_MS; }
 async function _nexMfaState(){
   try{
     const r=await fetch(SB+'/rest/v1/rpc/nex_mfa_state',{method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+_sbBearer(),'Content-Type':'application/json'},body:'{}'});
@@ -167,14 +181,14 @@ async function _nexMfaState(){
   }catch(e){ return null; }
 }
 function _mfaDigits(v){ return String(v||'').replace(/\D/g,'').slice(0,6); }
-async function _mfaAskCode(ac,factorId){
+async function _mfaAskCode(ac,factorId,again){
   for(let i=0;i<5;i++){
-    const v=await window.nxPrompt('Enter the 6-digit code from your authenticator app.','',{title:'Open Nex',okText:'Continue',inputType:'text',placeholder:'000000'});
+    const v=await window.nxPrompt(again?'It has been a while since your last code. Enter the 6-digit code from your authenticator app to open YatraLine.':'Enter the 6-digit code from your authenticator app.','',{title:again?'Confirm it is you':'Open Nex',okText:'Continue',inputType:'text',placeholder:'000000'});
     if(v===null||v===undefined) return false;
     const code=_mfaDigits(v);
     if(code.length!==6){ showToast('Enter the 6 digits shown in your app.','warning'); continue; }
     const { error }=await ac.mfa.challengeAndVerify({factorId:factorId,code:code});
-    if(!error){ await refreshSbAuthToken(); return true; }
+    if(!error){ _mfaOkAt=Date.now(); await refreshSbAuthToken(); return true; }
     showToast(/rate|too many/i.test(error.message||'')?'Too many tries. Wait a minute and try again.':'That code did not match. Wait for a new one and try again.','error');
   }
   return false;
@@ -224,7 +238,7 @@ function _mfaEnrol(ac,mandatory){
       const { error }=await ac.mfa.challengeAndVerify({factorId:enr.id,code:code});
       go.disabled=false;
       if(error){ err.textContent=/rate|too many/i.test(error.message||'')?'Too many tries. Wait a minute and try again.':'That code did not match. Wait for a new one and try again.'; inp.value=''; inp.focus(); return; }
-      await refreshSbAuthToken(); showToast('Two-step login is on','success'); done(true);
+      _mfaOkAt=Date.now(); await refreshSbAuthToken(); showToast('Two-step login is on','success'); done(true);
     };
     inp.addEventListener('keydown',function(e){ if(e.key==='Enter') go.click(); });
     [h,p,qrBox,key,inp,err,row].forEach(function(n){ card.appendChild(n); });
@@ -238,10 +252,11 @@ async function nexMfaGate(){
   await refreshSbAuthToken();
   const st=await _nexMfaState();
   if(!st||!st.allowed) return true;
-  if(_mfaAal()==='aal2') return true;
+  const verified=_mfaAal()==='aal2';
+  if(verified&&_mfaCodeFresh()) return true;
   const lf=await ac.mfa.listFactors();
   const ver=((lf&&lf.data&&lf.data.totp)||[])[0];
-  if(ver) return await _mfaAskCode(ac,ver.id);
+  if(ver) return await _mfaAskCode(ac,ver.id,verified);
   if(st.required) return await _mfaEnrol(ac,true);
   if(typeof myIsAdmin!=='undefined'&&myIsAdmin===true&&!sessionStorage.getItem('nx_mfa_offer_skip')){
     const r=await _mfaEnrol(ac,false);
