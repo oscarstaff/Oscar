@@ -42,7 +42,7 @@ function pipSVG(extra) {
 }
 
 const PIP_TIPS = [
-  [/^#\/leads/, 'Tip: the Needs follow-up tab lists everyone who missed or moved a class.'],
+  [/^#\/leads/, 'Tip: the Follow-up tag shows who is due a 1st, 2nd or 3rd follow-up. The Missed a class tab lists everyone who missed or moved a class.'],
   [/^#\/firstaid/, 'Tip: press Attended on a booking and your name is kept against it.'],
   [/^#\/calls/, 'Tip: log every call. A number we do not know becomes a lead flagged to you.'],
   [/^#\/payments/, 'Tip: a lead who pays $200 or more becomes a student on their own.'],

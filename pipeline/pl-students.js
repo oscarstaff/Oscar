@@ -9,17 +9,18 @@ const PATH = ['checklist_sent', 'docs_completed', 'processed', 'placement', 'cer
 /* ---------- Overview ---------- */
 route(/^\/$/, async () => {
   const today = sydToday();
-  const [nStu, nLead, nOpenEnr, nQueue, nUnm, nDue, sessions, pmRows, nVer, nCash] = await Promise.all([
+  const [nStu, nLead, nOpenEnr, nQueue, nUnm, nDue, sessions, pmRows, nVer, nCash, nFu] = await Promise.all([
     countKind('student'),
     countKind('lead'),
     count('nex_enrolments', 'deleted_at=is.null&stage=not.in.(certificate_issued,not_interested)'),
     count('nex_payment_queue', 'processing_step=neq.processed'),
     count('nex_payments', 'student_id=is.null'),
-    count('nex_followups', 'done_at=is.null&due_at=lte.' + today + 'T23:59:59'),
+    count('nex_tasks', 'status=neq.done&due_on=lte.' + today + '&assigned_to=eq.' + encodeURIComponent(ME.name)),
     sel('nex_class_sessions', 'select=*&class_date=gte.' + today + '&order=class_date&limit=4'),
     placementMailLoad().catch(() => []),
     canVerify() ? count('nex_payments', 'verify_status=eq.pending_verification') : 0,
-    ME.admin ? count('nex_payments', 'handover_status=eq.awaiting') : 0
+    ME.admin ? count('nex_payments', 'handover_status=eq.awaiting') : 0,
+    leadFuCount('due').catch(() => 0)
   ]);
   let counts = {};
   if (sessions.length) {
@@ -34,7 +35,8 @@ route(/^\/$/, async () => {
   afterRender(() => { const h = $('#tipsHide'); if (h) h.onclick = () => { try { localStorage.setItem('nex_tips_v1', '1'); } catch (e) {} const c = h.closest('.nx-tips'); if (c) c.remove(); }; });
   return pageHead('home', nStu.toLocaleString('en-AU') + (nStu === 1 ? ' student' : ' students') + ' and ' + nLead.toLocaleString('en-AU') + (nLead === 1 ? ' lead' : ' leads'), 'Welcome back, ' + first, '<a class="nx-btn primary" href="#/leads?new=1">' + ico('plus') + 'New lead</a>') +
     tips + placementMailCard(pmRows) + '<div class="nx-two"><div class="nx-stack"><div class="nx-card"><div class="nx-card-h"><h3>Needs attention</h3></div><div class="nx-attlist">' +
-    att('#/followups', nDue, 'Follow-ups due', 'today or overdue', 'bad') +
+    att('#/tasks', nDue, 'My tasks due', 'today or overdue', 'bad') +
+    att('#/leads?fu=due', nFu, 'Lead follow-ups due', '1st, 2nd or 3rd, today or overdue', 'bad') +
     att('#/payments?view=unmatched', nUnm, 'Unmatched payments', 'no student linked', 'warn') +
     att('#/payments', nQueue, 'Payments to process', 'in the processing queue', 'accent') +
     (canVerify() ? att('#/payments?view=verify', nVer, 'Bank payments to verify', 'waiting for Accounts', 'warn') : '') +
@@ -60,20 +62,62 @@ function feedItem(a) {
 
 /* ---------- Leads, Students and Search (one list, three pages) ----------
    Leads: paid under $200 in total. Students: paid $200 or more. Search: everyone, labelled. */
-/* when the next follow-up is due: today in bold, overdue in red */
-function nextFuHtml(f) {
-  if (!f || !f.due_at) return '<span class="nx-muted">–</span>';
-  const today = sydToday(), day = new Date(f.due_at).toLocaleDateString('en-CA', { timeZone: TZ });
-  const cls = day < today ? 'nx-neg' : day === today ? 'nx-money' : '';
-  const nth = f.kind === 'lead_cycle' && f.step ? ['', '1st', '2nd', '3rd'][f.step] + ' · ' : '';
-  return '<span class="' + cls + '">' + nth + esc(fmtDate(f.due_at)) + (day < today ? ' (overdue)' : day === today ? ' (today)' : '') + '</span>';
+/* The lead follow-up cycle: a 1st, 2nd and 3rd follow-up, 2, 4 and 6 days after first contact (nex_start_lead_cycle).
+   nex_lead_followup holds one row per lead: the step that is open now, when it is due, and how many steps are still open.
+   It is kept up to date by a trigger on nex_followups, so the Leads list can filter and sort on it. */
+const FU_NTH = ['', '1st', '2nd', '3rd'];
+const FU_EMBED = 'nex_lead_followup(step,due_at,due_day,assigned_to,open_count,total_count)';
+const FU_SORT = {
+  newest: 'created_at.desc',
+  due: 'nex_lead_followup(due_day).asc.nullslast,created_at.desc',
+  step: 'nex_lead_followup(step).desc.nullslast,nex_lead_followup(due_day).asc.nullslast,created_at.desc',
+  name: 'first_name.asc,last_name.asc'
+};
+/* the status tag for one lead: { key, label, tone, sub } */
+function fuInfo(raw, today) {
+  const fu = Array.isArray(raw) ? raw[0] : raw;
+  if (!fu || !fu.total_count) return { key: 'none', label: 'No follow-ups set', tone: '', sub: '' };
+  if (!fu.open_count || !fu.step) return { key: 'complete', label: 'Cycle complete', tone: 'ok', sub: fu.total_count + ' of ' + fu.total_count + ' done' };
+  const nth = FU_NTH[fu.step], who = fu.assigned_to ? ' · ' + fu.assigned_to : '';
+  if (fu.due_day < today) { const n = Math.round((new Date(today + 'T12:00:00') - new Date(fu.due_day + 'T12:00:00')) / 864e5); return { key: 'due' + fu.step, label: nth + ' Follow Up Due', tone: 'bad', sub: n + (n === 1 ? ' day' : ' days') + ' overdue' + who }; }
+  if (fu.due_day === today) return { key: 'due' + fu.step, label: nth + ' Follow Up Due', tone: 'warn', sub: 'Due today' + who };
+  return { key: 'upcoming', label: nth + ' follow-up', tone: 'info', sub: 'Due ' + fmtDate(fu.due_day) + who };
 }
-const SL = { q: '', stage: '', qual: '', unf: '', kind: 'student', view: 'all', page: 0, size: 50 };
+function fuCellHtml(raw, today) {
+  const i = fuInfo(raw, today);
+  return '<span class="nx-pill ' + i.tone + '">' + esc(i.label) + '</span>' + (i.sub ? '<div class="nx-muted" style="font-size:12px;margin-top:2px">' + esc(i.sub) + '</div>' : '');
+}
+/* the filter text for one follow-up state, to add to a nex_students query that embeds nex_lead_followup!inner */
+function fuFilter(which, today) {
+  const E = '&nex_lead_followup.', due = E + 'open_count=gt.0' + E + 'due_day=lte.' + today;
+  if (which === 'due') return due;
+  if (which === '1' || which === '2' || which === '3') return due + E + 'step=eq.' + which;
+  if (which === 'upcoming') return E + 'open_count=gt.0' + E + 'due_day=gt.' + today;
+  if (which === 'complete') return E + 'open_count=eq.0';
+  return '';
+}
+/* how many leads (under $200, not archived) are in one follow-up state: 'due', '1', '2', '3' */
+async function leadFuCount(which) {
+  const r = await api('nex_students?select=id,nex_student_paid!inner(paid_total),nex_lead_followup!inner(step)&deleted_at=is.null&nex_student_paid.paid_total=lt.' + STUDENT_MIN + fuFilter(which, sydToday()), { method: 'HEAD', headers: { Prefer: 'count=exact', Range: '0-0', 'Range-Unit': 'items' } });
+  const n = parseInt((r.headers.get('Content-Range') || '').split('/')[1], 10);
+  return isNaN(n) ? 0 : n;
+}
+/* the follow-up controls on the Leads toolbar */
+function fuControlsHtml() {
+  const st = [['due', 'Any follow-up due now'], ['1', '1st Follow Up Due'], ['2', '2nd Follow Up Due'], ['3', '3rd Follow Up Due'], ['upcoming', 'Follow-up coming up, not due yet'], ['complete', 'All 3 follow-ups done'], ['none', 'No follow-ups set']].map(([id, label]) => ({ id, label }));
+  const who = [{ id: 'me', label: 'Assigned to me' }].concat((REF.staff || []).filter(n => n !== ME.name).map(n => ({ id: 'n:' + n, label: n })));
+  const sorts = [['newest', 'Sort: newest first'], ['due', 'Sort: follow-up due soonest'], ['step', 'Sort: 3rd, 2nd, then 1st follow-up'], ['name', 'Sort: name A to Z']].map(([id, label]) => ({ id, label }));
+  return '<select class="nx-sel sm" id="slFu" aria-label="Follow-up status">' + selectOpts(st, SL.fu, 'All follow-up statuses') + '</select>' +
+    '<select class="nx-sel sm" id="slWho" aria-label="Follow-up assigned to">' + selectOpts(who, SL.who, 'Assigned to anyone') + '</select>' +
+    '<select class="nx-sel sm" id="slSort" aria-label="Sort leads">' + selectOpts(sorts, SL.sort) + '</select>';
+}
+const SL = { q: '', stage: '', qual: '', unf: '', fu: '', who: '', sort: 'newest', kind: 'student', view: 'all', page: 0, size: 50 };
 route(/^\/(students|leads|search)(?:\?(.*))?$/, async m => {
   const mode = m[1], qs = new URLSearchParams(m[2] || '');
   const kind = mode === 'leads' ? 'lead' : mode === 'students' ? 'student' : 'all';
-  if (SL.kind !== kind) { SL.kind = kind; SL.page = 0; SL.view = 'all'; SL.q = SL.stage = SL.qual = SL.unf = ''; }
+  if (SL.kind !== kind) { SL.kind = kind; SL.page = 0; SL.view = 'all'; SL.q = SL.stage = SL.qual = SL.unf = SL.fu = SL.who = ''; SL.sort = 'newest'; }
   if (qs.get('view') === 'follow' && kind === 'lead') SL.view = 'follow';
+  if (qs.get('fu') && kind === 'lead') { SL.fu = qs.get('fu'); SL.view = 'all'; SL.page = 0; if (SL.sort === 'newest') SL.sort = 'due'; }
   if (qs.get('unf')) { SL.unf = qs.get('unf'); SL.page = 0; }
   if (qs.has('q')) { SL.q = qs.get('q'); SL.page = 0; }
   const openNew = qs.get('new') === '1';
@@ -82,7 +126,19 @@ route(/^\/(students|leads|search)(?:\?(.*))?$/, async m => {
     const body = $('#slBody');
     const syncView = () => {
       $$('#slSeg button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === SL.view)));
-      $$('#slQ,#slStage,#slQual,#slUnf,#slClear').forEach(x => { x.hidden = SL.view === 'follow'; });
+      $$('#slQ,#slStage,#slQual,#slUnf,#slFu,#slWho,#slSort,#slChips,#slClear').forEach(x => { x.hidden = SL.view === 'follow'; });
+    };
+    /* the follow-up status tags with a count each; pressing one filters the list to it */
+    const drawChips = (n) => {
+      const el = $('#slChips'); if (!el) return;
+      const items = [['due', 'Due now'], ['1', '1st Follow Up Due'], ['2', '2nd Follow Up Due'], ['3', '3rd Follow Up Due']];
+      el.innerHTML = '<span class="nx-muted" style="font-size:12px">Follow-ups due</span>' + items.map(([k, l]) => '<button type="button" class="nx-chip" data-fu="' + k + '" aria-pressed="' + (SL.fu === k) + '">' + esc(l) + ' <b>' + (n[k] != null ? n[k] : '–') + '</b></button>').join('');
+      $$('[data-fu]', el).forEach(b => b.onclick = () => { SL.fu = SL.fu === b.dataset.fu ? '' : b.dataset.fu; SL.page = 0; if (SL.fu && SL.sort === 'newest') SL.sort = 'due'; const f = $('#slFu'), so = $('#slSort'); if (f) f.value = SL.fu; if (so) so.value = SL.sort; $$('[data-fu]', el).forEach(x => x.setAttribute('aria-pressed', String(x.dataset.fu === SL.fu))); load(); });
+    };
+    const refreshChips = async () => {
+      if (kind !== 'lead') return;
+      const n = {}; await Promise.all(['due', '1', '2', '3'].map(async k => { try { n[k] = await leadFuCount(k); } catch (e) {} }));
+      drawChips(n);
     };
     const refreshN = async () => { const n = await leadsFollowupCount(); const c = $('#slFuN'); if (c && n != null) { c.textContent = n; c.hidden = !n; } };
     const load = async () => {
@@ -90,10 +146,16 @@ route(/^\/(students|leads|search)(?:\?(.*))?$/, async m => {
       try {
         if (kind === 'lead' && SL.view === 'follow') { syncView(); await leadsFollowupLoad(body, $('#slFoot'), () => { load(); }); refreshN(); return; }
         if (kind === 'lead') syncView();
-        const q = safeQ(SL.q); const digits = cleanPhone(q);
-        let query = 'select=id,student_no,first_name,last_name,email,phone,agent_id,created_at,needs_details,flagged_to,nex_student_paid!inner(paid_total),nex_enrolments' + (SL.stage || SL.qual ? '!inner' : '') + '(id,stage,qualification_id,fee,year,enrolled_on)' + (kind === 'lead' ? ',nex_followups(due_at,step,kind)' : '') + '&deleted_at=is.null&order=created_at.desc' + (kind === 'lead' ? '&nex_followups.done_at=is.null&nex_followups.order=due_at.asc&nex_followups.limit=1' : '');
+        const q = safeQ(SL.q); const digits = cleanPhone(q); const today = sydToday();
+        const fuInner = kind === 'lead' && (['due', '1', '2', '3', 'upcoming', 'complete'].includes(SL.fu) || !!SL.who);
+        let query = 'select=id,student_no,first_name,last_name,email,phone,agent_id,created_at,needs_details,flagged_to,nex_student_paid!inner(paid_total),nex_enrolments' + (SL.stage || SL.qual ? '!inner' : '') + '(id,stage,qualification_id,fee,year,enrolled_on)' + (kind === 'lead' ? ',' + (fuInner ? FU_EMBED.replace('nex_lead_followup(', 'nex_lead_followup!inner(') : FU_EMBED) : '') + '&deleted_at=is.null&order=' + (kind === 'lead' ? (FU_SORT[SL.sort] || FU_SORT.newest) : 'created_at.desc');
         if (kind !== 'all') query += '&nex_student_paid.paid_total=' + (kind === 'lead' ? 'lt.' : 'gte.') + STUDENT_MIN;
         if (kind === 'lead' && SL.unf) query += '&needs_details=eq.true' + (SL.unf === 'mine' ? '&flagged_to=eq.' + encodeURIComponent(ME.name) : '');
+        if (kind === 'lead') {
+          query += fuFilter(SL.fu, today);
+          if (SL.fu === 'none') query += '&nex_lead_followup=is.null';
+          if (SL.who) query += '&nex_lead_followup.assigned_to=eq.' + encodeURIComponent(SL.who === 'me' ? ME.name : SL.who.slice(2));
+        }
         if (SL.stage) query += '&nex_enrolments.stage=eq.' + encodeURIComponent(SL.stage);
         if (SL.qual) query += '&nex_enrolments.qualification_id=eq.' + SL.qual;
         if (q) { const parts = ['first_name.ilike.*' + q + '*', 'last_name.ilike.*' + q + '*', 'email.ilike.*' + q + '*']; if (digits.length >= 4) parts.push('phone.ilike.*' + digits + '*'); query += '&or=(' + parts.join(',') + ')'; }
@@ -101,8 +163,8 @@ route(/^\/(students|leads|search)(?:\?(.*))?$/, async m => {
         let pays = [];
         if (rows.length) pays = await sel('nex_payments', 'select=student_id,amount,verify_status&student_id=in.' + inList(rows.map(r => r.id)));
         const paid = {}; pays.forEach(p => { if (payConfirmed(p)) paid[p.student_id] = (paid[p.student_id] || 0) + Number(p.amount); });
-        const filtered = SL.q || SL.stage || SL.qual;
-        body.innerHTML = rows.length ? '<div class="nx-tablewrap"><table class="nx-table"><thead><tr><th>' + (kind === 'lead' ? 'Lead' : kind === 'student' ? 'Student' : 'Name') + '</th><th>Phone</th><th>Qualification</th><th>Stage</th><th>Fee and paid</th>' + (kind === 'lead' ? '<th>Next follow-up</th>' : '') + '<th>Enrolled</th><th>Agent</th>' + (kind === 'lead' ? '<th></th>' : '') + '</tr></thead><tbody>' +
+        const filtered = SL.q || SL.stage || SL.qual || SL.fu || SL.who;
+        body.innerHTML = rows.length ? '<div class="nx-tablewrap"><table class="nx-table"><thead><tr><th>' + (kind === 'lead' ? 'Lead' : kind === 'student' ? 'Student' : 'Name') + '</th><th>Phone</th><th>Qualification</th><th>Stage</th><th>Fee and paid</th>' + (kind === 'lead' ? '<th>Follow-up</th>' : '') + '<th>Enrolled</th><th>Agent</th>' + (kind === 'lead' ? '<th></th>' : '') + '</tr></thead><tbody>' +
           rows.map(s => {
             const en = (s.nex_enrolments || []).slice().sort((a, b) => String(b.enrolled_on || '').localeCompare(String(a.enrolled_on || '')))[0] || {};
             const fee = (s.nex_enrolments || []).reduce((t, e) => t + Number(e.fee || 0), 0), pd = paid[s.id] || 0;
@@ -112,7 +174,7 @@ route(/^\/(students|leads|search)(?:\?(.*))?$/, async m => {
               '<td class="nx-num">' + esc(fmtPhone(s.phone)) + '</td><td>' + esc(qualShort(en.qualification_id) || '–') + '</td>' +
               '<td>' + (en.stage ? '<div class="nx-stagecell">' + pill('enrolment', en.stage) + '<div class="nx-mini">' + PATH.map((p, i) => '<i class="' + (idx >= 0 && i <= idx ? 'on' : '') + '"></i>').join('') + '</div></div>' : '<span class="nx-muted">–</span>') + '</td>' +
               '<td>' + (fee || pd ? '<div class="nx-meter"><div class="nx-meter-bar"><i class="' + (pd < fee ? 'warn' : '') + '" style="width:' + pct + '%"></i></div><small>' + money(pd) + ' of ' + money(fee) + '</small></div>' : '<span class="nx-muted">–</span>') + '</td>' +
-              (kind === 'lead' ? '<td>' + nextFuHtml((s.nex_followups || [])[0]) + '</td>' : '') +
+              (kind === 'lead' ? '<td>' + fuCellHtml(s.nex_lead_followup, today) + '</td>' : '') +
               '<td>' + esc(fmtDate(en.enrolled_on) || '–') + '</td><td>' + esc(agentName(s.agent_id) || '–') + '</td>' + (kind === 'lead' ? '<td><button class="nx-btn sm" data-bk="' + s.id + '">Book class</button></td>' : '') + '</tr>';
           }).join('') + '</tbody></table></div>' :
           empty('No ' + noun + ' found', filtered ? 'Try a different search or clear the filters.' : kind === 'lead' ? 'Everyone in YatraLine has paid $200 or more.' : kind === 'student' ? 'Nobody has paid $200 yet. New people start as leads.' : 'Nobody is in YatraLine yet.', kind === 'lead' && !filtered ? '<a class="nx-btn primary" href="#/leads?new=1">' + ico('plus') + 'New lead</a>' : '');
@@ -122,8 +184,9 @@ route(/^\/(students|leads|search)(?:\?(.*))?$/, async m => {
         const pv = $('#slPrev'), nx = $('#slNext');
         if (pv) pv.onclick = () => { SL.page--; load(); }; if (nx) nx.onclick = () => { SL.page++; load(); };
         $$('.nx-tr', body).forEach(tr => tr.onclick = () => go('#/students/' + tr.dataset.id));
-        $$('[data-bk]', body).forEach(b => b.onclick = e => { e.stopPropagation(); const p = rows.find(x => x.id === b.dataset.bk); const en = ((p && p.nex_enrolments) || []).slice().sort((a, c) => String(c.enrolled_on || '').localeCompare(String(a.enrolled_on || '')))[0]; if (p) bookClassModal(p, en ? en.id : null, () => { refreshN(); load(); }); });
+        $$('[data-bk]', body).forEach(b => b.onclick = e => { e.stopPropagation(); const p = rows.find(x => x.id === b.dataset.bk); const en = ((p && p.nex_enrolments) || []).slice().sort((a, c) => String(c.enrolled_on || '').localeCompare(String(a.enrolled_on || '')))[0]; if (p) bookClassModal(p, en ? en.id : null, () => { refreshN(); refreshChips(); load(); }); });
         if (kind === 'lead') refreshN();
+        if (kind === 'lead') { $$('[data-fu]', $('#slChips')).forEach(x => x.setAttribute('aria-pressed', String(x.dataset.fu === SL.fu))); }
       } catch (e) { body.innerHTML = empty('Could not load ' + noun, e.message); }
     };
     let t = 0;
@@ -132,16 +195,18 @@ route(/^\/(students|leads|search)(?:\?(.*))?$/, async m => {
     $('#slQual').onchange = e => { SL.qual = e.target.value; SL.page = 0; load(); };
     const un = $('#slUnf'); if (un) un.onchange = e => { SL.unf = e.target.value; SL.page = 0; load(); };
     $$('#slSeg button').forEach(b => b.onclick = () => { SL.view = b.dataset.v; SL.page = 0; load(); });
-    $('#slClear').onclick = () => { SL.q = SL.stage = SL.qual = SL.unf = ''; SL.page = 0; $('#slQ').value = ''; $('#slStage').value = ''; $('#slQual').value = ''; const u2 = $('#slUnf'); if (u2) u2.value = ''; load(); };
+    [['#slFu', 'fu'], ['#slWho', 'who'], ['#slSort', 'sort']].forEach(([id, key]) => { const el = $(id); if (el) el.onchange = e => { SL[key] = e.target.value; SL.page = 0; if (key === 'fu' && SL.fu && SL.sort === 'newest') { SL.sort = 'due'; $('#slSort').value = 'due'; } load(); }; });
+    $('#slClear').onclick = () => { SL.q = SL.stage = SL.qual = SL.unf = SL.fu = SL.who = ''; SL.sort = 'newest'; SL.page = 0; $('#slQ').value = ''; $('#slStage').value = ''; $('#slQual').value = ''; ['#slUnf', '#slFu', '#slWho'].forEach(id => { const el = $(id); if (el) el.value = ''; }); const so = $('#slSort'); if (so) so.value = 'newest'; load(); };
     const nb = $('#slNew'); if (nb) nb.onclick = () => newStudent();
     viewWait(load());
+    refreshChips();
     if (openNew) { history.replaceState(null, '', '#/leads'); newStudent(); }
   });
   const head = kind === 'lead' ? pageHead('user', 'Paid less than $200 so far', 'Leads', '<button class="nx-btn primary" id="slNew">' + ico('plus') + 'New lead</button>')
     : kind === 'student' ? pageHead('user', 'Paid $200 or more', 'Students', '')
     : pageHead('search', 'Leads and students', 'Search', '');
   return head +
-    '<div class="nx-card"><div class="nx-toolbar" style="border-top:0">' + (kind === 'lead' ? '<div class="nx-seg" id="slSeg" role="group" aria-label="Show"><button type="button" data-v="all" aria-pressed="' + (SL.view === 'all') + '">All leads</button><button type="button" data-v="follow" aria-pressed="' + (SL.view === 'follow') + '">Needs follow-up <span class="nx-count" id="slFuN" hidden></span></button></div>' : '') + '<input class="nx-in sm" style="min-width:280px" id="slQ" placeholder="Search ' + (kind === 'all' ? 'name, email or phone' : noun + ' by name, email or phone') + '" value="' + esc(SL.q) + '"><select class="nx-sel sm" id="slStage">' + selectOpts(stageFilterOpts(kind), SL.stage, 'Any stage') + '</select><select class="nx-sel sm" id="slQual">' + selectOpts(REF.quals.filter(q => q.active), SL.qual, 'Any qualification') + '</select>' + (kind === 'lead' ? '<select class="nx-sel sm" id="slUnf" aria-label="Unfinished leads"><option value=""' + (SL.unf ? '' : ' selected') + '>All leads</option><option value="mine"' + (SL.unf === 'mine' ? ' selected' : '') + '>Unfinished, flagged to me</option><option value="all"' + (SL.unf === 'all' ? ' selected' : '') + '>Unfinished, anyone</option></select>' : '') + '<button class="nx-btn quiet sm" id="slClear">Clear</button></div>' +
+    '<div class="nx-card"><div class="nx-toolbar" style="border-top:0">' + (kind === 'lead' ? '<div class="nx-seg" id="slSeg" role="group" aria-label="Show"><button type="button" data-v="all" aria-pressed="' + (SL.view === 'all') + '">All leads</button><button type="button" data-v="follow" aria-pressed="' + (SL.view === 'follow') + '">Missed a class <span class="nx-count" id="slFuN" hidden></span></button></div>' : '') + '<input class="nx-in sm" style="min-width:280px" id="slQ" placeholder="Search ' + (kind === 'all' ? 'name, email or phone' : noun + ' by name, email or phone') + '" value="' + esc(SL.q) + '"><select class="nx-sel sm" id="slStage">' + selectOpts(stageFilterOpts(kind), SL.stage, 'Any stage') + '</select><select class="nx-sel sm" id="slQual">' + selectOpts(REF.quals.filter(q => q.active), SL.qual, 'Any qualification') + '</select>' + (kind === 'lead' ? '<select class="nx-sel sm" id="slUnf" aria-label="Unfinished leads"><option value=""' + (SL.unf ? '' : ' selected') + '>All leads</option><option value="mine"' + (SL.unf === 'mine' ? ' selected' : '') + '>Unfinished, flagged to me</option><option value="all"' + (SL.unf === 'all' ? ' selected' : '') + '>Unfinished, anyone</option></select>' : '') + (kind === 'lead' ? fuControlsHtml() : '') + '<button class="nx-btn quiet sm" id="slClear">Clear</button></div>' + (kind === 'lead' ? '<div class="nx-toolbar" id="slChips" role="group" aria-label="Follow-ups due" style="padding-top:0;border-top:0"></div>' : '') +
     '<div id="slBody"></div><div class="nx-foot" id="slFoot"><span></span></div></div>';
 });
 
@@ -214,12 +279,13 @@ function newStudent() {
 const SR = { tab: 'details' };
 route(/^\/students\/([0-9a-f-]{36})$/, async m => {
   const id = m[1];
-  const [stu, det, enr, pays, books, followups, calls, logs] = await Promise.all([
+  const [stu, det, enr, pays, books, followups, tasks, calls, logs] = await Promise.all([
     sel('nex_students', 'select=*&id=eq.' + id), api('rpc/nex_get_details', { method: 'POST', body: { p_student: id } }).then(r => r.json()),
     sel('nex_enrolments', 'select=*&student_id=eq.' + id + '&deleted_at=is.null&order=enrolled_on.desc.nullslast'),
     sel('nex_payments', 'select=*&student_id=eq.' + id + '&order=paid_on.desc.nullslast'),
     sel('nex_class_bookings', 'select=*,nex_class_sessions(class_date,kind)&student_id=eq.' + id),
     sel('nex_followups', 'select=*&student_id=eq.' + id + '&order=created_at.desc'),
+    sel('nex_tasks', 'select=*&student_id=eq.' + id + '&status=neq.done&order=due_on.asc.nullslast').catch(() => []),
     sel('call_log', 'select=id,caller_name,phone_e164,reason,note,direction,logged_by,created_at,resolved_at,for_team&student_id=eq.' + id + '&deleted_at=is.null&order=created_at.desc&limit=40').catch(() => []),
     sel('nex_logbook_receipts', 'select=id,received_on,receiver,comments,created_at&student_id=eq.' + id + '&order=received_on.desc&limit=20').catch(() => [])
   ]);
@@ -242,7 +308,7 @@ route(/^\/students\/([0-9a-f-]{36})$/, async m => {
   const grossPaid = sumPaid(pays);
   const isStudent = grossPaid >= STUDENT_MIN;
   const totalPaid = grossPaid - refunds.reduce((t, r) => t + Number(r.amount), 0);
-  const ctx = { s, d, limited, enr, pays, books, followups, queue, refunds, reqs, plcs, hist, aud, docs, calls, logs, isStudent };
+  const ctx = { s, d, limited, enr, pays, books, followups: followups.filter(f => f.kind !== 'moved_to_task'), tasks, queue, refunds, reqs, plcs, hist, aud, docs, calls, logs, isStudent };
 
   afterRender(() => { bindStudent(ctx); setNav(isStudent ? '!/students' : '!/leads'); });
   const fact = (k, v) => '<div><dt>' + k + '</dt><dd>' + (v || '<span class="nx-muted">–</span>') + '</dd></div>';
@@ -266,8 +332,10 @@ function sideCards(c) {
     '<div class="nx-card"><div class="nx-card-h"><h3>Placement</h3></div>' +
     (c.plcs.length || c.reqs.length ? '<div class="nx-related">' + c.plcs.slice(0, 3).map(p => '<div><span><b>' + esc((p.nex_facilities || {}).name || p.facility_text || 'Placement') + '</b><small>' + (p.start_date ? 'Starts ' + esc(fmtDate(p.start_date)) : 'No start date') + '</small></span>' + pill('placement_stage', p.status) + '</div>').join('') +
       c.reqs.slice(0, 3).map(r => '<div><span><b>' + esc((r.nex_facilities || {}).name || r.facility_text || 'Request') + '</b><small>' + (r.self_placement ? 'Self placement' : 'Request') + (r.emailed_on ? ' · emailed ' + esc(fmtDate(r.emailed_on)) : '') + '</small></span>' + pill('placement', r.status) + '</div>').join('') + '</div>' : empty('No placement yet')) + '</div>' +
-    '<div class="nx-card"><div class="nx-card-h"><h3>Follow-ups</h3><span class="nx-btnrow">' + (!c.isStudent && !c.followups.some(f => f.kind === 'lead_cycle') ? '<button class="nx-btn sm" data-a="startCycle">Start follow-ups</button>' : '') + '<button class="nx-btn sm" data-a="addFu">Add</button></span></div>' +
-    (open.length ? '<div class="nx-related">' + open.slice().sort((a, b) => String(a.due_at || '9').localeCompare(String(b.due_at || '9'))).map(f => { const late = f.due_at && new Date(f.due_at).toLocaleDateString('en-CA', { timeZone: TZ }) < sydToday(); return '<div><span><b>' + esc(f.note) + '</b><small' + (late ? ' class="nx-neg"' : '') + '>' + (f.due_at ? 'Due ' + esc(fmtDate(f.due_at)) + (late ? ' (overdue)' : '') : 'No date') + (f.assigned_to ? ' · ' + esc(f.assigned_to) : '') + '</small></span><span class="nx-btnrow">' + (f.kind === 'lead_cycle' && f.step ? '<button class="nx-btn sm" data-a="emailFu" data-step="' + f.step + '">' + ico('mail') + 'Send email</button>' : '') + '<button class="nx-btn sm" data-a="doneFu" data-id="' + f.id + '">Done</button></span></div>'; }).join('') + '</div>' : empty('Nothing to follow up')) + '</div>';
+    '<div class="nx-card"><div class="nx-card-h"><h3>Follow-ups</h3><span class="nx-btnrow">' + (!c.isStudent && !c.followups.some(f => f.kind === 'lead_cycle') ? '<button class="nx-btn sm" data-a="startCycle">Start follow-ups</button>' : '') + '</span></div>' +
+    (open.length ? '<div class="nx-related">' + open.slice().sort((a, b) => String(a.due_at || '9').localeCompare(String(b.due_at || '9'))).map(f => { const late = f.due_at && new Date(f.due_at).toLocaleDateString('en-CA', { timeZone: TZ }) < sydToday(); return '<div><span><b>' + esc(f.note) + '</b><small' + (late ? ' class="nx-neg"' : '') + '>' + (f.due_at ? 'Due ' + esc(fmtDate(f.due_at)) + (late ? ' (overdue)' : '') : 'No date') + (f.assigned_to ? ' · ' + esc(f.assigned_to) : '') + '</small></span><span class="nx-btnrow">' + (f.kind === 'lead_cycle' && f.step ? '<button class="nx-btn sm" data-a="emailFu" data-step="' + f.step + '">' + ico('mail') + 'Send email</button>' : '') + '<button class="nx-btn sm" data-a="doneFu" data-id="' + f.id + '">Done</button></span></div>'; }).join('') + '</div>' : empty('Nothing to follow up')) + '</div>' +
+    '<div class="nx-card"><div class="nx-card-h"><h3>Tasks</h3><button class="nx-btn sm" data-a="addTask">Add</button></div>' +
+    (c.tasks.length ? '<div class="nx-related">' + c.tasks.map(t => { const late = t.due_on && t.due_on < sydToday(); return '<div><span><b>' + esc(t.title) + '</b><small' + (late ? ' class="nx-neg"' : '') + '>' + (t.due_on ? 'Due ' + esc(fmtDate(t.due_on)) + (late ? ' (overdue)' : '') : 'No date') + ' · ' + esc(tkLabel(TK_PRI, t.priority)) + (t.assigned_to ? ' · ' + esc(t.assigned_to) : '') + '</small></span><button class="nx-btn sm" data-a="doneTask" data-id="' + t.id + '">Done</button></div>'; }).join('') + '</div>' : empty('No open tasks')) + '</div>';
 }
 
 
@@ -447,7 +515,8 @@ async function studentAction(a, ds, c) {
   if (a === 'editEnr') return enrolmentForm(s, c.enr.find(e => e.id === ds.id), c.isStudent);
   if (a === 'addPay') return paymentForm({ student: s, enrolment: c.enr.find(e => e.id === ds.id) });
   if (a === 'refund') return refundForm(c.enr.find(e => e.id === ds.id), c.pays);
-  if (a === 'addFu') return followupForm({ student: s, enrolments: c.enr });
+  if (a === 'addTask') return taskForm(null, () => render(), s);
+  if (a === 'doneTask') { await upd('nex_tasks', 'id=eq.' + ds.id, { status: 'done' }); toast('Task done'); return render(); }
   if (a === 'startCycle') return formModal('Start follow-ups', [{ k: 'first', label: 'First contact', type: 'date', value: s.first_contact_on || new Date(s.created_at).toLocaleDateString('en-CA', { timeZone: TZ }), required: true, full: true, help: 'The 1st follow-up is 2 days after this date, the 2nd 4 days after, the 3rd 6 days after.' }], async v => { await api('rpc/nex_start_lead_cycle', { method: 'POST', body: { p_student: s.id, p_first: v.first } }); toast('3 follow-ups set'); render(); }, 'Start');
   if (a === 'doneFu') { await upd('nex_followups', 'id=eq.' + ds.id, { done_at: new Date().toISOString(), done_by: ME.name }); toast('Done'); return render(); }
   if (a === 'emailFu') return emailFollowup(s, Number(ds.step));
@@ -500,11 +569,4 @@ function refundForm(e, pays) {
     { k: 'payment_id', label: 'Payment being refunded', type: 'select', options: mine.map(p => ({ id: p.id, label: fmtDate(p.paid_on) + ' · ' + money(p.amount) })), blank: 'Not linked' },
     { k: 'approved_by', label: 'Approved by', type: 'select', options: REF.staff, required: true, blank: 'Choose' }, { k: 'reason', label: 'Reason', type: 'textarea', full: true, required: true }];
   return formModal('Record refund', f, async v => { await ins('nex_refunds', Object.assign({ enrolment_id: e.id, created_by: ME.name }, v), true); toast('Refund recorded'); render(); });
-}
-function followupForm(o) {
-  o = o || {};
-  const f = [{ k: 'note', label: 'What needs doing', type: 'textarea', full: true, required: true }, { k: 'due_at', label: 'Due date', type: 'date' },
-    { k: 'assigned_to', label: 'Who', type: 'select', options: REF.staff, value: ME.name, blank: 'Anyone' }];
-  if (o.enrolments && o.enrolments.length > 1) f.push({ k: 'enrolment_id', label: 'Enrolment', type: 'select', options: o.enrolments.map(e => ({ id: e.id, label: qualName(e.qualification_id) || 'Enrolment' })), blank: 'General' });
-  return formModal('New follow-up', f, async v => { if (v.due_at) v.due_at = v.due_at + 'T09:00:00+11:00'; await ins('nex_followups', Object.assign({ student_id: o.student ? o.student.id : null, created_by: ME.name }, v), true); toast('Follow-up added'); render(); });
 }
