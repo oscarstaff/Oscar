@@ -5,14 +5,14 @@
 const ROUTES = [];
 function route(re, fn) { ROUTES.push({ re, fn }); }
 let navToken = 0, lastRouteH = null, afters = [], viewWaits = [];
-/* tabs: Admin is only listed for hub admins. Follow-ups has a page but no tab. */
-const NAV = [['#/', 'Overview'], ['#/leads', 'Leads'], ['#/students', 'Students'], ['#/payments', 'Payments'], ['#/firstaid', 'First Aid'], ['#/placement', 'Placement'], ['misc', 'Misc', 'menu'], ['#/admin', 'Admin', 'admin']];
+/* tabs: Admin is only listed for hub admins. Task Manager is general tasks; the 1st, 2nd and 3rd lead follow-ups are on the Leads tab. */
+const NAV = [['#/', 'Overview'], ['#/leads', 'Leads'], ['#/students', 'Students'], ['#/payments', 'Payments'], ['#/firstaid', 'First Aid'], ['#/placement', 'Placement'], ['#/tasks', 'Task Manager'], ['misc', 'Misc', 'menu'], ['#/admin', 'Admin', 'admin']];
 /* the staff pages copied from Nexus sit together under the Misc button */
-const NAV_ICO = { '#/': 'home', '#/leads': 'user', '#/students': 'cap', '#/payments': 'cash', '#/firstaid': 'aid', '#/placement': 'pin', '#/admin': 'admin' };
+const NAV_ICO = { '#/': 'home', '#/leads': 'user', '#/students': 'cap', '#/payments': 'cash', '#/firstaid': 'aid', '#/placement': 'pin', '#/tasks': 'list', '#/admin': 'admin' };
 const MISC_ICO = { '#/quizzes': 'book', '#/documents': 'doc', '#/calls': 'phone', '#/logbooks': 'notebook', '#/teamreport': 'users', '#/convreport': 'trend', '#/achievements': 'trophy' };
 const MISC = [['#/quizzes', 'Quizzes'], ['#/documents', 'Documents'], ['#/calls', 'Calls'], ['#/logbooks', 'Logbook receipts'], ['#/teamreport', 'Team report'], ['#/convreport', 'Conversion report'], ['#/achievements', 'Achievements']];
 /* icon and title per section, so a loading page can show its real heading straight away */
-const HEADS = { '/': ['home', 'Overview'], '/leads': ['user', 'Leads'], '/students': ['cap', 'Students'], '/search': ['search', 'Search'], '/payments': ['cash', 'Payment queue'], '/firstaid': ['aid', 'First Aid and CPR'], '/placement': ['pin', 'Placement'], '/followups': ['bell', 'Things to follow up'], '/admin': ['admin', 'Lists and settings'], '/quizzes': ['book', 'Quizzes'], '/documents': ['doc', 'Documents'], '/calls': ['phone', 'Calls'], '/logbooks': ['notebook', 'Logbook receipts'], '/teamreport': ['users', 'Team report'], '/convreport': ['trend', 'Conversion report'], '/profile': ['user', 'Profile'], '/achievements': ['trophy', 'Team achievements'], '/staff': ['user', 'Profile'] };
+const HEADS = { '/': ['home', 'Overview'], '/leads': ['user', 'Leads'], '/students': ['cap', 'Students'], '/search': ['search', 'Search'], '/payments': ['cash', 'Payment queue'], '/firstaid': ['aid', 'First Aid and CPR'], '/placement': ['pin', 'Placement'], '/tasks': ['list', 'Task Manager'], '/followups': ['list', 'Task Manager'], '/admin': ['admin', 'Lists and settings'], '/quizzes': ['book', 'Quizzes'], '/documents': ['doc', 'Documents'], '/calls': ['phone', 'Calls'], '/logbooks': ['notebook', 'Logbook receipts'], '/teamreport': ['users', 'Team report'], '/convreport': ['trend', 'Conversion report'], '/profile': ['user', 'Profile'], '/achievements': ['trophy', 'Team achievements'], '/staff': ['user', 'Profile'] };
 function baseOf(h) { return '/' + ((h.split('/')[1] || '').split('?')[0]); }
 function isRecord(h) { return /^\/students\/[0-9a-f-]{36}$/.test(h); }
 /* after a page paints: name it for the browser tab and screen readers, and move keyboard focus to it when the page (not just its data) changed */

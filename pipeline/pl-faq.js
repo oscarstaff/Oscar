@@ -27,6 +27,8 @@ const NEXI_FAQ = [
   ]],
   ['First Aid and placement', [
     ['How do I book a First Aid seat?', 'Open First Aid, pick the class day, then press a free seat and choose the student. You can also press Book on the First Aid card on a person’s page.', ['#/firstaid', 'Open First Aid']],
+    ['Where did the Follow-ups page go?', 'It is now the Task Manager tab, for general jobs: internal tasks and tasks about a student or lead. Give each task a priority, a due date and someone to do it. The 1st, 2nd and 3rd lead follow-ups moved to the Leads tab.', ['#/tasks', 'Open Task Manager']],
+    ['How do I see which leads need their 1st, 2nd or 3rd follow-up?', 'Open Leads. Each lead has a Follow-up tag such as 2nd Follow Up Due (red when overdue). Press 1st, 2nd or 3rd Follow Up Due above the list to show only those, or use the follow-up, assigned to and sort boxes. Sorting by follow-up due puts the most overdue first.', ['#/leads?fu=due', 'Open leads due a follow-up']],
     ['What do QS, QD, $, PP, EP and SG mean?', 'They are the booking flags. QS quiz sent, QD quiz done, $ paid, PP placement plan (yes or done), EP education plan (yes or RTO done). Renewal classes show SG, signature done, in place of PP and EP.', null],
     ['How do I add a placement request or facility?', 'Open Placement, choose Requests, Placements, Facilities or Blacklist, and press the New button at the top right. It changes to match the list you are on.', ['#/placement', 'Open Placement']]
   ]],
