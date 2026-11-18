@@ -58,9 +58,12 @@ function selectOpts(list, cur, blank) {
 }
 
 /* ---------- toast + modal + form ---------- */
+/* A toast is for good news only. An error is never a toast: toast(msg, true) is routed to showError(), which puts it inline in the open dialog
+   or, when no dialog is open, in an error dialog. */
 function toast(msg, bad) {
+  if (bad) { showError(msg); return; }
   const el = document.createElement('div'); el.className = 'toast' + (bad ? ' bad' : ''); el.textContent = msg; if (bad) el.setAttribute('role', 'alert');
-  $('#toasts').appendChild(el); const life = bad ? 5000 : 2600; setTimeout(() => el.classList.add('out'), life - 200); setTimeout(() => el.remove(), life);
+  $('#toasts').appendChild(el); const life = 2600; setTimeout(() => el.classList.add('out'), life - 200); setTimeout(() => el.remove(), life);
 }
 let modalStack = [];
 function openModal(opt) {
@@ -89,8 +92,39 @@ function openModal(opt) {
   return m;
 }
 function showErr(m, e) {
-  let b = $('.nx-err', m.el); if (!b) { b = document.createElement('div'); b.className = 'nx-err'; b.setAttribute('role', 'alert'); $('.modal-b', m.el).appendChild(b); }
-  b.textContent = e && e.message ? e.message : 'Something went wrong.';
+  const msg = e && e.message ? e.message : (typeof e === 'string' && e ? e : 'Something went wrong.');
+  if (m.isError) { const p = $('.modal-b p', m.el); if (p) p.textContent = msg; return; }
+  clearErr(m);
+  const fld = e && (e.fieldEl || (e.field && $(e.field.charAt(0) === '#' ? e.field : '#f_' + e.field, m.el)));
+  if (fld) {
+    /* a problem with one field: say it right under that field and put the cursor there */
+    fld.setAttribute('aria-invalid', 'true');
+    const b = document.createElement('div'); b.className = 'nx-ferr'; b.setAttribute('role', 'alert'); b.textContent = msg;
+    fld.insertAdjacentElement('afterend', b);
+    fld.addEventListener('input', () => clearErr(m), { once: true });
+    try { fld.focus({ preventScroll: true }); } catch (x) {} try { b.scrollIntoView({ block: 'nearest' }); } catch (x) {}
+    return;
+  }
+  const b = document.createElement('div'); b.className = 'nx-err'; b.setAttribute('role', 'alert'); b.textContent = msg; $('.modal-b', m.el).appendChild(b);
+  try { b.scrollIntoView({ block: 'nearest' }); } catch (x) {}
+}
+function clearErr(m) {
+  $$('.nx-err,.nx-ferr', m.el).forEach(x => x.remove());
+  $$('[aria-invalid]', m.el).forEach(x => x.removeAttribute('aria-invalid'));
+}
+/* An error that belongs to one field: showErr() shows it under that field. key = the field's k in a form, or '#id' for any other field. */
+function fieldError(key, msg) { const e = new Error(msg); e.field = key; return e; }
+/* The one way to show an error. Inside an open dialog it goes inline in that dialog; with no dialog open it opens an error dialog. */
+function showError(e, title) {
+  const msg = e && e.message ? e.message : (typeof e === 'string' && e ? e : 'Something went wrong.');
+  const top = modalStack[modalStack.length - 1];
+  if (top && !top.gone) { showErr(top, e && e.message ? e : new Error(msg)); return top; }
+  return errorModal(msg, title);
+}
+function errorModal(msg, title) {
+  const m = openModal({ title: title || 'Something went wrong', body: '<p style="margin:0" role="alert">' + esc(msg) + '</p>', noFocus: true, buttons: [{ label: 'OK', primary: true, close: true }] });
+  m.isError = true; setTimeout(() => { const ok = $('.modal-f .nx-btn', m.el); if (ok) ok.focus(); }, 30);
+  return m;
 }
 document.addEventListener('keydown', e => {
   if (!modalStack.length) return;
@@ -217,7 +251,7 @@ function readFields(fields, root, prefix) {
     let v = f.type === 'check' ? el.checked : el.value.trim();
     if (f.type === 'number') v = v === '' ? null : Number(v);
     else if (f.type !== 'check' && v === '') v = null;
-    if (f.required && (v == null || v === '')) { el.setAttribute('aria-invalid', 'true'); try { el.focus(); } catch (e) {} throw new Error(f.label + ' is required.'); }
+    if (f.required && (v == null || v === '')) { const err = new Error(f.label + ' is required.'); err.fieldEl = el; throw err; }
     el.removeAttribute('aria-invalid');
     out[f.k] = v;
   }
