@@ -10,14 +10,17 @@ const PROBLEM = ['no_docs', 'not_found', 'issues', 'less_payment', 'no_plc_issue
 route(/^\/payments(?:\?(.*))?$/, async m => {
   const qs = new URLSearchParams(m[1] || '');
   if (qs.get('view')) { PY.view = qs.get('view'); PY.page = 0; PY.sel = null; history.replaceState(null, '', '#/payments'); }
-  const [cTo, cProb, cDone, cUnm] = await Promise.all([
+  if (PY.view === 'cash' && !ME.admin) PY.view = 'toprocess';   /* the cash receipts go to the admins */
+  const [cTo, cProb, cDone, cUnm, cVer, cCash] = await Promise.all([
     count('nex_payment_queue', 'processing_step=neq.processed'),
     count('nex_payment_queue', 'queue_status=in.(' + PROBLEM.join(',') + ')'),
     count('nex_payment_queue', 'processing_step=eq.processed'),
-    count('nex_payments', 'student_id=is.null')
+    count('nex_payments', 'student_id=is.null'),
+    count('nex_payments', 'verify_status=eq.pending_verification'),
+    ME.admin ? count('nex_payments', 'handover_status=eq.awaiting') : 0
   ]);
   afterRender(() => bindPayments());
-  const seg = [['toprocess', 'To process', cTo], ['attention', 'Needs attention', cProb], ['processed', 'Processed', cDone], ['unmatched', 'Unmatched', cUnm], ['all', 'All payments', null]];
+  const seg = [['toprocess', 'To process', cTo], ['attention', 'Needs attention', cProb], ['processed', 'Processed', cDone], ['verify', 'To verify', cVer]].concat(ME.admin ? [['cash', 'Cash receipts', cCash]] : [], [['unmatched', 'Unmatched', cUnm], ['all', 'All payments', null]]);
   return pageHead('cash', 'Payments', 'Payment queue', (canPay() ? '<button class="nx-btn primary" id="pyAdd">' + ico('plus') + 'Record payment</button>' : '')) +
     '<div class="nx-split"><div class="nx-card"><div class="nx-toolbar" style="border-top:0"><div class="nx-seg" id="pySeg">' + seg.map(([k, l, n]) => '<button data-v="' + k + '" aria-pressed="' + (PY.view === k) + '">' + l + (n != null ? ' <span class="nx-count">' + n + '</span>' : '') + '</button>').join('') + '</div><input class="nx-in sm" id="pyQ" style="min-width:220px" placeholder="Search name or reference" value="' + esc(PY.q) + '"></div>' +
     '<div id="pyBody"></div><div class="nx-foot" id="pyFoot"><span></span></div></div><div class="nx-drawer" id="pyDrawer" hidden></div></div>';
@@ -38,14 +41,16 @@ function bindPayments() {
     try {
       const q = safeQ(PY.q); let rows, total;
       const from = PY.page * PY.size, to = from + PY.size - 1;
-      if (PY.view === 'unmatched' || PY.view === 'all') {
+      if (['unmatched', 'all', 'verify', 'cash'].indexOf(PY.view) >= 0) {
         let query = 'select=*&order=paid_on.desc.nullslast,created_at.desc';
         if (PY.view === 'unmatched') query += '&student_id=is.null';
+        if (PY.view === 'verify') query += '&verify_status=eq.pending_verification';
+        if (PY.view === 'cash') query += '&handover_status=eq.awaiting';
         if (q) query += '&or=(payer_name.ilike.*' + q + '*,reference.ilike.*' + q + '*)';
         ({ rows, total } = await selPage('nex_payments', query, from, to));
         rowsCache = rows;
-        body.innerHTML = rows.length ? '<div class="nx-tablewrap"><table class="nx-table tight"><thead><tr><th>Date</th><th>Paid by</th><th>Amount</th><th>Method</th><th>Reference</th><th>Student</th><th></th></tr></thead><tbody>' +
-          rows.map(p => '<tr><td>' + esc(fmtDate(p.paid_on)) + '</td><td>' + esc(p.payer_name || '–') + '</td><td class="nx-money">' + money(p.amount) + '</td><td>' + esc(p.method || '–') + '</td><td>' + esc(p.reference || '–') + '</td><td>' + (p.student_id ? '<a href="#/students/' + p.student_id + '">Open</a>' : '<span class="nx-pill warn">Unmatched</span>') + '</td><td>' + (p.student_id || !canPay() ? '' : '<button class="nx-btn sm" data-link="' + p.id + '">Link to student</button>') + '</td></tr>').join('') + '</tbody></table></div>' : empty(PY.view === 'unmatched' ? 'Every payment is linked to a student' : 'No payments found');
+        body.innerHTML = rows.length ? '<div class="nx-tablewrap"><table class="nx-table tight"><thead><tr><th>Date</th><th>Paid by</th><th>Amount</th><th>Method</th><th>Reference</th><th>Student</th><th>Status</th><th></th></tr></thead><tbody>' +
+          rows.map(p => '<tr><td>' + esc(fmtDate(p.paid_on)) + '</td><td>' + esc(p.payer_name || '–') + '</td><td class="nx-money">' + money(p.amount) + '</td><td>' + esc(p.method || '–') + '</td><td>' + esc(p.reference || '–') + '</td><td>' + (p.student_id ? '<a href="#/students/' + p.student_id + '">Open</a>' : '<span class="nx-pill warn">Unmatched</span>') + '</td><td>' + payStatusHtml(p) + '</td><td>' + payActions(p) + '</td></tr>').join('') + '</tbody></table></div>' : empty(PY.view === 'unmatched' ? 'Every payment is linked to a student' : PY.view === 'verify' ? 'Nothing waiting for verification' : PY.view === 'cash' ? 'No cash receipts waiting for a check' : 'No payments found');
       } else {
         let query = 'select=*,nex_payments(id,amount,paid_on,payer_name,reference,method,student_id),nex_enrolments(id,student_id,qualification_id,fee,nex_students(id,first_name,last_name,email),pays:nex_payments(id,amount,paid_on,created_at))&order=updated_at.desc';
         if (PY.view === 'toprocess') query += '&processing_step=neq.processed';
@@ -64,6 +69,9 @@ function bindPayments() {
       $('#pyFoot').innerHTML = '<span>' + (total != null ? (total ? fromN + '–' + toN + ' of ' + total.toLocaleString('en-AU') : '') : rows.length + ' shown') + '</span><span class="nx-btnrow"><button class="nx-btn sm" id="pyPrev"' + (PY.page ? '' : ' disabled') + '>Previous</button><button class="nx-btn sm" id="pyNext"' + (total != null && toN >= total ? ' disabled' : '') + '>Next</button></span>';
       $('#pyPrev').onclick = () => { PY.page--; load(); }; $('#pyNext').onclick = () => { PY.page++; load(); };
       $$('[data-link]', body).forEach(b => b.onclick = () => linkPayment(rowsCache.find(x => x.id === b.dataset.link)));
+      $$('[data-vok]', body).forEach(b => b.onclick = () => verifyPayment(rowsCache.find(x => x.id === b.dataset.vok), 'confirmed', load));
+      $$('[data-vno]', body).forEach(b => b.onclick = () => verifyPayment(rowsCache.find(x => x.id === b.dataset.vno), 'rejected', load));
+      $$('[data-hand]', body).forEach(b => b.onclick = () => handoverCheck(rowsCache.find(x => x.id === b.dataset.hand), load));
     } catch (e) { body.innerHTML = empty('Could not load payments', e.message); }
   };
   $$('#pySeg button').forEach(b => b.onclick = () => { PY.view = b.dataset.v; PY.page = 0; PY.sel = null; $('#pyDrawer').hidden = true; $$('#pySeg button').forEach(x => x.setAttribute('aria-pressed', String(x === b))); load(); });
@@ -118,7 +126,7 @@ function globalAddPayment() {
     { k: 'payer_name', label: 'Student name', placeholder: 'Or type a name to look them up' },
     { k: 'enrolment_id', label: 'Enrolment', type: 'select', options: [], blank: 'Choose the enrolment' },
     { k: 'amount', label: 'Amount ($)', type: 'number', required: true }, { k: 'paid_on', label: 'Payment date', type: 'date', value: sydToday(), required: true },
-    { k: 'method', label: 'Method', type: 'select', options: ['Bank transfer', 'Cash', 'Card', 'Agent', 'Other'], blank: 'Not set' }, { k: 'reference', label: 'Reference', placeholder: 'Bank reference or receipt' },
+    { k: 'method', label: 'Method', type: 'select', options: PAY_METHODS, blank: 'Choose', required: true, help: PAY_METHOD_HELP }, { k: 'reference', label: 'Reference', placeholder: 'Bank reference or receipt' },
     { k: 'note', label: 'Note', full: true }];
   let lk = null, enr = [];
   const m = formModal('Record payment', f, async v => {
@@ -129,7 +137,7 @@ function globalAddPayment() {
     const { phone, email, enrolment_id, ...pay } = v;
     const p = await ins('nex_payments', Object.assign(pay, { payer_name: pay.payer_name || fullName(st), student_id: st ? st.id : null, enrolment_id: enrolmentId, created_by: ME.name }));
     if (enrolmentId) await queuePayment(enrolmentId, p.id);
-    toast(st ? 'Payment recorded for ' + fullName(st) : 'Payment recorded. Link it to a student later.'); render();
+    toast(st ? payDoneMsg(v.method).replace(/^Payment recorded/, 'Payment recorded for ' + fullName(st)) : 'Payment recorded. Link it to a student later.'); render();
   }, 'Save payment', idBoxHtml('Start with the student’s phone or email. If they are already in YatraLine, their details and enrolment fill in. Otherwise the payment is saved unmatched and can be linked later.'));
   const wrap = $('#f_enrolment_id', m.el).parentElement; wrap.hidden = true;
   lk = identityLookup(m, { ids: { phone: 'f_phone', email: 'f_email', name: 'f_payer_name' }, onChange: async st => {
@@ -141,4 +149,35 @@ function globalAddPayment() {
     wrap.hidden = !enr.length;
   } });
   return m;
+}
+
+/* The buttons on a payment row: link it to a student, Accounts verify a bank payment, an admin checks a cash handover. */
+function payActions(p) {
+  const b = [];
+  if (!p.student_id && canPay()) b.push('<button class="nx-btn sm" data-link="' + p.id + '">Link to student</button>');
+  if (p.verify_status === 'pending_verification' && canVerify()) b.push('<button class="nx-btn sm primary" data-vok="' + p.id + '">Verify</button><button class="nx-btn sm" data-vno="' + p.id + '">Not found</button>');
+  if (p.handover_status === 'awaiting' && ME.admin && p.student_id) b.push('<button class="nx-btn sm primary" data-hand="' + p.id + '">Handover checked</button>');
+  return b.length ? '<div class="nx-btnrow">' + b.join('') + '</div>' : '';
+}
+/* Accounts check a bank payment against the bank statement: confirm it, or say the money was not found (a reason is needed). A confirmed payment counts as received. */
+function verifyPayment(p, result, after) {
+  if (!p) return;
+  const who = esc(p.payer_name || 'this payer'), ok = result === 'confirmed';
+  const body = '<p style="margin:0 0 12px">' + (ok ? 'Confirm that ' + money(p.amount) + ' from ' + who + ' (' + esc(fmtDate(p.paid_on)) + ') is on the bank statement.' : 'Say why ' + money(p.amount) + ' from ' + who + ' was not found on the bank statement. It will not count as received.') +
+    '</p><label class="nx-lbl" for="vpNote">Note' + (ok ? '' : ' *') + '</label><input class="nx-in" id="vpNote" autocomplete="off" placeholder="' + (ok ? 'Optional, for example the statement line' : 'For example: not on the statement yet') + '">';
+  return openModal({ title: ok ? 'Verify payment' : 'Money not found', body, buttons: [{ label: 'Cancel', close: true }, { label: ok ? 'Verify' : 'Not found', primary: true, run: async mm => {
+    const note = $('#vpNote', mm.el).value.trim();
+    if (!ok && !note) throw fieldError('#vpNote', 'Say why the money was not found.');
+    await api('rpc/nex_verify_payment', { method: 'POST', body: { p_payment: p.id, p_result: result, p_note: note || null } });
+    toast(ok ? 'Payment verified' : 'Marked as not received'); after();
+  } }] });
+}
+/* An admin checks that the cash was handed over. The payment must already be on a student's profile, which is where it is recorded. */
+function handoverCheck(p, after) {
+  if (!p) return;
+  return openModal({ title: 'Check cash handover', body: '<p style="margin:0 0 12px">Confirm you have received ' + money(p.amount) + ' in cash for ' + esc(p.payer_name || 'this student') + ' (' + esc(fmtDate(p.paid_on)) + '). It is then recorded as checked on their profile.</p><label class="nx-lbl" for="hoNote">Note</label><input class="nx-in" id="hoNote" autocomplete="off" placeholder="Optional">',
+    buttons: [{ label: 'Cancel', close: true }, { label: 'Handover checked', primary: true, run: async mm => {
+      await api('rpc/nex_verify_cash_handover', { method: 'POST', body: { p_payment: p.id, p_note: $('#hoNote', mm.el).value.trim() || null } });
+      toast('Cash handover checked'); after();
+    } }] });
 }

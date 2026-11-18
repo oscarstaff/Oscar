@@ -19,6 +19,9 @@ route(/^\/firstaid(?:\/([0-9a-f-]{36}))?$/, async m => {
   const head = pageHead('aid', 'Evershine', 'First Aid and CPR', '<button class="nx-btn" id="faJump">Past classes</button><button class="nx-btn primary" id="faNew">' + ico('plus') + 'New class day</button>');
   if (!cur) return head + '<div class="nx-card">' + empty('No classes scheduled', 'Add the next class day to start taking bookings.') + '</div>';
   const live = books.filter(b => !bkOff(b.status));
+  /* the booking and the payment are separate things: a booking is confirmed whether or not anything is paid, and each payment has its own status */
+  const payBy = {}; const sids = live.map(b => b.student_id).filter(Boolean);
+  if (sids.length) (await sel('nex_payments', 'select=student_id,amount,method,verify_status,handover_status&student_id=in.' + inList(sids)).catch(() => [])).forEach(p => (payBy[p.student_id] = payBy[p.student_id] || []).push(p));
   const offs = books.filter(b => bkOff(b.status));
   const moved = offs.length ? await bkMovedMap(offs).catch(() => ({})) : {};
   const d = fmtDay(cur.class_date);
@@ -33,12 +36,21 @@ route(/^\/firstaid(?:\/([0-9a-f-]{36}))?$/, async m => {
     (showSeats ? '<div class="nx-seats" id="faSeats" role="list" aria-label="Seat map. Display only.">' + Array.from({ length: cur.seats }, (_, i) => { const n = i + 1; const b = live.find(x => x.seat_no === n); return '<div role="listitem" class="nx-seat ' + (b ? (b.booking_type !== 'student' ? 'walk' : 'booked') : '') + '" title="' + esc(b ? 'Seat ' + n + ': ' + b.name : 'Seat ' + n + ': free') + '"><span>' + (b ? esc((b.name || '').split(' ')[0].slice(0, 7)) : n) + '</span></div>'; }).join('') + '</div>' +
     '<div class="nx-legend"><span><i></i>Free</span><span><i class="booked"></i>Student</span><span><i class="walk"></i>Walk-in or agent group</span></div>' : '') + '</div></div>' +
     '<div class="nx-card" id="faBook"><div class="nx-card-h"><h3>Bookings</h3><div class="nx-btnrow">' + (canFlag() && cur.kind !== 'renewal' && live.length ? '<button class="nx-btn sm" id="faMail">' + ico('mail') + 'Email confirmations</button>' : '') + '<button class="nx-btn primary sm" id="faAdd">' + ico('plus') + 'Add booking</button></div></div>' +
-    (live.length ? '<div class="nx-tablewrap"><table class="nx-table tight"><thead><tr>' + (showSeats ? '<th>Seat</th>' : '') + '<th>Name</th><th>Phone</th><th>Type</th><th>Booked by</th><th>Attendance</th><th>Flags</th><th></th></tr></thead><tbody>' +
-      live.map(b => '<tr class="nx-tr" data-b="' + b.id + '">' + (showSeats ? '<td class="nx-num">' + (b.seat_no || '<span class="nx-muted">–</span>') + '</td>' : '') + '<td><b>' + (b.nex_students ? '<a href="#/students/' + b.nex_students.id + '">' + esc(b.name) + '</a>' : esc(b.name)) + '</b><div class="nx-muted" style="font-size:12px">' + esc(b.email || '') + '</div></td><td class="nx-num">' + esc(fmtPhone(b.phone)) + '</td><td>' + (b.booking_type === 'student' ? '<span class="nx-tag">Student</span>' : '<span class="nx-tag walk">' + (b.booking_type === 'walk_in' ? 'Walk-in' : 'Agent group') + '</span>') + (b.agent_id ? ' <span class="nx-muted">' + esc(agentName(b.agent_id)) + '</span>' : '') + '</td><td>' + esc(b.created_by || '') + '</td><td>' + attCell(b) + '</td>' +
+    (live.length ? '<div class="nx-tablewrap"><table class="nx-table tight"><thead><tr>' + (showSeats ? '<th>Seat</th>' : '') + '<th>Name</th><th>Phone</th><th>Type</th><th>Booked by</th><th>Payment</th><th>Attendance</th><th>Flags</th><th></th></tr></thead><tbody>' +
+      live.map(b => '<tr class="nx-tr" data-b="' + b.id + '">' + (showSeats ? '<td class="nx-num">' + (b.seat_no || '<span class="nx-muted">–</span>') + '</td>' : '') + '<td><b>' + (b.nex_students ? '<a href="#/students/' + b.nex_students.id + '">' + esc(b.name) + '</a>' : esc(b.name)) + '</b><div class="nx-muted" style="font-size:12px">' + esc(b.email || '') + '</div></td><td class="nx-num">' + esc(fmtPhone(b.phone)) + '</td><td>' + (b.booking_type === 'student' ? '<span class="nx-tag">Student</span>' : '<span class="nx-tag walk">' + (b.booking_type === 'walk_in' ? 'Walk-in' : 'Agent group') + '</span>') + (b.agent_id ? ' <span class="nx-muted">' + esc(agentName(b.agent_id)) + '</span>' : '') + '</td><td>' + esc(b.created_by || '') + '</td><td>' + bookingPayCell(b, payBy[b.student_id]) + '</td><td>' + attCell(b) + '</td>' +
         '<td><div class="nx-flags">' + bookingFlags(cur, b) + '</div></td><td><div class="nx-btnrow">' + (canFlag() && cur.kind !== 'renewal' && !bkOff(b.status) ? '<button class="nx-btn sm" data-conf="' + b.id + '">Email confirmation</button>' : '') + '<button class="nx-btn sm" data-edit="' + b.id + '">Edit</button></div></td></tr>').join('') + '</tbody></table></div>' : empty('No bookings yet', 'Press Add booking to add the first one.')) + (live.length ? '<div class="nx-legend nx-flaglegend"><span><b>QS</b> quiz sent</span><span><b>QD</b> quiz done</span><span><b>$</b> paid</span>' + (cur.kind !== 'renewal' ? '<span><b>PP</b> placement plan yes or done</span><span><b>EP</b> education plan yes or RTO done</span>' : '<span><b>SG</b> signature done</span>') + '</div>' : '') + '</div>' +
     (offs.length ? '<div class="nx-card" id="faOff"><div class="nx-card-h"><div><h3>No show, cancelled and rescheduled <span class="nx-count">' + offs.length + '</span></h3><div class="nx-muted">Not counted in the seats. Each one has a follow-up task for the next working day.</div></div></div>' + bkFollowTable(offs, moved) + '</div>' : '');
 });
 
+/* the payment next to a booking: what is confirmed, what still waits for Accounts, and a button to enter a payment (cash for the Evershine team) */
+function bookingPayCell(b, list) {
+  list = list || [];
+  const ok = sumPaid(list), pend = sumPending(list);
+  let h = ok ? '<span class="nx-pill ok">Paid ' + money(ok) + '</span>' : (pend ? '' : '<span class="nx-muted">No payment yet</span>');
+  if (pend) h += (h ? ' ' : '') + '<span class="nx-pill warn">' + money(pend) + ' pending verification</span>';
+  if (b.student_id && canCash()) h += ' <button class="nx-btn sm quiet" data-pay="' + b.id + '">+ Payment</button>';
+  return '<div class="nx-att-cell">' + h + '</div>';
+}
 function attCell(b) {
   if (b.status === 'attended') return '<div class="nx-att-cell"><span class="nx-pill ok">Attended</span><span class="nx-att-by">' + esc(b.attendance_by || '') + (b.attendance_at ? ' · ' + esc(fmtDT(b.attendance_at)) : '') + '</span><button class="nx-btn sm quiet" data-ud="' + b.id + '">Undo</button></div>';
   return '<div class="nx-att-cell">' + (b.status === 'booked' || !b.status ? '' : pill('booking', b.status)) + '<button class="nx-btn sm" data-at="' + b.id + '">Attended</button><button class="nx-btn sm quiet" data-mk="' + b.id + '">No show or cancelled</button></div>';
@@ -53,6 +65,7 @@ function bindFirstAid(cur, books) {
   $$('#faDays .nx-day').forEach(b => b.onclick = () => go('#/firstaid/' + b.dataset.id));
   $('#faEdit').onclick = () => classForm(cur);
   $('#faAdd').onclick = () => bookingForm(cur, null, books);
+  $$('[data-pay]').forEach(b => b.onclick = e => { e.stopPropagation(); const x = books.find(y => y.id === b.dataset.pay); if (x && x.student_id) paymentForm({ student: { id: x.student_id, first_name: (x.nex_students || {}).first_name || x.name, last_name: (x.nex_students || {}).last_name || '' } }); });
   $$('[data-edit]').forEach(b => b.onclick = e => { e.stopPropagation(); bookingForm(cur, books.find(x => x.id === b.dataset.edit), books); });
   $$('[data-conf]').forEach(b => b.onclick = e => { e.stopPropagation(); const x = books.find(y => y.id === b.dataset.conf); if (x) confirmEmail(cur, books, x); });
   const fm = $('#faMail'); if (fm) fm.onclick = () => confirmEmail(cur, books);
@@ -106,23 +119,29 @@ function bookingForm(cur, b, books) {
     { k: 'seat_no', label: 'Seat', type: 'number', value: b.seat_no || '', help: 'Leave empty for the waiting list' },
     { k: 'booking_type', label: 'Booking type', type: 'select', options: [{ id: 'student', label: 'Student' }, { id: 'walk_in', label: 'Walk-in' }, { id: 'agent_group', label: 'Agent group' }], value: b.booking_type || 'student' },
     { k: 'agent_id', label: 'Agent', type: 'select', options: REF.agents.filter(a => a.active), value: b.agent_id, blank: 'None' },
-    { k: 'status', label: 'Status', type: 'select', options: opts('booking', true), value: b.status || 'booked', blank: 'Not set' },
+    { k: 'status', label: 'Status', type: 'select', options: opts('booking', true), value: b.status || (b.id ? '' : 'booked'), blank: 'Not set', help: 'A booking is confirmed with or without payment. Payment is tracked on its own.' },
     { k: 'quiz_sent', label: 'Quiz link sent', type: 'check', value: b.quiz_sent }, { k: 'quiz_done', label: 'Quiz done', type: 'check', value: b.quiz_done }, { k: 'paid', label: 'Paid', type: 'check', value: b.paid }];
   if (cur.kind !== 'renewal') f.push({ k: 'placement_plan', label: 'Placement plan', type: 'select', options: Object.keys(PLAN_PL).map(k => ({ id: k, label: PLAN_PL[k] })), value: b.placement_plan, blank: 'Not set', help: 'Yes = going ahead with placement. Done = placement sorted. No = not doing placement.' },
     { k: 'education_plan', label: 'Education plan', type: 'select', options: Object.keys(PLAN_ED).map(k => ({ id: k, label: PLAN_ED[k] })), value: b.education_plan, blank: 'Not set', help: 'Yes = needs visa counselling. RTO done = RTO profile created. No = no counselling needed.' });
   if (cur.kind === 'renewal') f.push({ k: 'signature_done', label: 'Signature done', type: 'check', value: b.signature_done });
   if (!canFlag()) for (let i = f.length - 1; i >= 0; i--) if (['quiz_sent', 'quiz_done', 'paid', 'placement_plan', 'education_plan', 'signature_done', 'seat_no'].includes(f[i].k)) f.splice(i, 1);   /* the flags and the seat numbers are Evershine's */
   f.push({ k: 'note', label: 'Note', type: 'textarea', value: b.note, full: true });
-  const top = b.id ? '' : idBoxHtml('Type a phone number or email. If they are already a student, their details fill in. Walk-ins and agent groups can be typed in without a record.');
+  const top = b.id ? '' : idBoxHtml('Type a phone number or email. If they are already a student or lead, their details fill in. If they are not in YatraLine yet, they are added as a new lead when you save.');
   const m = formModal(b.id ? 'Edit booking' : 'Add booking', f, async v => {
     if (v.seat_no != null) { v.seat_no = Math.round(v.seat_no); if (v.seat_no < 1 || v.seat_no > cur.seats) throw fieldError('seat_no', 'Seat must be between 1 and ' + cur.seats + '.'); const t = takenBy(v.seat_no); if (t) throw fieldError('seat_no', 'Seat ' + v.seat_no + ' is already taken by ' + t.name + '.'); }
     if (v.phone) v.phone = cleanPhone(v.phone) || v.phone; if (v.email) v.email = v.email.toLowerCase();
     const newSt = v.status; if (b.id && newSt !== (b.status || '') && (bkOff(newSt) || newSt === 'attended' || (newSt === 'booked' && (bkOff(b.status) || b.status === 'attended')))) { delete v.status; v.seat_no = bkOff(newSt) ? null : v.seat_no; } else if (bkOff(v.status)) v.seat_no = null;
+    let newLead = false;
+    if (!b.id && !studentId && v.booking_type !== 'agent_group') {
+      /* nobody found for this person: find them by email, phone or name, or add them as a lead ("From class booking") */
+      const lead = await api('rpc/nex_find_or_create_lead', { method: 'POST', body: { p_name: v.name, p_phone: v.phone || null, p_email: v.email || null, p_note: 'From class booking' } }).then(r => r.json());
+      studentId = lead.id; newLead = !!lead.created;
+    }
     try {
       if (b.id) { await upd('nex_class_bookings', 'id=eq.' + b.id, Object.assign(v, { student_id: studentId })); if (newSt !== (b.status || '') && newSt && (bkOff(newSt) || newSt === 'attended' || (newSt === 'booked' && (bkOff(b.status) || b.status === 'attended')))) await bkMark(b, newSt); }
       else await ins('nex_class_bookings', Object.assign({ session_id: cur.id, student_id: studentId, created_by: ME.name }, v), true);
     } catch (e) { if (/duplicate|unique/i.test(e.message)) throw fieldError('seat_no', 'That seat was just taken. Choose another.'); throw e; }
-    toast('Booking saved'); render();
+    toast(newLead ? 'Booking saved. ' + v.name + ' was added as a new lead.' : 'Booking saved'); render();
   }, 'Save booking', top);
   if (b.id) {
     const foot = $('.modal-f', m.el); const cb = document.createElement('button'); cb.className = 'nx-btn'; cb.style.marginRight = 'auto'; cb.textContent = 'Cancel booking';

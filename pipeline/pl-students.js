@@ -9,7 +9,7 @@ const PATH = ['checklist_sent', 'docs_completed', 'processed', 'placement', 'cer
 /* ---------- Overview ---------- */
 route(/^\/$/, async () => {
   const today = sydToday();
-  const [nStu, nLead, nOpenEnr, nQueue, nUnm, nDue, sessions, pmRows] = await Promise.all([
+  const [nStu, nLead, nOpenEnr, nQueue, nUnm, nDue, sessions, pmRows, nVer, nCash] = await Promise.all([
     countKind('student'),
     countKind('lead'),
     count('nex_enrolments', 'deleted_at=is.null&stage=not.in.(certificate_issued,not_interested)'),
@@ -17,7 +17,9 @@ route(/^\/$/, async () => {
     count('nex_payments', 'student_id=is.null'),
     count('nex_followups', 'done_at=is.null&due_at=lte.' + today + 'T23:59:59'),
     sel('nex_class_sessions', 'select=*&class_date=gte.' + today + '&order=class_date&limit=4'),
-    placementMailLoad().catch(() => [])
+    placementMailLoad().catch(() => []),
+    canVerify() ? count('nex_payments', 'verify_status=eq.pending_verification') : 0,
+    ME.admin ? count('nex_payments', 'handover_status=eq.awaiting') : 0
   ]);
   let counts = {};
   if (sessions.length) {
@@ -35,6 +37,8 @@ route(/^\/$/, async () => {
     att('#/followups', nDue, 'Follow-ups due', 'today or overdue', 'bad') +
     att('#/payments?view=unmatched', nUnm, 'Unmatched payments', 'no student linked', 'warn') +
     att('#/payments', nQueue, 'Payments to process', 'in the processing queue', 'accent') +
+    (canVerify() ? att('#/payments?view=verify', nVer, 'Bank payments to verify', 'waiting for Accounts', 'warn') : '') +
+    (ME.admin ? att('#/payments?view=cash', nCash, 'Cash receipts to check', 'handover waiting for an admin', 'warn') : '') +
     att('#/students', nOpenEnr, 'Open enrolments', 'not yet issued or closed', 'accent') + '</div></div></div>' +
     '<div class="nx-stack"><div class="nx-card"><div class="nx-card-h"><h3>Upcoming classes</h3><a href="#/firstaid">All classes</a></div>' +
     (sessions.length ? '<ul class="nx-list">' + sessions.map(s => { const d = fmtDay(s.class_date); const n = counts[s.id] || 0; return '<li><a href="#/firstaid/' + s.id + '"><b>' + d.wd + ' ' + d.dm + '</b><small>' + (s.kind === 'renewal' ? 'Renewal / signature' : 'First Aid & CPR') + (s.trainer ? ' · ' + esc(s.trainer) : '') + '</small></a><span class="nx-pill ' + (n >= s.seats ? 'bad' : n >= s.seats - 5 ? 'warn' : 'accent') + '">' + n + ' / ' + s.seats + '</span></li>'; }).join('') + '</ul>' : empty('No classes scheduled', 'Add the next class day in First Aid.')) + '</div></div>' +
@@ -95,8 +99,8 @@ route(/^\/(students|leads|search)(?:\?(.*))?$/, async m => {
         if (q) { const parts = ['first_name.ilike.*' + q + '*', 'last_name.ilike.*' + q + '*', 'email.ilike.*' + q + '*']; if (digits.length >= 4) parts.push('phone.ilike.*' + digits + '*'); query += '&or=(' + parts.join(',') + ')'; }
         const { rows, total } = await selPage('nex_students', query, SL.page * SL.size, SL.page * SL.size + SL.size - 1);
         let pays = [];
-        if (rows.length) pays = await sel('nex_payments', 'select=student_id,amount&student_id=in.' + inList(rows.map(r => r.id)));
-        const paid = {}; pays.forEach(p => paid[p.student_id] = (paid[p.student_id] || 0) + Number(p.amount));
+        if (rows.length) pays = await sel('nex_payments', 'select=student_id,amount,verify_status&student_id=in.' + inList(rows.map(r => r.id)));
+        const paid = {}; pays.forEach(p => { if (payConfirmed(p)) paid[p.student_id] = (paid[p.student_id] || 0) + Number(p.amount); });
         const filtered = SL.q || SL.stage || SL.qual;
         body.innerHTML = rows.length ? '<div class="nx-tablewrap"><table class="nx-table"><thead><tr><th>' + (kind === 'lead' ? 'Lead' : kind === 'student' ? 'Student' : 'Name') + '</th><th>Phone</th><th>Qualification</th><th>Stage</th><th>Fee and paid</th>' + (kind === 'lead' ? '<th>Next follow-up</th>' : '') + '<th>Enrolled</th><th>Agent</th>' + (kind === 'lead' ? '<th></th>' : '') + '</tr></thead><tbody>' +
           rows.map(s => {
@@ -235,7 +239,7 @@ route(/^\/students\/([0-9a-f-]{36})$/, async m => {
   const main = enr[0] || {};
   const idx = PATH.indexOf(main.stage);
   const totalFee = enr.reduce((t, e) => t + Number(e.fee || 0), 0);
-  const grossPaid = pays.reduce((t, p) => t + Number(p.amount), 0);
+  const grossPaid = sumPaid(pays);
   const isStudent = grossPaid >= STUDENT_MIN;
   const totalPaid = grossPaid - refunds.reduce((t, r) => t + Number(r.amount), 0);
   const ctx = { s, d, limited, enr, pays, books, followups, queue, refunds, reqs, plcs, hist, aud, docs, calls, logs, isStudent };
@@ -345,7 +349,7 @@ function tabDetails(c) {
       field('Emergency contact', esc([d.emergency_name, d.emergency_relation && '(' + d.emergency_relation + ')', fmtPhone(d.emergency_phone)].filter(Boolean).join(' '))) + field('Disability', esc(d.disability)) + field('Indigenous status', esc(d.indigenous_status)) + '</dl><div style="padding:0 16px 16px"><button class="nx-btn sm" data-a="editDet">' + ico('edit') + 'Edit personal details</button></div>');
   return section('Contact', '<dl class="nx-fields">' + field('First name', esc(s.first_name)) + field('Last name', esc(s.last_name)) + field('Email', esc(s.email)) + field('Phone', esc(fmtPhone(s.phone))) + field('Second phone', esc(fmtPhone(s.phone2))) + field('Agent', esc(agentName(s.agent_id))) + field('Outside Sydney', s.outside_sydney ? 'Yes' : 'No') + '</dl><div style="padding:0 16px 16px"><button class="nx-btn sm" data-a="editStu">' + ico('edit') + 'Edit contact</button></div>') +
     sens +
-    (c.s.source_note ? section('Import notes', '<div style="padding:16px">' + esc(c.s.source_note) + '</div>') : '');
+    (c.s.source_note ? section('Source note', '<div style="padding:16px">' + esc(c.s.source_note) + '</div>') : '');
 }
 /* the document list for an enrolment comes from its course (nex_qualifications.doc_group) */
 function docTypesFor(e) {
@@ -398,19 +402,19 @@ function tabMoney(c) {
   const cards = c.enr.map(e => {
     const ps = c.pays.filter(p => p.enrolment_id === e.id); ps.forEach(p => linked.add(p.id));
     const rf = c.refunds.filter(r => r.enrolment_id === e.id);
-    const paid = ps.reduce((t, p) => t + Number(p.amount), 0) - rf.reduce((t, r) => t + Number(r.amount), 0);
+    const paid = sumPaid(ps) - rf.reduce((t, r) => t + Number(r.amount), 0), pend = sumPending(ps);
     const fee = Number(e.fee || 0); const bal = fee - paid;
     return section((qualName(e.qualification_id) || 'Enrolment') + (e.year ? ' · ' + e.year : ''),
       '<div style="padding:16px;display:flex;flex-wrap:wrap;gap:16px;align-items:center"><div><label class="nx-lbl">Stage</label><select class="nx-sel sm" data-stage="' + e.id + '">' + selectOpts(stageOpts(c.isStudent, e.stage), e.stage, 'Not set') + '</select>' + (c.isStudent ? '<div class="nx-muted" style="margin-top:4px;font-size:11px">Incomplete docs and Placement set themselves.</div>' : '<div class="nx-muted" style="margin-top:4px;font-size:11px">Leads can be at Checklist sent or Docs completed until $200 is paid.</div>') + '</div>' +
-      '<div><div class="nx-lbl">Agreed fee</div><div class="nx-money">' + (fee ? money(fee) : '–') + '</div></div><div><div class="nx-lbl">Paid</div><div class="nx-money">' + money(paid) + '</div></div><div><div class="nx-lbl">Balance</div><div class="nx-money ' + (bal > 0 ? 'nx-neg' : 'nx-pos') + '">' + (fee ? money(bal) : '–') + '</div></div><div class="nx-grow"></div>' +
-      '<div class="nx-btnrow">' + (canPay() ? '<button class="nx-btn sm" data-a="addPay" data-id="' + e.id + '">' + ico('plus') + 'Payment</button>' : '') + '<button class="nx-btn sm" data-a="refund" data-id="' + e.id + '">Refund</button><button class="nx-btn sm" data-a="editEnr" data-id="' + e.id + '">' + ico('edit') + 'Edit</button></div></div>' +
+      '<div><div class="nx-lbl">Agreed fee</div><div class="nx-money">' + (fee ? money(fee) : '–') + '</div></div><div><div class="nx-lbl">Paid</div><div class="nx-money">' + money(paid) + '</div>' + (pend ? '<div class="nx-muted" style="font-size:11px">' + money(pend) + ' pending verification</div>' : '') + '</div><div><div class="nx-lbl">Balance</div><div class="nx-money ' + (bal > 0 ? 'nx-neg' : 'nx-pos') + '">' + (fee ? money(bal) : '–') + '</div></div><div class="nx-grow"></div>' +
+      '<div class="nx-btnrow">' + (canCash() ? '<button class="nx-btn sm" data-a="addPay" data-id="' + e.id + '">' + ico('plus') + 'Payment</button>' : '') + '<button class="nx-btn sm" data-a="refund" data-id="' + e.id + '">Refund</button><button class="nx-btn sm" data-a="editEnr" data-id="' + e.id + '">' + ico('edit') + 'Edit</button></div></div>' +
       (e.notes || e.follow_up_note ? '<div style="padding:0 16px 12px" class="nx-muted">' + esc(e.notes || '') + '</div>' : '') +
-      (ps.length || rf.length ? '<div class="nx-tablewrap"><table class="nx-table auto tight"><thead><tr><th>Date</th><th>Amount</th><th>Instalment</th><th>Method</th><th>Reference</th><th>Processing</th></tr></thead><tbody>' +
-        ps.map(p => { const q = c.queue.find(x => x.payment_id === p.id); return '<tr><td>' + esc(fmtDate(p.paid_on)) + '</td><td class="nx-money">' + money(p.amount) + '</td><td>' + (x => x ? esc(x.label) : '–')(instalmentOf(e.fee, ps, p.id)) + '</td><td>' + esc(p.method || '–') + '</td><td>' + esc(p.reference || p.payer_name || '–') + '</td><td>' + (q ? pill('payment_queue', q.queue_status) + ' ' + pill('processing', q.processing_step) : '<span class="nx-muted">–</span>') + '</td></tr>'; }).join('') +
-        rf.map(r => '<tr><td>' + esc(fmtDate(r.refunded_on)) + '</td><td class="nx-money nx-neg">-' + money(r.amount).replace('-', '') + '</td><td></td><td>Refund</td><td>' + esc(r.reason || '–') + '</td><td>Approved by ' + esc(r.approved_by || '–') + '</td></tr>').join('') + '</tbody></table></div>' : '<div style="padding:0 16px 16px" class="nx-muted">No payments recorded.</div>'));
+      (ps.length || rf.length ? '<div class="nx-tablewrap"><table class="nx-table auto tight"><thead><tr><th>Date</th><th>Amount</th><th>Instalment</th><th>Method</th><th>Reference</th><th>Status</th><th>Processing</th></tr></thead><tbody>' +
+        ps.map(p => { const q = c.queue.find(x => x.payment_id === p.id); return '<tr><td>' + esc(fmtDate(p.paid_on)) + '</td><td class="nx-money">' + money(p.amount) + '</td><td>' + (x => x ? esc(x.label) : '–')(instalmentOf(e.fee, ps, p.id)) + '</td><td>' + esc(p.method || '–') + '</td><td>' + esc(p.reference || p.payer_name || '–') + '</td><td>' + payStatusHtml(p) + '</td><td>' + (q ? pill('payment_queue', q.queue_status) + ' ' + pill('processing', q.processing_step) : '<span class="nx-muted">–</span>') + '</td></tr>'; }).join('') +
+        rf.map(r => '<tr><td>' + esc(fmtDate(r.refunded_on)) + '</td><td class="nx-money nx-neg">-' + money(r.amount).replace('-', '') + '</td><td></td><td>Refund</td><td>' + esc(r.reason || '–') + '</td><td></td><td>Approved by ' + esc(r.approved_by || '–') + '</td></tr>').join('') + '</tbody></table></div>' : '<div style="padding:0 16px 16px" class="nx-muted">No payments recorded.</div>'));
   }).join('');
   const orphan = c.pays.filter(p => !linked.has(p.id));
-  return cards + (orphan.length ? section('Payments not linked to an enrolment', '<div class="nx-tablewrap"><table class="nx-table auto tight"><tbody>' + orphan.map(p => '<tr><td>' + esc(fmtDate(p.paid_on)) + '</td><td class="nx-money">' + money(p.amount) + '</td><td>' + esc(p.reference || p.payer_name || '–') + '</td></tr>').join('') + '</tbody></table></div>') : '');
+  return cards + (orphan.length ? section('Payments not linked to an enrolment', '<div class="nx-tablewrap"><table class="nx-table auto tight"><tbody>' + orphan.map(p => '<tr><td>' + esc(fmtDate(p.paid_on)) + '</td><td class="nx-money">' + money(p.amount) + '</td><td>' + esc(p.reference || p.payer_name || '–') + '</td><td>' + payStatusHtml(p) + '</td></tr>').join('') + '</tbody></table></div>') : '');
 }
 function tabActivity(c) {
   const items = [];
@@ -479,14 +483,14 @@ function enrolmentForm(s, e, isStudent) {
 function paymentForm(o) {
   o = o || {};
   const f = [{ k: 'amount', label: 'Amount ($)', type: 'number', required: true }, { k: 'paid_on', label: 'Payment date', type: 'date', value: sydToday(), required: true },
-    { k: 'method', label: 'Method', type: 'select', options: ['Bank transfer', 'Cash', 'Card', 'Agent', 'Other'], blank: 'Not set' }, { k: 'reference', label: 'Reference', placeholder: 'Bank reference or receipt' },
+    { k: 'method', label: 'Method', type: 'select', options: payMethodOpts(), value: canPay() ? '' : 'Cash', blank: 'Choose', required: true, help: PAY_METHOD_HELP }, { k: 'reference', label: 'Reference', placeholder: 'Bank reference or receipt' },
     { k: 'payer_name', label: 'Paid by', value: o.student ? fullName(o.student) : '' }, { k: 'note', label: 'Note', full: true }];
   const extra = o.student ? '' : '<div class="full" style="margin-bottom:12px"><div class="nx-warnbox">You will pick the student after you save this form. You can also leave the payment unmatched and link it later.</div></div>';
   return formModal(o.student ? 'Record payment for ' + fullName(o.student) : 'Record payment', f, async (v, m) => {
     const row = Object.assign({ student_id: o.student ? o.student.id : null, enrolment_id: o.enrolment ? o.enrolment.id : null, created_by: ME.name }, v);
     const p = await ins('nex_payments', row);
     if (o.enrolment && o.addToQueue !== false) await queuePayment(o.enrolment.id, p.id);
-    toast('Payment recorded'); render();
+    toast(payDoneMsg(v.method)); render();
   }, 'Save payment', extra);
 }
 function refundForm(e, pays) {
