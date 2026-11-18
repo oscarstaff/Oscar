@@ -1,4 +1,4 @@
-/* YatraLine appearance: Liquid Glass, Bright (default) or Dark.
+/* YatraLine appearance: glass look, Bright (default) or Dark.
    Loaded from <head> so the mode is set before first paint. Self-contained: no globals, no app helpers. */
 (function () {
   var KEY = 'yl_theme', MODES = ['glass', 'glass-dark'], DEFAULT = 'glass';
