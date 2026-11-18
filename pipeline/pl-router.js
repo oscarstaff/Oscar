@@ -6,11 +6,11 @@ const ROUTES = [];
 function route(re, fn) { ROUTES.push({ re, fn }); }
 let navToken = 0, lastRouteH = null, afters = [], viewWaits = [];
 /* tabs: Admin is only listed for hub admins. Task Manager is general tasks; the 1st, 2nd and 3rd lead follow-ups are on the Leads tab. */
-const NAV = [['#/', 'Overview'], ['#/leads', 'Leads'], ['#/students', 'Students'], ['#/payments', 'Payments'], ['#/firstaid', 'First Aid'], ['#/placement', 'Placement'], ['#/tasks', 'Task Manager'], ['misc', 'Misc', 'menu'], ['#/admin', 'Admin', 'admin']];
-/* the staff pages copied from Nexus sit together under the Misc button */
+const NAV = [['#/', 'Overview'], ['#/leads', 'Leads'], ['#/students', 'Students'], ['#/payments', 'Payments'], ['#/firstaid', 'First Aid'], ['#/placement', 'Placement'], ['#/tasks', 'Task Manager'], ['misc', 'More', 'menu'], ['#/admin', 'Admin', 'admin']];
+/* the staff pages copied from Nexus sit together under the More button, in three labelled groups */
 const NAV_ICO = { '#/': 'home', '#/leads': 'user', '#/students': 'cap', '#/payments': 'cash', '#/firstaid': 'aid', '#/placement': 'pin', '#/tasks': 'list', '#/admin': 'admin' };
 const MISC_ICO = { '#/quizzes': 'book', '#/documents': 'doc', '#/calls': 'phone', '#/logbooks': 'notebook', '#/teamreport': 'users', '#/convreport': 'trend', '#/achievements': 'trophy' };
-const MISC = [['#/quizzes', 'Quizzes'], ['#/documents', 'Documents'], ['#/calls', 'Calls'], ['#/logbooks', 'Logbook receipts'], ['#/teamreport', 'Team report'], ['#/convreport', 'Conversion report'], ['#/achievements', 'Achievements']];
+const MISC = [['#/calls', 'Calls', 'Work'], ['#/documents', 'Documents', 'Work'], ['#/logbooks', 'Logbook receipts', 'Work'], ['#/teamreport', 'Team report', 'Reports'], ['#/convreport', 'Conversion report', 'Reports'], ['#/quizzes', 'Quizzes', 'Staff'], ['#/achievements', 'Achievements', 'Staff']];
 /* icon and title per section, so a loading page can show its real heading straight away */
 const HEADS = { '/': ['home', 'Overview'], '/leads': ['user', 'Leads'], '/students': ['cap', 'Students'], '/search': ['search', 'Search'], '/payments': ['cash', 'Payment queue'], '/firstaid': ['aid', 'First Aid and CPR'], '/placement': ['pin', 'Placement'], '/tasks': ['list', 'Task Manager'], '/followups': ['list', 'Task Manager'], '/admin': ['admin', 'Lists and settings'], '/quizzes': ['book', 'Quizzes'], '/documents': ['doc', 'Documents'], '/calls': ['phone', 'Calls'], '/logbooks': ['notebook', 'Logbook receipts'], '/teamreport': ['users', 'Team report'], '/convreport': ['trend', 'Conversion report'], '/profile': ['user', 'Profile'], '/achievements': ['trophy', 'Team achievements'], '/staff': ['user', 'Profile'] };
 function baseOf(h) { return '/' + ((h.split('/')[1] || '').split('?')[0]); }
@@ -41,7 +41,7 @@ function setNav(h) {
   const mb = $('#navMisc'); if (mb) { const on = MISC.some(x => x[0] === '#' + cur); if (on) { if (!mb.classList.contains('on')) mb.classList.add('on'); } else mb.classList.remove('on'); }
   miscClose();
 }
-/* Misc menu. It is fixed to the page (not inside the scrolling tab bar, which would clip it) and opens from the button it belongs to. */
+/* More menu (was Misc). It is fixed to the page (not inside the scrolling tab bar, which would clip it) and opens from the button it belongs to. */
 function miscClose(refocus) {
   const m = $('#miscMenu'), b = $('#navMisc'); if (!m || m.hidden) return;
   m.hidden = true; if (b) { b.setAttribute('aria-expanded', 'false'); if (refocus) b.focus(); }
@@ -49,11 +49,12 @@ function miscClose(refocus) {
 function miscInit() {
   const b = $('#navMisc'); if (!b || b.dataset.bound) return; b.dataset.bound = '1';
   let m = $('#miscMenu');
-  if (!m) { m = document.createElement('div'); m.id = 'miscMenu'; m.className = 'nx-menu nx-noprint'; m.setAttribute('role', 'menu'); m.setAttribute('aria-label', 'Misc'); m.hidden = true; document.body.appendChild(m); }
+  if (!m) { m = document.createElement('div'); m.id = 'miscMenu'; m.className = 'nx-menu nx-noprint'; m.setAttribute('role', 'menu'); m.setAttribute('aria-label', 'More'); m.hidden = true; document.body.appendChild(m); }
   const items = () => $$('a', m);
   const open = focusLast => {
     const cur = '#' + baseOf(location.hash.replace(/^#/, '') || '/');
-    m.innerHTML = MISC.map(x => '<a role="menuitem" tabindex="-1" href="' + x[0] + '"' + (x[0] === cur ? ' aria-current="page"' : '') + '>' + ico(MISC_ICO[x[0]] || 'list') + x[1] + '</a>').join('');
+    let grp = '';
+    m.innerHTML = MISC.map(x => (x[2] !== grp ? (grp = x[2], '<div class="nx-menu-h" role="presentation">' + x[2] + '</div>') : '') + '<a role="menuitem" tabindex="-1" href="' + x[0] + '"' + (x[0] === cur ? ' aria-current="page"' : '') + '>' + ico(MISC_ICO[x[0]] || 'list') + x[1] + '</a>').join('');
     const r = b.getBoundingClientRect();
     m.hidden = false; m.style.top = Math.round(r.bottom + 4) + 'px';
     m.style.left = Math.round(Math.max(8, Math.min(r.left, window.innerWidth - m.offsetWidth - 8))) + 'px';
