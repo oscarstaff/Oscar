@@ -181,7 +181,7 @@ async function batchAddStudent(batch, card, places, done) {
       '<div style="margin-top:12px"><button type="button" class="nx-btn sm" id="ba_find">' + ico('search') + 'Find someone who is not on this list</button></div>' });
   const assign = async (enrolmentId, who) => {
     const shift = $('#ba_shift', m.el).value; let other = null;
-    if (card.is_others) { other = ($('#ba_other', m.el).value || '').trim(); if (!other) { toast('Type the aged care they found first.', true); $('#ba_other', m.el).focus(); return false; } }
+    if (card.is_others) { other = ($('#ba_other', m.el).value || '').trim(); if (!other) { showErr(m, fieldError('#ba_other', 'Type the aged care they found first.')); return false; } }
     try {
       await ins('nex_placements', { enrolment_id: enrolmentId, batch_id: batch.id, batch_facility_id: card.id, facility_id: card.facility_id || null, facility_text: other, shift, status: 'site_date_allocated', start_date: batch.starts_on }, true);
       toast((who || 'Student') + ' added'); await done(); return true;

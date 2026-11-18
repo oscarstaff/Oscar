@@ -61,9 +61,9 @@ async function bookClassModal(p, enrolmentId, after) {
     '<div style="margin-top:12px"><label class="nx-lbl" for="bkNote">Note</label><input class="nx-in" id="bkNote" autocomplete="off" placeholder="Optional"></div>' +
     '<div class="nx-help" style="margin-top:10px">After the class, mark them Attended, No show, Cancelled or Rescheduled. Paying $200 or more makes them a student automatically.</div>';
   return openModal({ title: 'Book class', body, buttons: [{ label: 'Cancel', close: true }, { label: 'Book', primary: true, run: async mm => {
-    const sid = $('#bkDay', mm.el).value; if (!sid) throw new Error('Choose a class day.');
+    const sid = $('#bkDay', mm.el).value; if (!sid) throw fieldError('#bkDay', 'Choose a class day.');
     const dup = await sel('nex_class_bookings', 'select=id,status&session_id=eq.' + sid + '&student_id=eq.' + p.id + '&limit=5');
-    if (dup.some(x => !bkOff(x.status))) throw new Error(fullName(p) + ' is already booked on that day.');
+    if (dup.some(x => !bkOff(x.status))) throw fieldError('#bkDay', fullName(p) + ' is already booked on that day.');
     const day = days.find(s => s.id === sid); if (day && day.taken >= day.seats && !(await confirmBox('Class is full', 'All ' + day.seats + ' seats are taken. Book them on the waiting list anyway?', 'Book anyway'))) return false;
     const row = { session_id: sid, student_id: p.id, name: fullName(p), phone: p.phone || null, email: p.email || null, booking_type: 'student', status: 'booked', note: $('#bkNote', mm.el).value.trim() || null, created_by: ME.name };
     if (enrolmentId) row.enrolment_id = enrolmentId;
@@ -76,7 +76,7 @@ async function rebookModal(b, after) {
   let days = []; try { days = await bkUpcoming(null); } catch (e) { days = []; }
   if (!days.length) { toast('No upcoming class days. Add one on the First Aid and CPR page.', true); return; }
   return openModal({ title: 'Rebook ' + esc(b.name || ''), body: '<label class="nx-lbl" for="bkDay">New class day</label><select class="nx-sel" id="bkDay">' + selectOpts(days.map(s => ({ id: s.id, label: bkDayLabel(s) })), days[0].id) + '</select>', buttons: [{ label: 'Cancel', close: true }, { label: 'Rebook', primary: true, run: async mm => {
-    const sid = $('#bkDay', mm.el).value; if (!sid) throw new Error('Choose a class day.');
+    const sid = $('#bkDay', mm.el).value; if (!sid) throw fieldError('#bkDay', 'Choose a class day.');
     await bkMark(b, 'rescheduled', sid, null);
     toast('Rebooked'); if (after) after(); else render();
   } }] });
