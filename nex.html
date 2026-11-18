@@ -8,7 +8,7 @@
 <meta name="referrer" content="no-referrer">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'sha256-R6nv9UhHBd2EmB08TfPRlx8kdUt9SPq4mLR8uVlAcb4=' 'sha256-mz2tb5P3UGVUiBbOlUqeAfUvdUeLt1EZbNSqmdl7MBw='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data: https://jcfgldqrdbfkgbixszds.supabase.co https://oscarstaff.github.io; connect-src https://jcfgldqrdbfkgbixszds.supabase.co; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>YatraLine · Student management</title>
-<script src="pipeline/theme.js?v=1"></script>
+<script src="pipeline/theme.js?v=2"></script>
 <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%20512%20512%27%3E%3Cdefs%3E%3ClinearGradient%20id%3D%27a%27%20x1%3D%270%27%20y1%3D%270%27%20x2%3D%271%27%20y2%3D%271%27%3E%3Cstop%20offset%3D%270%27%20stop-color%3D%27%232F86FF%27%2F%3E%3Cstop%20offset%3D%271%27%20stop-color%3D%27%230A2A7A%27%2F%3E%3C%2FlinearGradient%3E%3C%2Fdefs%3E%3Crect%20width%3D%27512%27%20height%3D%27512%27%20rx%3D%27116%27%20fill%3D%27url%28%23a%29%27%2F%3E%3Crect%20x%3D%27112%27%20y%3D%27188%27%20width%3D%27288%27%20height%3D%27136%27%20fill%3D%27%23E6F1FF%27%2F%3E%3Crect%20x%3D%2776%27%20y%3D%27156%27%20width%3D%2748%27%20height%3D%27200%27%20rx%3D%2718%27%20fill%3D%27%23fff%27%2F%3E%3Crect%20x%3D%27388%27%20y%3D%27156%27%20width%3D%2748%27%20height%3D%27200%27%20rx%3D%2718%27%20fill%3D%27%23fff%27%2F%3E%3Cpath%20d%3D%27M206%20216l40%2040-40%2040%27%20fill%3D%27none%27%20stroke%3D%27%237CC4FF%27%20stroke-width%3D%2732%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27%2F%3E%3Cpath%20d%3D%27M266%20216l40%2040-40%2040%27%20fill%3D%27none%27%20stroke%3D%27%231D6BF0%27%20stroke-width%3D%2732%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27%2F%3E%3C%2Fsvg%3E">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -1124,6 +1124,10 @@ body.nx-busy{cursor:progress}
 .nx-pill{font-weight:500;box-shadow:inset 0 0 0 1px color-mix(in srgb,currentColor 16%,transparent)}
 .nx-chip{box-shadow:var(--nx-shadow-xs)}
 
+/* theme switch: one soft cross-fade of the whole page */
+::view-transition-old(root),::view-transition-new(root){animation-duration:.5s;animation-timing-function:cubic-bezier(.4,0,.2,1);mix-blend-mode:normal}
+.yl-fade,.yl-fade *,.yl-fade *::before,.yl-fade *::after{transition:background-color .45s ease,border-color .45s ease,color .45s ease,box-shadow .45s ease,fill .45s ease,stroke .45s ease!important}
+@media (prefers-reduced-motion:reduce){::view-transition-group(*),::view-transition-old(*),::view-transition-new(*){animation:none!important}}
 /* ===== Colour modes: light (default), dark, glass (translucent). Set by pipeline/theme.js via html[data-theme]. ===== */
 .nx-theme{display:flex;gap:2px;padding:2px;border:1px solid #2a427c;border-radius:var(--nx-r);background:#162b5e;flex:none}
 .nx-theme button{display:grid;place-items:center;width:28px;height:26px;padding:0;border:0;border-radius:4px;background:transparent;color:var(--nx-shell-dim);cursor:pointer}
@@ -1155,29 +1159,69 @@ html[data-theme="dark"] .nx-top .nx-avatar{background:#5aa9ff}
 html[data-theme="dark"] .nx-search input,html[data-theme="dark"] .nx-lock,html[data-theme="dark"] .nx-theme{background:#0f1a33;border-color:#24365f}
 html[data-theme="dark"] ::placeholder{color:var(--nx-ink-3)}
 
-html[data-theme="glass"]{--nx-surface:rgba(255,255,255,.58);--nx-sunken:rgba(255,255,255,.34);--nx-hover:rgba(255,255,255,.7);
-  --nx-line:rgba(255,255,255,.65);--nx-line-strong:rgba(86,99,127,.32);--nx-card:rgba(255,255,255,.6);
-  --nx-shadow:0 4px 24px rgba(31,58,120,.10),0 1px 2px rgba(16,26,46,.06);--nx-shadow-xs:0 1px 2px rgba(16,26,46,.08);--nx-shadow-pop:0 16px 48px rgba(31,58,120,.28),0 2px 6px rgba(16,26,46,.1);
-  --nx-ink-3:#4b5878;--nx-shell:rgba(11,31,75,.72);--nx-mute-weak:rgba(86,99,127,.14)}
-html[data-theme="glass"] body.nx{background:radial-gradient(900px 620px at 8% -8%,#9cc4ff 0,transparent 62%),radial-gradient(820px 600px at 100% 6%,#cdbcff 0,transparent 58%),radial-gradient(1000px 720px at 55% 112%,#8fe4d2 0,transparent 58%),#e4ecfa;background-attachment:fixed}
-html[data-theme="glass"] .nx-top,html[data-theme="glass"] .nx-nav,html[data-theme="glass"] .nx-card,html[data-theme="glass"] .nx-menu,html[data-theme="glass"] .nx-nexi,html[data-theme="glass"] #pipSay{-webkit-backdrop-filter:blur(18px) saturate(1.5);backdrop-filter:blur(18px) saturate(1.5)}
-html[data-theme="glass"] .nx-top{border-bottom:1px solid rgba(255,255,255,.18)}
-html[data-theme="glass"] .nx-nav{border-bottom-color:rgba(255,255,255,.7)}
-html[data-theme="glass"] .nx-card,html[data-theme="glass"] .nx-nav{border-color:rgba(255,255,255,.7)}
-html[data-theme="glass"] .modal{background:rgba(255,255,255,.78);border:1px solid rgba(255,255,255,.8);-webkit-backdrop-filter:blur(26px) saturate(1.6);backdrop-filter:blur(26px) saturate(1.6)}
-html[data-theme="glass"] .modal-bg{background:rgba(20,40,90,.28);-webkit-backdrop-filter:blur(5px);backdrop-filter:blur(5px)}
-html[data-theme="glass"] .modal-f{background:rgba(255,255,255,.4)}
-html[data-theme="glass"] .nx-menu,html[data-theme="glass"] .nx-nexi,html[data-theme="glass"] #pipSay,html[data-theme="glass"] #pipSay::after{background:rgba(255,255,255,.86)}
-html[data-theme="glass"] .nx-in,html[data-theme="glass"] .nx-sel,html[data-theme="glass"] .nx-ta,html[data-theme="glass"] input,html[data-theme="glass"] select,html[data-theme="glass"] textarea{background-color:rgba(255,255,255,.72)}
-html[data-theme="glass"] .nx-top input{background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.28)}
-html[data-theme="glass"] .nx-top .nx-lock,html[data-theme="glass"] .nx-theme{background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.28)}
-html[data-theme="glass"] .nx-nexifab{background:rgba(255,255,255,.8)}
-html[data-theme="glass"] .nx-table th{background:rgba(255,255,255,.3)}
+/* Translucent = Liquid Glass: clear, strongly blurred and saturated material, bright specular edges, light refracting at the rim. */
+html[data-theme="glass"]{
+  --nx-r:9px;--nx-r-lg:20px;
+  --nx-glass:rgba(255,255,255,.40);--nx-glass-hi:rgba(255,255,255,.92);--nx-glass-lo:rgba(255,255,255,.28);
+  --nx-spec:inset 0 1px 0 var(--nx-glass-hi),inset 1px 0 0 rgba(255,255,255,.5),inset 0 -1px 0 var(--nx-glass-lo),inset 0 0 22px rgba(255,255,255,.22);
+  --nx-surface:rgba(255,255,255,.28);--nx-sunken:rgba(255,255,255,.16);--nx-hover:rgba(255,255,255,.5);--nx-card:rgba(255,255,255,.32);
+  --nx-line:rgba(255,255,255,.55);--nx-line-strong:rgba(60,78,120,.30);
+  --nx-ink:#08112b;--nx-ink-2:#1f2d52;--nx-ink-3:#35436a;
+  --nx-shell:rgba(14,30,72,.58);--nx-mute-weak:rgba(60,78,120,.14);
+  --nx-shadow:0 10px 30px rgba(31,58,120,.14),0 1px 3px rgba(16,26,46,.08);--nx-shadow-xs:0 1px 2px rgba(16,26,46,.10);
+  --nx-shadow-pop:0 28px 70px rgba(25,45,110,.34),0 4px 14px rgba(16,26,46,.14)}
+html[data-theme="glass"] body.nx{background:radial-gradient(760px 560px at 6% -6%,#7fb4ff 0,transparent 62%),radial-gradient(700px 560px at 96% 4%,#c7a8ff 0,transparent 58%),radial-gradient(620px 480px at 18% 78%,#ffc2a1 0,transparent 60%),radial-gradient(900px 640px at 78% 108%,#7fe3cf 0,transparent 58%),#dfe8fb;background-attachment:fixed;font-weight:450}
+/* the material */
+html[data-theme="glass"] .nx-top,html[data-theme="glass"] .nx-nav,html[data-theme="glass"] .nx-card,html[data-theme="glass"] .nx-menu,html[data-theme="glass"] .nx-nexi,html[data-theme="glass"] #pipSay{-webkit-backdrop-filter:blur(28px) saturate(1.9) brightness(1.04);backdrop-filter:blur(28px) saturate(1.9) brightness(1.04)}
+html[data-theme="glass"] .nx-card{background-image:linear-gradient(135deg,rgba(255,255,255,.34),rgba(255,255,255,.03) 38%,rgba(255,255,255,.08) 70%,rgba(255,255,255,.26));border:1px solid rgba(255,255,255,.6);box-shadow:var(--nx-spec),var(--nx-shadow);overflow:clip}
+html[data-theme="glass"] .nx-nav{margin:10px var(--nx-gutter) 0;padding:5px;gap:4px;border:1px solid rgba(255,255,255,.6);border-radius:16px;background-image:linear-gradient(180deg,rgba(255,255,255,.36),rgba(255,255,255,.06));box-shadow:var(--nx-spec),var(--nx-shadow)}
+html[data-theme="glass"] .nx-nav a{height:36px;border-radius:12px;font-weight:550}
+html[data-theme="glass"] .nx-nav a:hover{background:rgba(255,255,255,.34)}
+html[data-theme="glass"] .nx-nav a[aria-current="page"]{background:rgba(255,255,255,.72);box-shadow:var(--nx-spec),0 2px 8px rgba(31,58,120,.16)}
+html[data-theme="glass"] .nx-nav a[aria-current="page"]::after{display:none}
+html[data-theme="glass"] .nx-top{border-bottom:1px solid rgba(255,255,255,.28);box-shadow:inset 0 -1px 0 rgba(255,255,255,.12),0 6px 24px rgba(20,40,100,.18)}
+html[data-theme="glass"] .nx-card.nx-pagehead{background:none;border:0;box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none;overflow:visible}
+html[data-theme="glass"] .nx-top .nx-search input{background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.34);box-shadow:inset 0 1px 2px rgba(0,0,0,.18);color:#fff}
+html[data-theme="glass"] .nx-top .nx-search input::placeholder{color:rgba(232,239,252,.78)}
+html[data-theme="glass"] .nx-top .nx-search input:focus{background:rgba(255,255,255,.26)}
+html[data-theme="glass"] .nx-nav a{z-index:1}
+html[data-theme="glass"] .nx-nav a[aria-current="page"]{background:transparent;box-shadow:none}
+html[data-theme="glass"] .nx-nav[data-ink]::after,html[data-theme="glass"] .nx-nav[data-ink=on]::after{z-index:0;top:var(--ink-y,5px);bottom:auto;height:var(--ink-h,36px);width:calc(var(--ink-w,0px) + 20px);transform:translateX(calc(var(--ink-x,0px) - 10px));border-radius:12px;background:rgba(255,255,255,.58);box-shadow:var(--nx-spec),0 2px 10px rgba(31,58,120,.2)}
+/* controls */
+html[data-theme="glass"] .nx-btn{border-radius:var(--nx-r)}
+html[data-theme="glass"] .nx-btn:not(.primary):not(.quiet),html[data-theme="glass"] .modal-f .nx-btn:not(.primary){background-color:rgba(255,255,255,.34);background-image:linear-gradient(180deg,rgba(255,255,255,.5),rgba(255,255,255,.06));border:1px solid rgba(255,255,255,.65);box-shadow:var(--nx-spec),0 1px 3px rgba(16,26,46,.12)}
+html[data-theme="glass"] .nx-btn:not(.primary):not(.quiet):hover{background-color:rgba(255,255,255,.6)}
+html[data-theme="glass"] .nx-btn.primary{background-image:linear-gradient(180deg,rgba(255,255,255,.38),rgba(255,255,255,0) 55%);border:1px solid rgba(255,255,255,.45);box-shadow:inset 0 1px 0 rgba(255,255,255,.65),inset 0 -1px 0 rgba(0,0,0,.12),0 4px 14px rgba(21,89,214,.38)}
+html[data-theme="glass"] .nx-in,html[data-theme="glass"] .nx-sel,html[data-theme="glass"] .nx-ta,html[data-theme="glass"] input:not([type=checkbox]):not([type=radio]),html[data-theme="glass"] select,html[data-theme="glass"] textarea{background-color:rgba(255,255,255,.34);border:1px solid rgba(255,255,255,.6);box-shadow:inset 0 1px 3px rgba(16,26,46,.14),0 1px 0 rgba(255,255,255,.6);border-radius:var(--nx-r)}
+html[data-theme="glass"] .nx-in:focus,html[data-theme="glass"] .nx-sel:focus,html[data-theme="glass"] .nx-ta:focus,html[data-theme="glass"] input:focus,html[data-theme="glass"] select:focus,html[data-theme="glass"] textarea:focus{background-color:rgba(255,255,255,.66)}
+html[data-theme="glass"] .nx-top input{background:rgba(255,255,255,.16);border-color:rgba(255,255,255,.34);box-shadow:inset 0 1px 2px rgba(0,0,0,.18)}
+html[data-theme="glass"] .nx-top .nx-lock,html[data-theme="glass"] .nx-theme{background:rgba(255,255,255,.16);border-color:rgba(255,255,255,.34);box-shadow:inset 0 1px 0 rgba(255,255,255,.35)}
+html[data-theme="glass"] .nx-seg{background:rgba(255,255,255,.2);box-shadow:inset 0 1px 3px rgba(16,26,46,.12)}
+html[data-theme="glass"] .nx-seg:not([data-ink]) button[aria-pressed="true"],html[data-theme="glass"] .nx-seg[data-ink]::before{background:rgba(255,255,255,.78);box-shadow:var(--nx-spec),0 2px 8px rgba(31,58,120,.18)}
+html[data-theme="glass"] .nx-chip{background-color:rgba(255,255,255,.34);border-color:rgba(255,255,255,.65);box-shadow:var(--nx-spec)}
+html[data-theme="glass"] .nx-pill{box-shadow:inset 0 1px 0 rgba(255,255,255,.6),inset 0 0 0 1px color-mix(in srgb,currentColor 14%,transparent)}
+html[data-theme="glass"] .nx-table th{background:rgba(255,255,255,.14);font-weight:600}
+html[data-theme="glass"] .nx-table tr:hover td{background:rgba(255,255,255,.3)}
+/* sheets: the thickest glass, and they materialise (blur + scale) rather than fade */
+html[data-theme="glass"] .modal{border-radius:24px;background-color:rgba(255,255,255,.42);background-image:linear-gradient(135deg,rgba(255,255,255,.42),rgba(255,255,255,.04) 40%,rgba(255,255,255,.22));border:1px solid rgba(255,255,255,.75);box-shadow:var(--nx-spec),var(--nx-shadow-pop);-webkit-backdrop-filter:blur(44px) saturate(2) brightness(1.06);backdrop-filter:blur(44px) saturate(2) brightness(1.06);animation:nxglass .38s var(--nx-ease) both}
+html[data-theme="glass"] .modal-h{border-bottom-color:rgba(255,255,255,.55)}
+html[data-theme="glass"] .modal-f{background:rgba(255,255,255,.14);border-top-color:rgba(255,255,255,.55);border-radius:0 0 24px 24px}
+html[data-theme="glass"] .modal-bg{background:rgba(190,205,240,.32);-webkit-backdrop-filter:blur(6px) saturate(1.2);backdrop-filter:blur(6px) saturate(1.2)}
+html[data-theme="glass"] .nx-menu,html[data-theme="glass"] .nx-nexi,html[data-theme="glass"] #pipSay,html[data-theme="glass"] #pipSay::after{background-color:rgba(255,255,255,.55)}
+html[data-theme="glass"] .nx-menu,html[data-theme="glass"] .nx-nexi{border-radius:16px;border-color:rgba(255,255,255,.75);box-shadow:var(--nx-spec),var(--nx-shadow-pop)}
+html[data-theme="glass"] .nx-nexifab{background:rgba(255,255,255,.75);box-shadow:var(--nx-spec),var(--nx-shadow)}
+html[data-theme="glass"] .toast{background:rgba(14,30,72,.72);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);box-shadow:inset 0 1px 0 rgba(255,255,255,.3),var(--nx-shadow-pop)}
+@keyframes nxglass{from{opacity:0;transform:scale(.94) translateY(8px);-webkit-backdrop-filter:blur(0) saturate(1);backdrop-filter:blur(0) saturate(1)}to{opacity:1;transform:none}}
+}
+@media screen and (prefers-reduced-motion:reduce){html[data-theme="glass"] .modal{animation:nxbg .16s ease-out both}}
+@media screen and (prefers-contrast:more){
+html[data-theme="glass"]{--nx-surface:rgba(255,255,255,.94);--nx-card:rgba(255,255,255,.94);--nx-line:#8fa0c2;--nx-line-strong:#5a6b90}
+html[data-theme="glass"] .nx-card,html[data-theme="glass"] .modal,html[data-theme="glass"] .nx-nav{background-color:rgba(255,255,255,.95);background-image:none;border-color:#5a6b90}
 }
 @media screen and (prefers-reduced-transparency:reduce){
 html[data-theme="glass"]{--nx-surface:#fff;--nx-sunken:#f2f6fc;--nx-hover:#eef4fc;--nx-line:#dbe3ef;--nx-shell:#0b1f4b}
 html[data-theme="glass"] *{-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
-html[data-theme="glass"] .modal,html[data-theme="glass"] .nx-menu,html[data-theme="glass"] .nx-nexi,html[data-theme="glass"] #pipSay{background:#fff}
+html[data-theme="glass"] .modal,html[data-theme="glass"] .nx-menu,html[data-theme="glass"] .nx-nexi,html[data-theme="glass"] #pipSay,html[data-theme="glass"] .nx-card,html[data-theme="glass"] .nx-nav{background-color:#fff;background-image:none}
 }
 </style>
 </head>
