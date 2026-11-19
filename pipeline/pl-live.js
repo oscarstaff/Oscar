@@ -13,7 +13,7 @@
 const LV = { ws: null, ok: false, tries: 0, tok: '', hb: null, retry: null, due: null, dirty: false, wrote: 0, touched: 0, keyed: 0, ref: 0, quiet: 0, off: 0 };
 const LV_TOPIC = 'realtime:yl-live';
 const LV_MIN_GAP = 4000;        /* never refresh the page more often than this */
-const LV_PLAIN = ['nex_students', 'nex_student_details', 'nex_enrolments', 'nex_enrolment_docs', 'nex_payments', 'nex_payment_queue', 'nex_refunds', 'nex_followups', 'nex_class_bookings', 'nex_tasks', 'nex_placements'];
+const LV_PLAIN = ['nex_students', 'nex_student_details', 'nex_enrolments', 'nex_enrolment_docs', 'nex_payments', 'nex_payment_queue', 'nex_refunds', 'nex_followups', 'nex_class_bookings', 'nex_tasks', 'nex_placements', 'nex_placement_profile'];
 /* which tables each page shows (null = any table). A page that is not listed (admin, calls, quizzes, profile…) is never refreshed. */
 const LV_PAGES = [
   [/^\/$/, null],
@@ -21,7 +21,7 @@ const LV_PAGES = [
   [/^\/students\/[0-9a-f-]{36}$/, LV_PLAIN.concat(['nex_class_sessions', 'nex_placement_requests', 'nex_batches'])],
   [/^\/payments/, ['nex_payments', 'nex_payment_queue', 'nex_enrolments', 'nex_enrolment_docs', 'nex_refunds', 'nex_students']],
   [/^\/firstaid/, ['nex_class_sessions', 'nex_class_bookings', 'nex_payments', 'nex_followups', 'nex_students']],
-  [/^\/placement/, ['nex_placements', 'nex_placement_requests', 'nex_batches', 'nex_batch_facilities', 'nex_facilities', 'nex_blacklist', 'nex_enrolments', 'nex_enrolment_docs', 'nex_payments', 'nex_students']],
+  [/^\/placement/, ['nex_placement_profile', 'nex_placements', 'nex_placement_requests', 'nex_batches', 'nex_batch_facilities', 'nex_facilities', 'nex_blacklist', 'nex_enrolments', 'nex_enrolment_docs', 'nex_payments', 'nex_students']],
   [/^\/tasks/, ['nex_tasks', 'nex_students']],
   [/^\/logbooks/, ['nex_logbook_receipts', 'nex_students', 'nex_enrolments']],
   [/^\/followups/, ['nex_followups', 'nex_students', 'nex_enrolments']],

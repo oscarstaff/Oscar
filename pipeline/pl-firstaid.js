@@ -6,7 +6,7 @@
    ========================================================= */
 route(/^\/firstaid(?:\/([0-9a-f-]{36}))?$/, async m => {
   const today = sydToday();
-  const back = new Date(Date.now() - 21 * 864e5).toLocaleDateString('en-CA', { timeZone: TZ });
+  const back = today;   /* a class closes once its date has passed: the day strip shows today and later, older days are reached with Past classes */
   let sessions = await sel('nex_class_sessions', 'select=*&class_date=gte.' + back + '&order=class_date.asc,kind.asc&limit=60');
   let want = m[1];
   if (want && !sessions.find(s => s.id === want)) { const one = await sel('nex_class_sessions', 'select=*&id=eq.' + want); if (one[0]) sessions = [one[0]].concat(sessions).sort((a, b) => a.class_date.localeCompare(b.class_date)); }
@@ -25,6 +25,7 @@ route(/^\/firstaid(?:\/([0-9a-f-]{36}))?$/, async m => {
   const offs = books.filter(b => bkOff(b.status));
   const moved = offs.length ? await bkMovedMap(offs).catch(() => ({})) : {};
   const d = fmtDay(cur.class_date);
+  const closed = cur.class_date < today;   /* the database refuses new bookings into a class that has passed (admins can still add) */
   const seated = live.filter(b => b.seat_no);
   const showSeats = canFlag();   /* the seat numbers are where people sit on the day: only the Evershine team (and admins) see them */
   const walk = live.filter(b => b.booking_type !== 'student').length;
@@ -35,7 +36,8 @@ route(/^\/firstaid(?:\/([0-9a-f-]{36}))?$/, async m => {
     (live.length > cur.seats ? '<div class="nx-warnbox">This class has more bookings than seats. Move some people to another day.</div>' : '') +
     (showSeats ? '<div class="nx-seats" id="faSeats" role="list" aria-label="Seat map. Display only.">' + Array.from({ length: cur.seats }, (_, i) => { const n = i + 1; const b = live.find(x => x.seat_no === n); return '<div role="listitem" class="nx-seat ' + (b ? (b.booking_type !== 'student' ? 'walk' : 'booked') : '') + '" title="' + esc(b ? 'Seat ' + n + ': ' + b.name : 'Seat ' + n + ': free') + '"><span>' + (b ? esc((b.name || '').split(' ')[0].slice(0, 7)) : n) + '</span></div>'; }).join('') + '</div>' +
     '<div class="nx-legend"><span><i></i>Free</span><span><i class="booked"></i>Student</span><span><i class="walk"></i>Walk-in or agent group</span></div>' : '') + '</div></div>' +
-    '<div class="nx-card" id="faBook"><div class="nx-card-h"><h3>Bookings</h3><div class="nx-btnrow">' + (canFlag() && cur.kind !== 'renewal' && live.length ? '<button class="nx-btn sm" id="faMail">' + ico('mail') + 'Email confirmations</button>' : '') + '<button class="nx-btn primary sm" id="faAdd">' + ico('plus') + 'Add booking</button></div></div>' +
+    '<div class="nx-card" id="faBook"><div class="nx-card-h"><h3>Bookings</h3><div class="nx-btnrow">' + (canFlag() && cur.kind !== 'renewal' && live.length ? '<button class="nx-btn sm" id="faMail">' + ico('mail') + 'Email confirmations</button>' : '') + (closed && !ME.admin ? '<span class="nx-pill">Closed</span>' : '<button class="nx-btn primary sm" id="faAdd">' + ico('plus') + (closed ? 'Add booking (admin)' : 'Add booking') + '</button>') + '</div></div>' +
+    (closed ? '<div class="nx-card-b nx-muted" style="padding-bottom:0">This class has passed, so it is closed. Attendance and notes can still be updated' + (ME.admin ? '; as an admin you can still add a booking.' : '.') + '</div>' : '') +
     (live.length ? '<div class="nx-tablewrap"><table class="nx-table tight"><thead><tr>' + (showSeats ? '<th>Seat</th>' : '') + '<th>Name</th><th>Type</th><th>Payment</th><th>Attendance</th><th>Flags</th><th><span class="nx-sr">Actions</span></th></tr></thead><tbody>' +
       live.map(b => '<tr class="nx-tr" data-b="' + b.id + '">' + (showSeats ? '<td class="nx-num">' + (b.seat_no || '<span class="nx-muted">–</span>') + '</td>' : '') + '<td><b>' + (b.nex_students ? '<a href="#/students/' + b.nex_students.id + '">' + esc(b.name) + '</a>' : esc(b.name)) + '</b><span class="nx-sub">' + esc([fmtPhone(b.phone), b.email].filter(Boolean).join(' · ') || 'No contact details') + '</span></td>' +
         '<td>' + (b.booking_type === 'student' ? '<span class="nx-tag">Student</span>' : '<span class="nx-tag walk">' + (b.booking_type === 'walk_in' ? 'Walk-in' : 'Agent group') + '</span>') + (b.agent_id ? '<span class="nx-sub">' + esc(agentName(b.agent_id)) + '</span>' : '') + (b.created_by ? '<span class="nx-sub">Booked by ' + esc(b.created_by) + '</span>' : '') + '</td>' +
@@ -66,7 +68,7 @@ function bindFirstAid(cur, books) {
   if (!cur) return;
   $$('#faDays .nx-day').forEach(b => b.onclick = () => go('#/firstaid/' + b.dataset.id));
   $('#faEdit').onclick = () => classForm(cur);
-  $('#faAdd').onclick = () => bookingForm(cur, null, books);
+  if ($('#faAdd')) $('#faAdd').onclick = () => bookingForm(cur, null, books);
   $$('[data-pay]').forEach(b => b.onclick = e => { e.stopPropagation(); const x = books.find(y => y.id === b.dataset.pay); if (x && x.student_id) paymentForm({ student: { id: x.student_id, first_name: (x.nex_students || {}).first_name || x.name, last_name: (x.nex_students || {}).last_name || '' } }); });
   $$('[data-edit]').forEach(b => b.onclick = e => { e.stopPropagation(); bookingForm(cur, books.find(x => x.id === b.dataset.edit), books); });
   $$('[data-conf]').forEach(b => b.onclick = e => { e.stopPropagation(); const x = books.find(y => y.id === b.dataset.conf); if (x) confirmEmail(cur, books, x); });

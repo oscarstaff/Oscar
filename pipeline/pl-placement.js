@@ -8,7 +8,7 @@ const PL = { tab: 'batches', status: '', q: '', page: 0, size: 50 };
 
 route(/^\/placement$/, async () => {
   afterRender(() => bindPlacement());
-  const seg = [['batches', 'Batches'], ['requests', 'Requests'], ['placements', 'Placements'], ['facilities', 'Facilities'], ['blacklist', 'Blacklist']];
+  const seg = [['ready', 'Ready'], ['batches', 'Batches'], ['requests', 'Requests'], ['placements', 'Placements'], ['hold', 'On hold'], ['facilities', 'Facilities'], ['blacklist', 'Blacklist']];
   return pageHead('pin', 'Placement team', 'Placement', '<button class="nx-btn primary" id="plAdd">' + ico('plus') + '<span id="plAddL">New request</span></button>') +
     '<div class="nx-card"><div class="nx-toolbar" style="border-top:0"><div class="nx-seg" id="plSeg">' + seg.map(([k, l]) => '<button data-v="' + k + '" aria-pressed="' + (PL.tab === k) + '">' + l + '</button>').join('') + '</div><select class="nx-sel sm" id="plStatus"></select><input class="nx-in sm" id="plQ" style="min-width:220px" placeholder="Search" value="' + esc(PL.q) + '"></div><div id="plBody"></div><div class="nx-foot" id="plFoot"><span></span></div></div>';
 });
@@ -17,13 +17,15 @@ function bindPlacement() {
   const body = $('#plBody');
   const labels = { batches: '', requests: 'New request', placements: 'New placement', facilities: 'New facility', blacklist: 'Add to blacklist' };
   const load = async () => {
-    const bt = PL.tab === 'batches';
+    const bt = PL.tab === 'batches' || PL.tab === 'ready' || PL.tab === 'hold';     /* these three draw their own toolbar */
     $('#plAdd').hidden = bt; $('#plQ').hidden = bt; $('#plFoot').hidden = bt;
     if (!bt) $('#plAddL').textContent = labels[PL.tab];
     const sf = $('#plStatus'); sf.hidden = !(PL.tab === 'requests' || PL.tab === 'placements');
     if (!sf.hidden) sf.innerHTML = selectOpts(opts(PL.tab === 'requests' ? 'placement' : 'placement_stage', true), PL.status, 'Any status');
     holdBody(body);
     try {
+      if (PL.tab === 'ready') { await renderReady(body); return; }
+      if (PL.tab === 'hold') { await renderHold(body); return; }
       if (bt) { await renderBatches(body); return; }
       const q = safeQ(PL.q), from = PL.page * PL.size, to = from + PL.size - 1; let rows, total, html;
       if (PL.tab === 'requests') {
@@ -58,8 +60,8 @@ function bindPlacement() {
   $('#plStatus').onchange = e => { PL.status = e.target.value; PL.page = 0; load(); };
   let t = 0; $('#plQ').addEventListener('input', e => { clearTimeout(t); t = setTimeout(() => { PL.q = e.target.value; PL.page = 0; load(); }, 300); });
   $('#plAdd').onclick = () => {
-    if (PL.tab === 'requests') return pickEnrolment('New placement request', en => requestForm(null, en));
-    if (PL.tab === 'placements') return pickEnrolment('New placement', en => placementForm(null, en));
+    if (PL.tab === 'requests') return pickEnrolment('New placement request', (en, st) => requestForm(null, en, st));
+    if (PL.tab === 'placements') return pickEnrolment('New placement', (en, st) => placementForm(null, en, st));
     if (PL.tab === 'facilities') return facilityForm(null);
     return blacklistForm();
   };
@@ -77,8 +79,10 @@ function pickEnrolment(title, cb) {
 }
 async function facilityOptions() { const f = await sel('nex_facilities', 'select=id,name&active=eq.true&order=name&limit=1000'); return f.map(x => ({ id: x.id, label: x.name })); }
 
-async function requestForm(r, en) {
-  r = r || {}; const fac = await facilityOptions();
+async function requestForm(r, en, st) {
+  r = r || {};
+  if (!r.id && en && !await ppGate(await ppLoad(en.student_id), st ? fullName(st) : '', {})) return;   /* shows the team's flags (hold, English, irregular availability) before a request is sent */
+  const fac = await facilityOptions();
   const f = [{ k: 'facility_id', label: 'Facility', type: 'select', options: fac, value: r.facility_id, blank: 'Type a name instead', full: true }, { k: 'facility_text', label: 'Facility name (if not in the list)', value: r.facility_text, full: true },
     { k: 'self_placement', label: 'Self placement (student found it)', type: 'check', value: r.self_placement }, { k: 'form_url', label: 'Self-sought form response (link)', type: 'url', value: r.form_url, placeholder: 'https://', full: true },
     { k: 'emailed_on', label: 'Email sent on', type: 'date', value: r.emailed_on, help: 'Recorded only. YatraLine does not send the email.' },
@@ -88,8 +92,10 @@ async function requestForm(r, en) {
     toast('Saved'); render();
   });
 }
-async function placementForm(p, en) {
-  p = p || {}; const fac = await facilityOptions();
+async function placementForm(p, en, st) {
+  p = p || {};
+  if (!p.id && en && !await ppGate(await ppLoad(en.student_id), st ? fullName(st) : '', {})) return;
+  const fac = await facilityOptions();
   const f = [{ k: 'facility_id', label: 'Facility', type: 'select', options: fac, value: p.facility_id, blank: 'Type a name instead', full: true }, { k: 'facility_text', label: 'Facility name (if not in the list)', value: p.facility_text, full: true },
     { k: 'start_date', label: 'Start date', type: 'date', value: p.start_date }, { k: 'end_date', label: 'End date', type: 'date', value: p.end_date }, { k: 'hours', label: 'Hours', type: 'number', value: p.hours },
     { k: 'status', label: 'Stage', type: 'select', options: opts('placement_stage', true), value: p.status, blank: 'Not set' }, { k: 'note', label: 'Note', type: 'textarea', value: p.note, full: true }];
