@@ -345,10 +345,21 @@ function sideCards(c) {
 /* send a lead follow-up email (lists the documents not received yet) through the workspace mail script.
    The dialog opens at once at a fixed size and everything happens inside it: the preview loads in place, the mailbox's remaining sends
    load in the background, and "already sent" is a line in the dialog, not another dialog on top. */
+/* Mark a follow-up done. After the 3rd follow-up a lead who has not booked a class, or been put on hold or not interested, stays in the cycle:
+   the database asks for the date of the next one (NEXT_DATE_NEEDED) and this box collects it. */
+async function doneFollowup(id) {
+  const done = next => api('rpc/nex_done_followup', { method: 'POST', body: { p_id: id, p_next: next || null } });
+  try { await done(); toast('Done'); return render(); }
+  catch (err) {
+    if (!/NEXT_DATE_NEEDED/.test(err.message || '')) throw err;
+    return formModal('When is the next follow-up?', [{ k: 'next', label: 'Next follow-up date', type: 'date', required: true, full: true, help: 'This lead has not booked a class and is not on hold or not interested, so they stay on the follow-up list. They leave it when a class is booked or their enrolment is put on hold or not interested.' }],
+      async v => { await done(v.next); toast('Done. Next follow-up on ' + fmtDate(v.next)); render(); }, 'Save and mark done');
+  }
+}
 async function emailFollowup(s, step) {
   if (!s.email) { toast('Add an email address on the Details tab first.', true); return; }
   let force = false, sending = false;
-  const m = openModal({ title: 'Email ' + ['', '1st', '2nd', '3rd'][step] + ' follow-up', wide: true, noFocus: true,
+  const m = openModal({ title: 'Email ' + FU_NTH(step) + ' follow-up', wide: true, noFocus: true,
     body: '<div class="nx-md"><div class="nx-muted" data-ef="top">Preparing the email…</div><div data-ef="note"></div><div><label class="nx-lbl" for="efSub">Subject</label><input class="nx-in" id="efSub" disabled></div><div style="flex:1;display:flex;flex-direction:column"><label class="nx-lbl" for="efBody">Message</label><textarea class="nx-ta" id="efBody" style="flex:1;min-height:250px" disabled></textarea><div class="nx-help">You can edit this before it goes. Replies come to you.</div></div><div class="nx-err" data-ef="err" role="alert" hidden></div></div>' });
   const q = k => $('[data-ef="' + k + '"]', m.el), foot = $('.modal-f', m.el);
   const cancel = document.createElement('button'); cancel.className = 'nx-btn'; cancel.textContent = 'Cancel'; cancel.onclick = () => m.close();
@@ -374,6 +385,9 @@ async function emailFollowup(s, step) {
       const r = await fn('nex-send-followup', { student_id: s.id, step, subject, body, force });
       toast('Email sent to ' + pv.to + (r && typeof r.remaining === 'number' && r.remaining <= 20 ? '. ' + r.remaining + ' more can be sent today.' : ''));
       m.close(); render();
+      if (step >= 3 && !(r && r.ticked)) {   /* the 3rd and later follow-ups are finished here, so the date of the next one is asked for */
+        try { const o = await sel('nex_followups', 'select=id&student_id=eq.' + s.id + '&kind=eq.lead_cycle&step=eq.' + step + '&done_at=is.null&limit=1'); if (o[0]) await doneFollowup(o[0].id); } catch (e2) { toast(e2.message, true); }
+      }
     } catch (e) {
       if (e.code === 'recent' && !force) { force = true; q('note').innerHTML = '<div class="nx-pill warn" style="white-space:normal;height:auto;padding:6px 10px">' + esc(e.message) + ' Press Send again to send it anyway.</div>'; go.textContent = 'Send again'; }
       else { q('err').hidden = false; q('err').textContent = e.message; go.textContent = force ? 'Send again' : 'Send email'; }
@@ -522,16 +536,7 @@ async function studentAction(a, ds, c) {
   if (a === 'addTask') return taskForm(null, () => render(), s);
   if (a === 'doneTask') { await upd('nex_tasks', 'id=eq.' + ds.id, { status: 'done' }); toast('Task done'); return render(); }
   if (a === 'startCycle') return formModal('Start follow-ups', [{ k: 'first', label: 'First contact', type: 'date', value: s.first_contact_on || new Date(s.created_at).toLocaleDateString('en-CA', { timeZone: TZ }), required: true, full: true, help: 'The 1st follow-up is 2 days after this date, the 2nd 4 days after, the 3rd 6 days after.' }], async v => { await api('rpc/nex_start_lead_cycle', { method: 'POST', body: { p_student: s.id, p_first: v.first } }); toast('3 follow-ups set'); render(); }, 'Start');
-  if (a === 'doneFu') {
-    /* after the 3rd follow-up a lead who has not booked a class, or been put on hold or not interested, stays in the cycle: the staff member picks the date of the next one */
-    const done = next => api('rpc/nex_done_followup', { method: 'POST', body: { p_id: ds.id, p_next: next || null } });
-    try { await done(); toast('Done'); return render(); }
-    catch (err) {
-      if (!/NEXT_DATE_NEEDED/.test(err.message || '')) throw err;
-      return formModal('When is the next follow-up?', [{ k: 'next', label: 'Next follow-up date', type: 'date', required: true, full: true, help: 'This lead has not booked a class and is not on hold or not interested, so they stay on the follow-up list. They leave it when a class is booked or their enrolment is put on hold or not interested.' }],
-        async v => { await done(v.next); toast('Done. Next follow-up on ' + fmtDate(v.next)); render(); }, 'Save and mark done');
-    }
-  }
+  if (a === 'doneFu') return doneFollowup(ds.id);
   if (a === 'emailFu') return emailFollowup(s, Number(ds.step));
   if (a === 'doneDetails') { await upd('nex_students', 'id=eq.' + s.id, { needs_details: false, flagged_to: null }); toast('Marked complete'); return render(); }
   if (a === 'bookFA') return bookClassModal(s, (c.enr.find(e => e.id === ds.id) || c.enr[0] || {}).id || null, () => render());
