@@ -239,6 +239,7 @@ function mailDialog(cfg) {
 function fieldHtml(f, prefix) {
   const id = (prefix || 'f') + '_' + f.k, v = f.value == null ? '' : f.value;
   let c = '';
+  if (f.type === 'help') return '<div class="full"><div class="nx-help" style="margin-top:-4px">' + esc(f.text) + '</div></div>';
   if (f.type === 'select') c = '<select class="nx-sel" id="' + id + '">' + selectOpts(f.options || [], v, f.blank != null ? f.blank : '') + '</select>';
   else if (f.type === 'textarea') c = '<textarea class="nx-ta" id="' + id + '" placeholder="' + esc(f.placeholder || '') + '">' + esc(v) + '</textarea>';
   else if (f.type === 'check') return '<div class="' + (f.full ? 'full' : '') + '"><label class="nx-check"><input type="checkbox" id="' + id + '"' + (v ? ' checked' : '') + '> ' + esc(f.label) + '</label>' + (f.help ? '<div class="nx-help">' + esc(f.help) + '</div>' : '') + '</div>';
