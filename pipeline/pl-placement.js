@@ -8,17 +8,17 @@ const PL = { tab: 'batches', status: '', q: '', page: 0, size: 50 };
 
 route(/^\/placement$/, async () => {
   afterRender(() => bindPlacement());
-  const seg = [['ready', 'Ready'], ['batches', 'Batches'], ['requests', 'Requests'], ['placements', 'Placements'], ['hold', 'On hold'], ['facilities', 'Facilities'], ['blacklist', 'Blacklist']];
+  const seg = [['ready', 'Ready'], ['batches', 'Batches'], ['requests', 'Requests'], ['placements', 'Started placement'], ['hold', 'On hold'], ['facilities', 'Facilities'], ['blacklist', 'Blacklist']];
   return pageHead('pin', 'Placement team', 'Placement', '<button class="nx-btn primary" id="plAdd">' + ico('plus') + '<span id="plAddL">New request</span></button>') +
     '<div class="nx-card"><div class="nx-toolbar" style="border-top:0"><div class="nx-seg" id="plSeg">' + seg.map(([k, l]) => '<button data-v="' + k + '" aria-pressed="' + (PL.tab === k) + '">' + l + '</button>').join('') + '</div><select class="nx-sel sm" id="plStatus"></select><input class="nx-in sm" id="plQ" style="min-width:220px" placeholder="Search" value="' + esc(PL.q) + '"></div><div id="plBody"></div><div class="nx-foot" id="plFoot"><span></span></div></div>';
 });
 
 function bindPlacement() {
   const body = $('#plBody');
-  const labels = { batches: '', requests: 'New request', placements: 'New placement', facilities: 'New facility', blacklist: 'Add to blacklist' };
+  const labels = { batches: '', requests: 'New request', facilities: 'New facility', blacklist: 'Add to blacklist' };
   const load = async () => {
     const bt = PL.tab === 'batches' || PL.tab === 'ready' || PL.tab === 'hold';     /* these three draw their own toolbar */
-    $('#plAdd').hidden = bt; $('#plQ').hidden = bt; $('#plFoot').hidden = bt;
+    $('#plAdd').hidden = bt || PL.tab === 'placements'; $('#plQ').hidden = bt; $('#plFoot').hidden = bt;
     if (!bt) $('#plAddL').textContent = labels[PL.tab];
     const sf = $('#plStatus'); sf.hidden = !(PL.tab === 'requests' || PL.tab === 'placements');
     if (!sf.hidden) sf.innerHTML = selectOpts(opts(PL.tab === 'requests' ? 'placement' : 'placement_stage', true), PL.status, 'Any status');
@@ -36,7 +36,7 @@ function bindPlacement() {
       } else if (PL.tab === 'placements') {
         let query = 'select=*,nex_facilities(name),nex_enrolments(student_id,nex_students(id,first_name,last_name))&order=start_date.desc.nullslast,created_at.desc'; if (PL.status) query += '&status=eq.' + PL.status; if (q) query += '&facility_text=ilike.*' + q + '*';
         ({ rows, total } = await selPage('nex_placements', query, from, to));
-        html = rows.length ? '<div class="nx-tablewrap"><table class="nx-table tight"><thead><tr><th>Student</th><th>Facility</th><th>Starts</th><th>Ends</th><th>Hours</th><th>Status</th><th></th></tr></thead><tbody>' + rows.map(r => { const s = (r.nex_enrolments || {}).nex_students; return '<tr><td>' + (s ? '<a href="#/students/' + s.id + '"><b>' + esc(fullName(s)) + '</b></a>' : '–') + '</td><td>' + esc((r.nex_facilities || {}).name || r.facility_text || '–') + '</td><td>' + esc(fmtDate(r.start_date) || '–') + '</td><td>' + esc(fmtDate(r.end_date) || '–') + '</td><td class="nx-num">' + esc(r.hours || '–') + '</td><td>' + pill('placement_stage', r.status) + '</td><td><button class="nx-btn sm" data-ed="' + r.id + '">Update</button></td></tr>'; }).join('') + '</tbody></table></div>' : empty('No placements yet');
+        html = rows.length ? '<div class="nx-card-b nx-muted" style="padding-top:6px">Students are placed from the Batches tab, inside each aged care card. This list follows them once they are placed: update dates, hours and status here.</div><div class="nx-tablewrap"><table class="nx-table tight"><thead><tr><th>Student</th><th>Facility</th><th>Starts</th><th>Ends</th><th>Hours</th><th>Status</th><th></th></tr></thead><tbody>' + rows.map(r => { const s = (r.nex_enrolments || {}).nex_students; return '<tr><td>' + (s ? '<a href="#/students/' + s.id + '"><b>' + esc(fullName(s)) + '</b></a>' : '–') + '</td><td>' + esc((r.nex_facilities || {}).name || r.facility_text || '–') + '</td><td>' + esc(fmtDate(r.start_date) || '–') + '</td><td>' + esc(fmtDate(r.end_date) || '–') + '</td><td class="nx-num">' + esc(r.hours || '–') + '</td><td>' + pill('placement_stage', r.status) + '</td><td><button class="nx-btn sm" data-ed="' + r.id + '">Update</button></td></tr>'; }).join('') + '</tbody></table></div>' : empty('Nobody placed yet', 'Students are placed from a Batch: open an aged care card and add them there. They appear here once placed.');
         $$('[data-ed]', body).forEach(b => b.onclick = () => placementForm(rows.find(x => x.id === b.dataset.ed)));
       } else if (PL.tab === 'facilities') {
         let query = 'select=*&order=name.asc'; if (q) query += '&name=ilike.*' + q + '*';
@@ -61,7 +61,6 @@ function bindPlacement() {
   let t = 0; $('#plQ').addEventListener('input', e => { clearTimeout(t); t = setTimeout(() => { PL.q = e.target.value; PL.page = 0; load(); }, 300); });
   $('#plAdd').onclick = () => {
     if (PL.tab === 'requests') return pickEnrolment('New placement request', (en, st) => requestForm(null, en, st));
-    if (PL.tab === 'placements') return pickEnrolment('New placement', (en, st) => placementForm(null, en, st));
     if (PL.tab === 'facilities') return facilityForm(null);
     return blacklistForm();
   };

@@ -167,11 +167,14 @@ async function boot() {
   watchSession();
   setInterval(keepToken, 60000);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) keepToken(); });
+  /* these three do not depend on each other, so they go out together (each one used to wait for the one before it) */
+  const mfa = mfaGate();
+  const meP = loadMe().then(() => { ME.team = STAFF.team || ''; }, () => { ME.team = ''; });   /* the team decides who may mark attendance and handle payments */
   await sessionAlive();
   if (locked) return;
   setInterval(sessionAlive, 60000);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) sessionAlive(); });
-  await mfaGate();
+  await mfa;
   if (locked) return;
   $('#whoName').textContent = ME.name || 'Signed in'; $('#whoAva').textContent = initials(ME.name);
   $('#app').hidden = false;
@@ -180,7 +183,7 @@ async function boot() {
   window.addEventListener('hashchange', render);
   pressFeedback();
   nexiInit();
-  try { await loadMe(); ME.team = STAFF.team || ''; } catch (e) { ME.team = ''; }   /* the team decides who may mark attendance and handle payments */
+  await meP;
   render();
   try { liveStart(); } catch (e) { console.warn('[live] not started', e); }
 }
