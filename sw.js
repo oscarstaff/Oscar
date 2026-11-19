@@ -34,6 +34,7 @@ self.addEventListener('fetch', function(event) {
   if (req.url.indexOf('supabase.co') >= 0 || req.url.indexOf('googleapis.com') >= 0) return;
   if (req.url.indexOf('script.google.com') >= 0) return;
   if (req.url.indexOf('jsdelivr.net') >= 0) return;
+  if (req.url.indexOf('tile.openstreetmap.org') >= 0) return;
 
   event.respondWith(
     fetch(req).then(function(resp) {
