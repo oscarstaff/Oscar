@@ -165,7 +165,7 @@ function bindPlacementMail(rows) {
       toast('Skipped'); render();
     } catch (e) { toast(e.message, true); }
   });
-  $('#pmSend', box).onclick = () => mailDialog({ title: 'Send placement documents email', fn: 'nex-send-placement-docs', empty: 'Nobody is waiting for this email.', onDone: () => render(),
+  $('#pmSend', box).onclick = () => mailDialog({ title: 'Send placement documents email', fn: 'nex-send-placement-docs', htmlPreview: true, empty: 'Nobody is waiting for this email.', onDone: () => render(),
     load: async () => rows.map(b => { const st = one(b.nex_students), ses = one(b.nex_class_sessions), to = (b.email || (st && st.email) || '').trim();
       return { id: b.id, name: st ? fullName(st) : (b.name || '(no name)'), sub: [ses && ses.class_date ? 'Class ' + fmtDate(ses.class_date) : '', to].filter(Boolean).join(' · '), off: !to, offNote: 'No email address' }; }) });
 }
