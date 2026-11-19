@@ -6,7 +6,7 @@ const ROUTES = [];
 function route(re, fn) { ROUTES.push({ re, fn }); }
 let navToken = 0, lastRouteH = null, afters = [], viewWaits = [];
 /* tabs: Admin is only listed for hub admins. Task Manager is general tasks; the 1st, 2nd and 3rd lead follow-ups are on the Leads tab. */
-const NAV = [['#/', 'Overview'], ['#/leads', 'Leads'], ['#/students', 'Students'], ['#/payments', 'Payments'], ['#/firstaid', 'First Aid'], ['#/placement', 'Placement'], ['#/tasks', 'Task Manager'], ['misc', 'More', 'menu'], ['#/admin', 'Admin', 'admin']];
+const NAV = [['#/', 'Overview'], ['#/leads', 'Leads'], ['#/students', 'Students'], ['#/payments', 'Payments'], ['#/firstaid', 'Class'], ['#/placement', 'Placement'], ['#/tasks', 'Task Manager'], ['misc', 'More', 'menu'], ['#/admin', 'Admin', 'admin']];
 /* the staff pages copied from Nexus sit together under the More button, in three labelled groups */
 const NAV_ICO = { '#/': 'home', '#/leads': 'user', '#/students': 'cap', '#/payments': 'cash', '#/firstaid': 'aid', '#/placement': 'pin', '#/tasks': 'list', '#/admin': 'admin' };
 const MISC_ICO = { '#/quizzes': 'book', '#/documents': 'doc', '#/calls': 'phone', '#/logbooks': 'notebook', '#/teamreport': 'users', '#/convreport': 'trend', '#/achievements': 'trophy' };
