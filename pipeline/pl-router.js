@@ -96,7 +96,11 @@ function holdBody(el) {
   } else el.innerHTML = skelRows(6);
 }
 let firstPaint = true;
-async function render() {
+/* The page redraw that follows a save. Modals wait for it (see openModal), so the screen changes once, behind the closing window,
+   instead of showing the old text for half a second and then swapping to the new. */
+let RENDER_P = Promise.resolve();
+function render() { const p = renderNow(); RENDER_P = p.catch(() => {}); return p; }
+async function renderNow() {
   const h = location.hash.replace(/^#/, '') || '/';
   const tok = ++navToken;
   const r = ROUTES.find(x => x.re.test(h));
