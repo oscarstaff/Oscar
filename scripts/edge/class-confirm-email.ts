@@ -1,5 +1,5 @@
 // HTML version of the First Aid and CPR class confirmation email (used by the nex-send-class-confirm edge function).
-// Built the way email clients need it: tables, inline styles, a 600px column that shrinks on a phone, one hosted logo image.
+// Built the way email clients need it: tables, inline styles, a 720px column that shrinks on a phone, one hosted logo image.
 // The wording is the team's own wording, reorganised so it can be scanned; the plain-text version (draft() in index.ts) is sent alongside it.
 const BLUE = "#0e4a82", MID = "#1b78c2", SKY = "#4fc3f0", SKYSOFT = "#eaf6fd", INK = "#1b2733", MUTED = "#5b6776", LINE = "#dde6ef", SOFT = "#f4f8fc";
 const FONT = "-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
@@ -110,7 +110,7 @@ export function classConfirmHtml(first: string, date: string, time: string, c: C
 <body style="margin:0;padding:0;background:#e6eef6;-webkit-text-size-adjust:100%">
 <div style="display:none;max-height:0;overflow:hidden;opacity:0;font-size:1px;line-height:1px;color:#e6eef6">You're booked in: ${dateLine}, ${esc(time)} at Rockdale. Please arrive 10 - 15 minutes early.</div>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#e6eef6"><tr><td align="center" class="ow" style="padding:24px 12px">
-<table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;background:#ffffff;border-radius:18px;overflow:hidden;border:1px solid ${LINE}">
+<table role="presentation" width="720" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:720px;background:#ffffff;border-radius:18px;overflow:hidden;border:1px solid ${LINE}">
 
   <tr><td class="px" style="background:#ffffff;padding:18px 32px 16px">
     <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
