@@ -83,7 +83,7 @@ function openModal(opt) {
       btn.onclick = async () => {
         if (b.close) return m.close();
         btn.disabled = true; btn.classList.add('busy');
-        try { const keep = await b.run(m); if (keep !== false) m.close(); } catch (e) { showErr(m, e); } finally { btn.disabled = false; btn.classList.remove('busy'); }
+        try { const keep = await b.run(m); if (keep !== false) { if (typeof RENDER_P !== 'undefined') await Promise.race([RENDER_P, new Promise(res => setTimeout(res, 2500))]); m.close(); } } catch (e) { showErr(m, e); } finally { btn.disabled = false; btn.classList.remove('busy'); }
       };
       f.appendChild(btn);
     });
