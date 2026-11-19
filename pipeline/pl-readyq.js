@@ -170,11 +170,7 @@ function rdSort(rows, today) {
 }
 async function renderReady(body) {
   const today = sydToday();
-  const [rows, min] = await Promise.all([
-    selAll('nex_placement_queue', 'select=*&has_placement=eq.false&hold=eq.false&stage=not.in.(' + PP_ENDED + ')'),
-    btMin().catch(() => 500)
-  ]);
-  PL_MIN = min;
+  let rows = [], loaded = false;
   const opt = (v, cur, l) => '<option value="' + v + '"' + (cur === v ? ' selected' : '') + '>' + esc(l) + '</option>';
   const bar = '<div class="nx-toolbar" style="border-top:0;flex-wrap:wrap">' +
     '<input class="nx-in sm" id="rdQ" placeholder="Search a name" value="' + esc(RD.q) + '" style="min-width:170px">' +
@@ -187,8 +183,9 @@ async function renderReady(body) {
     '<select class="nx-sel sm" id="rdReady" aria-label="Readiness">' + opt('', RD.ready, 'Any readiness') + PP_READY.map(([k, l]) => opt(k, RD.ready, l)).join('') + '</select>' +
     '<select class="nx-sel sm" id="rdFlag" aria-label="Flags">' + opt('', RD.flag, 'Any flags') + opt('eng', RD.flag, 'English to be assessed') + opt('irr', RD.flag, 'Irregular availability') + opt('want', RD.flag, 'Asked for a date or aged care') + '</select>' +
     '<button class="nx-btn sm" id="rdClear">Clear</button></div>';
-  body.innerHTML = bar + '<div id="rdList"></div>';
+  body.innerHTML = bar + '<div id="rdList"><div class="nx-card-b nx-muted" style="padding-top:6px;min-height:22px">Loading…</div></div>';   /* the filters stay put while the list loads, so nothing jumps */
   const draw = () => {
+    if (!loaded) return;
     const list = rdSort(rdFilter(rows, today), today), box = $('#rdList', body), cap = 300, shown = list.slice(0, cap);
     box.innerHTML = '<div class="nx-card-b nx-muted" style="padding-top:6px">' + list.length + ' of ' + rows.length + ' students' + (RD.status === 'complete' ? ' with all placement documents received' : '') + '. Students ready to place come first, and those waiting 3 weeks or more are at the top.</div>' +
       (shown.length ? '<div class="nx-tablewrap"><table class="nx-table tight"><thead><tr><th>Student</th><th>Documents</th><th>State and area</th><th>Shift</th><th>Readiness</th><th>Payment</th><th class="nx-num">Calls</th><th>Notes</th><th></th></tr></thead><tbody>' + shown.map(r => {
@@ -206,6 +203,12 @@ async function renderReady(body) {
   const bindIn = (id, k, ev) => { const el = $('#' + id, body); el.addEventListener(ev || 'change', () => { RD[k] = el.value; draw(); }); };
   bindIn('rdQ', 'q', 'input'); bindIn('rdArea', 'area', 'input'); ['rdStatus:status', 'rdFrom:from', 'rdTo:to', 'rdWait:wait', 'rdSt:st', 'rdShift:shift', 'rdReady:ready', 'rdFlag:flag'].forEach(x => { const [i, k] = x.split(':'); bindIn(i, k); });
   $('#rdClear', body).onclick = () => { Object.assign(RD, { q: '', status: 'complete', from: '', to: '', st: '', area: '', shift: '', ready: '', wait: '', flag: '' }); renderReady(body); };
+  const [got, min] = await Promise.all([
+    selAll('nex_placement_queue', 'select=*&has_placement=eq.false&hold=eq.false&stage=not.in.(' + PP_ENDED + ')'),
+    btMin().catch(() => 500)
+  ]);
+  if (!body.isConnected || $('#rdList', body) == null) return;
+  rows = got; PL_MIN = min; loaded = true;
   draw();
 }
 
