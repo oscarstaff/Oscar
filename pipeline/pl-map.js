@@ -37,12 +37,12 @@ let PL_MAP = null;   /* the map currently on screen, so a redraw can throw the o
 async function plDrawFacilityMap(host, rows, onEdit) {
   if (PL_MAP) { try { PL_MAP.remove(); } catch (e) { /* the old container is already gone */ } PL_MAP = null; }
   const pins = rows.filter(r => r.lat != null && r.lng != null), missing = rows.filter(r => r.lat == null || r.lng == null);
-  const approx = pins.filter(r => !r.geo_exact).length;
+  const cur = pins.filter(r => r.active !== false).length;
   host.innerHTML = '<div class="nx-card-b" style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between">' +
     '<div class="nx-btnrow"><button class="nx-btn sm" id="plmSyd">Sydney</button><button class="nx-btn sm" id="plmAll">All sites</button></div>' +
-    '<div class="nx-muted" style="font-size:12px"><span style="color:#2F86FF">●</span> on the building &nbsp; <span style="color:#2F86FF">○</span> approximate (street or suburb)</div></div>' +
+    '<div class="nx-muted" style="font-size:12px"><span style="color:#2F86FF">●</span> Current &nbsp; <span style="color:#8A94A6">●</span> Not current</div></div>' +
     '<div id="plmEl" style="isolation:isolate;position:relative;z-index:0;height:min(68vh,620px);min-height:340px;margin:0 14px;border-radius:12px;overflow:hidden;background:#e8eef5"></div>' +
-    '<div class="nx-card-b nx-muted" style="font-size:12.5px">' + pins.length + ' on the map' + (approx ? ', ' + approx + ' approximate. To fix one, open Edit on the Facilities list and paste the exact location into Map pin.' : '.') +
+    '<div class="nx-card-b nx-muted" style="font-size:12.5px">' + pins.length + ' on the map: ' + cur + ' current, ' + (pins.length - cur) + ' not current. "Current" means Still placing students here is ticked on the facility.' +
     (missing.length ? '<div style="margin-top:6px"><b>No pin yet:</b> ' + missing.map(r => '<a href="#" data-pm="' + esc(r.id) + '">' + esc(r.name) + '</a>').join(', ') + '</div>' : '') + '</div>';
   $$('[data-pm]', host).forEach(a => a.onclick = e => { e.preventDefault(); const r = rows.find(x => x.id === a.dataset.pm); if (r) onEdit(r); });
   const el = $('#plmEl', host);
@@ -57,13 +57,13 @@ async function plDrawFacilityMap(host, rows, onEdit) {
   const pts = [];
   pins.forEach(r => {
     const ll = [Number(r.lat), Number(r.lng)]; pts.push(ll);
-    const mk = L.circleMarker(ll, r.geo_exact ? { radius: 8, color: '#fff', weight: 2, fillColor: '#2F86FF', fillOpacity: 0.95 } : { radius: 8, color: '#2F86FF', weight: 2, dashArray: '3', fillColor: '#2F86FF', fillOpacity: 0.15 }).addTo(map);
+    const mk = L.circleMarker(ll, r.active !== false ? { radius: 8, color: '#fff', weight: 2, fillColor: '#2F86FF', fillOpacity: 0.95 } : { radius: 7, color: '#fff', weight: 2, fillColor: '#8A94A6', fillOpacity: 0.9 }).addTo(map);
     mk.bindTooltip(r.name, { direction: 'top', offset: [0, -6] });
     const box = document.createElement('div'); box.style.cssText = 'color:#111;font:13px/1.45 system-ui,sans-serif;min-width:170px';
     const prov = plProvider(r.notes), addr = [r.address, r.suburb].filter(Boolean).join(', ');
     box.innerHTML = '<b>' + esc(r.name) + '</b>' + (prov ? '<div>' + esc(prov) + '</div>' : '') + (addr ? '<div>' + esc(addr) + '</div>' : '') +
       (r.phone ? '<div><a href="tel:' + esc(String(r.phone).replace(/[^\d+]/g, '')) + '">' + esc(r.phone) + '</a></div>' : '') +
-      (r.geo_exact ? '' : '<div style="color:#667;font-size:12px">Approximate pin</div>') + '<div style="margin-top:6px"><button type="button" class="nx-btn sm">Edit</button></div>';
+      '<div style="color:#667;font-size:12px">' + (r.active !== false ? 'Current' : 'Not current') + '</div>' + '<div style="margin-top:6px"><button type="button" class="nx-btn sm">Edit</button></div>';
     $('button', box).onclick = () => { map.closePopup(); onEdit(r); };
     mk.bindPopup(box);
   });
