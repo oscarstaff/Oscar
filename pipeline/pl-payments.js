@@ -122,9 +122,8 @@ function linkPayment(p, queueRow) {
 function globalAddPayment() {
   /* one form: type the student's phone or email (or name). If they are already in YatraLine their details fill in and the payment goes against their enrolment. */
   const f = [
-    { k: 'phone', label: 'Phone', type: 'tel' }, { k: 'email', label: 'Email', type: 'email' },
-    { k: 'payer_name', label: 'Student name', placeholder: 'Or type a name to look them up' },
-    { k: 'amount', label: 'Amount ($)', type: 'number', required: true },
+    { k: 'payer_name', label: 'Student name', placeholder: 'Start typing their name' }, { k: 'phone', label: 'Phone', type: 'tel' },
+    { k: 'email', label: 'Email', type: 'email' }, { k: 'amount', label: 'Amount ($)', type: 'number', required: true },
     { k: 'enrolment_id', label: 'Enrolment', type: 'select', options: [], blank: 'Choose the enrolment', full: true },
     { k: 'paid_on', label: 'Payment date', type: 'date', value: sydToday(), required: true },
     { k: 'method', label: 'Method', type: 'select', options: PAY_METHODS, blank: 'Choose', required: true },
@@ -140,7 +139,7 @@ function globalAddPayment() {
     const p = await ins('nex_payments', Object.assign(pay, { payer_name: pay.payer_name || fullName(st), student_id: st ? st.id : null, enrolment_id: enrolmentId, created_by: ME.name }));
     if (enrolmentId) await queuePayment(enrolmentId, p.id);
     toast(st ? payDoneMsg(v.method).replace(/^Payment recorded/, 'Payment recorded for ' + fullName(st)) : 'Payment recorded. Link it to a student later.'); render();
-  }, 'Save payment', idBoxHtml('Start with the student’s phone or email. If they are already in YatraLine, their details and enrolment fill in. Otherwise the payment is saved unmatched and can be linked later.'));
+  }, 'Save payment', idBoxHtml('Start with the student’s name (or their phone or email). If they are already in YatraLine, pick them and their details and enrolment fill in. Otherwise the payment is saved unmatched and can be linked later.'));
   const wrap = $('#f_enrolment_id', m.el).parentElement; wrap.hidden = true;
   lk = identityLookup(m, { ids: { phone: 'f_phone', email: 'f_email', name: 'f_payer_name' }, onChange: async st => {
     enr = []; const sel0 = $('#f_enrolment_id', m.el);
