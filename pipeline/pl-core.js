@@ -241,6 +241,7 @@ async function api(path, opt) {
     body: opt.body == null ? undefined : JSON.stringify(opt.body)
   });
   let r;
+  if (opt.method && opt.method !== 'GET' && typeof lvWrote === 'function') lvWrote();   /* live updates: skip the echo of my own save */
   try { r = await doFetch(); } catch (e) { if (e && e.message === 'session') throw e; throw offlineError(); }
   if (r.status === 401) { if (await refreshToken()) r = await doFetch(); else { endSession(); throw new Error('session'); } }
   if (!r.ok) {

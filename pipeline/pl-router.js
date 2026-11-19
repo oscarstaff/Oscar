@@ -182,6 +182,7 @@ async function boot() {
   nexiInit();
   try { await loadMe(); ME.team = STAFF.team || ''; } catch (e) { ME.team = ''; }   /* the team decides who may mark attendance and handle payments */
   render();
+  try { liveStart(); } catch (e) { console.warn('[live] not started', e); }
 }
 
 /* press / to jump to search */
