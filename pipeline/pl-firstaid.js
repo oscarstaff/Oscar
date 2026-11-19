@@ -31,13 +31,12 @@ function fbTable(cur, live, payBy, showSeats) {
 route(/^\/firstaid(?:\/([0-9a-f-]{36}))?$/, async m => {
   const today = sydToday();
   const back = CF.from || today;   /* a class closes once its date has passed: the day strip starts today unless you ask for earlier dates; older days are also reached with Past classes */
-  const [sess0, trs, used] = await Promise.all([
+  const [sess0, trs] = await Promise.all([
     sel('nex_class_sessions', 'select=*&class_date=gte.' + back + (CF.to ? '&class_date=lte.' + CF.to : '') + (CF.kind ? '&kind=eq.' + CF.kind : '') + (CF.trainer ? '&trainer=eq.' + encodeURIComponent(CF.trainer) : '') + '&order=class_date.asc,kind.asc&limit=' + (CF.from || CF.to ? 200 : 60)),
     sel('nex_trainers', 'select=*&order=name').catch(() => REF.trainers || []),
-    sel('nex_class_sessions', 'select=trainer&trainer=not.is.null&limit=2000').catch(() => [])
   ]);
   let sessions = sess0; REF.trainers = trs;
-  const trainerNames = Array.from(new Set(trs.filter(t => t.active).map(t => t.name).concat(used.map(x => x.trainer).filter(Boolean)))).sort((a, c) => a.localeCompare(c, 'en', { sensitivity: 'base' }));
+  const trainerNames = Array.from(new Set(trs.filter(t => t.active).map(t => t.name))).sort((a, c) => a.localeCompare(c, 'en', { sensitivity: 'base' }));
   let want = m[1];
   if (want && !sessions.find(s => s.id === want)) { const one = await sel('nex_class_sessions', 'select=*&id=eq.' + want); if (one[0]) sessions = [one[0]].concat(sessions).sort((a, b) => a.class_date.localeCompare(b.class_date)); }
   const cur = sessions.find(s => s.id === want) || sessions.find(s => s.class_date >= today) || sessions[sessions.length - 1] || null;
