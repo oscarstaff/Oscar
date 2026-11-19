@@ -526,6 +526,7 @@ function showHoursTab(tab){
       .then(function(){ return window._oneoffsP; }).catch(function(){}).then(reveal);
     if(myIsAdmin){
       document.getElementById('adminAvailSection').style.display='block';
+      loadAdminAvailLock();
       loadAdminAvailGrid();
     }else{
       document.getElementById('adminAvailSection').style.display='none';
@@ -1598,6 +1599,48 @@ function showProfileSection(sec){
   markAllNotificationsRead(true);
   const main=document.querySelector(".main");
   if(main)main.scrollTop=0;
+}
+
+/* ── Admin: lock / unlock availability editing for everyone (staff_settings.can_edit_avail) ── */
+let _availLockState=null;   // {total, locked}
+async function loadAdminAvailLock(){
+  const sub=document.getElementById('adminAvailLockSub'), btn=document.getElementById('adminAvailLockBtn');
+  if(!sub||!btn) return;
+  try{
+    const rows=await sbGet('staff_settings','?select=name,can_edit_avail');
+    const total=rows.length, locked=rows.filter(function(r){ return r.can_edit_avail===false; }).length;
+    _availLockState={total:total,locked:locked};
+    const allLocked=locked===total&&total>0;
+    sub.textContent = locked===0 ? 'Everyone can edit their availability.'
+      : allLocked ? 'Locked for everyone. Nobody can change their availability.'
+      : 'Locked for '+locked+' of '+total+' staff.';
+    btn.textContent = locked===0 ? 'Lock for everyone' : 'Unlock for everyone';
+    btn.disabled=false;
+  }catch(e){
+    sub.textContent='Couldn\u2019t load the lock status.'; btn.disabled=true;
+  }
+}
+async function toggleAvailLockAll(){
+  const st=_availLockState; if(!st) return;
+  const lockNow=st.locked===0;
+  const ok=await nxConfirm(
+    lockNow?'Nobody will be able to change their availability until you unlock it again. Hours people have already saved stay as they are.'
+           :'Everyone will be able to edit their availability again.',
+    {title:lockNow?'Lock availability for everyone?':'Unlock availability for everyone?',okText:lockNow?'Lock for everyone':'Unlock for everyone',cancelText:'Cancel'});
+  if(!ok) return;
+  const btn=document.getElementById('adminAvailLockBtn'); if(btn) btn.disabled=true;
+  try{
+    const r=await fetch(SB+'/rest/v1/staff_settings?name=not.is.null',{
+      method:'PATCH',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+_sbBearer(),'Content-Type':'application/json','Prefer':'return=representation'},
+      body:JSON.stringify({can_edit_avail:!lockNow})
+    });
+    const rows=r.ok?await r.json():null;
+    if(!Array.isArray(rows)||!rows.length) throw new Error('not saved');
+    showToast(lockNow?'Availability locked for everyone':'Availability unlocked for everyone');
+  }catch(e){ showToast('Couldn\u2019t change the lock. Try again.'); }
+  await loadAdminAvailLock();
+  try{ await checkLock(); }catch(e){}
 }
 
 async function loadAdminAvailGrid(){
