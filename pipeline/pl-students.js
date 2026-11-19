@@ -555,8 +555,9 @@ function enrolmentForm(s, e, isStudent) {
 function paymentForm(o) {
   o = o || {};
   const f = [{ k: 'amount', label: 'Amount ($)', type: 'number', required: true }, { k: 'paid_on', label: 'Payment date', type: 'date', value: sydToday(), required: true },
-    { k: 'method', label: 'Method', type: 'select', options: payMethodOpts(), value: canPay() ? '' : 'Cash', blank: 'Choose', required: true, help: PAY_METHOD_HELP }, { k: 'reference', label: 'Reference', placeholder: 'Bank reference or receipt' },
-    { k: 'payer_name', label: 'Paid by', value: o.student ? fullName(o.student) : '' }, { k: 'note', label: 'Note', full: true }];
+    { k: 'method', label: 'Method', type: 'select', options: payMethodOpts(), value: canPay() ? '' : 'Cash', blank: 'Choose', required: true }, { k: 'reference', label: 'Reference', placeholder: 'Bank reference or receipt' },
+    { k: 'method_help', type: 'help', text: PAY_METHOD_HELP },
+    { k: 'payer_name', label: 'Paid by', value: o.student ? fullName(o.student) : '' }, { k: 'note', label: 'Note' }];
   const extra = o.student ? '' : '<div class="full" style="margin-bottom:12px"><div class="nx-warnbox">You will pick the student after you save this form. You can also leave the payment unmatched and link it later.</div></div>';
   return formModal(o.student ? 'Record payment for ' + fullName(o.student) : 'Record payment', f, async (v, m) => {
     const row = Object.assign({ student_id: o.student ? o.student.id : null, enrolment_id: o.enrolment ? o.enrolment.id : null, created_by: ME.name }, v);

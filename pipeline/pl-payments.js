@@ -124,10 +124,12 @@ function globalAddPayment() {
   const f = [
     { k: 'phone', label: 'Phone', type: 'tel' }, { k: 'email', label: 'Email', type: 'email' },
     { k: 'payer_name', label: 'Student name', placeholder: 'Or type a name to look them up' },
-    { k: 'enrolment_id', label: 'Enrolment', type: 'select', options: [], blank: 'Choose the enrolment' },
-    { k: 'amount', label: 'Amount ($)', type: 'number', required: true }, { k: 'paid_on', label: 'Payment date', type: 'date', value: sydToday(), required: true },
-    { k: 'method', label: 'Method', type: 'select', options: PAY_METHODS, blank: 'Choose', required: true, help: PAY_METHOD_HELP }, { k: 'reference', label: 'Reference', placeholder: 'Bank reference or receipt' },
-    { k: 'note', label: 'Note', full: true }];
+    { k: 'amount', label: 'Amount ($)', type: 'number', required: true },
+    { k: 'enrolment_id', label: 'Enrolment', type: 'select', options: [], blank: 'Choose the enrolment', full: true },
+    { k: 'paid_on', label: 'Payment date', type: 'date', value: sydToday(), required: true },
+    { k: 'method', label: 'Method', type: 'select', options: PAY_METHODS, blank: 'Choose', required: true },
+    { k: 'method_help', type: 'help', text: PAY_METHOD_HELP },
+    { k: 'reference', label: 'Reference', placeholder: 'Bank reference or receipt' }, { k: 'note', label: 'Note' }];
   let lk = null, enr = [];
   const m = formModal('Record payment', f, async v => {
     const st = lk ? lk.get() : null;
