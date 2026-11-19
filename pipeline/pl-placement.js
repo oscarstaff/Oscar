@@ -41,7 +41,7 @@ function bindPlacement() {
       } else if (PL.tab === 'facilities') {
         const map = PL.fview === 'map';
         let query = 'select=*&order=name.asc'; if (q) query += '&name=ilike.*' + q + '*';
-        if (map) query += '&active=eq.true&limit=1000';
+        if (map) query += '&limit=1000';
         if (map) { rows = await sel('nex_facilities', query); total = rows.length; } else ({ rows, total } = await selPage('nex_facilities', query, from, to));
         const bar = '<div class="nx-card-b" style="padding-bottom:0"><div class="nx-seg" id="plFv"><button data-v="list" aria-pressed="' + !map + '">List</button><button data-v="map" aria-pressed="' + map + '">Map</button></div></div>';
         html = map ? bar + '<div id="plMapHost"></div>' : rows.length ? bar + '<div class="nx-tablewrap"><table class="nx-table tight"><thead><tr><th>Facility</th><th>Suburb</th><th>Contact</th><th>Phone</th><th>Email</th><th></th></tr></thead><tbody>' + rows.map(r => '<tr><td><b>' + esc(r.name) + '</b></td><td>' + esc(r.suburb || '–') + '</td><td>' + esc(r.contact_name || '–') + '</td><td>' + esc(r.phone || '–') + '</td><td>' + esc(r.email || '–') + '</td><td><button class="nx-btn sm" data-ed="' + r.id + '">Edit</button></td></tr>').join('') + '</tbody></table></div>' : bar + empty('No facilities', 'Add the homes you place students with.');
