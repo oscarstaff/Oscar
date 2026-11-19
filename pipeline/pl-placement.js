@@ -4,7 +4,7 @@
 /* =========================================================
    Placement, Follow-ups, Admin
    ========================================================= */
-const PL = { tab: 'batches', status: '', q: '', page: 0, size: 50 };
+const PL = { tab: 'batches', status: '', q: '', page: 0, size: 50, fview: 'list' };
 
 route(/^\/placement$/, async () => {
   afterRender(() => bindPlacement());
@@ -39,9 +39,15 @@ function bindPlacement() {
         html = rows.length ? '<div class="nx-card-b nx-muted" style="padding-top:6px">Students are placed from the Batches tab, inside each aged care card. This list follows them once they are placed: update dates, hours and status here.</div><div class="nx-tablewrap"><table class="nx-table tight"><thead><tr><th>Student</th><th>Facility</th><th>Starts</th><th>Ends</th><th>Hours</th><th>Status</th><th></th></tr></thead><tbody>' + rows.map(r => { const s = (r.nex_enrolments || {}).nex_students; return '<tr><td>' + (s ? '<a href="#/students/' + s.id + '"><b>' + esc(fullName(s)) + '</b></a>' : '–') + '</td><td>' + esc((r.nex_facilities || {}).name || r.facility_text || '–') + '</td><td>' + esc(fmtDate(r.start_date) || '–') + '</td><td>' + esc(fmtDate(r.end_date) || '–') + '</td><td class="nx-num">' + esc(r.hours || '–') + '</td><td>' + pill('placement_stage', r.status) + '</td><td><button class="nx-btn sm" data-ed="' + r.id + '">Update</button></td></tr>'; }).join('') + '</tbody></table></div>' : empty('Nobody placed yet', 'Students are placed from a Batch: open an aged care card and add them there. They appear here once placed.');
         $$('[data-ed]', body).forEach(b => b.onclick = () => placementForm(rows.find(x => x.id === b.dataset.ed)));
       } else if (PL.tab === 'facilities') {
+        const map = PL.fview === 'map';
         let query = 'select=*&order=name.asc'; if (q) query += '&name=ilike.*' + q + '*';
-        ({ rows, total } = await selPage('nex_facilities', query, from, to));
-        html = rows.length ? '<div class="nx-tablewrap"><table class="nx-table tight"><thead><tr><th>Facility</th><th>Suburb</th><th>Contact</th><th>Phone</th><th>Email</th><th></th></tr></thead><tbody>' + rows.map(r => '<tr><td><b>' + esc(r.name) + '</b></td><td>' + esc(r.suburb || '–') + '</td><td>' + esc(r.contact_name || '–') + '</td><td>' + esc(r.phone || '–') + '</td><td>' + esc(r.email || '–') + '</td><td><button class="nx-btn sm" data-ed="' + r.id + '">Edit</button></td></tr>').join('') + '</tbody></table></div>' : empty('No facilities', 'Add the homes you place students with.');
+        if (map) query += '&active=eq.true&limit=1000';
+        if (map) { rows = await sel('nex_facilities', query); total = rows.length; } else ({ rows, total } = await selPage('nex_facilities', query, from, to));
+        const bar = '<div class="nx-card-b" style="padding-bottom:0"><div class="nx-seg" id="plFv"><button data-v="list" aria-pressed="' + !map + '">List</button><button data-v="map" aria-pressed="' + map + '">Map</button></div></div>';
+        html = map ? bar + '<div id="plMapHost"></div>' : rows.length ? bar + '<div class="nx-tablewrap"><table class="nx-table tight"><thead><tr><th>Facility</th><th>Suburb</th><th>Contact</th><th>Phone</th><th>Email</th><th></th></tr></thead><tbody>' + rows.map(r => '<tr><td><b>' + esc(r.name) + '</b></td><td>' + esc(r.suburb || '–') + '</td><td>' + esc(r.contact_name || '–') + '</td><td>' + esc(r.phone || '–') + '</td><td>' + esc(r.email || '–') + '</td><td><button class="nx-btn sm" data-ed="' + r.id + '">Edit</button></td></tr>').join('') + '</tbody></table></div>' : bar + empty('No facilities', 'Add the homes you place students with.');
+        body.innerHTML = html;
+        $$('#plFv button', body).forEach(b => b.onclick = () => { PL.fview = b.dataset.v; PL.page = 0; load(); });
+        if (map) { $('#plFoot').hidden = true; plDrawFacilityMap($('#plMapHost', body), rows, facilityForm); }
         $$('[data-ed]', body).forEach(b => b.onclick = () => facilityForm(rows.find(x => x.id === b.dataset.ed)));
       } else {
         let query = 'select=*,nex_facilities(name)&order=added_at.desc'; if (q) query += '&or=(student_name.ilike.*' + q + '*,facility_text.ilike.*' + q + '*)';
@@ -49,11 +55,12 @@ function bindPlacement() {
         html = rows.length ? '<div class="nx-tablewrap"><table class="nx-table tight"><thead><tr><th>Student or facility</th><th>Where allocated</th><th>Reason</th><th>Added</th><th></th></tr></thead><tbody>' + rows.map(r => '<tr><td><b>' + esc(r.student_name || (r.nex_facilities || {}).name || r.facility_text || '–') + '</b><div class="nx-muted" style="font-size:12px">' + esc(r.email || '') + '</div></td><td>' + esc(r.allocated_at || '–') + '</td><td>' + esc(r.reason || '–') + '</td><td>' + esc(fmtDate(r.added_at)) + '<div class="nx-muted" style="font-size:12px">' + esc(r.added_by || '') + '</div></td><td>' + (ME.admin ? '<button class="nx-btn sm" data-rm="' + r.id + '">Remove</button>' : '') + '</td></tr>').join('') + '</tbody></table></div>' : empty('Blacklist is empty');
         body.innerHTML = html; $$('[data-rm]', body).forEach(b => b.onclick = async () => { if (await confirmBox('Remove from blacklist', 'Remove this entry?', 'Remove', true)) { try { await del('nex_blacklist', 'id=eq.' + b.dataset.rm); toast('Removed'); load(); } catch (e) { toast(e.message, true); } } });
       }
-      if (PL.tab !== 'blacklist') body.innerHTML = html;
+      if (PL.tab !== 'blacklist' && PL.tab !== 'facilities') body.innerHTML = html;   /* those two put their own markup in (facilities has to: the map is drawn into it) */
       if (PL.tab === 'blacklist') { /* already set */ }
       const fromN = total ? from + 1 : 0, toN = from + rows.length;
       $('#plFoot').innerHTML = '<span>' + (total != null ? (total ? fromN + '–' + toN + ' of ' + total.toLocaleString('en-AU') : '') : rows.length + ' shown') + '</span><span class="nx-btnrow"><button class="nx-btn sm" id="plPrev"' + (PL.page ? '' : ' disabled') + '>Previous</button><button class="nx-btn sm" id="plNext"' + (total != null && toN >= total ? ' disabled' : '') + '>Next</button></span>';
       $('#plPrev').onclick = () => { PL.page--; load(); }; $('#plNext').onclick = () => { PL.page++; load(); };
+      if (PL.tab === 'facilities' && PL.fview === 'map') $('#plFoot').hidden = true;
     } catch (e) { body.innerHTML = empty('Could not load', e.message); }
   };
   $$('#plSeg button').forEach(b => b.onclick = () => { PL.tab = b.dataset.v; PL.page = 0; PL.status = ''; $$('#plSeg button').forEach(x => x.setAttribute('aria-pressed', String(x === b))); load(); });
@@ -106,8 +113,14 @@ async function placementForm(p, en, st) {
 function facilityForm(r) {
   r = r || {};
   formModal(r.id ? 'Edit facility' : 'New facility', [{ k: 'name', label: 'Name', value: r.name, required: true, full: true }, { k: 'address', label: 'Address', value: r.address, full: true }, { k: 'suburb', label: 'Suburb', value: r.suburb },
+    { k: 'pin', label: 'Map pin', value: r.lat != null ? r.lat + ', ' + r.lng : '', placeholder: '-33.8688, 151.2093', help: 'Latitude, longitude. In Google Maps, right-click the building and click the numbers at the top of the menu to copy them. Leave empty for no pin.' },
     { k: 'contact_name', label: 'Contact person', value: r.contact_name }, { k: 'phone', label: 'Phone', type: 'tel', value: r.phone }, { k: 'email', label: 'Email', type: 'email', value: r.email },
     { k: 'active', label: 'Still placing students here', type: 'check', value: r.id ? r.active : true }, { k: 'notes', label: 'Notes', type: 'textarea', value: r.notes, full: true }], async v => {
+    const pin = v.pin; delete v.pin;   /* "lat, lng" text -> the lat, lng and geo_exact columns; only touched when the box was changed */
+    if ((pin || '') !== (r.lat != null ? r.lat + ', ' + r.lng : '')) {
+      if (pin == null) { v.lat = null; v.lng = null; v.geo_exact = false; }
+      else { const p = plParsePin(pin); if (!p) { const err = new Error('Map pin must be two numbers in Australia, like -33.8688, 151.2093.'); err.fieldEl = $('#f_pin'); throw err; } v.lat = p[0]; v.lng = p[1]; v.geo_exact = true; }
+    }
     if (r.id) await upd('nex_facilities', 'id=eq.' + r.id, v); else await ins('nex_facilities', v, true);
     toast('Saved'); render();
   });
