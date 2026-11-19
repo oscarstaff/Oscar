@@ -47,7 +47,7 @@ route(/^\/$/, async () => {
     '</div>';
 });
 
-const AUD_NAMES = { nex_students: 'student', nex_student_details: 'student details', nex_enrolments: 'enrolment', nex_payments: 'payment', nex_payment_queue: 'payment queue', nex_refunds: 'refund', nex_class_sessions: 'class', nex_class_bookings: 'booking', nex_placement_requests: 'placement request', nex_placement_doc_mail: 'placement documents email', nex_placements: 'placement', nex_facilities: 'facility', nex_blacklist: 'blacklist entry' };
+const AUD_NAMES = { nex_students: 'student', nex_student_details: 'student details', nex_enrolments: 'enrolment', nex_payments: 'payment', nex_payment_queue: 'payment queue', nex_refunds: 'refund', nex_class_sessions: 'class', nex_placement_profile: 'placement profile', nex_class_bookings: 'booking', nex_placement_requests: 'placement request', nex_placement_doc_mail: 'placement documents email', nex_placements: 'placement', nex_facilities: 'facility', nex_blacklist: 'blacklist entry' };
 const SKIP_KEYS = new Set(['updated_at', 'created_at', 'created_by', 'id', 'updated_by']);
 function diffHtml(a) {
   if (a.action !== 'UPDATE' || !a.old_row || !a.new_row) return '';
@@ -279,7 +279,7 @@ function newStudent() {
 const SR = { tab: 'details' };
 route(/^\/students\/([0-9a-f-]{36})$/, async m => {
   const id = m[1];
-  const [stu, det, enr, pays, books, followups, tasks, calls, logs] = await Promise.all([
+  const [stu, det, enr, pays, books, followups, tasks, calls, logs, ppRows, facs] = await Promise.all([
     sel('nex_students', 'select=*&id=eq.' + id), api('rpc/nex_get_details', { method: 'POST', body: { p_student: id } }).then(r => r.json()),
     sel('nex_enrolments', 'select=*&student_id=eq.' + id + '&deleted_at=is.null&order=enrolled_on.desc.nullslast'),
     sel('nex_payments', 'select=*&student_id=eq.' + id + '&order=paid_on.desc.nullslast'),
@@ -287,7 +287,9 @@ route(/^\/students\/([0-9a-f-]{36})$/, async m => {
     sel('nex_followups', 'select=*&student_id=eq.' + id + '&order=created_at.desc'),
     sel('nex_tasks', 'select=*&student_id=eq.' + id + '&status=neq.done&order=due_on.asc.nullslast').catch(() => []),
     sel('call_log', 'select=id,caller_name,phone_e164,reason,note,direction,logged_by,created_at,resolved_at,for_team&student_id=eq.' + id + '&deleted_at=is.null&order=created_at.desc&limit=40').catch(() => []),
-    sel('nex_logbook_receipts', 'select=id,received_on,receiver,comments,created_at&student_id=eq.' + id + '&order=received_on.desc&limit=20').catch(() => [])
+    sel('nex_logbook_receipts', 'select=id,received_on,receiver,comments,created_at&student_id=eq.' + id + '&order=received_on.desc&limit=20').catch(() => []),
+    sel('nex_placement_profile', 'select=*&student_id=eq.' + id).catch(() => []),
+    facilityOptions().catch(() => [])
   ]);
   const s = stu[0]; if (!s) return empty('Student not found', 'They may have been archived.');
   /* the sensitive details come through a function that logs who looked (admins see this) and stops bulk opening */
@@ -308,7 +310,7 @@ route(/^\/students\/([0-9a-f-]{36})$/, async m => {
   const grossPaid = sumPaid(pays);
   const isStudent = grossPaid >= STUDENT_MIN;
   const totalPaid = grossPaid - refunds.reduce((t, r) => t + Number(r.amount), 0);
-  const ctx = { s, d, limited, enr, pays, books, followups: followups.filter(f => f.kind !== 'moved_to_task'), tasks, queue, refunds, reqs, plcs, hist, aud, docs, calls, logs, isStudent };
+  const ctx = { pp: ppRows[0] || null, facs, s, d, limited, enr, pays, books, followups: followups.filter(f => f.kind !== 'moved_to_task'), tasks, queue, refunds, reqs, plcs, hist, aud, docs, calls, logs, isStudent };
 
   afterRender(() => { bindStudent(ctx); setNav(isStudent ? '!/students' : '!/leads'); });
   const fact = (k, v) => '<div><dt>' + k + '</dt><dd>' + (v || '<span class="nx-muted">–</span>') + '</dd></div>';
@@ -319,7 +321,7 @@ route(/^\/students\/([0-9a-f-]{36})$/, async m => {
     '<div class="nx-btnrow"><button class="nx-btn" data-a="editStu">' + ico('edit') + 'Edit</button><button class="nx-btn" data-a="addEnr">' + ico('plus') + 'Enrolment</button>' + (isStudent ? '' : '<button class="nx-btn primary" data-a="bookFA">' + ico('aid') + 'Book class</button>') + '' + (ME.admin ? '<button class="nx-btn quiet" data-a="archive">' + ico('archive') + 'Archive</button>' : '') + '</div></div>' +
     (main.id ? '<div style="padding:0 16px 16px"><ol class="nx-path">' + PATH.map((p, i) => '<li class="' + (i < idx ? 'done' : i === idx ? 'now' : '') + '">' + (i < idx ? ico('check') : '') + esc(statusLabel('enrolment', p)) + '</li>').join('') + '</ol>' + (idx < 0 && main.stage ? '<div style="margin-top:8px">Current stage: ' + pill('enrolment', main.stage) + '</div>' : '') + '</div>' : '') + '</div>' +
     '<div class="nx-cols"><div class="nx-colmain"><div class="nx-card"><div class="nx-tabs" role="tablist">' +
-    [['details', 'Details'], ['money', 'Enrolments and payments'], ['docs', 'Documents' + docsBadge(ctx)], ['activity', 'Activity']].map(([k, l]) => '<button class="nx-tab" role="tab" data-tab="' + k + '" aria-selected="' + (SR.tab === k) + '">' + l + '</button>').join('') + '</div><div id="srTab"></div></div></div>' +
+    [['details', 'Details'], ['money', 'Enrolments and payments'], ['docs', 'Documents' + docsBadge(ctx)], ['placement', 'Placement' + ppBadge(ctx)], ['activity', 'Activity']].map(([k, l]) => '<button class="nx-tab" role="tab" data-tab="' + k + '" aria-selected="' + (SR.tab === k) + '">' + l + '</button>').join('') + '</div><div id="srTab"></div></div></div>' +
     '<div class="nx-colside">' + sideCards(ctx) + '</div></div>';
 });
 
@@ -382,8 +384,9 @@ function bindStudent(c) {
   const view = $('#view');
   const tabBody = $('#srTab');
   const showTab = () => {
-    $$('.nx-tab', view).forEach(t => { t.setAttribute('aria-selected', String(t.dataset.tab === SR.tab)); if (t.dataset.tab === 'docs') t.textContent = 'Documents' + docsBadge(c); });
-    tabBody.innerHTML = SR.tab === 'details' ? tabDetails(c) : SR.tab === 'money' ? tabMoney(c) : SR.tab === 'docs' ? tabDocs(c) : tabActivity(c);
+    $$('.nx-tab', view).forEach(t => { t.setAttribute('aria-selected', String(t.dataset.tab === SR.tab)); if (t.dataset.tab === 'docs') t.textContent = 'Documents' + docsBadge(c); if (t.dataset.tab === 'placement') t.textContent = 'Placement' + ppBadge(c); });
+    tabBody.innerHTML = SR.tab === 'details' ? tabDetails(c) : SR.tab === 'money' ? tabMoney(c) : SR.tab === 'docs' ? tabDocs(c) : SR.tab === 'placement' ? tabPlacement(c) : tabActivity(c);
+    if (SR.tab === 'placement') ppBindTab(c, tabBody, showTab);
   };
   showTab();
   view.onclick = async e => {
@@ -433,13 +436,13 @@ function tabDocs(c) {
   if (!c.enr.length) return empty('No enrolments', 'Add an enrolment to track the documents it needs.');
   return c.enr.map(e => {
     const types = docTypesFor(e), title = (qualName(e.qualification_id) || 'Enrolment') + (e.year ? ' · ' + e.year : '');
-    if (!types.length) return section(title, '<div style="padding:16px" class="nx-muted">' + (e.qualification_id ? 'There is no document list for this course yet.' : 'Choose a qualification on this enrolment to see its document list.') + '</div>') + placementDocsSection(c, e, title);
+    if (!types.length) return section(title, '<div style="padding:16px" class="nx-muted">' + (e.qualification_id ? 'There is no document list for this course yet.' : 'Choose a qualification on this enrolment to see its document list.') + '</div>');
     const got = {}; c.docs.filter(d => d.enrolment_id === e.id).forEach(d => { got[d.doc_type_id] = d; });
     const n = types.filter(t => got[t.id]).length;
     return section(title + ' · ' + n + ' of ' + types.length + ' received',
       '<ul class="nx-list nx-doclist">' + types.map(t => { const g = got[t.id];
         return '<li><label class="nx-check"><input type="checkbox" data-doc="' + t.id + '" data-enr="' + e.id + '"' + (g ? ' checked' + (ME.admin ? '' : ' disabled title="Only hub admins can untick a document"') : '') + '> <span><b>' + esc(t.name) + '</b>' + (t.note ? '<small>' + esc(t.note) + '</small>' : '') + '</span></label>' +
-          (g ? '<span class="nx-muted">' + esc(fmtDate(g.received_on)) + (g.created_by ? ' · ' + esc(g.created_by) : '') + '</span>' : '<span class="nx-pill warn">Missing</span>') + '</li>'; }).join('') + '</ul>') + placementDocsSection(c, e, title);
+          (g ? '<span class="nx-muted">' + esc(fmtDate(g.received_on)) + (g.created_by ? ' · ' + esc(g.created_by) : '') + '</span>' : '<span class="nx-pill warn">Missing</span>') + '</li>'; }).join('') + '</ul>');
   }).join('');
 }
 /* the documents needed before placement (doc group 'placement'). Passport and Visa copy also count when ticked in the course list above,

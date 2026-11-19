@@ -42,9 +42,10 @@ async function renderBatches(body) {
     BT.id = (upcoming.length ? upcoming[upcoming.length - 1] : batches[0]).id;      /* the batch nearest to today */
   }
   const batch = batches.find(b => b.id === BT.id);
-  const [cards, places] = await Promise.all([
+  const [cards, places, asked] = await Promise.all([
     sel('nex_batch_facilities', 'select=*,nex_facilities(name,suburb)&batch_id=eq.' + batch.id + '&limit=500'),
-    sel('nex_placements', 'select=id,status,shift,batch_facility_id,enrolment_id,facility_text,start_date,note,nex_enrolments(student_id,nex_students(id,first_name,last_name))&batch_id=eq.' + batch.id + '&limit=2000')
+    sel('nex_placements', 'select=id,status,shift,batch_facility_id,enrolment_id,facility_text,start_date,note,nex_enrolments(student_id,nex_students(id,first_name,last_name))&batch_id=eq.' + batch.id + '&limit=2000'),
+    ppAskedRows(batch)
   ]);
   cards.sort((a, b) => (b.is_others - a.is_others) || btCardName(a).localeCompare(btCardName(b)));
   const live = places.filter(btLive);
@@ -67,7 +68,7 @@ async function renderBatches(body) {
       (c.logbook ? '<span class="nx-pill ' + (c.logbook === 'sent' ? 'ok' : (c.logbook === 'scheduled' ? 'info' : 'warn')) + '">Logbook ' + esc(c.logbook.replace('_', ' ')) + '</span>' : '');
     return '<button type="button" class="nx-bcard' + (c.is_others ? ' others' : '') + '" data-bf="' + c.id + '">' +
       '<span class="nx-bcard-h"><b>' + esc(btCardName(c)) + '</b>' + (c.is_others ? '<small>Students who found their own aged care</small>' : (((c.nex_facilities || {}).suburb) ? '<small>' + esc(c.nex_facilities.suburb) + '</small>' : '')) + '</span>' +
-      '<span class="nx-bq">' + chips + '</span>' + (chk ? '<span class="nx-bchk">' + chk + '</span>' : '') +
+      '<span class="nx-bq">' + chips + (ppAskedFor(batch, c, asked).length ? '<span>' + ppAskedFor(batch, c, asked).length + ' asked for this</span>' : '') + '</span>' + (chk ? '<span class="nx-bchk">' + chk + '</span>' : '') +
       (c.orientation_note ? '<small class="nx-muted">' + esc(c.orientation_note.slice(0, 80)) + '</small>' : '') + '</button>';
   }).join('') + '</div>' : '<div class="nx-card-b">' + empty('No aged cares in this batch yet', 'Add the aged cares taking students this week, with their AM / PM / Night quota.') + '</div>';
   body.innerHTML = head + grid;
@@ -117,6 +118,7 @@ async function batchCardOpen(batch, card) {
   let places = [];
   const loadPlaces = async () => { places = await sel('nex_placements', 'select=*,nex_enrolments(student_id,nex_students(id,first_name,last_name))&batch_facility_id=eq.' + card.id + '&order=created_at.asc&limit=500'); };
   await loadPlaces();
+  let asked = card.is_others ? [] : ppAskedFor(batch, card, await ppAskedRows(batch));      /* students who asked for this aged care around this date */
   const F = card.is_others ? [{ k: 'note', label: 'Note', type: 'textarea', value: card.note, full: true }] : [
     { k: 'quota_am', label: 'AM places', type: 'number', value: card.quota_am }, { k: 'quota_pm', label: 'PM places', type: 'number', value: card.quota_pm }, { k: 'quota_night', label: 'Night places', type: 'number', value: card.quota_night },
     { k: 'orientation_note', label: 'Orientation', value: card.orientation_note, full: true }, { k: 'shift_note', label: 'Shift times', value: card.shift_note, full: true },
@@ -142,8 +144,13 @@ async function batchCardOpen(batch, card) {
       '<span class="nx-btnrow"><button class="nx-btn sm" data-ed="' + p.id + '">Edit</button>' + (btLive(p) ? '<button class="nx-btn sm" data-wd="' + p.id + '">Withdraw</button>' : '') + '</span></li>'; };
     box.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px"><h3 style="font-size:15px;margin:0">Students (' + live.length + ')</h3><button type="button" class="nx-btn sm primary" id="bcAdd">' + ico('plus') + 'Add student</button></div>' + line +
       (live.length ? '<ul class="nx-list">' + live.map(row).join('') + '</ul>' : '<div class="nx-help">Nobody is placed here yet.</div>') +
+      (asked.length ? '<h3 style="font-size:15px;margin:16px 0 4px">Asked for this aged care (' + asked.length + ')</h3><div class="nx-help">They asked for this aged care around this date. Pick a shift and add them.</div><ul class="nx-list">' + asked.map(r => '<li><div><b>' + esc(fullName(r)) + '</b> ' + (r.placement_docs_missing > 0 ? '<span class="nx-pill bad">Missing ' + r.placement_docs_missing + ' documents</span>' : (r.paid_ok ? '<span class="nx-pill ok">Ready</span>' : '<span class="nx-pill bad">Needs more payment</span>')) + ' ' + ppPills(r) + '<small>' + esc([r.want_start ? 'Wants ' + fmtDate(r.want_start) : '', ppShiftText(r), r.want_note].filter(Boolean).join(' · ')) + '</small></div><span class="nx-btnrow"><select class="nx-sel sm" data-ashift="' + r.enrolment_id + '" aria-label="Shift">' + BT_SHIFTS.map(([k, l]) => '<option value="' + k + '"' + (((r.pref_shifts || [])[0] || 'am') === k ? ' selected' : '') + '>' + l + '</option>').join('') + '</select><button type="button" class="nx-btn sm primary" data-aadd="' + r.enrolment_id + '">Add</button></span></li>').join('') + '</ul>' : '') +
       (gone.length ? '<details style="margin-top:10px"><summary class="nx-muted">Withdrawn or closed (' + gone.length + ')</summary><ul class="nx-list">' + gone.map(row).join('') + '</ul></details>' : '');
     $('#bcAdd', box).onclick = () => batchAddStudent(batch, card, places, async () => { await loadPlaces(); draw(); btRefresh(); });
+    $$('[data-aadd]', box).forEach(b => b.onclick = async () => {
+      const r = asked.find(x => x.enrolment_id === b.dataset.aadd); if (!r) return; b.disabled = true;
+      if (await ppPlace(batch, card, r, $('[data-ashift="' + r.enrolment_id + '"]', box).value)) { asked = asked.filter(x => x !== r); await loadPlaces(); draw(); btRefresh(); } else b.disabled = false;
+    });
     $$('[data-ed]', box).forEach(b => b.onclick = () => placementEdit(places.find(x => x.id === b.dataset.ed), card, async () => { await loadPlaces(); draw(); btRefresh(); }));
     $$('[data-wd]', box).forEach(b => b.onclick = async () => {
       const p = places.find(x => x.id === b.dataset.wd), s = btStudent(p);
@@ -179,9 +186,10 @@ async function batchAddStudent(batch, card, places, done) {
       '<div class="full"><label class="nx-lbl" for="ba_q">Find in the ready list</label><input class="nx-in" id="ba_q" placeholder="Type a name" autocomplete="off"></div></div>' +
       '<div class="nx-help" style="margin:8px 0">Ready means all placement documents received and at least ' + esc(money(need)) + ' received. Ordered: waited the 3 weeks first, then most calls. Students still missing documents are last and cannot be added until their documents are ticked.</div><div id="ba_list"><div class="nx-help">Loading…</div></div>' +
       '<div style="margin-top:12px"><button type="button" class="nx-btn sm" id="ba_find">' + ico('search') + 'Find someone who is not on this list</button></div>' });
-  const assign = async (enrolmentId, who) => {
+  const assign = async (enrolmentId, who, flags) => {
     const shift = $('#ba_shift', m.el).value; let other = null;
     if (card.is_others) { other = ($('#ba_other', m.el).value || '').trim(); if (!other) { showErr(m, fieldError('#ba_other', 'Type the aged care they found first.')); return false; } }
+    if (flags !== undefined && !await ppGate(flags, who, { facility_id: card.facility_id, start: batch.starts_on })) return false;     /* hold, English, irregular availability, asked for another date or aged care */
     try {
       await ins('nex_placements', { enrolment_id: enrolmentId, batch_id: batch.id, batch_facility_id: card.id, facility_id: card.facility_id || null, facility_text: other, shift, status: 'site_date_allocated', start_date: batch.starts_on }, true);
       toast((who || 'Student') + ' added'); await done(); return true;
@@ -193,9 +201,9 @@ async function batchAddStudent(batch, card, places, done) {
     box.innerHTML = shown.length ? '<ul class="nx-list">' + shown.map(r => {
       const due = r.docs_complete_on ? btAddDays(r.docs_complete_on, BT_WAIT_DAYS) : null;
       const st = !due ? '<span class="nx-pill bad">' + (r.placement_docs_missing > 0 ? 'Missing ' + r.placement_docs_missing + (r.placement_docs_missing === 1 ? ' document' : ' documents') : 'No documents recorded') + '</span>' : (due <= today ? '<span class="nx-pill ok">Ready</span>' : '<span class="nx-pill warn">From ' + esc(fmtDate(due)) + '</span>');
-      return '<li><div><b>' + esc(fullName(r)) + '</b> ' + st + '<small>' + esc([qualName(r.qualification_id), money(r.paid_total) + ' received', r.docs_complete_on ? 'documents complete ' + fmtDate(r.docs_complete_on) : '', r.calls + (r.calls === 1 ? ' call' : ' calls')].filter(Boolean).join(' · ')) + '</small></div>' +
+      return '<li><div><b>' + esc(fullName(r)) + '</b> ' + st + ' ' + ppPills(r) + '<small>' + esc([qualName(r.qualification_id), money(r.paid_total) + ' received', r.docs_complete_on ? 'documents complete ' + fmtDate(r.docs_complete_on) : '', r.calls + (r.calls === 1 ? ' call' : ' calls')].filter(Boolean).join(' · ')) + '</small></div>' +
         '<button type="button" class="nx-btn sm primary" data-add="' + r.enrolment_id + '">Add</button></li>'; }).join('') + '</ul>' : '<div class="nx-help">' + (rows.length ? 'Nobody matches.' : 'Nobody is ready and unplaced right now.') + '</div>';
-    $$('[data-add]', box).forEach(b => b.onclick = async () => { const r = rows.find(x => x.enrolment_id === b.dataset.add); b.disabled = true; if (await assign(r.enrolment_id, fullName(r))) { rows = rows.filter(x => x !== r); draw(); } else b.disabled = false; });
+    $$('[data-add]', box).forEach(b => b.onclick = async () => { const r = rows.find(x => x.enrolment_id === b.dataset.add); b.disabled = true; if (await assign(r.enrolment_id, fullName(r), r)) { rows = rows.filter(x => x !== r); draw(); } else b.disabled = false; });
   };
   try {
     rows = await sel('nex_placement_ready', 'select=*&has_placement=eq.false&stage=in.(docs_completed,processed,placement)&limit=1000');
@@ -210,6 +218,6 @@ async function batchAddStudent(batch, card, places, done) {
       if (!ME.admin) { toast(fullName(st) + ' has ' + money(got) + ' received. A student needs at least ' + money(need) + ' before going in a batch.', true); return; }
       if (!await confirmBox('Below the minimum', fullName(st) + ' has only ' + money(got) + ' received (the minimum is ' + money(need) + '). Place them anyway?', 'Place anyway')) return;
     }
-    if (await assign(en.id, fullName(st))) { rows = rows.filter(x => x.enrolment_id !== en.id); draw(); }
+    if (await assign(en.id, fullName(st), (await ppLoad(st.id)) || {})) { rows = rows.filter(x => x.enrolment_id !== en.id); draw(); }
   }));
 }
