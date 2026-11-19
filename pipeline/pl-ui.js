@@ -223,6 +223,9 @@ function mailDialog(cfg) {
     sending = false; cancel.disabled = false; cancel.textContent = 'Close'; go.hidden = true;
     const msg = (ok ? 'Sent ' + ok + (ok === 1 ? ' email' : ' emails') : 'Nothing was sent') + (bad ? ' · ' + bad + ' failed' : '') + (stop ? ' · ' + stop : '') + (typeof quota === 'number' ? ' · ' + quota + ' more can be sent today' : '');
     if (live()) { q('top').textContent = msg; q('top').classList.toggle('nx-neg', !!(bad || stop)); } else toast(msg, !!(bad || stop));
+    /* Everything went through: a moment to see the ticks, then close. Closing also refreshes the page behind (onDone), so the student is gone from the list.
+       If anything failed or stopped, stay open so the person can read which ones. */
+    if (ok && !bad && !stop) { if (live()) { toast(msg); setTimeout(() => { if (!m.gone) m.close(); }, 1100); } }
   }
   go.onclick = run;
   (async () => {
