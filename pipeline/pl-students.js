@@ -65,7 +65,7 @@ function feedItem(a) {
 /* The lead follow-up cycle: a 1st, 2nd and 3rd follow-up, 2, 4 and 6 days after first contact (nex_start_lead_cycle).
    nex_lead_followup holds one row per lead: the step that is open now, when it is due, and how many steps are still open.
    It is kept up to date by a trigger on nex_followups, so the Leads list can filter and sort on it. */
-const FU_NTH = ['', '1st', '2nd', '3rd'];
+const FU_NTH = n => n + (n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10 > 3 ? 0 : n % 10]);   /* 1st, 2nd, 3rd, 4th ... after the 3rd the staff pick each next date */
 const FU_EMBED = 'nex_lead_followup(step,due_at,due_day,assigned_to,open_count,total_count)';
 const FU_SORT = {
   newest: 'created_at.desc',
@@ -77,8 +77,8 @@ const FU_SORT = {
 function fuInfo(raw, today) {
   const fu = Array.isArray(raw) ? raw[0] : raw;
   if (!fu || !fu.total_count) return { key: 'none', label: 'No follow-ups set', tone: '', sub: '' };
-  if (!fu.open_count || !fu.step) return { key: 'complete', label: 'Cycle complete', tone: 'ok', sub: fu.total_count + ' of ' + fu.total_count + ' done' };
-  const nth = FU_NTH[fu.step], who = fu.assigned_to ? ' · ' + fu.assigned_to : '';
+  if (!fu.open_count || !fu.step) return { key: 'complete', label: 'Follow-ups finished', tone: 'ok', sub: fu.total_count + ' done · booked, on hold or not interested' };
+  const nth = FU_NTH(fu.step), who = fu.assigned_to ? ' · ' + fu.assigned_to : '';
   if (fu.due_day < today) { const n = Math.round((new Date(today + 'T12:00:00') - new Date(fu.due_day + 'T12:00:00')) / 864e5); return { key: 'due' + fu.step, label: nth + ' Follow Up Due', tone: 'bad', sub: n + (n === 1 ? ' day' : ' days') + ' overdue' + who }; }
   if (fu.due_day === today) return { key: 'due' + fu.step, label: nth + ' Follow Up Due', tone: 'warn', sub: 'Due today' + who };
   return { key: 'upcoming', label: nth + ' follow-up', tone: 'info', sub: 'Due ' + fmtDate(fu.due_day) + who };
@@ -91,7 +91,8 @@ function fuCellHtml(raw, today) {
 function fuFilter(which, today) {
   const E = '&nex_lead_followup.', due = E + 'open_count=gt.0' + E + 'due_day=lte.' + today;
   if (which === 'due') return due;
-  if (which === '1' || which === '2' || which === '3') return due + E + 'step=eq.' + which;
+  if (which === '1' || which === '2') return due + E + 'step=eq.' + which;
+  if (which === '3') return due + E + 'step=gte.3';
   if (which === 'upcoming') return E + 'open_count=gt.0' + E + 'due_day=gt.' + today;
   if (which === 'complete') return E + 'open_count=eq.0';
   return '';
@@ -104,9 +105,9 @@ async function leadFuCount(which) {
 }
 /* the follow-up controls on the Leads toolbar */
 function fuControlsHtml() {
-  const st = [['due', 'Any follow-up due now'], ['1', '1st Follow Up Due'], ['2', '2nd Follow Up Due'], ['3', '3rd Follow Up Due'], ['upcoming', 'Follow-up coming up, not due yet'], ['complete', 'All 3 follow-ups done'], ['none', 'No follow-ups set']].map(([id, label]) => ({ id, label }));
+  const st = [['due', 'Any follow-up due now'], ['1', '1st Follow Up Due'], ['2', '2nd Follow Up Due'], ['3', '3rd or later Follow Up Due'], ['upcoming', 'Follow-up coming up, not due yet'], ['complete', 'Follow-ups finished'], ['none', 'No follow-ups set']].map(([id, label]) => ({ id, label }));
   const who = [{ id: 'me', label: 'Assigned to me' }].concat((REF.staff || []).filter(n => n !== ME.name).map(n => ({ id: 'n:' + n, label: n })));
-  const sorts = [['newest', 'Sort: newest first'], ['due', 'Sort: follow-up due soonest'], ['step', 'Sort: 3rd, 2nd, then 1st follow-up'], ['name', 'Sort: name A to Z']].map(([id, label]) => ({ id, label }));
+  const sorts = [['newest', 'Sort: newest first'], ['due', 'Sort: follow-up due soonest'], ['step', 'Sort: latest follow-up first'], ['name', 'Sort: name A to Z']].map(([id, label]) => ({ id, label }));
   return '<select class="nx-sel sm" id="slFu" aria-label="Follow-up status">' + selectOpts(st, SL.fu, 'All follow-up statuses') + '</select>' +
     '<select class="nx-sel sm" id="slWho" aria-label="Follow-up assigned to">' + selectOpts(who, SL.who, 'Assigned to anyone') + '</select>' +
     '<select class="nx-sel sm" id="slSort" aria-label="Sort leads">' + selectOpts(sorts, SL.sort) + '</select>';
@@ -344,10 +345,21 @@ function sideCards(c) {
 /* send a lead follow-up email (lists the documents not received yet) through the workspace mail script.
    The dialog opens at once at a fixed size and everything happens inside it: the preview loads in place, the mailbox's remaining sends
    load in the background, and "already sent" is a line in the dialog, not another dialog on top. */
+/* Mark a follow-up done. After the 3rd follow-up a lead who has not booked a class, or been put on hold or not interested, stays in the cycle:
+   the database asks for the date of the next one (NEXT_DATE_NEEDED) and this box collects it. */
+async function doneFollowup(id) {
+  const done = next => api('rpc/nex_done_followup', { method: 'POST', body: { p_id: id, p_next: next || null } });
+  try { await done(); toast('Done'); return render(); }
+  catch (err) {
+    if (!/NEXT_DATE_NEEDED/.test(err.message || '')) throw err;
+    return formModal('When is the next follow-up?', [{ k: 'next', label: 'Next follow-up date', type: 'date', required: true, full: true, help: 'This lead has not booked a class and is not on hold or not interested, so they stay on the follow-up list. They leave it when a class is booked or their enrolment is put on hold or not interested.' }],
+      async v => { await done(v.next); toast('Done. Next follow-up on ' + fmtDate(v.next)); render(); }, 'Save and mark done');
+  }
+}
 async function emailFollowup(s, step) {
   if (!s.email) { toast('Add an email address on the Details tab first.', true); return; }
   let force = false, sending = false;
-  const m = openModal({ title: 'Email ' + ['', '1st', '2nd', '3rd'][step] + ' follow-up', wide: true, noFocus: true,
+  const m = openModal({ title: 'Email ' + FU_NTH(step) + ' follow-up', wide: true, noFocus: true,
     body: '<div class="nx-md"><div class="nx-muted" data-ef="top">Preparing the email…</div><div data-ef="note"></div><div><label class="nx-lbl" for="efSub">Subject</label><input class="nx-in" id="efSub" disabled></div><div style="flex:1;display:flex;flex-direction:column"><label class="nx-lbl" for="efBody">Message</label><textarea class="nx-ta" id="efBody" style="flex:1;min-height:250px" disabled></textarea><div class="nx-help">You can edit this before it goes. Replies come to you.</div></div><div class="nx-err" data-ef="err" role="alert" hidden></div></div>' });
   const q = k => $('[data-ef="' + k + '"]', m.el), foot = $('.modal-f', m.el);
   const cancel = document.createElement('button'); cancel.className = 'nx-btn'; cancel.textContent = 'Cancel'; cancel.onclick = () => m.close();
@@ -373,6 +385,9 @@ async function emailFollowup(s, step) {
       const r = await fn('nex-send-followup', { student_id: s.id, step, subject, body, force });
       toast('Email sent to ' + pv.to + (r && typeof r.remaining === 'number' && r.remaining <= 20 ? '. ' + r.remaining + ' more can be sent today.' : ''));
       m.close(); render();
+      if (step >= 3 && !(r && r.ticked)) {   /* the 3rd and later follow-ups are finished here, so the date of the next one is asked for */
+        try { const o = await sel('nex_followups', 'select=id&student_id=eq.' + s.id + '&kind=eq.lead_cycle&step=eq.' + step + '&done_at=is.null&limit=1'); if (o[0]) await doneFollowup(o[0].id); } catch (e2) { toast(e2.message, true); }
+      }
     } catch (e) {
       if (e.code === 'recent' && !force) { force = true; q('note').innerHTML = '<div class="nx-pill warn" style="white-space:normal;height:auto;padding:6px 10px">' + esc(e.message) + ' Press Send again to send it anyway.</div>'; go.textContent = 'Send again'; }
       else { q('err').hidden = false; q('err').textContent = e.message; go.textContent = force ? 'Send again' : 'Send email'; }
@@ -521,7 +536,7 @@ async function studentAction(a, ds, c) {
   if (a === 'addTask') return taskForm(null, () => render(), s);
   if (a === 'doneTask') { await upd('nex_tasks', 'id=eq.' + ds.id, { status: 'done' }); toast('Task done'); return render(); }
   if (a === 'startCycle') return formModal('Start follow-ups', [{ k: 'first', label: 'First contact', type: 'date', value: s.first_contact_on || new Date(s.created_at).toLocaleDateString('en-CA', { timeZone: TZ }), required: true, full: true, help: 'The 1st follow-up is 2 days after this date, the 2nd 4 days after, the 3rd 6 days after.' }], async v => { await api('rpc/nex_start_lead_cycle', { method: 'POST', body: { p_student: s.id, p_first: v.first } }); toast('3 follow-ups set'); render(); }, 'Start');
-  if (a === 'doneFu') { await upd('nex_followups', 'id=eq.' + ds.id, { done_at: new Date().toISOString(), done_by: ME.name }); toast('Done'); return render(); }
+  if (a === 'doneFu') return doneFollowup(ds.id);
   if (a === 'emailFu') return emailFollowup(s, Number(ds.step));
   if (a === 'doneDetails') { await upd('nex_students', 'id=eq.' + s.id, { needs_details: false, flagged_to: null }); toast('Marked complete'); return render(); }
   if (a === 'bookFA') return bookClassModal(s, (c.enr.find(e => e.id === ds.id) || c.enr[0] || {}).id || null, () => render());
