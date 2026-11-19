@@ -105,6 +105,13 @@ function _ccTellDropped(rows){
   }catch(e){ console.warn('[clock] tell dropped:', e); }
 }
 
+/* The server can refuse a punch on purpose (for example "you are already clocked in"). That is an answer, not a lost
+   connection: it must not be saved to the phone and retried for hours. 401/408/429 are still treated as "try again". */
+function _ccRefused(err){ var c = err && err.status; return typeof c === 'number' && c >= 400 && c < 500 && c !== 401 && c !== 408 && c !== 429; }
+function _ccRefusedMsg(err){
+  try{ var m = String((JSON.parse(err.body || '{}') || {}).message || ''); if(/^clock_log:/i.test(m)) return m.replace(/^clock_log:\s*/i, '').replace(/^./, function(c){ return c.toUpperCase(); }); }catch(_){}
+  return 'The server did not accept that punch. Ask an admin if it looks wrong.';
+}
 async function flushClockSyncQueue(){
   try{
     const sbQ = JSON.parse(localStorage.getItem('clock_supabase_queue') || '[]');
@@ -124,7 +131,11 @@ async function flushClockSyncQueue(){
           try{ const ex=await sbGet('clock_log','?staff_name=eq.'+encodeURIComponent(item.payload.staff_name)+'&action=eq.'+item.payload.action+'&ts=eq.'+encodeURIComponent(item.payload.ts)+'&limit=1'); _dupe=!!(ex&&ex.length); }catch(_){}
           if(_dupe){ _anyFlushed=true; continue; }
           const res = await sbPost('clock_log', item.payload);
-          if(res && res.ok === false){ throw new Error('HTTP '+res.status); }
+          if(res && res.ok === false){
+            var _e = new Error('HTTP '+res.status); _e.status = res.status; try{ _e.body = await res.text(); }catch(_){}
+            if(_ccRefused(_e) && /clock_log:/i.test(_e.body || '')){ console.warn('[clock] queued punch refused (already recorded), dropped:', _ccRefusedMsg(_e)); _anyFlushed = true; continue; }
+            throw _e;
+          }
           _anyFlushed = true;
           console.log('[clock] queued supabase write flushed OK');
         }catch(e){
@@ -1378,8 +1389,8 @@ async function toggleClock(opts){
       new Promise(function(_,rej){ setTimeout(function(){ rej(new Error('timed out after 10s')); }, 10000); })
     ]);
     _writeP
-      .then(function(res){
-        if(res && res.ok === false){ throw new Error('HTTP '+res.status); }
+      .then(async function(res){
+        if(res && res.ok === false){ var _e = new Error('HTTP '+res.status); _e.status = res.status; try{ _e.body = await res.text(); }catch(_){} throw _e; }
         _clockPending = null;
         showToast(next==='in' ? 'Clocked in ✓' : 'Clocked out ✓','success');
         try{ localStorage.removeItem('clock_pending_'+me); }catch(_){}
@@ -1390,6 +1401,17 @@ async function toggleClock(opts){
       })
       .catch(function(err){
         console.warn('[clock] write failed:', err && err.message);
+        if(_ccRefused(err)){
+          /* refused on purpose: do not queue it. Show why and show what the server really has. */
+          _clockPending = null;
+          try{ localStorage.removeItem('clock_pending_'+me); }catch(_){}
+          try{ ccSync.set(''); }catch(_){}
+          window._lastClockToggle = 0; window._lastClockAnyToggle = 0;
+          var _why = _ccRefusedMsg(err);
+          if(typeof nxAlert === 'function') nxAlert(_why, {title:'Punch not recorded', okText:'OK'}); else showToast(_why, 'error');
+          try{ loadClockState(); }catch(_){}
+          return;
+        }
         _clockPending = { action: next, ts: realTs };
         _clockState = next;
         try{ localStorage.setItem('clock_state_'+me, JSON.stringify({state:_clockState, ts:realTs})); }catch(_){}
