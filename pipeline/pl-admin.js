@@ -12,6 +12,7 @@ route(/^\/admin$/, async () => {
     '<div class="nx-card"><div class="nx-card-h"><div><h3>Status lists</h3><div class="nx-muted">Each list belongs to one part of YatraLine, so the same word can mean different things in different places.' + (ME.admin ? '' : ' Only admins can change these.') + '</div></div>' + (ME.admin ? '<button class="nx-btn primary sm" id="adNewStatus">' + ico('plus') + 'Add status</button>' : '') + '</div><div class="nx-toolbar" style="border-top:0"><div class="nx-seg" id="adCtx">' + Object.keys(CTX_NAMES).map(k => '<button data-v="' + k + '" aria-pressed="' + (AD.ctx === k) + '">' + CTX_NAMES[k] + '</button>').join('') + '</div></div><div id="adStatus"></div></div>' +
     '<div class="nx-two"><div class="nx-card"><div class="nx-card-h"><h3>Qualifications</h3><button class="nx-btn primary sm" id="adNewQual">' + ico('plus') + 'Add</button></div><ul class="nx-list">' + REF.quals.map(q => '<li><span><b>' + esc(q.name) + '</b><small>' + esc(q.code) + (q.default_fee ? ' · usual fee ' + money(q.default_fee) : '') + (q.active ? '' : ' · hidden') + '</small></span><button class="nx-btn sm" data-q="' + q.id + '">Edit</button></li>').join('') + '</ul></div>' +
     '<div class="nx-card"><div class="nx-card-h"><h3>Agents</h3><button class="nx-btn primary sm" id="adNewAgent">' + ico('plus') + 'Add</button></div>' + (REF.agents.length ? '<ul class="nx-list">' + REF.agents.map(a => '<li><span><b>' + esc(a.name) + '</b><small>' + esc([a.phone, a.email].filter(Boolean).join(' · ') || 'No contact details') + (a.active ? '' : ' · hidden') + '</small></span><button class="nx-btn sm" data-ag="' + a.id + '">Edit</button></li>').join('') + '</ul>' : empty('No agents yet', 'Add the agents students come through.')) + '</div></div>' +
+    '<div class="nx-card"><div class="nx-card-h"><div><h3>Trainers</h3><div class="nx-muted">The Class page picks the trainer from this list, so every class day (and the pay history built from it) uses the same spelling. Renaming a trainer here renames them on their class days too.</div></div><button class="nx-btn primary sm" id="adNewTrainer">' + ico('plus') + 'Add</button></div>' + (REF.trainers.length ? '<ul class="nx-list">' + REF.trainers.map(t => '<li><span><b>' + esc(t.name) + '</b>' + (t.active ? '' : '<small>Hidden from the dropdown. Past class days keep the name.</small>') + '</span><button class="nx-btn sm" data-tr="' + t.id + '">Edit</button></li>').join('') + '</ul>' : empty('No trainers yet', 'Add the trainers who run the classes.')) + '</div>' +
     secCard() + mailFilesCard('placement') + mailFilesCard('class') + '<div class="nx-card"><div class="nx-card-b"><b>Who can open YatraLine</b><div class="nx-muted">Access is the YatraLine card on the Nodes page. Admins give it to staff with the YatraLine tick in ShiftOps, on each person’s edit panel.</div></div></div>' +
   (ME.admin ? '<div class="nx-card"><div class="nx-card-h"><div><h3>Who opened student records</h3><div class="nx-muted">The latest 100 times a staff member opened a student. A repeat look within 10 minutes is counted once. More than 150 different students in an hour (or 800 in a day) pauses a person’s access to personal details and shows here as Blocked. Only admins can see this.</div></div></div><div id="adViews"><div class="nx-card-b"><div class="nx-skel" style="width:60%"></div></div></div></div>' : '');
 });
@@ -27,6 +28,7 @@ function bindAdmin() {
   };
   $$('#adCtx button').forEach(b => b.onclick = () => { AD.ctx = b.dataset.v; showStatus(); });
   if ($('#adNewStatus')) $('#adNewStatus').onclick = () => statusForm(null);
+  $('#adNewTrainer').onclick = () => trainerForm(null); $$('[data-tr]').forEach(b => b.onclick = () => trainerForm(REF.trainers.find(x => x.id === b.dataset.tr)));
   $('#adNewQual').onclick = () => qualForm(null); $('#adNewAgent').onclick = () => agentForm(null);
   $$('[data-q]').forEach(b => b.onclick = () => qualForm(REF.quals.find(x => x.id === b.dataset.q)));
   $$('[data-ag]').forEach(b => b.onclick = () => agentForm(REF.agents.find(x => x.id === b.dataset.ag)));
@@ -108,6 +110,15 @@ function qualForm(q) {
   q = q || {};
   formModal(q.id ? 'Edit qualification' : 'Add qualification', [{ k: 'name', label: 'Name', value: q.name, required: true, full: true }, { k: 'code', label: 'Code', value: q.code, required: true, help: 'The national course code, for example CHC33021' }, { k: 'default_fee', label: 'Usual fee ($)', type: 'number', value: q.default_fee, help: 'A hint only. Fees are agreed per student.' }, { k: 'active', label: 'Show in lists', type: 'check', value: q.id ? q.active : true }], async v => {
     if (q.id) await upd('nex_qualifications', 'id=eq.' + q.id, v); else await ins('nex_qualifications', v, true);
+    toast('Saved'); await loadRef(true); render();
+  });
+}
+function trainerForm(t) {
+  t = t || {};
+  formModal(t.id ? 'Edit trainer' : 'Add trainer', [{ k: 'name', label: 'Full name', value: t.name, required: true, full: true, help: 'Written the way you want it to appear on class days and in the pay export.' }, { k: 'active', label: 'Shows in the dropdown', type: 'check', value: t.id ? t.active : true }], async v => {
+    v.name = (v.name || '').replace(/\s+/g, ' ').trim();
+    try { if (t.id) await upd('nex_trainers', 'id=eq.' + t.id, v); else await ins('nex_trainers', v, true); }
+    catch (e) { if (/duplicate|unique/i.test(e.message)) throw fieldError('name', 'That trainer is already in the list.'); throw e; }
     toast('Saved'); await loadRef(true); render();
   });
 }

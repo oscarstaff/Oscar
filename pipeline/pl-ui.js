@@ -5,15 +5,16 @@
 const REF = { status: {}, quals: [], agents: [], staff: [], loaded: false };
 async function loadRef(force) {
   if (REF.loaded && !force) return;
-  const [st, q, a, s, dt] = await Promise.all([
+  const [st, q, a, s, dt, tr] = await Promise.all([
     sel('nex_status_options', 'select=*&order=context,position'),
     sel('nex_qualifications', 'select=*&order=position,name'),
     sel('nex_agents', 'select=*&order=name'),
     sel('staff_names', 'select=name&order=name').catch(() => []),
-    sel('nex_doc_types', 'select=*&active=eq.true&order=group_key,position').catch(() => [])
+    sel('nex_doc_types', 'select=*&active=eq.true&order=group_key,position').catch(() => []),
+    sel('nex_trainers', 'select=*&order=name').catch(() => [])
   ]);
   REF.status = {}; st.forEach(o => { (REF.status[o.context] = REF.status[o.context] || []).push(o); });
-  REF.quals = q; REF.agents = a; REF.staff = s.map(x => x.name); REF.docTypes = dt; REF.loaded = true;
+  REF.quals = q; REF.agents = a; REF.staff = s.map(x => x.name); REF.docTypes = dt; REF.trainers = tr; REF.loaded = true;
 }
 function opts(ctx, activeOnly) { return (REF.status[ctx] || []).filter(o => !activeOnly || o.active); }
 function statusLabel(ctx, key) { const o = (REF.status[ctx] || []).find(x => x.key === key); return o ? o.label : (key || ''); }

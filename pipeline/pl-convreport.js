@@ -106,7 +106,7 @@ route(/^\/convreport$/, async () => {
     run();
   });
   const today = sydToday();
-  return pageHead('chart', 'Enrolment team', 'Conversion report', '') +
+  return pageHead('chart', 'From lead to student', 'Conversion report', '') +
     '<div class="nx-card nx-noprint"><div class="nx-card-h"><div><h3>Dates</h3><div class="nx-muted">Numbers are worked out from YatraLine for the dates you pick.</div></div><span class="nx-btnrow"><button class="nx-btn sm" data-crp="week">This week</button><button class="nx-btn sm" data-crp="last">Last week</button><button class="nx-btn sm" data-crp="7">Last 7 days</button><button class="nx-btn sm" data-crp="month">This month</button></span></div>' +
     '<div class="nx-card-b"><div class="nx-form"><div><label class="nx-lbl" for="crFrom">From</label><input class="nx-in" type="date" id="crFrom" max="' + today + '" value="' + esc(CR.from) + '"></div><div><label class="nx-lbl" for="crTo">To</label><input class="nx-in" type="date" id="crTo" max="' + today + '" value="' + esc(CR.to) + '"></div></div></div></div>' +
     '<div class="nx-card nx-printwrap"><div class="nx-card-h nx-noprint"><div><h3>Report</h3></div><span class="nx-btnrow"><button class="nx-btn sm" id="crPrint" hidden>' + ico('print') + 'Print or save as PDF</button></span></div><div id="crOut"><div class="nx-skel" style="height:240px;margin:16px"></div></div></div>';
