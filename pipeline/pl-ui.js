@@ -307,10 +307,11 @@ function identityLookup(m, cfg) {
   const root = m.el, box = $('.nx-idbox', root);
   const el = k => (cfg.ids[k] ? $('#' + cfg.ids[k], root) : null);
   const val = k => { const e = el(k); return e ? e.value.trim() : ''; };
-  const put = (k, v, force) => { const e = el(k); if (e && v != null && v !== '' && (force || !e.value.trim())) e.value = v; };
+  const put = (k, v) => { const e = el(k); if (e && v != null && v !== '') e.value = v; };
   let chosen = null, timer = 0, token = 0; const refused = new Set();
   const keyOf = s => (s.phone || '') + '|' + (s.email || '');
   const show = html => { box.innerHTML = html; };
+  /* choosing a person fills in ALL their details, name included, over whatever was typed so far */
   const choose = (s, auto) => {
     chosen = s;
     put('first', s.first_name); put('last', s.last_name); put('name', fullName(s)); put('phone', s.phone); put('email', s.email);
@@ -318,6 +319,7 @@ function identityLookup(m, cfg) {
     $('[data-notthem]', box).onclick = () => { refused.add(keyOf(s)); chosen = null; show(''); cfg.onChange && cfg.onChange(null); };
     cfg.onChange && cfg.onChange(s);
   };
+  /* name, phone and email are all checked together; every match says why it matched */
   const run = async () => {
     const my = ++token;
     const phone = cleanPhone(val('phone')), email = val('email').toLowerCase();
@@ -326,28 +328,27 @@ function identityLookup(m, cfg) {
     if (chosen && ((goodPhone && (chosen.phone === phone || chosen.phone2 === phone)) || (goodEmail && chosen.email === email))) return;
     if (chosen) { chosen = null; show(''); cfg.onChange && cfg.onChange(null); }
     const F = 'select=id,first_name,last_name,email,phone,phone2&deleted_at=is.null';
+    const toks = safeQ(nameTxt).split(/\s+/).filter(t => t.length >= 2).slice(0, 2);
+    const goodName = nameTxt.length >= 3 && toks.length > 0;
     try {
-      if (goodPhone || goodEmail) {
-        const parts = []; if (goodEmail) parts.push('email.eq.' + encodeURIComponent(email)); if (goodPhone) parts.push('phone.eq.' + phone, 'phone2.eq.' + phone);
-        const rows = (await sel('nex_students', F + '&or=(' + parts.join(',') + ')&limit=6')).filter(r => !refused.has(keyOf(r)));
-        if (my !== token) return;
-        if (rows.length === 1) return choose(rows[0], true);
-        if (rows.length > 1) {
-          show('<div class="nx-idpick"><div>More than one person has this phone or email. Who is it?</div>' + rows.map(r => '<button type="button" class="nx-pick" data-id="' + r.id + '"><span><b>' + esc(fullName(r)) + '</b><small>' + esc([fmtPhone(r.phone), r.email].filter(Boolean).join(' · ')) + '</small></span><span class="nx-btn sm">Use</span></button>').join('') + '</div>');
-          $$('.nx-pick', box).forEach(b => b.onclick = () => choose(rows.find(x => x.id === b.dataset.id), false));
-          return;
-        }
-      }
-      const toks = safeQ(nameTxt).split(/\s+/).filter(t => t.length >= 2).slice(0, 2);
-      if (nameTxt.length >= 3 && toks.length && !(goodPhone || goodEmail)) {
-        const one = t => 'or(first_name.ilike.*' + encodeURIComponent(t) + '*,last_name.ilike.*' + encodeURIComponent(t) + '*)';
-        const rows = await sel('nex_students', F + '&and=(' + toks.map(one).join(',') + ')&order=first_name&limit=5');
-        if (my !== token) return;
-        if (rows.length) {
-          show('<div class="nx-idpick"><div>Already in YatraLine with a similar name. Tap to use their details.</div>' + rows.map(r => '<button type="button" class="nx-pick" data-id="' + r.id + '"><span><b>' + esc(fullName(r)) + '</b><small>' + esc([fmtPhone(r.phone), r.email].filter(Boolean).join(' · ') || 'No contact details') + '</small></span><span class="nx-btn sm">Use</span></button>').join('') + '</div>');
-          $$('.nx-pick', box).forEach(b => b.onclick = () => choose(rows.find(x => x.id === b.dataset.id), false));
-          return;
-        }
+      const strongQ = (goodPhone || goodEmail) ? (() => { const parts = []; if (goodEmail) parts.push('email.eq.' + encodeURIComponent(email)); if (goodPhone) parts.push('phone.eq.' + phone, 'phone2.eq.' + phone); return sel('nex_students', F + '&or=(' + parts.join(',') + ')&limit=6'); })() : Promise.resolve([]);
+      const nameQ = goodName ? (() => { const one = t => 'or(first_name.ilike.*' + encodeURIComponent(t) + '*,last_name.ilike.*' + encodeURIComponent(t) + '*)'; return sel('nex_students', F + '&and=(' + toks.map(one).join(',') + ')&order=first_name&limit=5'); })() : Promise.resolve([]);
+      const [strong, named] = await Promise.all([strongQ, nameQ]);
+      if (my !== token) return;
+      const found = new Map();
+      const add = (r, why) => { if (refused.has(keyOf(r))) return; const x = found.get(r.id) || { r, why: [] }; if (x.why.indexOf(why) < 0) x.why.push(why); found.set(r.id, x); };
+      strong.forEach(r => { if (goodPhone && (r.phone === phone || r.phone2 === phone)) add(r, 'Same phone'); if (goodEmail && (r.email || '').toLowerCase() === email) add(r, 'Same email'); });
+      named.forEach(r => add(r, 'Similar name'));
+      const list = Array.from(found.values()).sort((x, y) => (y.why.length - x.why.length) || (x.why[0] === 'Similar name') - (y.why[0] === 'Similar name'));
+      const hasStrong = list.some(x => x.why.some(w => w !== 'Similar name'));
+      /* one clear match by phone or email, and the name typed so far fits it (or is empty): use them straight away */
+      const only = list.filter(x => x.why.some(w => w !== 'Similar name'));
+      const fits = r => !toks.length || toks.every(t => fullName(r).toLowerCase().indexOf(t.toLowerCase()) >= 0);
+      if (only.length === 1 && fits(only[0].r)) return choose(only[0].r, true);
+      if (list.length) {
+        show('<div class="nx-idpick"><div>' + (hasStrong ? 'Already in YatraLine. Tap the right person to use their details, or carry on if this is someone new.' : 'Already in YatraLine with a similar name. Tap to use their details, or carry on if this is someone new.') + '</div>' + list.map(x => '<button type="button" class="nx-pick" data-id="' + x.r.id + '"><span><b>' + esc(fullName(x.r)) + '</b><small>' + esc([fmtPhone(x.r.phone), x.r.email].filter(Boolean).join(' · ') || 'No contact details') + ' · ' + esc(x.why.join(', ')) + '</small></span><span class="nx-tag">Use</span></button>').join('') + '</div>');
+        $$('.nx-pick', box).forEach(b => b.onclick = () => choose(list.find(x => x.r.id === b.dataset.id).r, false));
+        return;
       }
       show((goodPhone || goodEmail) ? '<div class="nx-idnew">' + esc(cfg.newMsg || 'Not in YatraLine yet. Saving will add a new person.') + '</div>' : (box.dataset.hint ? '<div class="nx-idnew">' + esc(box.dataset.hint) + '</div>' : ''));
     } catch (err) { if (my === token) show(''); }

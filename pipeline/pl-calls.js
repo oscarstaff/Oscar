@@ -198,10 +198,10 @@ route(/^\/calls$/, async () => {
     '<div class="nx-card"><div class="nx-card-h"><div><h3>Log a call</h3><div class="nx-muted">Someone already in YatraLine gets the call on their Activity. A new number starts an unfinished lead flagged to you.</div></div></div><div class="nx-card-b">' +
     '<div class="nx-note nx-calllock" id="clLock"' + (g.ok ? ' hidden' : '') + ' role="status">' + esc(g.ok ? '' : g.why) + '</div>' +
     '<form id="clForm" class="nx-callform" novalidate><fieldset class="nx-fs" ' + (g.ok ? '' : 'disabled') + '><div class="nx-form">' +
-    '<div><label class="nx-lbl" for="clPhone">Phone<span id="clPhoneReq"> *</span></label><input class="nx-in" id="clPhone" type="tel" inputmode="tel" autocomplete="off" placeholder="0412 345 678"></div>' +
     '<div><label class="nx-lbl" for="clName">Caller name *</label><input class="nx-in" id="clName" autocomplete="off"></div>' +
-    '<div class="full">' + idBoxHtml('') + '</div>' +
+    '<div><label class="nx-lbl" for="clPhone">Phone<span id="clPhoneReq"> *</span></label><input class="nx-in" id="clPhone" type="tel" inputmode="tel" autocomplete="off" placeholder="0412 345 678"></div>' +
     '<div><label class="nx-lbl" for="clEmail">Email</label><input class="nx-in" id="clEmail" type="email" autocomplete="off" placeholder="Optional"></div>' +
+    '<div class="full">' + idBoxHtml('') + '</div>' +
     '<div><label class="nx-lbl" for="clDir">Direction</label><select class="nx-sel" id="clDir"><option value="in">Incoming</option><option value="out">Outgoing</option></select></div>' +
     '<div class="full"><label class="nx-lbl" for="clReason">Reason *</label><input class="nx-in" id="clReason" autocomplete="off" placeholder="Wants to book first aid class"><div class="nx-help" id="clWords" aria-live="polite"></div></div>' +
     '<div><label class="nx-lbl" for="clFor">For team</label><select class="nx-sel" id="clFor">' + teamOpts + '</select></div>' +
