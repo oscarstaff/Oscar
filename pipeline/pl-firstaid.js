@@ -11,6 +11,8 @@ const CB = { q: '', sort: 'name', type: '', att: '' };
 const FB_SEL = new Set(); let FB_SEL_SID = '';   /* bookings ticked for the Mass flag setter; cleared when you change class day */
 const FB_SORTS = [['name', 'Name A to Z'], ['name_desc', 'Name Z to A'], ['seat', 'Seat number'], ['new', 'Newest booking']];
 const FB_TYPES = [['student', 'Student'], ['walk_in', 'Walk-in'], ['agent_group', 'Agent group']];
+/* the plan for a full First Aid and CPR day, shown on the class card */
+const FA_PLAN = [['9–11am', 'Info session'], ['11am–1pm', 'First Aid'], ['Around 1pm', 'Break', 1], ['2–4pm', 'CPR'], ['4–5pm', 'Manual Handling']];
 function fbRows(live) {
   const q = CB.q.trim().toLowerCase(), qd = q.replace(/\D/g, '');
   const list = live.filter(b => (!CB.type || b.booking_type === CB.type) && (!CB.att || (CB.att === 'attended') === (b.status === 'attended')) &&
@@ -75,6 +77,7 @@ route(/^\/firstaid(?:\/([0-9a-f-]{36}))?$/, async m => {
     '<div style="display:flex;align-items:center;gap:6px 16px;flex-wrap:wrap"><div style="min-width:0"><div class="nx-eyebrow">' + (cur.kind === 'renewal' ? 'Renewal and signature day' : 'Full class day') + '</div><h3 style="font-size:16px">' + d.wd + ' ' + d.dm + (cur.trainer ? ' · ' + esc(cur.trainer) : '') + '</h3></div>' +
     '<span class="nx-muted" style="margin-left:auto"><b style="font-size:18px;color:var(--nx-ink)">' + live.length + '</b> of ' + cur.seats + ' seats · ' + (showSeats ? (cur.seats - seated.length) + ' free' : Math.max(0, cur.seats - live.length) + ' left') + (walk ? ' · ' + walk + ' walk-in or agent' : '') + (cur.start_time ? ' · ' + esc(cur.start_time) + (cur.end_time ? '–' + esc(cur.end_time) : '') : '') + '</span>' +
     '<button class="nx-btn sm" id="faEdit">' + ico('edit') + 'Edit class</button></div>' +
+    (cur.kind !== 'renewal' ? '<div class="nx-dayplan" aria-label="Plan for the day">' + FA_PLAN.map(x => '<span' + (x[2] ? ' class="brk"' : '') + '><b>' + x[0] + '</b> ' + x[1] + '</span>').join('') + '</div>' : '') +
     (showSeats ? '<div class="nx-cap"><i class="a" style="width:' + Math.min(100, seated.length / cur.seats * 100) + '%"></i></div>' : '') +
     (live.length > cur.seats ? '<div class="nx-warnbox">This class has more bookings than seats. Move some people to another day.</div>' : '') +
     '</div></div>' +
