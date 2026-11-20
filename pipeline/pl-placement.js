@@ -8,14 +8,14 @@ const PL = { tab: 'batches', status: '', q: '', page: 0, size: 50, fview: 'list'
 
 route(/^\/placement$/, async () => {
   afterRender(() => bindPlacement());
-  const seg = [['ready', 'Ready'], ['batches', 'Batches'], ['requests', 'Requests'], ['placements', 'Started placement'], ['hold', 'On hold'], ['facilities', 'Facilities'], ['blacklist', 'Blacklist']];
-  return pageHead('pin', 'Ready students, batches and placements', 'Placement', '<button class="nx-btn primary" id="plAdd">' + ico('plus') + '<span id="plAddL">New request</span></button>') +
+  const seg = [['ready', 'Ready'], ['batches', 'Batches'], ['requests', 'Self-Requests'], ['placements', 'Started placement'], ['hold', 'On hold'], ['facilities', 'Facilities'], ['blacklist', 'Blacklist']];
+  return pageHead('pin', 'Ready students, batches and placements', 'Placement', '<button class="nx-btn primary" id="plAdd">' + ico('plus') + '<span id="plAddL">New self-request</span></button>') +
     '<div class="nx-card"><div class="nx-toolbar" style="border-top:0"><div class="nx-seg" id="plSeg">' + seg.map(([k, l]) => '<button data-v="' + k + '" aria-pressed="' + (PL.tab === k) + '">' + l + '</button>').join('') + '</div><select class="nx-sel sm" id="plStatus"></select><input class="nx-in sm" id="plQ" style="min-width:220px" placeholder="Search" value="' + esc(PL.q) + '"></div><div id="plBody"></div><div class="nx-foot" id="plFoot"><span></span></div></div>';
 });
 
 function bindPlacement() {
   const body = $('#plBody');
-  const labels = { batches: '', requests: 'New request', facilities: 'New facility', blacklist: 'Add to blacklist' };
+  const labels = { batches: '', requests: 'New self-request', facilities: 'New facility', blacklist: 'Add to blacklist' };
   const load = async () => {
     const bt = PL.tab === 'batches' || PL.tab === 'ready' || PL.tab === 'hold';     /* these three draw their own toolbar */
     $('#plAdd').hidden = bt || PL.tab === 'placements'; $('#plQ').hidden = bt; $('#plFoot').hidden = bt;
