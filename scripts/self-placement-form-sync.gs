@@ -25,6 +25,18 @@ const MAP = {
 
 /* Finds what to listen to: the response sheet (SHEET_ID property, or the sheet this script is attached to) or, failing that,
    the form itself (FORM_ID property, or the form this script is attached to). Either one works. */
+/* The aged care details staff use. Each becomes a labelled line on the self-request (key = what YatraLine stores). */
+const INFO = [
+  ['address',   /^facility address/i],
+  ['email',     /^facility e-?mail/i],
+  ['found',     /how did you find/i],
+  ['referral',  /referral/i],
+  ['talked_to', /person you talked to|who was the person/i],
+  ['approval',  /approval/i],
+  ['emailed',   /emailed them/i],
+  ['extra',     /additional information|anything else/i]
+];
+
 function target_() {
   const p = PropertiesService.getScriptProperties(), sid = (p.getProperty('SHEET_ID') || '').trim(), fid = (p.getProperty('FORM_ID') || '').trim();
   if (sid) return { ss: SpreadsheetApp.openById(sid) };
@@ -86,12 +98,14 @@ function sendRow_(sh, head, row) {
   if (!key) throw new Error('Add the INTAKE_KEY script property first (Project Settings > Script properties).');
   const used = {}, f = {};
   ['name', 'email', 'phone'].forEach(k => f[k] = pick_(head, row, MAP[k], used));
-  const facIdx = {}; f.facility = pick_(head, row, MAP.facility, facIdx);
+  f.facility = pick_(head, row, MAP.facility, used);   // the aged care's name is stored on its own
+  f.info = {};
+  INFO.forEach(([k, re]) => { const v = pick_(head, row, { is: re }, used); if (v) f.info[k] = v; });
   const answers = {}, lines = [];
   head.forEach((h, i) => {
     const v = String(row[i] || '').trim(); if (!h || !v || /^timestamp$/i.test(h)) return;
     answers[h] = v;
-    if (!used[i]) lines.push(h + ': ' + v);   // the student's own name, email and phone are already on the student, so they stay out of the note
+    if (!used[i]) lines.push(h + ': ' + v);   // what is left (for example the student's own address) goes in the note; the student's name, email and phone and the aged care details are stored separately
   });
   f.details = lines.join('\n');
   const stamp = String(row[0] || '');
