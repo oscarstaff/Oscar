@@ -300,7 +300,7 @@ function showAuth(s){
         n.id='nxEndedNote'; n.setAttribute('role','alert');
         n.style.cssText='margin:0 0 14px;padding:11px 14px;border-radius:10px;font-size:13px;line-height:1.45;font-weight:600;background:#fff7ed;color:#9a3412;border:1px solid #fdba74;';
         n.textContent='Your Nexus session ended, so you were signed out. Sign in again to carry on. Any app tabs you had open need to be opened again from here.';
-        pg.insertBefore(n, pg.firstChild);
+        var host=pg.querySelector('.auth-right')||pg; host.insertBefore(n, host.firstChild);   /* inside the form column, not the page grid (it stretched across the left panel) */
       }
     }
   }catch(e){}
