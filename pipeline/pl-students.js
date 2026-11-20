@@ -78,14 +78,14 @@ function fuInfo(raw, today) {
   const fu = Array.isArray(raw) ? raw[0] : raw;
   if (!fu || !fu.total_count) return { key: 'none', label: 'No follow-ups set', tone: '', sub: '' };
   if (!fu.open_count || !fu.step) return { key: 'complete', label: 'Follow-ups finished', tone: 'ok', sub: fu.total_count + ' done · booked, on hold or not interested' };
-  const nth = FU_NTH(fu.step), who = fu.assigned_to ? ' · ' + fu.assigned_to : '';
+  const nth = FU_NTH(fu.step), who = fu.assigned_to ? ' · ' + String(fu.assigned_to).trim().split(/\s+/)[0] : '';   /* first name only so it fits on one line; the full name is in the hover title */
   if (fu.due_day < today) { const n = Math.round((new Date(today + 'T12:00:00') - new Date(fu.due_day + 'T12:00:00')) / 864e5); return { key: 'due' + fu.step, label: nth + ' Follow Up Due', tone: 'bad', sub: n + (n === 1 ? ' day' : ' days') + ' overdue' + who }; }
   if (fu.due_day === today) return { key: 'due' + fu.step, label: nth + ' Follow Up Due', tone: 'warn', sub: 'Due today' + who };
-  return { key: 'upcoming', label: nth + ' follow-up', tone: 'info', sub: 'Due ' + fmtDate(fu.due_day) + who };
+  return { key: 'upcoming', label: nth + ' follow-up', tone: 'info', sub: 'Due ' + fmtDay(fu.due_day).dm + who };
 }
 function fuCellHtml(raw, today) {
-  const i = fuInfo(raw, today);
-  return '<span class="nx-pill ' + i.tone + '">' + esc(i.label) + '</span>' + (i.sub ? '<div class="nx-muted" style="font-size:12px;margin-top:2px">' + esc(i.sub) + '</div>' : '');
+  const i = fuInfo(raw, today), f0 = Array.isArray(raw) ? raw[0] : raw; i.full = (f0 && f0.assigned_to) || '';
+  return '<span class="nx-pill ' + i.tone + '">' + esc(i.label) + '</span>' + (i.sub ? '<div class="nx-muted nx-fusub" title="' + esc(i.sub + (i.full ? ' (' + i.full + ')' : '')) + '">' + esc(i.sub) + '</div>' : '');
 }
 /* the filter text for one follow-up state, to add to a nex_students query that embeds nex_lead_followup!inner */
 function fuFilter(which, today) {
