@@ -241,15 +241,15 @@ async function renderHold(body) {
 /* ---------- batches: students who asked for this aged care and date ---------- */
 function ppAskedFor(batch, card, rows) {
   if (!card.facility_id) return [];
-  return rows.filter(r => r.want_facility_id === card.facility_id && r.want_start && Math.abs((new Date(r.want_start) - new Date(batch.starts_on)) / 864e5) <= PP_NEAR);
+  return rows.filter(r => r.want_facility_id === card.facility_id && r.want_start && Math.abs((new Date(r.want_start) - new Date(btStart(batch, card))) / 864e5) <= PP_NEAR);
 }
 async function ppAskedRows(batch) {
-  const a = btAddDays(batch.starts_on, -PP_NEAR), b = btAddDays(batch.starts_on, PP_NEAR);
+  const a = btAddDays(batch.starts_on, -PP_NEAR - 7), b = btAddDays(batch.starts_on, PP_NEAR + 7);   /* a little wider: an aged care can start a few days after the batch */
   return sel('nex_placement_queue', 'select=*&has_placement=eq.false&hold=eq.false&want_start=gte.' + a + '&want_start=lte.' + b + '&limit=500').catch(() => []);
 }
 /* place one student on a card (checks the flags first); used by the batch card's "asked for this aged care" list */
 async function ppPlace(batch, card, r, shift) {
-  if (!await ppGate(r, fullName(r), { facility_id: card.facility_id, start: batch.starts_on })) return false;
-  try { await ins('nex_placements', { enrolment_id: r.enrolment_id, batch_id: batch.id, batch_facility_id: card.id, facility_id: card.facility_id || null, shift, status: 'site_date_allocated', start_date: batch.starts_on }, true); toast(fullName(r) + ' added'); return true; }
+  if (!await ppGate(r, fullName(r), { facility_id: card.facility_id, start: btStart(batch, card) })) return false;
+  try { await ins('nex_placements', { enrolment_id: r.enrolment_id, batch_id: batch.id, batch_facility_id: card.id, facility_id: card.facility_id || null, shift, status: 'site_date_allocated', start_date: btStart(batch, card) }, true); toast(fullName(r) + ' added'); return true; }
   catch (e) { toast(e.message, true); return false; }
 }
