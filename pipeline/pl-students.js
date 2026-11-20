@@ -215,7 +215,7 @@ function studentFields(s) {
   s = s || {};
   return [
     { k: 'first_name', label: 'First name', value: s.first_name, required: true }, { k: 'last_name', label: 'Last name', value: s.last_name },
-    { k: 'email', label: 'Email', type: 'email', value: s.email }, { k: 'phone', label: 'Phone', type: 'tel', value: s.phone },
+    { k: 'phone', label: 'Phone', type: 'tel', value: s.phone }, { k: 'email', label: 'Email', type: 'email', value: s.email },
     { k: 'phone2', label: 'Second phone', type: 'tel', value: s.phone2 }, { k: 'agent_id', label: 'Agent', type: 'select', options: REF.agents.filter(a => a.active), value: s.agent_id, blank: 'Self / no agent' },
     { k: 'outside_sydney', type: 'check', label: 'Outside Sydney', value: s.outside_sydney, full: true, help: 'Counted in the Outside Sydney row of the Conversion report.' }
   ];
@@ -226,16 +226,24 @@ function tidyStudent(v) {
   if (v.phone2) v.phone2 = cleanPhone(v.phone2) || v.phone2;
   return v;
 }
-async function findDupes(v) {
+/* anyone already in YatraLine with the same phone, the same email, or the same first and last name (exceptId leaves one person out, for edits) */
+async function findDupes(v, exceptId) {
   const parts = [];
-  if (v.email) parts.push('email.eq.' + v.email);
-  if (v.phone && v.phone.length >= 8) parts.push('phone.eq.' + v.phone);
+  if (v.email) parts.push('email.eq.' + encodeURIComponent(v.email));
+  if (v.phone && v.phone.length >= 8) parts.push('phone.eq.' + v.phone, 'phone2.eq.' + v.phone);
+  if (v.first_name && v.last_name) parts.push('and(first_name.ilike.' + encodeURIComponent(safeQ(v.first_name)) + ',last_name.ilike.' + encodeURIComponent(safeQ(v.last_name)) + ')');
   if (!parts.length) return [];
-  return sel('nex_students', 'select=id,first_name,last_name,email,phone&deleted_at=is.null&or=(' + parts.join(',') + ')&limit=5');
+  const rows = await sel('nex_students', 'select=id,first_name,last_name,email,phone&deleted_at=is.null&or=(' + parts.join(',') + ')&limit=6');
+  return exceptId ? rows.filter(r => r.id !== exceptId) : rows;
+}
+/* the yellow "this looks like someone already in YatraLine" box inside a form; the person presses Save again if it really is someone new */
+function dupeBox(m, d, again) {
+  let b = $('.nx-warnbox', m.el); if (!b) { b = document.createElement('div'); b.className = 'nx-warnbox'; b.style.marginBottom = '12px'; $('.modal-b', m.el).prepend(b); }
+  b.innerHTML = 'This looks like someone already in YatraLine: ' + d.map(x => '<a href="#/students/' + x.id + '">' + esc(fullName(x)) + '</a>' + (x.phone || x.email ? ' (' + esc([fmtPhone(x.phone), x.email].filter(Boolean).join(' · ')) + ')' : '')).join(', ') + '. ' + again + ' if this is a different person.';
 }
 function newStudent() {
   const base = studentFields(), by = k => base.find(x => x.k === k);
-  const f = [by('phone'), by('email'), by('first_name'), by('last_name'), by('phone2'), by('agent_id')].concat([
+  const f = [by('first_name'), by('last_name'), by('phone'), by('email'), by('phone2'), by('agent_id')].concat([
     { k: 'qualification_id', label: 'Qualification', type: 'select', options: REF.quals.filter(q => q.active), blank: 'Add later' },
     { k: 'fee', label: 'Agreed fee ($)', type: 'number' },
     { k: 'stage', label: 'Stage', type: 'select', options: stageOpts(false, 'checklist_sent'), value: 'checklist_sent', blank: 'Not set' },
@@ -254,12 +262,7 @@ function newStudent() {
     tidyStudent(stu);
     if (!warned) {
       const d = await findDupes(stu);
-      if (d.length) {
-        warned = true;
-        let b = $('.nx-warnbox', m.el); if (!b) { b = document.createElement('div'); b.className = 'nx-warnbox'; b.style.marginBottom = '12px'; $('.modal-b', m.el).prepend(b); }
-        b.innerHTML = 'This looks like someone already in YatraLine: ' + d.map(x => '<a href="#/students/' + x.id + '">' + esc(fullName(x)) + '</a>').join(', ') + '. Press Add lead again if this is a different person.';
-        return false;
-      }
+      if (d.length) { warned = true; dupeBox(m, d, 'Press Add lead again'); return false; }
     }
     /* the first contact date is the day the lead is added, and the follow-up cycle (1st, 2nd, 3rd follow-up, 2, 4 and 6 days later) starts at once, assigned to whoever added them */
     const s = await ins('nex_students', Object.assign(stu, { created_by: ME.name, first_contact_on: sydToday() }));
@@ -270,7 +273,7 @@ function newStudent() {
   };
   /* first name is checked in save() so that picking an existing person does not need it */
   f.find(x => x.k === 'first_name').required = false; f.find(x => x.k === 'first_name').label = 'First name *';
-  const m = formModal('New lead', f, save, 'Add lead', idBoxHtml('Start with a phone number or email. If they are already in YatraLine, their details fill in.'));
+  const m = formModal('New lead', f, save, 'Add lead', idBoxHtml('Type the name, phone and email. If they are already in YatraLine, they show up here and their details fill in.'));
   standardFee(m, 'f_qualification_id', 'f_fee');
   lk = identityLookup(m, { ids: { phone: 'f_phone', email: 'f_email', first: 'f_first_name', last: 'f_last_name' }, onChange: s => { const b = $('.modal-f .nx-btn.primary', m.el); if (b) b.textContent = s ? 'Add to ' + fullName(s) : 'Add lead'; } });
   return m;
@@ -515,7 +518,10 @@ function tabActivity(c) {
 
 async function studentAction(a, ds, c) {
   const s = c.s;
-  if (a === 'editStu') return formModal('Edit contact', studentFields(s), async v => { tidyStudent(v); await upd('nex_students', 'id=eq.' + s.id, v); toast('Saved'); render(); });
+  if (a === 'editStu') { let warnedE = false; return formModal('Edit contact', studentFields(s), async (v, m) => {
+    tidyStudent(v);
+    if (!warnedE && ['first_name', 'last_name', 'phone', 'email'].some(k => (v[k] || '') !== (s[k] || ''))) { const d = await findDupes(v, s.id); if (d.length) { warnedE = true; dupeBox(m, d, 'Press Save again'); return false; } }
+    await upd('nex_students', 'id=eq.' + s.id, v); toast('Saved'); render(); }); }
   if (a === 'editDet') {
     const d = c.d;
     const f = [{ k: 'dob', label: 'Date of birth', type: 'date', value: d.dob }, { k: 'usi', label: 'USI', value: d.usi, help: 'Unique Student Identifier, 10 characters' },

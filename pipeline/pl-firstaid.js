@@ -354,9 +354,7 @@ function confirmEmail(cur, books, only) {
 const PLAN_PL = { yes: 'Yes', done: 'Done', no: 'No' };
 function bookingForm(cur, b, books) {
   b = b || {}; let studentId = b.student_id || null;
-  const takenBy = n => books.find(x => x.seat_no === n && !bkOff(x.status) && x.id !== b.id);
   const f = [{ k: 'name', label: 'Name', value: b.name, required: true }, { k: 'phone', label: 'Phone', type: 'tel', value: b.phone }, { k: 'email', label: 'Email', type: 'email', value: b.email },
-    { k: 'seat_no', label: 'Seat', type: 'number', value: b.seat_no || '', help: 'Leave empty for the waiting list' },
     { k: 'booking_type', label: 'Booking type', type: 'select', options: [{ id: 'student', label: 'Student' }, { id: 'walk_in', label: 'Walk-in' }, { id: 'agent_group', label: 'Agent group' }], value: b.booking_type || 'student' },
     { k: 'agent_id', label: 'Agent', type: 'select', options: REF.agents.filter(a => a.active), value: b.agent_id, blank: 'None' },
     { k: 'status', label: 'Status', type: 'select', options: opts('booking', true), value: b.status || (b.id ? '' : 'booked'), blank: 'Not set', help: 'A booking is confirmed with or without payment. Payment is tracked on its own.' },
@@ -368,11 +366,10 @@ function bookingForm(cur, b, books) {
     FA_SECTIONS.filter(x => runs.includes(x[0])).forEach(x => f.push({ k: 'sec_' + x[0], label: x[1], type: 'check', value: !Array.isArray(b.sections) || b.sections.includes(x[0]) }));
   }
   if (cur.kind === 'renewal') f.push({ k: 'signature_done', label: 'Signature done', type: 'check', value: b.signature_done });
-  if (!canFlag()) for (let i = f.length - 1; i >= 0; i--) if (['quiz_sent', 'placement_plan', 'signature_done', 'seat_no'].includes(f[i].k)) f.splice(i, 1);   /* the flags and the seat numbers are Evershine's */
+  if (!canFlag()) for (let i = f.length - 1; i >= 0; i--) if (['quiz_sent', 'placement_plan', 'signature_done'].includes(f[i].k)) f.splice(i, 1);   /* the flags are Evershine's. Seats are never typed in here: only the Allocate button gives a seat. */
   f.push({ k: 'note', label: 'Note', type: 'textarea', value: b.note, full: true });
-  const top = b.id ? '' : idBoxHtml('Type a phone number or email. If they are already a student or lead, their details fill in. If they are not in YatraLine yet, they are added as a new lead when you save.');
+  const top = b.id ? '' : idBoxHtml('Type the name, phone and email. If they are already a student or lead, they show up here and their details fill in. If they are not in YatraLine yet, they are added as a new lead when you save.');
   const m = formModal(b.id ? 'Edit booking' : 'Add booking', f, async v => {
-    if (v.seat_no != null) { v.seat_no = Math.round(v.seat_no); if (v.seat_no < 1 || v.seat_no > cur.seats) throw fieldError('seat_no', 'Seat must be between 1 and ' + cur.seats + '.'); const t = takenBy(v.seat_no); if (t) throw fieldError('seat_no', 'Seat ' + v.seat_no + ' is already taken by ' + t.name + '.'); }
     if (runs.length > 1) {
       const on = runs.filter(k => v['sec_' + k]); runs.forEach(k => delete v['sec_' + k]);
       if (!on.length) throw fieldError('sec_' + runs[0], 'Tick at least one section.');
@@ -380,6 +377,12 @@ function bookingForm(cur, b, books) {
     }
     if (v.phone) v.phone = cleanPhone(v.phone) || v.phone; if (v.email) v.email = v.email.toLowerCase();
     const newSt = v.status; if (b.id && newSt !== (b.status || '') && (bkOff(newSt) || newSt === 'attended' || (newSt === 'booked' && (bkOff(b.status) || b.status === 'attended')))) { delete v.status; v.seat_no = bkOff(newSt) ? null : v.seat_no; } else if (bkOff(v.status)) v.seat_no = null;
+    /* the same person cannot be booked twice on one class day: matched by their record, or by the same email or phone */
+    if (v.booking_type !== 'agent_group') {
+      const em = (v.email || '').toLowerCase(), ph = v.phone || '';
+      const dup = books.find(x => x.id !== b.id && !bkOff(x.status) && x.booking_type !== 'agent_group' && ((studentId && x.student_id === studentId) || (em && (x.email || '').toLowerCase() === em) || (ph && x.phone === ph)));
+      if (dup) throw new Error(dup.name + ' is already booked on this class day. Open their booking to change it, or use a different phone and email if this is someone else.');
+    }
     let newLead = false;
     if (!b.id && !studentId && v.booking_type !== 'agent_group') {
       /* nobody found for this person: find them by email, phone or name, or add them as a lead ("From class booking") */
@@ -389,7 +392,7 @@ function bookingForm(cur, b, books) {
     try {
       if (b.id) { await upd('nex_class_bookings', 'id=eq.' + b.id, Object.assign(v, { student_id: studentId })); if (newSt !== (b.status || '') && newSt && (bkOff(newSt) || newSt === 'attended' || (newSt === 'booked' && (bkOff(b.status) || b.status === 'attended')))) await bkMark(b, newSt); }
       else await ins('nex_class_bookings', Object.assign({ session_id: cur.id, student_id: studentId, created_by: ME.name }, v), true);
-    } catch (e) { if (/duplicate|unique/i.test(e.message)) throw fieldError('seat_no', 'That seat was just taken. Choose another.'); throw e; }
+    } catch (e) { throw e; }
     toast(newLead ? 'Booking saved. ' + v.name + ' was added as a new lead.' : 'Booking saved'); render();
   }, 'Save booking', top);
   if (b.id) {
