@@ -15,12 +15,12 @@ const SB_URL = 'https://jcfgldqrdbfkgbixszds.supabase.co';
 const SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpjZmdsZHFyZGJma2diaXhzemRzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1Nzc3NzEsImV4cCI6MjA5MDE1Mzc3MX0.Wj8cCpnlsoZOPj5sKWeEdfvgjG4Nc-UuTTYgbcrPfeI';   // public anon key, already in the app
 
 /* A question is "the student's" when its heading matches `is` and does not match `not`. The first match wins. */
-const NOT_STUDENT = /facility|aged|care home|organi[sz]ation|supervisor|manager|coordinator|mentor|referee|employer|workplace|director|contact person|rn\b|nurse in charge/i;
+const NOT_STUDENT = /facility|aged|care home|organi[sz]ation|supervisor|manager|coordinator|mentor|referee|referral|employer|workplace|director|contact person|rn\b|nurse in charge|approval|emailed/i;
 const MAP = {
-  name:     { is: /(^|\b)(full\s*)?name\b|student/i, not: NOT_STUDENT },
-  email:    { is: /e-?mail/i, not: NOT_STUDENT },
-  phone:    { is: /phone|mobile|contact number/i, not: NOT_STUDENT },
-  facility: { is: /facility|aged care|care home|organi[sz]ation|workplace|place of placement/i, not: /address|email|phone|contact|supervisor|manager|date|start|end|suburb|state|postcode/i }
+  name:     { is: /^(your\s+)?(full\s+)?name$|student name/i, not: NOT_STUDENT },
+  email:    { is: /^(your\s+|student\s+)?e-?mail( address)?$/i, not: NOT_STUDENT },
+  phone:    { is: /^(your\s+|student\s+)?(phone|mobile|contact)( number| no\.?)?$/i, not: NOT_STUDENT },
+  facility: { is: /^facility name$|^name of (the )?(facility|aged care)|^aged care( name)?$|^(organi[sz]ation|workplace) name$/i, not: /address|email|phone|contact|supervisor|manager|date|start|end|suburb|state|postcode/i }
 };
 
 /* Finds what to listen to: the response sheet (SHEET_ID property, or the sheet this script is attached to) or, failing that,
@@ -51,6 +51,7 @@ function onFormSubmit(e) {   // sheet trigger
 
 function formRow_(resp) {   // a Form response as [headings, answers], the same shape as a sheet row
   const head = ['Timestamp'], row = [Utilities.formatDate(resp.getTimestamp(), Session.getScriptTimeZone(), 'd/M/yyyy HH:mm:ss')];
+  const who = resp.getRespondentEmail && resp.getRespondentEmail(); if (who) { head.push('Email Address'); row.push(who); }   // only when the form is set to collect email addresses
   resp.getItemResponses().forEach(ir => { const a = ir.getResponse(); head.push(ir.getItem().getTitle()); row.push(Array.isArray(a) ? a.join(', ') : String(a == null ? '' : a)); });
   return [head, row];
 }
