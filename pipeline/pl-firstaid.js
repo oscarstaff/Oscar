@@ -128,8 +128,7 @@ function bindFirstAid(cur, books, ctx) {
   if ($('#cfClear')) $('#cfClear').onclick = () => { Object.assign(CF, { trainer: '', from: '', to: '' }); render(); };
   if ($('#faNew')) $('#faNew').onclick = () => classForm(null);
   if ($('#faExport')) $('#faExport').onclick = () => exportDay(cur);
-  if ($('#faJump')) $('#faJump').onclick = () => formModal('Go to a past class', [{ k: 'd', label: 'Class date', type: 'date', required: true }], async v => {
-    const r = await sel('nex_class_sessions', 'select=id&class_date=eq.' + v.d + '&limit=1'); if (!r[0]) throw new Error('No class on that date.'); go('#/firstaid/' + r[0].id); }, 'Go');
+  if ($('#faJump')) $('#faJump').onclick = () => pastClasses();
   if (!cur) return;
   $$('#faDays .nx-day').forEach(b => b.onclick = () => go('#/firstaid/' + b.dataset.id));
   $('#faEdit').onclick = () => classForm(cur);
@@ -259,6 +258,20 @@ function exportDay(cur) {
     setTimeout(() => URL.revokeObjectURL(a.href), 4000);
     toast('Exported ' + (out.length - 1) + (out.length === 2 ? ' row' : ' rows') + ' for ' + fmtDate(v.d));
   }, 'Download');
+}
+
+/* "Past classes": the most recent class days, newest first, with how many were booked, so nobody has to search by date */
+async function pastClasses() {
+  const m = openModal({ title: 'Past classes', footer: false, body: '<div class="nx-sel-opt" id="pcList" style="max-height:60vh"><div class="nx-help">Loading…</div></div>' });
+  const box = $('#pcList', m.el);
+  try {
+    const rows = await sel('nex_class_sessions', 'select=id,class_date,kind,trainer,seats&class_date=lt.' + sydToday() + '&order=class_date.desc&limit=60');
+    if (!rows.length) { box.innerHTML = '<div class="nx-help">No past classes yet.</div>'; return; }
+    const cnt = {}, att = {};
+    (await selAll('nex_class_bookings', 'select=session_id,status&session_id=in.' + inList(rows.map(r => r.id)))).forEach(b => { if (!bkOff(b.status)) { cnt[b.session_id] = (cnt[b.session_id] || 0) + 1; if (b.status === 'attended') att[b.session_id] = (att[b.session_id] || 0) + 1; } });
+    box.innerHTML = rows.map(r => { const d = fmtDay(r.class_date); return '<button type="button" class="nx-pick" data-id="' + r.id + '"><span><b>' + d.wd + ' ' + d.dm + ' ' + r.class_date.slice(0, 4) + '</b><small>' + esc([r.kind === 'renewal' ? 'Renewal' : 'Full class', r.trainer].filter(Boolean).join(' · ')) + '</small></span><span class="nx-tag">' + (cnt[r.id] || 0) + ' booked' + (att[r.id] ? ' · ' + att[r.id] + ' attended' : '') + '</span></button>'; }).join('') + (rows.length === 60 ? '<div class="nx-help">Showing the latest 60 classes.</div>' : '');
+    $$('.nx-pick', box).forEach(b => b.onclick = () => { m.close(); go('#/firstaid/' + b.dataset.id); });
+  } catch (e) { box.innerHTML = '<div class="nx-err">' + esc(e.message) + '</div>'; }
 }
 
 /* the dropdown: active trainers, plus an older typed-in name kept as it is until someone changes it */
