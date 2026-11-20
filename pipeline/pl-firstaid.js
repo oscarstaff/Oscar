@@ -18,14 +18,17 @@ function fbRows(live) {
   const by = { name: nm, name_desc: (a, c) => nm(c, a), seat: (a, c) => ((a.seat_no || 1e9) - (c.seat_no || 1e9)) || nm(a, c), new: (a, c) => String(c.created_at || '').localeCompare(String(a.created_at || '')) || nm(a, c) };
   return list.sort(by[CB.sort] || nm);
 }
+function fbRow(cur, b, i, payBy, showSeats) {
+  return '<tr class="nx-tr" data-b="' + b.id + '"><td class="nx-num">' + (i + 1) + '</td><td><b>' + (b.nex_students ? '<a href="#/students/' + b.nex_students.id + '">' + esc(b.name) + '</a>' : esc(b.name)) + '</b><span class="nx-sub">' + esc([showSeats && b.seat_no ? 'Seat ' + b.seat_no : '', fmtPhone(b.phone), b.email].filter(Boolean).join(' · ') || 'No contact details') + '</span></td>' +
+      '<td>' + (b.booking_type === 'student' ? '<span class="nx-tag">Student</span>' : '<span class="nx-tag walk">' + (b.booking_type === 'walk_in' ? 'Walk-in' : 'Agent group') + '</span>') + (b.agent_id ? '<span class="nx-sub">' + esc(agentName(b.agent_id)) + '</span>' : '') + (b.created_by ? '<span class="nx-sub">Booked by ' + esc(b.created_by) + '</span>' : '') + '</td>' +
+      '<td>' + bookingPayCell(b, payBy[b.student_id]) + '</td><td>' + attCell(b) + '</td>' +
+      '<td><div class="nx-flags">' + bookingFlags(cur, b) + '</div></td><td class="nx-actcell"><div class="nx-btnrow">' + (canFlag() && cur.kind !== 'renewal' && !bkOff(b.status) ? '<button class="nx-btn sm icon" data-conf="' + b.id + '" title="Email confirmation" aria-label="Email confirmation to ' + esc(b.name) + '">' + ico('mail') + '</button>' : '') + '<button class="nx-btn sm" data-edit="' + b.id + '">Edit</button></div></td></tr>';
+}
 function fbTable(cur, live, payBy, showSeats) {
   const list = fbRows(live);
   if (!list.length) return empty(live.length ? 'Nobody matches' : 'No bookings yet', live.length ? 'Try clearing a filter.' : 'Press Add booking to add the first one.');
   return '<div class="nx-tablewrap"><table class="nx-table tight"><thead><tr>' + '<th class="nx-num" scope="col">#</th><th>Name</th><th>Type</th><th>Payment</th><th>Attendance</th><th>Flags</th><th><span class="nx-sr">Actions</span></th></tr></thead><tbody>' +
-    list.map((b, i) => '<tr class="nx-tr" data-b="' + b.id + '"><td class="nx-num">' + (i + 1) + '</td><td><b>' + (b.nex_students ? '<a href="#/students/' + b.nex_students.id + '">' + esc(b.name) + '</a>' : esc(b.name)) + '</b><span class="nx-sub">' + esc([showSeats && b.seat_no ? 'Seat ' + b.seat_no : '', fmtPhone(b.phone), b.email].filter(Boolean).join(' · ') || 'No contact details') + '</span></td>' +
-      '<td>' + (b.booking_type === 'student' ? '<span class="nx-tag">Student</span>' : '<span class="nx-tag walk">' + (b.booking_type === 'walk_in' ? 'Walk-in' : 'Agent group') + '</span>') + (b.agent_id ? '<span class="nx-sub">' + esc(agentName(b.agent_id)) + '</span>' : '') + (b.created_by ? '<span class="nx-sub">Booked by ' + esc(b.created_by) + '</span>' : '') + '</td>' +
-      '<td>' + bookingPayCell(b, payBy[b.student_id]) + '</td><td>' + attCell(b) + '</td>' +
-      '<td><div class="nx-flags">' + bookingFlags(cur, b) + '</div></td><td class="nx-actcell"><div class="nx-btnrow">' + (canFlag() && cur.kind !== 'renewal' && !bkOff(b.status) ? '<button class="nx-btn sm icon" data-conf="' + b.id + '" title="Email confirmation" aria-label="Email confirmation to ' + esc(b.name) + '">' + ico('mail') + '</button>' : '') + '<button class="nx-btn sm" data-edit="' + b.id + '">Edit</button></div></td></tr>').join('') + '</tbody></table></div>';
+    list.map((b, i) => fbRow(cur, b, i, payBy, showSeats)).join('') + '</tbody></table></div>';
 }
 
 route(/^\/firstaid(?:\/([0-9a-f-]{36}))?$/, async m => {
@@ -105,13 +108,22 @@ function bindFirstAid(cur, books, ctx) {
   if ($('#faAdd')) $('#faAdd').onclick = () => bookingForm(cur, null, books);
   const fm = $('#faMail'); if (fm) fm.onclick = () => confirmEmail(cur, books);
   const by = id => books.find(x => x.id === id);
+  /* Attended and Undo change one row only. Redraw just that row, in place, so the page does not reload and nothing moves. */
+  const patchRow = async id => {
+    const x = by(id), box = $('#fbRows'); if (!x || !box) return render();
+    try { const r = await sel('nex_class_bookings', 'select=*,nex_students(id,first_name,last_name)&id=eq.' + id); if (!r[0]) return render(); Object.assign(x, r[0]); } catch (e) { return render(); }
+    const i = fbRows(ctx.live || []).findIndex(y => y.id === id), tr = $('tr[data-b="' + id + '"]', box);
+    if (i < 0 || !tr) return redraw();
+    const tb = document.createElement('tbody'); tb.innerHTML = fbRow(cur, x, i, ctx.payBy || {}, canFlag());
+    tr.replaceWith(tb.firstElementChild); bindRows();
+  };
   const bindRows = () => {
     const box = $('#fbRows'); if (!box) return;
     $$('[data-pay]', box).forEach(b => b.onclick = e => { e.stopPropagation(); const x = by(b.dataset.pay); if (x && x.student_id) paymentForm({ student: { id: x.student_id, first_name: (x.nex_students || {}).first_name || x.name, last_name: (x.nex_students || {}).last_name || '' } }); });
     $$('[data-edit]', box).forEach(b => b.onclick = e => { e.stopPropagation(); bookingForm(cur, by(b.dataset.edit), books); });
     $$('[data-conf]', box).forEach(b => b.onclick = e => { e.stopPropagation(); const x = by(b.dataset.conf); if (x) confirmEmail(cur, books, x); });
-    $$('[data-att]', box).forEach(sl => { sl.onclick = e => e.stopPropagation(); sl.onchange = e => { e.stopPropagation(); const x = by(sl.dataset.att), v = sl.value; sl.value = ''; if (!x || !v) return; if (v === 'attended') bkAttended(x); else attendanceModal(x, v); }; });
-    $$('[data-ud]', box).forEach(b => b.onclick = e => { e.stopPropagation(); bkUndo(by(b.dataset.ud)); });
+    $$('[data-att]', box).forEach(sl => { sl.onclick = e => e.stopPropagation(); sl.onchange = e => { e.stopPropagation(); const x = by(sl.dataset.att), v = sl.value; sl.value = ''; if (!x || !v) return; if (v === 'attended') bkAttended(x, () => patchRow(x.id)); else attendanceModal(x, v); }; });
+    $$('[data-ud]', box).forEach(b => b.onclick = e => { e.stopPropagation(); bkUndo(by(b.dataset.ud), () => patchRow(b.dataset.ud)); });
   };
   /* the booking list: search, sort and filter in place (nothing is fetched again, so nothing jumps) */
   const live = ctx.live || [], payBy = ctx.payBy || {}, showSeats = canFlag();
