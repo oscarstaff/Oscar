@@ -825,31 +825,6 @@ async function loadProfilePage(){
   loadProfileBirthday();
   loadProfilePronouns();
   loadOnboardingChecklist();
-  try{
-    const rows=await sbGet("staff_credentials","?staff_name=eq."+encodeURIComponent(me)+"&select=sq1_question,sq2_question");
-    const statusEl=document.getElementById("profSqStatus");
-    if(statusEl){
-      if(rows.length&&rows[0].sq1_question&&rows[0].sq2_question){
-        statusEl.innerHTML='<span style="color:#16a34a;font-size:12px;font-weight:600;">✓ Two security questions set</span>';
-      }else{
-        statusEl.innerHTML='<span style="color:#d97706;font-size:12px;font-weight:600;">⚠ No security questions set — add them so you can reset your password</span>';
-      }
-    }
-  }catch(e){console.warn(e);}
-}
-
-async function loadCurrentQuestions(){
-  try{
-    const rows=await sbGet("staff_credentials","?staff_name=eq."+encodeURIComponent(me)+"&select=sq1_question,sq2_question");
-    if(!rows.length)return;
-    const q1=document.getElementById("profQ1"),q2=document.getElementById("profQ2");
-    if(q1&&rows[0].sq1_question){
-      for(let o of q1.options)if(o.value===rows[0].sq1_question){o.selected=true;break;}
-    }
-    if(q2&&rows[0].sq2_question){
-      for(let o of q2.options)if(o.value===rows[0].sq2_question){o.selected=true;break;}
-    }
-  }catch(e){console.warn(e);}
 }
 
 async function changePassword(){
@@ -902,40 +877,6 @@ async function changePassword(){
   }
   finally{btn.disabled=false;btn.textContent="Update";}
 }
-
-async function saveSecurityQuestions(){
-  const q1=document.getElementById("profQ1").value;
-  const a1=document.getElementById("profA1").value.trim().toLowerCase();
-  const q2=document.getElementById("profQ2").value;
-  const a2=document.getElementById("profA2").value.trim().toLowerCase();
-  const err=document.getElementById("profSqErr"),ok=document.getElementById("profSqOk");
-  err.classList.remove("show");ok.classList.remove("show");
-  if(!q1){err.textContent="Please select your first security question.";err.classList.add("show");return;}
-  if(!a1){err.textContent="Please answer your first security question.";err.classList.add("show");return;}
-  if(!q2){err.textContent="Please select your second security question.";err.classList.add("show");return;}
-  if(!a2){err.textContent="Please answer your second security question.";err.classList.add("show");return;}
-  if(q1===q2){err.textContent="Please choose two different questions.";err.classList.add("show");return;}
-  const btn=document.getElementById("profSqBtn");btn.disabled=true;btn.innerHTML='<span class="sp"></span> Saving...';
-  try{
-    const [h1,h2]=await Promise.all([hash(a1),hash(a2)]);
-    const res=await fetch(SB+"/rest/v1/staff_credentials?staff_name=eq."+encodeURIComponent(me),{
-      method:"PATCH",
-      headers:{"apikey":KEY,"Authorization":"Bearer "+KEY,"Content-Type":"application/json","Prefer":"return=minimal"},
-      body:JSON.stringify({sq1_question:q1,sq1_answer_hash:h1,sq2_question:q2,sq2_answer_hash:h2})
-    });
-    if(res.ok||res.status===204){
-      ok.textContent="Security questions saved!";ok.classList.add("show");
-      document.getElementById("profA1").value="";
-      document.getElementById("profA2").value="";
-      setTimeout(()=>{toggleSection("profSqSection");loadProfilePage();},1500);
-    }else throw new Error();
-  }catch(e){err.textContent="Failed. Please try again.";err.classList.add("show");}
-  finally{btn.disabled=false;btn.textContent="Save Questions";}
-}
-
-
-
-
 
 async function ensureStaffSettingsRow(){
   if(!me) return;

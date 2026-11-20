@@ -199,19 +199,6 @@ const ONBOARDING_TASKS = [
     }
   },
   {
-    id: 'security_questions',
-    title: 'Set your security questions',
-    body: 'So you can reset your own password if you forget it.',
-    cta: 'Set questions',
-    action: "goTo('profile');setTimeout(function(){showProfileSection('account');var el=document.getElementById('profSqSection');if(el){toggleSection('profSqSection');loadCurrentQuestions();}},400)",
-    check: async function(){
-      try{
-        const rows = await sbGet('staff_credentials','?staff_name=eq.'+encodeURIComponent(me)+'&select=sq1_question,sq2_question');
-        return !!(rows && rows[0] && rows[0].sq1_question && rows[0].sq2_question);
-      }catch(e){ return false; }
-    }
-  },
-  {
     id: 'availability',
     title: 'Set your availability',
     body: 'Tell us when you can work so shifts match your schedule.',
@@ -252,7 +239,7 @@ const TOUR_STEPS = [
   {
     target: '#mhUser',
     title: 'My Profile',
-    body: 'Tap your name up here to open your Profile. Set your security questions and date of birth so you can reset your own password if you forget it.',
+    body: 'Tap your name up here to open your Profile. Set your date of birth and change your password here. If you forget your password, use Forgot password on the sign-in page.',
     advance: 'tap'
   },
   {

@@ -287,7 +287,7 @@ async function openGatedApp(ev,app,url){
 }
 function showAuth(s){
   try{ var _bo=document.getElementById('nexusBootOverlay'); if(_bo){ _bo.classList.add('nb-hide'); setTimeout(function(){ _bo.style.display='none'; },400); } }catch(e){}
-  ["login","setpass","resetkey","forgot","setnew"].forEach(p=>{var el=document.getElementById("pg-"+p);if(el)el.style.display="none";});
+  ["login","setpass","forgot","setnew"].forEach(p=>{var el=document.getElementById("pg-"+p);if(el)el.style.display="none";});
   const pg=document.getElementById("pg-"+s);
   pg.style.display = (s==="login") ? "" : "block";
   try{ document.getElementById("authLayer").classList.toggle("login-edge", s==="login"); }catch(e){}
