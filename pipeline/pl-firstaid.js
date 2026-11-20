@@ -117,7 +117,7 @@ function bookingPayCell(b, list) {
   return '<div class="nx-paycell"><div class="nx-paytop">' + h + (b.student_id && canCash() ? '<button class="nx-btn sm icon" data-pay="' + b.id + '" title="Add a payment" aria-label="Add a payment for ' + esc(b.name) + '">' + ico('plus') + '</button>' : '') + '</div></div>';
 }
 function attCell(b) {
-  if (b.status === 'attended') return '<div class="nx-stack-cell"><div class="nx-att-top"><span class="nx-pill ok">Attended</span><button class="nx-btn sm" data-ud="' + b.id + '">Undo</button></div><span class="nx-att-by">' + esc(b.attendance_by || '') + (b.attendance_at ? ' · ' + esc(fmtDT(b.attendance_at)) : '') + '</span></div>';
+  if (b.status === 'attended') return '<div class="nx-stack-cell"><div class="nx-att-top"><span class="nx-pill ok">Attended</span>' + bkUndoBtn(b) + '</div><span class="nx-att-by">' + esc(b.attendance_by || '') + (b.attendance_at ? ' · ' + esc(fmtDT(b.attendance_at)) : '') + '</span></div>';
   return '<div class="nx-att-cell">' + (b.status === 'booked' || !b.status ? '' : pill('booking', b.status)) + '<select class="nx-sel sm" data-att="' + b.id + '" aria-label="Mark attendance for ' + esc(b.name) + '"><option value="">Mark attendance</option><option value="attended">Attended</option><option value="no_show">No show</option><option value="cancelled">Cancelled</option><option value="rescheduled">Rescheduled</option></select></div>';
 }
 

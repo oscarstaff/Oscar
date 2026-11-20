@@ -45,7 +45,11 @@ async function attendanceModal(b, preset, after) {
 async function bkAttended(b, after) {
   try { await bkMark(b, 'attended'); toast('Marked attended'); if (after) after(); else render(); } catch (e) { toast(e.message, true); }
 }
+/* an attendance mark can be changed or undone by whoever made it, or by an admin; not by another person or team */
+const bkCanChange = b => !!(ME.admin || !b || !b.attendance_by || b.attendance_by === ME.name);
+const bkUndoBtn = (b, cls) => '<button class="nx-btn sm ' + (cls || '') + '" data-ud="' + b.id + '"' + (bkCanChange(b) ? '' : ' disabled title="Marked by ' + esc(b.attendance_by) + '. Only they or an admin can undo it."') + '>Undo</button>';
 async function bkUndo(b, after) {
+  if (!bkCanChange(b)) return toast('Marked by ' + b.attendance_by + '. Only they or an admin can undo it.', true);
   try { await bkMark(b, 'booked'); toast('Back to booked'); if (after) after(); else render(); } catch (e) { toast(e.message, true); }
 }
 async function bkHandled(b, after) {
@@ -91,7 +95,7 @@ function bkFollowRow(b, opt) {
     '<td>' + pill('booking', b.status) + '</td><td>' + (ss_.class_date ? esc(fmtDate(ss_.class_date)) : '') + '<div class="nx-muted" style="font-size:12px">' + (ss_.kind === 'renewal' ? 'Renewal' : 'Full class') + '</div></td>' +
     '<td><span class="nx-att-by">' + esc(b.attendance_by || '') + (b.attendance_at ? ' · ' + esc(fmtDT(b.attendance_at)) : '') + '</span></td>' +
     '<td>' + (moved ? '<span class="nx-pill ok">Moved to ' + esc(fmtDate(moved)) + '</span>' : handled ? '<span class="nx-pill ok">Handled' + (b.followup_done_by ? ' · ' + esc(b.followup_done_by) : '') + '</span>' : '<span class="nx-pill warn">To follow up</span>') + '</td>' +
-    '<td><div class="nx-btnrow">' + (handled || moved ? '' : '<button class="nx-btn sm primary" data-rb="' + b.id + '">Rebook</button><button class="nx-btn sm" data-hd="' + b.id + '">Mark handled</button>') + '<button class="nx-btn sm quiet" data-ud="' + b.id + '">Undo</button></div></td></tr>';
+    '<td><div class="nx-btnrow">' + (handled || moved ? '' : '<button class="nx-btn sm primary" data-rb="' + b.id + '">Rebook</button><button class="nx-btn sm" data-hd="' + b.id + '">Mark handled</button>') + '' + bkUndoBtn(b, 'quiet') + '</div></td></tr>';
 }
 async function bkMovedMap(rows) {
   const ids = rows.map(b => b.rescheduled_to).filter(Boolean); const out = {};
