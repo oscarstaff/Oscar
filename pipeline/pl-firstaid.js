@@ -361,19 +361,24 @@ function bookingForm(cur, b, books) {
     { k: 'quiz_sent', label: 'Quiz link sent', type: 'check', value: b.quiz_sent }];
   if (cur.kind !== 'renewal') f.push({ k: 'placement_plan', label: 'Placement plan', type: 'select', options: Object.keys(PLAN_PL).map(k => ({ id: k, label: PLAN_PL[k] })), value: b.placement_plan, blank: 'Not set', help: 'Yes = going ahead with placement. Done = placement sorted. No = not doing placement.' });
   const runs = cur.kind === 'renewal' ? [] : faRunning(cur);
-  if (runs.length > 1) {
-    f.push({ type: 'help', text: 'Sections this person attends. Untick any they are not doing: their confirmation email lists only the ticked ones, with those times.' });
-    FA_SECTIONS.filter(x => runs.includes(x[0])).forEach(x => f.push({ k: 'sec_' + x[0], label: x[1], type: 'check', value: !Array.isArray(b.sections) || b.sections.includes(x[0]) }));
+  /* what a student can sign up for: CPR is issued with First Aid, so First Aid always comes with CPR */
+  const OPTS = [['info', 'Info session', ['info']], ['fa_cpr', 'First Aid + CPR', ['first_aid', 'cpr']], ['cpr', 'CPR only', ['cpr']], ['manual', 'Manual Handling', ['manual']]]
+    .filter(o => o[2].every(k => runs.includes(k)));
+  if (runs.length > 1 && OPTS.length) {
+    const mine = Array.isArray(b.sections) ? b.sections : null;   /* null = the whole day */
+    const on = { info: !mine || mine.includes('info'), fa_cpr: !mine || mine.includes('first_aid'), cpr: !!mine && mine.includes('cpr') && !mine.includes('first_aid'), manual: !mine || mine.includes('manual') };
+    f.push({ type: 'help', text: 'What this person is attending. Untick anything they are not doing: their confirmation email lists only what is ticked, with those times.' });
+    OPTS.forEach(o => f.push({ k: 'sec_' + o[0], label: o[1], type: 'check', value: on[o[0]] }));
   }
   if (cur.kind === 'renewal') f.push({ k: 'signature_done', label: 'Signature done', type: 'check', value: b.signature_done });
   if (!canFlag()) for (let i = f.length - 1; i >= 0; i--) if (['quiz_sent', 'placement_plan', 'signature_done'].includes(f[i].k)) f.splice(i, 1);   /* the flags are Evershine's. Seats are never typed in here: only the Allocate button gives a seat. */
   f.push({ k: 'note', label: 'Note', type: 'textarea', value: b.note, full: true });
   const top = b.id ? '' : idBoxHtml('Type the name, phone and email. If they are already a student or lead, they show up here and their details fill in. If they are not in YatraLine yet, they are added as a new lead when you save.');
   const m = formModal(b.id ? 'Edit booking' : 'Add booking', f, async v => {
-    if (runs.length > 1) {
-      const on = runs.filter(k => v['sec_' + k]); runs.forEach(k => delete v['sec_' + k]);
-      if (!on.length) throw fieldError('sec_' + runs[0], 'Tick at least one section.');
-      v.sections = on.length === runs.length ? null : on;
+    if (runs.length > 1 && OPTS.length) {
+      const got = new Set(); OPTS.forEach(o => { if (v['sec_' + o[0]]) o[2].forEach(k => got.add(k)); delete v['sec_' + o[0]]; });
+      if (!got.size) throw fieldError('sec_' + OPTS[0][0], 'Tick at least one thing they are attending.');
+      v.sections = runs.every(k => got.has(k)) ? null : runs.filter(k => got.has(k));
     }
     if (v.phone) v.phone = cleanPhone(v.phone) || v.phone; if (v.email) v.email = v.email.toLowerCase();
     const newSt = v.status; if (b.id && newSt !== (b.status || '') && (bkOff(newSt) || newSt === 'attended' || (newSt === 'booked' && (bkOff(b.status) || b.status === 'attended')))) { delete v.status; v.seat_no = bkOff(newSt) ? null : v.seat_no; } else if (bkOff(v.status)) v.seat_no = null;
@@ -395,6 +400,8 @@ function bookingForm(cur, b, books) {
     } catch (e) { throw e; }
     toast(newLead ? 'Booking saved. ' + v.name + ' was added as a new lead.' : 'Booking saved'); render();
   }, 'Save booking', top);
+  { const fa = $('#f_sec_fa_cpr', m.el), cp = $('#f_sec_cpr', m.el);
+    if (fa && cp) { fa.addEventListener('change', () => { if (fa.checked) cp.checked = false; }); cp.addEventListener('change', () => { if (cp.checked) fa.checked = false; }); } }
   if (b.id) {
     const foot = $('.modal-f', m.el); const cb = document.createElement('button'); cb.className = 'nx-btn'; cb.style.marginRight = 'auto'; cb.textContent = 'Cancel booking';
     cb.onclick = async () => { try { await bkMark(b, 'cancelled'); m.close(); toast('Booking cancelled. Follow-up task added.'); render(); } catch (e) { showErr(m, e); } };
