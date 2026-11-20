@@ -61,8 +61,37 @@ function classTime(s: any) {
   return a && z ? `${a} - ${z}` : STD_TIME;
 }
 
-function draft(first: string, date: string, time: string) {
-  const body = `Dear ${first || "Student"},\n\nThank you for choosing us for your training certificate. As discussed, your class is confirmed for ${date} (Time: ${time}) at Unit 5, 5 King Street, Rockdale, NSW 2216. Please arrive 10 - 15 minutes early for your registration to avoid lining up.\nParking: 1 Market Street Rockdale\nQUIZ FOR FIRST AID/CPR/MANUAL HANDLING:\n\n* Please check the attached PDF for quiz access guidance.\n\nPlease make the payment the day before coming to the class for your easiness:-\nFees:\n\n* Certificate III in Individual Support (Ageing & Disability) including First Aid & CPR: $1,300\n* Certificate IV Ageing Support with Medication including First Aid & CPR: $1,500\n* Certificate IV Disability including First Aid & CPR: $1,500\n* First Aid CPR and Manual Handling: $200\n* First Aid and CPR: $125\n* CPR: $55\n* Manual Handling: $80\n\nPayment Details (COMMONWEALTH Bank):\n\n* Account Name: Oscar Training Centre\n* BSB: 062235\n* Account Number:11104627\n* Description/Reference: [Your Name] + The Certificate you are proceeding with\n\nKindly, send us a screenshot of the payment before you attend the classes once made. If you are paying from someone else's account, make sure to have them include your full name and Date of Birth in the reference.\nFor any assistance please do not hesitate to contact us at 0402462830.`;
+// The plan for the day. Each class day can carry its own plan (nex_class_sessions.schedule); when it has none, the trainer's usual plan is used.
+// Keep SECTIONS / STD_PLAN / ANJU_PLAN in step with FA_SECTIONS and FA_PLANS in pipeline/pl-firstaid.js.
+const SECTIONS: [string, string][] = [["info", "Info session"], ["first_aid", "First Aid"], ["cpr", "CPR"], ["manual", "Manual Handling"]];
+type Plan = Record<string, [string, string]>;
+const STD_PLAN: Plan = { info: ["09:00", "11:00"], first_aid: ["11:00", "13:00"], break: ["13:00", "14:00"], cpr: ["14:00", "16:00"], manual: ["16:00", "17:00"] };
+const ANJU_PLAN: Plan = { first_aid: ["09:00", "12:00"], cpr: ["12:00", "14:15"], break: ["13:00", "13:30"], manual: ["14:15", "15:00"], info: ["15:00", "17:00"] };
+function planOf(ses: any): Plan {
+  const sc = ses && ses.schedule;
+  if (sc && typeof sc === "object" && !Array.isArray(sc)) return sc as Plan;
+  return /\banju\b/i.test(String((ses && ses.trainer) || "")) ? ANJU_PLAN : STD_PLAN;
+}
+const okRange = (r: any) => Array.isArray(r) && /^\d{1,2}:\d{2}/.test(String(r[0] || "")) && /^\d{1,2}:\d{2}/.test(String(r[1] || ""));
+// the times this person needs to be there: only the sections they attend (sections null = all), with the break when it falls inside their day
+function personalTimes(ses: any, sections: string[] | null) {
+  const plan = planOf(ses);
+  const mine = SECTIONS.filter(([k]) => okRange(plan[k]) && (!sections || sections.includes(k)))
+    .map(([k, label]) => ({ label, a: String(plan[k][0]), z: String(plan[k][1]) }))
+    .sort((x, y) => x.a.localeCompare(y.a, "en", { numeric: true }));
+  if (!mine.length) return null;
+  const start = mine.map((m) => m.a).sort((x, y) => x.localeCompare(y, "en", { numeric: true }))[0];
+  const end = mine.map((m) => m.z).sort((x, y) => y.localeCompare(x, "en", { numeric: true }))[0];
+  const rows = mine.slice();
+  const br = plan.break;
+  if (okRange(br) && String(br[0]) >= start && String(br[1]) <= end) rows.push({ label: "Break", a: String(br[0]), z: String(br[1]) });
+  rows.sort((x, y) => x.a.localeCompare(y.a, "en", { numeric: true }));
+  const lines = rows.map((r) => `${r.label}: ${fmtClock(r.a)} - ${fmtClock(r.z)}`);
+  return { lines, start, end, span: `${fmtClock(start)} - ${fmtClock(end)}` };
+}
+
+function draft(first: string, date: string, time: string, lines?: string[]) {
+  const body = `Dear ${first || "Student"},\n\nThank you for choosing us for your training certificate. As discussed, your class is confirmed for ${date} (Time: ${time}) at Unit 5, 5 King Street, Rockdale, NSW 2216. Please arrive 10 - 15 minutes early for your registration to avoid lining up.\n${lines && lines.length ? "Your sections and times:\n" + lines.map((l) => "* " + l).join("\n") + "\n" : ""}Parking: 1 Market Street Rockdale\nQUIZ FOR FIRST AID/CPR/MANUAL HANDLING:\n\n* Please check the attached PDF for quiz access guidance.\n\nPlease make the payment the day before coming to the class for your easiness:-\nFees:\n\n* Certificate III in Individual Support (Ageing & Disability) including First Aid & CPR: $1,300\n* Certificate IV Ageing Support with Medication including First Aid & CPR: $1,500\n* Certificate IV Disability including First Aid & CPR: $1,500\n* First Aid CPR and Manual Handling: $200\n* First Aid and CPR: $125\n* CPR: $55\n* Manual Handling: $80\n\nPayment Details (COMMONWEALTH Bank):\n\n* Account Name: Oscar Training Centre\n* BSB: 062235\n* Account Number:11104627\n* Description/Reference: [Your Name] + The Certificate you are proceeding with\n\nKindly, send us a screenshot of the payment before you attend the classes once made. If you are paying from someone else's account, make sure to have them include your full name and Date of Birth in the reference.\nFor any assistance please do not hesitate to contact us at 0402462830.`;
   return { subject: `First Aid and CPR class confirmation: ${date}`, body };
 }
 
@@ -122,7 +151,7 @@ serve(async (req) => {
     }
     const [allowed, bkRows, priorRows, list] = await Promise.all([
       teamP,
-      rest(`nex_class_bookings?id=eq.${bookingId}&select=id,name,email,student_id,status,nex_students(first_name,email),nex_class_sessions(class_date,start_time,end_time)`, jwt),
+      rest(`nex_class_bookings?id=eq.${bookingId}&select=id,name,email,student_id,status,sections,nex_students(first_name,email),nex_class_sessions(class_date,start_time,end_time,trainer,schedule)`, jwt),
       rest(`nex_class_confirm_mail?booking_id=eq.${bookingId}&select=status,created_by,updated_at,class_date`, jwt),
       attachmentList(jwt).catch(() => [] as any[]),
     ]);
@@ -138,9 +167,11 @@ serve(async (req) => {
     if (!EMAIL_RE.test(to)) return json({ error: "no_email", message: "There is no valid email address on file." }, 422);
     const first = String((stu && stu.first_name) || bk.name || "").trim().split(/\s+/)[0];
 
-    const date = fmtDate(ses.class_date), time = classTime(ses);
-    const d = draft(first, date, time);
-    const html = classConfirmHtml(first, date, time, { iso: ses.class_date, start: ses.start_time, end: ses.end_time });
+    const date = fmtDate(ses.class_date);
+    const pt = personalTimes(ses, Array.isArray(bk.sections) ? bk.sections : null);
+    const time = pt ? pt.span : classTime(ses);   // the overall span; the sections this person attends are listed separately
+    const d = draft(first, date, time, pt ? pt.lines : undefined);
+    const html = classConfirmHtml(first, date, time, pt ? { iso: ses.class_date, start: pt.start, end: pt.end, lines: pt.lines, span: pt.span } : { iso: ses.class_date, start: ses.start_time, end: ses.end_time });
     const prior = priorRows[0] || null;
     const attachments = list.map((a: any) => ({ file_name: a.file_name, size_bytes: a.size_bytes }));
     if (b.preview) return json({ ok: true, to, subject: d.subject, body: d.body, html, prior, attachments });

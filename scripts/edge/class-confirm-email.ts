@@ -31,7 +31,7 @@ export function esc(s: string) {
 }
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-export type ClassInfo = { iso?: string; start?: string; end?: string };
+export type ClassInfo = { iso?: string; start?: string; end?: string; lines?: string[]; span?: string };   // lines = one row per section this person attends (with times); span = overall time
 // the weekday, month and day are worked out from the date itself, so they cannot disagree with it
 function parts(date: string, iso?: string) {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || "") || (() => { const x = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(date || ""); return x ? [x[0], x[3], x[2], x[1]] : null; })();
@@ -107,7 +107,7 @@ export function classConfirmHtml(first: string, date: string, time: string, c: C
 }
 </style><title>First Aid and CPR class confirmation</title></head>
 <body style="margin:0;padding:0;background:#e6eef6;-webkit-text-size-adjust:100%">
-<div style="display:none;max-height:0;overflow:hidden;opacity:0;font-size:1px;line-height:1px;color:#e6eef6">You're booked in: ${dateLine}, ${esc(time)} at Rockdale. Please arrive 10 - 15 minutes early.</div>
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;font-size:1px;line-height:1px;color:#e6eef6">You're booked in: ${dateLine}, ${esc(c.span || time)} at Rockdale. Please arrive 10 - 15 minutes early.</div>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#e6eef6"><tr><td align="center" class="ow" style="padding:0">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;background:#ffffff">
 
@@ -130,7 +130,7 @@ export function classConfirmHtml(first: string, date: string, time: string, c: C
         ${tile ? `<td class="tile" valign="top" width="88" style="width:88px;padding-right:18px">${tile}</td>` : ""}
         <td valign="top"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
           ${kv("Date", dateLine)}
-          ${kv("Time", esc(time))}
+          ${kv("Time", c.lines && c.lines.length ? c.lines.map(esc).join("<br>") : esc(time))}
           ${kv("Venue", esc(ADDRESS))}
           ${kv("Parking", esc(PARKING), true)}
         </table></td>

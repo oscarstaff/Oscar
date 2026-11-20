@@ -12,7 +12,27 @@ const FB_SEL = new Set(); let FB_SEL_SID = '';   /* bookings ticked for the Mass
 const FB_SORTS = [['name', 'Name A to Z'], ['name_desc', 'Name Z to A'], ['seat', 'Seat number'], ['new', 'Newest booking']];
 const FB_TYPES = [['student', 'Student'], ['walk_in', 'Walk-in'], ['agent_group', 'Agent group']];
 /* the plan for a full First Aid and CPR day, shown on the class card */
-const FA_PLAN = [['9–11am', 'Info session'], ['11am–1pm', 'First Aid'], ['Around 1pm', 'Break', 1], ['2–4pm', 'CPR'], ['4–5pm', 'Manual Handling']];
+/* The plan for a class day. Each day can carry its own plan (nex_class_sessions.schedule); with none, the trainer's usual plan applies.
+   Keep in step with STD_PLAN / ANJU_PLAN in scripts/edge/nex-send-class-confirm.ts, which builds each student's email from it. */
+const FA_SECTIONS = [['info', 'Info session', 'Info'], ['first_aid', 'First Aid', 'FA'], ['cpr', 'CPR', 'CPR'], ['manual', 'Manual Handling', 'MH']];
+const FA_PLANS = {
+  std: { info: ['09:00', '11:00'], first_aid: ['11:00', '13:00'], break: ['13:00', '14:00'], cpr: ['14:00', '16:00'], manual: ['16:00', '17:00'] },
+  anju: { first_aid: ['09:00', '12:00'], cpr: ['12:00', '14:15'], break: ['13:00', '13:30'], manual: ['14:15', '15:00'], info: ['15:00', '17:00'] }
+};
+const faDefaultPlan = trainer => /\banju\b/i.test(trainer || '') ? FA_PLANS.anju : FA_PLANS.std;
+const faPlan = c => (c && c.schedule && typeof c.schedule === 'object' && !Array.isArray(c.schedule)) ? c.schedule : faDefaultPlan(c && c.trainer);
+const faOk = r => Array.isArray(r) && /^\d{1,2}:\d{2}/.test(r[0] || '') && /^\d{1,2}:\d{2}/.test(r[1] || '');
+const faMin = t => { const m = /^(\d{1,2}):(\d{2})/.exec(t || ''); return m ? +m[1] * 60 + +m[2] : 0; };
+function faClock(t, bare) { const m = faMin(t), h = Math.floor(m / 60), mm = m % 60; return ((h % 12) || 12) + (mm ? ':' + String(mm).padStart(2, '0') : '') + (bare ? '' : (h < 12 ? 'am' : 'pm')); }
+function faRange(a, z) { const sameHalf = (faMin(a) < 720) === (faMin(z) < 720); return sameHalf ? faClock(a, true) + '–' + faClock(z) : faClock(a) + '–' + faClock(z); }
+function faRunning(c) { const pl = faPlan(c); return FA_SECTIONS.filter(x => faOk(pl[x[0]])).map(x => x[0]); }   /* the sections that run on this day */
+function faPlanHtml(c) {
+  const pl = faPlan(c);
+  const rows = FA_SECTIONS.filter(x => faOk(pl[x[0]])).map(x => ({ label: x[1], r: pl[x[0]], brk: 0 }));
+  if (faOk(pl.break)) rows.push({ label: 'Break', r: pl.break, brk: 1 });
+  rows.sort((a, b) => faMin(a.r[0]) - faMin(b.r[0]));
+  return rows.length ? '<div class="nx-dayplan" aria-label="Plan for the day">' + rows.map(x => '<span' + (x.brk ? ' class="brk"' : '') + '><b>' + faRange(x.r[0], x.r[1]) + '</b> ' + x.label + '</span>').join('') + '</div>' : '';
+}
 function fbRows(live) {
   const q = CB.q.trim().toLowerCase(), qd = q.replace(/\D/g, '');
   const list = live.filter(b => (!CB.type || b.booking_type === CB.type) && (!CB.att || (CB.att === 'attended') === (b.status === 'attended')) &&
@@ -23,7 +43,7 @@ function fbRows(live) {
 }
 function fbRow(cur, b, i, payBy, showSeats) {
   const off = bkOff(b.status);
-  return '<tr class="nx-tr' + (b.conf_sent && !off ? ' nx-conf' : '') + '" data-b="' + b.id + '">' + (showSeats ? '<td class="nx-chk"><input type="checkbox" data-sel="' + b.id + '"' + (FB_SEL.has(b.id) ? ' checked' : '') + ' aria-label="Select ' + esc(b.name) + '"></td>' : '') + '<td class="nx-num">' + (i + 1) + '</td><td class="nx-namecell"><div class="nx-nameline"><b>' + (b.nex_students ? '<a href="#/students/' + b.nex_students.id + '">' + esc(b.name) + '</a>' : esc(b.name)) + '</b>' + (b.booking_type === 'student' ? '<span class="nx-tag"' + (b.created_by ? ' title="Booked by ' + esc(b.created_by) + '"' : '') + '>Student</span>' : '<span class="nx-tag walk" title="' + esc([b.agent_id ? agentName(b.agent_id) : '', b.created_by ? 'Booked by ' + b.created_by : ''].filter(Boolean).join(' · ')) + '">' + (b.booking_type === 'walk_in' ? 'Walk-in' : 'Agent group') + '</span>') + '</div><span class="nx-sub" title="' + esc([fmtPhone(b.phone), b.email].filter(Boolean).join(' · ')) + '">' + esc([fmtPhone(b.phone), b.email].filter(Boolean).join(' · ') || 'No contact details') + '</span></td>' +
+  return '<tr class="nx-tr' + (b.conf_sent && !off ? ' nx-conf' : '') + '" data-b="' + b.id + '">' + (showSeats ? '<td class="nx-chk"><input type="checkbox" data-sel="' + b.id + '"' + (FB_SEL.has(b.id) ? ' checked' : '') + ' aria-label="Select ' + esc(b.name) + '"></td>' : '') + '<td class="nx-num">' + (i + 1) + '</td><td class="nx-namecell"><div class="nx-nameline"><b>' + (b.nex_students ? '<a href="#/students/' + b.nex_students.id + '">' + esc(b.name) + '</a>' : esc(b.name)) + '</b>' + (b.booking_type === 'student' ? '<span class="nx-tag"' + (b.created_by ? ' title="Booked by ' + esc(b.created_by) + '"' : '') + '>Student</span>' : '<span class="nx-tag walk" title="' + esc([b.agent_id ? agentName(b.agent_id) : '', b.created_by ? 'Booked by ' + b.created_by : ''].filter(Boolean).join(' · ')) + '">' + (b.booking_type === 'walk_in' ? 'Walk-in' : 'Agent group') + '</span>') + (cur.kind !== 'renewal' && Array.isArray(b.sections) && b.sections.length ? '<span class="nx-tag part" title="Attends only: ' + esc(FA_SECTIONS.filter(x => b.sections.includes(x[0])).map(x => x[1]).join(', ')) + '">' + esc(FA_SECTIONS.filter(x => b.sections.includes(x[0])).map(x => x[2]).join(' + ')) + '</span>' : '') + '</div><span class="nx-sub" title="' + esc([fmtPhone(b.phone), b.email].filter(Boolean).join(' · ')) + '">' + esc([fmtPhone(b.phone), b.email].filter(Boolean).join(' · ') || 'No contact details') + '</span></td>' +
       '<td>' + bookingPayCell(b, payBy[b.student_id]) + '</td><td>' + attCell(b) + '</td>' +
       '<td class="nx-flagcell"><div class="nx-flags">' + bookingFlags(cur, b, showSeats && !off) + '</div></td>' +
       (showSeats ? '<td class="nx-seatcell">' + (b.seat_no ? '<b>Seat ' + b.seat_no + '</b>' : (off ? '' : '<button class="nx-btn sm" data-seat="' + b.id + '" title="Give the next free seat">Allocate</button>')) + '</td>' : '') +
@@ -77,7 +97,7 @@ route(/^\/firstaid(?:\/([0-9a-f-]{36}))?$/, async m => {
     '<div style="display:flex;align-items:center;gap:6px 16px;flex-wrap:wrap"><div style="min-width:0"><div class="nx-eyebrow">' + (cur.kind === 'renewal' ? 'Renewal and signature day' : 'Full class day') + '</div><h3 style="font-size:16px">' + d.wd + ' ' + d.dm + (cur.trainer ? ' · ' + esc(cur.trainer) : '') + '</h3></div>' +
     '<span class="nx-muted" style="margin-left:auto"><b style="font-size:18px;color:var(--nx-ink)">' + live.length + '</b> of ' + cur.seats + ' seats · ' + (showSeats ? (cur.seats - seated.length) + ' free' : Math.max(0, cur.seats - live.length) + ' left') + (walk ? ' · ' + walk + ' walk-in or agent' : '') + (cur.start_time ? ' · ' + esc(cur.start_time) + (cur.end_time ? '–' + esc(cur.end_time) : '') : '') + '</span>' +
     '<button class="nx-btn sm" id="faEdit">' + ico('edit') + 'Edit class</button></div>' +
-    (cur.kind !== 'renewal' ? '<div class="nx-dayplan" aria-label="Plan for the day">' + FA_PLAN.map(x => '<span' + (x[2] ? ' class="brk"' : '') + '><b>' + x[0] + '</b> ' + x[1] + '</span>').join('') + '</div>' : '') +
+    (cur.kind !== 'renewal' ? faPlanHtml(cur) : '') +
     (showSeats ? '<div class="nx-cap"><i class="a" style="width:' + Math.min(100, seated.length / cur.seats * 100) + '%"></i></div>' : '') +
     (live.length > cur.seats ? '<div class="nx-warnbox">This class has more bookings than seats. Move some people to another day.</div>' : '') +
     '</div></div>' +
@@ -249,12 +269,49 @@ function trainerOptions(cur) {
 }
 function classForm(c) {
   c = c || {};
-  const f = [{ k: 'class_date', label: 'Class date', type: 'date', value: c.class_date, required: true }, { k: 'trainer', label: 'Trainer', type: 'select', options: trainerOptions(c.trainer), value: c.trainer || '', blank: 'Not set', help: 'Chosen from the Trainers list so the name is always spelled the same. Not there? An admin adds trainers under Admin.' }, { k: 'seats', label: 'Seats', type: 'number', value: c.seats || 50, required: true },
-    { k: 'start_time', label: 'Starts', type: 'time', value: c.start_time }, { k: 'end_time', label: 'Ends', type: 'time', value: c.end_time }, { k: 'note', label: 'Note', type: 'textarea', value: c.note, full: true }];
-  return formModal(c.id ? 'Edit class day' : 'New class day', f, async v => {
+  const plan = c.kind === 'renewal' ? null : faPlan(c);
+  const f = [{ k: 'class_date', label: 'Class date', type: 'date', value: c.class_date, required: true }, { k: 'trainer', label: 'Trainer', type: 'select', options: trainerOptions(c.trainer), value: c.trainer || '', blank: 'Not set', help: 'Chosen from the Trainers list so the name is always spelled the same. Not there? An admin adds trainers under Admin.' }, { k: 'seats', label: 'Seats', type: 'number', value: c.seats || 50, required: true }];
+  if (!plan) f.push({ k: 'start_time', label: 'Starts', type: 'time', value: c.start_time }, { k: 'end_time', label: 'Ends', type: 'time', value: c.end_time });
+  else {
+    f.push({ type: 'help', text: 'Plan for the day. It starts from the trainer\'s usual plan and you can change any time. Confirmation emails list each student\'s own sections with these times. Clear both times of a section that is not running.' });
+    FA_SECTIONS.concat([['break', 'Break']]).forEach(x => { const r = faOk(plan[x[0]]) ? plan[x[0]] : ['', '']; f.push({ k: 'p_' + x[0] + '_a', label: x[1] + ' starts', type: 'time', value: r[0] }, { k: 'p_' + x[0] + '_z', label: x[1] + ' ends', type: 'time', value: r[1] }); });
+  }
+  f.push({ k: 'note', label: 'Note', type: 'textarea', value: c.note, full: true });
+  const keys = FA_SECTIONS.map(x => x[0]).concat(['break']);
+  const m = formModal(c.id ? 'Edit class day' : 'New class day', f, async v => {
+    if (plan) {
+      const sch = {};
+      for (const k of keys) {
+        const a = v['p_' + k + '_a'], z = v['p_' + k + '_z']; delete v['p_' + k + '_a']; delete v['p_' + k + '_z'];
+        if (!a && !z) continue;
+        if (!a || !z) throw fieldError('p_' + k + (a ? '_z' : '_a'), 'Give both a start and an end time, or clear both.');
+        if (faMin(z) <= faMin(a)) throw fieldError('p_' + k + '_z', 'The end must be after the start.');
+        sch[k] = [a.slice(0, 5), z.slice(0, 5)];
+      }
+      const runs = FA_SECTIONS.map(x => x[0]).filter(k => sch[k]);
+      if (!runs.length) throw fieldError('p_first_aid_a', 'At least one section needs times.');
+      v.start_time = runs.map(k => sch[k][0]).sort((x, y) => faMin(x) - faMin(y))[0];
+      v.end_time = runs.map(k => sch[k][1]).sort((x, y) => faMin(y) - faMin(x))[0];
+      const dflt = faDefaultPlan(v.trainer);
+      v.schedule = keys.length === Object.keys(sch).length && keys.every(k => dflt[k] && dflt[k][0] === sch[k][0] && dflt[k][1] === sch[k][1]) ? null : sch;   /* same as the trainer's usual plan = keep following it */
+    }
     if (c.id) { await upd('nex_class_sessions', 'id=eq.' + c.id, v); toast('Saved'); render(); }
     else { const s = await ins('nex_class_sessions', v); toast('Class added'); go('#/firstaid/' + s.id); }
   });
+  if (plan) {
+    /* choosing another trainer refills the plan with that trainer's usual times, unless the plan was already changed by hand */
+    const tr = $('#f_trainer', m.el); let last = tr.value;
+    const read = () => keys.map(k => ($('#f_p_' + k + '_a', m.el).value || '').slice(0, 5) + '-' + ($('#f_p_' + k + '_z', m.el).value || '').slice(0, 5)).join('|');
+    const of = pl => keys.map(k => faOk(pl[k]) ? pl[k][0].slice(0, 5) + '-' + pl[k][1].slice(0, 5) : '-').join('|');
+    tr.addEventListener('change', () => {
+      if (read() === of(faPlan({ trainer: last, schedule: c.schedule && last === c.trainer ? c.schedule : null }))) {
+        const nd = faDefaultPlan(tr.value);
+        keys.forEach(k => { const r = faOk(nd[k]) ? nd[k] : ['', '']; $('#f_p_' + k + '_a', m.el).value = r[0]; $('#f_p_' + k + '_z', m.el).value = r[1]; });
+      }
+      last = tr.value;
+    });
+  }
+  return m;
 }
 
 /* one small marker per yes/no on a booking; screen readers get the full words, sighted users get a hover title and the legend under the table */
@@ -292,12 +349,22 @@ function bookingForm(cur, b, books) {
     { k: 'status', label: 'Status', type: 'select', options: opts('booking', true), value: b.status || (b.id ? '' : 'booked'), blank: 'Not set', help: 'A booking is confirmed with or without payment. Payment is tracked on its own.' },
     { k: 'quiz_sent', label: 'Quiz link sent', type: 'check', value: b.quiz_sent }];
   if (cur.kind !== 'renewal') f.push({ k: 'placement_plan', label: 'Placement plan', type: 'select', options: Object.keys(PLAN_PL).map(k => ({ id: k, label: PLAN_PL[k] })), value: b.placement_plan, blank: 'Not set', help: 'Yes = going ahead with placement. Done = placement sorted. No = not doing placement.' });
+  const runs = cur.kind === 'renewal' ? [] : faRunning(cur);
+  if (runs.length > 1) {
+    f.push({ type: 'help', text: 'Sections this person attends. Untick any they are not doing: their confirmation email lists only the ticked ones, with those times.' });
+    FA_SECTIONS.filter(x => runs.includes(x[0])).forEach(x => f.push({ k: 'sec_' + x[0], label: x[1], type: 'check', value: !Array.isArray(b.sections) || b.sections.includes(x[0]) }));
+  }
   if (cur.kind === 'renewal') f.push({ k: 'signature_done', label: 'Signature done', type: 'check', value: b.signature_done });
   if (!canFlag()) for (let i = f.length - 1; i >= 0; i--) if (['quiz_sent', 'placement_plan', 'signature_done', 'seat_no'].includes(f[i].k)) f.splice(i, 1);   /* the flags and the seat numbers are Evershine's */
   f.push({ k: 'note', label: 'Note', type: 'textarea', value: b.note, full: true });
   const top = b.id ? '' : idBoxHtml('Type a phone number or email. If they are already a student or lead, their details fill in. If they are not in YatraLine yet, they are added as a new lead when you save.');
   const m = formModal(b.id ? 'Edit booking' : 'Add booking', f, async v => {
     if (v.seat_no != null) { v.seat_no = Math.round(v.seat_no); if (v.seat_no < 1 || v.seat_no > cur.seats) throw fieldError('seat_no', 'Seat must be between 1 and ' + cur.seats + '.'); const t = takenBy(v.seat_no); if (t) throw fieldError('seat_no', 'Seat ' + v.seat_no + ' is already taken by ' + t.name + '.'); }
+    if (runs.length > 1) {
+      const on = runs.filter(k => v['sec_' + k]); runs.forEach(k => delete v['sec_' + k]);
+      if (!on.length) throw fieldError('sec_' + runs[0], 'Tick at least one section.');
+      v.sections = on.length === runs.length ? null : on;
+    }
     if (v.phone) v.phone = cleanPhone(v.phone) || v.phone; if (v.email) v.email = v.email.toLowerCase();
     const newSt = v.status; if (b.id && newSt !== (b.status || '') && (bkOff(newSt) || newSt === 'attended' || (newSt === 'booked' && (bkOff(b.status) || b.status === 'attended')))) { delete v.status; v.seat_no = bkOff(newSt) ? null : v.seat_no; } else if (bkOff(v.status)) v.seat_no = null;
     let newLead = false;
