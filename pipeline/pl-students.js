@@ -16,7 +16,7 @@ route(/^\/$/, async () => {
     count('nex_payment_queue', 'processing_step=neq.processed'),
     count('nex_payments', 'student_id=is.null'),
     count('nex_tasks', 'status=neq.done&due_on=lte.' + today + '&assigned_to=eq.' + encodeURIComponent(ME.name)),
-    sel('nex_class_sessions', 'select=*&class_date=gte.' + today + '&order=class_date&limit=4'),
+    sel('nex_class_sessions', 'select=*&kind=neq.renewal&class_date=gte.' + today + '&order=class_date&limit=4'),
     placementMailLoad().catch(() => []),
     canVerify() ? count('nex_payments', 'verify_status=eq.pending_verification') : 0,
     ME.admin ? count('nex_payments', 'handover_status=eq.awaiting') : 0,

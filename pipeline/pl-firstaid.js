@@ -6,7 +6,7 @@
    ========================================================= */
 /* Which class days the day strip shows, and how the booking list under it is sorted. They stay as set while you move around.
    The booking list is A to Z by name until someone picks another order. */
-const CF = { kind: '', trainer: '', from: '', to: '' };
+const CF = { trainer: '', from: '', to: '' };
 const CB = { q: '', sort: 'name', type: '', att: '' };
 const FB_SORTS = [['name', 'Name A to Z'], ['name_desc', 'Name Z to A'], ['seat', 'Seat number'], ['new', 'Newest booking']];
 const FB_TYPES = [['student', 'Student'], ['walk_in', 'Walk-in'], ['agent_group', 'Agent group']];
@@ -32,7 +32,7 @@ route(/^\/firstaid(?:\/([0-9a-f-]{36}))?$/, async m => {
   const today = sydToday();
   const back = CF.from || today;   /* a class closes once its date has passed: the day strip starts today unless you ask for earlier dates; older days are also reached with Past classes */
   const [sess0, trs] = await Promise.all([
-    sel('nex_class_sessions', 'select=*&class_date=gte.' + back + (CF.to ? '&class_date=lte.' + CF.to : '') + (CF.kind ? '&kind=eq.' + CF.kind : '') + (CF.trainer ? '&trainer=eq.' + encodeURIComponent(CF.trainer) : '') + '&order=class_date.asc,kind.asc&limit=' + (CF.from || CF.to ? 200 : 60)),
+    sel('nex_class_sessions', 'select=*&kind=neq.renewal&class_date=gte.' + back + (CF.to ? '&class_date=lte.' + CF.to : '') + (CF.trainer ? '&trainer=eq.' + encodeURIComponent(CF.trainer) : '') + '&order=class_date.asc,kind.asc&limit=' + (CF.from || CF.to ? 200 : 60)),
     sel('nex_trainers', 'select=*&order=name').catch(() => REF.trainers || []),
   ]);
   let sessions = sess0; REF.trainers = trs;
@@ -45,9 +45,8 @@ route(/^\/firstaid(?:\/([0-9a-f-]{36}))?$/, async m => {
   let books = [];
   if (cur) books = await sel('nex_class_bookings', 'select=*,nex_students(id,first_name,last_name)&session_id=eq.' + cur.id + '&order=created_at.asc');
   const o = (v, cur, l) => '<option value="' + esc(v) + '"' + (cur === v ? ' selected' : '') + '>' + esc(l) + '</option>';
-  const filtered = !!(CF.kind || CF.trainer || CF.from || CF.to);
-  const bar = '<div class="nx-card"><div class="nx-toolbar" style="border-top:0;flex-wrap:wrap"><select class="nx-sel sm" id="cfKind" aria-label="Class type">' + o('', CF.kind, 'All class types') + o('full', CF.kind, 'Full class') + o('renewal', CF.kind, 'Renewal and signature') + '</select>' +
-    '<select class="nx-sel sm" id="cfTrainer" aria-label="Trainer">' + o('', CF.trainer, 'All trainers') + trainerNames.map(n => o(n, CF.trainer, n)).join('') + '</select>' +
+  const filtered = !!(CF.trainer || CF.from || CF.to);
+  const bar = '<div class="nx-card"><div class="nx-toolbar" style="border-top:0;flex-wrap:wrap"><select class="nx-sel sm" id="cfTrainer" aria-label="Trainer">' + o('', CF.trainer, 'All trainers') + trainerNames.map(n => o(n, CF.trainer, n)).join('') + '</select>' +
     '<label class="nx-muted" style="display:flex;align-items:center;gap:4px">From <input class="nx-in sm" type="date" id="cfFrom" value="' + esc(CF.from) + '"> to <input class="nx-in sm" type="date" id="cfTo" value="' + esc(CF.to) + '"></label>' +
     (filtered ? '<button class="nx-btn sm" id="cfClear">Clear</button>' : '') + '<span class="nx-muted" style="margin-left:auto">' + (CF.from || CF.to ? 'Showing class days in this date range' : 'Showing today and later. Pick a From date to look back.') + '</span></div></div>';
   afterRender(() => bindFirstAid(cur, books, { payBy, live }));
@@ -95,8 +94,8 @@ function attCell(b) {
 function bindFirstAid(cur, books, ctx) {
   ctx = ctx || {};
   /* which class days are shown */
-  [['cfKind', 'kind'], ['cfTrainer', 'trainer'], ['cfFrom', 'from'], ['cfTo', 'to']].forEach(([id, k]) => { const el = $('#' + id); if (el) el.onchange = () => { CF[k] = el.value; render(); }; });
-  if ($('#cfClear')) $('#cfClear').onclick = () => { Object.assign(CF, { kind: '', trainer: '', from: '', to: '' }); render(); };
+  [['cfTrainer', 'trainer'], ['cfFrom', 'from'], ['cfTo', 'to']].forEach(([id, k]) => { const el = $('#' + id); if (el) el.onchange = () => { CF[k] = el.value; render(); }; });
+  if ($('#cfClear')) $('#cfClear').onclick = () => { Object.assign(CF, { trainer: '', from: '', to: '' }); render(); };
   if ($('#faNew')) $('#faNew').onclick = () => classForm(null);
   if ($('#faExport')) $('#faExport').onclick = () => exportDay(cur);
   if ($('#faJump')) $('#faJump').onclick = () => formModal('Go to a past class', [{ k: 'd', label: 'Class date', type: 'date', required: true }], async v => {
@@ -166,8 +165,7 @@ function trainerOptions(cur) {
 }
 function classForm(c) {
   c = c || {};
-  const f = [{ k: 'class_date', label: 'Class date', type: 'date', value: c.class_date, required: true }, { k: 'kind', label: 'Type', type: 'select', options: [{ id: 'full', label: 'Full class (First Aid and CPR)' }, { id: 'renewal', label: 'Renewal and signature' }], value: c.kind || 'full' },
-    { k: 'trainer', label: 'Trainer', type: 'select', options: trainerOptions(c.trainer), value: c.trainer || '', blank: 'Not set', help: 'Chosen from the Trainers list so the name is always spelled the same. Not there? An admin adds trainers under Admin.' }, { k: 'seats', label: 'Seats', type: 'number', value: c.seats || 50, required: true },
+  const f = [{ k: 'class_date', label: 'Class date', type: 'date', value: c.class_date, required: true }, { k: 'trainer', label: 'Trainer', type: 'select', options: trainerOptions(c.trainer), value: c.trainer || '', blank: 'Not set', help: 'Chosen from the Trainers list so the name is always spelled the same. Not there? An admin adds trainers under Admin.' }, { k: 'seats', label: 'Seats', type: 'number', value: c.seats || 50, required: true },
     { k: 'start_time', label: 'Starts', type: 'time', value: c.start_time }, { k: 'end_time', label: 'Ends', type: 'time', value: c.end_time }, { k: 'note', label: 'Note', type: 'textarea', value: c.note, full: true }];
   return formModal(c.id ? 'Edit class day' : 'New class day', f, async v => {
     if (c.id) { await upd('nex_class_sessions', 'id=eq.' + c.id, v); toast('Saved'); render(); }

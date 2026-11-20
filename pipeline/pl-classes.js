@@ -10,7 +10,7 @@ const BK_WORD = { no_show: 'No show', cancelled: 'Cancelled', rescheduled: 'Resc
 
 async function bkUpcoming(excludeSession) {
   const today = sydToday();
-  const ss = await sel('nex_class_sessions', 'select=id,class_date,kind,seats&class_date=gte.' + today + '&order=class_date.asc,kind.asc&limit=40');
+  const ss = await sel('nex_class_sessions', 'select=id,class_date,kind,seats&kind=neq.renewal&class_date=gte.' + today + '&order=class_date.asc,kind.asc&limit=40');
   if (!ss.length) return [];
   const rows = await selAll('nex_class_bookings', 'select=session_id,status&session_id=in.' + inList(ss.map(s => s.id)));
   const n = {}; rows.forEach(b => { if (!bkOff(b.status)) n[b.session_id] = (n[b.session_id] || 0) + 1; });
