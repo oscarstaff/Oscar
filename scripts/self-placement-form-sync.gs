@@ -1,8 +1,8 @@
 /* YatraLine · Self-placement Google Form -> Placement > Self-Requests
    Paste into the form's RESPONSE SHEET: Sheet > Extensions > Apps Script. Then:
    1. Project Settings > Script properties > add  INTAKE_KEY  (the key Sanny was given; it is NOT in this file).
-      If you made this script at script.google.com instead of from the sheet's Extensions menu, also add  SHEET_ID  =
-      the long id in the response sheet's web address (between /d/ and /edit).
+      If setup() says it cannot find the form or its sheet, also add  FORM_ID  = the long id in the FORM's address
+      (open the form to edit it; the id is between /d/ and /edit). A sheet id (SHEET_ID) works too.
    2. Run setup() once and allow access. It installs the "on form submit" trigger.
    3. (Optional) Run sendAllRows() once to bring in answers that came in before today. Safe to run again: repeats are ignored.
    What happens: each response is sent to Supabase (nex_form_intake). If the email, phone or name matches a student with one
@@ -23,31 +23,51 @@ const MAP = {
   facility: { is: /facility|aged care|care home|organi[sz]ation|workplace|place of placement/i, not: /address|email|phone|contact|supervisor|manager|date|start|end|suburb|state|postcode/i }
 };
 
-function ss_() {
-  const id = PropertiesService.getScriptProperties().getProperty('SHEET_ID');
-  const s = id ? SpreadsheetApp.openById(id.trim()) : SpreadsheetApp.getActive();
-  if (!s) throw new Error('This script is not attached to the response sheet. Open it from the sheet (Extensions > Apps Script), or add a SHEET_ID script property: the long id in the sheet\'s web address, between /d/ and /edit.');
-  return s;
+/* Finds what to listen to: the response sheet (SHEET_ID property, or the sheet this script is attached to) or, failing that,
+   the form itself (FORM_ID property, or the form this script is attached to). Either one works. */
+function target_() {
+  const p = PropertiesService.getScriptProperties(), sid = (p.getProperty('SHEET_ID') || '').trim(), fid = (p.getProperty('FORM_ID') || '').trim();
+  if (sid) return { ss: SpreadsheetApp.openById(sid) };
+  if (fid) return { form: FormApp.openById(fid) };
+  let s = null; try { s = SpreadsheetApp.getActive(); } catch (e) {}
+  if (s) return { ss: s };
+  let f = null; try { f = FormApp.getActiveForm(); } catch (e) {}
+  if (f) return { form: f };
+  throw new Error('Cannot find the form or its sheet. Add a FORM_ID script property: the long id in the FORM\'s address, between /d/ and /edit (open the form to edit it).');
 }
 
 function setup() {
-  const ss = ss_();
-  ScriptApp.getProjectTriggers().forEach(t => { if (t.getHandlerFunction() === 'onFormSubmit') ScriptApp.deleteTrigger(t); });
-  ScriptApp.newTrigger('onFormSubmit').forSpreadsheet(ss).onFormSubmit().create();
-  Logger.log('Trigger installed. Submit a test response to try it.');
+  const t = target_();
+  ScriptApp.getProjectTriggers().forEach(x => { if (/^onFormSubmit/.test(x.getHandlerFunction())) ScriptApp.deleteTrigger(x); });
+  if (t.ss) ScriptApp.newTrigger('onFormSubmit').forSpreadsheet(t.ss).onFormSubmit().create();
+  else ScriptApp.newTrigger('onFormSubmitForm').forForm(t.form).onFormSubmit().create();
+  Logger.log('Trigger installed on the ' + (t.ss ? 'response sheet' : 'form') + '. Submit a test response to try it.');
 }
 
-function onFormSubmit(e) {
+function onFormSubmit(e) {   // sheet trigger
   const sh = e.range.getSheet();
   sendRow_(sh, sh.getRange(1, 1, 1, sh.getLastColumn()).getDisplayValues()[0], sh.getRange(e.range.getRow(), 1, 1, sh.getLastColumn()).getDisplayValues()[0]);
 }
 
+function formRow_(resp) {   // a Form response as [headings, answers], the same shape as a sheet row
+  const head = ['Timestamp'], row = [Utilities.formatDate(resp.getTimestamp(), Session.getScriptTimeZone(), 'd/M/yyyy HH:mm:ss')];
+  resp.getItemResponses().forEach(ir => { const a = ir.getResponse(); head.push(ir.getItem().getTitle()); row.push(Array.isArray(a) ? a.join(', ') : String(a == null ? '' : a)); });
+  return [head, row];
+}
+
+function onFormSubmitForm(e) {   // form trigger
+  const hr = formRow_(e.response); sendRow_(null, hr[0], hr[1]);
+}
+
 function sendAllRows() {
-  const sh = ss_().getSheets()[0], n = sh.getLastRow();   // the form's answers are the first tab
-  if (n < 2) return;
-  const head = sh.getRange(1, 1, 1, sh.getLastColumn()).getDisplayValues()[0], rows = sh.getRange(2, 1, n - 1, sh.getLastColumn()).getDisplayValues();
-  let imported = 0, inbox = 0, dup = 0;
-  rows.forEach(r => { const res = sendRow_(sh, head, r); if (res.result === 'imported') imported++; else if (res.result === 'inbox') inbox++; else dup++; });
+  const t = target_(); let imported = 0, inbox = 0, dup = 0;
+  const count = res => { if (res.result === 'imported') imported++; else if (res.result === 'inbox') inbox++; else dup++; };
+  if (t.form) t.form.getResponses().forEach(r => { const hr = formRow_(r); count(sendRow_(null, hr[0], hr[1])); });
+  else {
+    const sh = t.ss.getSheets()[0], n = sh.getLastRow(); if (n < 2) return;   // the form's answers are the first tab
+    const head = sh.getRange(1, 1, 1, sh.getLastColumn()).getDisplayValues()[0], rows = sh.getRange(2, 1, n - 1, sh.getLastColumn()).getDisplayValues();
+    rows.forEach(r => count(sendRow_(sh, head, r)));
+  }
   Logger.log('Sent: ' + imported + ' added as requests, ' + inbox + ' waiting for a student, ' + dup + ' already there.');
 }
 
