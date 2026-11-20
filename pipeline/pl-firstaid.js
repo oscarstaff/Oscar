@@ -66,7 +66,6 @@ route(/^\/firstaid(?:\/([0-9a-f-]{36}))?$/, async m => {
   var payBy = {}; const sids = live.map(b => b.student_id).filter(Boolean);
   if (sids.length) (await sel('nex_payments', 'select=student_id,amount,method,verify_status,handover_status&student_id=in.' + inList(sids)).catch(() => [])).forEach(p => (payBy[p.student_id] = payBy[p.student_id] || []).push(p));
   const offs = books.filter(b => bkOff(b.status));
-  const moved = offs.length ? await bkMovedMap(offs).catch(() => ({})) : {};
   const d = fmtDay(cur.class_date);
   const closed = cur.class_date < today;   /* the database refuses new bookings into a class that has passed (admins can still add) */
   const seated = live.filter(b => b.seat_no);
@@ -82,7 +81,7 @@ route(/^\/firstaid(?:\/([0-9a-f-]{36}))?$/, async m => {
     (closed ? '<div class="nx-card-b nx-muted" style="padding-bottom:0">This class has passed, so it is closed. Attendance and notes can still be updated' + (ME.admin ? '; as an admin you can still add a booking.' : '.') + '</div>' : '') +
     (live.length ? '<div class="nx-toolbar" style="border-top:0;flex-wrap:wrap"><input class="nx-in sm" id="fbQ" placeholder="Search name, phone or email" value="' + esc(CB.q) + '" style="min-width:200px"><select class="nx-sel sm" id="fbSort" aria-label="Sort bookings">' + FB_SORTS.map(([k, l]) => o(k, CB.sort, l)).join('') + '</select><select class="nx-sel sm" id="fbType" aria-label="Booking type">' + o('', CB.type, 'All booking types') + FB_TYPES.map(([k, l]) => o(k, CB.type, l)).join('') + '</select><select class="nx-sel sm" id="fbAtt" aria-label="Attendance">' + o('', CB.att, 'Any attendance') + o('attended', CB.att, 'Attended') + o('open', CB.att, 'Not marked attended') + '</select><span class="nx-muted" id="fbCount" style="margin-left:auto"></span></div>' : '') +
     '<div id="fbRows">' + fbTable(cur, live, payBy, showSeats) + '</div>' + (live.length ? '<div class="nx-legend nx-flaglegend"><span><b>QS</b> quiz sent</span>' + (cur.kind !== 'renewal' ? '<span><b>PP</b> placement plan yes or done</span>' : '<span><b>SG</b> signature done</span>') + (canFlag() ? '<span class="nx-muted">Press a flag to change it.</span>' : '') + '<span class="nx-confkey"><i></i>Confirmation email sent</span>' + '</div>' : '') + '</div>' +
-    (offs.length ? '<div class="nx-card" id="faOff"><div class="nx-card-h"><div><h3>No show, cancelled and rescheduled <span class="nx-count">' + offs.length + '</span></h3><div class="nx-muted">Not counted in the seats. Each one has a follow-up task for the next working day.</div></div></div>' + bkFollowTable(offs, moved) + '</div>' : '');
+    (offs.length ? '<div class="nx-card"><div class="nx-card-b" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><span class="nx-muted"><b>' + offs.length + '</b> no show, cancelled or rescheduled on this day. They are not counted in the seats and now live in Leads, under Need to follow up.</span><a class="nx-btn sm" href="#/leads?view=follow">Open Need to follow up</a></div></div>' : '');
 });
 
 /* the payment next to a booking: what is confirmed, what still waits for Accounts, and a button to enter a payment (cash for the Evershine team) */
@@ -206,7 +205,6 @@ function bindFirstAid(cur, books, ctx) {
   };
   [['fbQ', 'q', 'input'], ['fbSort', 'sort'], ['fbType', 'type'], ['fbAtt', 'att']].forEach(([id, k, ev]) => { const el = $('#' + id); if (el) el.addEventListener(ev || 'change', () => { CB[k] = el.value; redraw(); }); });
   redraw();
-  const off = $('#faOff'); if (off) bkBindFollow(off, books.filter(x => bkOff(x.status)), render);
 }
 
 /* ---------- Export to Sheets: one class day, with the trainer's name on every row, for working out trainer pay ---------- */

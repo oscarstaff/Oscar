@@ -110,14 +110,16 @@ function bkBindFollow(root, rows, after) {
   $$('[data-ud]', root).forEach(b => b.onclick = e => { e.stopPropagation(); bkUndo(by(b.dataset.ud), after); });
 }
 
-/* Leads, "Missed a class" tab: people still on the lead side (under $200) who missed or moved a class */
+/* Leads, "Need to follow up" tab: everyone who was a no show, cancelled or rescheduled without a new class day (leads, students, walk-ins) */
+const BK_FU_Q = '&status=in.(no_show,cancelled,rescheduled)&followup_done_at=is.null&rescheduled_to=is.null';
+const bkFuLive = r => !r.nex_students || !r.nex_students.deleted_at;   /* people moved to the archive drop off the list; walk-ins have no student record and stay */
 async function leadsFollowupLoad(body, foot, after) {
-  const rows = await selAll('nex_class_bookings', 'select=*,nex_class_sessions(class_date,kind),nex_students!inner(id,deleted_at,nex_student_paid!inner(paid_total))&status=in.(no_show,cancelled,rescheduled)&followup_done_at=is.null&rescheduled_to=is.null&nex_students.deleted_at=is.null&nex_students.nex_student_paid.paid_total=lt.200&order=attendance_at.desc.nullslast');
-  if (!rows.length) { body.innerHTML = empty('Nobody has missed a class', 'No shows, cancellations and reschedules without a new class day show up here.'); foot.innerHTML = '<span></span>'; return 0; }
+  const rows = (await selAll('nex_class_bookings', 'select=*,nex_class_sessions(class_date,kind),nex_students(id,deleted_at)' + BK_FU_Q + '&order=attendance_at.desc.nullslast')).filter(bkFuLive);
+  if (!rows.length) { body.innerHTML = empty('Nobody to follow up', 'No shows, cancellations and reschedules without a new class day show up here.'); foot.innerHTML = '<span></span>'; return 0; }
   body.innerHTML = bkFollowTable(rows, {}); foot.innerHTML = '<span>' + rows.length + ' to follow up</span>';
   bkBindFollow(body, rows, after); $$('.nx-tr', body).forEach(tr => tr.onclick = e => { const b = rows.find(x => x.id === tr.dataset.bk); if (b && b.student_id) go('#/students/' + b.student_id); });
   return rows.length;
 }
 async function leadsFollowupCount() {
-  try { const r = await sel('nex_class_bookings', 'select=id,nex_students!inner(deleted_at,nex_student_paid!inner(paid_total))&status=in.(no_show,cancelled,rescheduled)&followup_done_at=is.null&rescheduled_to=is.null&nex_students.deleted_at=is.null&nex_students.nex_student_paid.paid_total=lt.200&limit=500'); return r.length; } catch (e) { return null; }
+  try { const r = await sel('nex_class_bookings', 'select=id,nex_students(deleted_at)' + BK_FU_Q + '&limit=1000'); return r.filter(bkFuLive).length; } catch (e) { return null; }
 }
