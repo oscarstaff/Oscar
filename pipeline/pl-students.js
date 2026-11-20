@@ -261,8 +261,9 @@ function newStudent() {
         return false;
       }
     }
-    /* the first contact date is the day the lead is added; the follow-ups are set by staff afterwards (Start follow-ups on the lead) */
+    /* the first contact date is the day the lead is added, and the follow-up cycle (1st, 2nd, 3rd follow-up, 2, 4 and 6 days later) starts at once, assigned to whoever added them */
     const s = await ins('nex_students', Object.assign(stu, { created_by: ME.name, first_contact_on: sydToday() }));
+    try { await api('rpc/nex_start_lead_cycle', { method: 'POST', body: { p_student: s.id, p_first: sydToday(), p_assignee: ME.name } }); } catch (e) { toast('Lead added, but the follow-ups could not be started: ' + e.message, true); }
     if (qualification_id || fee != null || stage) await ins('nex_enrolments', { student_id: s.id, qualification_id, fee, stage, enrolled_on, year: new Date().getFullYear(), created_by: ME.name }, true);
     toast('Lead added');
     go('#/students/' + s.id);
