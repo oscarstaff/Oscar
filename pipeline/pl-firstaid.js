@@ -8,6 +8,7 @@
    The booking list is A to Z by name until someone picks another order. */
 const CF = { trainer: '', from: '', to: '' };
 const CB = { q: '', sort: 'name', type: '', att: '' };
+const FB_SEL = new Set(); let FB_SEL_SID = '';   /* bookings ticked for the Mass flag setter; cleared when you change class day */
 const FB_SORTS = [['name', 'Name A to Z'], ['name_desc', 'Name Z to A'], ['seat', 'Seat number'], ['new', 'Newest booking']];
 const FB_TYPES = [['student', 'Student'], ['walk_in', 'Walk-in'], ['agent_group', 'Agent group']];
 function fbRows(live) {
@@ -19,15 +20,18 @@ function fbRows(live) {
   return list.sort(by[CB.sort] || nm);
 }
 function fbRow(cur, b, i, payBy, showSeats) {
-  return '<tr class="nx-tr" data-b="' + b.id + '"><td class="nx-num">' + (i + 1) + '</td><td><b>' + (b.nex_students ? '<a href="#/students/' + b.nex_students.id + '">' + esc(b.name) + '</a>' : esc(b.name)) + '</b><span class="nx-sub">' + esc([showSeats && b.seat_no ? 'Seat ' + b.seat_no : '', fmtPhone(b.phone), b.email].filter(Boolean).join(' · ') || 'No contact details') + '</span></td>' +
+  const off = bkOff(b.status);
+  return '<tr class="nx-tr" data-b="' + b.id + '">' + (showSeats ? '<td class="nx-chk"><input type="checkbox" data-sel="' + b.id + '"' + (FB_SEL.has(b.id) ? ' checked' : '') + ' aria-label="Select ' + esc(b.name) + '"></td>' : '') + '<td class="nx-num">' + (i + 1) + '</td><td><b>' + (b.nex_students ? '<a href="#/students/' + b.nex_students.id + '">' + esc(b.name) + '</a>' : esc(b.name)) + '</b><span class="nx-sub">' + esc([fmtPhone(b.phone), b.email].filter(Boolean).join(' · ') || 'No contact details') + '</span></td>' +
       '<td>' + (b.booking_type === 'student' ? '<span class="nx-tag">Student</span>' : '<span class="nx-tag walk">' + (b.booking_type === 'walk_in' ? 'Walk-in' : 'Agent group') + '</span>') + (b.agent_id ? '<span class="nx-sub">' + esc(agentName(b.agent_id)) + '</span>' : '') + (b.created_by ? '<span class="nx-sub">Booked by ' + esc(b.created_by) + '</span>' : '') + '</td>' +
       '<td>' + bookingPayCell(b, payBy[b.student_id]) + '</td><td>' + attCell(b) + '</td>' +
-      '<td><div class="nx-flags">' + bookingFlags(cur, b) + '</div></td><td class="nx-actcell"><div class="nx-btnrow">' + (canFlag() && cur.kind !== 'renewal' && !bkOff(b.status) ? '<button class="nx-btn sm icon" data-conf="' + b.id + '" title="Email confirmation" aria-label="Email confirmation to ' + esc(b.name) + '">' + ico('mail') + '</button>' : '') + '<button class="nx-btn sm" data-edit="' + b.id + '">Edit</button></div></td></tr>';
+      '<td class="nx-flagcell"><div class="nx-flags">' + bookingFlags(cur, b, showSeats && !off) + '</div></td>' +
+      (showSeats ? '<td class="nx-seatcell">' + (b.seat_no ? '<b>Seat ' + b.seat_no + '</b>' : (off ? '' : '<button class="nx-btn sm" data-seat="' + b.id + '">Allocate seat</button>')) + '</td>' : '') +
+      '<td class="nx-actcell"><div class="nx-btnrow">' + (canFlag() && cur.kind !== 'renewal' && !off ? '<button class="nx-btn sm icon" data-conf="' + b.id + '" title="Email confirmation" aria-label="Email confirmation to ' + esc(b.name) + '">' + ico('mail') + '</button>' : '') + '<button class="nx-btn sm" data-edit="' + b.id + '">Edit</button></div></td></tr>';
 }
 function fbTable(cur, live, payBy, showSeats) {
   const list = fbRows(live);
   if (!list.length) return empty(live.length ? 'Nobody matches' : 'No bookings yet', live.length ? 'Try clearing a filter.' : 'Press Add booking to add the first one.');
-  return '<div class="nx-tablewrap"><table class="nx-table tight"><thead><tr>' + '<th class="nx-num" scope="col">#</th><th>Name</th><th>Type</th><th>Payment</th><th>Attendance</th><th>Flags</th><th><span class="nx-sr">Actions</span></th></tr></thead><tbody>' +
+  return '<div class="nx-tablewrap"><table class="nx-table tight"><thead><tr>' + (showSeats ? '<th class="nx-chk"><input type="checkbox" id="fbSelAll" aria-label="Select everyone shown"></th>' : '') + '<th class="nx-num" scope="col">#</th><th>Name</th><th>Type</th><th>Payment</th><th>Attendance</th><th>Flags</th>' + (showSeats ? '<th>Seat</th>' : '') + '<th><span class="nx-sr">Actions</span></th></tr></thead><tbody>' +
     list.map((b, i) => fbRow(cur, b, i, payBy, showSeats)).join('') + '</tbody></table></div>';
 }
 
@@ -72,10 +76,10 @@ route(/^\/firstaid(?:\/([0-9a-f-]{36}))?$/, async m => {
     (showSeats ? '<div class="nx-cap"><i class="a" style="width:' + Math.min(100, seated.length / cur.seats * 100) + '%"></i></div>' : '') +
     (live.length > cur.seats ? '<div class="nx-warnbox">This class has more bookings than seats. Move some people to another day.</div>' : '') +
     '</div></div>' +
-    '<div class="nx-card" id="faBook"><div class="nx-card-h"><h3>Bookings</h3><div class="nx-btnrow">' + (canFlag() && cur.kind !== 'renewal' && live.length ? '<button class="nx-btn sm" id="faMail">' + ico('mail') + 'Email confirmations</button>' : '') + (closed && !ME.admin ? '<span class="nx-pill">Closed</span>' : '<button class="nx-btn primary sm" id="faAdd">' + ico('plus') + (closed ? 'Add booking (admin)' : 'Add booking') + '</button>') + '</div></div>' +
+    '<div class="nx-card" id="faBook"><div class="nx-card-h"><h3>Bookings</h3><div class="nx-btnrow">' + (canFlag() && cur.kind !== 'renewal' && live.length ? '<button class="nx-btn sm" id="faMail">' + ico('mail') + 'Email confirmations</button>' : '') + (canFlag() && live.length ? '<button class="nx-btn sm" id="faMass" disabled>Mass flag setter</button>' : '') + (closed && !ME.admin ? '<span class="nx-pill">Closed</span>' : '<button class="nx-btn primary sm" id="faAdd">' + ico('plus') + (closed ? 'Add booking (admin)' : 'Add booking') + '</button>') + '</div></div>' +
     (closed ? '<div class="nx-card-b nx-muted" style="padding-bottom:0">This class has passed, so it is closed. Attendance and notes can still be updated' + (ME.admin ? '; as an admin you can still add a booking.' : '.') + '</div>' : '') +
     (live.length ? '<div class="nx-toolbar" style="border-top:0;flex-wrap:wrap"><input class="nx-in sm" id="fbQ" placeholder="Search name, phone or email" value="' + esc(CB.q) + '" style="min-width:200px"><select class="nx-sel sm" id="fbSort" aria-label="Sort bookings">' + FB_SORTS.map(([k, l]) => o(k, CB.sort, l)).join('') + '</select><select class="nx-sel sm" id="fbType" aria-label="Booking type">' + o('', CB.type, 'All booking types') + FB_TYPES.map(([k, l]) => o(k, CB.type, l)).join('') + '</select><select class="nx-sel sm" id="fbAtt" aria-label="Attendance">' + o('', CB.att, 'Any attendance') + o('attended', CB.att, 'Attended') + o('open', CB.att, 'Not marked attended') + '</select><span class="nx-muted" id="fbCount" style="margin-left:auto"></span></div>' : '') +
-    '<div id="fbRows">' + fbTable(cur, live, payBy, showSeats) + '</div>' + (live.length ? '<div class="nx-legend nx-flaglegend"><span><b>QS</b> quiz sent</span><span><b>QD</b> quiz done</span><span><b>$</b> paid</span>' + (cur.kind !== 'renewal' ? '<span><b>PP</b> placement plan yes or done</span><span><b>EP</b> education plan yes or RTO done</span>' : '<span><b>SG</b> signature done</span>') + '</div>' : '') + '</div>' +
+    '<div id="fbRows">' + fbTable(cur, live, payBy, showSeats) + '</div>' + (live.length ? '<div class="nx-legend nx-flaglegend"><span><b>QS</b> quiz sent</span>' + (cur.kind !== 'renewal' ? '<span><b>PP</b> placement plan yes or done</span>' : '<span><b>SG</b> signature done</span>') + (canFlag() ? '<span class="nx-muted">Press a flag to change it.</span>' : '') + '</div>' : '') + '</div>' +
     (offs.length ? '<div class="nx-card" id="faOff"><div class="nx-card-h"><div><h3>No show, cancelled and rescheduled <span class="nx-count">' + offs.length + '</span></h3><div class="nx-muted">Not counted in the seats. Each one has a follow-up task for the next working day.</div></div></div>' + bkFollowTable(offs, moved) + '</div>' : '');
 });
 
@@ -84,9 +88,8 @@ function bookingPayCell(b, list) {
   list = list || [];
   const ok = sumPaid(list), pend = sumPending(list);
   let h = ok ? '<span class="nx-pill ok">Paid ' + money(ok) + '</span>' : (pend ? '' : '<span class="nx-muted">No payment yet</span>');
-  if (pend) h += '<span class="nx-pill warn">' + money(pend) + ' pending verification</span>';
-  if (b.student_id && canCash()) h += '<button class="nx-btn sm" data-pay="' + b.id + '">' + ico('plus') + 'Payment</button>';
-  return '<div class="nx-stack-cell">' + h + '</div>';
+  if (pend) h += '<span class="nx-pill warn" title="Waiting for verification">' + money(pend) + ' pending</span>';
+  return '<div class="nx-stack-cell nx-paycell"><div class="nx-paytop">' + h + '</div>' + (b.student_id && canCash() ? '<button class="nx-btn sm" data-pay="' + b.id + '">' + ico('plus') + 'Payment</button>' : '') + '</div>';
 }
 function attCell(b) {
   if (b.status === 'attended') return '<div class="nx-stack-cell"><div class="nx-att-top"><span class="nx-pill ok">Attended</span><button class="nx-btn sm" data-ud="' + b.id + '">Undo</button></div><span class="nx-att-by">' + esc(b.attendance_by || '') + (b.attendance_at ? ' · ' + esc(fmtDT(b.attendance_at)) : '') + '</span></div>';
@@ -108,23 +111,90 @@ function bindFirstAid(cur, books, ctx) {
   if ($('#faAdd')) $('#faAdd').onclick = () => bookingForm(cur, null, books);
   const fm = $('#faMail'); if (fm) fm.onclick = () => confirmEmail(cur, books);
   const by = id => books.find(x => x.id === id);
-  /* Attended and Undo change one row only. Redraw just that row, in place, so the page does not reload and nothing moves. */
-  const patchRow = async id => {
+  if (FB_SEL_SID !== cur.id) { FB_SEL.clear(); FB_SEL_SID = cur.id; }
+  (ctx.live || []).length || FB_SEL.clear();
+  [...FB_SEL].forEach(id => { if (!(ctx.live || []).some(x => x.id === id)) FB_SEL.delete(id); });   /* someone marked no show is no longer on the list */
+  /* One row changes at a time (Attended, Undo, a flag, a seat, a payment): redraw just that row, in place, so the page does not reload and nothing moves. */
+  const patchRow = async (id, noFetch) => {
     const x = by(id), box = $('#fbRows'); if (!x || !box) return render();
-    try { const r = await sel('nex_class_bookings', 'select=*,nex_students(id,first_name,last_name)&id=eq.' + id); if (!r[0]) return render(); Object.assign(x, r[0]); } catch (e) { return render(); }
+    if (!noFetch) { try { const r = await sel('nex_class_bookings', 'select=*,nex_students(id,first_name,last_name)&id=eq.' + id); if (!r[0]) return render(); Object.assign(x, r[0]); } catch (e) { return render(); } }
     const i = fbRows(ctx.live || []).findIndex(y => y.id === id), tr = $('tr[data-b="' + id + '"]', box);
     if (i < 0 || !tr) return redraw();
     const tb = document.createElement('tbody'); tb.innerHTML = fbRow(cur, x, i, ctx.payBy || {}, canFlag());
     tr.replaceWith(tb.firstElementChild); bindRows();
   };
+  /* after a payment is saved: reload that student's payments only, then redraw their row */
+  const payDone = async x => {
+    try { const r = await sel('nex_payments', 'select=student_id,amount,method,verify_status,handover_status&student_id=eq.' + x.student_id); if (ctx.payBy) ctx.payBy[x.student_id] = r; } catch (e) { return render(); }
+    patchRow(x.id, true);
+  };
+  /* flags: press QS or PP in the list. It always asks first, so a stray click changes nothing. */
+  const setFlags = async (list, patch) => {
+    await upd('nex_class_bookings', 'id=in.' + inList(list.map(x => x.id)), patch);
+    list.forEach(x => Object.assign(x, patch));
+    if (list.length === 1) patchRow(list[0].id, true); else redraw();
+  };
+  const planModal = x => {
+    const cur_ = x.placement_plan || '';
+    const radio = (v, l, h) => '<label><input type="radio" name="ppv" value="' + v + '"' + (v === cur_ ? ' checked' : '') + '><span><b>' + l + '</b><small>' + h + '</small></span></label>';
+    openModal({ title: 'Placement plan: ' + esc(x.name), noFocus: true,
+      body: '<div class="nx-radios" role="radiogroup" aria-label="Placement plan">' + radio('yes', 'Yes', 'Going ahead with placement.') + radio('done', 'Done', 'Placement sorted.') + radio('no', 'No', 'Not doing placement.') + radio('', 'Not set', 'Clear the flag.') + '</div>',
+      buttons: [{ label: 'Cancel', close: true }, { label: 'Save', primary: true, run: async mm => {
+        const v = ($('input[name=ppv]:checked', mm.el) || {}).value || '';
+        if (v === cur_) return;
+        await setFlags([x], { placement_plan: v || null }); toast('Placement plan saved');
+      } }] });
+  };
+  const flagClick = async (x, key) => {
+    if (key === 'quiz_sent') {
+      const on = !x.quiz_sent;
+      if (!(await confirmBox('Quiz sent', (on ? 'Mark the quiz as sent for ' : 'Clear "quiz sent" for ') + (x.name || 'this booking') + '?', on ? 'Yes, mark it sent' : 'Yes, clear it'))) return;
+      try { await setFlags([x], { quiz_sent: on }); toast(on ? 'Marked quiz sent' : 'Quiz sent cleared'); } catch (e) { toast(e.message, true); }
+    } else if (key === 'placement_plan') planModal(x);
+  };
+  /* Allocate seat: the lowest free seat on this class day */
+  const allocSeat = async x => {
+    for (let t = 0; t < 4; t++) {
+      let taken;
+      try { taken = new Set((await sel('nex_class_bookings', 'select=seat_no&session_id=eq.' + cur.id + '&seat_no=not.is.null&limit=1000')).map(r => r.seat_no)); } catch (e) { return toast(e.message, true); }
+      let n = 1; while (taken.has(n) && n <= cur.seats) n++;
+      if (n > cur.seats) return toast('No seats left on this class day', true);
+      try { await upd('nex_class_bookings', 'id=eq.' + x.id, { seat_no: n }); x.seat_no = n; toast('Seat ' + n + ' allocated to ' + (x.name || 'booking')); return patchRow(x.id, true); }
+      catch (e) { if (!/duplicate|unique/i.test(e.message)) return toast(e.message, true); }   /* somebody took that seat a moment ago: try the next one */
+    }
+    toast('Could not allocate a seat. Try again.', true);
+  };
+  /* Mass flag setter: tick bookings, then set a flag on all of them at once */
+  const massBtn = () => { const bt = $('#faMass'); if (!bt) return; const n = FB_SEL.size; bt.disabled = !n; bt.textContent = n ? 'Mass flag setter (' + n + ')' : 'Mass flag setter'; };
+  const massModal = () => {
+    const picked = (ctx.live || []).filter(x => FB_SEL.has(x.id)); if (!picked.length) return;
+    const sl = (id, label, opts) => '<div style="margin-bottom:12px"><label class="nx-lbl" for="' + id + '">' + label + '</label><select class="nx-sel" id="' + id + '">' + opts.map(([v, l]) => '<option value="' + v + '">' + l + '</option>').join('') + '</select></div>';
+    openModal({ title: 'Mass flag setter', noFocus: true,
+      body: '<p style="margin:0 0 12px">These flags will change on <b>' + picked.length + ' booking' + (picked.length === 1 ? '' : 's') + '</b>. Anything left on "No change" stays as it is.</p>' +
+        sl('mfQs', 'Quiz sent (QS)', [['', 'No change'], ['on', 'Mark as sent'], ['off', 'Clear']]) +
+        (cur.kind !== 'renewal' ? sl('mfPp', 'Placement plan (PP)', [['', 'No change'], ['yes', 'Yes'], ['done', 'Done'], ['no', 'No'], ['clear', 'Not set']]) : ''),
+      buttons: [{ label: 'Cancel', close: true }, { label: 'Apply to ' + picked.length, primary: true, run: async mm => {
+        const patch = {}, q = ($('#mfQs', mm.el) || {}).value, pp = ($('#mfPp', mm.el) || {}).value;
+        if (q) patch.quiz_sent = q === 'on'; if (pp) patch.placement_plan = pp === 'clear' ? null : pp;
+        if (!Object.keys(patch).length) throw new Error('Choose a flag to change, or press Cancel.');
+        await setFlags(picked, patch); toast('Flags updated on ' + picked.length + ' booking' + (picked.length === 1 ? '' : 's'));
+      } }] });
+  };
   const bindRows = () => {
     const box = $('#fbRows'); if (!box) return;
-    $$('[data-pay]', box).forEach(b => b.onclick = e => { e.stopPropagation(); const x = by(b.dataset.pay); if (x && x.student_id) paymentForm({ student: { id: x.student_id, first_name: (x.nex_students || {}).first_name || x.name, last_name: (x.nex_students || {}).last_name || '' } }); });
+    $$('[data-pay]', box).forEach(b => b.onclick = e => { e.stopPropagation(); const x = by(b.dataset.pay); if (x && x.student_id) paymentForm({ student: { id: x.student_id, first_name: (x.nex_students || {}).first_name || x.name, last_name: (x.nex_students || {}).last_name || '' }, after: () => payDone(x) }); });
     $$('[data-edit]', box).forEach(b => b.onclick = e => { e.stopPropagation(); bookingForm(cur, by(b.dataset.edit), books); });
     $$('[data-conf]', box).forEach(b => b.onclick = e => { e.stopPropagation(); const x = by(b.dataset.conf); if (x) confirmEmail(cur, books, x); });
     $$('[data-att]', box).forEach(sl => { sl.onclick = e => e.stopPropagation(); sl.onchange = e => { e.stopPropagation(); const x = by(sl.dataset.att), v = sl.value; sl.value = ''; if (!x || !v) return; if (v === 'attended') bkAttended(x, () => patchRow(x.id)); else attendanceModal(x, v); }; });
     $$('[data-ud]', box).forEach(b => b.onclick = e => { e.stopPropagation(); bkUndo(by(b.dataset.ud), () => patchRow(b.dataset.ud)); });
+    $$('[data-flag]', box).forEach(b => b.onclick = e => { e.stopPropagation(); const x = by(b.dataset.fb); if (x) flagClick(x, b.dataset.flag); });
+    $$('[data-seat]', box).forEach(b => b.onclick = e => { e.stopPropagation(); const x = by(b.dataset.seat); if (x) { b.disabled = true; allocSeat(x).then(() => { if (b.isConnected) b.disabled = false; }); } });
+    $$('[data-sel]', box).forEach(c => c.onchange = () => { if (c.checked) FB_SEL.add(c.dataset.sel); else FB_SEL.delete(c.dataset.sel); selAllState(); massBtn(); });
+    const all = $('#fbSelAll'); if (all) all.onchange = () => { const shown = fbRows(ctx.live || []).map(x => x.id); shown.forEach(id => all.checked ? FB_SEL.add(id) : FB_SEL.delete(id)); $$('[data-sel]', box).forEach(c => c.checked = FB_SEL.has(c.dataset.sel)); massBtn(); };
+    selAllState(); massBtn();
   };
+  const selAllState = () => { const all = $('#fbSelAll'); if (!all) return; const shown = fbRows(ctx.live || []); all.checked = !!shown.length && shown.every(x => FB_SEL.has(x.id)); all.indeterminate = !all.checked && shown.some(x => FB_SEL.has(x.id)); };
+  if ($('#faMass')) $('#faMass').onclick = massModal;
   /* the booking list: search, sort and filter in place (nothing is fetched again, so nothing jumps) */
   const live = ctx.live || [], payBy = ctx.payBy || {}, showSeats = canFlag();
   const redraw = () => {
@@ -149,7 +219,7 @@ function exportDay(cur) {
     const sess = await sel('nex_class_sessions', 'select=*&class_date=eq.' + v.d + '&order=kind.asc');
     if (!sess.length) throw fieldError('d', 'There is no class on that day.');
     const rows = await selAll('nex_class_bookings', 'select=*&session_id=in.' + inList(sess.map(s => s.id)) + '&order=created_at.asc');
-    const head = ['Class date', 'Day', 'Class type', 'Trainer', 'Starts', 'Ends', 'Seats', 'Booked (not cancelled)', 'Attended', 'Name', 'Phone', 'Email', 'Booking type', 'Agent', 'Seat', 'Status', 'Attendance marked by', 'Attendance marked at', 'Paid', 'Quiz sent', 'Quiz done', 'Booked by', 'Note'];
+    const head = ['Class date', 'Day', 'Class type', 'Trainer', 'Starts', 'Ends', 'Seats', 'Booked (not cancelled)', 'Attended', 'Name', 'Phone', 'Email', 'Booking type', 'Agent', 'Seat', 'Status', 'Attendance marked by', 'Attendance marked at', 'Quiz sent', 'Booked by', 'Note'];
     const yn = x => x ? 'Yes' : 'No', out = [head];
     const nm = (a, c) => (a.name || '').localeCompare(c.name || '', 'en', { sensitivity: 'base' });
     sess.forEach(s => {
@@ -157,8 +227,8 @@ function exportDay(cur) {
       const dd = fmtDay(s.class_date), kind = s.kind === 'renewal' ? 'Renewal and signature' : 'Full class';
       mine.forEach(b => out.push([s.class_date, dd.wd, kind, s.trainer || 'Not set', s.start_time || '', s.end_time || '', s.seats, booked, att, b.name, fmtPhone(b.phone) || '', b.email || '',
         b.booking_type === 'student' ? 'Student' : b.booking_type === 'walk_in' ? 'Walk-in' : 'Agent group', b.agent_id ? agentName(b.agent_id) : '', b.seat_no || '', b.status ? statusLabel('booking', b.status) : 'Booked',
-        b.attendance_by || '', b.attendance_at ? fmtDT(b.attendance_at) : '', yn(b.paid), yn(b.quiz_sent), yn(b.quiz_done), b.created_by || '', b.note || '']));
-      if (!mine.length) out.push([s.class_date, dd.wd, kind, s.trainer || 'Not set', s.start_time || '', s.end_time || '', s.seats, 0, 0, '(no bookings)'].concat(Array(13).fill('')));
+        b.attendance_by || '', b.attendance_at ? fmtDT(b.attendance_at) : '', yn(b.quiz_sent), b.created_by || '', b.note || '']));
+      if (!mine.length) out.push([s.class_date, dd.wd, kind, s.trainer || 'Not set', s.start_time || '', s.end_time || '', s.seats, 0, 0, '(no bookings)'].concat(Array(11).fill('')));
     });
     const blob = new Blob(['﻿' + out.map(r => r.map(csvCell).join(',')).join('\r\n')], { type: 'text/csv;charset=utf-8' });
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'class-bookings-' + v.d + '.csv'; document.body.appendChild(a); a.click(); a.remove();
@@ -184,16 +254,16 @@ function classForm(c) {
 }
 
 /* one small marker per yes/no on a booking; screen readers get the full words, sighted users get a hover title and the legend under the table */
-function flagHtml(on, abbr, label, value) {
+function flagHtml(on, abbr, label, value, key, bid) {
   const v = value || (on ? 'yes' : 'no');
+  if (key) return '<button type="button" class="nx-flag nx-flagbtn ' + (on ? 'on' : '') + '" data-flag="' + key + '" data-fb="' + bid + '" aria-label="' + esc(label + ': ' + v + '. Press to change') + '" title="' + esc(label + ': ' + v + '. Press to change') + '">' + abbr + '</button>';
   return '<span class="nx-flag ' + (on ? 'on' : '') + '" role="img" aria-label="' + esc(label + ': ' + v) + '" title="' + esc(label + ': ' + v) + '">' + abbr + '</span>';
 }
-function bookingFlags(cur, b) {
-  let h = flagHtml(b.quiz_sent, 'QS', 'Quiz sent') + flagHtml(b.quiz_done, 'QD', 'Quiz done') + flagHtml(b.paid, '$', 'Paid');
-  if (cur.kind !== 'renewal') {
-    h += flagHtml(b.placement_plan === 'yes' || b.placement_plan === 'done', 'PP', 'Placement plan', PLAN_PL[b.placement_plan] ? PLAN_PL[b.placement_plan].toLowerCase() : 'not set');
-    h += flagHtml(b.education_plan === 'yes' || b.education_plan === 'rto_done', 'EP', 'Education plan', PLAN_ED[b.education_plan] ? PLAN_ED[b.education_plan].toLowerCase() : 'not set');
-  } else h += flagHtml(b.signature_done, 'SG', 'Signature done');
+/* the flags are Quiz sent (QS) and Placement plan (PP). Evershine and admins can press one right in the list (it asks first). */
+function bookingFlags(cur, b, click) {
+  let h = flagHtml(b.quiz_sent, 'QS', 'Quiz sent', null, click ? 'quiz_sent' : '', b.id);
+  if (cur.kind !== 'renewal') h += flagHtml(b.placement_plan === 'yes' || b.placement_plan === 'done', 'PP', 'Placement plan', PLAN_PL[b.placement_plan] ? PLAN_PL[b.placement_plan].toLowerCase() : 'not set', click ? 'placement_plan' : '', b.id);
+  else h += flagHtml(b.signature_done, 'SG', 'Signature done');
   return h;
 }
 /* "Email confirmation": one booking from its row, or everyone booked on the class day, through the shared email dialog
@@ -207,7 +277,7 @@ function confirmEmail(cur, books, only) {
       return list.map(b => { const x = by[b.id]; return { id: b.id, name: b.name, sub: (b.seat_no ? 'Seat ' + b.seat_no + ' · ' : '') + (b.email || 'Email from their student record'), off: !b.email && !b.student_id, offNote: 'No email address', sentNote: x ? 'Already sent' + (x.created_by ? ' by ' + x.created_by : '') + ' on ' + fmtDate(x.updated_at) : '' }; });
     } });
 }
-const PLAN_PL = { yes: 'Yes', done: 'Done', no: 'No' }, PLAN_ED = { yes: 'Yes', rto_done: 'RTO done', no: 'No' };
+const PLAN_PL = { yes: 'Yes', done: 'Done', no: 'No' };
 function bookingForm(cur, b, books) {
   b = b || {}; let studentId = b.student_id || null;
   const takenBy = n => books.find(x => x.seat_no === n && !bkOff(x.status) && x.id !== b.id);
@@ -216,11 +286,10 @@ function bookingForm(cur, b, books) {
     { k: 'booking_type', label: 'Booking type', type: 'select', options: [{ id: 'student', label: 'Student' }, { id: 'walk_in', label: 'Walk-in' }, { id: 'agent_group', label: 'Agent group' }], value: b.booking_type || 'student' },
     { k: 'agent_id', label: 'Agent', type: 'select', options: REF.agents.filter(a => a.active), value: b.agent_id, blank: 'None' },
     { k: 'status', label: 'Status', type: 'select', options: opts('booking', true), value: b.status || (b.id ? '' : 'booked'), blank: 'Not set', help: 'A booking is confirmed with or without payment. Payment is tracked on its own.' },
-    { k: 'quiz_sent', label: 'Quiz link sent', type: 'check', value: b.quiz_sent }, { k: 'quiz_done', label: 'Quiz done', type: 'check', value: b.quiz_done }, { k: 'paid', label: 'Paid', type: 'check', value: b.paid }];
-  if (cur.kind !== 'renewal') f.push({ k: 'placement_plan', label: 'Placement plan', type: 'select', options: Object.keys(PLAN_PL).map(k => ({ id: k, label: PLAN_PL[k] })), value: b.placement_plan, blank: 'Not set', help: 'Yes = going ahead with placement. Done = placement sorted. No = not doing placement.' },
-    { k: 'education_plan', label: 'Education plan', type: 'select', options: Object.keys(PLAN_ED).map(k => ({ id: k, label: PLAN_ED[k] })), value: b.education_plan, blank: 'Not set', help: 'Yes = needs visa counselling. RTO done = RTO profile created. No = no counselling needed.' });
+    { k: 'quiz_sent', label: 'Quiz link sent', type: 'check', value: b.quiz_sent }];
+  if (cur.kind !== 'renewal') f.push({ k: 'placement_plan', label: 'Placement plan', type: 'select', options: Object.keys(PLAN_PL).map(k => ({ id: k, label: PLAN_PL[k] })), value: b.placement_plan, blank: 'Not set', help: 'Yes = going ahead with placement. Done = placement sorted. No = not doing placement.' });
   if (cur.kind === 'renewal') f.push({ k: 'signature_done', label: 'Signature done', type: 'check', value: b.signature_done });
-  if (!canFlag()) for (let i = f.length - 1; i >= 0; i--) if (['quiz_sent', 'quiz_done', 'paid', 'placement_plan', 'education_plan', 'signature_done', 'seat_no'].includes(f[i].k)) f.splice(i, 1);   /* the flags and the seat numbers are Evershine's */
+  if (!canFlag()) for (let i = f.length - 1; i >= 0; i--) if (['quiz_sent', 'placement_plan', 'signature_done', 'seat_no'].includes(f[i].k)) f.splice(i, 1);   /* the flags and the seat numbers are Evershine's */
   f.push({ k: 'note', label: 'Note', type: 'textarea', value: b.note, full: true });
   const top = b.id ? '' : idBoxHtml('Type a phone number or email. If they are already a student or lead, their details fill in. If they are not in YatraLine yet, they are added as a new lead when you save.');
   const m = formModal(b.id ? 'Edit booking' : 'Add booking', f, async v => {

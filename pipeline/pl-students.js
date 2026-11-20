@@ -578,7 +578,7 @@ function paymentForm(o) {
     const row = Object.assign({ student_id: o.student ? o.student.id : null, enrolment_id: o.enrolment ? o.enrolment.id : null, created_by: ME.name }, v);
     const p = await ins('nex_payments', row);
     if (o.enrolment && o.addToQueue !== false) await queuePayment(o.enrolment.id, p.id);
-    toast(payDoneMsg(v.method)); render();
+    toast(payDoneMsg(v.method)); if (o.after) o.after(p); else render();
   }, 'Save payment', extra);
 }
 function refundForm(e, pays) {
