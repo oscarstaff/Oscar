@@ -1,6 +1,8 @@
 /* YatraLine · Self-placement Google Form -> Placement > Self-Requests
    Paste into the form's RESPONSE SHEET: Sheet > Extensions > Apps Script. Then:
    1. Project Settings > Script properties > add  INTAKE_KEY  (the key Sanny was given; it is NOT in this file).
+      If you made this script at script.google.com instead of from the sheet's Extensions menu, also add  SHEET_ID  =
+      the long id in the response sheet's web address (between /d/ and /edit).
    2. Run setup() once and allow access. It installs the "on form submit" trigger.
    3. (Optional) Run sendAllRows() once to bring in answers that came in before today. Safe to run again: repeats are ignored.
    What happens: each response is sent to Supabase (nex_form_intake). If the email, phone or name matches a student with one
@@ -21,9 +23,17 @@ const MAP = {
   facility: { is: /facility|aged care|care home|organi[sz]ation|workplace|place of placement/i, not: /address|email|phone|contact|supervisor|manager|date|start|end|suburb|state|postcode/i }
 };
 
+function ss_() {
+  const id = PropertiesService.getScriptProperties().getProperty('SHEET_ID');
+  const s = id ? SpreadsheetApp.openById(id.trim()) : SpreadsheetApp.getActive();
+  if (!s) throw new Error('This script is not attached to the response sheet. Open it from the sheet (Extensions > Apps Script), or add a SHEET_ID script property: the long id in the sheet\'s web address, between /d/ and /edit.');
+  return s;
+}
+
 function setup() {
+  const ss = ss_();
   ScriptApp.getProjectTriggers().forEach(t => { if (t.getHandlerFunction() === 'onFormSubmit') ScriptApp.deleteTrigger(t); });
-  ScriptApp.newTrigger('onFormSubmit').forSpreadsheet(SpreadsheetApp.getActive()).onFormSubmit().create();
+  ScriptApp.newTrigger('onFormSubmit').forSpreadsheet(ss).onFormSubmit().create();
   Logger.log('Trigger installed. Submit a test response to try it.');
 }
 
@@ -33,7 +43,8 @@ function onFormSubmit(e) {
 }
 
 function sendAllRows() {
-  const sh = SpreadsheetApp.getActiveSheet(), n = sh.getLastRow(); if (n < 2) return;
+  const sh = ss_().getSheets()[0], n = sh.getLastRow();   // the form's answers are the first tab
+  if (n < 2) return;
   const head = sh.getRange(1, 1, 1, sh.getLastColumn()).getDisplayValues()[0], rows = sh.getRange(2, 1, n - 1, sh.getLastColumn()).getDisplayValues();
   let imported = 0, inbox = 0, dup = 0;
   rows.forEach(r => { const res = sendRow_(sh, head, r); if (res.result === 'imported') imported++; else if (res.result === 'inbox') inbox++; else dup++; });
