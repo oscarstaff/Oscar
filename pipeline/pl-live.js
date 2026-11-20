@@ -21,7 +21,7 @@ const LV_PAGES = [
   [/^\/students\/[0-9a-f-]{36}$/, LV_PLAIN.concat(['nex_class_sessions', 'nex_placement_requests', 'nex_batches'])],
   [/^\/payments/, ['nex_payments', 'nex_payment_queue', 'nex_enrolments', 'nex_enrolment_docs', 'nex_refunds', 'nex_students']],
   [/^\/firstaid/, ['nex_class_sessions', 'nex_class_bookings', 'nex_trainers', 'nex_payments', 'nex_followups', 'nex_students']],
-  [/^\/placement/, ['nex_placement_profile', 'nex_placements', 'nex_placement_requests', 'nex_batches', 'nex_batch_facilities', 'nex_facilities', 'nex_blacklist', 'nex_enrolments', 'nex_enrolment_docs', 'nex_payments', 'nex_students']],
+  [/^\/placement/, ['nex_placement_profile', 'nex_form_responses', 'nex_placements', 'nex_placement_requests', 'nex_batches', 'nex_batch_facilities', 'nex_facilities', 'nex_blacklist', 'nex_enrolments', 'nex_enrolment_docs', 'nex_payments', 'nex_students']],
   [/^\/tasks/, ['nex_tasks', 'nex_students']],
   [/^\/logbooks/, ['nex_logbook_receipts', 'nex_students', 'nex_enrolments']],
   [/^\/followups/, ['nex_followups', 'nex_students', 'nex_enrolments']],
