@@ -8,9 +8,14 @@ const BK_OFF = ['no_show', 'cancelled', 'rescheduled'];
 const bkOff = s => BK_OFF.indexOf(s) >= 0;
 const BK_WORD = { no_show: 'No show', cancelled: 'Cancelled', rescheduled: 'Rescheduled', attended: 'Attended', booked: 'Booked' };
 
-async function bkUpcoming(excludeSession) {
+/* upcoming class days to move or book into. A renewal booking only moves to renewal days; everything else goes to full class days. */
+async function bkKindOf(b) {
+  if (b.nex_class_sessions && b.nex_class_sessions.kind) return b.nex_class_sessions.kind;
+  try { const r = await sel('nex_class_sessions', 'select=kind&id=eq.' + b.session_id); return (r[0] && r[0].kind) || 'full'; } catch (e) { return 'full'; }
+}
+async function bkUpcoming(excludeSession, kind) {
   const today = sydToday();
-  const ss = await sel('nex_class_sessions', 'select=id,class_date,kind,seats&kind=neq.renewal&class_date=gte.' + today + '&order=class_date.asc,kind.asc&limit=40');
+  const ss = await sel('nex_class_sessions', 'select=id,class_date,kind,seats&kind=' + (kind === 'renewal' ? 'eq.renewal' : 'neq.renewal') + '&class_date=gte.' + today + '&order=class_date.asc,kind.asc&limit=40');
   if (!ss.length) return [];
   const rows = await selAll('nex_class_bookings', 'select=session_id,status&session_id=in.' + inList(ss.map(s => s.id)));
   const n = {}; rows.forEach(b => { if (!bkOff(b.status)) n[b.session_id] = (n[b.session_id] || 0) + 1; });
@@ -23,7 +28,8 @@ function bkMark(b, status, newSession, note) {
 
 /* No show, cancelled or rescheduled. Rescheduled can pick the new class day straight away. */
 async function attendanceModal(b, preset, after) {
-  let days = []; try { days = await bkUpcoming(b.session_id); } catch (e) { days = []; }
+  const kind = await bkKindOf(b);
+  let days = []; try { days = await bkUpcoming(b.session_id, kind); } catch (e) { days = []; }
   const radio = (v, l, hint) => '<label><input type="radio" name="bkSt" value="' + v + '"' + (v === (preset || 'no_show') ? ' checked' : '') + '><span><b>' + l + '</b><small>' + hint + '</small></span></label>';
   const body = '<div class="nx-radios" role="radiogroup" aria-label="Attendance">' +
     radio('no_show', 'No show', 'Did not come. Goes on the follow-up list.') +
@@ -77,14 +83,18 @@ async function bookClassModal(p, enrolmentId, after) {
 }
 /* off-status booking: book a fresh class day, the old one is closed off as handled */
 async function rebookModal(b, after) {
-  let days = []; try { days = await bkUpcoming(null); } catch (e) { days = []; }
-  if (!days.length) { toast('No upcoming class days. Add one on the First Aid and CPR page.', true); return; }
-  return openModal({ title: 'Rebook ' + esc(b.name || ''), body: '<label class="nx-lbl" for="bkDay">New class day</label><select class="nx-sel" id="bkDay">' + selectOpts(days.map(s => ({ id: s.id, label: bkDayLabel(s) })), days[0].id) + '</select>', buttons: [{ label: 'Cancel', close: true }, { label: 'Rebook', primary: true, run: async mm => {
+  const kind = await bkKindOf(b);
+  let days = []; try { days = await bkUpcoming(null, kind); } catch (e) { days = []; }
+  if (!days.length) { toast('No upcoming ' + (kind === 'renewal' ? 'renewal' : 'full class') + ' days. Add one on the First Aid and CPR page.', true); return; }
+  return openModal({ title: 'Rebook ' + esc(b.name || ''), body: '<label class="nx-lbl" for="bkDay">New ' + (kind === 'renewal' ? 'renewal day' : 'class day') + '</label><select class="nx-sel" id="bkDay">' + selectOpts(days.map(s => ({ id: s.id, label: bkDayLabel(s) })), days[0].id) + '</select><div class="nx-help">' + (kind === 'renewal' ? 'This was a renewal booking, so it is rebooked onto a renewal day.' : 'Rebooked onto a full class day.') + (Array.isArray(b.sections) && b.sections.length ? ' They keep their sections (' + esc(bkSecText(b)) + ' only).' : '') + '</div>', buttons: [{ label: 'Cancel', close: true }, { label: 'Rebook', primary: true, run: async mm => {
     const sid = $('#bkDay', mm.el).value; if (!sid) throw fieldError('#bkDay', 'Choose a class day.');
     await bkMark(b, 'rescheduled', sid, null);
     toast('Rebooked'); if (after) after(); else render();
   } }] });
 }
+
+/* the sections a part-day booking attends, e.g. "FA + CPR" */
+const bkSecText = b => FA_SECTIONS.filter(x => (b.sections || []).includes(x[0])).map(x => x[2]).join(' + ');
 
 /* the follow-up rows: a booking card line used on the First Aid section and the Leads tab */
 function bkFollowRow(b, opt) {
@@ -92,7 +102,7 @@ function bkFollowRow(b, opt) {
   const moved = b.rescheduled_to ? (opt.movedTo && opt.movedTo[b.rescheduled_to]) : null;
   const handled = !!b.followup_done_at;
   return '<tr class="nx-tr" data-bk="' + b.id + '"><td><b>' + (b.student_id ? '<a href="#/students/' + b.student_id + '">' + esc(b.name) + '</a>' : esc(b.name)) + '</b><div class="nx-muted" style="font-size:12px">' + esc(fmtPhone(b.phone) || b.email || '') + '</div></td>' +
-    '<td>' + pill('booking', b.status) + '</td><td>' + (ss_.class_date ? esc(fmtDate(ss_.class_date)) : '') + '<div class="nx-muted" style="font-size:12px">' + (ss_.kind === 'renewal' ? 'Renewal' : 'Full class') + '</div></td>' +
+    '<td>' + pill('booking', b.status) + '</td><td>' + (ss_.class_date ? esc(fmtDate(ss_.class_date)) : '') + '<div class="nx-muted" style="font-size:12px">' + (ss_.kind === 'renewal' ? '<span class="nx-tag walk" title="A renewal booking. It is rebooked onto a renewal day.">Renewal only</span>' : 'Full class') + (Array.isArray(b.sections) && b.sections.length ? ' <span class="nx-tag part" title="Was attending only these sections. Kept when rebooked.">' + esc(bkSecText(b)) + ' only</span>' : '') + '</div></td>' +
     '<td><span class="nx-att-by">' + esc(b.attendance_by || '') + (b.attendance_at ? ' · ' + esc(fmtDT(b.attendance_at)) : '') + '</span></td>' +
     '<td>' + (moved ? '<span class="nx-pill ok">Moved to ' + esc(fmtDate(moved)) + '</span>' : handled ? '<span class="nx-pill ok">Handled' + (b.followup_done_by ? ' · ' + esc(b.followup_done_by) : '') + '</span>' : '<span class="nx-pill warn">To follow up</span>') + '</td>' +
     '<td><div class="nx-btnrow">' + (handled || moved ? '' : '<button class="nx-btn sm primary" data-rb="' + b.id + '">Rebook</button><button class="nx-btn sm" data-hd="' + b.id + '">Mark handled</button>') + '' + bkUndoBtn(b, 'quiet') + '</div></td></tr>';
