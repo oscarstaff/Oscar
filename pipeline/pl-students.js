@@ -239,8 +239,7 @@ function newStudent() {
     { k: 'qualification_id', label: 'Qualification', type: 'select', options: REF.quals.filter(q => q.active), blank: 'Add later' },
     { k: 'fee', label: 'Agreed fee ($)', type: 'number' },
     { k: 'stage', label: 'Stage', type: 'select', options: stageOpts(false, 'checklist_sent'), value: 'checklist_sent', blank: 'Not set' },
-    { k: 'enrolled_on', label: 'Enrolled on', type: 'date', value: sydToday() },
-    { k: 'first_contact_on', label: 'First contact', type: 'date', value: sydToday(), help: 'Follow-ups are set for 2, 4 and 6 days after this date.' }
+    { k: 'enrolled_on', label: 'Enrolled on', type: 'date', value: sydToday() }
   ]);
   let warned = false, existing = null, lk = null;
   const save = async (v, m) => {
@@ -262,11 +261,11 @@ function newStudent() {
         return false;
       }
     }
-    const s = await ins('nex_students', Object.assign(stu, { created_by: ME.name }));
+    /* the first contact date is the day the lead is added; the follow-ups are set by staff afterwards (Start follow-ups on the lead) */
+    const s = await ins('nex_students', Object.assign(stu, { created_by: ME.name, first_contact_on: sydToday() }));
     if (qualification_id || fee != null || stage) await ins('nex_enrolments', { student_id: s.id, qualification_id, fee, stage, enrolled_on, year: new Date().getFullYear(), created_by: ME.name }, true);
-    let cycleErr = false;
-    try { await api('rpc/nex_start_lead_cycle', { method: 'POST', body: { p_student: s.id, p_first: stu.first_contact_on || null } }); } catch (e) { cycleErr = true; }
-    toast(cycleErr ? 'Lead added, but the follow-ups could not be set. Open the lead and press Start follow-ups.' : 'Lead added with 3 follow-ups', cycleErr); go('#/students/' + s.id);
+    toast('Lead added');
+    go('#/students/' + s.id);
   };
   /* first name is checked in save() so that picking an existing person does not need it */
   f.find(x => x.k === 'first_name').required = false; f.find(x => x.k === 'first_name').label = 'First name *';
@@ -318,7 +317,7 @@ route(/^\/students\/([0-9a-f-]{36})$/, async m => {
   return '<div class="nx-crumbs"><a href="' + (isStudent ? '#/students">Students' : '#/leads">Leads') + '</a> / <span>' + esc(fullName(s)) + '</span></div>' +
     (s.needs_details ? '<div class="nx-card nx-unfbar"><div class="nx-note">' + ico('bell') + '<span><b>Unfinished lead.</b> Started from a call' + (s.flagged_to ? ' logged by <b>' + esc(s.flagged_to) + '</b>' : '') + '. Add their email, course and any other details, then mark it complete.</span> <button class="nx-btn sm primary" data-a="doneDetails">' + ico('check') + 'Mark complete</button></div></div>' : '') +
     '<div class="nx-card"><div class="nx-hl"><span class="nx-avatar">' + esc(initials(fullName(s))) + '</span><div><div class="nx-eyebrow">' + (isStudent ? 'Student ' : 'Lead ') + esc(String(s.student_no || '')) + '</div><h1 class="nx-title">' + esc(fullName(s)) + ' <span class="nx-pill ' + (isStudent ? 'accent' : 'info') + '">' + (isStudent ? 'Student' : 'Lead') + '</span></h1></div>' +
-    '<dl class="nx-facts">' + fact('Email', esc(s.email || '')) + fact('Phone', esc(fmtPhone(s.phone))) + fact('Agent', esc(agentName(s.agent_id))) + fact('Fee and paid', totalFee || totalPaid ? money(totalPaid) + ' of ' + money(totalFee) : '') + fact('Added', esc(fmtDate(s.created_at))) + '</dl>' +
+    '<dl class="nx-facts">' + fact('Email', esc(s.email || '')) + fact('Phone', esc(fmtPhone(s.phone))) + fact('Agent', esc(agentName(s.agent_id))) + fact('Fee and paid', totalFee || totalPaid ? money(totalPaid) + ' of ' + money(totalFee) : '') + fact('Added', esc(fmtDate(s.created_at))) + (!isStudent && s.first_contact_on ? fact('First contact', esc(fmtDate(s.first_contact_on))) : '') + '</dl>' +
     '<div class="nx-btnrow"><button class="nx-btn" data-a="editStu">' + ico('edit') + 'Edit</button><button class="nx-btn" data-a="addEnr">' + ico('plus') + 'Enrolment</button>' + (isStudent ? '' : '<button class="nx-btn primary" data-a="bookFA">' + ico('aid') + 'Book class</button>') + '' + (ME.admin ? '<button class="nx-btn quiet" data-a="archive">' + ico('archive') + 'Archive</button>' : '') + '</div></div>' +
     (main.id ? '<div style="padding:0 16px 16px"><ol class="nx-path">' + PATH.map((p, i) => '<li class="' + (i < idx ? 'done' : i === idx ? 'now' : '') + '">' + (i < idx ? ico('check') : '') + esc(statusLabel('enrolment', p)) + '</li>').join('') + '</ol>' + (idx < 0 && main.stage ? '<div style="margin-top:8px">Current stage: ' + pill('enrolment', main.stage) + '</div>' : '') + '</div>' : '') + '</div>' +
     '<div class="nx-cols"><div class="nx-colmain"><div class="nx-card"><div class="nx-tabs" role="tablist">' +
