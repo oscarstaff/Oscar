@@ -25,6 +25,8 @@ async function btMin() {
   if (!(BT.min >= 0)) BT.min = 500;
   return BT.min;
 }
+/* the day an aged care actually starts: its own date when it has one (holidays), otherwise the batch's */
+const btStart = (batch, card) => (card && card.starts_on) || batch.starts_on;
 function btCardName(c) { return c.is_others ? 'Others confirmed' : ((c.nex_facilities || {}).name || '(aged care)'); }
 function btCount(places, cardId, shift) { return places.filter(p => p.batch_facility_id === cardId && btLive(p) && (!shift || p.shift === shift)).length; }
 function btStudent(p) { return (p.nex_enrolments || {}).nex_students || null; }
@@ -63,6 +65,7 @@ async function renderBatches(body) {
       ? '<span>' + btCount(places, c.id) + ' students</span>'
       : BT_SHIFTS.map(([k, l]) => { const q = c['quota_' + k], n = btCount(places, c.id, k); return q || n ? '<span class="' + (n > q ? 'over' : (n === q ? 'full' : '')) + '">' + l + ' ' + n + '/' + q + '</span>' : ''; }).join('') || '<span>No quota set</span>';
     const chk = c.is_others ? '' :
+      (c.starts_on && c.starts_on !== batch.starts_on ? '<span class="nx-pill warn" title="This aged care starts on a different day from the rest of the batch">Starts ' + esc(btDate(c.starts_on).replace(/ 20\d\d$/, '')) + '</span>' : '') +
       '<span class="nx-pill ' + (c.docs_sent_on ? 'ok' : '') + '">Docs ' + (c.docs_sent_on ? 'sent' : 'not sent') + '</span>' +
       '<span class="nx-pill ' + (c.info_sent_on ? 'ok' : '') + '">Info ' + (c.info_sent_on ? 'sent' : 'not sent') + '</span>' +
       (c.logbook ? '<span class="nx-pill ' + (c.logbook === 'sent' ? 'ok' : (c.logbook === 'scheduled' ? 'info' : 'warn')) + '">Logbook ' + esc(c.logbook.replace('_', ' ')) + '</span>' : '');
@@ -85,13 +88,14 @@ async function batchNew(known) {
   const used = new Set(batches.map(b => b.starts_on));
   let d = sydToday(); while (used.has(d)) d = btAddDays(d, 1);
   const f = [{ k: 'starts_on', label: 'Starts on', type: 'date', value: d, required: true }, { k: 'name', label: 'Name (optional)', placeholder: 'e.g. November intake' }];
-  if (batches.length) f.push({ k: 'copy', label: 'Copy the aged cares and quotas from the latest batch', type: 'check', value: true, full: true, help: 'Quotas change every batch, so you can edit each card afterwards. Students and checklists are not copied.' });
+  if (batches.length) f.push({ k: 'copy', label: 'Copy the aged cares and quotas from an earlier batch', type: 'check', value: true, full: true, help: 'Quotas change every batch, so you can edit each card afterwards. Start dates, students and checklists are not copied.' },
+    { k: 'copy_from', label: 'Copy from', type: 'select', options: batches.map(b => ({ id: b.id, label: btDate(b.starts_on) + (b.name ? ' · ' + b.name : '') })), value: batches[0].id, full: true });
   f.push({ k: 'note', label: 'Note', type: 'textarea', full: true });
   formModal('New batch', f, async v => {
     if (used.has(v.starts_on)) throw new Error('There is already a batch starting that day.');
-    const row = await ins('nex_batches', { starts_on: v.starts_on, name: v.name, note: v.note });
+    const row = await ins('nex_batches', { starts_on: v.starts_on, name: v.name, note: v.note });   /* copy / copy_from are not columns */
     if (v.copy && batches.length) {
-      const src = batches.find(b => b.starts_on < v.starts_on) || batches[0];
+      const src = batches.find(b => b.id === v.copy_from) || batches.find(b => b.starts_on < v.starts_on) || batches[0];
       const old = await sel('nex_batch_facilities', 'select=facility_id,is_others,quota_am,quota_pm,quota_night,orientation_note,shift_note&batch_id=eq.' + src.id + '&limit=500');
       if (old.length) await ins('nex_batch_facilities', old.map(o => Object.assign({ batch_id: row.id }, o)), true);
     }
@@ -120,19 +124,21 @@ async function batchCardOpen(batch, card) {
   await loadPlaces();
   let asked = card.is_others ? [] : ppAskedFor(batch, card, await ppAskedRows(batch));      /* students who asked for this aged care around this date */
   const F = card.is_others ? [{ k: 'note', label: 'Note', type: 'textarea', value: card.note, full: true }] : [
+    { k: 'starts_on', label: 'Starts on', type: 'date', value: card.starts_on || batch.starts_on, help: 'Starts with the batch (' + btDate(batch.starts_on) + ') unless you change it, for example when this aged care starts after a holiday. Students on this card move with it.' },
     { k: 'quota_am', label: 'AM places', type: 'number', value: card.quota_am }, { k: 'quota_pm', label: 'PM places', type: 'number', value: card.quota_pm }, { k: 'quota_night', label: 'Night places', type: 'number', value: card.quota_night },
     { k: 'orientation_note', label: 'Orientation', value: card.orientation_note, full: true }, { k: 'shift_note', label: 'Shift times', value: card.shift_note, full: true },
     { k: 'docs_sent_on', label: 'Documents sent to the aged care on', type: 'date', value: card.docs_sent_on }, { k: 'info_sent_on', label: 'Information sent to students on', type: 'date', value: card.info_sent_on },
     { k: 'logbook', label: 'Logbook', type: 'select', options: BT_LOGBOOK, value: card.logbook, blank: 'Not set' },
     { k: 'note', label: 'Note', type: 'textarea', value: card.note, full: true }];
   const m = openModal({
-    title: btCardName(card) + ' · ' + btDate(batch.starts_on), wide: true,
+    title: btCardName(card) + ' · ' + btDate(btStart(batch, card)), wide: true,
     body: '<div class="nx-form">' + F.map(f => fieldHtml(f, 'bc')).join('') + '</div><hr class="nx-hr"><div id="bcStu"></div>' +
       (ME.admin ? '<div style="margin-top:14px"><button type="button" class="nx-btn sm" id="bcDel">Remove this card from the batch</button></div>' : ''),
     buttons: [{ label: 'Close', close: true }, { label: 'Save details', primary: true, run: async mm => {
       const v = readFields(F, mm.el, 'bc');
       for (const k of ['quota_am', 'quota_pm', 'quota_night']) if (k in v) v[k] = Math.max(0, Math.round(v[k] || 0));
-      Object.assign(card, await upd('nex_batch_facilities', 'id=eq.' + card.id, v)); toast('Saved'); btRefresh(); return false;
+      if ('starts_on' in v) v.starts_on = v.starts_on && v.starts_on !== batch.starts_on ? v.starts_on : null;   /* the batch's own date is stored as "no own date" */
+      Object.assign(card, await upd('nex_batch_facilities', 'id=eq.' + card.id, v)); toast('Saved'); await loadPlaces(); draw(); btRefresh(); return false;
     } }]
   });
   const draw = () => {
@@ -140,7 +146,7 @@ async function batchCardOpen(batch, card) {
     const live = places.filter(btLive), gone = places.filter(p => !btLive(p));
     const line = card.is_others ? '' : '<div class="nx-muted" style="margin:2px 0 8px">' + BT_SHIFTS.map(([k, l]) => l + ' ' + live.filter(p => p.shift === k).length + ' of ' + (card['quota_' + k] || 0)).join(' · ') + '</div>';
     const row = p => { const s = btStudent(p); return '<li><div>' + (s ? '<a href="#/students/' + s.id + '"><b>' + esc(fullName(s)) + '</b></a>' : '–') + ' <span class="nx-pill info">' + esc(BT_SHIFT_L[p.shift] || '') + '</span>' +
-      '<small>' + esc([card.is_others ? p.facility_text : '', statusLabel('placement_stage', p.status), p.note].filter(Boolean).join(' · ')) + '</small></div>' +
+      '<small>' + esc([card.is_others ? p.facility_text : '', statusLabel('placement_stage', p.status), p.start_date && p.start_date !== btStart(batch, card) ? 'Starts ' + btDate(p.start_date) : '', p.note].filter(Boolean).join(' · ')) + '</small></div>' +
       '<span class="nx-btnrow"><button class="nx-btn sm" data-ed="' + p.id + '">Edit</button>' + (btLive(p) ? '<button class="nx-btn sm" data-wd="' + p.id + '">Withdraw</button>' : '') + '</span></li>'; };
     box.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px"><h3 style="font-size:15px;margin:0">Students (' + live.length + ')</h3><button type="button" class="nx-btn sm primary" id="bcAdd">' + ico('plus') + 'Add student</button></div>' + line +
       (live.length ? '<ul class="nx-list">' + live.map(row).join('') + '</ul>' : '<div class="nx-help">Nobody is placed here yet.</div>') +
@@ -189,9 +195,9 @@ async function batchAddStudent(batch, card, places, done) {
   const assign = async (enrolmentId, who, flags) => {
     const shift = $('#ba_shift', m.el).value; let other = null;
     if (card.is_others) { other = ($('#ba_other', m.el).value || '').trim(); if (!other) { showErr(m, fieldError('#ba_other', 'Type the aged care they found first.')); return false; } }
-    if (flags !== undefined && !await ppGate(flags, who, { facility_id: card.facility_id, start: batch.starts_on })) return false;     /* hold, English, irregular availability, asked for another date or aged care */
+    if (flags !== undefined && !await ppGate(flags, who, { facility_id: card.facility_id, start: btStart(batch, card) })) return false;     /* hold, English, irregular availability, asked for another date or aged care */
     try {
-      await ins('nex_placements', { enrolment_id: enrolmentId, batch_id: batch.id, batch_facility_id: card.id, facility_id: card.facility_id || null, facility_text: other, shift, status: 'site_date_allocated', start_date: batch.starts_on }, true);
+      await ins('nex_placements', { enrolment_id: enrolmentId, batch_id: batch.id, batch_facility_id: card.id, facility_id: card.facility_id || null, facility_text: other, shift, status: 'site_date_allocated', start_date: btStart(batch, card) }, true);
       toast((who || 'Student') + ' added'); await done(); return true;
     } catch (e) { toast(e.message, true); return false; }
   };
