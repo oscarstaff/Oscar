@@ -1959,6 +1959,7 @@ html{ scrollbar-gutter:stable; }
 .wa-dg{display:flex;justify-content:space-between;gap:12px;font-size:13px;padding:4px 0;border-bottom:1px solid var(--border)}
 .wa-dg span{opacity:.8;text-align:right}
 @media(max-width:760px){.wa-digest{grid-template-columns:1fr}}
+.sb-xteam{display:block;margin-top:2px;font-size:9px;font-weight:700;letter-spacing:.2px;color:var(--accent-text,#0071e3)}
 </style>
 <style id="polish-2026-07-31">
 /* ═══════════════════════════════════════════════════════════════════════
@@ -3306,6 +3307,10 @@ body.avail-editing #availGrid .avail-chip.av2:hover{ background:color-mix(in srg
       </select>
     </div>
     <div class="form-group"><label class="form-label">Role / Notes</label><input type="text" class="form-input" id="shiftRole" placeholder="e.g. Floor Manager, Cashier…"></div>
+    <div class="form-group" id="shiftTeamGroup"><label class="form-label">Works for team</label>
+      <select class="form-input" id="shiftTeam"></select>
+      <div style="font-size:11px;opacity:.65;margin-top:4px">Pick another team to rostered someone onto that team's work for this shift. The shift stays on their own roster row.</div>
+    </div>
     <div class="form-group"><label class="form-label">Device</label>
       <select class="form-input" id="shiftDevice">
         <option value="">— No device —</option>
@@ -4928,7 +4933,7 @@ function renderRoster(){
           const stCls = sh._status==='open' ? ' shift-openpick' : (sh._status==='pending_release' ? ' shift-pendrel' : '');
           const stTag = sh._status==='open' ? '<br><span class="sb-tag">OPEN FOR PICKUP</span>'
                       : (sh._status==='pending_release' ? '<br><span class="sb-tag">RELEASE ASKED</span>' : '');
-          html+=`<div class="shift-badge ${il?'shift-leave':'shift-slot'}${stCls}" ${il?'':`style="background:${s.color}1a;border-left:3px solid ${s.color};" draggable="true" onmousedown="shiftBadgeDown(${s.id},${d},${i})" ondragstart="shiftDragStart(event,${s.id},${d},${i})" ondragend="shiftDragEnd(event)"`} onclick="event.stopPropagation();${il?'editShift':'shiftBadgeClick'}(${s.id},${d},${i})">${il?'LEAVE':`<b class="sb-time">${sh.start}–${sh.end}</b>`}${stTag}${(!il&&sh._dbId&&_rcnPending[sh._dbId])?'<span title="Change not yet seen by '+s.first+'" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#f59e0b;margin-left:4px;vertical-align:middle"></span>':''}${dev?`<br><span style="font-size:8px;opacity:.85;color:${devConflict?'#ff6432':'inherit'}"> ${dev.name}${sh.deviceStart?` ${sh.deviceStart}–${sh.deviceEnd}`:''}${devConflict?' ':''}</span>`:`${staffRoleLabel(s)?`<br><span style="font-size:8px;opacity:.7">${staffRoleLabel(s)}</span>`:''}`}</div>`;
+          html+=`<div class="shift-badge ${il?'shift-leave':'shift-slot'}${stCls}" ${il?'':`style="background:${s.color}1a;border-left:3px solid ${s.color};" draggable="true" onmousedown="shiftBadgeDown(${s.id},${d},${i})" ondragstart="shiftDragStart(event,${s.id},${d},${i})" ondragend="shiftDragEnd(event)"`} onclick="event.stopPropagation();${il?'editShift':'shiftBadgeClick'}(${s.id},${d},${i})">${il?'LEAVE':`<b class="sb-time">${sh.start}–${sh.end}</b>`}${(!il&&sh._team)?`<span class="sb-xteam" title="Works for the ${sh._team} team">→ ${sh._team}</span>`:''}${stTag}${(!il&&sh._dbId&&_rcnPending[sh._dbId])?'<span title="Change not yet seen by '+s.first+'" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#f59e0b;margin-left:4px;vertical-align:middle"></span>':''}${dev?`<br><span style="font-size:8px;opacity:.85;color:${devConflict?'#ff6432':'inherit'}"> ${dev.name}${sh.deviceStart?` ${sh.deviceStart}–${sh.deviceEnd}`:''}${devConflict?' ':''}</span>`:`${staffRoleLabel(s)?`<br><span style="font-size:8px;opacity:.7">${staffRoleLabel(s)}</span>`:''}`}</div>`;
         });
         html+='</div>';
       }
@@ -4956,6 +4961,14 @@ function renderRoster(){
   try{ if(typeof applyTeamLeadLock==='function' && document.body.classList.contains('tl-readonly')) applyTeamLeadLock(); }catch(e){}
 }
 
+function _shiftTeamFill(staffId, value){
+  var sel=document.getElementById('shiftTeam'); if(!sel) return;
+  var own=''; try{ var st=(staff||[]).find(function(x){return x.id===staffId;}); own=(st&&st.team)||''; }catch(e){}
+  var list=(teams||[]).slice(); if(value && list.indexOf(value)<0) list.push(value);
+  sel.innerHTML='<option value="">'+(own?('Their own team ('+own+')'):'Their own team')+'</option>'+
+    list.filter(function(t){return t!==own;}).sort().map(function(t){return '<option value="'+t+'"'+(t===value?' selected':'')+'>'+t+'</option>';}).join('');
+  sel.value=value||'';
+}
 function clickCell(staffId,day){
   editingShift=null;
   document.getElementById('shiftModalTitle').textContent='Assign Shift';
@@ -4966,6 +4979,7 @@ function clickCell(staffId,day){
   document.getElementById('shiftEnd').value='19:00';
   document.getElementById('shiftType').value='shift';
   document.getElementById('shiftRole').value='';
+  _shiftTeamFill(staffId,'');
   document.getElementById('shiftWeek').value='w1';
   populateShiftDeviceSelect(null);
   onShiftTypeChange(document.getElementById('shiftType'));
@@ -4984,6 +4998,7 @@ function editShift(staffId,dayIdx,shiftIdx){
   document.getElementById('shiftEnd').value=sh.end||'19:00';
   document.getElementById('shiftType').value=sh.type==='leave'?'leave':'shift';
   document.getElementById('shiftRole').value=sh.role||'';
+  _shiftTeamFill(staffId,sh._team||'');
   document.getElementById('shiftWeek').value='w1';
   populateShiftDeviceSelect(sh.deviceId||null);
   onShiftTypeChange(document.getElementById('shiftType'));
@@ -5180,7 +5195,7 @@ async function loadWeekShiftsFromDB(weekStart){
     if(!tok || !_soTokAlive()) throw new Error('no live session');
     const from=wk, to=_isoDate(addDays(new Date(weekStart),6));
     const r=await fetch(SUPABASE_URL+'/rest/v1/roster_shifts'+
-      '?select=id,staff_name,shift_date,start_time,end_time,role,status,open_to_team,release_requested_by'+
+      '?select=id,staff_name,shift_date,start_time,end_time,role,works_for_team,status,open_to_team,release_requested_by'+
       '&shift_date=gte.'+from+'&shift_date=lte.'+to+'&order=shift_date.asc,start_time.asc',
       {headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+tok}});
     if(!r.ok) throw new Error('HTTP '+r.status);
@@ -5211,6 +5226,7 @@ async function loadWeekShiftsFromDB(weekStart){
         end:String(row.end_time||'').slice(0,5),
         type:'shift',
         role:row.role||'',
+        _team:row.works_for_team||'',
         _dbId:row.id,
         _status:row.status||'assigned',
         _openTeam:row.open_to_team||null,
@@ -5398,7 +5414,7 @@ async function fillFromPreviousWeek(){
 
   try{
     const [srcRes,tgtRes]=await Promise.all([
-      fetch(SUPABASE_URL+'/rest/v1/roster_shifts?select=staff_name,shift_date,start_time,end_time,role'+
+      fetch(SUPABASE_URL+'/rest/v1/roster_shifts?select=staff_name,shift_date,start_time,end_time,role,works_for_team'+
         '&shift_date=gte.'+srcFrom+'&shift_date=lte.'+srcTo,
         {headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY}}),
       fetch(SUPABASE_URL+'/rest/v1/roster_shifts?select=id'+
@@ -5430,6 +5446,7 @@ async function fillFromPreviousWeek(){
         start_time:r.start_time,
         end_time:r.end_time,
         role:r.role||null,
+        works_for_team:r.works_for_team||null,
         status:'assigned',
         created_by:(typeof currentUser!=='undefined'&&currentUser)?currentUser:'copy-week',
         updated_by:(typeof currentUser!=='undefined'&&currentUser)?currentUser:'copy-week'
@@ -7157,6 +7174,7 @@ function openAddShift(staffId,dayIdx){
   document.getElementById('shiftEnd').value='19:00';
   document.getElementById('shiftType').value='shift';
   document.getElementById('shiftRole').value='';
+  _shiftTeamFill(staffId,'');
   onShiftTypeChange(document.getElementById('shiftType'));
   renderShiftPickupBox(null);   // new shift: nothing to open for pickup yet
   openModal('shiftModal');
@@ -7379,6 +7397,7 @@ function onShiftTypeChange(sel){
   timeRow.querySelectorAll('input').forEach(i=>i.disabled=isLeave);
   document.getElementById('shiftRole').closest('.form-group').style.opacity=isLeave?'0.35':'1';
   document.getElementById('shiftRole').disabled=isLeave;
+  var _tg=document.getElementById('shiftTeamGroup'); if(_tg) _tg.style.display=isLeave?'none':'';
 }
 function deleteCurrentShift(){
   if(!editingShift)return;
@@ -7511,7 +7530,7 @@ async function dbCreateShift(staffId, dayIdx, sh){
       body:JSON.stringify({
         staff_name:name, shift_date:_shiftDateFor(dayIdx),
         start_time:sh.start, end_time:sh.end,
-        role:sh.role||null,
+        role:sh.role||null, works_for_team:sh._team||null,
         created_by:(typeof currentUser!=='undefined'&&currentUser)?currentUser:null,
         updated_by:(typeof currentUser!=='undefined'&&currentUser)?currentUser:null
       })
@@ -7534,7 +7553,7 @@ async function dbUpdateShift(sh, staffId, dayIdx){
   if(!sh||!sh._dbId) return false;
   const name=_nameForStaffId(staffId);
   try{
-    const body={start_time:sh.start,end_time:sh.end,role:sh.role||null,
+    const body={start_time:sh.start,end_time:sh.end,role:sh.role||null,works_for_team:sh._team||null,
                 updated_by:(typeof currentUser!=='undefined'&&currentUser)?currentUser:null};
     if(name) body.staff_name=name;
     if(dayIdx!==undefined && dayIdx!==null) body.shift_date=_shiftDateFor(dayIdx);
@@ -7579,12 +7598,18 @@ function saveShift(){
   if(!shifts[staffId])shifts[staffId]={};
   if(!shifts[staffId][day])shifts[staffId][day]=[];
   const sh={start,end,type,role:isLeave?'Leave':role};
+  if(!isLeave){
+    var _tv=(document.getElementById('shiftTeam')||{}).value||'';
+    var _st=(staff||[]).find(function(x){return x.id===staffId;});
+    if(_tv && _st && _st.team===_tv) _tv='';
+    if(_tv) sh._team=_tv;
+  }
   if(deviceId)sh.deviceId=deviceId;
   let _wasEdit=false, _prev=null;
   if(editingShift&&editingShift.staffId===staffId&&editingShift.dayIdx===day){
     _prev=shifts[staffId][day][editingShift.shiftIdx];
     // Carry the DB identity across an edit, or the update would orphan the row.
-    if(_prev&&_prev._dbId){ sh._dbId=_prev._dbId; sh._status=_prev._status; _wasEdit=true; }
+    if(_prev&&_prev._dbId){ sh._dbId=_prev._dbId; sh._status=_prev._status; sh._openTeam=_prev._openTeam; sh._releaseBy=_prev._releaseBy; _wasEdit=true; }
     shifts[staffId][day][editingShift.shiftIdx]=sh;
   }
   else shifts[staffId][day].push(sh);
@@ -11876,7 +11901,7 @@ async function waSave(){
   _wa.draft={}; _wa.msg='Saved. Enrolment staff can now see it in Nexus.'; waRender();
 }
 
-const SHIFTOPS_BUILD='2026-11-21-v53-work-allocation-people';
+const SHIFTOPS_BUILD='2026-11-21-v54-cross-team-shift';
 console.log('%c[ShiftOps build '+SHIFTOPS_BUILD+' loaded]','background:#0071e3;color:#fff;padding:2px 8px;border-radius:4px;font-weight:700;');
 // Start every session in the FULL (admin) view. The team-lead read-only lock is
 // only ever added later, and only once the role is positively confirmed as team
