@@ -19,7 +19,7 @@ const teamIs = (...t) => { const mine = String(ME.team || '').trim().toLowerCase
 const canFlag = () => !!ME.admin || teamIs('Evershine');
 const canPay = () => !!ME.admin || teamIs('Processing', 'Accounts');
 const canVerify = () => !!ME.admin || teamIs('Accounts');        /* Accounts check a bank payment against the bank statement (admins can too) */
-const canCash = () => canPay() || teamIs('Evershine');            /* the Evershine team takes cash on the class day, so they may enter cash (nothing else) */
+const canCash = () => canPay() || teamIs('Evershine');            /* the Evershine team takes payments on the class day, so they may enter cash or a bank transfer (nothing else) */
 /* Only confirmed money counts as received. A bank transfer is Pending verification until Accounts verify it; cash is confirmed as soon as it is entered. */
 const payConfirmed = p => !p || !p.verify_status || p.verify_status === 'confirmed';
 const sumPaid = list => (list || []).reduce((t, p) => t + (payConfirmed(p) ? Number(p.amount || 0) : 0), 0);
@@ -33,7 +33,7 @@ function payStatusHtml(p) {
   return h;
 }
 const PAY_METHODS = ['Bank transfer', 'Cash', 'Card', 'Agent', 'Other'];
-const payMethodOpts = () => canPay() ? PAY_METHODS : ['Cash'];
+const payMethodOpts = () => canPay() ? PAY_METHODS : ['Cash', 'Bank transfer'];   /* class staff: cash or bank transfer only */
 const PAY_METHOD_HELP = 'Bank transfer waits as Pending verification until Accounts check it against the bank statement. Cash is confirmed straight away and goes to the admins to check the handover.';
 function payDoneMsg(method) {
   const m = String(method || '').toLowerCase();

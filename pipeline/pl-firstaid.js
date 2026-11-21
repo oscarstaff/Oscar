@@ -108,7 +108,7 @@ route(/^\/firstaid(?:\/([0-9a-f-]{36}))?$/, async m => {
     (offs.length ? '<div class="nx-card"><div class="nx-card-b" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><span class="nx-muted"><b>' + offs.length + '</b> no show, cancelled or rescheduled on this day. They are not counted in the seats and now live in Leads, under Need to follow up.</span><a class="nx-btn sm" href="#/leads?view=follow">Open Need to follow up</a></div></div>' : '');
 });
 
-/* the payment next to a booking: what is confirmed, what still waits for Accounts, and a button to enter a payment (cash for the Evershine team) */
+/* the payment next to a booking: what is confirmed, what still waits for Accounts, and a button to enter a payment (cash or bank transfer for the Evershine team) */
 function bookingPayCell(b, list) {
   list = list || [];
   const ok = sumPaid(list), pend = sumPending(list);
