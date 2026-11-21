@@ -21,7 +21,7 @@ route(/^\/payments(?:\?(.*))?$/, async m => {
   ]);
   afterRender(() => bindPayments());
   const seg = [['toprocess', 'To process', cTo], ['attention', 'Needs attention', cProb], ['processed', 'Processed', cDone], ['verify', 'To verify', cVer]].concat(ME.admin ? [['cash', 'Cash receipts', cCash]] : [], [['unmatched', 'Unmatched', cUnm], ['all', 'All payments', null]]);
-  return pageHead('cash', 'Payments', 'Payment queue', (canPay() ? '<button class="nx-btn primary" id="pyAdd">' + ico('plus') + 'Record payment</button>' : '')) +
+  return pageHead('cash', 'Payments', 'Payment queue', '<button class="nx-btn primary" id="pyAdd">' + ico('plus') + 'Record payment</button>') +
     '<div class="nx-split"><div class="nx-card"><div class="nx-toolbar" style="border-top:0"><div class="nx-seg" id="pySeg">' + seg.map(([k, l, n]) => '<button data-v="' + k + '" aria-pressed="' + (PY.view === k) + '">' + l + (n != null ? ' <span class="nx-count">' + n + '</span>' : '') + '</button>').join('') + '</div><input class="nx-in sm" id="pyQ" style="min-width:220px" placeholder="Search name or reference" value="' + esc(PY.q) + '"></div>' +
     '<div id="pyBody"></div><div class="nx-foot" id="pyFoot"><span></span></div></div><div class="nx-drawer" id="pyDrawer" hidden></div></div>';
 });
@@ -126,8 +126,8 @@ function globalAddPayment() {
     { k: 'email', label: 'Email', type: 'email' }, { k: 'amount', label: 'Amount ($)', type: 'number', required: true },
     { k: 'enrolment_id', label: 'Enrolment', type: 'select', options: [], blank: 'Choose the enrolment', full: true },
     { k: 'paid_on', label: 'Payment date', type: 'date', value: sydToday(), required: true },
-    { k: 'method', label: 'Method', type: 'select', options: PAY_METHODS, blank: 'Choose', required: true },
-    { k: 'method_help', type: 'help', text: PAY_METHOD_HELP },
+    { k: 'method', label: 'Method', type: 'select', options: payMethodOpts(), blank: 'Choose', required: true },
+    { k: 'method_help', type: 'help', text: payMethodHelp() },
     { k: 'reference', label: 'Reference', placeholder: 'Bank reference or receipt' }, { k: 'note', label: 'Note' }];
   let lk = null, enr = [];
   const m = formModal('Record payment', f, async v => {
