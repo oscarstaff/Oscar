@@ -25,7 +25,7 @@ function mfaGate() {
       const st = await (await api('rpc/nex_mfa_state', { method: 'POST', body: {} })).json();
       if (st && st.required && aalNow() !== 'aal2') {
         const box = $('#mfa'), card = $('#mfaCard');
-        card.innerHTML = '<div class="gate-t mfa-t">Enter your code in Nexus</div><p class="mfa-p">YatraLine needs you to confirm it is you. Go back to Nexus, open the YatraLine card on the Nodes page, and approve with your passkey (Face ID or fingerprint). First time? Nexus walks you through setting one up.</p>';
+        card.innerHTML = '<div class="gate-t mfa-t">Enter your code in Nexus</div><p class="mfa-p">YatraLine needs you to confirm it is you. Go back to Nexus, open the YatraLine card on the Nodes page, and approve with your passkey (Face ID or fingerprint) or enter the 6-digit code from your authenticator app. First time? Nexus walks you through setting one up.</p>';
         box.hidden = false; return;
       }
     } catch (e) { if (e.message === 'session') return; }
@@ -35,7 +35,7 @@ function mfaGate() {
 
 /* ---------- Admin page card ---------- */
 function secCard() {
-  return '<div class="nx-card"><div class="nx-card-h"><div><h3>Two-step login</h3><div class="nx-muted">A passkey (Face ID or fingerprint), asked in Nexus once per sign-in when a person opens YatraLine.</div></div></div><div id="adSec" class="nx-card-b"><div class="nx-skel" style="width:50%"></div></div></div>';
+  return '<div class="nx-card"><div class="nx-card-h"><div><h3>Two-step login</h3><div class="nx-muted">A passkey (Face ID or fingerprint) or a 6-digit authenticator code, asked in Nexus once per sign-in when a person opens YatraLine.</div></div></div><div id="adSec" class="nx-card-b"><div class="nx-skel" style="width:50%"></div></div></div>';
 }
 async function bindSec() {
   const box = $('#adSec'); if (!box) return;
