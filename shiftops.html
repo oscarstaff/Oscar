@@ -11698,7 +11698,8 @@ var WA_SECS=[
   {k:'note',label:'Notes',ph:'Anything else for the day'}
 ];
 var _wa={wk:null,rows:{},draft:{},sel:0,loading:false,err:'',msg:'',saving:false,failed:false};
-function _waVisible(){
+function _waVisible(){ return true; }   // every ShiftOps user can read it
+function _waCanEdit(){
   try{
     if(typeof AM_TEAM_LEAD!=='undefined' && AM_TEAM_LEAD && typeof _tlResolved!=='undefined' && _tlResolved){
       return String(MY_TEAM||'').trim().toLowerCase()===WA_TEAM.toLowerCase();
@@ -11761,16 +11762,17 @@ function waRender(){
   var ds=_waDate(_wa.sel), boxes='';
   WA_SECS.forEach(function(s){
     var k=_waKey(ds,s.k); var v=(k in _wa.draft)?_wa.draft[k]:(_wa.rows[k]||'');
-    boxes+='<label class="wa-box"><span>'+s.label+'</span><textarea data-k="'+k+'" rows="'+(s.k==='work'?9:5)+'" placeholder="'+_waEsc(s.ph)+'" maxlength="6000" oninput="waType(this)"'+(_wa.loading?' disabled':'')+'>'+_waEsc(v)+'</textarea></label>';
+    boxes+='<label class="wa-box"><span>'+s.label+'</span><textarea data-k="'+k+'" rows="'+(s.k==='work'?9:5)+'" placeholder="'+_waEsc(s.ph)+'" maxlength="6000" oninput="waType(this)"'+(_wa.loading?' disabled':'')+(_waCanEdit()?'':' readonly')+'>'+_waEsc(v)+'</textarea></label>';
   });
+  var canEdit=_waCanEdit();
   var dirty=_waDirtyKeys().length;
   var status=_wa.err?'<div class="wa-err" role="alert">'+_waEsc(_wa.err)+(_wa.failed?' <button class="btn btn-ghost" style="padding:3px 10px" onclick="waSync(true)">Retry</button>':'')+'</div>'
     :(_wa.msg?'<div class="wa-ok">'+_waEsc(_wa.msg)+'</div>':'');
   host.innerHTML='<div class="wa-card"><div class="wa-head"><div><div class="wa-title">Work allocation · '+WA_TEAM+' team</div>'+
-    '<div class="wa-sub">'+fmtDate(d0)+' – '+fmtDate(d6)+'. Each Enrolment person also sees their own lines in Nexus under Shifts.</div></div>'+
-    '<div class="wa-acts"><button class="btn btn-ghost" onclick="waCopyDay()">Copy from previous day</button>'+
+    '<div class="wa-sub">'+fmtDate(d0)+' – '+fmtDate(d6)+'. '+(canEdit?'Everyone sees it in Nexus under Shifts, with their own lines first.':'Read only. The Enrolment lead and admins edit this.')+'</div></div>'+
+    (canEdit?'<div class="wa-acts"><button class="btn btn-ghost" onclick="waCopyDay()">Copy from previous day</button>'+
     '<button class="btn btn-ghost" onclick="waCopyWeek()">Copy last week</button>'+
-    '<button class="btn btn-primary" id="waSave" onclick="waSave()"'+((dirty&&!_wa.saving)?'':' disabled')+'>'+(_wa.saving?'Saving…':(dirty?'Save changes':'Saved'))+'</button></div></div>'+
+    '<button class="btn btn-primary" id="waSave" onclick="waSave()"'+((dirty&&!_wa.saving)?'':' disabled')+'>'+(_wa.saving?'Saving…':(dirty?'Save changes':'Saved'))+'</button></div>':'')+'</div>'+
     '<div class="wa-tabs">'+tabs+'</div>'+(_wa.loading?'<div class="wa-sub" style="padding:8px 0">Loading…</div>':'')+
     '<div class="wa-boxes">'+boxes+'</div>'+status+'</div>';
 }
