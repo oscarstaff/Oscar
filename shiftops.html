@@ -1954,6 +1954,11 @@ html{ scrollbar-gutter:stable; }
 .wa-err{margin-top:10px;padding:9px 12px;border-radius:10px;font-size:12.5px;font-weight:600;background:rgba(251,113,133,.12);border:1px solid rgba(251,113,133,.45)}
 .wa-ok{margin-top:10px;font-size:12.5px;font-weight:600;color:#34c759}
 @media(max-width:760px){.wa-boxes{grid-template-columns:1fr}}
+.wa-digest{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:14px;padding-top:12px;border-top:1px solid var(--border)}
+.wa-dh{font-size:11px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;opacity:.65;margin-bottom:6px}
+.wa-dg{display:flex;justify-content:space-between;gap:12px;font-size:13px;padding:4px 0;border-bottom:1px solid var(--border)}
+.wa-dg span{opacity:.8;text-align:right}
+@media(max-width:760px){.wa-digest{grid-template-columns:1fr}}
 </style>
 <style id="polish-2026-07-31">
 /* ═══════════════════════════════════════════════════════════════════════
@@ -11707,6 +11712,26 @@ function _waCanEdit(){
   }catch(e){}
   return true;
 }
+
+function _waParse(body){
+  /* "Front Desk - Baruna & Anurag" -> {role, names}. Lines with no separator keep names empty. */
+  return String(body||'').split(/\r?\n/).map(function(l){return l.trim();}).filter(Boolean).map(function(l){
+    var m=l.match(/^(.+?)\s*(?:[-–—:])\s+(.+)$/);
+    if(!m) return {role:l,names:[],raw:l};
+    var names=m[2].split(/\s*(?:&|,|\/|\+|\band\b)\s*/i).map(function(n){return n.trim();}).filter(Boolean);
+    return {role:m[1].trim(),names:names,raw:l};
+  });
+}
+function _waSame(a,b){
+  a=String(a||'').trim().toLowerCase(); b=String(b||'').trim().toLowerCase();
+  if(!a||!b) return false; if(a===b) return true;
+  if(a.length<5||b.length<5||Math.abs(a.length-b.length)>1) return false;
+  /* one typo allowed (Supria / Supriya) */
+  var i=0; while(i<a.length&&i<b.length&&a[i]===b[i]) i++;
+  if(a.length===b.length) return a.slice(i+1)===b.slice(i+1);
+  var s=a.length<b.length?a:b, L=a.length<b.length?b:a;
+  return s.slice(i)===L.slice(i+1);
+}
 function _waDate(i){ return _isoDate(addDays(new Date(currentWeekStart),i)); }
 function _waKey(d,s){ return d+'|'+s; }
 function _waEsc(t){ return String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
@@ -11774,7 +11799,19 @@ function waRender(){
     '<button class="btn btn-ghost" onclick="waCopyWeek()">Copy last week</button>'+
     '<button class="btn btn-primary" id="waSave" onclick="waSave()"'+((dirty&&!_wa.saving)?'':' disabled')+'>'+(_wa.saving?'Saving…':(dirty?'Save changes':'Saved'))+'</button></div>':'')+'</div>'+
     '<div class="wa-tabs">'+tabs+'</div>'+(_wa.loading?'<div class="wa-sub" style="padding:8px 0">Loading…</div>':'')+
-    '<div class="wa-boxes">'+boxes+'</div>'+status+'</div>';
+    '<div class="wa-boxes">'+boxes+'</div>'+_waDigest(ds)+status+'</div>';
+}
+/* Digest for the selected day: by duty and by person, built from the lines as typed (drafts included). */
+function _waDigest(ds){
+  var k=_waKey(ds,'work'); var txt=(k in _wa.draft)?_wa.draft[k]:(_wa.rows[k]||'');
+  var items=_waParse(txt).filter(function(x){return x.names.length;});
+  if(!items.length) return '';
+  var per={}, order=[];
+  items.forEach(function(it){ it.names.forEach(function(n){ var key=n.toLowerCase(); if(!per[key]){ per[key]={n:n,r:[]}; order.push(key); } per[key].r.push(it.role); }); });
+  order.sort();
+  var byDuty=items.map(function(it){ return '<div class="wa-dg"><b>'+_waEsc(it.role)+'</b><span>'+_waEsc(it.names.join(' & '))+'</span></div>'; }).join('');
+  var byPerson=order.map(function(key){ return '<div class="wa-dg"><b>'+_waEsc(per[key].n)+'</b><span>'+_waEsc(per[key].r.join(', '))+'</span></div>'; }).join('');
+  return '<div class="wa-digest"><div><div class="wa-dh">By duty</div>'+byDuty+'</div><div><div class="wa-dh">By person</div>'+byPerson+'</div></div>';
 }
 function waPick(i){ _wa.sel=i; _wa.msg=''; waRender(); }
 function waType(el){
@@ -11839,7 +11876,7 @@ async function waSave(){
   _wa.draft={}; _wa.msg='Saved. Enrolment staff can now see it in Nexus.'; waRender();
 }
 
-const SHIFTOPS_BUILD='2026-11-21-v52-work-allocation';
+const SHIFTOPS_BUILD='2026-11-21-v53-work-allocation-people';
 console.log('%c[ShiftOps build '+SHIFTOPS_BUILD+' loaded]','background:#0071e3;color:#fff;padding:2px 8px;border-radius:4px;font-weight:700;');
 // Start every session in the FULL (admin) view. The team-lead read-only lock is
 // only ever added later, and only once the role is positively confirmed as team
