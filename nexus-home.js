@@ -885,7 +885,7 @@ async function loadMyRoster(){
     const rows=await sbGet('roster_shifts',
       '?staff_name=eq.'+encodeURIComponent(me)+
       '&shift_date=gte.'+iso+
-      '&select=id,shift_date,start_time,end_time,role,status'+
+      '&select=id,shift_date,start_time,end_time,role,works_for_team,status'+
       '&order=shift_date.asc,start_time.asc');
     const pub=await _publishedWeeks();
     const visible=_filterPublished(rows||[], pub);
@@ -949,6 +949,7 @@ function renderMyRoster(rows, why){
             '<div style="font-size:14.5px;font-weight:700;color:var(--ui-ink,#0f172a);">'+day+'</div>'+
             '<div style="font-size:13.5px;color:var(--ui-ink-2,#334155);margin-top:2px;">'+hhmm(r.start_time)+' – '+hhmm(r.end_time)+
               (r.role?' · '+esc(r.role):'')+'</div>'+
+            (r.works_for_team?'<div style="display:inline-block;margin-top:5px;font-size:11px;font-weight:700;color:#0a58b5;background:rgba(0,113,227,.10);border-radius:999px;padding:2px 9px;">'+esc(r.works_for_team)+' team shift</div>':'')+
           '</div>'+pill+action+
         '</div>'+_waDayHtml(r.shift_date)+
       '</div>';
