@@ -1513,16 +1513,39 @@ async function checkNewDiscussions(){ /* discussions retired */ }
 
 
 
-/* ── Your work allocation (Enrolment) ────────────────────────────────────
-   The Enrolment lead types the desk / computer / role lines in ShiftOps. Here
-   each person sees today and the days ahead, with the lines that name them first.
-   Shown to everyone, whenever there is an allocation in the next two weeks. */
-function _waWhole(re, line){ try{ return new RegExp('(^|[^A-Za-z])'+re+'([^A-Za-z]|$)','i').test(line); }catch(e){ return false; } }
-function _waMine(body){
-  const full=String(me||'').trim(), first=full.split(/\s+/)[0]||'';
-  const esc1=function(x){ return x.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'); };
-  const lines=String(body||'').split(/\r?\n/).map(function(l){return l.trim();}).filter(Boolean);
-  return lines.filter(function(l){ return (full && _waWhole(esc1(full), l)) || (first.length>1 && _waWhole(esc1(first), l)); });
+/* ── Work allocation ─────────────────────────────────────────────────────
+   Typed in ShiftOps as "Duty - Name & Name", one line each. Everyone sees their own
+   duties first (and who they share them with), then the team digest for the day. */
+
+function _waParse(body){
+  /* "Front Desk - Baruna & Anurag" -> {role, names}. Lines with no separator keep names empty. */
+  return String(body||'').split(/\r?\n/).map(function(l){return l.trim();}).filter(Boolean).map(function(l){
+    var m=l.match(/^(.+?)\s*(?:[-–—:])\s+(.+)$/);
+    if(!m) return {role:l,names:[],raw:l};
+    var names=m[2].split(/\s*(?:&|,|\/|\+|\band\b)\s*/i).map(function(n){return n.trim();}).filter(Boolean);
+    return {role:m[1].trim(),names:names,raw:l};
+  });
+}
+function _waSame(a,b){
+  a=String(a||'').trim().toLowerCase(); b=String(b||'').trim().toLowerCase();
+  if(!a||!b) return false; if(a===b) return true;
+  if(a.length<5||b.length<5||Math.abs(a.length-b.length)>1) return false;
+  /* one typo allowed (Supria / Supriya) */
+  var i=0; while(i<a.length&&i<b.length&&a[i]===b[i]) i++;
+  if(a.length===b.length) return a.slice(i+1)===b.slice(i+1);
+  var s=a.length<b.length?a:b, L=a.length<b.length?b:a;
+  return s.slice(i)===L.slice(i+1);
+}
+
+function _waMyDuties(body){
+  const first=String(me||'').trim().split(/\s+/)[0]||'';
+  const out=[];
+  _waParse(body).forEach(function(it){
+    if(it.names.some(function(n){ return _waSame(n,first) || _waSame(n,String(me||'').trim()); })){
+      out.push({role:it.role, with:it.names.filter(function(n){ return !_waSame(n,first) && !_waSame(n,String(me||'').trim()); })});
+    }
+  });
+  return out;
 }
 async function loadMyAllocation(){
   const host=document.getElementById('myAllocation');
@@ -1536,25 +1559,34 @@ async function loadMyAllocation(){
     (rows||[]).forEach(function(r){ (days[r.alloc_date]=days[r.alloc_date]||{})[r.section]=r.body||''; });
     const keys=Object.keys(days).sort();
     if(!keys.length){ host.innerHTML=''; return; }
-    const lab={work:'Work allocation',available:'Available',note:'Notes'};
+    const lab={available:'Available',note:'Notes'};
     let html='<div style="margin-bottom:18px;padding:14px;border:1.5px solid var(--ui-line,#e2e8f0);border-radius:14px;background:var(--ui-card,#fff);">'+
-      '<div style="font-size:14px;font-weight:800;color:var(--ui-ink,#0f172a);margin-bottom:2px;">Your work allocation</div>'+
-      '<div style="font-size:12.5px;color:var(--ui-ink-3,#64748b);margin-bottom:10px;line-height:1.5;">Set by your team lead. Your lines come first.</div>';
+      '<div style="font-size:14px;font-weight:800;color:var(--ui-ink,#0f172a);margin-bottom:2px;">Work allocation</div>'+
+      '<div style="font-size:12.5px;color:var(--ui-ink-3,#64748b);margin-bottom:10px;line-height:1.5;">Your duties first, then the whole team for the day.</div>';
     keys.forEach(function(k){
       const dt=new Date(k+'T00:00:00'), isToday=iso(d0)===k;
       const label=dt.toLocaleDateString('en-AU',{weekday:'long',day:'numeric',month:'short'})+(isToday?' · Today':'');
-      const mine=_waMine(days[k].work);
+      const mine=_waMyDuties(days[k].work), all=_waParse(days[k].work);
       html+='<div style="padding:10px 0;border-top:1px solid var(--ui-line,#e2e8f0);">'+
-        '<div style="font-size:12.5px;font-weight:800;color:var(--ui-ink,#0f172a);margin-bottom:4px;">'+esc(label)+'</div>';
-      if(mine.length) mine.forEach(function(l){ html+='<div style="font-size:13.5px;font-weight:700;padding:6px 10px;margin:3px 0;border-radius:8px;background:rgba(0,113,227,.09);">'+esc(l)+'</div>'; });
-      else html+='<div style="font-size:12.5px;color:var(--ui-ink-4,#94a3b8);">No line with your name on this day.</div>';
-      html+='<details style="margin-top:6px;"><summary style="font-size:12px;font-weight:700;color:var(--ui-ink-3,#64748b);cursor:pointer;">Whole team for the day</summary>';
-      ['work','available','note'].forEach(function(s){
+        '<div style="font-size:12.5px;font-weight:800;color:var(--ui-ink,#0f172a);margin-bottom:6px;">'+esc(label)+'</div>';
+      if(mine.length) mine.forEach(function(m){
+        html+='<div style="font-size:14px;font-weight:800;padding:7px 11px;margin:3px 0;border-radius:9px;background:rgba(0,113,227,.10);">'+esc(m.role)+
+          (m.with.length?'<span style="font-weight:600;color:var(--ui-ink-3,#64748b);"> · with '+esc(m.with.join(' & '))+'</span>':'')+'</div>';
+      });
+      else html+='<div style="font-size:12.5px;color:var(--ui-ink-4,#94a3b8);margin-bottom:2px;">Nothing allocated to you on this day.</div>';
+      if(all.length){
+        html+='<div style="font-size:10.5px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--ui-ink-3,#64748b);margin:10px 0 3px;">Team digest</div>';
+        all.forEach(function(it){
+          const you=mine.some(function(m){ return m.role===it.role; });
+          html+='<div style="display:flex;justify-content:space-between;gap:12px;font-size:13px;padding:3px 0;'+(you?'font-weight:800;':'')+'"><span>'+esc(it.role)+'</span><span style="text-align:right;color:var(--ui-ink-3,#64748b);">'+esc(it.names.join(' & '))+'</span></div>';
+        });
+      }
+      ['available','note'].forEach(function(s){
         const b=(days[k][s]||'').trim(); if(!b) return;
-        html+='<div style="font-size:10.5px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--ui-ink-3,#64748b);margin:8px 0 2px;">'+lab[s]+'</div>'+
+        html+='<div style="font-size:10.5px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--ui-ink-3,#64748b);margin:10px 0 2px;">'+lab[s]+'</div>'+
           '<div style="font-size:13px;line-height:1.55;white-space:pre-wrap;">'+esc(b)+'</div>';
       });
-      html+='</details></div>';
+      html+='</div>';
     });
     html+='</div>';
     host.innerHTML=html;
