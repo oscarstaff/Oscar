@@ -60,10 +60,10 @@ route(/^\/profile$/, async () => {
       if (glowAllowed(mine).indexOf(skin) < 0) return;
       mine.skin = skin; smsg.textContent = '';
       skinBox.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
-      paintGlowWho(dir);
+      paintGlowWho(dir); glowSoon();
       try { await upd('staff_credentials', 'staff_name=eq.' + encodeURIComponent(ME.name) + '&select=staff_name', { name_skin: skin }); }
       catch (err) {
-        mine.skin = was; smsg.textContent = 'Not saved. ' + err.message; paintGlowWho(dir);
+        mine.skin = was; smsg.textContent = 'Not saved. ' + err.message; paintGlowWho(dir); glowSoon();
         skinBox.querySelectorAll('button').forEach(x => x.classList.toggle('on', x.getAttribute('data-skin') === glowSkin(mine)));
       }
     });
@@ -157,6 +157,46 @@ function glowName(name, p) { return p && p.glow ? '<span class="glow-name glow-'
 function paintGlowWho(dir) {
   const el = $('#whoName'), p = dir && dir[ME.name]; if (!el) return;
   el.className = p && p.glow ? 'glow-name glow-' + glowSkin(p) : '';
+}
+/* Glow everywhere a name is seen. After any page change, a sweep wraps each earned-Glow person's full name in a shimmering span,
+   wherever it appears as plain text (tables, timelines, "added by", dialogs). Form fields, selects, scripts and anything already glowing are skipped. */
+let GLOW_RE = null, GLOW_FOR = null, glowTimer = 0, glowOn = false, glowLoading = false;
+function glowBuild() {
+  if (GLOW_FOR === PV_CACHE) return;
+  GLOW_FOR = PV_CACHE;
+  const names = Object.keys(PV_CACHE || {}).filter(n => PV_CACHE[n].glow && n.length > 2).sort((a, b) => b.length - a.length);
+  GLOW_RE = names.length ? new RegExp('(' + names.map(n => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|') + ')', 'g') : null;
+}
+function glowSweep() {
+  glowTimer = 0;
+  if (!PV_CACHE) { if (!glowLoading) { glowLoading = true; staffDir().then(glowSoon, () => {}).finally(() => { glowLoading = false; }); } return; }
+  glowBuild();
+  /* restyle names already wrapped (the skin may have just changed) */
+  document.querySelectorAll('span.glow-name[data-gn]').forEach(sp => { const p = PV_CACHE[sp.getAttribute('data-gn')]; if (p) sp.className = 'glow-name glow-' + glowSkin(p); });
+  if (!GLOW_RE) return;
+  const root = document.body, SKIP = /^(SCRIPT|STYLE|TEXTAREA|INPUT|SELECT|OPTION|NOSCRIPT|SVG|CANVAS)$/;
+  const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, { acceptNode(n) {
+    const t = n.nodeValue; if (!t || t.length < 3) return NodeFilter.FILTER_REJECT;
+    for (let e = n.parentElement; e; e = e.parentElement) { if (SKIP.test(e.tagName) || e.isContentEditable || (e.classList && e.classList.contains('glow-name'))) return NodeFilter.FILTER_REJECT; }
+    GLOW_RE.lastIndex = 0; return GLOW_RE.test(t) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+  } });
+  const hits = []; while (w.nextNode()) hits.push(w.currentNode);
+  hits.forEach(n => {
+    const t = n.nodeValue, frag = document.createDocumentFragment(); let last = 0, m; GLOW_RE.lastIndex = 0;
+    while ((m = GLOW_RE.exec(t))) {
+      if (m.index > last) frag.appendChild(document.createTextNode(t.slice(last, m.index)));
+      const sp = document.createElement('span'); sp.className = 'glow-name glow-' + glowSkin(PV_CACHE[m[1]]); sp.setAttribute('data-gn', m[1]); sp.textContent = m[1]; frag.appendChild(sp);
+      last = m.index + m[1].length;
+    }
+    if (last < t.length) frag.appendChild(document.createTextNode(t.slice(last)));
+    n.parentNode.replaceChild(frag, n);
+  });
+}
+function glowSoon() { if (!glowTimer) glowTimer = setTimeout(glowSweep, 80); }
+function glowStart() {
+  if (glowOn) { glowSoon(); return; } glowOn = true;
+  new MutationObserver(glowSoon).observe(document.body, { childList: true, subtree: true, characterData: true });
+  glowSoon();
 }
 const BANNED_NICK = ['fuck', 'fucker', 'motherfucker', 'fuk', 'fuc', 'shit', 'bitch', 'cunt', 'dick', 'pussy', 'asshole', 'bastard', 'whore', 'slut', 'nigger', 'nigga', 'fag', 'faggot', 'cock', 'wank', 'machikne', 'mathsikne', 'machikni', 'randi', 'radi', 'bhalu', 'sala', 'saala', 'khate', 'muji', 'mooji', 'mujhi', 'muzi', 'lado', 'lauda', 'laado', 'puti', 'gadha', 'gu', 'chikne'];
 const normNick = s => String(s || '').toLowerCase().replace(/[013457@$]/g, c => ({ '0': 'o', '1': 'i', '3': 'e', '4': 'a', '5': 's', '7': 't', '@': 'a', '$': 's' }[c])).replace(/[^a-z]/g, '').replace(/(.)\1+/g, '$1');
