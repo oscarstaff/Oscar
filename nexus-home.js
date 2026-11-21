@@ -889,23 +889,25 @@ async function loadMyRoster(){
       '&order=shift_date.asc,start_time.asc');
     const pub=await _publishedWeeks();
     const visible=_filterPublished(rows||[], pub);
-    if(!visible.length && (rows||[]).length){
-      const host2=document.getElementById('myRosterList');
-      if(host2) host2.innerHTML='<div style="padding:30px 0;text-align:center;color:var(--ui-ink-4,#94a3b8);font-size:13px;">Your roster for the coming weeks hasn\'t been published yet.</div>';
-      return;
-    }
-    renderMyRoster(visible);
+    await _waLoadData();
+    renderMyRoster(visible, (!visible.length && (rows||[]).length)?'unpublished':'');
   }catch(e){
     console.warn('loadMyRoster',e);
     host.innerHTML='<div style="padding:26px 0;text-align:center;color:var(--ui-ink-4,#94a3b8);font-size:13px;">Couldn\'t load your roster. Pull to refresh.</div>';
   }
 }
 
-function renderMyRoster(rows){
+function renderMyRoster(rows, why){
   const host=document.getElementById('myRosterList');
   if(!host) return;
+  /* Days where you are named in the work allocation but have no visible shift (e.g. roster not published yet) still get a row. */
+  rows=(rows||[]).slice();
+  Object.keys(window._waDays||{}).forEach(function(dt){
+    if(!rows.some(function(r){ return r.shift_date===dt; }) && _waMyDuties(window._waDays[dt].work).length) rows.push({shift_date:dt,_alloc:true});
+  });
+  rows.sort(function(a,b){ return String(a.shift_date).localeCompare(String(b.shift_date)) || String(a.start_time||'').localeCompare(String(b.start_time||'')); });
   if(!rows.length){
-    host.innerHTML='<div style="padding:30px 0;text-align:center;color:var(--ui-ink-4,#94a3b8);font-size:13px;">No upcoming shifts rostered.</div>';
+    host.innerHTML='<div style="padding:30px 0;text-align:center;color:var(--ui-ink-4,#94a3b8);font-size:13px;">'+(why==='unpublished'?'Your roster for the coming weeks hasn\'t been published yet.':'No upcoming shifts rostered.')+'</div>';
     return;
   }
   const hhmm=function(t){ return String(t||'').slice(0,5); };
@@ -928,6 +930,11 @@ function renderMyRoster(rows){
       const d=new Date(r.shift_date+'T00:00:00');
       const day=d.toLocaleDateString('en-AU',{weekday:'long',day:'numeric',month:'short'});
       let pill='', action='';
+      if(r._alloc){
+        return '<div style="border:1px solid var(--ui-line,#e2e8f0);border-radius:12px;padding:13px 15px;margin-bottom:9px;background:var(--ui-surface,#fff);">'+
+          '<div style="font-size:14.5px;font-weight:700;color:var(--ui-ink,#0f172a);">'+day+'</div>'+
+          '<div style="font-size:12.5px;color:var(--ui-ink-3,#64748b);margin-top:2px;">Work allocation</div>'+_waDayHtml(r.shift_date)+'</div>';
+      }
       if(r.status==='pending_release'){
         pill='<span style="font-size:11px;font-weight:700;color:#b45309;background:#fffbeb;border:1px solid #fde68a;border-radius:999px;padding:3px 9px;">Awaiting approval</span>';
       }else if(r.status==='open'){
@@ -943,7 +950,7 @@ function renderMyRoster(rows){
             '<div style="font-size:13.5px;color:var(--ui-ink-2,#334155);margin-top:2px;">'+hhmm(r.start_time)+' – '+hhmm(r.end_time)+
               (r.role?' · '+esc(r.role):'')+'</div>'+
           '</div>'+pill+action+
-        '</div>'+
+        '</div>'+_waDayHtml(r.shift_date)+
       '</div>';
     }).join('');
     return '<div style="margin-bottom:18px;">'+
@@ -1514,8 +1521,8 @@ async function checkNewDiscussions(){ /* discussions retired */ }
 
 
 /* ── Work allocation ─────────────────────────────────────────────────────
-   Typed in ShiftOps as "Duty - Name & Name", one line each. Everyone sees their own
-   duties first (and who they share them with), then the team digest for the day. */
+   Typed in ShiftOps as "Duty - Name & Name", one line each. It shows on the person's shift card
+   (and as its own day row when they are named but have no published shift). */
 
 function _waParse(body){
   /* "Front Desk - Baruna & Anurag" -> {role, names}. Lines with no separator keep names empty. */
@@ -1547,9 +1554,8 @@ function _waMyDuties(body){
   });
   return out;
 }
-async function loadMyAllocation(){
-  const host=document.getElementById('myAllocation');
-  if(!host) return;
+/* Loads the next 14 days of allocations into window._waDays ({date:{work,available,note}}). Never throws. */
+async function _waLoadData(){
   try{
     const d0=new Date(); d0.setHours(0,0,0,0);
     const iso=function(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
@@ -1557,38 +1563,30 @@ async function loadMyAllocation(){
     const rows=await sbGet('work_allocations','?team=eq.Enrolment&alloc_date=gte.'+iso(d0)+'&alloc_date=lte.'+iso(to)+'&select=alloc_date,section,body&order=alloc_date.asc');
     const days={};
     (rows||[]).forEach(function(r){ (days[r.alloc_date]=days[r.alloc_date]||{})[r.section]=r.body||''; });
-    const keys=Object.keys(days).sort();
-    if(!keys.length){ host.innerHTML=''; return; }
-    const lab={available:'Available',note:'Notes'};
-    let html='<div style="margin-bottom:18px;padding:14px;border:1.5px solid var(--ui-line,#e2e8f0);border-radius:14px;background:var(--ui-card,#fff);">'+
-      '<div style="font-size:14px;font-weight:800;color:var(--ui-ink,#0f172a);margin-bottom:2px;">Work allocation</div>'+
-      '<div style="font-size:12.5px;color:var(--ui-ink-3,#64748b);margin-bottom:10px;line-height:1.5;">Your duties first, then the whole team for the day.</div>';
-    keys.forEach(function(k){
-      const dt=new Date(k+'T00:00:00'), isToday=iso(d0)===k;
-      const label=dt.toLocaleDateString('en-AU',{weekday:'long',day:'numeric',month:'short'})+(isToday?' · Today':'');
-      const mine=_waMyDuties(days[k].work), all=_waParse(days[k].work);
-      html+='<div style="padding:10px 0;border-top:1px solid var(--ui-line,#e2e8f0);">'+
-        '<div style="font-size:12.5px;font-weight:800;color:var(--ui-ink,#0f172a);margin-bottom:6px;">'+esc(label)+'</div>';
-      if(mine.length) mine.forEach(function(m){
-        html+='<div style="font-size:14px;font-weight:800;padding:7px 11px;margin:3px 0;border-radius:9px;background:rgba(0,113,227,.10);">'+esc(m.role)+
-          (m.with.length?'<span style="font-weight:600;color:var(--ui-ink-3,#64748b);"> · with '+esc(m.with.join(' & '))+'</span>':'')+'</div>';
-      });
-      else html+='<div style="font-size:12.5px;color:var(--ui-ink-4,#94a3b8);margin-bottom:2px;">Nothing allocated to you on this day.</div>';
-      if(all.length){
-        html+='<div style="font-size:10.5px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--ui-ink-3,#64748b);margin:10px 0 3px;">Team digest</div>';
-        all.forEach(function(it){
-          const you=mine.some(function(m){ return m.role===it.role; });
-          html+='<div style="display:flex;justify-content:space-between;gap:12px;font-size:13px;padding:3px 0;'+(you?'font-weight:800;':'')+'"><span>'+esc(it.role)+'</span><span style="text-align:right;color:var(--ui-ink-3,#64748b);">'+esc(it.names.join(' & '))+'</span></div>';
-        });
-      }
-      ['available','note'].forEach(function(s){
-        const b=(days[k][s]||'').trim(); if(!b) return;
-        html+='<div style="font-size:10.5px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--ui-ink-3,#64748b);margin:10px 0 2px;">'+lab[s]+'</div>'+
-          '<div style="font-size:13px;line-height:1.55;white-space:pre-wrap;">'+esc(b)+'</div>';
-      });
-      html+='</div>';
+    window._waDays=days;
+  }catch(e){ console.warn('_waLoadData',e); window._waDays=window._waDays||{}; }
+}
+/* The allocation for one day, drawn inside that day's shift card: your duties as chips, then a "Team for the day" digest. */
+function _waDayHtml(date){
+  const d=(window._waDays||{})[date]; if(!d) return '';
+  const mine=_waMyDuties(d.work), all=_waParse(d.work);
+  const lab={available:'Available',note:'Notes'};
+  let h='<div style="margin-top:10px;">';
+  mine.forEach(function(m){
+    h+='<div style="font-size:14px;font-weight:800;padding:7px 11px;margin:3px 0;border-radius:9px;background:rgba(0,113,227,.10);">'+esc(m.role)+
+      (m.with.length?'<span style="font-weight:600;color:var(--ui-ink-3,#64748b);"> · with '+esc(m.with.join(' & '))+'</span>':'')+'</div>';
+  });
+  if(all.length || (d.available||'').trim() || (d.note||'').trim()){
+    h+='<details style="margin-top:6px;"><summary style="font-size:12px;font-weight:700;color:var(--ui-ink-3,#64748b);cursor:pointer;">Team for the day</summary>';
+    all.forEach(function(it){
+      const you=mine.some(function(m){ return m.role===it.role; });
+      h+='<div style="display:flex;justify-content:space-between;gap:12px;font-size:13px;padding:3px 0;'+(you?'font-weight:800;':'')+'"><span>'+esc(it.role)+'</span><span style="text-align:right;color:var(--ui-ink-3,#64748b);">'+esc(it.names.join(' & '))+'</span></div>';
     });
-    html+='</div>';
-    host.innerHTML=html;
-  }catch(e){ console.warn('loadMyAllocation',e); host.innerHTML=''; }
+    ['available','note'].forEach(function(k){
+      const b=(d[k]||'').trim(); if(!b) return;
+      h+='<div style="font-size:10.5px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--ui-ink-3,#64748b);margin:10px 0 2px;">'+lab[k]+'</div><div style="font-size:13px;line-height:1.55;white-space:pre-wrap;">'+esc(b)+'</div>';
+    });
+    h+='</details>';
+  }
+  return h+'</div>';
 }
