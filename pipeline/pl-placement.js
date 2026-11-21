@@ -29,12 +29,10 @@ function bindPlacement() {
       if (bt) { await renderBatches(body); return; }
       const q = safeQ(PL.q), from = PL.page * PL.size, to = from + PL.size - 1; let rows, total, html;
       if (PL.tab === 'requests') {
-        let query = 'select=*,nex_facilities(name),nex_enrolments(student_id,nex_students(id,first_name,last_name))&order=created_at.desc'; if (PL.status) query += '&status=eq.' + PL.status; if (q) query += '&facility_text=ilike.*' + q + '*';
+        let query = 'select=*,nex_facilities(name),nex_enrolments(student_id,nex_students(id,first_name,last_name))&order=created_at.desc'; if (PL.status) query += '&status=eq.' + PL.status; if (q) query += '&or=(facility_text.ilike.*' + q + '*,student_name.ilike.*' + q + '*)';
         ({ rows, total } = await selPage('nex_placement_requests', query, from, to));
-        html = rows.length ? '<div class="nx-tablewrap"><table class="nx-table tight"><thead><tr><th>Student</th><th>Facility</th><th>Type</th><th>Emailed</th><th>Status</th><th>Note</th><th></th></tr></thead><tbody>' + rows.map(r => { const s = (r.nex_enrolments || {}).nex_students; return '<tr><td>' + (s ? '<a href="#/students/' + s.id + '"><b>' + esc(fullName(s)) + '</b></a>' : '–') + '</td><td>' + esc((r.nex_facilities || {}).name || r.facility_text || '–') + (r.form_info && (r.form_info.email || r.form_info.address) ? '<div class="nx-muted" style="font-size:12px">' + esc([r.form_info.email, r.form_info.address].filter(Boolean).join(' · ')) + '</div>' : '') + '</td><td>' + (r.self_placement ? '<span class="nx-tag walk">Self placement</span>' : '<span class="nx-tag">Arranged</span>') + (r.created_by === 'Google Form' ? ' <span class="nx-tag">Google Form</span>' : '') + (safeUrl(r.form_url) ? ' <a href="' + esc(safeUrl(r.form_url)) + '" target="_blank" rel="noopener noreferrer">Form</a>' : '') + '</td><td>' + esc(fmtDate(r.emailed_on) || '–') + '</td><td>' + pill('placement', r.status) + '</td><td class="nx-muted">' + esc((r.note || '').slice(0, 60)) + '</td><td><span class="nx-btnrow"><button class="nx-btn sm" data-ed="' + r.id + '">Update</button>' + (!r.facility_id && r.facility_text ? '<button class="nx-btn sm" data-af="' + r.id + '">Add facility</button>' : '') + '</span></td></tr>'; }).join('') + '</tbody></table></div>' : empty('No placement requests');
-        const fr = PL.page ? [] : await sel('nex_form_responses', 'select=*&status=eq.new&order=received_at.desc&limit=100').catch(() => []);   /* answers from the self-sought Google Form that nobody has matched to a student yet */
-        if (fr.length) html = plFormBanner(fr) + html;
-        body._rows = rows; body._fr = fr;
+        html = rows.length ? '<div class="nx-tablewrap"><table class="nx-table tight"><thead><tr><th>Student</th><th>Facility</th><th>Type</th><th>Emailed</th><th>Status</th><th>Note</th><th></th></tr></thead><tbody>' + rows.map(r => { const s = (r.nex_enrolments || {}).nex_students; return '<tr><td>' + (s ? '<a href="#/students/' + s.id + '"><b>' + esc(fullName(s)) + '</b></a>' : r.student_name ? '<b>' + esc(r.student_name) + '</b> <span class="nx-tag">Not linked yet</span>' + (r.student_email || r.student_phone ? '<div class="nx-muted" style="font-size:12px">' + esc([r.student_email, r.student_phone].filter(Boolean).join(' · ')) + '</div>' : '') : '–') + '</td><td>' + esc((r.nex_facilities || {}).name || r.facility_text || '–') + (r.form_info && (r.form_info.email || r.form_info.address) ? '<div class="nx-muted" style="font-size:12px">' + esc([r.form_info.email, r.form_info.address].filter(Boolean).join(' · ')) + '</div>' : '') + '</td><td>' + (r.self_placement ? '<span class="nx-tag walk">Self placement</span>' : '<span class="nx-tag">Arranged</span>') + (r.created_by === 'Google Form' ? ' <span class="nx-tag">Google Form</span>' : '') + (safeUrl(r.form_url) ? ' <a href="' + esc(safeUrl(r.form_url)) + '" target="_blank" rel="noopener noreferrer">Form</a>' : '') + '</td><td>' + esc(fmtDate(r.emailed_on) || '–') + '</td><td><select class="nx-sel sm" data-st="' + r.id + '" aria-label="Status">' + selectOpts(opts('placement', true), r.status || '', 'Not set') + '</select></td><td class="nx-muted">' + esc((r.note || '').slice(0, 60)) + '</td><td><span class="nx-btnrow"><button class="nx-btn sm" data-ed="' + r.id + '">Update</button>' + (!r.enrolment_id ? '<button class="nx-btn sm" data-ln="' + r.id + '">Link student</button>' : '') + (!r.facility_id && r.facility_text ? '<button class="nx-btn sm" data-af="' + r.id + '">Add facility</button>' : '') + '</span></td></tr>'; }).join('') + '</tbody></table></div>' : empty('No placement requests');
+        body._rows = rows;
       } else if (PL.tab === 'placements') {
         let query = 'select=*,nex_facilities(name),nex_enrolments(student_id,nex_students(id,first_name,last_name))&order=start_date.desc.nullslast,created_at.desc'; if (PL.status) query += '&status=eq.' + PL.status; if (q) query += '&facility_text=ilike.*' + q + '*';
         ({ rows, total } = await selPage('nex_placements', query, from, to));
@@ -63,7 +61,13 @@ function bindPlacement() {
         $$('[data-af]', body).forEach(b => b.onclick = () => { const r = rows.find(x => x.id === b.dataset.af), fi = r.form_info || {};
           facilityForm({ name: r.facility_text, address: fi.address, email: fi.email, notes: fi.found ? 'How a student found it: ' + fi.found : null, active: true }, async row => { await upd('nex_placement_requests', 'id=eq.' + r.id, { facility_id: row.id, facility_text: null }); });   /* new facility, then link this request to it */
         });
-        const fo = $('#plFrOpen', body); if (fo) fo.onclick = () => plFormInbox(body._fr, load);
+        $$('[data-ln]', body).forEach(b => b.onclick = () => { const r = rows.find(x => x.id === b.dataset.ln);   /* attach a form answer to the student's record */
+          pickEnrolment('Which student is ' + (r.student_name || 'this') + '?', async (en) => { try { await upd('nex_placement_requests', 'id=eq.' + r.id, { enrolment_id: en.id, student_name: null, student_email: null, student_phone: null }); toast('Linked'); load(); } catch (e) { toast(e.message, true); } }, r.student_name || r.student_email || '');
+        });
+        $$('[data-st]', body).forEach(el => el.onchange = async () => {   /* change the status right in the list */
+          const r = rows.find(x => x.id === el.dataset.st), was = r.status || '';
+          try { await upd('nex_placement_requests', 'id=eq.' + r.id, { status: el.value || null }); r.status = el.value || null; toast('Status updated'); } catch (e) { el.value = was; toast(e.message, true); }
+        });
       }
       if (PL.tab === 'blacklist') { /* already set */ }
       const fromN = total ? from + 1 : 0, toN = from + rows.length;
@@ -94,24 +98,20 @@ function pickEnrolment(title, cb, initial) {
 }
 async function facilityOptions() { const f = await sel('nex_facilities', 'select=id,name&active=eq.true&order=name&limit=1000'); return f.map(x => ({ id: x.id, label: x.name })); }
 
-async function requestForm(r, en, st, resp) {
-  r = r || (resp ? { self_placement: true, status: 'not_applied', facility_text: resp.facility_text, note: resp.details } : {});   /* resp = a Google Form answer being attached to this student */
+async function requestForm(r, en, st) {
+  r = r || {};
   if (!r.id && en && !await ppGate(await ppLoad(en.student_id), st ? fullName(st) : '', {})) return;   /* shows the team's flags (hold, English, irregular availability) before a request is sent */
   const fac = await facilityOptions();
-  if (resp) { const hit = fac.find(x => x.label.trim().toLowerCase() === String(resp.facility_text || '').trim().toLowerCase()); if (hit) { r.facility_id = hit.id; r.facility_text = null; } }
   const f = [{ k: 'facility_id', label: 'Facility', type: 'select', options: fac, value: r.facility_id, blank: 'Type a name instead', full: true }, { k: 'facility_text', label: 'Facility name (if not in the list)', value: r.facility_text, full: true },
     { k: 'self_placement', label: 'Self placement (student found it)', type: 'check', value: r.self_placement }, { k: 'form_url', label: 'Self-sought form response (link)', type: 'url', value: r.form_url, placeholder: 'https://', full: true },
     { k: 'emailed_on', label: 'Email sent on', type: 'date', value: r.emailed_on, help: 'Recorded only. YatraLine does not send the email.' },
     { k: 'status', label: 'Status', type: 'select', options: opts('placement', true), value: r.status || 'request_sent', blank: 'Not set' }, { k: 'note', label: 'Note', type: 'textarea', value: r.note, full: true }];
-  const info = r.form_info || (resp && resp.info) || null;
+  const info = r.form_info || null;
   formModal(r.id ? 'Update placement request' : 'New placement request', f, async v => {
     if (r.id) await upd('nex_placement_requests', 'id=eq.' + r.id, v);
-    else if (resp) {
-      const row = await ins('nex_placement_requests', Object.assign({ enrolment_id: en.id, created_by: ME.name, form_info: resp.info || null }, v));
-      await upd('nex_form_responses', 'id=eq.' + resp.id, { status: 'imported', student_id: st.id, enrolment_id: en.id, request_id: row && row.id, matched_by: 'staff', handled_by: ME.name, handled_at: new Date().toISOString(), reason: null });
-    } else await ins('nex_placement_requests', Object.assign({ enrolment_id: en.id, created_by: ME.name }, v), true);
+    else await ins('nex_placement_requests', Object.assign({ enrolment_id: en.id, created_by: ME.name }, v), true);
     toast('Saved'); render();
-  }, null, plInfoHtml(info));
+  }, null, (r.student_name && !r.enrolment_id ? '<div class="nx-card-b" style="padding:0 0 10px"><b>Student on the form (not linked yet):</b> ' + esc([r.student_name, r.student_email, r.student_phone].filter(Boolean).join(' · ')) + '</div>' : '') + plInfoHtml(info));
 }
 /* The aged care details the student gave on the self-sought form (stored in form_info), as labelled lines */
 const PL_INFO = [['address', 'Aged care address'], ['email', 'Aged care email'], ['found', 'How they found it'], ['referral', 'Referral and position'], ['talked_to', 'Person they spoke to'], ['approval', 'Manager approval'], ['emailed', 'Student emailed them'], ['extra', 'Anything else']];
@@ -119,27 +119,6 @@ function plInfoHtml(info) {
   if (!info || typeof info !== 'object') return '';
   const rows = PL_INFO.filter(([k]) => info[k]).map(([k, l]) => '<div style="display:flex;gap:10px;padding:2px 0"><span class="nx-muted" style="min-width:150px">' + l + '</span><span style="white-space:pre-wrap">' + esc(info[k]) + '</span></div>').join('');
   return rows ? '<div class="nx-card-b" style="padding:0 0 12px"><b>From the Google Form</b>' + rows + '</div>' : '';
-}
-/* ---- Google Form answers waiting for a student (filled by the Apps Script in scripts/self-placement-form-sync.gs) ---- */
-function plFormBanner(fr) {
-  return '<div class="nx-card-b" style="padding:12px 16px"><div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><span class="nx-tag walk">Google Form</span><b>' + fr.length + (fr.length === 1 ? ' form answer needs a student' : ' form answers need a student') + '</b><span class="nx-muted">Sent in through the self-sought form, but not matched to one student and enrolment.</span><button class="nx-btn sm primary" id="plFrOpen" style="margin-left:auto">Review</button></div></div>';
-}
-function plFormInbox(list, reload) {
-  const rows = list.slice();
-  const draw = () => rows.map(r => '<div class="nx-card-b" style="padding:12px 0;border-top:1px solid rgba(128,128,128,.25)"><div style="display:flex;gap:10px;flex-wrap:wrap;align-items:baseline"><b>' + esc(r.name || 'No name') + '</b><span class="nx-muted">' + esc([r.email, r.phone].filter(Boolean).join(' · ') || 'No email or phone') + '</span><span class="nx-muted" style="margin-left:auto">' + esc(fmtDT(r.received_at)) + '</span></div>' +
-    '<div>' + (r.facility_text ? 'Aged care: <b>' + esc(r.facility_text) + '</b>' : '<span class="nx-muted">No aged care named</span>') + '</div>' + (r.info && (r.info.email || r.info.address) ? '<div class="nx-muted" style="font-size:12px">' + esc([r.info.email, r.info.address].filter(Boolean).join(' · ')) + '</div>' : '') + (r.reason ? '<div class="nx-muted" style="font-size:12px">' + esc(r.reason) + '</div>' : '') +
-    (r.details ? '<details style="margin-top:4px"><summary class="nx-muted" style="cursor:pointer">All answers</summary><div style="white-space:pre-wrap;font-size:13px;margin-top:4px">' + esc(r.details) + '</div></details>' : '') +
-    '<div class="nx-btnrow" style="margin-top:8px"><button class="nx-btn sm primary" data-pick="' + r.id + '">Choose student</button><button class="nx-btn sm" data-dis="' + r.id + '">Dismiss</button></div></div>').join('') || '<div class="nx-help">All done.</div>';
-  const m = openModal({ title: 'Form answers to match', wide: true, footer: false, body: '<div class="nx-help">Choose the student for each answer. It becomes a self-request with the answers in its note. Dismiss anything that is not a placement request.</div><div id="plFrList">' + draw() + '</div>' });
-  const bind = () => {
-    $$('[data-pick]', m.el).forEach(b => b.onclick = () => { const r = rows.find(x => x.id === b.dataset.pick); m.close(); pickEnrolment('Which student sent this?', (en, st) => requestForm(null, en, st, r), r.name || r.email || ''); });
-    $$('[data-dis]', m.el).forEach(b => b.onclick = async () => {
-      const r = rows.find(x => x.id === b.dataset.dis);
-      if (!await confirmBox('Dismiss this answer', 'Remove ' + (r.name || 'this answer') + ' from the list? It stays on record.', 'Dismiss', true)) return;
-      try { await upd('nex_form_responses', 'id=eq.' + r.id, { status: 'dismissed', handled_by: ME.name, handled_at: new Date().toISOString() }); rows.splice(rows.indexOf(r), 1); $('#plFrList', m.el).innerHTML = draw(); bind(); reload(); } catch (e) { toast(e.message, true); }
-    });
-  };
-  bind();
 }
 async function placementForm(p, en, st) {
   p = p || {};
