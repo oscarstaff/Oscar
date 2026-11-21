@@ -35,6 +35,7 @@ route(/^\/profile$/, async () => {
     const dirty = () => { save.disabled = snap() === base; msg.textContent = ''; };
     ['nickname', 'pronouns', 'birthday', 'bio', 'show_bio'].forEach(k => { f(k).addEventListener('input', dirty); f(k).addEventListener('change', dirty); });
     save.onclick = async () => {
+      if (nickBanned(f('nickname').value)) { msg.textContent = 'That nickname isn’t allowed. Please choose another.'; f('nickname').focus(); return; }
       const patch = { nickname: f('nickname').value.trim().slice(0, 40) || null, pronouns: f('pronouns').value.trim().slice(0, 30) || null, birthday: f('birthday').value || null, bio: f('bio').value.trim().slice(0, 280) || null, show_bio: f('show_bio').checked };
       save.classList.add('busy'); save.disabled = true;
       try { await upd('staff_credentials', 'staff_name=eq.' + encodeURIComponent(ME.name) + '&select=staff_name', patch); Object.assign(STAFF, { nickname: patch.nickname || '', pronouns: patch.pronouns || '', birthday: patch.birthday || '', bio: patch.bio || '', show_bio: patch.show_bio }); base = snap(); PV_CACHE = null; toast('Profile saved'); }
@@ -52,18 +53,33 @@ route(/^\/profile$/, async () => {
       catch (e) { toast('Photo not saved. ' + e.message, true); }
       pick.classList.remove('busy'); pick.disabled = false;
     };
+    const skinBox = $('#pfSkins');
+    if (skinBox) skinBox.addEventListener('click', async e => {
+      const b = e.target.closest('button[data-skin]'); if (!b) return;
+      const mine = dir[ME.name], skin = b.getAttribute('data-skin'), was = mine.skin, smsg = $('#pfSkinMsg');
+      if (glowAllowed(mine).indexOf(skin) < 0) return;
+      mine.skin = skin; smsg.textContent = '';
+      skinBox.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
+      paintGlowWho(dir);
+      try { await upd('staff_credentials', 'staff_name=eq.' + encodeURIComponent(ME.name) + '&select=staff_name', { name_skin: skin }); }
+      catch (err) {
+        mine.skin = was; smsg.textContent = 'Not saved. ' + err.message; paintGlowWho(dir);
+        skinBox.querySelectorAll('button').forEach(x => x.classList.toggle('on', x.getAttribute('data-skin') === glowSkin(mine)));
+      }
+    });
   });
   const fact = (k, v) => '<div><dt>' + k + '</dt><dd>' + (v ? esc(v) : '<span class="nx-muted">–</span>') + '</dd></div>';
   return pageHead('user', 'Shared with your Nexus profile', 'Profile', '') +
-    '<div class="nx-card"><div class="nx-hl"><span class="nx-avatar nx-pfava' + (me.avatar ? ' has-photo" style="background-image:url(&quot;' + esc(me.avatar) + '&quot;)"' : '"') + '>' + (me.avatar ? '' : esc(initials(ME.name))) + '</span><div><div class="nx-eyebrow">' + (ME.admin ? 'Hub admin' : 'Staff') + '</div><h2 class="nx-title">' + esc(ME.name) + '</h2></div>' +
+    '<div class="nx-card"><div class="nx-hl"><span class="nx-avatar nx-pfava' + (me.avatar ? ' has-photo" style="background-image:url(&quot;' + esc(me.avatar) + '&quot;)"' : '"') + '>' + (me.avatar ? '' : esc(initials(ME.name))) + '</span><div><div class="nx-eyebrow">' + (ME.admin ? 'Hub admin' : 'Staff') + '</div><h2 class="nx-title">' + glowName(ME.name, dir[ME.name]) + '</h2></div>' +
     '<dl class="nx-facts">' + fact('Team', me.team) + fact('Email', me.email) + '</dl><div class="nx-btnrow"><a class="nx-btn" href="' + esc(staffHref(ME.name)) + '">View my profile</a><button class="nx-btn" id="pfPhoto">' + ico('edit') + 'Change photo</button><input type="file" id="pfFile" accept="image/jpeg,image/png,image/webp" hidden></div></div></div>' +
     '<div class="nx-card"><div class="nx-card-h"><h3>About you</h3></div><div class="nx-card-b"><div class="nx-form">' +
-    '<div><label class="nx-lbl" for="pf_nickname">Nickname</label><input class="nx-in" id="pf_nickname" maxlength="40" value="' + esc(me.nickname) + '"><div class="nx-help">Shown beside your name in Nexus.</div></div>' +
+    '<div><label class="nx-lbl" for="pf_nickname">Nickname</label><input class="nx-in" id="pf_nickname" maxlength="40" value="' + esc(me.nickname) + '"><div class="nx-help">Shown beside your name in Nexus and YatraLine.</div></div>' +
     '<div><label class="nx-lbl" for="pf_pronouns">Pronouns</label><input class="nx-in" id="pf_pronouns" maxlength="30" value="' + esc(me.pronouns) + '"></div>' +
     '<div><label class="nx-lbl" for="pf_birthday">Birthday</label><input class="nx-in" type="date" id="pf_birthday" value="' + esc(me.birthday) + '"></div>' +
     '<div class="full"><label class="nx-lbl" for="pf_bio">Bio</label><textarea class="nx-ta" id="pf_bio" rows="3" maxlength="280">' + esc(me.bio) + '</textarea></div>' +
     '<div class="full"><label class="nx-check"><input type="checkbox" id="pf_show_bio"' + (me.show_bio ? ' checked' : '') + '> Show my bio to other staff</label></div></div>' +
     '<div class="nx-btnrow" style="margin-top:16px"><button class="nx-btn primary" id="pfSave" disabled>Save changes</button><span class="nx-err" id="pfMsg" role="alert"></span></div></div></div>' +
+    (glowAllowed(dir[ME.name]).length ? '<div class="nx-card"><div class="nx-card-h"><div><h3>Name glow</h3><div class="nx-muted">You earned it. Pick how your name shimmers. Nexus shows the same one.</div></div></div><div class="nx-card-b"><div class="nx-skins" id="pfSkins">' + glowAllowed(dir[ME.name]).map(k => '<button type="button" class="nx-skin' + (k === glowSkin(dir[ME.name]) ? ' on' : '') + '" data-skin="' + k + '"><span class="glow-name glow-' + k + '">' + esc(GLOW_LABELS[k] || k) + '</span></button>').join('') + '</div><div class="nx-err" id="pfSkinMsg" role="alert"></div></div></div>' : '') +
     (Object.keys(teams).length ? '<div class="nx-card"><div class="nx-card-h"><div><h3>Team directory</h3><div class="nx-muted">Open anyone’s profile.</div></div></div><div class="nx-card-b nx-dir">' + Object.keys(teams).sort().map(t => '<div><div class="nx-lbl">' + esc(t) + '</div><div class="nx-dirnames">' + teams[t].map(n => '<a href="' + esc(staffHref(n)) + '">' + esc(n) + '</a>').join('') + '</div></div>').join('') + '</div></div>' : '') +
     '<div class="nx-card"><div class="nx-note">' + ico('lock') + 'Password, security questions, themes and notification settings are changed in Nexus.</div></div>';
 });
@@ -97,6 +113,7 @@ function achAgo(iso) {
 }
 route(/^\/achievements$/, async () => {
   const safe = p => p.catch(() => []);
+  const dirP = staffDir().catch(() => ({}));
   const [cq, tq, ph, cm, av] = await Promise.all([
     safe(sel('custom_quiz_results', 'select=staff_name,created_at&passed=is.true&order=created_at.desc&limit=200')),
     safe(sel('training_quiz_results', 'select=staff_name,created_at&passed=is.true&order=created_at.desc&limit=200')),
@@ -116,18 +133,34 @@ route(/^\/achievements$/, async () => {
   const starts = Array.from(new Set((ph || []).map(r => r.fort_start).filter(Boolean))).sort();
   let target = null; for (let i = starts.length - 1; i >= 0; i--) { if (new Date(starts[i] + 'T00:00:00').getTime() + 14 * 86400000 <= Date.now()) { target = starts[i]; break; } }
   const glowing = target ? Array.from(new Set(perfect.filter(r => r.fort_start === target).map(r => r.staff_name))).sort() : [];
+  const dir = await dirP, gn = n => glowName(n, dir[n]);
   const pic = {}; (av || []).forEach(r => { const u = avatarUrl(r); if (u && r.staff_name) pic[r.staff_name] = u; });
   const face = n => pic[n] ? '<span class="nx-avatar has-photo" style="background-image:url(&quot;' + esc(pic[n]) + '&quot;)"></span>' : '<span class="nx-avatar">' + esc(initials(n)) + '</span>';
   const what = e => e.type === 'glow' ? ['warn', 'Glow', 'earned Glow, a perfect fortnight'] : e.type === 'calls' ? ['info', 'Calls', 'logged ' + (e.n || 0).toLocaleString('en-AU') + ' calls'] : ['ok', 'Training', 'passed a training quiz'];
   const shown = ev.slice(0, 150);
   return pageHead('star', 'Same feed as Nexus', 'Team achievements', '') +
-    (glowing.length ? '<div class="nx-card"><div class="nx-card-h"><div><h3>Glowing this fortnight</h3><div class="nx-muted">A perfect punctuality score in the last finished fortnight.</div></div></div><div class="nx-card-b nx-glowrow">' + glowing.map(n => '<a class="nx-who nx-wholink" href="' + esc(staffHref(n)) + '">' + face(n) + '<b>' + esc(n) + '</b></a>').join('') + '</div></div>' : '') +
-    '<div class="nx-card"><div class="nx-card-h"><h3>Recently earned</h3></div>' + (shown.length ? '<ul class="nx-list nx-achlist">' + shown.map(e => { const w = what(e); return '<li><a class="nx-who nx-wholink" href="' + esc(staffHref(e.name)) + '">' + face(e.name) + '<span class="nx-achtxt"><b>' + esc(e.name) + '</b> ' + esc(w[2]) + '</span></a><span class="nx-btnrow"><span class="nx-pill ' + w[0] + '">' + w[1] + '</span><span class="nx-muted nx-achago">' + esc(achAgo(e.date)) + '</span></span></li>'; }).join('') + '</ul>' : empty('No achievements yet', 'Passed quizzes, perfect fortnights and call milestones show up here.')) + '</div>';
+    (glowing.length ? '<div class="nx-card"><div class="nx-card-h"><div><h3>Glowing this fortnight</h3><div class="nx-muted">A perfect punctuality score in the last finished fortnight.</div></div></div><div class="nx-card-b nx-glowrow">' + glowing.map(n => '<a class="nx-who nx-wholink" href="' + esc(staffHref(n)) + '">' + face(n) + '<b>' + gn(n) + '</b></a>').join('') + '</div></div>' : '') +
+    '<div class="nx-card"><div class="nx-card-h"><h3>Recently earned</h3></div>' + (shown.length ? '<ul class="nx-list nx-achlist">' + shown.map(e => { const w = what(e); return '<li><a class="nx-who nx-wholink" href="' + esc(staffHref(e.name)) + '">' + face(e.name) + '<span class="nx-achtxt"><b>' + gn(e.name) + '</b> ' + esc(w[2]) + '</span></a><span class="nx-btnrow"><span class="nx-pill ' + w[0] + '">' + w[1] + '</span><span class="nx-muted nx-achago">' + esc(achAgo(e.date)) + '</span></span></li>'; }).join('') + '</ul>' : empty('No achievements yet', 'Passed quizzes, perfect fortnights and call milestones show up here.')) + '</div>';
 });
 
 /* ---------- Staff profile view (#/staff/<name>): the Nexus "profile-view" page ----------
    Anyone's public profile: team, nickname, what they are known for, quick stats, bio and achievements.
-   Built from the same tables as Nexus. Nexus-only cosmetics (name glow skins, banner perks) are not shown here. */
+   Built from the same tables as Nexus, including the name glow skin (staff_credentials.name_skin), so a skin picked here or in Nexus shows in both. */
+/* ---------- Name glow (same rules and the same staff_credentials.name_skin as Nexus) ----------
+   Earned by a perfect fortnight (all 8 skins) or 1,000 logged calls (Forest Gold). */
+const GLOW_SKINS = ['gold', 'ocean', 'sunset', 'molten', 'holographic', 'emerald', 'rosegold', 'galaxy'], ELITE_SKINS = ['darkemerald'];
+const GLOW_LABELS = { gold: 'Gold', ocean: 'Ocean', sunset: 'Sunset', molten: 'Molten', holographic: 'Holographic', emerald: 'Emerald', rosegold: 'Rose gold', galaxy: 'Galaxy', darkemerald: 'Forest Gold' };
+function glowAllowed(p) { return (p && p.perfect ? GLOW_SKINS : []).concat(p && p.elite ? ELITE_SKINS : []); }
+function glowSkin(p) { const ok = glowAllowed(p); return p && p.skin && ok.indexOf(p.skin) >= 0 ? p.skin : (p && p.elite ? 'darkemerald' : 'gold'); }
+/* a name as HTML: shimmering when the person has earned Glow, plain text otherwise */
+function glowName(name, p) { return p && p.glow ? '<span class="glow-name glow-' + glowSkin(p) + '" title="Earned Glow">' + esc(name) + '</span>' : esc(name); }
+function paintGlowWho(dir) {
+  const el = $('#whoName'), p = dir && dir[ME.name]; if (!el) return;
+  el.className = p && p.glow ? 'glow-name glow-' + glowSkin(p) : '';
+}
+const BANNED_NICK = ['fuck', 'fucker', 'motherfucker', 'fuk', 'fuc', 'shit', 'bitch', 'cunt', 'dick', 'pussy', 'asshole', 'bastard', 'whore', 'slut', 'nigger', 'nigga', 'fag', 'faggot', 'cock', 'wank', 'machikne', 'mathsikne', 'machikni', 'randi', 'radi', 'bhalu', 'sala', 'saala', 'khate', 'muji', 'mooji', 'mujhi', 'muzi', 'lado', 'lauda', 'laado', 'puti', 'gadha', 'gu', 'chikne'];
+const normNick = s => String(s || '').toLowerCase().replace(/[013457@$]/g, c => ({ '0': 'o', '1': 'i', '3': 'e', '4': 'a', '5': 's', '7': 't', '@': 'a', '$': 's' }[c])).replace(/[^a-z]/g, '').replace(/(.)\1+/g, '$1');
+const nickBanned = nick => { const n = normNick(nick); return !!n && BANNED_NICK.some(w => n.indexOf(normNick(w)) !== -1); };
 const PV_THEMES = { Enrolment: '#0369a1', Processing: '#c2410c', Placement: '#047857', Evershine: '#6d28d9', Accounts: '#334155', Education: '#4338ca', Office: '#0f766e' };
 let PV_CACHE = null, PV_AT = 0;
 function staffHref(n) { return '#/staff/' + encodeURIComponent(n); }
@@ -136,7 +169,7 @@ async function staffDir(force) {
   const safe = p => p.catch(() => []);
   const [names, creds, sett, pc, pt, ph, cm, mv, av] = await Promise.all([
     sel('staff_names', 'select=name&order=name.asc'),
-    safe(sel('staff_credentials', 'select=staff_name,team,pronouns,nickname')),
+    safe(sel('staff_credentials', 'select=staff_name,team,pronouns,nickname,name_skin')),
     safe(sel('staff_settings', 'select=name,is_hub_admin')),
     safe(sel('custom_quiz_results', 'select=staff_name,quiz_id&passed=is.true&limit=5000')),
     safe(sel('training_quiz_results', 'select=staff_name,quiz_id&passed=is.true&limit=5000')),
@@ -146,7 +179,7 @@ async function staffDir(force) {
     safe(sel('staff_avatars', 'select=staff_name,avatar,avatar_path&limit=500'))
   ]);
   const by = {}; (names || []).forEach(n => { if (n && n.name) by[n.name] = { name: n.name, team: '', pronouns: '', nickname: '', admin: false, training: 0, punct: null, calls: 0, moves: [], avatar: '', glow: false, elite: false }; });
-  (creds || []).forEach(c => { const p = by[c.staff_name]; if (p) { p.team = c.team || ''; p.pronouns = c.pronouns || ''; p.nickname = (c.nickname || '').trim(); } });
+  (creds || []).forEach(c => { const p = by[c.staff_name]; if (p) { p.team = c.team || ''; p.pronouns = c.pronouns || ''; p.nickname = (c.nickname || '').trim(); p.skin = c.name_skin || ''; } });
   (sett || []).forEach(x => { const p = by[x.name]; if (p) p.admin = x.is_hub_admin === true; });
   const passed = {}; (pc || []).concat(pt || []).forEach(r => { if (r && r.staff_name && r.quiz_id != null) (passed[r.staff_name] = passed[r.staff_name] || new Set()).add(String(r.quiz_id)); });
   Object.keys(passed).forEach(n => { if (by[n]) by[n].training = passed[n].size; });
@@ -157,7 +190,7 @@ async function staffDir(force) {
     const p = by[r.staff_name]; if (!p) return;
     const days = Number(r.x) || 0, sc = Number(r.score) || 0;
     if (!p.punct) p.punct = { tier: days >= 4 && sc >= 90 ? 'gold' : days >= 4 && sc >= 80 ? 'silver' : null, score: sc, days, fort: String(r.fort_start || '').slice(0, 10) };
-    if (target && r.fort_start === target && sc === 100 && days >= 4) p.glow = true;
+    if (target && r.fort_start === target && sc === 100 && days >= 4) { p.glow = true; p.perfect = true; }
   });
   (cm || []).forEach(r => { const p = by[r.staff_name]; if (!p) return; const m = Number(r.milestone) || 0; if (m > p.calls) p.calls = m; if (m >= 1000) { p.elite = true; p.glow = true; } });
   (mv || []).forEach(r => { const p = by[r.staff_name]; if (p) p.moves.push(r); });
@@ -223,7 +256,7 @@ route(/^\/staff\/(.+)$/, async m => {
   return back +
     '<div class="nx-card nx-pv"><div class="nx-pvband" style="background:' + col + '"><span aria-hidden="true">' + esc((p.team || '').toUpperCase()) + '</span></div><div class="nx-pvbody">' +
     '<span class="nx-avatar nx-pvava' + (p.avatar ? ' has-photo" style="background-image:url(&quot;' + esc(p.avatar) + '&quot;)"' : '"') + '>' + (p.avatar ? '' : esc(initials(name))) + '</span>' +
-    '<div class="nx-pvhead"><div><h1 class="nx-title">' + esc(name) + (p.nickname ? ' <span class="nx-pvaka">aka “' + esc(p.nickname) + '”</span>' : '') + '</h1>' + (p.elite ? '<div class="nx-pvtitle">The Call-Handler</div>' : '') +
+    '<div class="nx-pvhead"><div><h1 class="nx-title">' + glowName(name, p) + (p.nickname ? ' <span class="nx-pvaka">aka “' + esc(p.nickname) + '”</span>' : '') + '</h1>' + (p.elite ? '<div class="nx-pvtitle">The Call-Handler</div>' : '') +
     '<div class="nx-pvmeta">' + (p.team ? '<span class="nx-tag">' + esc(p.team) + ' team</span>' : '') + (p.admin ? '<span class="nx-tag walk">Admin</span>' : '') + (p.pronouns ? '<span class="nx-muted">' + esc(p.pronouns) + '</span>' : '') + '</div></div>' +
     (name === ME.name ? '<a class="nx-btn" href="#/profile">' + ico('edit') + 'Edit profile</a>' : '') + '</div>' +
     (p.moves.length ? '<ul class="nx-pvmoves">' + p.moves.slice(0, 3).map(r => '<li>Moved from <b>' + esc(r.from_team || '?') + '</b> to <b>' + esc(r.to_team || '?') + '</b> · ' + esc(day(r.changed_at)) + '</li>').join('') + '</ul>' : '') +
