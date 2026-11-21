@@ -1937,6 +1937,23 @@ html{ scrollbar-gutter:stable; }
   .btn, .card, .stat-card, .modal, #empProfBody, #payResults, .tab-content.active, .appbar-nav .nav-item{ animation:none !important; transition:none !important; transform:none !important; }
 }
 /* ═══ END SAFE POLISH LAYER ═══ */
+
+.wa-card{margin:18px 0 6px;padding:16px 18px;border:1px solid var(--border);border-radius:14px;background:var(--surface,rgba(255,255,255,.03))}
+.wa-head{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-start;justify-content:space-between;margin-bottom:12px}
+.wa-title{font-size:15px;font-weight:700}
+.wa-sub{font-size:12px;opacity:.7;margin-top:2px}
+.wa-acts{display:flex;flex-wrap:wrap;gap:8px}
+.wa-tabs{display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;margin-bottom:10px}
+.wa-tab{position:relative;display:flex;flex-direction:column;align-items:center;min-width:64px;padding:7px 12px;border-radius:10px;border:1px solid var(--border);background:transparent;color:inherit;font:inherit;font-size:12px;font-weight:700;cursor:pointer}
+.wa-tab .wa-d{font-size:10px;font-weight:500;opacity:.65}
+.wa-tab.on{background:var(--accent,#0071e3);border-color:var(--accent,#0071e3);color:#fff}
+.wa-dot{position:absolute;top:5px;right:6px;width:6px;height:6px;border-radius:50%;background:#34c759}
+.wa-boxes{display:grid;grid-template-columns:2fr 1fr 1fr;gap:12px}
+.wa-box{display:flex;flex-direction:column;gap:5px;font-size:11px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;opacity:1}
+.wa-box textarea{font:inherit;font-size:13px;font-weight:400;letter-spacing:0;text-transform:none;line-height:1.5;padding:9px 11px;border-radius:10px;border:1px solid var(--border);background:var(--bg,transparent);color:inherit;resize:vertical;min-height:90px}
+.wa-err{margin-top:10px;padding:9px 12px;border-radius:10px;font-size:12.5px;font-weight:600;background:rgba(251,113,133,.12);border:1px solid rgba(251,113,133,.45)}
+.wa-ok{margin-top:10px;font-size:12.5px;font-weight:600;color:#34c759}
+@media(max-width:760px){.wa-boxes{grid-template-columns:1fr}}
 </style>
 <style id="polish-2026-07-31">
 /* ═══════════════════════════════════════════════════════════════════════
@@ -3136,6 +3153,7 @@ body.avail-editing #availGrid .avail-chip.av2:hover{ background:color-mix(in srg
           </div>
         </div>
         <div class="roster-grid" id="rosterGrid"></div>
+        <div id="waCard"></div>
       </div>
 
       <div class="tab-content" id="section-availability">
@@ -4823,6 +4841,7 @@ async function openLeaveClash(id){
 
 function renderRoster(){
   const grid=document.getElementById('rosterGrid');
+  try{ waSync(); }catch(e){}
   // Derive this week's leaves straight from leave_submissions: match by name,
   // strip anything that doesn't belong, add every approved leave that does.
   // The grid is ALWAYS a true reflection of leave_submissions.
@@ -11667,7 +11686,158 @@ async function aaSave(){
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────
-const SHIFTOPS_BUILD='2026-11-14-v51-team-list';
+/* ── Work allocation (Enrolment team) ─────────────────────────────────────
+   Free-text desk / computer / role lines per day, typed like the weekly sheet.
+   One row per (team, day, section) in work_allocations. Admins and the
+   Enrolment team lead can edit (enforced by RLS, wa_can_write). Errors show
+   inline in the card, never in a toast. */
+var WA_TEAM='Enrolment';
+var WA_SECS=[
+  {k:'work',label:'Work allocation',ph:'One line per person, e.g.\nSupriya – Desk 1, PC 4, Enquiries\nNippu – Desk 2, PC 5, Follow-ups'},
+  {k:'available',label:'Available',ph:'Who is free to help, one per line'},
+  {k:'note',label:'Notes',ph:'Anything else for the day'}
+];
+var _wa={wk:null,rows:{},draft:{},sel:0,loading:false,err:'',msg:'',saving:false,failed:false};
+function _waVisible(){
+  try{
+    if(typeof AM_TEAM_LEAD!=='undefined' && AM_TEAM_LEAD && typeof _tlResolved!=='undefined' && _tlResolved){
+      return String(MY_TEAM||'').trim().toLowerCase()===WA_TEAM.toLowerCase();
+    }
+  }catch(e){}
+  return true;
+}
+function _waDate(i){ return _isoDate(addDays(new Date(currentWeekStart),i)); }
+function _waKey(d,s){ return d+'|'+s; }
+function _waEsc(t){ return String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function _waDirtyKeys(){
+  var out=[];
+  Object.keys(_wa.draft).forEach(function(k){
+    var cur=(_wa.rows[k]||'');
+    if((_wa.draft[k]||'').replace(/\s+$/,'')!==cur.replace(/\s+$/,'')) out.push(k);
+  });
+  return out;
+}
+async function _waFetch(from,to){
+  var tok=null; try{ tok=await _soFreshTok(); }catch(e){}
+  if(!tok || !_soTokAlive()) throw new Error('You are not signed in right now. Refresh the page and sign in again.');
+  var r=await fetch(SUPABASE_URL+'/rest/v1/work_allocations?select=alloc_date,section,body&team=eq.'+encodeURIComponent(WA_TEAM)+
+    '&alloc_date=gte.'+from+'&alloc_date=lte.'+to,{headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+tok}});
+  if(!r.ok) throw new Error('Could not load work allocation (HTTP '+r.status+').');
+  var rows=await r.json(); if(!Array.isArray(rows)) throw new Error('Could not load work allocation (bad response).');
+  return rows;
+}
+async function waSync(force){
+  var host=document.getElementById('waCard'); if(!host) return;
+  if(!_waVisible()){ host.innerHTML=''; return; }
+  var wk=_isoDate(currentWeekStart);
+  if(!force && _wa.wk===wk && !_wa.failed){ if(!host.firstChild) waRender(); return; }
+  if(_wa.loading) return;
+  var weekChanged=_wa.wk!==wk;
+  if(weekChanged){
+    _wa.rows={}; _wa.err=''; _wa.msg='';
+    var t=new Date(); var di=-1; for(var i=0;i<7;i++){ if(_waDate(i)===_isoDate(t)) di=i; }
+    _wa.sel=di>=0?di:0;
+  }
+  _wa.wk=wk; _wa.loading=true; _wa.failed=false; waRender();
+  try{
+    var rows=await _waFetch(_waDate(0),_waDate(6));
+    if(_wa.wk!==wk) return;
+    var m={}; rows.forEach(function(r){ m[_waKey(r.alloc_date,r.section)]=r.body||''; });
+    _wa.rows=m; _wa.err='';
+  }catch(e){ _wa.err=String(e&&e.message||e); _wa.failed=true; }
+  finally{ _wa.loading=false; waRender(); }
+}
+function waRender(){
+  var host=document.getElementById('waCard'); if(!host) return;
+  if(!_waVisible()){ host.innerHTML=''; return; }
+  var d0=addDays(new Date(currentWeekStart),0), d6=addDays(new Date(currentWeekStart),6);
+  var tabs='';
+  for(var i=0;i<7;i++){
+    var ds=_waDate(i), filled=false;
+    WA_SECS.forEach(function(s){ var k=_waKey(ds,s.k); var v=(k in _wa.draft)?_wa.draft[k]:(_wa.rows[k]||''); if(v.trim()) filled=true; });
+    tabs+='<button type="button" class="wa-tab'+(i===_wa.sel?' on':'')+'" onclick="waPick('+i+')">'+DAYS[i]+
+      '<span class="wa-d">'+fmtDate(addDays(new Date(currentWeekStart),i))+'</span>'+(filled?'<i class="wa-dot" aria-label="has entries"></i>':'')+'</button>';
+  }
+  var ds=_waDate(_wa.sel), boxes='';
+  WA_SECS.forEach(function(s){
+    var k=_waKey(ds,s.k); var v=(k in _wa.draft)?_wa.draft[k]:(_wa.rows[k]||'');
+    boxes+='<label class="wa-box"><span>'+s.label+'</span><textarea data-k="'+k+'" rows="'+(s.k==='work'?9:5)+'" placeholder="'+_waEsc(s.ph)+'" maxlength="6000" oninput="waType(this)"'+(_wa.loading?' disabled':'')+'>'+_waEsc(v)+'</textarea></label>';
+  });
+  var dirty=_waDirtyKeys().length;
+  var status=_wa.err?'<div class="wa-err" role="alert">'+_waEsc(_wa.err)+(_wa.failed?' <button class="btn btn-ghost" style="padding:3px 10px" onclick="waSync(true)">Retry</button>':'')+'</div>'
+    :(_wa.msg?'<div class="wa-ok">'+_waEsc(_wa.msg)+'</div>':'');
+  host.innerHTML='<div class="wa-card"><div class="wa-head"><div><div class="wa-title">Work allocation · '+WA_TEAM+' team</div>'+
+    '<div class="wa-sub">'+fmtDate(d0)+' – '+fmtDate(d6)+'. Each Enrolment person also sees their own lines in Nexus under Shifts.</div></div>'+
+    '<div class="wa-acts"><button class="btn btn-ghost" onclick="waCopyDay()">Copy from previous day</button>'+
+    '<button class="btn btn-ghost" onclick="waCopyWeek()">Copy last week</button>'+
+    '<button class="btn btn-primary" id="waSave" onclick="waSave()"'+((dirty&&!_wa.saving)?'':' disabled')+'>'+(_wa.saving?'Saving…':(dirty?'Save changes':'Saved'))+'</button></div></div>'+
+    '<div class="wa-tabs">'+tabs+'</div>'+(_wa.loading?'<div class="wa-sub" style="padding:8px 0">Loading…</div>':'')+
+    '<div class="wa-boxes">'+boxes+'</div>'+status+'</div>';
+}
+function waPick(i){ _wa.sel=i; _wa.msg=''; waRender(); }
+function waType(el){
+  _wa.draft[el.getAttribute('data-k')]=el.value; _wa.msg='';
+  var b=document.getElementById('waSave'); if(b && !_wa.saving){ var n=_waDirtyKeys().length; b.disabled=!n; b.textContent=n?'Save changes':'Saved'; }
+}
+function waCopyDay(){
+  if(_wa.sel<1){ _wa.err='There is no previous day in this week to copy from. Use Copy last week instead.'; waRender(); return; }
+  var from=_waDate(_wa.sel-1), to=_waDate(_wa.sel), n=0;
+  WA_SECS.forEach(function(s){
+    var fk=_waKey(from,s.k), tk=_waKey(to,s.k);
+    var src=(fk in _wa.draft)?_wa.draft[fk]:(_wa.rows[fk]||'');
+    var cur=(tk in _wa.draft)?_wa.draft[tk]:(_wa.rows[tk]||'');
+    if(src.trim() && !cur.trim()){ _wa.draft[tk]=src; n++; }
+  });
+  _wa.err=''; _wa.msg=n?'Copied from '+DAYS[_wa.sel-1]+'. Press Save changes to keep it.':'Nothing to copy: '+DAYS[_wa.sel-1]+' is empty, or this day already has entries.';
+  waRender();
+}
+async function waCopyWeek(){
+  _wa.err=''; _wa.msg='';
+  try{
+    var prevMon=addDays(new Date(currentWeekStart),-7);
+    var rows=await _waFetch(_isoDate(prevMon),_isoDate(addDays(prevMon,6)));
+    var n=0;
+    rows.forEach(function(r){
+      var d=_isoDate(addDays(new Date(r.alloc_date+'T00:00:00'),7)), k=_waKey(d,r.section);
+      var cur=(k in _wa.draft)?_wa.draft[k]:(_wa.rows[k]||'');
+      if((r.body||'').trim() && !cur.trim()){ _wa.draft[k]=r.body; n++; }
+    });
+    _wa.msg=n?'Copied last week into the empty days. Press Save changes to keep it.':'Nothing to copy: last week has no entries, or this week is already filled.';
+  }catch(e){ _wa.err=String(e&&e.message||e); }
+  waRender();
+}
+async function waSave(){
+  var keys=_waDirtyKeys(); if(!keys.length||_wa.saving) return;
+  _wa.saving=true; _wa.err=''; _wa.msg=''; waRender();
+  var up=[], del=[];
+  keys.forEach(function(k){
+    var p=k.split('|'), body=(_wa.draft[k]||'').replace(/\s+$/,'');
+    if(body.trim()) up.push({team:WA_TEAM,alloc_date:p[0],section:p[1],body:body});
+    else if(_wa.rows[k]) del.push(p);
+  });
+  var fail='';
+  try{
+    var tok=await _soFreshTok();
+    if(!tok || !_soTokAlive()) throw new Error('You are not signed in right now. Refresh the page and sign in again.');
+    var H={apikey:SUPABASE_KEY,Authorization:'Bearer '+tok,'Content-Type':'application/json'};
+    if(up.length){
+      var r=await fetch(SUPABASE_URL+'/rest/v1/work_allocations?on_conflict=team,alloc_date,section',
+        {method:'POST',headers:Object.assign({Prefer:'resolution=merge-duplicates,return=minimal'},H),body:JSON.stringify(up)});
+      if(!r.ok){ var t=await r.text().catch(function(){return '';});
+        fail=(r.status===401||r.status===403)?'You do not have permission to edit the '+WA_TEAM+' work allocation. Only admins and the '+WA_TEAM+' team lead can.':'Could not save (HTTP '+r.status+'). '+t.slice(0,160); }
+    }
+    for(var i=0;i<del.length && !fail;i++){
+      var rd=await fetch(SUPABASE_URL+'/rest/v1/work_allocations?team=eq.'+encodeURIComponent(WA_TEAM)+'&alloc_date=eq.'+del[i][0]+'&section=eq.'+del[i][1],{method:'DELETE',headers:H});
+      if(!rd.ok) fail='Could not clear an emptied box (HTTP '+rd.status+').';
+    }
+  }catch(e){ fail=String(e&&e.message||e); }
+  _wa.saving=false;
+  if(fail){ _wa.err=fail; waRender(); return; }
+  keys.forEach(function(k){ var b=(_wa.draft[k]||'').replace(/\s+$/,''); if(b.trim()) _wa.rows[k]=b; else delete _wa.rows[k]; });
+  _wa.draft={}; _wa.msg='Saved. Enrolment staff can now see it in Nexus.'; waRender();
+}
+
+const SHIFTOPS_BUILD='2026-11-21-v52-work-allocation';
 console.log('%c[ShiftOps build '+SHIFTOPS_BUILD+' loaded]','background:#0071e3;color:#fff;padding:2px 8px;border-radius:4px;font-weight:700;');
 // Start every session in the FULL (admin) view. The team-lead read-only lock is
 // only ever added later, and only once the role is positively confirmed as team

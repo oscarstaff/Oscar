@@ -1511,3 +1511,54 @@ function hideBanner(){
 
 async function checkNewDiscussions(){ /* discussions retired */ }
 
+
+
+/* ── Your work allocation (Enrolment) ────────────────────────────────────
+   The Enrolment lead types the desk / computer / role lines in ShiftOps. Here
+   each person sees today and the days ahead, with the lines that name them first.
+   Shown to Enrolment staff, or to anyone whose name appears in a line. */
+function _waWhole(re, line){ try{ return new RegExp('(^|[^A-Za-z])'+re+'([^A-Za-z]|$)','i').test(line); }catch(e){ return false; } }
+function _waMine(body){
+  const full=String(me||'').trim(), first=full.split(/\s+/)[0]||'';
+  const esc1=function(x){ return x.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'); };
+  const lines=String(body||'').split(/\r?\n/).map(function(l){return l.trim();}).filter(Boolean);
+  return lines.filter(function(l){ return (full && _waWhole(esc1(full), l)) || (first.length>1 && _waWhole(esc1(first), l)); });
+}
+async function loadMyAllocation(){
+  const host=document.getElementById('myAllocation');
+  if(!host) return;
+  try{
+    const d0=new Date(); d0.setHours(0,0,0,0);
+    const iso=function(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
+    const to=new Date(d0); to.setDate(to.getDate()+13);
+    const rows=await sbGet('work_allocations','?team=eq.Enrolment&alloc_date=gte.'+iso(d0)+'&alloc_date=lte.'+iso(to)+'&select=alloc_date,section,body&order=alloc_date.asc');
+    const days={};
+    (rows||[]).forEach(function(r){ (days[r.alloc_date]=days[r.alloc_date]||{})[r.section]=r.body||''; });
+    const keys=Object.keys(days).sort();
+    const inTeam=/^enrol/i.test(myTeam||'');
+    const named=keys.some(function(k){ return _waMine(days[k].work).length; });
+    if(!keys.length || !(inTeam||named)){ host.innerHTML=''; return; }
+    const lab={work:'Work allocation',available:'Available',note:'Notes'};
+    let html='<div style="margin-bottom:18px;padding:14px;border:1.5px solid var(--ui-line,#e2e8f0);border-radius:14px;background:var(--ui-card,#fff);">'+
+      '<div style="font-size:14px;font-weight:800;color:var(--ui-ink,#0f172a);margin-bottom:2px;">Your work allocation</div>'+
+      '<div style="font-size:12.5px;color:var(--ui-ink-3,#64748b);margin-bottom:10px;line-height:1.5;">Set by your team lead. Your lines come first.</div>';
+    keys.forEach(function(k){
+      const dt=new Date(k+'T00:00:00'), isToday=iso(d0)===k;
+      const label=dt.toLocaleDateString('en-AU',{weekday:'long',day:'numeric',month:'short'})+(isToday?' · Today':'');
+      const mine=_waMine(days[k].work);
+      html+='<div style="padding:10px 0;border-top:1px solid var(--ui-line,#e2e8f0);">'+
+        '<div style="font-size:12.5px;font-weight:800;color:var(--ui-ink,#0f172a);margin-bottom:4px;">'+esc(label)+'</div>';
+      if(mine.length) mine.forEach(function(l){ html+='<div style="font-size:13.5px;font-weight:700;padding:6px 10px;margin:3px 0;border-radius:8px;background:rgba(0,113,227,.09);">'+esc(l)+'</div>'; });
+      else html+='<div style="font-size:12.5px;color:var(--ui-ink-4,#94a3b8);">No line with your name on this day.</div>';
+      html+='<details style="margin-top:6px;"><summary style="font-size:12px;font-weight:700;color:var(--ui-ink-3,#64748b);cursor:pointer;">Whole team for the day</summary>';
+      ['work','available','note'].forEach(function(s){
+        const b=(days[k][s]||'').trim(); if(!b) return;
+        html+='<div style="font-size:10.5px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--ui-ink-3,#64748b);margin:8px 0 2px;">'+lab[s]+'</div>'+
+          '<div style="font-size:13px;line-height:1.55;white-space:pre-wrap;">'+esc(b)+'</div>';
+      });
+      html+='</details></div>';
+    });
+    html+='</div>';
+    host.innerHTML=html;
+  }catch(e){ console.warn('loadMyAllocation',e); host.innerHTML=''; }
+}
