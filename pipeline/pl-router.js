@@ -188,6 +188,7 @@ async function boot() {
   pressFeedback();
   nexiInit();
   await meP;
+  staffDir().then(paintGlowWho).catch(() => {});   /* top-bar name shimmers once Glow is known; not worth holding the page for */
   render();
   try { liveStart(); } catch (e) { console.warn('[live] not started', e); }
 }

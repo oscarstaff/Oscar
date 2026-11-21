@@ -42,6 +42,7 @@ const NEXI_FAQ = [
     ['How do I fill in the team report?', 'Press More in the tab bar and choose Team report. Enter your numbers or tasks for the day and press Save entry. Team leads and admins can generate the weekly report and print it or save it as a PDF.', ['#/teamreport', 'Open Team report']],
     ['Where do I see team achievements?', 'Press More in the tab bar and choose Achievements. It lists who passed a training quiz, who earned Glow for a perfect fortnight and who reached a call milestone, the same feed as Nexus.', ['#/achievements', 'Open Achievements']],
     ['How do I change my photo, nickname or bio?', 'Press your name at the top right to open Profile. Your password, themes and notification settings are changed in Nexus.', ['#/profile', 'Open Profile']],
+    ['How do I change how my name glows?', 'If you earned Glow (a perfect fortnight, or 1,000 logged calls), your name shimmers everywhere in YatraLine. Open Profile and pick a style under Name glow. Nexus uses the same choice, so changing it in either place changes both.', ['#/profile', 'Open Profile']],
     ['How do I see someone else’s profile?', 'Press a name in Achievements (under More), or pick someone from the Team directory at the bottom of your Profile page. You see their team, what they are known for, their stats, bio and achievements.', ['#/achievements', 'Open Achievements']]
   ]]
 ];
