@@ -1345,8 +1345,7 @@ async function loadShiftsPage(){
   try{
     await Promise.allSettled([
       (typeof loadMyRoster==='function') ? loadMyRoster() : null,
-      (typeof loadShiftPickup==='function') ? loadShiftPickup() : null,
-      (typeof loadMyAllocation==='function') ? loadMyAllocation() : null
+      (typeof loadShiftPickup==='function') ? loadShiftPickup() : null
     ]);
   }catch(e){}
   if(tok !== _shiftsLoadToken) return;
