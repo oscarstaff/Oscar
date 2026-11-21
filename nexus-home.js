@@ -1523,7 +1523,7 @@ async function checkNewDiscussions(){ /* discussions retired */ }
 
 /* ── Work allocation ─────────────────────────────────────────────────────
    Typed in ShiftOps as "Duty - Name & Name", one line each. It shows on the person's shift card
-   (and as its own day row when they are named but have no published shift). */
+   (and as its own day row when they are named but have no shift of their own). Only for published weeks. */
 
 function _waParse(body){
   /* "Front Desk - Baruna & Anurag" -> {role, names}. Lines with no separator keep names empty. */
@@ -1562,8 +1562,13 @@ async function _waLoadData(){
     const iso=function(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
     const to=new Date(d0); to.setDate(to.getDate()+13);
     const rows=await sbGet('work_allocations','?team=eq.Enrolment&alloc_date=gte.'+iso(d0)+'&alloc_date=lte.'+iso(to)+'&select=alloc_date,section,body&order=alloc_date.asc');
+    /* Not sent to staff until that week's roster is published. If the publish list can't be read, show nothing. */
+    const pub=await _publishedWeeks();
     const days={};
-    (rows||[]).forEach(function(r){ (days[r.alloc_date]=days[r.alloc_date]||{})[r.section]=r.body||''; });
+    (rows||[]).forEach(function(r){
+      if(!pub || !pub.has(_weekMonISO(r.alloc_date))) return;
+      (days[r.alloc_date]=days[r.alloc_date]||{})[r.section]=r.body||'';
+    });
     window._waDays=days;
   }catch(e){ console.warn('_waLoadData',e); window._waDays=window._waDays||{}; }
 }
