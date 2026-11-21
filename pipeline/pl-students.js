@@ -62,7 +62,8 @@ function feedItem(a) {
 
 /* ---------- Leads, Students and Search (one list, three pages) ----------
    Leads: paid under $200 in total. Students: paid $200 or more. Search: everyone, labelled. */
-/* The lead follow-up cycle: a 1st, 2nd and 3rd follow-up, 2, 4 and 6 days after first contact (nex_start_lead_cycle).
+/* The lead follow-up cycle is for chasing documents, so it closes when the enrolment reaches Docs completed. Payment chasing after that is done by filtering the Leads list by stage.
+   The lead follow-up cycle: a 1st, 2nd and 3rd follow-up, 2, 4 and 6 days after first contact (nex_start_lead_cycle).
    nex_lead_followup holds one row per lead: the step that is open now, when it is due, and how many steps are still open.
    It is kept up to date by a trigger on nex_followups, so the Leads list can filter and sort on it. */
 const FU_NTH = n => n + (n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10 > 3 ? 0 : n % 10]);   /* 1st, 2nd, 3rd, 4th ... after the 3rd the staff pick each next date */
@@ -77,7 +78,7 @@ const FU_SORT = {
 function fuInfo(raw, today) {
   const fu = Array.isArray(raw) ? raw[0] : raw;
   if (!fu || !fu.total_count) return { key: 'none', label: 'No follow-ups set', tone: '', sub: '' };
-  if (!fu.open_count || !fu.step) return { key: 'complete', label: 'Follow-ups finished', tone: 'ok', sub: fu.total_count + ' done · booked, on hold or not interested' };
+  if (!fu.open_count || !fu.step) return { key: 'complete', label: 'Follow-ups finished', tone: 'ok', sub: fu.total_count + ' done · booked, on hold, not interested or docs completed' };
   const nth = FU_NTH(fu.step), who = fu.assigned_to ? ' · ' + String(fu.assigned_to).trim().split(/\s+/)[0] : '';   /* first name only so it fits on one line; the full name is in the hover title */
   if (fu.due_day < today) { const n = Math.round((new Date(today + 'T12:00:00') - new Date(fu.due_day + 'T12:00:00')) / 864e5); return { key: 'due' + fu.step, label: nth + ' Follow Up Due', tone: 'bad', sub: n + (n === 1 ? ' day' : ' days') + ' overdue' + who }; }
   if (fu.due_day === today) return { key: 'due' + fu.step, label: nth + ' Follow Up Due', tone: 'warn', sub: 'Due today' + who };
