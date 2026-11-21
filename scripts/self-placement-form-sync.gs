@@ -5,9 +5,9 @@
       (open the form to edit it; the id is between /d/ and /edit). A sheet id (SHEET_ID) works too.
    2. Run setup() once and allow access. It installs the "on form submit" trigger.
    3. (Optional) Run sendAllRows() once to bring in answers that came in before today. Safe to run again: repeats are ignored.
-   What happens: each response is sent to Supabase (nex_form_intake). If the email, phone or name matches a student with one
-   enrolment, a "Not applied" self-request appears in Placement > Self-Requests. Anything else waits in the "Form responses"
-   box at the top of that tab for staff to attach to a student.
+   What happens: each response is sent to Supabase (nex_form_intake) and appears in Placement > Self-Requests as a "Not applied"
+   request tagged Google Form. If the email, phone or name matches a student with one enrolment it is linked to them; otherwise
+   it shows the name from the form with "Not linked yet" and a Link student button. Change the status from the list.
    Only the student's own name, email and phone are used for matching. If the form has several email/phone/name questions
    (for example the aged care's email), edit the three patterns in MAP below so they point at the student's. */
 
