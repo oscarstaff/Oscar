@@ -17,7 +17,7 @@ async function authApi(path) {
 }
 /* the token stays valid for up to an hour after Supabase ends the session, so ask the login service now and then */
 async function sessionAlive() { if (locked) return; try { await authApi('user'); } catch (e) { /* only a dead session locks (authApi does that); a network blip does not */ } }
-async function mfaList() { const u = await authApi('user'); return ((u && u.factors) || []).filter(f => (f.factor_type === 'totp' || f.factor_type === 'webauthn') && f.status === 'verified'); }
+async function mfaList() { const u = await authApi('user'); return ((u && u.factors) || []).filter(f => f.factor_type === 'totp' && f.status === 'verified'); }
 /* runs once before the app is drawn; never resolves when a code is needed and missing */
 function mfaGate() {
   return new Promise(async resolve => {
@@ -25,7 +25,7 @@ function mfaGate() {
       const st = await (await api('rpc/nex_mfa_state', { method: 'POST', body: {} })).json();
       if (st && st.required && aalNow() !== 'aal2') {
         const box = $('#mfa'), card = $('#mfaCard');
-        card.innerHTML = '<div class="gate-t mfa-t">Enter your code in Nexus</div><p class="mfa-p">YatraLine needs you to confirm it is you. Go back to Nexus, open the YatraLine card on the Nodes page, and approve with your passkey (Face ID or fingerprint). First time? Nexus walks you through setting one up.</p>';
+        card.innerHTML = '<div class="gate-t mfa-t">Enter your code in Nexus</div><p class="mfa-p">YatraLine needs your 6-digit code. Go back to Nexus, open the YatraLine card on the Nodes page, and enter the code from your authenticator app (or set it up if this is your first time).</p>';
         box.hidden = false; return;
       }
     } catch (e) { if (e.message === 'session') return; }
@@ -35,7 +35,7 @@ function mfaGate() {
 
 /* ---------- Admin page card ---------- */
 function secCard() {
-  return '<div class="nx-card"><div class="nx-card-h"><div><h3>Two-step login</h3><div class="nx-muted">A passkey (Face ID or fingerprint), asked in Nexus once per sign-in when a person opens YatraLine.</div></div></div><div id="adSec" class="nx-card-b"><div class="nx-skel" style="width:50%"></div></div></div>';
+  return '<div class="nx-card"><div class="nx-card-h"><div><h3>Two-step login</h3><div class="nx-muted">A 6-digit code from an authenticator app, asked in Nexus once per sign-in when a person opens YatraLine.</div></div></div><div id="adSec" class="nx-card-b"><div class="nx-skel" style="width:50%"></div></div></div>';
 }
 async function bindSec() {
   const box = $('#adSec'); if (!box) return;

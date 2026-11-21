@@ -169,7 +169,7 @@ function _mfaCodeAt(){
   let at=_mfaOkAt;
   try{
     const c=JSON.parse(atob((window._sbAuthToken||'').split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));
-    (c.amr||[]).forEach(function(a){ if(a&&(a.method==='totp'||a.method==='mfa/totp'||a.method==='mfa/webauthn')&&Number(a.timestamp)>0) at=Math.max(at,Number(a.timestamp)*1000); });
+    (c.amr||[]).forEach(function(a){ if(a&&a.method==='totp'&&Number(a.timestamp)>0) at=Math.max(at,Number(a.timestamp)*1000); });
   }catch(e){}
   return at;
 }
@@ -179,70 +179,6 @@ async function _nexMfaState(){
     const r=await fetch(SB+'/rest/v1/rpc/nex_mfa_state',{method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+_sbBearer(),'Content-Type':'application/json'},body:'{}'});
     return r.ok?await r.json():null;
   }catch(e){ return null; }
-}
-/* ---- Passkey (Face ID, fingerprint, Windows Hello, phone via QR) as the second step. Same aal2 level as a code, so the database rule is unchanged. ---- */
-function _pkSupported(){ try{ return !!(window.PublicKeyCredential && navigator.credentials); }catch(e){ return false; } }
-function _pkMsg(error){
-  const n=String((error&&(error.name||error.code))||''), m=String((error&&error.message)||'');
-  if(/NotAllowed|AbortError|cancel/i.test(n+' '+m)) return 'Cancelled, or it timed out. Press the button to try again.';
-  if(/not_enabled|webauthn.*(disabled|not enabled)/i.test(n+' '+m+' '+String((error&&error.code)||''))) return 'Passkeys are not switched on for this project yet. Ask the admin to turn on WebAuthn under Supabase Authentication, Multi-Factor.';
-  if(/rate|too many/i.test(m)) return 'Too many tries. Wait a minute and try again.';
-  return 'That did not work: '+(m||'unknown error')+'. Try again.';
-}
-/* A small centred dialog. Each action's run() is called straight from the click (browsers only allow the passkey prompt right after a tap).
-   run() returns {done:value} to close, {error:'text'} to show a message in the dialog, or nothing to stay open. */
-function _mfaBox(title,text,actions){
-  return new Promise(function(resolve){
-    const bg=document.createElement('div');
-    bg.style.cssText='position:fixed;inset:0;z-index:100700;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(15,23,42,.55);';
-    const card=document.createElement('div');
-    card.setAttribute('role','dialog'); card.setAttribute('aria-modal','true');
-    card.style.cssText='width:min(380px,100%);background:var(--ui-surface,#fff);color:var(--ui-ink,#0f172a);border-radius:18px;padding:22px;box-shadow:0 24px 60px rgba(0,0,0,.35);font:14px/1.5 system-ui,sans-serif;text-align:center;';
-    const h=document.createElement('div'); h.textContent=title; h.style.cssText='font-size:18px;font-weight:700;margin-bottom:6px;';
-    const p=document.createElement('div'); p.textContent=text; p.style.cssText='font-size:13px;color:var(--ui-ink-3,#64748b);margin-bottom:12px;';
-    const err=document.createElement('div'); err.setAttribute('role','alert'); err.style.cssText='color:#b3261e;font-size:13px;min-height:18px;margin-bottom:8px;';
-    const col=document.createElement('div'); col.style.cssText='display:flex;flex-direction:column;gap:8px;';
-    const done=function(v){ bg.remove(); resolve(v); };
-    actions.forEach(function(a){
-      const b=document.createElement('button'); b.type='button'; b.textContent=a.label;
-      b.style.cssText=a.primary?'border:0;border-radius:10px;padding:11px;font:600 14px system-ui,sans-serif;background:var(--accent,#059669);color:#fff;cursor:pointer;':'border:1px solid var(--ui-line-hi,#cbd5e1);background:transparent;color:inherit;border-radius:10px;padding:11px;font:600 14px system-ui,sans-serif;cursor:pointer;';
-      b.onclick=async function(){
-        if(!a.run){ done(a.value); return; }
-        const all=col.querySelectorAll('button'); all.forEach(function(x){x.disabled=true;}); err.textContent='';
-        let r; try{ r=await a.run(); }catch(e){ r={error:_pkMsg(e)}; }
-        all.forEach(function(x){x.disabled=false;});
-        if(r&&r.done!==undefined) done(r.done); else if(r&&r.error) err.textContent=r.error;
-      };
-      col.appendChild(b);
-    });
-    [h,p,err,col].forEach(function(n){ card.appendChild(n); });
-    bg.appendChild(card); document.body.appendChild(bg);
-    const first=col.querySelector('button'); if(first) setTimeout(function(){ first.focus(); },30);
-  });
-}
-/* true = confirmed, 'code' = they chose the 6-digit code, false = closed */
-function _mfaAskPasskey(ac,factorId,hasCode,again){
-  const acts=[{label:'Use my passkey',primary:true,run:async function(){
-    const r=await ac.mfa.webauthn.authenticate({factorId:factorId});
-    if(r&&r.error) return {error:_pkMsg(r.error)};
-    _mfaOkAt=Date.now(); await refreshSbAuthToken(); return {done:true};
-  }}];
-  if(hasCode) acts.push({label:'Enter a 6-digit code instead',value:'code'});
-  acts.push({label:'Cancel',value:false});
-  return _mfaBox(again?'Confirm it is you':'Open YatraLine',(again?'It has been a while since your last check. ':'')+'Approve with Face ID, your fingerprint or your device PIN. On a computer you can use your phone by scanning the QR code it shows.',acts);
-}
-/* Make a passkey for this person. Resolves true when done, false when they decline. */
-function _mfaMakePasskey(ac,title,text,laterLabel){
-  return _mfaBox(title,text,[{label:'Set up a passkey',primary:true,run:async function(){
-    try{
-      const lf=await ac.mfa.listFactors();
-      const stale=((lf&&lf.data&&lf.data.all)||[]).filter(function(f){return f.status!=='verified';});
-      for(const f of stale){ try{ await ac.mfa.unenroll({factorId:f.id}); }catch(e){} }
-    }catch(e){}
-    const r=await ac.mfa.webauthn.register({friendlyName:'Nex passkey '+new Date().toLocaleDateString('en-CA')});
-    if(r&&r.error) return {error:_pkMsg(r.error)};
-    _mfaOkAt=Date.now(); await refreshSbAuthToken(); showToast('Passkey is on','success'); return {done:true};
-  }},{label:laterLabel,value:false}]);
 }
 function _mfaDigits(v){ return String(v||'').replace(/\D/g,'').slice(0,6); }
 async function _mfaAskCode(ac,factorId,again){
@@ -257,14 +193,58 @@ async function _mfaAskCode(ac,factorId,again){
   }
   return false;
 }
-/* Setup: a passkey is the only way in now. Resolves true (done), 'skip' (optional offer declined) or false (closed while required). */
-async function _mfaEnrol(ac,mandatory){
-  if(!_pkSupported()||!ac.mfa.webauthn){
-    await _mfaBox('Passkey not available','This browser cannot make a passkey. Open Nexus in Chrome, Safari or Edge on a phone or computer with Face ID, a fingerprint reader or a device PIN.',[{label:'OK',primary:true,value:false}]);
-    return false;
-  }
-  const made=await _mfaMakePasskey(ac,'Set up your passkey',(mandatory?'YatraLine now asks you to confirm it is you. ':'')+'You approve with Face ID, your fingerprint or your device PIN, so there is no code to type. Takes about 10 seconds.',mandatory?'Cancel':'Not now');
-  return made?true:(mandatory?false:'skip');
+/* Setup card: QR + key + first code. Resolves true (done), 'skip' (optional offer declined) or false (closed while required). */
+function _mfaEnrol(ac,mandatory){
+  return new Promise(async function(resolve){
+    let enr;
+    try{
+      const lf=await ac.mfa.listFactors();
+      const stale=((lf&&lf.data&&lf.data.all)||[]).filter(function(f){return f.status!=='verified';});
+      for(const f of stale){ try{ await ac.mfa.unenroll({factorId:f.id}); }catch(e){} }
+      const r=await ac.mfa.enroll({factorType:'totp',friendlyName:'Nex '+Date.now(),issuer:'Oscars Nex'});
+      if(r.error||!r.data) throw (r.error||new Error('Could not start setup'));
+      enr=r.data;
+    }catch(e){ console.warn('mfa enrol',e); showToast('Could not start two-step setup. Try again.','error'); resolve(false); return; }
+    const t=enr.totp||{}, secret=String(t.secret||'').replace(/(.{4})/g,'$1 ').trim();
+    const bg=document.createElement('div');
+    bg.style.cssText='position:fixed;inset:0;z-index:100700;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(15,23,42,.55);';
+    const card=document.createElement('div');
+    card.setAttribute('role','dialog'); card.setAttribute('aria-modal','true');
+    card.style.cssText='width:min(380px,100%);max-height:92vh;overflow:auto;background:var(--ui-surface,#fff);color:var(--ui-ink,#0f172a);border-radius:18px;padding:22px;box-shadow:0 24px 60px rgba(0,0,0,.35);font:14px/1.5 system-ui,sans-serif;text-align:center;';
+    const h=document.createElement('div'); h.textContent='Set up two-step login'; h.style.cssText='font-size:18px;font-weight:700;margin-bottom:6px;';
+    const p=document.createElement('div'); p.style.cssText='font-size:13px;color:var(--ui-ink-3,#64748b);text-align:left;margin-bottom:10px;';
+    p.textContent=(mandatory?'Nex now asks for a 6-digit code as well as your password. ':'')+'1. Install an authenticator app (Google Authenticator, Microsoft Authenticator or Authy). 2. Scan the picture, or type the key. 3. Enter the 6 digits it shows.';
+    const qrBox=document.createElement('div'); qrBox.style.cssText='background:#fff;border:1px solid var(--ui-line,#e2e8f0);border-radius:12px;padding:8px;width:176px;margin:0 auto 8px;';
+    const img=document.createElement('img'); img.alt='QR code for your authenticator app'; img.width=160; img.height=160; img.style.display='block';
+    const qr=String(t.qr_code||'').trim(), at=qr.search(/<svg[\s>]/i);
+    if(/^data:image\/svg\+xml/i.test(qr)) img.src=qr; else if(at>=0) img.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(qr.slice(at)); else qrBox.style.display='none';
+    qrBox.appendChild(img);
+    const key=document.createElement('div'); key.textContent=secret; key.style.cssText='font-family:ui-monospace,Menlo,monospace;font-size:13px;letter-spacing:.05em;background:var(--ui-surface-3,#f1f5f9);border-radius:8px;padding:8px 10px;margin-bottom:10px;word-break:break-all;';
+    const inp=document.createElement('input'); inp.type='text'; inp.inputMode='numeric'; inp.autocomplete='one-time-code'; inp.maxLength=7; inp.placeholder='000000'; inp.setAttribute('aria-label','6-digit code');
+    inp.style.cssText='width:100%;box-sizing:border-box;text-align:center;font:600 24px ui-monospace,Menlo,monospace;letter-spacing:.3em;padding:10px;border-radius:10px;border:1px solid var(--ui-line-hi,#cbd5e1);background:var(--ui-surface,#fff);color:var(--ui-ink,#0f172a);margin-bottom:8px;';
+    inp.addEventListener('input',function(){ inp.value=_mfaDigits(inp.value); });
+    const err=document.createElement('div'); err.style.cssText='color:#b3261e;font-size:13px;min-height:18px;margin-bottom:6px;';
+    const go=document.createElement('button'); go.textContent='Turn on'; go.style.cssText='width:100%;border:0;border-radius:10px;padding:11px;font:600 14px system-ui,sans-serif;background:var(--accent,#059669);color:#fff;cursor:pointer;';
+    const row=document.createElement('div'); row.style.cssText='display:flex;gap:8px;';
+    row.appendChild(go);
+    const done=function(v){ bg.remove(); resolve(v); };
+    const later=document.createElement('button'); later.textContent=mandatory?'Cancel':'Not now'; later.style.cssText='border:1px solid var(--ui-line-hi,#cbd5e1);background:transparent;color:inherit;border-radius:10px;padding:11px 14px;font:600 14px system-ui,sans-serif;cursor:pointer;';
+    later.onclick=function(){ done(mandatory?false:'skip'); };
+    row.appendChild(later);
+    go.onclick=async function(){
+      const code=_mfaDigits(inp.value);
+      if(code.length!==6){ err.textContent='Enter the 6 digits shown in your app.'; return; }
+      go.disabled=true; err.textContent='';
+      const { error }=await ac.mfa.challengeAndVerify({factorId:enr.id,code:code});
+      go.disabled=false;
+      if(error){ err.textContent=/rate|too many/i.test(error.message||'')?'Too many tries. Wait a minute and try again.':'That code did not match. Wait for a new one and try again.'; inp.value=''; inp.focus(); return; }
+      _mfaOkAt=Date.now(); await refreshSbAuthToken(); showToast('Two-step login is on','success'); done(true);
+    };
+    inp.addEventListener('keydown',function(e){ if(e.key==='Enter') go.click(); });
+    [h,p,qrBox,key,inp,err,row].forEach(function(n){ card.appendChild(n); });
+    bg.appendChild(card); document.body.appendChild(bg);
+    setTimeout(function(){ inp.focus(); },30);
+  });
 }
 /* true = go ahead and open Nex. The database enforces the rule too, so a skipped check never opens data. */
 async function nexMfaGate(){
@@ -276,19 +256,7 @@ async function nexMfaGate(){
   if(verified&&_mfaCodeFresh()) return true;
   const lf=await ac.mfa.listFactors();
   const ver=((lf&&lf.data&&lf.data.totp)||[])[0];
-  const pkf=((lf&&lf.data&&lf.data.webauthn)||[])[0];
-  if(pkf){
-    if(!(_pkSupported()&&ac.mfa.webauthn)){ await _mfaBox('Passkey not available','This browser cannot use your passkey. Open Nexus in Chrome, Safari or Edge, or ask an admin to reset your two-step login.',[{label:'OK',primary:true,value:false}]); return false; }
-    return (await _mfaAskPasskey(ac,pkf.id,false,verified))===true;
-  }
-  if(ver){
-    /* Older setups only have the authenticator code. It is accepted once, to get in and make a passkey; after that it is never asked. */
-    const ok=await _mfaAskCode(ac,ver.id,verified);
-    if(ok&&_pkSupported()&&ac.mfa.webauthn){
-      await _mfaMakePasskey(ac,'Switch to a passkey','Codes are being retired. Set up a passkey now and from the next time you just tap to approve with Face ID or your fingerprint.','Not now');
-    }
-    return ok;
-  }
+  if(ver) return await _mfaAskCode(ac,ver.id,verified);
   if(st.required) return await _mfaEnrol(ac,true);
   if(typeof myIsAdmin!=='undefined'&&myIsAdmin===true&&!sessionStorage.getItem('nx_mfa_offer_skip')){
     const r=await _mfaEnrol(ac,false);
