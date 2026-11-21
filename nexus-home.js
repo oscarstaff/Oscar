@@ -1516,7 +1516,7 @@ async function checkNewDiscussions(){ /* discussions retired */ }
 /* ── Your work allocation (Enrolment) ────────────────────────────────────
    The Enrolment lead types the desk / computer / role lines in ShiftOps. Here
    each person sees today and the days ahead, with the lines that name them first.
-   Shown to Enrolment staff, or to anyone whose name appears in a line. */
+   Shown to everyone, whenever there is an allocation in the next two weeks. */
 function _waWhole(re, line){ try{ return new RegExp('(^|[^A-Za-z])'+re+'([^A-Za-z]|$)','i').test(line); }catch(e){ return false; } }
 function _waMine(body){
   const full=String(me||'').trim(), first=full.split(/\s+/)[0]||'';
@@ -1535,9 +1535,7 @@ async function loadMyAllocation(){
     const days={};
     (rows||[]).forEach(function(r){ (days[r.alloc_date]=days[r.alloc_date]||{})[r.section]=r.body||''; });
     const keys=Object.keys(days).sort();
-    const inTeam=/^enrol/i.test(myTeam||'');
-    const named=keys.some(function(k){ return _waMine(days[k].work).length; });
-    if(!keys.length || !(inTeam||named)){ host.innerHTML=''; return; }
+    if(!keys.length){ host.innerHTML=''; return; }
     const lab={work:'Work allocation',available:'Available',note:'Notes'};
     let html='<div style="margin-bottom:18px;padding:14px;border:1.5px solid var(--ui-line,#e2e8f0);border-radius:14px;background:var(--ui-card,#fff);">'+
       '<div style="font-size:14px;font-weight:800;color:var(--ui-ink,#0f172a);margin-bottom:2px;">Your work allocation</div>'+
