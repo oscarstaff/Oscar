@@ -19,7 +19,7 @@ const teamIs = (...t) => { const mine = String(ME.team || '').trim().toLowerCase
 const canFlag = () => !!ME.admin || teamIs('Evershine');
 const canPay = () => !!ME.admin || teamIs('Processing', 'Accounts');
 const canVerify = () => !!ME.admin || teamIs('Accounts');        /* Accounts check a bank payment against the bank statement (admins can too) */
-const canCash = () => canPay() || teamIs('Evershine');            /* the Evershine team takes payments on the class day, so they may enter cash or a bank transfer (nothing else) */
+const canCash = () => true;                                         /* anyone may ADD a payment. Only Processing and Accounts change one, and Accounts verify everything but cash */
 /* Only confirmed money counts as received. A bank transfer is Pending verification until Accounts verify it; cash is confirmed as soon as it is entered. */
 const payConfirmed = p => !p || !p.verify_status || p.verify_status === 'confirmed';
 const sumPaid = list => (list || []).reduce((t, p) => t + (payConfirmed(p) ? Number(p.amount || 0) : 0), 0);
@@ -33,11 +33,12 @@ function payStatusHtml(p) {
   return h;
 }
 const PAY_METHODS = ['Bank transfer', 'Cash', 'Card', 'Agent', 'Other'];
-const payMethodOpts = () => canPay() ? PAY_METHODS : ['Cash', 'Bank transfer'];   /* class staff: cash or bank transfer only */
-const PAY_METHOD_HELP = 'Bank transfer waits as Pending verification until Accounts check it against the bank statement. Cash is confirmed straight away and goes to the admins to check the handover.';
+const payMethodOpts = () => PAY_METHODS;
+const payMethodHelp = () => canPay() ? 'Bank transfer waits as Pending verification until Accounts check it against the bank statement. Cash is confirmed straight away and goes to the admins to check the handover.'
+  : 'Cash is confirmed straight away and goes to the admins to check the handover. Anything else waits as Pending verification until Accounts check it.';
 function payDoneMsg(method) {
   const m = String(method || '').toLowerCase();
-  return m.indexOf('bank') >= 0 ? 'Payment recorded. It stays Pending verification until Accounts check the bank statement.'
+  return m.indexOf('bank') >= 0 || (m && m !== 'cash' && !canPay()) ? 'Payment recorded. It stays Pending verification until Accounts check it.'
     : m === 'cash' ? 'Cash recorded and confirmed. The admins have it in their cash receipts to check the handover.' : 'Payment recorded';
 }
 
