@@ -1959,7 +1959,7 @@ html{ scrollbar-gutter:stable; }
 .wa-dg{display:flex;justify-content:space-between;gap:12px;font-size:13px;padding:4px 0;border-bottom:1px solid var(--border)}
 .wa-dg span{opacity:.8;text-align:right}
 @media(max-width:760px){.wa-digest{grid-template-columns:1fr}}
-.sb-xteam{display:block;margin-top:2px;font-size:9px;font-weight:700;letter-spacing:.2px;color:var(--accent-text,#0071e3)}
+.sb-xteam{display:inline-block;margin-top:3px;font-size:8.5px;font-weight:800;letter-spacing:.4px;color:#78350f;background:#fbbf24;border-radius:4px;padding:1px 5px}
 </style>
 <style id="polish-2026-07-31">
 /* ═══════════════════════════════════════════════════════════════════════
@@ -4933,7 +4933,7 @@ function renderRoster(){
           const stCls = sh._status==='open' ? ' shift-openpick' : (sh._status==='pending_release' ? ' shift-pendrel' : '');
           const stTag = sh._status==='open' ? '<br><span class="sb-tag">OPEN FOR PICKUP</span>'
                       : (sh._status==='pending_release' ? '<br><span class="sb-tag">RELEASE ASKED</span>' : '');
-          html+=`<div class="shift-badge ${il?'shift-leave':'shift-slot'}${stCls}" ${il?'':`style="background:${s.color}1a;border-left:3px solid ${s.color};" draggable="true" onmousedown="shiftBadgeDown(${s.id},${d},${i})" ondragstart="shiftDragStart(event,${s.id},${d},${i})" ondragend="shiftDragEnd(event)"`} onclick="event.stopPropagation();${il?'editShift':'shiftBadgeClick'}(${s.id},${d},${i})">${il?'LEAVE':`<b class="sb-time">${sh.start}–${sh.end}</b>`}${(!il&&sh._team)?`<span class="sb-xteam" title="Works for the ${sh._team} team">→ ${sh._team}</span>`:''}${stTag}${(!il&&sh._dbId&&_rcnPending[sh._dbId])?'<span title="Change not yet seen by '+s.first+'" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#f59e0b;margin-left:4px;vertical-align:middle"></span>':''}${dev?`<br><span style="font-size:8px;opacity:.85;color:${devConflict?'#ff6432':'inherit'}"> ${dev.name}${sh.deviceStart?` ${sh.deviceStart}–${sh.deviceEnd}`:''}${devConflict?' ':''}</span>`:`${staffRoleLabel(s)?`<br><span style="font-size:8px;opacity:.7">${staffRoleLabel(s)}</span>`:''}`}</div>`;
+          html+=`<div class="shift-badge ${il?'shift-leave':'shift-slot'}${stCls}" ${il?'':`style="${sh._team?'background:rgba(245,158,11,.28);border-left:3px solid #f59e0b;box-shadow:0 0 0 1px rgba(245,158,11,.55) inset;':`background:${s.color}1a;border-left:3px solid ${s.color};`}" draggable="true" onmousedown="shiftBadgeDown(${s.id},${d},${i})" ondragstart="shiftDragStart(event,${s.id},${d},${i})" ondragend="shiftDragEnd(event)"`} onclick="event.stopPropagation();${il?'editShift':'shiftBadgeClick'}(${s.id},${d},${i})">${il?'LEAVE':`<b class="sb-time">${sh.start}–${sh.end}</b>`}${(!il&&sh._team)?`<span class="sb-xteam" title="Works for the ${sh._team} team">FOR ${String(sh._team).toUpperCase()}</span>`:''}${stTag}${(!il&&sh._dbId&&_rcnPending[sh._dbId])?'<span title="Change not yet seen by '+s.first+'" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#f59e0b;margin-left:4px;vertical-align:middle"></span>':''}${dev?`<br><span style="font-size:8px;opacity:.85;color:${devConflict?'#ff6432':'inherit'}"> ${dev.name}${sh.deviceStart?` ${sh.deviceStart}–${sh.deviceEnd}`:''}${devConflict?' ':''}</span>`:`${staffRoleLabel(s)?`<br><span style="font-size:8px;opacity:.7">${staffRoleLabel(s)}</span>`:''}`}</div>`;
         });
         html+='</div>';
       }
@@ -7148,7 +7148,7 @@ function renderRoleView(){
         const conflict=getAvail(s.id,d).type==='no'&&ds.some(sh=>sh.type!=='leave');
         html+=`<div class="role-shift-cell${conflict?' shift-conflict':''}">`;
         if(!ds.length)html+=`<span class="pro-empty">—</span>`;
-        else ds.forEach((sh,i)=>{const il=sh.type==='leave';html+=`<div class="shift-badge ${il?'shift-leave':'shift-slot'}" style="font-size:8.5px;cursor:pointer" onclick="editShift(${s.id},${d},${i})">${il?'LEAVE':`${sh.start}–${sh.end}${sh._team?' → '+sh._team:''}`}</div>`;});
+        else ds.forEach((sh,i)=>{const il=sh.type==='leave';html+=`<div class="shift-badge ${il?'shift-leave':'shift-slot'}" style="font-size:8.5px;cursor:pointer" onclick="editShift(${s.id},${d},${i})">${il?'LEAVE':`${sh.start}–${sh.end}${sh._team?' · for '+sh._team:''}`}</div>`;});
         html+='</div>';
       }
       html+='</div>';
@@ -8957,7 +8957,7 @@ async function exportPDF(dayFilter=null){
     return ds.map(sh=>{
       if(sh.type==='leave') return 'LEAVE';
       let t=sh.start+'–'+sh.end;
-      if(sh._team) t+='\n→ '+sh._team;   // worked for another team
+      if(sh._team) t+='\nFOR '+String(sh._team).toUpperCase();   // worked for another team (ASCII only: the PDF font has no arrow)
       if(sh.deviceId){
         const dev=devices.find(x=>x.id===sh.deviceId);
         if(dev){ t+='\n'+dev.name+((sh.deviceStart&&sh.deviceEnd)?(' '+sh.deviceStart+'–'+sh.deviceEnd):''); }
@@ -8969,6 +8969,7 @@ async function exportPDF(dayFilter=null){
     const ds=(shifts[s.id]||{})[d]||[];
     if(!ds.length) return 'empty';
     if(ds.some(sh=>sh.type==='leave')) return 'leave';
+    if(ds.some(sh=>sh._team)) return 'xteam';
     return 'work';
   }
 
@@ -9048,6 +9049,7 @@ async function exportPDF(dayFilter=null){
       if(data.section!=='body') return;
       const kind=row.kinds&&row.kinds[data.column.index];
       if(kind==='work'){ data.cell.styles.fillColor=[232,245,233]; data.cell.styles.textColor=[27,94,32]; }
+      else if(kind==='xteam'){ data.cell.styles.fillColor=[255,224,160]; data.cell.styles.textColor=[120,53,15]; data.cell.styles.fontStyle='bold'; }
       else if(kind==='leave'){ data.cell.styles.fillColor=[255,235,238]; data.cell.styles.textColor=[198,40,40]; data.cell.styles.fontStyle='bold'; data.cell.styles.halign='center'; }
       else if(kind==='empty'){ data.cell.styles.textColor=[200,200,200]; data.cell.styles.halign='center'; }
       else if(kind==='name'){ data.cell.styles.fontStyle='bold'; data.cell.styles.fontSize=6.8; }
@@ -11902,7 +11904,7 @@ async function waSave(){
   _wa.draft={}; _wa.msg='Saved. Enrolment staff can now see it in Nexus.'; waRender();
 }
 
-const SHIFTOPS_BUILD='2026-11-21-v55-cross-team-pdf';
+const SHIFTOPS_BUILD='2026-11-21-v56-cross-team-colour';
 console.log('%c[ShiftOps build '+SHIFTOPS_BUILD+' loaded]','background:#0071e3;color:#fff;padding:2px 8px;border-radius:4px;font-weight:700;');
 // Start every session in the FULL (admin) view. The team-lead read-only lock is
 // only ever added later, and only once the role is positively confirmed as team
