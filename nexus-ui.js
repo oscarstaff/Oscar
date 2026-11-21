@@ -169,7 +169,7 @@ function _mfaCodeAt(){
   let at=_mfaOkAt;
   try{
     const c=JSON.parse(atob((window._sbAuthToken||'').split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));
-    (c.amr||[]).forEach(function(a){ if(a&&a.method==='totp'&&Number(a.timestamp)>0) at=Math.max(at,Number(a.timestamp)*1000); });
+    (c.amr||[]).forEach(function(a){ if(a&&(a.method==='totp'||a.method==='mfa/totp'||a.method==='mfa/webauthn')&&Number(a.timestamp)>0) at=Math.max(at,Number(a.timestamp)*1000); });
   }catch(e){}
   return at;
 }
@@ -179,6 +179,70 @@ async function _nexMfaState(){
     const r=await fetch(SB+'/rest/v1/rpc/nex_mfa_state',{method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+_sbBearer(),'Content-Type':'application/json'},body:'{}'});
     return r.ok?await r.json():null;
   }catch(e){ return null; }
+}
+/* ---- Passkey (Face ID, fingerprint, Windows Hello, phone via QR) as the second step. Same aal2 level as a code, so the database rule is unchanged. ---- */
+function _pkSupported(){ try{ return !!(window.PublicKeyCredential && navigator.credentials); }catch(e){ return false; } }
+function _pkMsg(error){
+  const n=String((error&&(error.name||error.code))||''), m=String((error&&error.message)||'');
+  if(/NotAllowed|AbortError|cancel/i.test(n+' '+m)) return 'Cancelled, or it timed out. Press the button to try again.';
+  if(/not_enabled|webauthn.*(disabled|not enabled)/i.test(n+' '+m+' '+String((error&&error.code)||''))) return 'Passkeys are not switched on for this project yet. Ask the admin to turn on WebAuthn under Supabase Authentication, Multi-Factor.';
+  if(/rate|too many/i.test(m)) return 'Too many tries. Wait a minute and try again.';
+  return 'That did not work: '+(m||'unknown error')+'. Try again.';
+}
+/* A small centred dialog. Each action's run() is called straight from the click (browsers only allow the passkey prompt right after a tap).
+   run() returns {done:value} to close, {error:'text'} to show a message in the dialog, or nothing to stay open. */
+function _mfaBox(title,text,actions){
+  return new Promise(function(resolve){
+    const bg=document.createElement('div');
+    bg.style.cssText='position:fixed;inset:0;z-index:100700;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(15,23,42,.55);';
+    const card=document.createElement('div');
+    card.setAttribute('role','dialog'); card.setAttribute('aria-modal','true');
+    card.style.cssText='width:min(380px,100%);background:var(--ui-surface,#fff);color:var(--ui-ink,#0f172a);border-radius:18px;padding:22px;box-shadow:0 24px 60px rgba(0,0,0,.35);font:14px/1.5 system-ui,sans-serif;text-align:center;';
+    const h=document.createElement('div'); h.textContent=title; h.style.cssText='font-size:18px;font-weight:700;margin-bottom:6px;';
+    const p=document.createElement('div'); p.textContent=text; p.style.cssText='font-size:13px;color:var(--ui-ink-3,#64748b);margin-bottom:12px;';
+    const err=document.createElement('div'); err.setAttribute('role','alert'); err.style.cssText='color:#b3261e;font-size:13px;min-height:18px;margin-bottom:8px;';
+    const col=document.createElement('div'); col.style.cssText='display:flex;flex-direction:column;gap:8px;';
+    const done=function(v){ bg.remove(); resolve(v); };
+    actions.forEach(function(a){
+      const b=document.createElement('button'); b.type='button'; b.textContent=a.label;
+      b.style.cssText=a.primary?'border:0;border-radius:10px;padding:11px;font:600 14px system-ui,sans-serif;background:var(--accent,#059669);color:#fff;cursor:pointer;':'border:1px solid var(--ui-line-hi,#cbd5e1);background:transparent;color:inherit;border-radius:10px;padding:11px;font:600 14px system-ui,sans-serif;cursor:pointer;';
+      b.onclick=async function(){
+        if(!a.run){ done(a.value); return; }
+        const all=col.querySelectorAll('button'); all.forEach(function(x){x.disabled=true;}); err.textContent='';
+        let r; try{ r=await a.run(); }catch(e){ r={error:_pkMsg(e)}; }
+        all.forEach(function(x){x.disabled=false;});
+        if(r&&r.done!==undefined) done(r.done); else if(r&&r.error) err.textContent=r.error;
+      };
+      col.appendChild(b);
+    });
+    [h,p,err,col].forEach(function(n){ card.appendChild(n); });
+    bg.appendChild(card); document.body.appendChild(bg);
+    const first=col.querySelector('button'); if(first) setTimeout(function(){ first.focus(); },30);
+  });
+}
+/* true = confirmed, 'code' = they chose the 6-digit code, false = closed */
+function _mfaAskPasskey(ac,factorId,hasCode,again){
+  const acts=[{label:'Use my passkey',primary:true,run:async function(){
+    const r=await ac.mfa.webauthn.authenticate({factorId:factorId});
+    if(r&&r.error) return {error:_pkMsg(r.error)};
+    _mfaOkAt=Date.now(); await refreshSbAuthToken(); return {done:true};
+  }}];
+  if(hasCode) acts.push({label:'Enter a 6-digit code instead',value:'code'});
+  acts.push({label:'Cancel',value:false});
+  return _mfaBox(again?'Confirm it is you':'Open YatraLine',(again?'It has been a while since your last check. ':'')+'Approve with Face ID, your fingerprint or your device PIN. On a computer you can use your phone by scanning the QR code it shows.',acts);
+}
+/* Make a passkey for this person. Resolves true when done, false when they decline. */
+function _mfaMakePasskey(ac,title,text,laterLabel){
+  return _mfaBox(title,text,[{label:'Set up a passkey',primary:true,run:async function(){
+    try{
+      const lf=await ac.mfa.listFactors();
+      const stale=((lf&&lf.data&&lf.data.all)||[]).filter(function(f){return f.status!=='verified';});
+      for(const f of stale){ try{ await ac.mfa.unenroll({factorId:f.id}); }catch(e){} }
+    }catch(e){}
+    const r=await ac.mfa.webauthn.register({friendlyName:'Nex passkey '+new Date().toLocaleDateString('en-CA')});
+    if(r&&r.error) return {error:_pkMsg(r.error)};
+    _mfaOkAt=Date.now(); await refreshSbAuthToken(); showToast('Passkey is on','success'); return {done:true};
+  }},{label:laterLabel,value:false}]);
 }
 function _mfaDigits(v){ return String(v||'').replace(/\D/g,'').slice(0,6); }
 async function _mfaAskCode(ac,factorId,again){
@@ -228,6 +292,17 @@ function _mfaEnrol(ac,mandatory){
     const row=document.createElement('div'); row.style.cssText='display:flex;gap:8px;';
     row.appendChild(go);
     const done=function(v){ bg.remove(); resolve(v); };
+    const pk=document.createElement('button'); pk.type='button'; pk.textContent='Use a passkey instead (Face ID, fingerprint)';
+    pk.style.cssText='width:100%;border:1px solid var(--ui-line-hi,#cbd5e1);background:transparent;color:inherit;border-radius:10px;padding:10px;font:600 13px system-ui,sans-serif;cursor:pointer;margin-bottom:8px;';
+    pk.onclick=async function(){
+      pk.disabled=true; err.textContent='';
+      try{
+        const r=await ac.mfa.webauthn.register({friendlyName:'Nex passkey '+new Date().toLocaleDateString('en-CA')});
+        if(r&&r.error){ err.textContent=_pkMsg(r.error); pk.disabled=false; return; }
+        try{ await ac.mfa.unenroll({factorId:enr.id}); }catch(e){}   /* the unfinished authenticator-app setup is no longer needed */
+        _mfaOkAt=Date.now(); await refreshSbAuthToken(); showToast('Passkey is on','success'); done(true);
+      }catch(e){ err.textContent=_pkMsg(e); pk.disabled=false; }
+    };
     const later=document.createElement('button'); later.textContent=mandatory?'Cancel':'Not now'; later.style.cssText='border:1px solid var(--ui-line-hi,#cbd5e1);background:transparent;color:inherit;border-radius:10px;padding:11px 14px;font:600 14px system-ui,sans-serif;cursor:pointer;';
     later.onclick=function(){ done(mandatory?false:'skip'); };
     row.appendChild(later);
@@ -241,7 +316,7 @@ function _mfaEnrol(ac,mandatory){
       _mfaOkAt=Date.now(); await refreshSbAuthToken(); showToast('Two-step login is on','success'); done(true);
     };
     inp.addEventListener('keydown',function(e){ if(e.key==='Enter') go.click(); });
-    [h,p,qrBox,key,inp,err,row].forEach(function(n){ card.appendChild(n); });
+    [h,p].concat(_pkSupported()?[pk]:[]).concat([qrBox,key,inp,err,row]).forEach(function(n){ card.appendChild(n); });
     bg.appendChild(card); document.body.appendChild(bg);
     setTimeout(function(){ inp.focus(); },30);
   });
@@ -256,7 +331,25 @@ async function nexMfaGate(){
   if(verified&&_mfaCodeFresh()) return true;
   const lf=await ac.mfa.listFactors();
   const ver=((lf&&lf.data&&lf.data.totp)||[])[0];
-  if(ver) return await _mfaAskCode(ac,ver.id,verified);
+  const pkf=((lf&&lf.data&&lf.data.webauthn)||[])[0];
+  const canPk=!!(pkf&&_pkSupported()&&ac.mfa.webauthn);
+  if(canPk){
+    const r=await _mfaAskPasskey(ac,pkf.id,!!ver,verified);
+    if(r!=='code') return r===true;
+  }
+  if(ver){
+    const ok=await _mfaAskCode(ac,ver.id,verified);
+    /* once, offer a passkey to someone who has only the code, so next time it is a tap */
+    if(ok&&!pkf&&_pkSupported()&&ac.mfa.webauthn){
+      let skipAt=0; try{ skipAt=Number(localStorage.getItem('nx_pk_offer_skip'))||0; }catch(e){}
+      if(Date.now()-skipAt>30*864e5){
+        const made=await _mfaMakePasskey(ac,'Skip the code next time','Set up a passkey and you approve with Face ID or your fingerprint instead of typing 6 digits. Your authenticator app keeps working as a backup.','Not now');
+        if(!made){ try{ localStorage.setItem('nx_pk_offer_skip',String(Date.now())); }catch(e){} }
+      }
+    }
+    return ok;
+  }
+  if(pkf&&!_pkSupported()){ await _mfaBox('Passkey not available','This browser cannot use your passkey. Open Nexus in Chrome, Safari or Edge, or ask an admin to reset your two-step login.',[{label:'OK',primary:true,value:false}]); return false; }
   if(st.required) return await _mfaEnrol(ac,true);
   if(typeof myIsAdmin!=='undefined'&&myIsAdmin===true&&!sessionStorage.getItem('nx_mfa_offer_skip')){
     const r=await _mfaEnrol(ac,false);
