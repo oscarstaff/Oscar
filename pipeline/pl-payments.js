@@ -34,20 +34,51 @@ async function queuePayment(enrolmentId, paymentId) {
   await ins('nex_payment_queue', row, true).catch(() => {});
 }
 
+/* The Payments search. The database does the filtering, never the 50 rows on screen. Typing a name finds payments and queue
+   rows by who paid, the reference, and the student's name or email (every word typed must match the first name, last name or
+   email, so "sam kar" works). Returns { filter, capped }: filter is the "&or=(...)" to add to the query (null = nothing matches);
+   capped is true when more people matched than one query can carry, so the page can tell the person to type more. */
+const PY_CAP = { people: 60, pays: 60, enrols: 100 };
+async function pySearchFilter(q, view) {
+  const enc = encodeURIComponent, list = ids => '(' + ids.join(',') + ')';
+  const words = q.split(/\s+/).filter(Boolean).slice(0, 4);
+  const who = 'payer_name.ilike.*' + enc(q) + '*,reference.ilike.*' + enc(q) + '*';
+  const tableView = ['unmatched', 'all', 'verify', 'cash'].indexOf(view) >= 0;
+  let capped = false, people = [];
+  if (view !== 'unmatched') {   /* an unmatched payment has no student, so only who paid and the reference can match there */
+    const and = words.map(w => 'or(first_name.ilike.*' + enc(w) + '*,last_name.ilike.*' + enc(w) + '*,email.ilike.*' + enc(w) + '*)').join(',');
+    people = await sel('nex_students', 'select=id&and=(' + and + ')&limit=' + (PY_CAP.people + 1));
+    if (people.length > PY_CAP.people) { capped = true; people = people.slice(0, PY_CAP.people); }
+  }
+  const pids = people.map(p => p.id);
+  if (tableView) return { filter: '&or=(' + who + (pids.length ? ',student_id.in.' + list(pids) : '') + ')', capped };
+  /* the queue is keyed by payment and enrolment, so turn the matches into those ids */
+  let pays = await sel('nex_payments', 'select=id&or=(' + who + ')&limit=' + (PY_CAP.pays + 1));
+  if (pays.length > PY_CAP.pays) { capped = true; pays = pays.slice(0, PY_CAP.pays); }
+  let enrols = pids.length ? await sel('nex_enrolments', 'select=id&student_id=in.' + list(pids) + '&limit=' + (PY_CAP.enrols + 1)) : [];
+  if (enrols.length > PY_CAP.enrols) { capped = true; enrols = enrols.slice(0, PY_CAP.enrols); }
+  const parts = [];
+  if (pays.length) parts.push('payment_id.in.' + list(pays.map(x => x.id)));
+  if (enrols.length) parts.push('enrolment_id.in.' + list(enrols.map(x => x.id)));
+  return { filter: parts.length ? '&or=(' + parts.join(',') + ')' : null, capped };
+}
+
 function bindPayments() {
-  const body = $('#pyBody'); let rowsCache = [];
+  const body = $('#pyBody'); let rowsCache = [], seq = 0;
   const load = async () => {
     holdBody(body);
+    const mine = ++seq;   /* a slow answer to an older search must not overwrite a newer one */
     try {
-      const q = safeQ(PY.q); let rows, total;
+      const q = safeQ(PY.q); let rows, total, capNote = false;
       const from = PY.page * PY.size, to = from + PY.size - 1;
       if (['unmatched', 'all', 'verify', 'cash'].indexOf(PY.view) >= 0) {
         let query = 'select=*&order=paid_on.desc.nullslast,created_at.desc';
         if (PY.view === 'unmatched') query += '&student_id=is.null';
         if (PY.view === 'verify') query += '&verify_status=eq.pending_verification';
         if (PY.view === 'cash') query += '&handover_status=eq.awaiting';
-        if (q) query += '&or=(payer_name.ilike.*' + q + '*,reference.ilike.*' + q + '*)';
+        if (q) { const s = await pySearchFilter(q, PY.view); capNote = s.capped; query += s.filter; }
         ({ rows, total } = await selPage('nex_payments', query, from, to));
+        if (mine !== seq) return;
         rowsCache = rows;
         body.innerHTML = rows.length ? '<div class="nx-tablewrap"><table class="nx-table tight"><thead><tr><th>Date</th><th>Paid by</th><th>Amount</th><th>Method</th><th>Reference</th><th>Student</th><th>Status</th><th></th></tr></thead><tbody>' +
           rows.map(p => '<tr><td>' + esc(fmtDate(p.paid_on)) + '</td><td>' + esc(p.payer_name || '–') + '</td><td class="nx-money">' + money(p.amount) + '</td><td>' + esc(p.method || '–') + '</td><td>' + esc(p.reference || '–') + '</td><td>' + (p.student_id ? '<a href="#/students/' + p.student_id + '">Open</a>' : '<span class="nx-pill warn">Unmatched</span>') + '</td><td>' + payStatusHtml(p) + '</td><td>' + payActions(p) + '</td></tr>').join('') + '</tbody></table></div>' : empty(PY.view === 'unmatched' ? 'Every payment is linked to a student' : PY.view === 'verify' ? 'Nothing waiting for verification' : PY.view === 'cash' ? 'No cash receipts waiting for a check' : 'No payments found');
@@ -56,17 +87,20 @@ function bindPayments() {
         if (PY.view === 'toprocess') query += '&processing_step=neq.processed';
         else if (PY.view === 'attention') query += '&queue_status=in.(' + PROBLEM.join(',') + ')';
         else query += '&processing_step=eq.processed';
-        ({ rows, total } = await selPage('nex_payment_queue', query, from, to));
-        if (q) { const lq = q.toLowerCase(); rows = rows.filter(r => JSON.stringify([(r.nex_payments || {}).payer_name, (r.nex_payments || {}).reference, ((r.nex_enrolments || {}).nex_students || {}).first_name, ((r.nex_enrolments || {}).nex_students || {}).last_name]).toLowerCase().includes(lq)); }
+        /* the search runs in the database (not on the 50 rows on screen), so the counts and the page buttons stay right */
+        let noMatch = false;
+        if (q) { const s = await pySearchFilter(q, PY.view); capNote = s.capped; if (s.filter) query += s.filter; else noMatch = true; }
+        if (noMatch) { rows = []; total = 0; } else ({ rows, total } = await selPage('nex_payment_queue', query, from, to));
+        if (mine !== seq) return;
         rowsCache = rows;
         const stepIdx = k => ['draft_not_made', 'draft_made', 'ready_to_process', 'processed'].indexOf(k);
         body.innerHTML = rows.length ? '<div class="nx-tablewrap"><table class="nx-table tight"><thead><tr><th>Student</th><th>Paid</th><th>Amount</th><th>Queue status</th><th>Processing</th><th>Updated</th></tr></thead><tbody>' +
           rows.map(r => { const p = r.nex_payments || {}, e = r.nex_enrolments || {}, s = e.nex_students || null; const si = stepIdx(r.processing_step);
-            return '<tr class="nx-tr ' + (PY.sel === r.id ? 'sel' : '') + '" data-id="' + r.id + '"><td><div class="nx-who"><span class="nx-avatar">' + esc(initials(s ? fullName(s) : p.payer_name)) + '</span><div><b>' + esc(s ? fullName(s) : (p.payer_name || 'Unknown')) + '</b><span>' + esc(s ? s.email || '' : 'Not matched') + '</span></div></div></td><td>' + esc(fmtDate(p.paid_on)) + '</td><td class="nx-money">' + money(p.amount) + (e.fee && p.id ? (x => x ? '<div class="nx-muted nx-inst">' + esc(x.label) + '</div>' : '')(instalmentOf(e.fee, e.pays, p.id)) : '') + '</td><td>' + pill('payment_queue', r.queue_status) + '</td><td>' + '<div class="nx-stagecell">' + pill('processing', r.processing_step) + '<div class="nx-steps">' + [0, 1, 2, 3].map(i => '<i class="' + (i <= si ? 'on' : '') + '"></i>').join('') + '</div></div></td><td>' + esc(fmtDT(r.updated_at)) + '</td></tr>'; }).join('') + '</tbody></table></div>' : empty('Nothing here', PY.view === 'toprocess' ? 'The queue is clear.' : 'No entries in this list.');
+            return '<tr class="nx-tr ' + (PY.sel === r.id ? 'sel' : '') + '" data-id="' + r.id + '"><td><div class="nx-who"><span class="nx-avatar">' + esc(initials(s ? fullName(s) : p.payer_name)) + '</span><div><b>' + esc(s ? fullName(s) : (p.payer_name || 'Unknown')) + '</b><span>' + esc(s ? s.email || '' : 'Not matched') + '</span></div></div></td><td>' + esc(fmtDate(p.paid_on)) + '</td><td class="nx-money">' + money(p.amount) + (e.fee && p.id ? (x => x ? '<div class="nx-muted nx-inst">' + esc(x.label) + '</div>' : '')(instalmentOf(e.fee, e.pays, p.id)) : '') + '</td><td>' + pill('payment_queue', r.queue_status) + '</td><td>' + '<div class="nx-stagecell">' + pill('processing', r.processing_step) + '<div class="nx-steps">' + [0, 1, 2, 3].map(i => '<i class="' + (i <= si ? 'on' : '') + '"></i>').join('') + '</div></div></td><td>' + esc(fmtDT(r.updated_at)) + '</td></tr>'; }).join('') + '</tbody></table></div>' : empty('Nothing here', q ? 'No entries match your search.' : PY.view === 'toprocess' ? 'The queue is clear.' : 'No entries in this list.');
         $$('.nx-tr', body).forEach(tr => tr.onclick = () => openQueueDrawer(rowsCache.find(x => x.id === tr.dataset.id), load));
       }
       const fromN = total ? from + 1 : 0, toN = from + rows.length;
-      $('#pyFoot').innerHTML = '<span>' + (total != null ? (total ? fromN + '–' + toN + ' of ' + total.toLocaleString('en-AU') : '') : rows.length + ' shown') + '</span><span class="nx-btnrow"><button class="nx-btn sm" id="pyPrev"' + (PY.page ? '' : ' disabled') + '>Previous</button><button class="nx-btn sm" id="pyNext"' + (total != null && toN >= total ? ' disabled' : '') + '>Next</button></span>';
+      $('#pyFoot').innerHTML = '<span>' + (total != null ? (total ? fromN + '–' + toN + ' of ' + total.toLocaleString('en-AU') : '') : rows.length + ' shown') + (capNote ? ' · Many people match. Type more of the name to narrow it down.' : '') + '</span><span class="nx-btnrow"><button class="nx-btn sm" id="pyPrev"' + (PY.page ? '' : ' disabled') + '>Previous</button><button class="nx-btn sm" id="pyNext"' + (total != null && toN >= total ? ' disabled' : '') + '>Next</button></span>';
       $('#pyPrev').onclick = () => { PY.page--; load(); }; $('#pyNext').onclick = () => { PY.page++; load(); };
       $$('[data-link]', body).forEach(b => b.onclick = () => linkPayment(rowsCache.find(x => x.id === b.dataset.link)));
       $$('[data-vok]', body).forEach(b => b.onclick = () => verifyPayment(rowsCache.find(x => x.id === b.dataset.vok), 'confirmed', load));
