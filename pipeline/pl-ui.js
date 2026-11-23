@@ -29,6 +29,7 @@ function agentName(id) { const a = REF.agents.find(x => x.id === id); return a ?
 /* ---------- status pill ---------- */
 const TONE = {
   enrolment: { docs_completed: 'info', processed: 'accent', placement: 'accent', certificate_issued: 'ok', hold: 'warn', issue: 'bad', not_interested: '', incomplete_docs: 'warn', blended: 'info' },
+  placement_queue: { plc_interested: 'accent', plc_nyc: 'warn', plc_done: 'ok' },
   payment_queue: { instalment: 'info', done_plc: 'ok', confirmed_no_plc: 'ok', yes_plc: 'accent', yes_plc_less_payment: 'warn', less_payment: 'warn', no_docs: 'bad', not_found: 'bad', issues: 'bad', no_plc_issues: 'bad' },
   processing: { processed: 'ok', ready_to_process: 'accent', draft_made: 'info', draft_not_made: 'warn' },
   placement: { replied_granted: 'ok', replied_refused: 'bad', request_sent: 'info', replied_additional_docs: 'warn', withdrawn: '' },
