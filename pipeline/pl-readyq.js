@@ -132,7 +132,7 @@ function ppBindTab(c, root, redraw) {
 }
 
 /* ---------- Placement > Ready ---------- */
-const RD = { q: '', status: 'complete', from: '', to: '', st: '', area: '', shift: '', ready: '', wait: '', flag: '' };
+const RD = { q: '', status: 'complete', from: '', to: '', st: '', area: '', shift: '', ready: '', wait: '', flag: '', more: false };
 function rdWaitOf(r, today) {
   if (r.placement_docs_missing > 0 || !r.docs_complete_on) return { k: 'none', due: null };
   const due = btAddDays(r.docs_complete_on, BT_WAIT_DAYS);
@@ -172,17 +172,26 @@ async function renderReady(body) {
   const today = sydToday();
   let rows = [], loaded = false;
   const opt = (v, cur, l) => '<option value="' + v + '"' + (cur === v ? ' selected' : '') + '>' + esc(l) + '</option>';
-  const bar = '<div class="nx-toolbar" style="border-top:0;flex-wrap:wrap">' +
-    '<input class="nx-in sm" id="rdQ" placeholder="Search a name" value="' + esc(RD.q) + '" style="min-width:170px">' +
-    '<select class="nx-sel sm" id="rdStatus" aria-label="Documents">' + opt('complete', RD.status, 'Docs complete') + opt('incomplete', RD.status, 'Docs incomplete') + opt('', RD.status, 'All') + '</select>' +
-    '<label class="nx-muted" style="display:flex;align-items:center;gap:4px">Docs done from <input class="nx-in sm" type="date" id="rdFrom" value="' + esc(RD.from) + '"> to <input class="nx-in sm" type="date" id="rdTo" value="' + esc(RD.to) + '"></label>' +
+  /* the few filters people use every day sit on one line; the rest fold away under "More filters" (the button shows how many are on) */
+  const MORE = ['from', 'to', 'st', 'area', 'shift', 'ready', 'flag'];
+  const moreN = () => MORE.filter(k => RD[k]).length;
+  const anyOn = () => !!(moreN() || RD.q || RD.wait || RD.status !== 'complete');
+  const fld = (label, inner) => '<label class="nx-fld"><span>' + label + '</span>' + inner + '</label>';
+  const bar = '<div class="nx-toolbar" style="border-top:0">' +
+    '<input class="nx-in sm" id="rdQ" placeholder="Search a name" value="' + esc(RD.q) + '" style="min-width:220px;flex:1 1 220px;max-width:320px">' +
+    '<select class="nx-sel sm" id="rdStatus" aria-label="Documents">' + opt('complete', RD.status, 'Docs complete') + opt('incomplete', RD.status, 'Docs incomplete') + opt('', RD.status, 'All students') + '</select>' +
     '<select class="nx-sel sm" id="rdWait" aria-label="Waiting time">' + opt('', RD.wait, 'Any waiting time') + opt('over', RD.wait, '3 weeks or more (priority)') + opt('under', RD.wait, 'Under 3 weeks') + '</select>' +
-    '<select class="nx-sel sm" id="rdSt" aria-label="State">' + opt('', RD.st, 'Any state') + PP_STATES.map(x => opt(x, RD.st, x)).join('') + '</select>' +
-    '<input class="nx-in sm" id="rdArea" placeholder="Area or suburb" value="' + esc(RD.area) + '" style="min-width:130px">' +
-    '<select class="nx-sel sm" id="rdShift" aria-label="Shift">' + opt('', RD.shift, 'Any shift') + BT_SHIFTS.map(([k, l]) => opt(k, RD.shift, l)).join('') + opt('irregular', RD.shift, 'Irregular') + '</select>' +
-    '<select class="nx-sel sm" id="rdReady" aria-label="Readiness">' + opt('', RD.ready, 'Any readiness') + PP_READY.map(([k, l]) => opt(k, RD.ready, l)).join('') + '</select>' +
-    '<select class="nx-sel sm" id="rdFlag" aria-label="Flags">' + opt('', RD.flag, 'Any flags') + opt('eng', RD.flag, 'English to be assessed') + opt('irr', RD.flag, 'Irregular availability') + opt('want', RD.flag, 'Asked for a date or aged care') + '</select>' +
-    '<button class="nx-btn sm" id="rdClear">Clear</button></div>';
+    '<button type="button" class="nx-btn sm" id="rdMore" aria-expanded="' + !!RD.more + '" aria-controls="rdPanel">' + ico('sliders') + '<span id="rdMoreL"></span></button>' +
+    '<button type="button" class="nx-btn sm quiet" id="rdClear">Clear</button></div>' +
+    '<div class="nx-filtergrid" id="rdPanel"' + (RD.more ? '' : ' hidden') + '>' +
+      fld('Docs done from', '<input class="nx-in sm" type="date" id="rdFrom" value="' + esc(RD.from) + '">') +
+      fld('Docs done to', '<input class="nx-in sm" type="date" id="rdTo" value="' + esc(RD.to) + '">') +
+      fld('State', '<select class="nx-sel sm" id="rdSt">' + opt('', RD.st, 'Any state') + PP_STATES.map(x => opt(x, RD.st, x)).join('') + '</select>') +
+      fld('Area or suburb', '<input class="nx-in sm" id="rdArea" placeholder="Type an area" value="' + esc(RD.area) + '">') +
+      fld('Shift', '<select class="nx-sel sm" id="rdShift">' + opt('', RD.shift, 'Any shift') + BT_SHIFTS.map(([k, l]) => opt(k, RD.shift, l)).join('') + opt('irregular', RD.shift, 'Irregular') + '</select>') +
+      fld('Readiness', '<select class="nx-sel sm" id="rdReady">' + opt('', RD.ready, 'Any readiness') + PP_READY.map(([k, l]) => opt(k, RD.ready, l)).join('') + '</select>') +
+      fld('Flags', '<select class="nx-sel sm" id="rdFlag">' + opt('', RD.flag, 'Any flags') + opt('eng', RD.flag, 'English to be assessed') + opt('irr', RD.flag, 'Irregular availability') + opt('want', RD.flag, 'Asked for a date or aged care') + '</select>') +
+    '</div>';
   body.innerHTML = bar + '<div id="rdList"><div class="nx-card-b nx-muted" style="padding-top:6px;min-height:22px">Loading…</div></div>';   /* the filters stay put while the list loads, so nothing jumps */
   const draw = () => {
     if (!loaded) return;
@@ -200,7 +209,10 @@ async function renderReady(body) {
     $$('[data-ppgo]', box).forEach(a => a.addEventListener('click', () => { if (typeof SR !== 'undefined') SR.tab = 'placement'; }));
     $$('[data-hold]', box).forEach(b => b.onclick = () => { const r = rows.find(x => x.student_id === b.dataset.hold); ppHoldForm({ id: r.student_id, first_name: r.first_name, last_name: r.last_name }, null, async () => { await renderReady(body); }); });
   };
-  const bindIn = (id, k, ev) => { const el = $('#' + id, body); el.addEventListener(ev || 'change', () => { RD[k] = el.value; draw(); }); };
+  const syncBar = () => { const n = moreN(), l = $('#rdMoreL', body), c = $('#rdClear', body); if (l) l.textContent = 'More filters' + (n ? ' (' + n + ')' : ''); if (c) c.hidden = !anyOn(); };
+  const bindIn = (id, k, ev) => { const el = $('#' + id, body); el.addEventListener(ev || 'change', () => { RD[k] = el.value; syncBar(); draw(); }); };
+  $('#rdMore', body).onclick = () => { RD.more = !RD.more; $('#rdPanel', body).hidden = !RD.more; $('#rdMore', body).setAttribute('aria-expanded', String(!!RD.more)); };
+  syncBar();
   bindIn('rdQ', 'q', 'input'); bindIn('rdArea', 'area', 'input'); ['rdStatus:status', 'rdFrom:from', 'rdTo:to', 'rdWait:wait', 'rdSt:st', 'rdShift:shift', 'rdReady:ready', 'rdFlag:flag'].forEach(x => { const [i, k] = x.split(':'); bindIn(i, k); });
   $('#rdClear', body).onclick = () => { Object.assign(RD, { q: '', status: 'complete', from: '', to: '', st: '', area: '', shift: '', ready: '', wait: '', flag: '' }); renderReady(body); };
   const [got, min] = await Promise.all([
