@@ -248,12 +248,13 @@ function newStudent() {
     { k: 'qualification_id', label: 'Qualification', type: 'select', options: REF.quals.filter(q => q.active), blank: 'Add later' },
     { k: 'fee', label: 'Agreed fee ($)', type: 'number' },
     { k: 'stage', label: 'Stage', type: 'select', options: stageOpts(false, 'checklist_sent'), value: 'checklist_sent', blank: 'Not set' },
-    { k: 'enrolled_on', label: 'Enrolled on', type: 'date', value: sydToday() }
+    { k: 'enrolled_on', label: 'Enrolled on', type: 'date', value: sydToday() },
+    { k: 'send_welcome', label: 'Send the enrolment email now', type: 'check', value: false, full: true, help: 'Not sent by itself. Tick it to email the steps and documents list to this lead (needs an email address).' }
   ]);
   let warned = false, existing = null, lk = null;
   const save = async (v, m) => {
     existing = lk ? lk.get() : null;
-    const { qualification_id, fee, stage, enrolled_on, ...stu } = v;
+    const { qualification_id, fee, stage, enrolled_on, send_welcome, ...stu } = v;
     if (existing) {
       /* they are already in YatraLine: add the new enrolment to them (if one was filled in) and open their record */
       if (qualification_id || fee != null) await ins('nex_enrolments', { student_id: existing.id, qualification_id, fee, stage, enrolled_on, year: new Date().getFullYear(), created_by: ME.name }, true);
@@ -269,7 +270,12 @@ function newStudent() {
     const s = await ins('nex_students', Object.assign(stu, { created_by: ME.name, first_contact_on: sydToday() }));
     try { await api('rpc/nex_start_lead_cycle', { method: 'POST', body: { p_student: s.id, p_first: sydToday(), p_assignee: ME.name } }); } catch (e) { toast('Lead added, but the follow-ups could not be started: ' + e.message, true); }
     if (qualification_id || fee != null || stage) await ins('nex_enrolments', { student_id: s.id, qualification_id, fee, stage, enrolled_on, year: new Date().getFullYear(), created_by: ME.name }, true);
-    toast('Lead added');
+    let mailNote = '';
+    if (send_welcome) {
+      if (!stu.email) mailNote = ' No email address, so the enrolment email was not sent.';
+      else { try { await api('rpc/nex_queue_welcome', { method: 'POST', body: { p_student: s.id } }); mailNote = ' Enrolment email is on its way.'; } catch (e) { mailNote = ' The enrolment email could not be sent: ' + e.message; } }
+    }
+    toast('Lead added.' + mailNote);
     go('#/students/' + s.id);
   };
   /* first name is checked in save() so that picking an existing person does not need it */
@@ -300,7 +306,7 @@ route(/^\/students\/([0-9a-f-]{36})$/, async m => {
   /* the sensitive details come through a function that logs who looked (admins see this) and stops bulk opening */
   const limited = !!(det && det.limited), d = (det && det.details) || {};
   const eids = enr.map(e => e.id);
-  const [queue, refunds, reqs, plcs, hist, aud0, docs, delB, welcome] = await Promise.all([
+  const [queue, refunds, reqs, plcs, hist, aud0, docs, delB, welcome, notes] = await Promise.all([
     eids.length ? sel('nex_payment_queue', 'select=*&enrolment_id=in.' + inList(eids)) : [],
     eids.length ? sel('nex_refunds', 'select=*&enrolment_id=in.' + inList(eids) + '&order=refunded_on.desc') : [],
     eids.length ? sel('nex_placement_requests', 'select=*,nex_facilities(name)&enrolment_id=in.' + inList(eids) + '&order=created_at.desc') : [],
@@ -309,7 +315,8 @@ route(/^\/students\/([0-9a-f-]{36})$/, async m => {
     sel('nex_audit', 'select=*&row_id=in.' + inList([id].concat(eids, pays.map(p => p.id), books.map(b => b.id), followups.map(f => f.id), tasks.map(t => t.id))) + '&order=changed_at.desc&limit=100'),
     eids.length ? sel('nex_enrolment_docs', 'select=*&enrolment_id=in.' + inList(eids)).catch(() => []) : [],
     sel('nex_audit', 'select=*&table_name=eq.nex_class_bookings&action=eq.DELETE&old_row->>student_id=eq.' + encodeURIComponent(id) + '&order=changed_at.desc&limit=20').catch(() => []),   /* a deleted booking is no longer in the list above, so its record is found by the student it belonged to */
-    sel('nex_welcome_mail', 'select=status,to_email,sent_at,last_error,created_by,attempts&student_id=eq.' + id).catch(() => [])   /* the enrolment email sent when the lead was added */
+    sel('nex_welcome_mail', 'select=status,to_email,sent_at,last_error,created_by,attempts&student_id=eq.' + id).catch(() => []),   /* the enrolment email sent when the lead was added */
+    sel('nex_student_notes', 'select=*&student_id=eq.' + id + '&order=created_at.desc&limit=200').catch(() => [])   /* notes staff typed on the Activity tab */
   ]);
   const aud = aud0.concat(delB).sort((a, b) => String(b.changed_at).localeCompare(String(a.changed_at)));
   const main = enr[0] || {};
@@ -318,7 +325,7 @@ route(/^\/students\/([0-9a-f-]{36})$/, async m => {
   const grossPaid = sumPaid(pays);
   const isStudent = grossPaid >= STUDENT_MIN;
   const totalPaid = grossPaid - refunds.reduce((t, r) => t + Number(r.amount), 0);
-  const ctx = { pp: ppRows[0] || null, facs, s, d, limited, enr, pays, books, followups: followups.filter(f => f.kind !== 'moved_to_task'), tasks, queue, refunds, reqs, plcs, hist, aud, docs, calls, logs, isStudent, welcome: welcome[0] || null };
+  const ctx = { pp: ppRows[0] || null, facs, s, d, limited, enr, pays, books, followups: followups.filter(f => f.kind !== 'moved_to_task'), tasks, queue, refunds, reqs, plcs, hist, aud, docs, calls, logs, isStudent, welcome: welcome[0] || null, notes };
 
   afterRender(() => { bindStudent(ctx); setNav(isStudent ? '!/students' : '!/leads'); });
   const fact = (k, v) => '<div><dt>' + k + '</dt><dd>' + (v || '<span class="nx-muted">–</span>') + '</dd></div>';
@@ -329,7 +336,7 @@ route(/^\/students\/([0-9a-f-]{36})$/, async m => {
     '<div class="nx-btnrow"><button class="nx-btn" data-a="editStu">' + ico('edit') + 'Edit</button><button class="nx-btn" data-a="addEnr">' + ico('plus') + 'Enrolment</button>' + (isStudent ? '' : '<button class="nx-btn primary" data-a="bookFA">' + ico('aid') + 'Book class</button>') + '' + (ME.admin ? '<button class="nx-btn quiet" data-a="archive">' + ico('archive') + 'Archive</button>' : '') + '</div></div>' +
     (main.id ? '<div style="padding:0 16px 16px"><ol class="nx-path">' + PATH.map((p, i) => '<li class="' + (i < idx ? 'done' : i === idx ? 'now' : '') + '">' + (i < idx ? ico('check') : '') + esc(statusLabel('enrolment', p)) + '</li>').join('') + '</ol>' + (idx < 0 && main.stage ? '<div style="margin-top:8px">Current stage: ' + pill('enrolment', main.stage) + '</div>' : '') + '</div>' : '') + '</div>' +
     '<div class="nx-cols"><div class="nx-colmain"><div class="nx-card"><div class="nx-tabs" role="tablist">' +
-    [['details', 'Details'], ['money', 'Enrolments and payments'], ['docs', 'Documents' + docsBadge(ctx)], ['placement', 'Placement' + ppBadge(ctx)], ['activity', 'Activity']].map(([k, l]) => '<button class="nx-tab" role="tab" data-tab="' + k + '" aria-selected="' + (SR.tab === k) + '">' + l + '</button>').join('') + '</div><div id="srTab"></div></div></div>' +
+    [['details', 'Details'], ['money', 'Enrolments and payments' + docsBadge(ctx)], ['placement', 'Placement' + ppBadge(ctx)], ['activity', 'Activity']].map(([k, l]) => '<button class="nx-tab" role="tab" data-tab="' + k + '" aria-selected="' + (SR.tab === k) + '">' + l + '</button>').join('') + '</div><div id="srTab"></div></div></div>' +
     '<div class="nx-colside">' + sideCards(ctx) + '</div></div>';
 });
 
@@ -413,14 +420,17 @@ async function emailFollowup(s, step) {
     }
   };
 }
+let SR_REDRAW = null;
+function showActivity(c) { if (SR_REDRAW) SR_REDRAW(); }
 function bindStudent(c) {
   const view = $('#view');
   const tabBody = $('#srTab');
   const showTab = () => {
-    $$('.nx-tab', view).forEach(t => { t.setAttribute('aria-selected', String(t.dataset.tab === SR.tab)); if (t.dataset.tab === 'docs') t.textContent = 'Documents' + docsBadge(c); if (t.dataset.tab === 'placement') t.textContent = 'Placement' + ppBadge(c); });
-    tabBody.innerHTML = SR.tab === 'details' ? tabDetails(c) : SR.tab === 'money' ? tabMoney(c) : SR.tab === 'docs' ? tabDocs(c) : SR.tab === 'placement' ? tabPlacement(c) : tabActivity(c);
+    $$('.nx-tab', view).forEach(t => { t.setAttribute('aria-selected', String(t.dataset.tab === SR.tab)); if (t.dataset.tab === 'money') t.textContent = 'Enrolments and payments' + docsBadge(c); if (t.dataset.tab === 'placement') t.textContent = 'Placement' + ppBadge(c); });
+    tabBody.innerHTML = SR.tab === 'details' ? tabDetails(c) : SR.tab === 'money' ? tabMoney(c) : SR.tab === 'placement' ? tabPlacement(c) : tabActivity(c);
     if (SR.tab === 'placement') ppBindTab(c, tabBody, showTab);
   };
+  SR_REDRAW = showTab;
   showTab();
   view.onclick = async e => {
     const tb = e.target.closest('.nx-tab'); if (tb) { SR.tab = tb.dataset.tab; showTab(); return; }
@@ -456,13 +466,13 @@ function tabDetails(c) {
     welcomeSection(c) +
     (c.s.source_note ? section('Source note', '<div style="padding:16px">' + esc(c.s.source_note) + '</div>') : '');
 }
-/* the enrolment email (steps and documents list, from the support mailbox) that goes out when a lead with an email is added */
+/* the enrolment email (steps and documents list, from the support mailbox): sent when staff tick the box on the New lead form, or press the button here */
 /* PAUSED: every student from the Jan-Sep import already had their enrolment email, so the button is greyed out. Set to false to turn it back on. */
 const WELCOME_PAUSED = true;
 function welcomeSection(c) {
   const w = c.welcome, s = c.s;
   const when = w && w.sent_at ? fmtDT(w.sent_at) : '';
-  const state = !w ? (s.email ? '<span class="nx-pill">Not sent</span> <span class="nx-muted">It is sent automatically when a lead is added with an email. Use the button to send it now.</span>' : '<span class="nx-muted">Add an email address to this person to send it.</span>')
+  const state = !w ? (s.email ? '<span class="nx-pill">Not sent</span> <span class="nx-muted">It is not sent by itself. Tick "Send the enrolment email now" when adding a lead, or use the button.</span>' : '<span class="nx-muted">Add an email address to this person to send it.</span>')
     : w.status === 'sent' ? '<span class="nx-pill ok">Sent</span> <span class="nx-muted">' + esc(when) + ' to ' + esc(w.to_email) + ' from support</span>'
     : w.status === 'failed' ? '<span class="nx-pill bad">Not sent</span> <span class="nx-muted">' + esc(w.last_error || 'It could not be sent.') + '</span>'
     : '<span class="nx-pill warn">Sending</span> <span class="nx-muted">To ' + esc(w.to_email) + '. It goes out within a few minutes.' + (w.last_error ? ' ' + esc(w.last_error) : '') + '</span>';
@@ -479,22 +489,26 @@ function docsBadge(c) {
   c.enr.forEach(e => { const ts = docTypesFor(e); if (!ts.length) return; any = true; const got = new Set(c.docs.filter(d => d.enrolment_id === e.id).map(d => d.doc_type_id)); miss += ts.filter(t => !got.has(t.id)).length; });
   return any ? (miss ? ' · ' + miss + ' missing' : ' · complete') : '';
 }
-function tabDocs(c) {
-  if (!c.enr.length) return empty('No enrolments', 'Add an enrolment to track the documents it needs.');
-  return c.enr.map(e => {
-    const types = docTypesFor(e), title = (qualName(e.qualification_id) || 'Enrolment') + (e.year ? ' · ' + e.year : '');
-    if (!types.length) return section(title, '<div style="padding:16px" class="nx-muted">' + (e.qualification_id ? 'There is no document list for this course yet.' : 'Choose a qualification on this enrolment to see its document list.') + '</div>');
-    const got = {}; c.docs.filter(d => d.enrolment_id === e.id).forEach(d => { got[d.doc_type_id] = d; });
-    const n = types.filter(t => got[t.id]).length;
-    return section(title + ' · ' + n + ' of ' + types.length + ' received',
-      '<ul class="nx-list nx-doclist">' + types.map(t => { const g = got[t.id];
-        return '<li><label class="nx-check"><input type="checkbox" data-doc="' + t.id + '" data-enr="' + e.id + '"' + (g ? ' checked' + (ME.admin ? '' : ' disabled title="Only hub admins can untick a document"') : '') + '> <span><b>' + esc(t.name) + '</b>' + (t.note ? '<small>' + esc(t.note) + '</small>' : '') + '</span></label>' +
-          (g ? '<span class="nx-muted">' + esc(fmtDate(g.received_on)) + (g.created_by ? ' · ' + esc(g.created_by) : '') + '</span>' : '<span class="nx-pill warn">Missing</span>') + '</li>'; }).join('') + '</ul>');
-  }).join('');
+/* the course's document tick list, shown right under its enrolment on the Enrolments and payments tab */
+function courseDocsSection(c, e) {
+  const types = docTypesFor(e), who = c.enr.length > 1 ? ' (' + (qualName(e.qualification_id) || 'Enrolment') + (e.year ? ' · ' + e.year : '') + ')' : '';
+  if (!types.length) return section('Documents' + who, '<div style="padding:16px" class="nx-muted">' + (e.qualification_id ? 'There is no document list for this course yet.' : 'Choose a qualification on this enrolment to see its document list.') + '</div>');
+  const got = {}; c.docs.filter(d => d.enrolment_id === e.id).forEach(d => { got[d.doc_type_id] = d; });
+  const n = types.filter(t => got[t.id]).length;
+  return section('Documents' + who + ' · ' + n + ' of ' + types.length + ' received',
+    '<ul class="nx-list nx-doclist">' + types.map(t => { const g = got[t.id];
+      return '<li><label class="nx-check"><input type="checkbox" data-doc="' + t.id + '" data-enr="' + e.id + '"' + (g ? ' checked' + (ME.admin ? '' : ' disabled title="Only hub admins can untick a document"') : '') + '> <span><b>' + esc(t.name) + '</b>' + (t.note ? '<small>' + esc(t.note) + '</small>' : '') + '</span></label>' +
+        (g ? '<span class="nx-muted">' + esc(fmtDate(g.received_on)) + (g.created_by ? ' · ' + esc(g.created_by) : '') + '</span>' : '<span class="nx-pill warn">Missing</span>') + '</li>'; }).join('') + '</ul>');
 }
+/* placement documents are not needed while the newest payment queue row says Confirmed no PLC or PLC NYC
+   (the same rule as the database function nex_plc_off). Placement Interested or Plc Completed on the Placement status brings them back. */
+const PLC_OFF_QUEUE = ['confirmed_no_plc', 'confirmed_no_plc_less', 'plc_nyc'];
+function plcOffRow(q) { return !!q && (q.placement_status === 'plc_nyc' || (PLC_OFF_QUEUE.includes(q.queue_status) && !['plc_interested', 'plc_done'].includes(q.placement_status || ''))); }
+function plcOffRowOf(c, e) { const rows = (c.queue || []).filter(q => q.enrolment_id === e.id).sort((a, b) => String(b.updated_at || '').localeCompare(String(a.updated_at || '')) || String(b.created_at || '').localeCompare(String(a.created_at || ''))); return plcOffRow(rows[0]) ? rows[0] : null; }
 /* the documents needed before placement (doc group 'placement'). Passport and Visa copy also count when ticked in the course list above,
    the same way the database rule counts them */
 function placementDocState(c, e) {
+  if (plcOffRowOf(c, e)) return { rows: [], miss: 0, last: null, off: true };
   const types = (REF.docTypes || []).filter(t => t.group_key === 'placement');
   const nameOf = id => { const t = (REF.docTypes || []).find(x => x.id === id); return t ? t.name.trim().toLowerCase() : ''; };
   const mine = c.docs.filter(d => d.enrolment_id === e.id);
@@ -506,7 +520,10 @@ function placementDocState(c, e) {
   return { rows, miss, last };
 }
 function placementDocsSection(c, e, title) {
-  const st = placementDocState(c, e); if (!st.rows.length) return '';
+  const st = placementDocState(c, e);
+  if (st.off) { const q = plcOffRowOf(c, e), why = q.placement_status === 'plc_nyc' ? statusLabel('placement_queue', 'plc_nyc') : statusLabel('payment_queue', q.queue_status);
+    return section('Placement documents' + (c.enr.length > 1 ? ' (' + title + ')' : '') + ' · not needed', '<div class="nx-muted" style="padding:16px">Not needed while the payment status is <b>' + esc(why) + '</b>. If it changes to Placement Interested, the documents come back and the student goes into the placement email box on the Overview.</div>'); }
+  if (!st.rows.length) return '';
   return section('Placement documents' + (c.enr.length > 1 ? ' (' + title + ')' : '') + ' · ' + (st.rows.length - st.miss) + ' of ' + st.rows.length + ' received' + (st.last ? ' · complete ' + fmtDate(st.last) : ''),
     '<div class="nx-help" style="padding:10px 16px 0">All of these are needed before a placement request is sent or a student goes in a batch. The 3-week wait counts from the day the last one arrives.</div>' +
     '<ul class="nx-list nx-doclist">' + st.rows.map(r => {
@@ -529,24 +546,42 @@ function tabMoney(c) {
       (e.notes || e.follow_up_note ? '<div style="padding:0 16px 12px" class="nx-muted">' + esc(e.notes || '') + '</div>' : '') +
       (ps.length || rf.length ? '<div class="nx-tablewrap"><table class="nx-table auto tight"><thead><tr><th>Date</th><th>Amount</th><th>Instalment</th><th>Method</th><th>Reference</th><th>Status</th><th>Processing</th></tr></thead><tbody>' +
         ps.map(p => { const q = c.queue.find(x => x.payment_id === p.id); return '<tr><td>' + esc(fmtDate(p.paid_on)) + '</td><td class="nx-money">' + money(p.amount) + '</td><td>' + (x => x ? esc(x.label) : '–')(instalmentOf(e.fee, ps, p.id)) + '</td><td>' + esc(p.method || '–') + '</td><td>' + esc(p.reference || p.payer_name || '–') + '</td><td>' + payStatusHtml(p) + '</td><td>' + (q ? pill('payment_queue', q.queue_status) + ' ' + pill('processing', q.processing_step) : '<span class="nx-muted">–</span>') + '</td></tr>'; }).join('') +
-        rf.map(r => '<tr><td>' + esc(fmtDate(r.refunded_on)) + '</td><td class="nx-money nx-neg">-' + money(r.amount).replace('-', '') + '</td><td></td><td>Refund</td><td>' + esc(r.reason || '–') + '</td><td></td><td>Approved by ' + esc(r.approved_by || '–') + '</td></tr>').join('') + '</tbody></table></div>' : '<div style="padding:0 16px 16px" class="nx-muted">No payments recorded.</div>'));
+        rf.map(r => '<tr><td>' + esc(fmtDate(r.refunded_on)) + '</td><td class="nx-money nx-neg">-' + money(r.amount).replace('-', '') + '</td><td></td><td>Refund</td><td>' + esc(r.reason || '–') + '</td><td></td><td>Approved by ' + esc(r.approved_by || '–') + '</td></tr>').join('') + '</tbody></table></div>' : '<div style="padding:0 16px 16px" class="nx-muted">No payments recorded.</div>')) + courseDocsSection(c, e);
   }).join('');
   const orphan = c.pays.filter(p => !linked.has(p.id));
   return cards + (orphan.length ? section('Payments not linked to an enrolment', '<div class="nx-tablewrap"><table class="nx-table auto tight"><tbody>' + orphan.map(p => '<tr><td>' + esc(fmtDate(p.paid_on)) + '</td><td class="nx-money">' + money(p.amount) + '</td><td>' + esc(p.reference || p.payer_name || '–') + '</td><td>' + payStatusHtml(p) + '</td></tr>').join('') + '</tbody></table></div>') : '');
 }
+function noteItem(n) {
+  const mine = ME.admin || n.created_by === ME.name;
+  return '<li><span class="dot info">' + ico('notebook') + '</span><div><b>' + esc(n.created_by || 'Staff') + '</b> added a note<div class="nx-note-body">' + esc(n.body) + '</div><time>' + fmtDT(n.created_at) + (mine ? ' · <button type="button" class="nx-linkbtn" data-a="delNote" data-id="' + n.id + '">Delete</button>' : '') + '</time></div></li>';
+}
 function tabActivity(c) {
   const items = [];
+  (c.notes || []).forEach(n => items.push({ t: n.created_at, html: noteItem(n) }));
   c.hist.forEach(h => items.push({ t: h.changed_at, html: '<li><span class="dot">' + ico('list') + '</span><div><b>' + esc(h.changed_by || 'System (automatic)') + '</b> moved ' + esc(h.context.replace(/_/g, ' ')) + (h.from_status ? ' from <b>' + esc(statusLabel(h.context, h.from_status)) + '</b>' : '') + ' to <b>' + esc(statusLabel(h.context, h.to_status)) + '</b><time>' + fmtDT(h.changed_at) + '</time></div></li>' }));
   c.aud.forEach(a => { if (a.action === 'UPDATE' && !diffHtml(a)) return; items.push({ t: a.changed_at, html: feedItem(a) }); });
   (c.logs || []).forEach(k => items.push({ t: k.created_at, html: '<li><span class="dot ok">' + ico('notebook') + '</span><div><b>' + esc(k.receiver || 'System (automatic)') + '</b> received their logbook on ' + esc(fmtDate(k.received_on)) + (k.comments ? '<div class="nx-diff">' + esc(k.comments) + '</div>' : '') + '<time>' + fmtDT(k.created_at) + '</time></div></li>' }));
   (c.calls || []).forEach(k => items.push({ t: k.created_at, html: '<li><span class="dot info">' + ico('bell') + '</span><div><b>' + esc(k.logged_by || 'System (automatic)') + '</b> logged a call (' + (k.direction === 'out' ? 'out' : 'in') + '): ' + esc(k.reason) + (k.resolved_at ? '' : ' <span class="nx-pill warn">Waiting for a callback</span>') + (k.note ? '<div class="nx-diff">' + esc(k.note) + '</div>' : '') + '<time>' + fmtDT(k.created_at) + '</time></div></li>' }));
   (c.books || []).forEach(b => { if (!b.attendance_at || !BK_WORD[b.status]) return; const cd = (b.nex_class_sessions || {}).class_date; items.push({ t: b.attendance_at, html: '<li><span class="dot ' + (b.status === 'attended' ? 'ok' : 'warn') + '">' + ico('aid') + '</span><div><b>' + esc(b.attendance_by || 'System (automatic)') + '</b> marked <b>' + BK_WORD[b.status] + '</b> for First Aid and CPR' + (cd ? ' on ' + esc(fmtDate(cd)) : '') + '<time>' + fmtDT(b.attendance_at) + '</time></div></li>' }); });
   items.sort((a, b) => String(b.t).localeCompare(String(a.t)));
-  return items.length ? '<ul class="nx-feed">' + items.slice(0, 100).map(i => i.html).join('') + '</ul>' : empty('No activity yet');
+  const box = '<div class="nx-notebox"><label class="nx-lbl" for="noteText">Add a note</label><textarea class="nx-ta" id="noteText" rows="3" maxlength="4000" placeholder="Write something the rest of the team should know. Everyone on staff can see it."></textarea><div class="nx-btnrow"><button type="button" class="nx-btn primary sm" data-a="postNote">Post note</button><span class="nx-muted">Visible to all staff</span></div></div>';
+  return box + (items.length ? '<ul class="nx-feed">' + items.slice(0, 100).map(i => i.html).join('') + '</ul>' : empty('No activity yet'));
 }
 
 async function studentAction(a, ds, c) {
   const s = c.s;
+  if (a === 'postNote') {
+    const box = $('#noteText'), body = box ? box.value.trim() : '';
+    if (!body) { if (box) { box.setAttribute('aria-invalid', 'true'); box.focus(); } toast('Write the note first', true); return; }
+    const btn = $('[data-a="postNote"]'); if (btn) btn.disabled = true;
+    try { const row = await ins('nex_student_notes', { student_id: s.id, body, created_by: ME.name }); c.notes = [row].concat(c.notes || []); toast('Note posted'); }
+    catch (e) { if (btn) btn.disabled = false; throw e; }
+    return showActivity(c);
+  }
+  if (a === 'delNote') {
+    if (!await confirmBox('Delete this note', 'It disappears for everyone.', 'Delete')) return;
+    await del('nex_student_notes', 'id=eq.' + ds.id); c.notes = (c.notes || []).filter(n => n.id !== ds.id); toast('Note deleted'); return showActivity(c);
+  }
   if (a === 'editStu') { let warnedE = false; return formModal('Edit contact', studentFields(s), async (v, m) => {
     tidyStudent(v);
     if (!warnedE && ['first_name', 'last_name', 'phone', 'email'].some(k => (v[k] || '') !== (s[k] || ''))) { const d = await findDupes(v, s.id); if (d.length) { warnedE = true; dupeBox(m, d, 'Press Save again'); return false; } }

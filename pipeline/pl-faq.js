@@ -19,7 +19,7 @@ const NEXI_FAQ = [
     ['Who can add or change payments?', 'Only the Processing and Accounts teams (and hub admins) can record a payment, link it to a student, or work the payment queue. Everyone else can see them.', null]
   ]],
   ['Payments', [
-    ['How do I tick off documents someone has sent?', 'Open the person and go to the Documents tab. Each enrolment shows the documents its course needs. Tick a document when you have received it. The tab title shows how many are still missing.', ['#/students', 'Open Students']],
+    ['How do I tick off documents someone has sent?', 'Open the person and go to the Enrolments and payments tab. The documents its course needs are listed right under each enrolment. Tick a document when you have received it. The tab title shows how many are still missing. Placement documents are on the Placement tab, and are not needed while the payment status is Confirmed no PLC or PLC NYC.', ['#/students', 'Open Students']],
     ['How do I record a payment?', 'Open Payments and press Record payment. Type the phone or email of the student and their details and enrolment fill in. Or open the person, go to Enrolments and payments, and press Payment on the right enrolment.', ['#/payments', 'Open Payments']],
     ['What is an unmatched payment?', 'A payment that is not linked to a person yet. It does not count towards anyone’s $200 until you match it. The Unmatched view in Payments lists them.', ['#/payments?view=unmatched', 'Show unmatched']],
     ['How do refunds work?', 'Open the person, go to Enrolments and payments, and press Refund on the enrolment. The refund is recorded against that enrolment and shows in their history.', null],
