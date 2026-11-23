@@ -16,7 +16,7 @@ const DOCS = [
 const CARE_DOCS = ["Current and previous reference letters", "Payslips"];
 const NOTES = [
   "Certificate IV in Disability applicants must have completed CHC33021 Certificate III in Individual Support (Ageing & Disability). Please include a copy.",
-  "First Aid, CPR and Manual Handling classes are held at Rockdale college.",
+  "First Aid, CPR and Manual Handling classes are held at Rockdale.",
 ];
 const SIGN = ["Kind regards,", "Oscars Training Centre Support"];
 const CLOSING = "We can't process your enrolment until we receive the form and all documents. If you have any questions, please do not hesitate to contact us at " + PHONE + ".";
