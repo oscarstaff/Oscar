@@ -18,6 +18,7 @@ const NOTES = [
   "Certificate IV in Disability applicants must have completed CHC33021 Certificate III in Individual Support (Ageing & Disability). Please include a copy.",
   "First Aid, CPR and Manual Handling classes are held at Rockdale college.",
 ];
+const SIGN = ["Kind regards,", "Oscars Training Centre Support"];
 const CLOSING = "We can't process your enrolment until we receive the form and all documents. If you have any questions, please do not hesitate to contact us at " + PHONE + ".";
 
 export function welcomeText(): string {
@@ -39,6 +40,8 @@ export function welcomeText(): string {
     ...NOTES.map((n) => "* " + n),
     "",
     CLOSING,
+    "",
+    ...SIGN,
   ].join("\n");
 }
 
@@ -60,5 +63,6 @@ export function welcomeHtml(): string {
 <p style="margin:0 0 6px"><b>Please note:</b></p>
 <ul style="margin:0 0 14px;padding-left:22px">${NOTES.map((n) => `<li>${esc(n)}</li>`).join("")}</ul>
 <p style="margin:0">${esc(CLOSING).replace(PHONE, `<a href="tel:${PHONE}" style="color:#0e4a82">${PHONE}</a>`)}</p>
+<p style="margin:14px 0 0">${SIGN.map(esc).join("<br>")}</p>
 </div>`;
 }
