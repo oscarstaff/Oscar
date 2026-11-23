@@ -87,17 +87,30 @@ route(/^\/firstaid(?:\/([0-9a-f-]{36}))?$/, async m => {
   var payBy = {}; const sids = live.map(b => b.student_id).filter(Boolean);
   if (sids.length) (await sel('nex_payments', 'select=student_id,amount,method,verify_status,handover_status&student_id=in.' + inList(sids)).catch(() => [])).forEach(p => (payBy[p.student_id] = payBy[p.student_id] || []).push(p));
   const offs = books.filter(b => bkOff(b.status));
+  /* a renewal day belongs to the class on the same date and is tucked inside it: the full class shows a small row for its renewal day, and the renewal day links back */
+  let tuck = '';
+  {
+    const isRen = cur.kind === 'renewal';
+    const pair = await sel('nex_class_sessions', 'select=id,class_date,kind,seats&class_date=eq.' + cur.class_date + '&kind=' + (isRen ? 'neq.renewal' : 'eq.renewal') + '&order=created_at.asc&limit=1').catch(() => []);
+    const pd = fmtDay(cur.class_date);
+    if (isRen) tuck = pair[0] ? '<div class="nx-tuck"><a class="nx-btn sm" href="#/firstaid/' + pair[0].id + '">' + ico('back') + 'Back to the full class</a><span class="nx-muted">This renewal day is tucked into ' + pd.wd + ' ' + pd.dm + '.</span></div>' : '';
+    else if (pair[0]) {
+      const rb = await selAll('nex_class_bookings', 'select=status&session_id=eq.' + pair[0].id).catch(() => []), rn = rb.filter(x => !bkOff(x.status)).length;
+      tuck = '<div class="nx-tuck"><span class="nx-tuck-t">Renewal and signature</span><span class="nx-muted"><b>' + rn + '</b> of ' + pair[0].seats + ' booked</span><a class="nx-btn sm" href="#/firstaid/' + pair[0].id + '">Open renewal day</a></div>';
+    } else if (canFlag()) tuck = '<div class="nx-tuck"><span class="nx-tuck-t">Renewal and signature</span><span class="nx-muted">No renewal day for this date yet.</span><button class="nx-btn sm" id="faAddRen">' + ico('plus') + 'Add renewal day</button></div>';
+  }
   const d = fmtDay(cur.class_date);
   const closed = cur.class_date < today;   /* the database refuses new bookings into a class that has passed (admins can still add) */
   const seated = live.filter(b => b.seat_no);
   const showSeats = canFlag();   /* the seat numbers are where people sit on the day: only the Evershine team (and admins) see them */
   const walk = live.filter(b => b.booking_type !== 'student').length;
-  return head + bar + '<div class="nx-card"><div class="nx-card-b" style="padding:10px 16px"><div class="nx-days" id="faDays">' + sessions.map(s => { const dd = fmtDay(s.class_date); const n = cnt[s.id] || 0; return '<button class="nx-day" data-id="' + s.id + '" aria-pressed="' + (s.id === cur.id) + '"><b>' + dd.wd + ' ' + dd.dm + '</b><span>' + (s.kind === 'renewal' ? 'Renewal' : 'Full class') + ' · ' + n + ' / ' + s.seats + '</span></button>'; }).join('') + '</div></div></div>' +
+  return head + bar + '<div class="nx-card"><div class="nx-card-b" style="padding:10px 16px"><div class="nx-days" id="faDays">' + sessions.filter(s => s.kind !== 'renewal').map(s => { const dd = fmtDay(s.class_date); const n = cnt[s.id] || 0; return '<button class="nx-day" data-id="' + s.id + '" aria-pressed="' + (s.id === cur.id) + '"><b>' + dd.wd + ' ' + dd.dm + '</b><span>' + (s.kind === 'renewal' ? 'Renewal' : 'Full class') + ' · ' + n + ' / ' + s.seats + '</span></button>'; }).join('') + '</div></div></div>' +
     '<div class="nx-card"><div class="nx-card-b" style="padding:10px 16px;display:flex;flex-direction:column;gap:8px">' +
     '<div style="display:flex;align-items:center;gap:6px 16px;flex-wrap:wrap"><div style="min-width:0"><div class="nx-eyebrow">' + (cur.kind === 'renewal' ? 'Renewal and signature day' : 'Full class day') + '</div><h3 style="font-size:16px">' + d.wd + ' ' + d.dm + (cur.trainer ? ' · ' + esc(cur.trainer) : '') + '</h3></div>' +
     '<span class="nx-muted" style="margin-left:auto"><b style="font-size:18px;color:var(--nx-ink)">' + live.length + '</b> of ' + cur.seats + ' seats · ' + (showSeats ? (cur.seats - seated.length) + ' free' : Math.max(0, cur.seats - live.length) + ' left') + (walk ? ' · ' + walk + ' walk-in or agent' : '') + (cur.start_time ? ' · ' + esc(cur.start_time) + (cur.end_time ? '–' + esc(cur.end_time) : '') : '') + '</span>' +
     '<button class="nx-btn sm" id="faEdit">' + ico('edit') + 'Edit class</button></div>' +
     (cur.kind !== 'renewal' ? faPlanHtml(cur) : '') +
+    tuck +
     (showSeats ? '<div class="nx-cap"><i class="a" style="width:' + Math.min(100, seated.length / cur.seats * 100) + '%"></i></div>' : '') +
     (live.length > cur.seats ? '<div class="nx-warnbox">This class has more bookings than seats. Move some people to another day.</div>' : '') +
     '</div></div>' +
@@ -132,6 +145,7 @@ function bindFirstAid(cur, books, ctx) {
   if (!cur) return;
   $$('#faDays .nx-day').forEach(b => b.onclick = () => go('#/firstaid/' + b.dataset.id));
   $('#faEdit').onclick = () => classForm(cur);
+  if ($('#faAddRen')) $('#faAddRen').onclick = async e => { const btn = e.currentTarget; btn.disabled = true; try { await ensureRenewal(cur.class_date); toast('Renewal day added'); render(); } catch (err) { toast(err.message || 'Could not add the renewal day', true); btn.disabled = false; } };
   if ($('#faAdd')) $('#faAdd').onclick = () => bookingForm(cur, null, books);
   const fm = $('#faMail'); if (fm) fm.onclick = () => confirmEmail(cur, books);
   const by = id => books.find(x => x.id === id);
@@ -274,6 +288,14 @@ async function pastClasses() {
   } catch (e) { box.innerHTML = '<div class="nx-err">' + esc(e.message) + '</div>'; }
 }
 
+/* every full class day gets a renewal and signature day on the same date. It is created with the class, kept out of the day strip, and tucked inside the class. */
+const RENEWAL_SEATS = 50;
+async function ensureRenewal(date) {
+  const have = await sel('nex_class_sessions', 'select=id&kind=eq.renewal&class_date=eq.' + date + '&limit=1');
+  if (have.length) return false;   /* one renewal day per date, even when two full classes run that day */
+  await ins('nex_class_sessions', { class_date: date, kind: 'renewal', seats: RENEWAL_SEATS }, true);
+  return true;
+}
 /* the dropdown: active trainers, plus an older typed-in name kept as it is until someone changes it */
 function trainerOptions(cur) {
   const list = (REF.trainers || []).filter(t => t.active).map(t => ({ id: t.name, label: t.name }));
@@ -309,7 +331,11 @@ function classForm(c) {
       v.schedule = keys.length === Object.keys(sch).length && keys.every(k => dflt[k] && dflt[k][0] === sch[k][0] && dflt[k][1] === sch[k][1]) ? null : sch;   /* same as the trainer's usual plan = keep following it */
     }
     if (c.id) { await upd('nex_class_sessions', 'id=eq.' + c.id, v); toast('Saved'); render(); }
-    else { const s = await ins('nex_class_sessions', v); toast('Class added'); go('#/firstaid/' + s.id); }
+    else {
+      const s = await ins('nex_class_sessions', v);
+      let ren = false; try { ren = await ensureRenewal(v.class_date); } catch (e) { /* the class is saved; the renewal day can be added from the class page */ }
+      toast(ren ? 'Class and renewal day added' : 'Class added'); go('#/firstaid/' + s.id);
+    }
   });
   if (plan) {
     /* choosing another trainer refills the plan with that trainer's usual times, unless the plan was already changed by hand */
