@@ -311,4 +311,13 @@ async function del(table, match) {
   if (!j.length) throw new Error('Nothing was deleted. Only admins can delete.');
 }
 function inList(ids) { return '(' + ids.map(i => '"' + String(i).replace(/"/g, '') + '"').join(',') + ')'; }
+/* the parts of an or=(...) filter that find a person by what was typed: the whole text in first name, last name or email, and, when several words
+   were typed, every word somewhere in first name, last name or email (so "Aabiskar Thapa Magar" finds first name "Aabiskar Thapa" + last name "Magar") */
+function personSearchParts(q, digits) {
+  const toks = String(q || '').split(/\s+/).filter(Boolean), one = t => 'or(first_name.ilike.*' + t + '*,last_name.ilike.*' + t + '*,email.ilike.*' + t + '*)';
+  const parts = ['first_name.ilike.*' + q + '*', 'last_name.ilike.*' + q + '*', 'email.ilike.*' + q + '*'];
+  if (toks.length > 1) parts.push('and(' + toks.map(one).join(',') + ')');
+  if (digits && digits.length >= 4) parts.push('phone.ilike.*' + digits + '*');
+  return parts;
+}
 function safeQ(q) { return String(q || '').replace(/[,()*%\\:"]/g, ' ').trim(); }
