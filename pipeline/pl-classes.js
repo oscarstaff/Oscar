@@ -51,6 +51,8 @@ async function attendanceModal(b, preset, after) {
 async function bkAttended(b, after) {
   try { await bkMark(b, 'attended'); toast('Marked attended'); if (after) after(); else render(); } catch (e) { toast(e.message, true); }
 }
+/* who made the booking, and when. Bookings that came in with the 14 Nov import have no name recorded. */
+function bkBookedBy(b) { return b.created_by ? 'Booked by ' + b.created_by + (b.created_at ? ' · ' + fmtDate(b.created_at) : '') : 'Booked by: not recorded'; }
 /* an attendance mark can be changed or undone by whoever made it, or by an admin; not by another person or team */
 const bkCanChange = b => !!(ME.admin || !b || !b.attendance_by || b.attendance_by === ME.name);
 const bkUndoBtn = (b, cls) => '<button class="nx-btn sm ' + (cls || '') + '" data-ud="' + b.id + '"' + (bkCanChange(b) ? '' : ' disabled title="Marked by ' + esc(b.attendance_by) + '. Only they or an admin can undo it."') + '>Undo</button>';
@@ -101,7 +103,7 @@ function bkFollowRow(b, opt) {
   opt = opt || {}; const ss_ = b.nex_class_sessions || {}; const st = b.nex_students || {};
   const moved = b.rescheduled_to ? (opt.movedTo && opt.movedTo[b.rescheduled_to]) : null;
   const handled = !!b.followup_done_at;
-  return '<tr class="nx-tr" data-bk="' + b.id + '"><td><b>' + (b.student_id ? '<a href="#/students/' + b.student_id + '">' + esc(b.name) + '</a>' : esc(b.name)) + '</b><div class="nx-muted" style="font-size:12px">' + esc(fmtPhone(b.phone) || b.email || '') + '</div></td>' +
+  return '<tr class="nx-tr" data-bk="' + b.id + '"><td><b>' + (b.student_id ? '<a href="#/students/' + b.student_id + '">' + esc(b.name) + '</a>' : esc(b.name)) + '</b><div class="nx-muted" style="font-size:12px">' + esc(fmtPhone(b.phone) || b.email || '') + '</div><div class="nx-muted" style="font-size:12px">' + esc(bkBookedBy(b)) + '</div></td>' +
     '<td>' + pill('booking', b.status) + '</td><td>' + (ss_.class_date ? esc(fmtDate(ss_.class_date)) : '') + '<div class="nx-muted" style="font-size:12px">' + (ss_.kind === 'renewal' ? '<span class="nx-tag walk" title="A renewal booking. It is rebooked onto a renewal day.">Renewal only</span>' : 'Full class') + (Array.isArray(b.sections) && b.sections.length ? ' <span class="nx-tag part" title="Was attending only these sections. Kept when rebooked.">' + esc(bkSecText(b)) + ' only</span>' : '') + '</div></td>' +
     '<td><span class="nx-att-by">' + esc(b.attendance_by || '') + (b.attendance_at ? ' · ' + esc(fmtDT(b.attendance_at)) : '') + '</span></td>' +
     '<td>' + (moved ? '<span class="nx-pill ok">Moved to ' + esc(fmtDate(moved)) + '</span>' : handled ? '<span class="nx-pill ok">Handled' + (b.followup_done_by ? ' · ' + esc(b.followup_done_by) : '') + '</span>' : '<span class="nx-pill warn">To follow up</span>') + '</td>' +
