@@ -446,6 +446,8 @@ function tabDetails(c) {
     (c.s.source_note ? section('Source note', '<div style="padding:16px">' + esc(c.s.source_note) + '</div>') : '');
 }
 /* the enrolment email (steps and documents list, from the support mailbox) that goes out when a lead with an email is added */
+/* PAUSED: every student from the Jan-Sep import already had their enrolment email, so the button is greyed out. Set to false to turn it back on. */
+const WELCOME_PAUSED = true;
 function welcomeSection(c) {
   const w = c.welcome, s = c.s;
   const when = w && w.sent_at ? fmtDT(w.sent_at) : '';
@@ -454,7 +456,7 @@ function welcomeSection(c) {
     : w.status === 'failed' ? '<span class="nx-pill bad">Not sent</span> <span class="nx-muted">' + esc(w.last_error || 'It could not be sent.') + '</span>'
     : '<span class="nx-pill warn">Sending</span> <span class="nx-muted">To ' + esc(w.to_email) + '. It goes out within a few minutes.' + (w.last_error ? ' ' + esc(w.last_error) : '') + '</span>';
   const can = s.email && !(w && (w.status === 'pending' || w.status === 'sending'));
-  return section('Enrolment email', '<div style="padding:16px">' + state + '</div>' + (can ? '<div style="padding:0 16px 16px"><button class="nx-btn sm" data-a="welcomeSend">' + ico('mail') + (w && w.status === 'sent' ? 'Send again' : 'Send enrolment email') + '</button></div>' : ''));
+  return section('Enrolment email', '<div style="padding:16px">' + state + '</div>' + (can ? '<div style="padding:0 16px 16px"><button class="nx-btn sm" data-a="welcomeSend"' + (WELCOME_PAUSED ? ' disabled style="opacity:.45;cursor:not-allowed" title="Paused: the existing students were already emailed"' : '') + '>' + ico('mail') + (w && w.status === 'sent' ? 'Send again' : 'Send enrolment email') + '</button>' + (WELCOME_PAUSED ? ' <span class="nx-muted">Paused for now. Existing students were already emailed.</span>' : '') + '</div>' : ''));
 }
 /* the document list for an enrolment comes from its course (nex_qualifications.doc_group) */
 function docTypesFor(e) {
@@ -552,6 +554,7 @@ async function studentAction(a, ds, c) {
   }
   if (a === 'archive') { if (!ME.admin) return toast('Only hub admins can archive records.', true); if (await confirmBox(c.isStudent ? 'Archive student' : 'Archive lead', fullName(s) + ' will be hidden from lists. Their records are kept.', 'Archive', true)) { await upd('nex_students', 'id=eq.' + s.id, { deleted_at: new Date().toISOString() }); toast('Archived'); go(c.isStudent ? '#/students' : '#/leads'); } return; }
   if (a === 'welcomeSend') {
+    if (WELCOME_PAUSED) return toast('Enrolment emails are paused for now.', true);
     if (c.welcome && c.welcome.status === 'sent' && !(await confirmBox('Send again', 'They were already sent the enrolment email. Send it to ' + s.email + ' again?', 'Send again'))) return;
     await api('rpc/nex_queue_welcome', { method: 'POST', body: { p_student: s.id } }); toast('Enrolment email is on its way'); return render();
   }
