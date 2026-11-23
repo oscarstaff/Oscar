@@ -2,7 +2,7 @@
 // Called by the database (nex_welcome_kick) the moment a lead with an email is added, and every 5 minutes to retry what is still waiting.
 // POST {} with the header x-cron-secret. It sends every row in nex_welcome_mail that is 'pending' (or 'failed' with fewer than 3 tries).
 // The recipient is ALWAYS the email stored on the row, which the database copied from the lead; nothing in the request can change it.
-// Sent through a second copy of the Nex mail relay (scripts/nex-mail-relay.gs, script property NEX_MAIL_KEY) deployed under the SUPPORT Google account; its URL and key are the secrets NEX_MAIL4_URL / NEX_MAIL4_KEY. That relay sends the plain text as HTML itself, so the html field is ignored.
+// Sent through the same Nex mail relay as the follow-up emails (NEX_MAIL_URL / NEX_MAIL_KEY, the support mailbox). Set NEX_MAIL4_URL / NEX_MAIL4_KEY only to use a different sender. That relay sends the plain text as HTML itself, so the html field is ignored.
 // Deploy with verify_jwt OFF (the caller is the database; the secret above is the check). Needs the usual SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.
 // Deployed as two files: index.ts (this file) and email.ts (= scripts/edge/welcome-email.ts).
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
@@ -10,8 +10,8 @@ import { welcomeText, welcomeHtml, WELCOME_SUBJECT } from "./email.ts";
 
 const SB = Deno.env.get("SUPABASE_URL")!;
 const SRK = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const MAIL_URL = Deno.env.get("NEX_MAIL4_URL") || "";
-const MAIL_KEY = Deno.env.get("NEX_MAIL4_KEY") || "";
+const MAIL_URL = Deno.env.get("NEX_MAIL4_URL") || Deno.env.get("NEX_MAIL_URL") || "";   // the follow-up sender (support mailbox) unless a separate one is set
+const MAIL_KEY = Deno.env.get("NEX_MAIL4_KEY") || Deno.env.get("NEX_MAIL_KEY") || "";
 const FROM_NAME = "Oscars Training Centre Support";
 const MAX_TRIES = 3;
 const MAX_AGE_MS = 3 * 24 * 3600 * 1000;   // a row waiting longer than this (the mailbox was never connected) is not sent by surprise days later; use Send again on the student
@@ -37,7 +37,7 @@ serve(async (req) => {
     const secret = req.headers.get("x-cron-secret") || "";
     const ok = await rest("rpc/cron_secret_ok", { method: "POST", body: JSON.stringify({ p: secret }) }).catch(() => false);
     if (ok !== true) return json({ error: "forbidden" }, 403);
-    if (!MAIL_URL || !MAIL_KEY) return json({ ok: true, sent: 0, note: "The support mailbox isn't connected yet (NEX_MAIL4_URL / NEX_MAIL4_KEY)." });
+    if (!MAIL_URL || !MAIL_KEY) return json({ ok: true, sent: 0, note: "The mail sender isn't connected (NEX_MAIL_URL / NEX_MAIL_KEY)." });
 
     // anything stuck in 'sending' for over 10 minutes (the function stopped half way) goes back to waiting
     const stale = new Date(Date.now() - 10 * 60 * 1000).toISOString();
@@ -61,10 +61,12 @@ serve(async (req) => {
         await rest(`nex_welcome_mail?student_id=eq.${row.student_id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "failed", attempts: MAX_TRIES, last_error: "Waited more than 3 days to be sent. Use Send enrolment email on the student to send it now." }) });
         skipped++; continue;
       }
+      let first = "";
+      try { const st = await rest(`nex_students?id=eq.${row.student_id}&select=first_name`); first = String((st && st[0] && st[0].first_name) || "").trim().split(/\s+/)[0].replace(/[\u0000-\u001f<>]/g, "").slice(0, 40); } catch { /* send without a name */ }
       try {
         const mr = await fetch(MAIL_URL, {
           method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, redirect: "follow",
-          body: JSON.stringify({ key: MAIL_KEY, to, subject: WELCOME_SUBJECT, text: welcomeText(), html: welcomeHtml(), fromName: FROM_NAME }),
+          body: JSON.stringify({ key: MAIL_KEY, to, subject: WELCOME_SUBJECT, text: welcomeText(first), html: welcomeHtml(first), fromName: FROM_NAME }),
         });
         const mt = await mr.text();
         let mj: any = null;

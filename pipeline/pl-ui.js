@@ -285,8 +285,7 @@ function pickStudent(title, onPick, initial) {
       box.innerHTML = '<div class="nx-help">Searching…</div>';
       try {
         const digits = cleanPhone(q);
-        const parts = ['first_name.ilike.*' + q + '*', 'last_name.ilike.*' + q + '*', 'email.ilike.*' + q + '*'];
-        if (digits.length >= 4) parts.push('phone.ilike.*' + digits + '*');
+        const parts = personSearchParts(q, digits);
         const rows = await sel('nex_students', 'select=id,first_name,last_name,email,phone&deleted_at=is.null&or=(' + parts.join(',') + ')&order=first_name&limit=20');
         box.innerHTML = rows.length ? rows.map(s => '<button type="button" class="nx-pick" data-id="' + s.id + '"><span><b>' + esc(fullName(s)) + '</b><small>' + esc([s.email, fmtPhone(s.phone)].filter(Boolean).join(' · ') || 'No contact details') + '</small></span><span class="nx-tag">Choose</span></button>').join('') : '<div class="nx-help">No student found.</div>';
         $$('.nx-pick', box).forEach(b => b.onclick = () => { const s = rows.find(x => x.id === b.dataset.id); m.close(); onPick(s); });

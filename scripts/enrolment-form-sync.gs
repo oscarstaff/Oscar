@@ -4,7 +4,7 @@
       If setup() says it cannot find the form or its sheet, also add  FORM_ID  = the long id in the FORM's address
       (open the form to edit it; the id is between /d/ and /edit). A sheet id (SHEET_ID) works too.
    2. Run setup() once and allow access. It installs the "on form submit" trigger.
-   3. (Optional) Run sendAllRows() once to tick the form for everyone who already submitted it. Safe to run again: repeats are ignored.
+   3. (Optional) Run sendAllRows() to tick the form for everyone who submitted it in the last 90 days. Safe to run again: it carries on where it stopped and repeats are ignored.
    What happens: when the student submits the form, only their name, primary email, sign-in email and mobile number are sent to YatraLine
    (nothing else on the form leaves the sheet). They are matched by email, then mobile number, then exact full name (only when one student has that name).
    Their "Enrolment form" box is ticked on every enrolment they have. If they have no enrolment yet, it ticks the moment one is added.
@@ -13,12 +13,12 @@
 const SB_URL = 'https://jcfgldqrdbfkgbixszds.supabase.co';
 const SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpjZmdsZHFyZGJma2diaXhzemRzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1Nzc3NzEsImV4cCI6MjA5MDE1Mzc3MX0.Wj8cCpnlsoZOPj5sKWeEdfvgjG4Nc-UuTTYgbcrPfeI';   // public anon key, already in the app
 
-/* The form's headings. "Column 8" is the student's mobile number (its heading was left unnamed on the form). */
+/* The form's headings. In the response sheet the mobile number column is headed "Column 8"; on the form itself the question is "Mobile No". Both work. */
 const MAP = {
   name:   /^full name$/i,
   email:  /^email \(please provide primary email/i,
   email2: /^email address$/i,
-  phone:  /^column 8$/i
+  phone:  /^(column 8|mobile( no\.?| number)?)$/i
 };
 
 function target_() {
@@ -56,21 +56,51 @@ function onFormSubmitForm(e) {   // form trigger
   const hr = formRow_(e.response); sendRow_(hr[0], hr[1]);
 }
 
-function sendAllRows() {
-  const t = target_(); const n = { ticked: 0, other: 0, dup: 0 };
-  const count = res => { if (res.result === 'ticked') n.ticked++; else if (res.result === 'duplicate') n.dup++; else n.other++; };
-  if (t.form) t.form.getResponses().forEach(r => { const hr = formRow_(r); count(sendRow_(hr[0], hr[1])); });
-  else {
-    const sh = t.ss.getSheets()[0], last = sh.getLastRow(); if (last < 2) return;   // the form's answers are the first tab
-    const head = sh.getRange(1, 1, 1, sh.getLastColumn()).getDisplayValues()[0], rows = sh.getRange(2, 1, last - 1, sh.getLastColumn()).getDisplayValues();
-    rows.forEach(r => count(sendRow_(head, r)));
+/* Brings in answers that came in before the trigger was installed. Run it as often as it needs: it picks up where it stopped, never sends the same
+   answer twice, and only looks at the last 90 days (set the script property BACKFILL_DAYS to change that, for example 30 or 365).
+   It stops after about 4 minutes to stay inside Google's 6 minute limit; if the log says "run it again", run it again. */
+function findSheet_(ss) {   // the tab whose first row has the "Full Name" and email headings (not always the first tab)
+  const tabs = ss.getSheets();
+  for (let i = 0; i < tabs.length; i++) {
+    const w = Math.max(1, Math.min(tabs[i].getLastColumn(), 80));
+    const head = tabs[i].getRange(1, 1, 1, w).getDisplayValues()[0].map(h => String(h || '').replace(/\s*\*\s*$/, '').trim());
+    if (head.some(h => MAP.name.test(h)) && head.some(h => MAP.email.test(h) || MAP.email2.test(h))) return tabs[i];
   }
-  Logger.log('Ticked: ' + n.ticked + ' · not matched or already ticked: ' + n.other + ' · already sent before: ' + n.dup + '. Details for the unmatched are in YatraLine (nex_enrolment_form_log).');
+  return null;
+}
+
+function sendAllRows() {
+  const t = target_(), started = Date.now(), props = PropertiesService.getScriptProperties();
+  const n = { ticked: 0, other: 0, dup: 0, empty: 0 };
+  const count = res => { if (res.result === 'ticked') n.ticked++; else if (res.result === 'duplicate') n.dup++; else if (res.result === 'empty') n.empty++; else n.other++; };
+  const days = Number(props.getProperty('BACKFILL_DAYS')) || 90, cutoff = new Date(Date.now() - days * 864e5);
+  if (t.form) {
+    t.form.getResponses().filter(r => r.getTimestamp() >= cutoff).forEach(r => { const hr = formRow_(r); count(sendRow_(hr[0], hr[1])); });
+    Logger.log('Ticked: ' + n.ticked + ' · not matched or no enrolment yet: ' + n.other + ' · already sent before: ' + n.dup + '.');
+    return;
+  }
+  const sh = findSheet_(t.ss);
+  if (!sh) throw new Error('Cannot find the tab with the form answers (a first row with "Full Name" and the email heading). Tabs: ' + t.ss.getSheets().map(x => x.getName()).join(', '));
+  const last = sh.getLastRow(), width = sh.getLastColumn();
+  if (last < 2) { Logger.log('The tab "' + sh.getName() + '" has no answers.'); return; }
+  const head = sh.getRange(1, 1, 1, width).getDisplayValues()[0];
+  const stamps = sh.getRange(2, 1, last - 1, 1).getValues();
+  let row = Math.max(2, Number(props.getProperty('SYNC_NEXT_ROW')) || 2), seen = 0;
+  for (; row <= last; row++) {
+    if (Date.now() - started > 240000) break;   // about 4 minutes
+    const ts = stamps[row - 2][0];
+    if (ts instanceof Date && ts < cutoff) continue;   // older than the window
+    seen++;
+    count(sendRow_(head, sh.getRange(row, 1, 1, width).getDisplayValues()[0]));
+  }
+  const finished = row > last;
+  props.setProperty('SYNC_NEXT_ROW', finished ? '2' : String(row));
+  Logger.log('Tab "' + sh.getName() + '" · answers sent this run: ' + seen + ' · ticked: ' + n.ticked + ' · not matched or no enrolment yet: ' + n.other + ' · already sent before: ' + n.dup + ' · rows with no name or email: ' + n.empty + '.' + (finished ? ' Done.' : ' Not finished: run it again.'));
 }
 
 function pick_(head, row, re) {
   for (let i = 0; i < head.length; i++) {
-    const h = String(head[i] || '').trim();
+    const h = String(head[i] || '').replace(/\s*\*\s*$/, '').trim();   // a trailing * (required question) is ignored
     if (re.test(h) && String(row[i] || '').trim()) return String(row[i]).trim();
   }
   return '';

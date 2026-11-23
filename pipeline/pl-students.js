@@ -160,7 +160,7 @@ route(/^\/(students|leads|search)(?:\?(.*))?$/, async m => {
         }
         if (SL.stage) query += '&nex_enrolments.stage=eq.' + encodeURIComponent(SL.stage);
         if (SL.qual) query += '&nex_enrolments.qualification_id=eq.' + SL.qual;
-        if (q) { const parts = ['first_name.ilike.*' + q + '*', 'last_name.ilike.*' + q + '*', 'email.ilike.*' + q + '*']; if (digits.length >= 4) parts.push('phone.ilike.*' + digits + '*'); query += '&or=(' + parts.join(',') + ')'; }
+        if (q) query += '&or=(' + personSearchParts(q, digits).join(',') + ')';
         const { rows, total } = await selPage('nex_students', query, SL.page * SL.size, SL.page * SL.size + SL.size - 1);
         let pays = [];
         if (rows.length) pays = await sel('nex_payments', 'select=student_id,amount,verify_status&student_id=in.' + inList(rows.map(r => r.id)));
