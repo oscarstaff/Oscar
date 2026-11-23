@@ -97,3 +97,10 @@ create trigger t_live_ping after insert or delete or update on public.nex_studen
 
 -- 4. a new lead is no longer emailed by itself; the New lead form has a tick that calls nex_queue_welcome
 drop trigger if exists t_welcome_lead on public.nex_students;
+
+-- 24 Nov 2026 (migration "queue_status_placement_move"): "Documents" in the payments queue is now "Queue status" and keeps only
+-- Not set, No Docs, Not Found, Incomplete Documents, Insufficient Payment, Evershine, Others, Instalment.
+-- The placement values moved to the Placement status (new: Confirmed no PLC, Placement Not Required); the old keys are inactive, not deleted.
+-- Mapping: yes_plc, yes_plc_less_payment -> plc_interested; done_plc -> plc_done; no_plc, no_plc_issues -> plc_not_required;
+--          confirmed_no_plc, confirmed_no_plc_less -> confirmed_no_plc; plc_nyc -> plc_nyc.  The "less payment" ones became queue status less_payment, no_plc_issues -> issues.
+-- The old nex_plc_off(queue, plc) became: off when plc is plc_nyc, confirmed_no_plc or plc_not_required.

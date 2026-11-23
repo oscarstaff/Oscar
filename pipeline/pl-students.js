@@ -516,10 +516,10 @@ function courseDocsSection(c, e) {
       return '<li><label class="nx-check"><input type="checkbox" data-doc="' + t.id + '" data-enr="' + e.id + '"' + (g ? ' checked' + (ME.admin ? '' : ' disabled title="Only hub admins can untick a document"') : '') + '> <span><b>' + esc(t.name) + '</b>' + (t.note ? '<small>' + esc(t.note) + '</small>' : '') + '</span></label>' +
         (g ? '<span class="nx-muted">' + esc(fmtDate(g.received_on)) + (g.created_by ? ' · ' + esc(g.created_by) : '') + '</span>' : '<span class="nx-pill warn">Missing</span>') + '</li>'; }).join('') + '</ul>');
 }
-/* placement documents are not needed while the newest payment queue row says Confirmed no PLC or PLC NYC
-   (the same rule as the database function nex_plc_off). Placement Interested or Plc Completed on the Placement status brings them back. */
-const PLC_OFF_QUEUE = ['confirmed_no_plc', 'confirmed_no_plc_less', 'plc_nyc'];
-function plcOffRow(q) { return !!q && (q.placement_status === 'plc_nyc' || (PLC_OFF_QUEUE.includes(q.queue_status) && !['plc_interested', 'plc_done'].includes(q.placement_status || ''))); }
+/* placement documents are not needed while the newest payment queue row has Placement status PLC NYC, Confirmed no PLC or Placement Not Required
+   (the same rule as the database function nex_plc_off). Plc Interested or Plc Completed brings them back. */
+const PLC_OFF = ['plc_nyc', 'confirmed_no_plc', 'plc_not_required'];
+function plcOffRow(q) { return !!q && PLC_OFF.includes(q.placement_status || ''); }
 function plcOffRowOf(c, e) { const rows = (c.queue || []).filter(q => q.enrolment_id === e.id).sort((a, b) => String(b.updated_at || '').localeCompare(String(a.updated_at || '')) || String(b.created_at || '').localeCompare(String(a.created_at || ''))); return plcOffRow(rows[0]) ? rows[0] : null; }
 /* the documents needed before placement (doc group 'placement'). Passport and Visa copy also count when ticked in the course list above,
    the same way the database rule counts them */
@@ -537,8 +537,8 @@ function placementDocState(c, e) {
 }
 function placementDocsSection(c, e, title) {
   const st = placementDocState(c, e);
-  if (st.off) { const q = plcOffRowOf(c, e), why = q.placement_status === 'plc_nyc' ? statusLabel('placement_queue', 'plc_nyc') : statusLabel('payment_queue', q.queue_status);
-    return section('Placement documents' + (c.enr.length > 1 ? ' (' + title + ')' : '') + ' · not needed', '<div class="nx-muted" style="padding:16px">Not needed while the payment status is <b>' + esc(why) + '</b>. If it changes to Placement Interested, the documents come back and the student goes into the placement email box on the Overview.</div>'); }
+  if (st.off) { const q = plcOffRowOf(c, e), why = statusLabel('placement_queue', q.placement_status);
+    return section('Placement documents' + (c.enr.length > 1 ? ' (' + title + ')' : '') + ' · not needed', '<div class="nx-muted" style="padding:16px">Not needed while the Placement status is <b>' + esc(why) + '</b>. If it changes to Placement Interested, the documents come back and the student goes into the placement email box on the Overview.</div>'); }
   if (!st.rows.length) return '';
   return section('Placement documents' + (c.enr.length > 1 ? ' (' + title + ')' : '') + ' · ' + (st.rows.length - st.miss) + ' of ' + st.rows.length + ' received' + (st.last ? ' · complete ' + fmtDate(st.last) : ''),
     '<div class="nx-help" style="padding:10px 16px 0">All of these are needed before a placement request is sent or a student goes in a batch. The 3-week wait counts from the day the last one arrives.</div>' +
@@ -561,7 +561,7 @@ function tabMoney(c) {
       '<div class="nx-btnrow">' + (canCash() ? '<button class="nx-btn sm" data-a="addPay" data-id="' + e.id + '">' + ico('plus') + 'Payment</button>' : '') + '<button class="nx-btn sm" data-a="refund" data-id="' + e.id + '">Refund</button><button class="nx-btn sm" data-a="editEnr" data-id="' + e.id + '">' + ico('edit') + 'Edit</button></div></div>' +
       (e.notes || e.follow_up_note ? '<div style="padding:0 16px 12px" class="nx-muted">' + esc(e.notes || '') + '</div>' : '') +
       (ps.length || rf.length ? '<div class="nx-tablewrap"><table class="nx-table auto tight"><thead><tr><th>Date</th><th>Amount</th><th>Instalment</th><th>Method</th><th>Reference</th><th>Status</th><th>Processing</th></tr></thead><tbody>' +
-        ps.map(p => { const q = c.queue.find(x => x.payment_id === p.id); return '<tr><td>' + esc(fmtDate(p.paid_on)) + '</td><td class="nx-money">' + money(p.amount) + '</td><td>' + (x => x ? esc(x.label) : '–')(instalmentOf(e.fee, ps, p.id)) + '</td><td>' + esc(p.method || '–') + '</td><td>' + esc(p.reference || p.payer_name || '–') + '</td><td>' + payStatusHtml(p) + '</td><td>' + (q ? pill('payment_queue', q.queue_status) + ' ' + pill('processing', q.processing_step) : '<span class="nx-muted">–</span>') + '</td></tr>'; }).join('') +
+        ps.map(p => { const q = c.queue.find(x => x.payment_id === p.id); return '<tr><td>' + esc(fmtDate(p.paid_on)) + '</td><td class="nx-money">' + money(p.amount) + '</td><td>' + (x => x ? esc(x.label) : '–')(instalmentOf(e.fee, ps, p.id)) + '</td><td>' + esc(p.method || '–') + '</td><td>' + esc(p.reference || p.payer_name || '–') + '</td><td>' + payStatusHtml(p) + '</td><td>' + (q ? ([q.placement_status && pill('placement_queue', q.placement_status), q.queue_status && pill('payment_queue', q.queue_status), q.processing_step && pill('processing', q.processing_step)].filter(Boolean).join(' ') || '<span class="nx-muted">–</span>') : '<span class="nx-muted">–</span>') + '</td></tr>'; }).join('') +
         rf.map(r => '<tr><td>' + esc(fmtDate(r.refunded_on)) + '</td><td class="nx-money nx-neg">-' + money(r.amount).replace('-', '') + '</td><td></td><td>Refund</td><td>' + esc(r.reason || '–') + '</td><td></td><td>Approved by ' + esc(r.approved_by || '–') + '</td></tr>').join('') + '</tbody></table></div>' : '<div style="padding:0 16px 16px" class="nx-muted">No payments recorded.</div>')) + courseDocsSection(c, e);
   }).join('');
   const orphan = c.pays.filter(p => !linked.has(p.id));

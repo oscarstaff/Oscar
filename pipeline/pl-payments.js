@@ -5,7 +5,7 @@
    Payments and First Aid
    ========================================================= */
 const PY = { view: 'toprocess', q: '', page: 0, size: 50, sel: null };
-const PROBLEM = ['no_docs', 'not_found', 'issues', 'less_payment', 'no_plc_issues', 'yes_plc_less_payment', 'confirmed_no_plc_less'];
+const PROBLEM = ['no_docs', 'not_found', 'issues', 'less_payment'];
 
 route(/^\/payments(?:\?(.*))?$/, async m => {
   const qs = new URLSearchParams(m[1] || '');
@@ -94,7 +94,7 @@ function bindPayments() {
         if (mine !== seq) return;
         rowsCache = rows;
         const stepIdx = k => ['draft_not_made', 'draft_made', 'ready_to_process', 'processed'].indexOf(k);
-        body.innerHTML = rows.length ? '<div class="nx-tablewrap"><table class="nx-table tight"><thead><tr><th>Student</th><th>Paid</th><th>Amount</th><th>Placement</th><th>Documents</th><th>Processing</th><th>Updated</th></tr></thead><tbody>' +
+        body.innerHTML = rows.length ? '<div class="nx-tablewrap"><table class="nx-table tight"><thead><tr><th>Student</th><th>Paid</th><th>Amount</th><th>Placement</th><th>Queue status</th><th>Processing</th><th>Updated</th></tr></thead><tbody>' +
           rows.map(r => { const p = r.nex_payments || {}, e = r.nex_enrolments || {}, s = e.nex_students || null; const si = stepIdx(r.processing_step);
             return '<tr class="nx-tr ' + (PY.sel === r.id ? 'sel' : '') + '" data-id="' + r.id + '"><td><div class="nx-who"><span class="nx-avatar">' + esc(initials(s ? fullName(s) : p.payer_name)) + '</span><div><b>' + esc(s ? fullName(s) : (p.payer_name || 'Unknown')) + '</b><span>' + esc(s ? s.email || '' : 'Not matched') + '</span></div></div></td><td>' + esc(fmtDate(p.paid_on)) + '</td><td class="nx-money">' + money(p.amount) + (e.fee && p.id ? (x => x ? '<div class="nx-muted nx-inst">' + esc(x.label) + '</div>' : '')(instalmentOf(e.fee, e.pays, p.id)) : '') + '</td><td>' + pill('placement_queue', r.placement_status) + '</td><td>' + pill('payment_queue', r.queue_status) + '</td><td>' + '<div class="nx-stagecell">' + pill('processing', r.processing_step) + '<div class="nx-steps">' + [0, 1, 2, 3].map(i => '<i class="' + (i <= si ? 'on' : '') + '"></i>').join('') + '</div></div></td><td>' + esc(fmtDT(r.updated_at)) + '</td></tr>'; }).join('') + '</tbody></table></div>' : empty('Nothing here', q ? 'No entries match your search.' : PY.view === 'toprocess' ? 'The queue is clear.' : 'No entries in this list.');
         $$('.nx-tr', body).forEach(tr => tr.onclick = () => openQueueDrawer(rowsCache.find(x => x.id === tr.dataset.id), load));
@@ -123,7 +123,7 @@ function openQueueDrawer(r, reload) {
     '<div><div class="nx-lbl">Payment</div><div class="nx-big">' + money(p.amount) + '</div><div class="nx-muted">' + esc(fmtDate(p.paid_on)) + (p.method ? ' · ' + esc(p.method) : '') + (p.reference ? ' · ' + esc(p.reference) : '') + '</div></div>' +
     (e.fee ? '<div class="nx-muted">Agreed fee ' + money(e.fee) + (x => x ? ' · ' + esc(x.label) + ' · paid so far ' + money(x.paidTo) : '')(instalmentOf(e.fee, e.pays, p.id)) + '</div>' : '') +
     '<div><label class="nx-lbl" for="pdPl">Placement</label><select class="nx-sel" id="pdPl">' + selectOpts(opts('placement_queue', true), r.placement_status, 'Not set') + '</select><div class="nx-help">Follows the placement plan flag that Evershine sets on the class booking: Yes or not set = Plc Interested, No = PLC NYC, Done = Plc Completed.</div></div>' +
-    '<div><label class="nx-lbl" for="pdQs">Documents</label><select class="nx-sel" id="pdQs">' + selectOpts(opts('payment_queue', true), r.queue_status, 'Not set') + '</select></div>' +
+    '<div><label class="nx-lbl" for="pdQs">Queue status</label><select class="nx-sel" id="pdQs">' + selectOpts(opts('payment_queue', true), r.queue_status, 'Not set') + '</select></div>' +
     '<div><label class="nx-lbl" for="pdSt">Processing step</label><select class="nx-sel" id="pdSt">' + selectOpts(opts('processing', true), r.processing_step) + '</select></div>' +
     '<div><label class="nx-lbl" for="pdAs">Assigned to</label><select class="nx-sel" id="pdAs">' + selectOpts(REF.staff, r.assigned_to, 'Nobody') + '</select></div>' +
     '<div><label class="nx-lbl" for="pdNote">Note</label><textarea class="nx-ta" id="pdNote">' + esc(r.note || '') + '</textarea></div>' +
