@@ -47,7 +47,7 @@ route(/^\/$/, async () => {
     '</div>';
 });
 
-const AUD_NAMES = { nex_students: 'student', nex_student_details: 'student details', nex_enrolments: 'enrolment', nex_payments: 'payment', nex_payment_queue: 'payment queue', nex_refunds: 'refund', nex_class_sessions: 'class', nex_placement_profile: 'placement profile', nex_class_bookings: 'booking', nex_placement_requests: 'placement request', nex_placement_doc_mail: 'placement documents email', nex_placements: 'placement', nex_facilities: 'facility', nex_blacklist: 'blacklist entry' };
+const AUD_NAMES = { nex_students: 'student', nex_student_details: 'student details', nex_enrolments: 'enrolment', nex_payments: 'payment', nex_payment_queue: 'payment queue', nex_refunds: 'refund', nex_class_sessions: 'class', nex_placement_profile: 'placement profile', nex_class_bookings: 'booking', nex_placement_requests: 'placement request', nex_placement_doc_mail: 'placement documents email', nex_placements: 'placement', nex_facilities: 'facility', nex_blacklist: 'blacklist entry', nex_followups: 'follow-up', nex_tasks: 'task', nex_enrolment_docs: 'document record' };
 const SKIP_KEYS = new Set(['updated_at', 'created_at', 'created_by', 'id', 'updated_by']);
 function diffHtml(a) {
   if (a.action !== 'UPDATE' || !a.old_row || !a.new_row) return '';
@@ -57,7 +57,7 @@ function diffHtml(a) {
 function feedItem(a) {
   const what = AUD_NAMES[a.table_name] || a.table_name;
   const verb = a.action === 'INSERT' ? 'Added' : a.action === 'DELETE' ? 'Deleted' : 'Updated';
-  return '<li><span class="dot ' + (a.action === 'DELETE' ? 'warn' : a.action === 'INSERT' ? '' : 'info') + '">' + ico(a.action === 'INSERT' ? 'plus' : a.action === 'DELETE' ? 'x' : 'edit') + '</span><div><b>' + esc(a.changed_by || 'Someone') + '</b> ' + verb.toLowerCase() + ' a ' + esc(what) + diffHtml(a) + '<time>' + fmtDT(a.changed_at) + '</time></div></li>';
+  return '<li><span class="dot ' + (a.action === 'DELETE' ? 'warn' : a.action === 'INSERT' ? '' : 'info') + '">' + ico(a.action === 'INSERT' ? 'plus' : a.action === 'DELETE' ? 'x' : 'edit') + '</span><div><b>' + esc(a.changed_by || 'System (automatic)') + '</b> ' + verb.toLowerCase() + ' a ' + esc(what) + diffHtml(a) + '<time>' + fmtDT(a.changed_at) + '</time></div></li>';
 }
 
 /* ---------- Leads, Students and Search (one list, three pages) ----------
@@ -306,7 +306,7 @@ route(/^\/students\/([0-9a-f-]{36})$/, async m => {
     eids.length ? sel('nex_placement_requests', 'select=*,nex_facilities(name)&enrolment_id=in.' + inList(eids) + '&order=created_at.desc') : [],
     eids.length ? sel('nex_placements', 'select=*,nex_facilities(name)&enrolment_id=in.' + inList(eids) + '&order=created_at.desc') : [],
     eids.length ? sel('nex_status_history', 'select=*&entity_id=in.' + inList(eids) + '&order=changed_at.desc&limit=40') : [],
-    sel('nex_audit', 'select=*&row_id=in.' + inList([id].concat(eids, pays.map(p => p.id))) + '&order=changed_at.desc&limit=40'),
+    sel('nex_audit', 'select=*&row_id=in.' + inList([id].concat(eids, pays.map(p => p.id), books.map(b => b.id), followups.map(f => f.id), tasks.map(t => t.id))) + '&order=changed_at.desc&limit=100'),
     eids.length ? sel('nex_enrolment_docs', 'select=*&enrolment_id=in.' + inList(eids)).catch(() => []) : []
   ]);
   const main = enr[0] || {};
@@ -508,13 +508,13 @@ function tabMoney(c) {
 }
 function tabActivity(c) {
   const items = [];
-  c.hist.forEach(h => items.push({ t: h.changed_at, html: '<li><span class="dot">' + ico('list') + '</span><div><b>' + esc(h.changed_by || 'Someone') + '</b> moved ' + esc(h.context.replace(/_/g, ' ')) + (h.from_status ? ' from <b>' + esc(statusLabel(h.context, h.from_status)) + '</b>' : '') + ' to <b>' + esc(statusLabel(h.context, h.to_status)) + '</b><time>' + fmtDT(h.changed_at) + '</time></div></li>' }));
+  c.hist.forEach(h => items.push({ t: h.changed_at, html: '<li><span class="dot">' + ico('list') + '</span><div><b>' + esc(h.changed_by || 'System (automatic)') + '</b> moved ' + esc(h.context.replace(/_/g, ' ')) + (h.from_status ? ' from <b>' + esc(statusLabel(h.context, h.from_status)) + '</b>' : '') + ' to <b>' + esc(statusLabel(h.context, h.to_status)) + '</b><time>' + fmtDT(h.changed_at) + '</time></div></li>' }));
   c.aud.forEach(a => { if (a.action === 'UPDATE' && !diffHtml(a)) return; items.push({ t: a.changed_at, html: feedItem(a) }); });
-  (c.logs || []).forEach(k => items.push({ t: k.created_at, html: '<li><span class="dot ok">' + ico('notebook') + '</span><div><b>' + esc(k.receiver || 'Someone') + '</b> received their logbook on ' + esc(fmtDate(k.received_on)) + (k.comments ? '<div class="nx-diff">' + esc(k.comments) + '</div>' : '') + '<time>' + fmtDT(k.created_at) + '</time></div></li>' }));
-  (c.calls || []).forEach(k => items.push({ t: k.created_at, html: '<li><span class="dot info">' + ico('bell') + '</span><div><b>' + esc(k.logged_by || 'Someone') + '</b> logged a call (' + (k.direction === 'out' ? 'out' : 'in') + '): ' + esc(k.reason) + (k.resolved_at ? '' : ' <span class="nx-pill warn">Waiting for a callback</span>') + (k.note ? '<div class="nx-diff">' + esc(k.note) + '</div>' : '') + '<time>' + fmtDT(k.created_at) + '</time></div></li>' }));
-  (c.books || []).forEach(b => { if (!b.attendance_at || !BK_WORD[b.status]) return; const cd = (b.nex_class_sessions || {}).class_date; items.push({ t: b.attendance_at, html: '<li><span class="dot ' + (b.status === 'attended' ? 'ok' : 'warn') + '">' + ico('aid') + '</span><div><b>' + esc(b.attendance_by || 'Someone') + '</b> marked <b>' + BK_WORD[b.status] + '</b> for First Aid and CPR' + (cd ? ' on ' + esc(fmtDate(cd)) : '') + '<time>' + fmtDT(b.attendance_at) + '</time></div></li>' }); });
+  (c.logs || []).forEach(k => items.push({ t: k.created_at, html: '<li><span class="dot ok">' + ico('notebook') + '</span><div><b>' + esc(k.receiver || 'System (automatic)') + '</b> received their logbook on ' + esc(fmtDate(k.received_on)) + (k.comments ? '<div class="nx-diff">' + esc(k.comments) + '</div>' : '') + '<time>' + fmtDT(k.created_at) + '</time></div></li>' }));
+  (c.calls || []).forEach(k => items.push({ t: k.created_at, html: '<li><span class="dot info">' + ico('bell') + '</span><div><b>' + esc(k.logged_by || 'System (automatic)') + '</b> logged a call (' + (k.direction === 'out' ? 'out' : 'in') + '): ' + esc(k.reason) + (k.resolved_at ? '' : ' <span class="nx-pill warn">Waiting for a callback</span>') + (k.note ? '<div class="nx-diff">' + esc(k.note) + '</div>' : '') + '<time>' + fmtDT(k.created_at) + '</time></div></li>' }));
+  (c.books || []).forEach(b => { if (!b.attendance_at || !BK_WORD[b.status]) return; const cd = (b.nex_class_sessions || {}).class_date; items.push({ t: b.attendance_at, html: '<li><span class="dot ' + (b.status === 'attended' ? 'ok' : 'warn') + '">' + ico('aid') + '</span><div><b>' + esc(b.attendance_by || 'System (automatic)') + '</b> marked <b>' + BK_WORD[b.status] + '</b> for First Aid and CPR' + (cd ? ' on ' + esc(fmtDate(cd)) : '') + '<time>' + fmtDT(b.attendance_at) + '</time></div></li>' }); });
   items.sort((a, b) => String(b.t).localeCompare(String(a.t)));
-  return items.length ? '<ul class="nx-feed">' + items.slice(0, 60).map(i => i.html).join('') + '</ul>' : empty('No activity yet');
+  return items.length ? '<ul class="nx-feed">' + items.slice(0, 100).map(i => i.html).join('') + '</ul>' : empty('No activity yet');
 }
 
 async function studentAction(a, ds, c) {

@@ -51,8 +51,8 @@ async function attendanceModal(b, preset, after) {
 async function bkAttended(b, after) {
   try { await bkMark(b, 'attended'); toast('Marked attended'); if (after) after(); else render(); } catch (e) { toast(e.message, true); }
 }
-/* who made the booking, and when. Bookings that came in with the 14 Nov import have no name recorded. */
-function bkBookedBy(b) { return b.created_by ? 'Booked by ' + b.created_by + (b.created_at ? ' · ' + fmtDate(b.created_at) : '') : 'Booked by: not recorded'; }
+/* who made the booking, and when. A booking made by the system (an import or an automatic job) says so. */
+function bkBookedBy(b) { return 'Booked by ' + (b.created_by || 'System (automatic)') + (b.created_at ? ' · ' + fmtDate(b.created_at) : ''); }
 /* an attendance mark can be changed or undone by whoever made it, or by an admin; not by another person or team */
 const bkCanChange = b => !!(ME.admin || !b || !b.attendance_by || b.attendance_by === ME.name);
 const bkUndoBtn = (b, cls) => '<button class="nx-btn sm ' + (cls || '') + '" data-ud="' + b.id + '"' + (bkCanChange(b) ? '' : ' disabled title="Marked by ' + esc(b.attendance_by) + '. Only they or an admin can undo it."') + '>Undo</button>';
