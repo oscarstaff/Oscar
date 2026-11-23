@@ -13,12 +13,12 @@
 const SB_URL = 'https://jcfgldqrdbfkgbixszds.supabase.co';
 const SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpjZmdsZHFyZGJma2diaXhzemRzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1Nzc3NzEsImV4cCI6MjA5MDE1Mzc3MX0.Wj8cCpnlsoZOPj5sKWeEdfvgjG4Nc-UuTTYgbcrPfeI';   // public anon key, already in the app
 
-/* The form's headings. "Column 8" is the student's mobile number (its heading was left unnamed on the form). */
+/* The form's headings. In the response sheet the mobile number column is headed "Column 8"; on the form itself the question is "Mobile No". Both work. */
 const MAP = {
   name:   /^full name$/i,
   email:  /^email \(please provide primary email/i,
   email2: /^email address$/i,
-  phone:  /^column 8$/i
+  phone:  /^(column 8|mobile( no\.?| number)?)$/i
 };
 
 function target_() {
@@ -70,7 +70,7 @@ function sendAllRows() {
 
 function pick_(head, row, re) {
   for (let i = 0; i < head.length; i++) {
-    const h = String(head[i] || '').trim();
+    const h = String(head[i] || '').replace(/\s*\*\s*$/, '').trim();   // a trailing * (required question) is ignored
     if (re.test(h) && String(row[i] || '').trim()) return String(row[i]).trim();
   }
   return '';
