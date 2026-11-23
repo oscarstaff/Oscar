@@ -47,7 +47,7 @@ route(/^\/$/, async () => {
     '</div>';
 });
 
-const AUD_NAMES = { nex_students: 'student', nex_student_details: 'student details', nex_enrolments: 'enrolment', nex_payments: 'payment', nex_payment_queue: 'payment queue', nex_refunds: 'refund', nex_class_sessions: 'class', nex_placement_profile: 'placement profile', nex_class_bookings: 'booking', nex_placement_requests: 'placement request', nex_placement_doc_mail: 'placement documents email', nex_placements: 'placement', nex_facilities: 'facility', nex_blacklist: 'blacklist entry', nex_followups: 'follow-up', nex_tasks: 'task', nex_enrolment_docs: 'document record' };
+const AUD_NAMES = { nex_students: 'student', nex_student_details: 'student details', nex_enrolments: 'enrolment', nex_payments: 'payment', nex_payment_queue: 'payment queue', nex_refunds: 'refund', nex_class_sessions: 'class', nex_placement_profile: 'placement profile', nex_class_bookings: 'booking', nex_placement_requests: 'placement request', nex_placement_doc_mail: 'placement documents email', nex_placements: 'placement', nex_facilities: 'facility', nex_blacklist: 'blacklist entry', nex_followups: 'follow-up', nex_tasks: 'task', nex_enrolment_docs: 'document record', nex_welcome_mail: 'enrolment email' };
 const SKIP_KEYS = new Set(['updated_at', 'created_at', 'created_by', 'id', 'updated_by']);
 function diffHtml(a) {
   if (a.action !== 'UPDATE' || !a.old_row || !a.new_row) return '';
@@ -300,7 +300,7 @@ route(/^\/students\/([0-9a-f-]{36})$/, async m => {
   /* the sensitive details come through a function that logs who looked (admins see this) and stops bulk opening */
   const limited = !!(det && det.limited), d = (det && det.details) || {};
   const eids = enr.map(e => e.id);
-  const [queue, refunds, reqs, plcs, hist, aud0, docs, delB] = await Promise.all([
+  const [queue, refunds, reqs, plcs, hist, aud0, docs, delB, welcome] = await Promise.all([
     eids.length ? sel('nex_payment_queue', 'select=*&enrolment_id=in.' + inList(eids)) : [],
     eids.length ? sel('nex_refunds', 'select=*&enrolment_id=in.' + inList(eids) + '&order=refunded_on.desc') : [],
     eids.length ? sel('nex_placement_requests', 'select=*,nex_facilities(name)&enrolment_id=in.' + inList(eids) + '&order=created_at.desc') : [],
@@ -308,7 +308,8 @@ route(/^\/students\/([0-9a-f-]{36})$/, async m => {
     eids.length ? sel('nex_status_history', 'select=*&entity_id=in.' + inList(eids) + '&order=changed_at.desc&limit=40') : [],
     sel('nex_audit', 'select=*&row_id=in.' + inList([id].concat(eids, pays.map(p => p.id), books.map(b => b.id), followups.map(f => f.id), tasks.map(t => t.id))) + '&order=changed_at.desc&limit=100'),
     eids.length ? sel('nex_enrolment_docs', 'select=*&enrolment_id=in.' + inList(eids)).catch(() => []) : [],
-    sel('nex_audit', 'select=*&table_name=eq.nex_class_bookings&action=eq.DELETE&old_row->>student_id=eq.' + encodeURIComponent(id) + '&order=changed_at.desc&limit=20').catch(() => [])   /* a deleted booking is no longer in the list above, so its record is found by the student it belonged to */
+    sel('nex_audit', 'select=*&table_name=eq.nex_class_bookings&action=eq.DELETE&old_row->>student_id=eq.' + encodeURIComponent(id) + '&order=changed_at.desc&limit=20').catch(() => []),   /* a deleted booking is no longer in the list above, so its record is found by the student it belonged to */
+    sel('nex_welcome_mail', 'select=status,to_email,sent_at,last_error,created_by,attempts&student_id=eq.' + id).catch(() => [])   /* the enrolment email sent when the lead was added */
   ]);
   const aud = aud0.concat(delB).sort((a, b) => String(b.changed_at).localeCompare(String(a.changed_at)));
   const main = enr[0] || {};
@@ -317,7 +318,7 @@ route(/^\/students\/([0-9a-f-]{36})$/, async m => {
   const grossPaid = sumPaid(pays);
   const isStudent = grossPaid >= STUDENT_MIN;
   const totalPaid = grossPaid - refunds.reduce((t, r) => t + Number(r.amount), 0);
-  const ctx = { pp: ppRows[0] || null, facs, s, d, limited, enr, pays, books, followups: followups.filter(f => f.kind !== 'moved_to_task'), tasks, queue, refunds, reqs, plcs, hist, aud, docs, calls, logs, isStudent };
+  const ctx = { pp: ppRows[0] || null, facs, s, d, limited, enr, pays, books, followups: followups.filter(f => f.kind !== 'moved_to_task'), tasks, queue, refunds, reqs, plcs, hist, aud, docs, calls, logs, isStudent, welcome: welcome[0] || null };
 
   afterRender(() => { bindStudent(ctx); setNav(isStudent ? '!/students' : '!/leads'); });
   const fact = (k, v) => '<div><dt>' + k + '</dt><dd>' + (v || '<span class="nx-muted">–</span>') + '</dd></div>';
@@ -441,7 +442,19 @@ function tabDetails(c) {
       field('Emergency contact', esc([d.emergency_name, d.emergency_relation && '(' + d.emergency_relation + ')', fmtPhone(d.emergency_phone)].filter(Boolean).join(' '))) + field('Disability', esc(d.disability)) + field('Indigenous status', esc(d.indigenous_status)) + '</dl><div style="padding:0 16px 16px"><button class="nx-btn sm" data-a="editDet">' + ico('edit') + 'Edit personal details</button></div>');
   return section('Contact', '<dl class="nx-fields">' + field('First name', esc(s.first_name)) + field('Last name', esc(s.last_name)) + field('Email', esc(s.email)) + field('Phone', esc(fmtPhone(s.phone))) + field('Second phone', esc(fmtPhone(s.phone2))) + field('Agent', esc(agentName(s.agent_id))) + field('Outside Sydney', s.outside_sydney ? 'Yes' : 'No') + '</dl><div style="padding:0 16px 16px"><button class="nx-btn sm" data-a="editStu">' + ico('edit') + 'Edit contact</button></div>') +
     sens +
+    welcomeSection(c) +
     (c.s.source_note ? section('Source note', '<div style="padding:16px">' + esc(c.s.source_note) + '</div>') : '');
+}
+/* the enrolment email (steps and documents list, from the support mailbox) that goes out when a lead with an email is added */
+function welcomeSection(c) {
+  const w = c.welcome, s = c.s;
+  const when = w && w.sent_at ? fmtDT(w.sent_at) : '';
+  const state = !w ? (s.email ? '<span class="nx-pill">Not sent</span> <span class="nx-muted">It is sent automatically when a lead is added with an email. Use the button to send it now.</span>' : '<span class="nx-muted">Add an email address to this person to send it.</span>')
+    : w.status === 'sent' ? '<span class="nx-pill ok">Sent</span> <span class="nx-muted">' + esc(when) + ' to ' + esc(w.to_email) + ' from support</span>'
+    : w.status === 'failed' ? '<span class="nx-pill bad">Not sent</span> <span class="nx-muted">' + esc(w.last_error || 'It could not be sent.') + '</span>'
+    : '<span class="nx-pill warn">Sending</span> <span class="nx-muted">To ' + esc(w.to_email) + '. It goes out within a few minutes.' + (w.last_error ? ' ' + esc(w.last_error) : '') + '</span>';
+  const can = s.email && !(w && (w.status === 'pending' || w.status === 'sending'));
+  return section('Enrolment email', '<div style="padding:16px">' + state + '</div>' + (can ? '<div style="padding:0 16px 16px"><button class="nx-btn sm" data-a="welcomeSend">' + ico('mail') + (w && w.status === 'sent' ? 'Send again' : 'Send enrolment email') + '</button></div>' : ''));
 }
 /* the document list for an enrolment comes from its course (nex_qualifications.doc_group) */
 function docTypesFor(e) {
@@ -538,6 +551,10 @@ async function studentAction(a, ds, c) {
     });
   }
   if (a === 'archive') { if (!ME.admin) return toast('Only hub admins can archive records.', true); if (await confirmBox(c.isStudent ? 'Archive student' : 'Archive lead', fullName(s) + ' will be hidden from lists. Their records are kept.', 'Archive', true)) { await upd('nex_students', 'id=eq.' + s.id, { deleted_at: new Date().toISOString() }); toast('Archived'); go(c.isStudent ? '#/students' : '#/leads'); } return; }
+  if (a === 'welcomeSend') {
+    if (c.welcome && c.welcome.status === 'sent' && !(await confirmBox('Send again', 'They were already sent the enrolment email. Send it to ' + s.email + ' again?', 'Send again'))) return;
+    await api('rpc/nex_queue_welcome', { method: 'POST', body: { p_student: s.id } }); toast('Enrolment email is on its way'); return render();
+  }
   if (a === 'addEnr') return enrolmentForm(s, null, c.isStudent);
   if (a === 'editEnr') return enrolmentForm(s, c.enr.find(e => e.id === ds.id), c.isStudent);
   if (a === 'addPay') return paymentForm({ student: s, enrolment: c.enr.find(e => e.id === ds.id) });
