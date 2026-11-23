@@ -3,7 +3,7 @@
    One of the YatraLine files loaded by nex.html (list and order: PL_FILES in the loader). All of them share one global scope. */
 /* ---------- Admin ---------- */
 const AD = { ctx: 'enrolment' };
-const CTX_NAMES = { enrolment: 'Enrolment stages', payment_queue: 'Payment queue statuses', processing: 'Processing steps', placement: 'Placement request statuses', placement_stage: 'Placement stages', booking: 'First Aid booking statuses' };
+const CTX_NAMES = { enrolment: 'Enrolment stages', payment_queue: 'Payment queue statuses', placement_queue: 'Payment queue placement statuses', processing: 'Processing steps', placement: 'Placement request statuses', placement_stage: 'Placement stages', booking: 'First Aid booking statuses' };
 route(/^\/admin$/, async () => {
   if (!ME.admin) { go('#/'); return null; }   /* Admin is for hub admins only */
   await loadRef(true);
