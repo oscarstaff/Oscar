@@ -61,10 +61,12 @@ serve(async (req) => {
         await rest(`nex_welcome_mail?student_id=eq.${row.student_id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "failed", attempts: MAX_TRIES, last_error: "Waited more than 3 days to be sent. Use Send enrolment email on the student to send it now." }) });
         skipped++; continue;
       }
+      let first = "";
+      try { const st = await rest(`nex_students?id=eq.${row.student_id}&select=first_name`); first = String((st && st[0] && st[0].first_name) || "").trim().split(/\s+/)[0].replace(/[\u0000-\u001f<>]/g, "").slice(0, 40); } catch { /* send without a name */ }
       try {
         const mr = await fetch(MAIL_URL, {
           method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, redirect: "follow",
-          body: JSON.stringify({ key: MAIL_KEY, to, subject: WELCOME_SUBJECT, text: welcomeText(), html: welcomeHtml(), fromName: FROM_NAME }),
+          body: JSON.stringify({ key: MAIL_KEY, to, subject: WELCOME_SUBJECT, text: welcomeText(first), html: welcomeHtml(first), fromName: FROM_NAME }),
         });
         const mt = await mr.text();
         let mj: any = null;

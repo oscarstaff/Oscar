@@ -21,9 +21,12 @@ const NOTES = [
 const SIGN = ["Kind regards,", "Oscars Training Centre Support"];
 const CLOSING = "We can't process your enrolment until we receive the form and all documents. If you have any questions, please do not hesitate to contact us at " + PHONE + ".";
 
-export function welcomeText(): string {
+// first = the lead's first name; with no name the email just says "Hi,"
+const hi = (first: string) => (first ? `Hi ${first},` : "Hi,");
+
+export function welcomeText(first = ""): string {
   return [
-    "Hi,",
+    hi(first),
     "",
     "Thanks for your interest in training with us. To start your enrolment:",
     "",
@@ -48,11 +51,11 @@ export function welcomeText(): string {
 const esc = (s: string) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 const FONT = "font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.55;color:#1b2733";
 
-export function welcomeHtml(): string {
+export function welcomeHtml(first = ""): string {
   const link = (u: string, t: string) => `<a href="${u}" style="color:#0e4a82">${esc(t)}</a>`;
   const withUsi = (d: string) => esc(d).replace("www.usi.gov.au", link("https://www.usi.gov.au", "www.usi.gov.au"));
   return `<div style="${FONT};max-width:640px">
-<p style="margin:0 0 14px">Hi,</p>
+<p style="margin:0 0 14px">${esc(hi(first))}</p>
 <p style="margin:0 0 14px">Thanks for your interest in training with us. To start your enrolment:</p>
 <p style="margin:0 0 6px"><b>Step 1:</b> Complete the RPL Enrolment Form</p>
 <p style="margin:0 0 14px">${link(FORM, FORM)}</p>
