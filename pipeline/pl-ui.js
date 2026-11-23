@@ -64,6 +64,9 @@ function selectOpts(list, cur, blank) {
    or, when no dialog is open, in an error dialog. */
 function toast(msg, bad, undo) {
   if (bad) { showError(msg); return; }
+  if (undo === undefined) undo = undoTake();   /* the changes this action just made, if they can all be put back; false means never */
+  else if (undo) undoFresh();
+  if (undo === false) undo = null;
   const el = document.createElement('div'); el.className = 'toast' + (undo ? ' has-undo' : '');
   const tx = document.createElement('span'); tx.textContent = msg; el.appendChild(tx);
   const life = undo ? 8000 : 2600; let gone = false;
