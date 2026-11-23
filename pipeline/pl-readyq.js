@@ -204,7 +204,7 @@ async function renderReady(body) {
   bindIn('rdQ', 'q', 'input'); bindIn('rdArea', 'area', 'input'); ['rdStatus:status', 'rdFrom:from', 'rdTo:to', 'rdWait:wait', 'rdSt:st', 'rdShift:shift', 'rdReady:ready', 'rdFlag:flag'].forEach(x => { const [i, k] = x.split(':'); bindIn(i, k); });
   $('#rdClear', body).onclick = () => { Object.assign(RD, { q: '', status: 'complete', from: '', to: '', st: '', area: '', shift: '', ready: '', wait: '', flag: '' }); renderReady(body); };
   const [got, min] = await Promise.all([
-    selAll('nex_placement_queue', 'select=*&has_placement=eq.false&hold=eq.false&stage=not.in.(' + PP_ENDED + ')'),
+    selAll('nex_placement_queue', 'select=*&has_placement=eq.false&hold=eq.false&stage=not.in.(' + PP_ENDED + ')&order=enrolment_id'),
     btMin().catch(() => 500)
   ]);
   if (!body.isConnected || $('#rdList', body) == null) return;
@@ -245,7 +245,7 @@ function ppAskedFor(batch, card, rows) {
 }
 async function ppAskedRows(batch) {
   const a = btAddDays(batch.starts_on, -PP_NEAR - 7), b = btAddDays(batch.starts_on, PP_NEAR + 7);   /* a little wider: an aged care can start a few days after the batch */
-  return sel('nex_placement_queue', 'select=*&has_placement=eq.false&hold=eq.false&want_start=gte.' + a + '&want_start=lte.' + b + '&limit=500').catch(() => []);
+  return sel('nex_placement_queue', 'select=*&has_placement=eq.false&hold=eq.false&want_start=gte.' + a + '&want_start=lte.' + b + '&order=enrolment_id&limit=500').catch(() => []);
 }
 /* place one student on a card (checks the flags first); used by the batch card's "asked for this aged care" list */
 async function ppPlace(batch, card, r, shift) {
