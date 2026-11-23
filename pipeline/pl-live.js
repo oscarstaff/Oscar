@@ -1,11 +1,11 @@
 'use strict';
-/* pl-live.js · YatraLine · live updates.
-   One of the YatraLine files loaded by nex.html (list and order: PL_FILES in the loader). All of them share one global scope.
+/* pl-live.js · Yatra · live updates.
+   One of the Yatra files loaded by nex.html (list and order: PL_FILES in the loader). All of them share one global scope.
 
    How it works: every write to a main table leaves a one-line "ping" in nex_live_ping (a database trigger). This file keeps one
    WebSocket open to Supabase Realtime, listens for new pings, and refreshes the page you are on when a ping is about a table that page
    shows. No student data travels over the socket: a ping is only "table X changed, by Y". RLS means only people allowed into
-   YatraLine receive pings.
+   Yatra receive pings.
 
    It never refreshes while you are typing, while a dialog is open, or a moment after you click. Your own saves are skipped (the page
    already refreshed itself). If the socket cannot connect (a strict network), the page refreshes itself every minute instead.

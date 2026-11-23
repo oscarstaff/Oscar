@@ -304,7 +304,7 @@ function getAuthClient(){
   }
   return _authClient;
 }
-/* ---- Token broker for the apps (ShiftOps, YatraLine, ...) -------------------------------------------------------
+/* ---- Token broker for the apps (ShiftOps, Yatra, ...) -------------------------------------------------------
    Only this tab holds the Nexus sign-in (access + refresh token). Apps never get the refresh token: two tabs spending the same
    refresh token trips Supabase's reuse detection and ends the whole session, which is what signed people out of Nexus.
    Instead an app asks this tab over a same-origin BroadcastChannel and is handed a current access token (about an hour of life). */

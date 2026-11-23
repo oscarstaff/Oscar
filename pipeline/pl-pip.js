@@ -1,6 +1,6 @@
 'use strict';
-/* pl-pip.js · YatraLine · Pip, the pixel Tibetan mastiff.
-   One of the YatraLine files loaded by nex.html (list and order: PL_FILES in the loader). All of them share one global scope. */
+/* pl-pip.js · Yatra · Pip, the pixel Tibetan mastiff.
+   One of the Yatra files loaded by nex.html (list and order: PL_FILES in the loader). All of them share one global scope. */
 /* =========================================================
    Pip: the pixel Tibetan mastiff who answers "how do I...".
    Alive on purpose: blinks, watches the pointer, perks up and pants when hovered,

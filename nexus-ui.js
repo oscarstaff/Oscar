@@ -183,7 +183,7 @@ async function _nexMfaState(){
 function _mfaDigits(v){ return String(v||'').replace(/\D/g,'').slice(0,6); }
 async function _mfaAskCode(ac,factorId,again){
   for(let i=0;i<5;i++){
-    const v=await window.nxPrompt(again?'It has been a while since your last code. Enter the 6-digit code from your authenticator app to open YatraLine.':'Enter the 6-digit code from your authenticator app.','',{title:again?'Confirm it is you':'Open Nex',okText:'Continue',inputType:'text',placeholder:'000000'});
+    const v=await window.nxPrompt(again?'It has been a while since your last code. Enter the 6-digit code from your authenticator app to open Yatra.':'Enter the 6-digit code from your authenticator app.','',{title:again?'Confirm it is you':'Open Nex',okText:'Continue',inputType:'text',placeholder:'000000'});
     if(v===null||v===undefined) return false;
     const code=_mfaDigits(v);
     if(code.length!==6){ showToast('Enter the 6 digits shown in your app.','warning'); continue; }

@@ -1,6 +1,6 @@
 'use strict';
-/* pl-motion.js · YatraLine · Motion: sliding tabs and page arrivals.
-   One of the YatraLine files loaded by nex.html (list and order: PL_FILES in the loader). All of them share one global scope. */
+/* pl-motion.js · Yatra · Motion: sliding tabs and page arrivals.
+   One of the Yatra files loaded by nex.html (list and order: PL_FILES in the loader). All of them share one global scope. */
 /* ---------- Motion: tabs slide, pages arrive, nothing snaps ----------
    Corporate personality: one easing (ease-out, no overshoot), three speeds (quick 110, standard 260-320, slow 400).
    - The underline under the active tab, and the thumb behind the active pill button, are ONE element that glides to the next one.

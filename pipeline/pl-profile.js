@@ -1,6 +1,6 @@
 'use strict';
-/* pl-profile.js · YatraLine · Documents, Profile, Team achievements, Staff profile view.
-   One of the YatraLine files loaded by nex.html (list and order: PL_FILES in the loader). All of them share one global scope. */
+/* pl-profile.js · Yatra · Documents, Profile, Team achievements, Staff profile view.
+   One of the Yatra files loaded by nex.html (list and order: PL_FILES in the loader). All of them share one global scope. */
 /* ---------- Documents (read and open; upload and delete stay in Nexus) ---------- */
 const DC = { q: '' };
 route(/^\/documents$/, async () => {
@@ -73,7 +73,7 @@ route(/^\/profile$/, async () => {
     '<div class="nx-card"><div class="nx-hl"><span class="nx-avatar nx-pfava' + (me.avatar ? ' has-photo" style="background-image:url(&quot;' + esc(me.avatar) + '&quot;)"' : '"') + '>' + (me.avatar ? '' : esc(initials(ME.name))) + '</span><div><div class="nx-eyebrow">' + (ME.admin ? 'Hub admin' : 'Staff') + '</div><h2 class="nx-title">' + glowName(ME.name, dir[ME.name]) + '</h2></div>' +
     '<dl class="nx-facts">' + fact('Team', me.team) + fact('Email', me.email) + '</dl><div class="nx-btnrow"><a class="nx-btn" href="' + esc(staffHref(ME.name)) + '">View my profile</a><button class="nx-btn" id="pfPhoto">' + ico('edit') + 'Change photo</button><input type="file" id="pfFile" accept="image/jpeg,image/png,image/webp" hidden></div></div></div>' +
     '<div class="nx-card"><div class="nx-card-h"><h3>About you</h3></div><div class="nx-card-b"><div class="nx-form">' +
-    '<div><label class="nx-lbl" for="pf_nickname">Nickname</label><input class="nx-in" id="pf_nickname" maxlength="40" value="' + esc(me.nickname) + '"><div class="nx-help">Shown beside your name in Nexus and YatraLine.</div></div>' +
+    '<div><label class="nx-lbl" for="pf_nickname">Nickname</label><input class="nx-in" id="pf_nickname" maxlength="40" value="' + esc(me.nickname) + '"><div class="nx-help">Shown beside your name in Nexus and Yatra.</div></div>' +
     '<div><label class="nx-lbl" for="pf_pronouns">Pronouns</label><input class="nx-in" id="pf_pronouns" maxlength="30" value="' + esc(me.pronouns) + '"></div>' +
     '<div><label class="nx-lbl" for="pf_birthday">Birthday</label><input class="nx-in" type="date" id="pf_birthday" value="' + esc(me.birthday) + '"></div>' +
     '<div class="full"><label class="nx-lbl" for="pf_bio">Bio</label><textarea class="nx-ta" id="pf_bio" rows="3" maxlength="280">' + esc(me.bio) + '</textarea></div>' +
@@ -86,7 +86,7 @@ route(/^\/profile$/, async () => {
 /* shrink the photo to 320px JPEG in the browser, store it in the avatars bucket under the person's own folder, then point staff_avatars at it */
 async function savePhoto(file) {
   const dataUrl = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = () => rej(new Error('Could not read that file.')); r.readAsDataURL(file); });
-  const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error('That file is not a photo YatraLine can open.')); i.src = dataUrl; });
+  const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error('That file is not a photo Yatra can open.')); i.src = dataUrl; });
   const S = 320, c = document.createElement('canvas'); c.width = c.height = S;
   const side = Math.min(img.naturalWidth, img.naturalHeight), sx = (img.naturalWidth - side) / 2, sy = (img.naturalHeight - side) / 2;
   c.getContext('2d').drawImage(img, sx, sy, side, side, 0, 0, S, S);

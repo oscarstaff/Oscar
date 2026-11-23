@@ -1,6 +1,6 @@
 'use strict';
-/* pl-router.js · YatraLine · router, tabs, press feedback and boot().
-   One of the YatraLine files loaded by nex.html (list and order: PL_FILES in the loader). All of them share one global scope. */
+/* pl-router.js · Yatra · router, tabs, press feedback and boot().
+   One of the Yatra files loaded by nex.html (list and order: PL_FILES in the loader). All of them share one global scope. */
 /* ---------- router ---------- */
 const ROUTES = [];
 function route(re, fn) { ROUTES.push({ re, fn }); }
@@ -19,7 +19,7 @@ function isRecord(h) { return /^\/students\/[0-9a-f-]{36}$/.test(h); }
 function tidyView(v) { v.querySelectorAll('th:not([scope])').forEach(th => th.setAttribute('scope', 'col')); }
 function pageArrived(h) {
   const hd = HEADS[baseOf(h)];
-  document.title = (hd && !isRecord(h) ? hd[1] + ' · ' : '') + 'YatraLine';
+  document.title = (hd && !isRecord(h) ? hd[1] + ' · ' : '') + 'Yatra';
   if (lastRouteH !== null && lastRouteH.split('?')[0] !== h.split('?')[0]) { const v = $('#view'); if (v && !modalStack.length) { try { v.focus({ preventScroll: true }); } catch (e) {} } }
   lastRouteH = h;
 }

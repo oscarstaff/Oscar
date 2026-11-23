@@ -1,6 +1,6 @@
 'use strict';
-/* pl-firstaid.js · YatraLine · First Aid and CPR class days and the seat map.
-   One of the YatraLine files loaded by nex.html (list and order: PL_FILES in the loader). All of them share one global scope. */
+/* pl-firstaid.js · Yatra · First Aid and CPR class days and the seat map.
+   One of the Yatra files loaded by nex.html (list and order: PL_FILES in the loader). All of them share one global scope. */
 /* =========================================================
    First Aid and CPR
    ========================================================= */
@@ -400,7 +400,7 @@ function bookingForm(cur, b, books) {
   if (cur.kind === 'renewal') f.push({ k: 'signature_done', label: 'Signature done', type: 'check', value: b.signature_done });
   if (!canFlag()) for (let i = f.length - 1; i >= 0; i--) if (['quiz_sent', 'placement_plan', 'signature_done'].includes(f[i].k)) f.splice(i, 1);   /* the flags are Evershine's. Seats are never typed in here: only the Allocate button gives a seat. */
   f.push({ k: 'note', label: 'Note', type: 'textarea', value: b.note, full: true });
-  const top = b.id ? '' : idBoxHtml('Type the name, phone and email. If they are already a student or lead, they show up here and their details fill in. If they are not in YatraLine yet, they are added as a new lead when you save.');
+  const top = b.id ? '' : idBoxHtml('Type the name, phone and email. If they are already a student or lead, they show up here and their details fill in. If they are not in Yatra yet, they are added as a new lead when you save.');
   const m = formModal(b.id ? 'Edit booking' : 'Add booking', f, async v => {
     if (runs.length > 1 && OPTS.length) {
       const got = new Set(); OPTS.forEach(o => { if (v['sec_' + o[0]]) o[2].forEach(k => got.add(k)); delete v['sec_' + o[0]]; });
@@ -437,7 +437,7 @@ function bookingForm(cur, b, books) {
       const db = document.createElement('button'); db.className = 'nx-btn'; db.textContent = 'Delete booking';
       db.onclick = async () => {
         m.close();
-        const ok = await confirmBox('Delete this booking?', 'This removes ' + b.name + '’s booking from this class for good, with its seat, confirmation-email record and follow-ups. The person stays in YatraLine. The delete is recorded in their Activity. To keep a record that they did not come, use Cancel booking instead.', 'Delete booking', true);
+        const ok = await confirmBox('Delete this booking?', 'This removes ' + b.name + '’s booking from this class for good, with its seat, confirmation-email record and follow-ups. The person stays in Yatra. The delete is recorded in their Activity. To keep a record that they did not come, use Cancel booking instead.', 'Delete booking', true);
         if (!ok) { bookingForm(cur, b, books); return; }
         try { await del('nex_class_bookings', 'id=eq.' + b.id); toast('Booking deleted'); } catch (e) { showError(e, 'Could not delete the booking'); }
         render();

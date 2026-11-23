@@ -1,7 +1,7 @@
 'use strict';
-/* pl-batches.js · YatraLine · Placement batches: a batch is a start date, each aged care is a card with AM / PM / Night quotas,
+/* pl-batches.js · Yatra · Placement batches: a batch is a start date, each aged care is a card with AM / PM / Night quotas,
    and students are placed on a card with a shift.
-   One of the YatraLine files loaded by nex.html (list and order: PL_FILES in the loader). All of them share one global scope.
+   One of the Yatra files loaded by nex.html (list and order: PL_FILES in the loader). All of them share one global scope.
 
    Rules (the database enforces them too; see migration nex_placement_batches):
    - a student needs at least the "placement_min_paid" amount received (default $500) before going in a batch; hub admins are exempt

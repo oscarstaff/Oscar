@@ -1,8 +1,8 @@
 'use strict';
-/* pl-teamreport.js · YatraLine · Team report.
-   One of the YatraLine files loaded by nex.html (list and order: PL_FILES in the loader). All of them share one global scope. */
+/* pl-teamreport.js · Yatra · Team report.
+   One of the Yatra files loaded by nex.html (list and order: PL_FILES in the loader). All of them share one global scope. */
 /* =========================================================
-   YatraLine staff pages, copied from Nexus (15 Nov 2026): Team report and the Pip FAQ helper.
+   Yatra staff pages, copied from Nexus (15 Nov 2026): Team report and the Pip FAQ helper.
    Team report reads and writes the same tables as Nexus (processing_reports, processing_metrics,
    placement_weekly), so an entry made in either app shows in both.
    ========================================================= */

@@ -1,8 +1,8 @@
 'use strict';
-/* pl-staff.js · YatraLine · who am I as a staff member (loadMe, team).
-   One of the YatraLine files loaded by nex.html (list and order: PL_FILES in the loader). All of them share one global scope. */
+/* pl-staff.js · Yatra · who am I as a staff member (loadMe, team).
+   One of the Yatra files loaded by nex.html (list and order: PL_FILES in the loader). All of them share one global scope. */
 /* =========================================================
-   YatraLine staff pages, copied from Nexus (15 Nov 2026): Quizzes, Documents, Profile.
+   Yatra staff pages, copied from Nexus (15 Nov 2026): Quizzes, Documents, Profile.
    Nexus keeps its own versions and stays the place for quiz building, document upload,
    passwords, themes and notifications. Same Supabase tables, so both apps show the same data.
    ========================================================= */

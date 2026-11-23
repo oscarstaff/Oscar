@@ -1,6 +1,6 @@
 'use strict';
-/* pl-tasks.js · YatraLine · Task Manager: general tasks for the team (internal jobs and jobs about a student or lead).
-   One of the YatraLine files loaded by nex.html (list and order: PL_FILES in the loader). All of them share one global scope.
+/* pl-tasks.js · Yatra · Task Manager: general tasks for the team (internal jobs and jobs about a student or lead).
+   One of the Yatra files loaded by nex.html (list and order: PL_FILES in the loader). All of them share one global scope.
    The 1st, 2nd and 3rd lead follow-ups are NOT here. They live on the Leads page (see pl-students.js and nex_lead_followup). */
 const TK = { who: 'me', show: 'open', pri: '', kind: '', q: '', sort: 'due' };
 const TK_PRI = [{ id: 'urgent', label: 'Urgent' }, { id: 'high', label: 'High' }, { id: 'normal', label: 'Normal' }, { id: 'low', label: 'Low' }];
