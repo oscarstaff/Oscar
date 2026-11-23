@@ -1,6 +1,6 @@
 'use strict';
-/* pl-map.js · YatraLine · Map of the aged care facilities (Placement > Facilities > Map).
-   One of the YatraLine files loaded by nex.html (list and order: PL_FILES in the loader). All of them share one global scope.
+/* pl-map.js · Yatra · Map of the aged care facilities (Placement > Facilities > Map).
+   One of the Yatra files loaded by nex.html (list and order: PL_FILES in the loader). All of them share one global scope.
    The map library (Leaflet, in vendor/) is only downloaded the first time someone opens the map.
    Tiles come from OpenStreetMap (allowed in the page's Content-Security-Policy: img-src). Pins are stored on nex_facilities (lat, lng, geo_exact). */
 

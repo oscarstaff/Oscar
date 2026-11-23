@@ -1,6 +1,6 @@
 'use strict';
-/* pl-placement.js · YatraLine · Placement requests, placements, facilities, blacklist.
-   One of the YatraLine files loaded by nex.html (list and order: PL_FILES in the loader). All of them share one global scope. */
+/* pl-placement.js · Yatra · Placement requests, placements, facilities, blacklist.
+   One of the Yatra files loaded by nex.html (list and order: PL_FILES in the loader). All of them share one global scope. */
 /* =========================================================
    Placement, Follow-ups, Admin
    ========================================================= */
@@ -104,7 +104,7 @@ async function requestForm(r, en, st) {
   const fac = await facilityOptions();
   const f = [{ k: 'facility_id', label: 'Facility', type: 'select', options: fac, value: r.facility_id, blank: 'Type a name instead', full: true }, { k: 'facility_text', label: 'Facility name (if not in the list)', value: r.facility_text, full: true },
     { k: 'self_placement', label: 'Self placement (student found it)', type: 'check', value: r.self_placement }, { k: 'form_url', label: 'Self-sought form response (link)', type: 'url', value: r.form_url, placeholder: 'https://', full: true },
-    { k: 'emailed_on', label: 'Email sent on', type: 'date', value: r.emailed_on, help: 'Recorded only. YatraLine does not send the email.' },
+    { k: 'emailed_on', label: 'Email sent on', type: 'date', value: r.emailed_on, help: 'Recorded only. Yatra does not send the email.' },
     { k: 'status', label: 'Status', type: 'select', options: opts('placement', true), value: r.status || 'request_sent', blank: 'Not set' }, { k: 'note', label: 'Note', type: 'textarea', value: r.note, full: true }];
   const info = r.form_info || null;
   formModal(r.id ? 'Update placement request' : 'New placement request', f, async v => {

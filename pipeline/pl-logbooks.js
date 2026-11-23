@@ -1,9 +1,9 @@
 'use strict';
-/* pl-logbooks.js · YatraLine · Logbook receipts.
-   One of the YatraLine files loaded by nex.html (list and order: PL_FILES in the loader). All of them share one global scope. */
+/* pl-logbooks.js · Yatra · Logbook receipts.
+   One of the Yatra files loaded by nex.html (list and order: PL_FILES in the loader). All of them share one global scope. */
 /* ---------- Logbook receipts: who received which student's logbook, and when ----------
    Replaces the sheet with the columns DATE, STUDENT NAME, EMAIL ADDRESS, LOGBOOK RECEIVER, COMMENTS.
-   A receipt for someone in YatraLine is linked to them (it shows on their Activity). A name YatraLine does not know is saved by name only. */
+   A receipt for someone in Yatra is linked to them (it shows on their Activity). A name Yatra does not know is saved by name only. */
 const LB = { q: '', mine: false, days: '60', rows: [], staff: null };
 async function lbStaff() {
   if (LB.staff) return LB.staff;
@@ -36,7 +36,7 @@ route(/^\/logbooks$/, async () => {
   try { await lbLoad(); } catch (e) { LB.rows = []; }
   afterRender(() => {
     const f = $('#lbForm'), save = $('#lbSave');
-    const lk = identityLookup({ el: f }, { ids: { name: 'lbName', email: 'lbEmail' }, newMsg: 'Not found in YatraLine. The receipt will be saved by name only.' });
+    const lk = identityLookup({ el: f }, { ids: { name: 'lbName', email: 'lbEmail' }, newMsg: 'Not found in Yatra. The receipt will be saved by name only.' });
     const paint = () => {
       $('#lbTable').innerHTML = lbTable();
       $('#lbCount').textContent = lbVisible().length + (lbVisible().length === 1 ? ' receipt' : ' receipts');
@@ -90,7 +90,7 @@ route(/^\/logbooks$/, async () => {
   });
   const me = ME.name || '';
   return pageHead('notebook', 'Staff', 'Logbook receipts', '') +
-    '<div class="nx-card"><div class="nx-card-h"><div><h3>Record a logbook</h3><div class="nx-muted">Type the student’s name or email. If they are in YatraLine the receipt is added to their Activity.</div></div></div><div class="nx-card-b">' +
+    '<div class="nx-card"><div class="nx-card-h"><div><h3>Record a logbook</h3><div class="nx-muted">Type the student’s name or email. If they are in Yatra the receipt is added to their Activity.</div></div></div><div class="nx-card-b">' +
     '<form id="lbForm" novalidate><div class="nx-form">' +
     '<div><label class="nx-lbl" for="lbName">Student name *</label><input class="nx-in" id="lbName" autocomplete="off"></div>' +
     '<div><label class="nx-lbl" for="lbEmail">Email address</label><input class="nx-in" id="lbEmail" type="email" autocomplete="off"></div>' +

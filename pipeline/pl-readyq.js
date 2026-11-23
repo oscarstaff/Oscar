@@ -1,6 +1,6 @@
 'use strict';
-/* pl-readyq.js · YatraLine · Placement "Ready" list, "On hold" list, and each student's placement profile.
-   One of the YatraLine files loaded by nex.html (list and order: PL_FILES in the loader). All of them share one global scope.
+/* pl-readyq.js · Yatra · Placement "Ready" list, "On hold" list, and each student's placement profile.
+   One of the Yatra files loaded by nex.html (list and order: PL_FILES in the loader). All of them share one global scope.
 
    The profile (table nex_placement_profile, one row per student) holds what the Placement team needs to know before sending someone out:
    preferred shift, irregular availability, English check, state / area they want, readiness, a hold, and a start date or aged care they asked for.

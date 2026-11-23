@@ -1,8 +1,8 @@
 'use strict';
-/* pl-calls.js · YatraLine · Call Log (copied from Nexus).
-   One of the YatraLine files loaded by nex.html (list and order: PL_FILES in the loader). All of them share one global scope. */
-/* ---------- Calls: the Nexus Call Log, copied into YatraLine ----------
-   Logging a call for someone already in YatraLine adds it to their Activity. A number YatraLine has never seen starts an UNFINISHED lead,
+/* pl-calls.js · Yatra · Call Log (copied from Nexus).
+   One of the Yatra files loaded by nex.html (list and order: PL_FILES in the loader). All of them share one global scope. */
+/* ---------- Calls: the Nexus Call Log, copied into Yatra ----------
+   Logging a call for someone already in Yatra adds it to their Activity. A number Yatra has never seen starts an UNFINISHED lead,
    flagged to whoever logged the call. All of that happens in the database function nex_log_call, so it is one step.
    The "clocked in and inside office hours" lock is a convenience on this page only. The database does not enforce it. */
 const CL = { view: 'wait', scope: 'team', q: '', today: false, rows: [], teams: null, gate: null };
@@ -94,7 +94,7 @@ route(/^\/calls$/, async () => {
     const root = $('#clPage'); if (!root) return;
     const f = $('#clForm', root), phone = $('#clPhone'), name = $('#clName'), email = $('#clEmail'), reason = $('#clReason'), note = $('#clNote');
     const forTeam = $('#clFor'), plcBox = $('#clPlc'), notStu = $('#clNotStu'), save = $('#clSave'), cnt = $('#clWords');
-    const lk = identityLookup({ el: f }, { ids: { phone: 'clPhone', name: 'clName', email: 'clEmail' }, newMsg: 'Not in YatraLine yet. Logging this will start an unfinished lead flagged to you.' });
+    const lk = identityLookup({ el: f }, { ids: { phone: 'clPhone', name: 'clName', email: 'clEmail' }, newMsg: 'Not in Yatra yet. Logging this will start an unfinished lead flagged to you.' });
     const sync = () => {
       const plc = callIsPlc(forTeam.value);
       plcBox.hidden = !plc;
@@ -195,7 +195,7 @@ route(/^\/calls$/, async () => {
   const teamOpts = ['<option value=""' + (my ? '' : ' selected') + '>Not sure</option>'].concat(teams.map(t => '<option' + (t.toLowerCase() === my.toLowerCase() ? ' selected' : '') + '>' + esc(t) + '</option>')).join('');
   return pageHead('phone', 'Staff', 'Calls', '') +
     '<div id="clPage">' +
-    '<div class="nx-card"><div class="nx-card-h"><div><h3>Log a call</h3><div class="nx-muted">Someone already in YatraLine gets the call on their Activity. A new number starts an unfinished lead flagged to you.</div></div></div><div class="nx-card-b">' +
+    '<div class="nx-card"><div class="nx-card-h"><div><h3>Log a call</h3><div class="nx-muted">Someone already in Yatra gets the call on their Activity. A new number starts an unfinished lead flagged to you.</div></div></div><div class="nx-card-b">' +
     '<div class="nx-note nx-calllock" id="clLock"' + (g.ok ? ' hidden' : '') + ' role="status">' + esc(g.ok ? '' : g.why) + '</div>' +
     '<form id="clForm" class="nx-callform" novalidate><fieldset class="nx-fs" ' + (g.ok ? '' : 'disabled') + '><div class="nx-form">' +
     '<div><label class="nx-lbl" for="clName">Caller name *</label><input class="nx-in" id="clName" autocomplete="off"></div>' +

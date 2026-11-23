@@ -1,8 +1,8 @@
 'use strict';
-/* pl-core.js · YatraLine · consts, team rules, helpers, sign-in and the api().
-   One of the YatraLine files loaded by nex.html (list and order: PL_FILES in the loader). All of them share one global scope. */
+/* pl-core.js · Yatra · consts, team rules, helpers, sign-in and the api().
+   One of the Yatra files loaded by nex.html (list and order: PL_FILES in the loader). All of them share one global scope. */
 /* =========================================================
-   YatraLine core: api, helpers, ui kit, router
+   Yatra core: api, helpers, ui kit, router
    ========================================================= */
 const SB = 'https://jcfgldqrdbfkgbixszds.supabase.co';
 const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpjZmdsZHFyZGJma2diaXhzemRzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1Nzc3NzEsImV4cCI6MjA5MDE1Mzc3MX0.Wj8cCpnlsoZOPj5sKWeEdfvgjG4Nc-UuTTYgbcrPfeI';
@@ -133,7 +133,7 @@ function tokenPayload(t) {
   try { const p = t.split('.'); let b = p[1].replace(/-/g, '+').replace(/_/g, '/'); while (b.length % 4) b += '='; return JSON.parse(atob(b)); } catch (e) { return null; }
 }
 function tokenAlive(t, slack) { const c = tokenPayload(t); return !!(c && c.exp && c.exp * 1000 > Date.now() + (slack || 30000)); }
-/* YatraLine never holds the Nexus refresh token (two tabs spending one refresh token ends the whole Nexus session).
+/* Yatra never holds the Nexus refresh token (two tabs spending one refresh token ends the whole Nexus session).
    When the access token runs low it asks the open Nexus tab for a fresh one over a same-origin BroadcastChannel. */
 let hubBC = null;
 try { if (typeof BroadcastChannel !== 'undefined') hubBC = new BroadcastChannel('nexus-auth'); } catch (e) { hubBC = null; }
@@ -179,8 +179,8 @@ function sessionWarn(on, mins) {
     el.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99990;padding:9px 16px;text-align:center;font-size:13px;font-weight:700;background:#3a2410;color:#fdba74;border-bottom:1px solid #f59e0b';
     document.body.appendChild(el);
   }
-  el.textContent = 'Your YatraLine sign-in ends in about ' + Math.max(1, mins) + ' minute' + (mins === 1 ? '' : 's') + '. ' +
-    (hubWhy === 'signed_out' ? 'Nexus has been signed out. ' : 'Nexus is not open in another tab. ') + 'Finish what you are saving, then open YatraLine again from Nexus.';
+  el.textContent = 'Your Yatra sign-in ends in about ' + Math.max(1, mins) + ' minute' + (mins === 1 ? '' : 's') + '. ' +
+    (hubWhy === 'signed_out' ? 'Nexus has been signed out. ' : 'Nexus is not open in another tab. ') + 'Finish what you are saving, then open Yatra again from Nexus.';
 }
 /* checked every minute: top up the token early, warn if it can't be topped up */
 async function keepToken() {
@@ -211,12 +211,12 @@ function endSession(why) {
   const a = $('#app'); if (a) a.hidden = true;
   const msg = $('#lockMsg'), head = $('#lockHead');
   const M = {
-    idle: ['YatraLine locked', 'YatraLine locked after 1 hour without activity, so student details are hidden. Open Nexus and launch YatraLine again.'],
-    gone: ['Your session ended', 'You were signed out of Nexus, so YatraLine closed and hid student details. Sign in to Nexus again, then open YatraLine.'],
-    old: ['Your session ended', 'For safety YatraLine closes after 12 hours. Open Nexus and launch YatraLine again.'],
-    ran_out: ['Your session ended', 'Your sign-in lasts about an hour and Nexus was not open to renew it. Open Nexus (sign in again if it asks), then launch YatraLine.']
+    idle: ['Yatra locked', 'Yatra locked after 1 hour without activity, so student details are hidden. Open Nexus and launch Yatra again.'],
+    gone: ['Your session ended', 'You were signed out of Nexus, so Yatra closed and hid student details. Sign in to Nexus again, then open Yatra.'],
+    old: ['Your session ended', 'For safety Yatra closes after 12 hours. Open Nexus and launch Yatra again.'],
+    ran_out: ['Your session ended', 'Your sign-in lasts about an hour and Nexus was not open to renew it. Open Nexus (sign in again if it asks), then launch Yatra.']
   };
-  const mm = M[why] || ['Your session ended', 'Your sign-in has run out. Open Nexus (sign in again if it asks), then launch YatraLine.'];
+  const mm = M[why] || ['Your session ended', 'Your sign-in has run out. Open Nexus (sign in again if it asks), then launch Yatra.'];
   if (head) head.textContent = mm[0];
   if (msg) msg.textContent = mm[1];
   sessionWarn(false);
@@ -249,12 +249,12 @@ async function api(path, opt) {
   if (!r.ok) {
     let m = ''; try { const j = await r.json(); m = j.message || j.hint || j.details || ''; } catch (e) {}
     if (/row-level security|permission denied/i.test(m)) m = "You don't have permission to do that.";
-    else if (r.status >= 500) m = 'YatraLine had a problem saving or loading that. Try again in a moment.';
+    else if (r.status >= 500) m = 'Yatra had a problem saving or loading that. Try again in a moment.';
     const err = new Error(m || ('Request failed (' + r.status + ')')); err.status = r.status; throw err;
   }
   return r;
 }
-/* call a YatraLine edge function as the signed-in person; failures keep the function's own message and code */
+/* call a Yatra edge function as the signed-in person; failures keep the function's own message and code */
 async function fn(name, body) {
   undoBad();   /* an edge function sends emails and the like: that cannot be undone */
   const doFetch = async () => fetch(SB + '/functions/v1/' + name, { method: 'POST', headers: { apikey: KEY, Authorization: 'Bearer ' + await bearer(), 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
