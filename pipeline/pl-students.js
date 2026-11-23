@@ -360,8 +360,8 @@ function sideCards(c) {
     '<div class="nx-card"><div class="nx-card-h"><h3>Placement</h3></div>' +
     (c.plcs.length || c.reqs.length ? '<div class="nx-related">' + c.plcs.slice(0, 3).map(p => '<div><span><b>' + esc((p.nex_facilities || {}).name || p.facility_text || 'Placement') + '</b><small>' + (p.start_date ? 'Starts ' + esc(fmtDate(p.start_date)) : 'No start date') + '</small></span>' + pill('placement_stage', p.status) + '</div>').join('') +
       c.reqs.slice(0, 3).map(r => '<div><span><b>' + esc((r.nex_facilities || {}).name || r.facility_text || 'Request') + '</b><small>' + (r.self_placement ? 'Self placement' : 'Request') + (r.emailed_on ? ' · emailed ' + esc(fmtDate(r.emailed_on)) : '') + '</small></span>' + pill('placement', r.status) + '</div>').join('') + '</div>' : empty('No placement yet')) + '</div>' +
-    '<div class="nx-card"><div class="nx-card-h"><h3>Follow-ups</h3><span class="nx-btnrow">' + (!c.isStudent && !c.followups.some(f => f.kind === 'lead_cycle') ? '<button class="nx-btn sm" data-a="startCycle">Start follow-ups</button>' : '') + '</span></div>' +
-    (open.length ? '<div class="nx-related">' + open.slice().sort((a, b) => String(a.due_at || '9').localeCompare(String(b.due_at || '9'))).map(f => { const late = f.due_at && new Date(f.due_at).toLocaleDateString('en-CA', { timeZone: TZ }) < sydToday(); return '<div><span><b>' + esc(f.note) + '</b><small' + (late ? ' class="nx-neg"' : '') + '>' + (f.due_at ? 'Due ' + esc(fmtDate(f.due_at)) + (late ? ' (overdue)' : '') : 'No date') + (f.assigned_to ? ' · ' + esc(f.assigned_to) : '') + '</small></span><span class="nx-btnrow">' + (f.kind === 'lead_cycle' && f.step ? '<button class="nx-btn sm" data-a="emailFu" data-step="' + f.step + '">' + ico('mail') + 'Send email</button>' : '') + '<button class="nx-btn sm" data-a="doneFu" data-id="' + f.id + '">Done</button></span></div>'; }).join('') + '</div>' : (doneFu.length ? '' : empty('Nothing to follow up'))) + fuHistory + '</div>' +
+    '<div class="nx-card"><div class="nx-card-h"><h3>Follow-ups</h3><span class="nx-btnrow">' + (!c.isStudent && !c.followups.some(f => f.kind === 'lead_cycle') ? '<button class="nx-btn sm" data-a="startCycle">Start follow-ups</button>' : '') + (!open.length && (c.isStudent || c.followups.some(f => f.kind === 'lead_cycle')) ? '<button class="nx-btn sm" data-a="addFu">' + ico('plus') + (fuDocsDone(c) ? 'Add payment follow-up' : 'Add follow-up') + '</button>' : '') + '</span></div>' +
+    (open.length ? '<div class="nx-related">' + open.slice().sort((a, b) => String(a.due_at || '9').localeCompare(String(b.due_at || '9'))).map(f => { const late = f.due_at && new Date(f.due_at).toLocaleDateString('en-CA', { timeZone: TZ }) < sydToday(); return '<div><span><b>' + esc(f.note) + '</b><small' + (late ? ' class="nx-neg"' : '') + '>' + (f.due_at ? 'Due ' + esc(fmtDate(f.due_at)) + (late ? ' (overdue)' : '') : 'No date') + (f.assigned_to ? ' · ' + esc(f.assigned_to) : '') + '</small></span><span class="nx-btnrow">' + (f.kind === 'lead_cycle' && f.step && f.step <= 3 ? '<button class="nx-btn sm" data-a="emailFu" data-step="' + f.step + '">' + ico('mail') + 'Send email</button>' : '') + '<button class="nx-btn sm" data-a="doneFu" data-id="' + f.id + '">Done</button></span></div>'; }).join('') + '</div>' : (doneFu.length ? '' : empty('Nothing to follow up'))) + fuHistory + '</div>' +
     '<div class="nx-card"><div class="nx-card-h"><h3>Tasks</h3><button class="nx-btn sm" data-a="addTask">Add</button></div>' +
     (c.tasks.length ? '<div class="nx-related">' + c.tasks.map(t => { const late = t.due_on && t.due_on < sydToday(); return '<div><span><b>' + esc(t.title) + '</b><small' + (late ? ' class="nx-neg"' : '') + '>' + (t.due_on ? 'Due ' + esc(fmtDate(t.due_on)) + (late ? ' (overdue)' : '') : 'No date') + ' · ' + esc(tkLabel(TK_PRI, t.priority)) + (t.assigned_to ? ' · ' + esc(t.assigned_to) : '') + '</small></span><button class="nx-btn sm" data-a="doneTask" data-id="' + t.id + '">Done</button></div>'; }).join('') + '</div>' : empty('No open tasks')) + '</div>';
 }
@@ -372,6 +372,22 @@ function sideCards(c) {
    load in the background, and "already sent" is a line in the dialog, not another dialog on top. */
 /* Mark a follow-up done. After the 3rd follow-up a lead who has not booked a class, or been put on hold or not interested, stays in the cycle:
    the database asks for the date of the next one (NEXT_DATE_NEEDED) and this box collects it. */
+/* once any enrolment has reached Docs completed the documents are done, so the next follow-up chases the payment, not documents */
+function fuDocsDone(c) { return c.enr.some(e => ['docs_completed', 'processed', 'placement', 'certificate_issued'].includes(e.stage)); }
+function fuDueAt(d) { return d + 'T09:00:00' + crOffset(d); }
+async function addFollowup(c) {
+  const s = c.s, pay = fuDocsDone(c), top = c.followups.filter(f => f.kind === 'lead_cycle').reduce((m, f) => Math.max(m, f.step || 0), 0);
+  const d2 = new Date(sydToday() + 'T12:00:00Z'); d2.setUTCDate(d2.getUTCDate() + 2);
+  return formModal(pay ? 'Add a payment follow-up' : 'Add a follow-up', [
+    { k: 'due', label: pay ? 'Chase the payment on' : 'Follow up on', type: 'date', value: d2.toISOString().slice(0, 10), required: true, full: true, help: pay ? 'Their documents are complete, so this follow-up is about payment, not documents.' : 'It shows on the Leads list when it is due, like the 1st to 3rd follow-ups.' },
+    { k: 'note', label: 'Note (optional)', type: 'textarea', full: true, placeholder: pay ? 'e.g. balance still owing, promised to pay Friday' : 'e.g. waiting on their passport' }], async v => {
+    if (!v.due) throw new Error('Pick a date.');
+    if (v.due < sydToday()) throw new Error('Pick a date from today on.');
+    const step = top + 1, text = (v.note || '').trim();
+    await ins('nex_followups', { student_id: s.id, due_at: fuDueAt(v.due), note: FU_NTH(step) + ' follow-up' + (pay ? ': Payment' + (text ? ' - ' + text : '') : (text ? ': ' + text : '')), assigned_to: ME.name, kind: 'lead_cycle', step }, true);
+    toast('Follow-up added for ' + fmtDate(v.due)); render();
+  }, 'Add follow-up');
+}
 async function doneFollowup(id) {
   const done = next => api('rpc/nex_done_followup', { method: 'POST', body: { p_id: id, p_next: next || null } });
   try { await done(); toast('Done'); return render(); }
@@ -611,6 +627,7 @@ async function studentAction(a, ds, c) {
   if (a === 'addTask') return taskForm(null, () => render(), s);
   if (a === 'doneTask') { await upd('nex_tasks', 'id=eq.' + ds.id, { status: 'done' }); toast('Task done'); return render(); }
   if (a === 'startCycle') return formModal('Start follow-ups', [{ k: 'first', label: 'First contact', type: 'date', value: s.first_contact_on || new Date(s.created_at).toLocaleDateString('en-CA', { timeZone: TZ }), required: true, full: true, help: 'The 1st follow-up is 2 days after this date, the 2nd 4 days after, the 3rd 6 days after.' }], async v => { await api('rpc/nex_start_lead_cycle', { method: 'POST', body: { p_student: s.id, p_first: v.first } }); toast('3 follow-ups set'); render(); }, 'Start');
+  if (a === 'addFu') return addFollowup(c);
   if (a === 'doneFu') return doneFollowup(ds.id);
   if (a === 'emailFu') return emailFollowup(s, Number(ds.step));
   if (a === 'doneDetails') { await upd('nex_students', 'id=eq.' + s.id, { needs_details: false, flagged_to: null }); toast('Marked complete'); return render(); }
