@@ -243,6 +243,7 @@ async function api(path, opt) {
   });
   let r;
   if (opt.method && opt.method !== 'GET' && typeof lvWrote === 'function') lvWrote();   /* live updates: skip the echo of my own save */
+  if (/^rpc\//.test(path)) undoBad();   /* a server procedure can do anything (send an email, queue a job), so a toast after one never offers Undo */
   try { r = await doFetch(); } catch (e) { if (e && e.message === 'session') throw e; throw offlineError(); }
   if (r.status === 401) { if (await refreshToken()) r = await doFetch(); else { endSession(); throw new Error('session'); } }
   if (!r.ok) {
@@ -255,6 +256,7 @@ async function api(path, opt) {
 }
 /* call a YatraLine edge function as the signed-in person; failures keep the function's own message and code */
 async function fn(name, body) {
+  undoBad();   /* an edge function sends emails and the like: that cannot be undone */
   const doFetch = async () => fetch(SB + '/functions/v1/' + name, { method: 'POST', headers: { apikey: KEY, Authorization: 'Bearer ' + await bearer(), 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
   let r;
   try { r = await doFetch(); } catch (e) { if (e && e.message === 'session') throw e; throw offlineError(); }
@@ -296,20 +298,59 @@ async function selAll(table, q) {
 }
 async function ins(table, row, noReturn) {
   const r = await api(table, { method: 'POST', body: row, headers: { Prefer: noReturn ? 'return=minimal' : 'return=representation' } });
-  if (noReturn) return null;
-  const j = await r.json(); return Array.isArray(j) ? j[0] : j;
+  if (noReturn) { if (row && !Array.isArray(row) && row.id) undoNote({ t: 'ins', table, id: row.id }); else undoBad(); return null; }
+  const j = await r.json(); if (Array.isArray(j) && j.length && j.every(x => x && x.id)) j.forEach(x => undoNote({ t: 'ins', table, id: x.id })); else undoBad();
+  return Array.isArray(j) ? j[0] : j;
 }
 async function upd(table, match, patch) {
+  const before = await undoSnap(table, match, patch);   /* the old values, so the change can be put back */
   const r = await api(table + '?' + match, { method: 'PATCH', body: patch, headers: { Prefer: 'return=representation' } });
   const j = await r.json();
   if (!j.length) throw new Error('Nothing was changed. You may not have permission for that.');
+  if (before) undoNote({ t: 'upd', table, rows: before.filter(o => j.some(n => n.id === o.id)) }); else undoBad();
   return j[0];
 }
 async function del(table, match) {
   const r = await api(table + '?' + match, { method: 'DELETE', headers: { Prefer: 'return=representation' } });
   const j = await r.json();
   if (!j.length) throw new Error('Nothing was deleted. Only admins can delete.');
+  undoNote({ t: 'del', table, rows: j });
 }
+/* ---------- Undo: every change a person makes is remembered for a few seconds so its toast can offer Undo ----------
+   upd, ins and del note what they did and how to put it back. A new click, change or submit starts a clean list. A server procedure or an
+   edge function (emails, queued jobs) marks the action as not undoable, so a toast after one never offers Undo. */
+const UNDO = { ops: [], bad: false, at: 0, mute: 0 };
+function undoFresh() { UNDO.ops = []; UNDO.bad = false; UNDO.at = 0; }
+function undoNote(op) { if (UNDO.mute) return; UNDO.ops.push(op); UNDO.at = Date.now(); }
+function undoBad() { if (UNDO.mute) return; UNDO.bad = true; UNDO.at = Date.now(); }
+async function undoSnap(table, match, patch) {
+  if (UNDO.mute) return null;
+  try {
+    const rows = await sel(table, match + '&select=' + ['id'].concat(Object.keys(patch)).join(',') + '&limit=201');
+    return rows.length && rows.length <= 200 && rows.every(r => r.id) ? rows : null;
+  } catch (e) { return null; }
+}
+/* the Undo for the changes noted since the last click, or null when there is nothing safe to put back */
+function undoTake() {
+  const ops = UNDO.ops, ok = ops.length && !UNDO.bad && Date.now() - UNDO.at < 6000 && ops.length <= 40;
+  undoFresh();
+  if (!ok) return null;
+  return async () => {
+    let missed = 0;
+    UNDO.mute++;
+    try {
+      for (const op of ops.slice().reverse()) {
+        const hit = async r => { const j = await r.json(); if (!j.length) missed++; };
+        if (op.t === 'upd') for (const o of op.rows) { const { id, ...old } = o; await hit(await api(op.table + '?id=eq.' + id, { method: 'PATCH', body: old, headers: { Prefer: 'return=representation' } })); }
+        else if (op.t === 'ins') await hit(await api(op.table + '?id=eq.' + op.id, { method: 'DELETE', headers: { Prefer: 'return=representation' } }));
+        else if (op.t === 'del') await api(op.table, { method: 'POST', body: op.rows, headers: { Prefer: 'return=minimal' } });
+      }
+    } finally { UNDO.mute--; }
+    if (missed) { if (typeof render === 'function') render(); throw new Error(missed === ops.length ? "Could not undo that. You may not have permission to." : 'Part of that could not be undone. You may not have permission for the rest.'); }
+    if (typeof render === 'function') render();
+  };
+}
+['click', 'change', 'submit'].forEach(ev => document.addEventListener(ev, () => { if (!UNDO.mute) undoFresh(); }, true));
 function inList(ids) { return '(' + ids.map(i => '"' + String(i).replace(/"/g, '') + '"').join(',') + ')'; }
 /* the parts of an or=(...) filter that find a person by what was typed: the whole text in first name, last name or email, and, when several words
    were typed, every word somewhere in first name, last name or email (so "Aabiskar Thapa Magar" finds first name "Aabiskar Thapa" + last name "Magar") */

@@ -180,14 +180,14 @@ function bindFirstAid(cur, books, ctx) {
       buttons: [{ label: 'Cancel', close: true }, { label: 'Save', primary: true, run: async mm => {
         const v = ($('input[name=ppv]:checked', mm.el) || {}).value || '';
         if (v === cur_) return;
-        await setFlags([x], { placement_plan: v || null }); toast('Placement plan saved');
+        await setFlags([x], { placement_plan: v || null }); toast('Placement plan saved', false, () => setFlags([x], { placement_plan: cur_ || null }));
       } }] });
   };
   const flagClick = async (x, key) => {
     if (key === 'quiz_sent') {
       const on = !x.quiz_sent;
       if (!(await confirmBox('Quiz sent', (on ? 'Mark the quiz as sent for ' : 'Clear "quiz sent" for ') + (x.name || 'this booking') + '?', on ? 'Yes, mark it sent' : 'Yes, clear it'))) return;
-      try { await setFlags([x], { quiz_sent: on }); toast(on ? 'Marked quiz sent' : 'Quiz sent cleared'); } catch (e) { toast(e.message, true); }
+      try { await setFlags([x], { quiz_sent: on }); toast(on ? 'Marked quiz sent' : 'Quiz sent cleared', false, () => setFlags([x], { quiz_sent: !on })); } catch (e) { toast(e.message, true); }
     } else if (key === 'placement_plan') planModal(x);
   };
   /* Allocate seat: the lowest free seat on this class day */

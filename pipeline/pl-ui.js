@@ -62,10 +62,22 @@ function selectOpts(list, cur, blank) {
 /* ---------- toast + modal + form ---------- */
 /* A toast is for good news only. An error is never a toast: toast(msg, true) is routed to showError(), which puts it inline in the open dialog
    or, when no dialog is open, in an error dialog. */
-function toast(msg, bad) {
+function toast(msg, bad, undo) {
   if (bad) { showError(msg); return; }
-  const el = document.createElement('div'); el.className = 'toast' + (bad ? ' bad' : ''); el.textContent = msg; if (bad) el.setAttribute('role', 'alert');
-  $('#toasts').appendChild(el); const life = 2600; setTimeout(() => el.classList.add('out'), life - 200); setTimeout(() => el.remove(), life);
+  if (undo === undefined) undo = undoTake();   /* the changes this action just made, if they can all be put back; false means never */
+  else if (undo) undoFresh();
+  if (undo === false) undo = null;
+  const el = document.createElement('div'); el.className = 'toast' + (undo ? ' has-undo' : '');
+  const tx = document.createElement('span'); tx.textContent = msg; el.appendChild(tx);
+  const life = undo ? 8000 : 2600; let gone = false;
+  const close = () => { if (gone) return; gone = true; el.classList.add('out'); setTimeout(() => el.remove(), 200); };
+  if (undo) {
+    /* a toast can carry an Undo: it stays a little longer, and the button puts the change back */
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'toast-undo'; b.textContent = 'Undo';
+    b.onclick = async () => { b.disabled = true; try { await undo(); close(); toast('Undone'); } catch (e) { close(); showError(e.message || 'Could not undo that'); } };
+    el.appendChild(b);
+  }
+  $('#toasts').appendChild(el); setTimeout(close, life - 200); setTimeout(() => el.remove(), life);
 }
 let modalStack = [];
 function openModal(opt) {

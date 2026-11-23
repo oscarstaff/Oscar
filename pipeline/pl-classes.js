@@ -49,7 +49,7 @@ async function attendanceModal(b, preset, after) {
   return m;
 }
 async function bkAttended(b, after) {
-  try { await bkMark(b, 'attended'); toast('Marked attended'); if (after) after(); else render(); } catch (e) { toast(e.message, true); }
+  try { await bkMark(b, 'attended'); toast('Marked attended', false, async () => { await bkMark(b, 'booked'); if (after) after(); else render(); }); if (after) after(); else render(); } catch (e) { toast(e.message, true); }
 }
 /* who made the booking, and when. A booking made by the system (an import or an automatic job) says so. */
 function bkBookedBy(b) { return 'Booked by ' + (b.created_by || 'System (automatic)') + (b.created_at ? ' · ' + fmtDate(b.created_at) : ''); }
