@@ -407,6 +407,17 @@ function bookingForm(cur, b, books) {
     const foot = $('.modal-f', m.el); const cb = document.createElement('button'); cb.className = 'nx-btn'; cb.style.marginRight = 'auto'; cb.textContent = 'Cancel booking';
     cb.onclick = async () => { try { await bkMark(b, 'cancelled'); m.close(); toast('Booking cancelled. Follow-up task added.'); render(); } catch (e) { showErr(m, e); } };
     foot.prepend(cb);
+    if (ME.admin) {   /* only admins can remove a booking for good (the database enforces this too) */
+      const db = document.createElement('button'); db.className = 'nx-btn'; db.textContent = 'Delete booking';
+      db.onclick = async () => {
+        m.close();
+        const ok = await confirmBox('Delete this booking?', 'This removes ' + b.name + '’s booking from this class for good, with its seat, confirmation-email record and follow-ups. The person stays in YatraLine. The delete is recorded in their Activity. To keep a record that they did not come, use Cancel booking instead.', 'Delete booking', true);
+        if (!ok) { bookingForm(cur, b, books); return; }
+        try { await del('nex_class_bookings', 'id=eq.' + b.id); toast('Booking deleted'); } catch (e) { showError(e, 'Could not delete the booking'); }
+        render();
+      };
+      foot.prepend(db);
+    }
     if (canFlag() && cur.kind !== 'renewal' && !bkOff(b.status)) { const eb = document.createElement('button'); eb.className = 'nx-btn'; eb.textContent = 'Email confirmation'; eb.onclick = () => { m.close(); confirmEmail(cur, books, b); }; foot.prepend(eb); }
   } else {
     identityLookup(m, { ids: { name: 'f_name', phone: 'f_phone', email: 'f_email' }, onChange: st => { studentId = st ? st.id : null; if (st) { const bt = $('#f_booking_type', m.el); if (bt) bt.value = 'student'; } } });
