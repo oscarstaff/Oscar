@@ -300,15 +300,17 @@ route(/^\/students\/([0-9a-f-]{36})$/, async m => {
   /* the sensitive details come through a function that logs who looked (admins see this) and stops bulk opening */
   const limited = !!(det && det.limited), d = (det && det.details) || {};
   const eids = enr.map(e => e.id);
-  const [queue, refunds, reqs, plcs, hist, aud, docs] = await Promise.all([
+  const [queue, refunds, reqs, plcs, hist, aud0, docs, delB] = await Promise.all([
     eids.length ? sel('nex_payment_queue', 'select=*&enrolment_id=in.' + inList(eids)) : [],
     eids.length ? sel('nex_refunds', 'select=*&enrolment_id=in.' + inList(eids) + '&order=refunded_on.desc') : [],
     eids.length ? sel('nex_placement_requests', 'select=*,nex_facilities(name)&enrolment_id=in.' + inList(eids) + '&order=created_at.desc') : [],
     eids.length ? sel('nex_placements', 'select=*,nex_facilities(name)&enrolment_id=in.' + inList(eids) + '&order=created_at.desc') : [],
     eids.length ? sel('nex_status_history', 'select=*&entity_id=in.' + inList(eids) + '&order=changed_at.desc&limit=40') : [],
     sel('nex_audit', 'select=*&row_id=in.' + inList([id].concat(eids, pays.map(p => p.id), books.map(b => b.id), followups.map(f => f.id), tasks.map(t => t.id))) + '&order=changed_at.desc&limit=100'),
-    eids.length ? sel('nex_enrolment_docs', 'select=*&enrolment_id=in.' + inList(eids)).catch(() => []) : []
+    eids.length ? sel('nex_enrolment_docs', 'select=*&enrolment_id=in.' + inList(eids)).catch(() => []) : [],
+    sel('nex_audit', 'select=*&table_name=eq.nex_class_bookings&action=eq.DELETE&old_row->>student_id=eq.' + encodeURIComponent(id) + '&order=changed_at.desc&limit=20').catch(() => [])   /* a deleted booking is no longer in the list above, so its record is found by the student it belonged to */
   ]);
+  const aud = aud0.concat(delB).sort((a, b) => String(b.changed_at).localeCompare(String(a.changed_at)));
   const main = enr[0] || {};
   const idx = PATH.indexOf(main.stage);
   const totalFee = enr.reduce((t, e) => t + Number(e.fee || 0), 0);
