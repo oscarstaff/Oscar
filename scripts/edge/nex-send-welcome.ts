@@ -2,7 +2,7 @@
 // Called by the database (nex_welcome_kick) the moment a lead with an email is added, and every 5 minutes to retry what is still waiting.
 // POST {} with the header x-cron-secret. It sends every row in nex_welcome_mail that is 'pending' (or 'failed' with fewer than 3 tries).
 // The recipient is ALWAYS the email stored on the row, which the database copied from the lead; nothing in the request can change it.
-// Sent through a Google Apps Script mail relay (NEX_MAIL4_URL / NEX_MAIL4_KEY) deployed under the support Google account.
+// Sent through its own Google Apps Script mail relay (scripts/support-mail-relay.gs; NEX_MAIL4_URL / NEX_MAIL4_KEY) deployed under the support Google account.
 // Deploy with verify_jwt OFF (the caller is the database; the secret above is the check). Needs the usual SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.
 // Deployed as two files: index.ts (this file) and email.ts (= scripts/edge/welcome-email.ts).
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
