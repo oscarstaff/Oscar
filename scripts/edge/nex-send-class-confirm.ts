@@ -73,7 +73,7 @@ function planOf(ses: any): Plan {
   return /\banju\b/i.test(String((ses && ses.trainer) || "")) ? ANJU_PLAN : STD_PLAN;
 }
 const okRange = (r: any) => Array.isArray(r) && /^\d{1,2}:\d{2}/.test(String(r[0] || "")) && /^\d{1,2}:\d{2}/.test(String(r[1] || ""));
-// the times this person needs to be there: only the sections they attend (sections null = all), with the break when it falls inside their day
+// the times this person needs to be there: only the sections they attend (sections null = all); no break row
 function personalTimes(ses: any, sections: string[] | null) {
   const plan = planOf(ses);
   const mine = SECTIONS.filter(([k]) => okRange(plan[k]) && (!sections || sections.includes(k)))
@@ -82,9 +82,7 @@ function personalTimes(ses: any, sections: string[] | null) {
   if (!mine.length) return null;
   const start = mine.map((m) => m.a).sort((x, y) => x.localeCompare(y, "en", { numeric: true }))[0];
   const end = mine.map((m) => m.z).sort((x, y) => y.localeCompare(x, "en", { numeric: true }))[0];
-  const rows = mine.slice();
-  const br = plan.break;
-  if (okRange(br) && String(br[0]) >= start && String(br[1]) <= end) rows.push({ label: "Break", a: String(br[0]), z: String(br[1]) });
+  const rows = mine.slice();   // the break time is not sent to students: it is not listed in the email
   rows.sort((x, y) => x.a.localeCompare(y.a, "en", { numeric: true }));
   const lines = rows.map((r) => `${r.label}: ${fmtClock(r.a)} - ${fmtClock(r.z)}`);
   return { lines, start, end, span: `${fmtClock(start)} - ${fmtClock(end)}` };
