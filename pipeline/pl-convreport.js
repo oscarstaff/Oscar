@@ -3,7 +3,7 @@
    One of the Yatra files loaded by nex.html (list and order: PL_FILES in the loader). All of them share one global scope. */
 /* ---------- Conversion report: the enrolment team's weekly numbers, worked out from Yatra ----------
    Status table and pie: enrolments created in the range (enrolment date, else the day it was added), by stage now.
-   Follow-ups: follow-ups marked done in the range, by step. Class: see the note printed under the block. */
+   Follow-ups: follow-ups marked done in the range, by step. Payments: payments dated in the range (not rejected). Class: see the note printed under the block. */
 const CR = { from: '', to: '' };
 const CR_ORDER = ['processed', 'placement', 'not_interested', 'hold', 'docs_completed', 'blended', 'incomplete_docs', 'issue', 'checklist_sent', 'certificate_issued'];
 const CR_COLORS = ['#2f6fed', '#e5484d', '#8b5e3c', '#f5a524', '#8e4ec6', '#12a594', '#d6409f', '#6e7787', '#30a46c', '#3a8eca', '#9aa3b2'];
@@ -26,13 +26,26 @@ function crPreset(k) {
 }
 function crLong(d) { const x = new Date(d + 'T12:00:00'); return x.toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' }).replace(/ /g, '-'); }
 
+/* every payment dated in the range, fetched a page at a time (the server hands out at most 1,000 rows per request) */
+async function crPayments(from, to) {
+  const q = 'select=amount,student_id,verify_status&paid_on=gte.' + from + '&paid_on=lte.' + to + '&or=(verify_status.is.null,verify_status.neq.rejected)&order=paid_on,id';
+  let all = [];
+  for (let off = 0; off < 20000; off += 1000) {
+    const rows = await sel('nex_payments', q + '&limit=1000&offset=' + off);
+    all = all.concat(rows);
+    if (rows.length < 1000) break;
+  }
+  return all;
+}
+
 async function crData(from, to) {
   const A = crStart(from), B = crStart(crNext(to));
   const orQ = encodeURIComponent('(and(enrolled_on.gte.' + from + ',enrolled_on.lte.' + to + '),and(enrolled_on.is.null,created_at.gte.' + A + ',created_at.lt.' + B + '))');
-  const [enr, fus, bks] = await Promise.all([
+  const [enr, fus, bks, pays] = await Promise.all([
     sel('nex_enrolments', 'select=id,stage,student_id,nex_students!inner(outside_sydney)&nex_students.deleted_at=is.null&deleted_at=is.null&or=' + orQ + '&limit=1000'),
     sel('nex_followups', 'select=step,kind&done_at=gte.' + encodeURIComponent(A) + '&done_at=lt.' + encodeURIComponent(B) + '&limit=1000'),
-    sel('nex_class_bookings', 'select=student_id,name&created_at=gte.' + encodeURIComponent(A) + '&created_at=lt.' + encodeURIComponent(B) + '&status=not.in.(cancelled,info_only)&limit=1000')
+    sel('nex_class_bookings', 'select=student_id,name&created_at=gte.' + encodeURIComponent(A) + '&created_at=lt.' + encodeURIComponent(B) + '&status=not.in.(cancelled,info_only)&limit=1000'),
+    crPayments(from, to)
   ]);
   const people = Array.from(new Set(enr.map(e => e.student_id)));
   const booked = new Set();
@@ -45,7 +58,10 @@ async function crData(from, to) {
   fus.forEach(f => { if (f.kind === 'lead_cycle' && f.step) steps[f.step] = (steps[f.step] || 0) + 1; else other++; });
   const outside = new Set(enr.filter(e => e.nex_students && e.nex_students.outside_sydney).map(e => e.student_id)).size;
   const classBooked = new Set(bks.map(b => b.student_id || ('n:' + String(b.name || '').toLowerCase()))).size;
-  return { total: enr.length, byStage, steps, other, fuTotal: fus.length, without: people.filter(p => !booked.has(p)).length, classBooked, outside, capped: enr.length >= 1000 || fus.length >= 1000 };
+  const pay = { n: pays.length, amt: 0, people: new Set(), unN: 0, unAmt: 0, ver: 0 };
+  pays.forEach(p => { const a = Number(p.amount) || 0; pay.amt += a; if (p.student_id) pay.people.add(p.student_id); else { pay.unN++; pay.unAmt += a; } if (p.verify_status === 'pending_verification') pay.ver++; });
+  pay.people = pay.people.size;
+  return { pay, total: enr.length, byStage, steps, other, fuTotal: fus.length, without: people.filter(p => !booked.has(p)).length, classBooked, outside, capped: enr.length >= 1000 || fus.length >= 1000 };
 }
 
 function crPie(rows, total) {
@@ -76,6 +92,8 @@ function crHtml(d, from, to) {
   let fu = '<tr class="nx-totrow"><td>Follow-ups done</td><td class="nx-num">' + d.fuTotal + '</td></tr>';
   for (let i = 1; i <= 9; i++) fu += '<tr><td>' + ord(i) + ' follow-up</td><td class="nx-num">' + (d.steps[i] || 0) + '</td></tr>';
   fu += '<tr><td>Other (added by hand)</td><td class="nx-num">' + d.other + '</td></tr>';
+  const P = d.pay;
+  const pays = '<tr class="nx-totrow"><td>Money received</td><td class="nx-num">' + money(Math.round(P.amt * 100) / 100) + '</td></tr><tr><td>Payments</td><td class="nx-num">' + P.n + '</td></tr><tr><td>People who paid</td><td class="nx-num">' + P.people + '</td></tr><tr><td>Not linked to a person yet</td><td class="nx-num">' + P.unN + (P.unN ? ' (' + money(Math.round(P.unAmt * 100) / 100) + ')' : '') + '</td></tr><tr><td>Waiting to be verified</td><td class="nx-num">' + P.ver + '</td></tr>';
   const cls = '<tr><td>Without First Aid and CPR</td><td class="nx-num">' + d.without + '</td></tr><tr><td>Class booked</td><td class="nx-num">' + d.classBooked + '</td></tr><tr><td>Outside Sydney</td><td class="nx-num">' + d.outside + '</td></tr>';
   return '<div class="nx-report nx-crep">' +
     '<div class="nx-crhead"><div><span class="nx-muted">From</span><b>' + esc(crLong(from)) + '</b></div><div><span class="nx-muted">To</span><b>' + esc(crLong(to)) + '</b></div></div>' +
@@ -83,7 +101,8 @@ function crHtml(d, from, to) {
     '<div class="nx-crgrid"><div><h3>Student conversion</h3>' + statusTable + '</div><div class="nx-crpie">' + crPie(rows, d.total) + '</div></div>' +
     '<div class="nx-crgrid2"><div><h3>Follow-ups</h3><div class="nx-tablewrap"><table class="nx-table auto tight"><thead><tr><th>Follow-up</th><th class="nx-num">Number</th></tr></thead><tbody>' + fu + '</tbody></table></div></div>' +
     '<div><h3>Class status</h3><div class="nx-tablewrap"><table class="nx-table auto tight"><thead><tr><th>Class status</th><th class="nx-num">Number</th></tr></thead><tbody>' + cls + '</tbody></table></div>' +
-    '<p class="nx-muted nx-crnote">Status: enrolments added in these dates, by the stage they are in now. Follow-ups: marked done in these dates. Class booked: people with a First Aid and CPR booking made in these dates. Without: people added in these dates with no booking yet. Outside Sydney: added in these dates and ticked Outside Sydney on their record.</p></div></div></div>';
+    '<p class="nx-muted nx-crnote">Status: enrolments added in these dates, by the stage they are in now. Follow-ups: marked done in these dates. Class booked: people with a First Aid and CPR booking made in these dates. Without: people added in these dates with no booking yet. Outside Sydney: added in these dates and ticked Outside Sydney on their record. Payments: payments dated in these dates, not counting rejected ones.</p></div>' +
+    '<div><h3>Payments</h3><div class="nx-tablewrap"><table class="nx-table auto tight"><thead><tr><th>Payments</th><th class="nx-num">Number</th></tr></thead><tbody>' + pays + '</tbody></table></div></div></div></div>';
 }
 
 route(/^\/convreport$/, async () => {
