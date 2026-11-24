@@ -27,6 +27,7 @@ route(/^\/$/, async () => {
     const bk = await sel('nex_class_bookings', 'select=session_id&session_id=in.' + inList(sessions.map(s => s.id)));
     bk.forEach(b => counts[b.session_id] = (counts[b.session_id] || 0) + 1);
   }
+  const forTeams = (...t) => ME.admin || !String(ME.team || '').trim() || teamIs(...t);   /* Needs attention shows each person only what their team works on; admins (and anyone with no team set) see everything */
   const att = (href, n, label, sub, tone) => '<a class="nx-att' + (n ? '' : ' zero') + '" href="' + href + '"><span class="nx-big n ' + (n ? tone : '') + '">' + (n ? n : ico('check')) + '</span><span class="t"><b>' + label + '</b><small>' + (n ? sub : 'All clear') + '</small></span>' + ico('next') + '</a>';
   const first = (ME.name || '').split(' ')[0] || 'Overview';
   let tipsGone = false; try { tipsGone = localStorage.getItem('nex_tips_v1') === '1'; } catch (e) {}
@@ -36,12 +37,12 @@ route(/^\/$/, async () => {
   return pageHead('home', nStu.toLocaleString('en-AU') + (nStu === 1 ? ' student' : ' students') + ' and ' + nLead.toLocaleString('en-AU') + (nLead === 1 ? ' lead' : ' leads'), 'Welcome back, ' + first, '<a class="nx-btn primary" href="#/leads?new=1">' + ico('plus') + 'New lead</a>') +
     tips + placementMailCard(pmRows) + '<div class="nx-two"><div class="nx-stack"><div class="nx-card"><div class="nx-card-h"><h3>Needs attention</h3></div><div class="nx-attlist">' +
     att('#/tasks', nDue, 'My tasks due', 'today or overdue', 'bad') +
-    att('#/leads?fu=due', nFu, 'Lead follow-ups due', '1st, 2nd or 3rd, today or overdue', 'bad') +
-    att('#/payments?view=unmatched', nUnm, 'Unmatched payments', 'no student linked', 'warn') +
-    att('#/payments', nQueue, 'Payments to process', 'in the processing queue', 'accent') +
+    (forTeams('Enrolment') ? att('#/leads?fu=due', nFu, 'Lead follow-ups due', '1st, 2nd or 3rd, today or overdue', 'bad') : '') +
+    (forTeams('Accounts', 'Processing') ? att('#/payments?view=unmatched', nUnm, 'Unmatched payments', 'no student linked', 'warn') : '') +
+    (forTeams('Processing', 'Accounts') ? att('#/payments', nQueue, 'Payments to process', 'in the processing queue', 'accent') : '') +
     (canVerify() ? att('#/payments?view=verify', nVer, 'Bank payments to verify', 'waiting for Accounts', 'warn') : '') +
     (ME.admin ? att('#/payments?view=cash', nCash, 'Cash receipts to check', 'handover waiting for an admin', 'warn') : '') +
-    att('#/students', nOpenEnr, 'Open enrolments', 'not yet issued or closed', 'accent') + '</div></div></div>' +
+    (forTeams('Enrolment', 'Processing', 'Placement', 'Accounts') ? att('#/students', nOpenEnr, 'Open enrolments', 'not yet issued or closed', 'accent') : '') + '</div></div></div>' +
     '<div class="nx-stack"><div class="nx-card"><div class="nx-card-h"><h3>Upcoming classes</h3><a href="#/firstaid">All classes</a></div>' +
     (sessions.length ? '<ul class="nx-list">' + sessions.map(s => { const d = fmtDay(s.class_date); const n = counts[s.id] || 0; return '<li><a href="#/firstaid/' + s.id + '"><b>' + d.wd + ' ' + d.dm + '</b><small>' + (s.kind === 'renewal' ? 'Renewal / signature' : 'First Aid & CPR') + (s.trainer ? ' · ' + esc(s.trainer) : '') + '</small></a><span class="nx-pill ' + (n >= s.seats ? 'bad' : n >= s.seats - 5 ? 'warn' : 'accent') + '">' + n + ' / ' + s.seats + '</span></li>'; }).join('') + '</ul>' : empty('No classes scheduled', 'Add the next class day in First Aid.')) + '</div></div>' +
     '</div>';
