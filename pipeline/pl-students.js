@@ -9,7 +9,7 @@ const PATH = ['checklist_sent', 'docs_completed', 'processed', 'placement', 'cer
 /* ---------- Overview ---------- */
 route(/^\/$/, async () => {
   const today = sydToday();
-  const [nStu, nLead, nOpenEnr, nQueue, nUnm, nDue, sessions, pmRows, nVer, nCash, nFu] = await Promise.all([
+  const [nStu, nLead, nOpenEnr, nQueue, nUnm, nDue, sessions, pmRows, nVer, nCash, nFu, nReady] = await Promise.all([
     countKind('student'),
     countKind('lead'),
     count('nex_enrolments', 'deleted_at=is.null&stage=not.in.(certificate_issued,not_interested)'),
@@ -20,7 +20,8 @@ route(/^\/$/, async () => {
     placementMailLoad().catch(() => []),
     canVerify() ? count('nex_payments', 'verify_status=eq.pending_verification') : 0,
     ME.admin ? count('nex_payments', 'handover_status=eq.awaiting') : 0,
-    leadFuCount('due').catch(() => 0)
+    leadFuCount('due').catch(() => 0),
+    (ME.admin || teamIs('Placement')) ? count('nex_placement_queue', 'has_placement=eq.false&hold=eq.false&placement_docs_missing=eq.0&stage=not.in.(' + PP_ENDED + ')').catch(() => 0) : 0
   ]);
   let counts = {};
   if (sessions.length) {
@@ -33,6 +34,7 @@ route(/^\/$/, async () => {
   let tipsGone = false; try { tipsGone = localStorage.getItem('nex_tips_v1') === '1'; } catch (e) {}
   const tips = tipsGone ? '' : '<div class="nx-card nx-tips"><div class="nx-card-h"><h3>Finding your way around</h3><button class="nx-btn quiet sm" id="tipsHide">Hide this</button></div><ul class="nx-tiplist"><li><b>Search from anywhere.</b> Type a name, email or phone number in the bar at the top.</li><li><b>Everything about a person is on their page.</b> Enrolments, payments, bookings, placement and follow-ups, with a history of every change.</li><li><b>Book First Aid seats from First Aid.</b> Pick the day, press a free seat, and the flags show what is still outstanding.</li><li><b>Leads become students at $200.</b> New people start under Leads and move to Students once their payments reach $200.</li></ul></div>';
   afterRender(() => bindPlacementMail(pmRows));
+  afterRender(() => { const r = $('#attReady'); if (r) r.addEventListener('click', () => { PL.tab = 'ready'; PL.page = 0; PL.status = ''; }); });
   afterRender(() => { const h = $('#tipsHide'); if (h) h.onclick = () => { try { localStorage.setItem('nex_tips_v1', '1'); } catch (e) {} const c = h.closest('.nx-tips'); if (c) c.remove(); }; });
   return pageHead('home', nStu.toLocaleString('en-AU') + (nStu === 1 ? ' student' : ' students') + ' and ' + nLead.toLocaleString('en-AU') + (nLead === 1 ? ' lead' : ' leads'), 'Welcome back, ' + first, '<a class="nx-btn primary" href="#/leads?new=1">' + ico('plus') + 'New lead</a>') +
     tips + placementMailCard(pmRows) + '<div class="nx-two"><div class="nx-stack"><div class="nx-card"><div class="nx-card-h"><h3>Needs attention</h3></div><div class="nx-attlist">' +
@@ -42,7 +44,8 @@ route(/^\/$/, async () => {
     (forTeams('Processing', 'Accounts') ? att('#/payments', nQueue, 'Payments to process', 'in the processing queue', 'accent') : '') +
     (canVerify() ? att('#/payments?view=verify', nVer, 'Bank payments to verify', 'waiting for Accounts', 'warn') : '') +
     (ME.admin ? att('#/payments?view=cash', nCash, 'Cash receipts to check', 'handover waiting for an admin', 'warn') : '') +
-    (forTeams('Enrolment', 'Processing', 'Placement', 'Accounts') ? att('#/students', nOpenEnr, 'Open enrolments', 'not yet issued or closed', 'accent') : '') + '</div></div></div>' +
+    (forTeams('Placement') ? att('#/placement', nReady, 'Ready to place', 'placement documents all received', 'accent').replace('<a class="nx-att', '<a id="attReady" class="nx-att') : '') +
+    (forTeams('Enrolment', 'Processing', 'Accounts') ? att('#/students', nOpenEnr, 'Open enrolments', 'not yet issued or closed', 'accent') : '') + '</div></div></div>' +
     '<div class="nx-stack"><div class="nx-card"><div class="nx-card-h"><h3>Upcoming classes</h3><a href="#/firstaid">All classes</a></div>' +
     (sessions.length ? '<ul class="nx-list">' + sessions.map(s => { const d = fmtDay(s.class_date); const n = counts[s.id] || 0; return '<li><a href="#/firstaid/' + s.id + '"><b>' + d.wd + ' ' + d.dm + '</b><small>' + (s.kind === 'renewal' ? 'Renewal / signature' : 'First Aid & CPR') + (s.trainer ? ' · ' + esc(s.trainer) : '') + '</small></a><span class="nx-pill ' + (n >= s.seats ? 'bad' : n >= s.seats - 5 ? 'warn' : 'accent') + '">' + n + ' / ' + s.seats + '</span></li>'; }).join('') + '</ul>' : empty('No classes scheduled', 'Add the next class day in First Aid.')) + '</div></div>' +
     '</div>';
