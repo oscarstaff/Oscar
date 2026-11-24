@@ -78,7 +78,7 @@ const FU_SORT = {
 function fuInfo(raw, today) {
   const fu = Array.isArray(raw) ? raw[0] : raw;
   if (!fu || !fu.total_count) return { key: 'none', label: 'No follow-ups set', tone: '', sub: '' };
-  if (!fu.open_count || !fu.step) return { key: 'complete', label: 'Follow-ups finished', tone: 'ok', sub: fu.total_count + ' done · booked, on hold, not interested or docs completed' };
+  if (!fu.open_count || !fu.step) return { key: 'complete', label: 'Follow-ups finished', tone: 'ok', sub: '', tip: fu.total_count + ' done · booked, on hold, not interested or docs completed' };   /* the reason is a hover, not a second line */
   const nth = FU_NTH(fu.step), who = fu.assigned_to ? ' · ' + String(fu.assigned_to).trim().split(/\s+/)[0] : '';   /* first name only so it fits on one line; the full name is in the hover title */
   if (fu.due_day < today) { const n = Math.round((new Date(today + 'T12:00:00') - new Date(fu.due_day + 'T12:00:00')) / 864e5); return { key: 'due' + fu.step, label: nth + ' Follow Up Due', tone: 'bad', sub: n + (n === 1 ? ' day' : ' days') + ' overdue' + who }; }
   if (fu.due_day === today) return { key: 'due' + fu.step, label: nth + ' Follow Up Due', tone: 'warn', sub: 'Due today' + who };
@@ -86,7 +86,7 @@ function fuInfo(raw, today) {
 }
 function fuCellHtml(raw, today) {
   const i = fuInfo(raw, today), f0 = Array.isArray(raw) ? raw[0] : raw; i.full = (f0 && f0.assigned_to) || '';
-  return '<span class="nx-pill ' + i.tone + '">' + esc(i.label) + '</span>' + (i.sub ? '<div class="nx-muted nx-fusub" title="' + esc(i.sub + (i.full ? ' (' + i.full + ')' : '')) + '">' + esc(i.sub) + '</div>' : '');
+  return '<span class="nx-pill ' + i.tone + '"' + (i.tip ? ' title="' + esc(i.tip) + '"' : '') + '>' + esc(i.label) + '</span>' + (i.sub ? '<div class="nx-muted nx-fusub" title="' + esc(i.sub + (i.full ? ' (' + i.full + ')' : '')) + '">' + esc(i.sub) + '</div>' : '');
 }
 /* the filter text for one follow-up state, to add to a nex_students query that embeds nex_lead_followup!inner */
 function fuFilter(which, today) {
@@ -109,15 +109,31 @@ function fuControlsHtml() {
   const st = [['due', 'Any follow-up due now'], ['1', '1st Follow Up Due'], ['2', '2nd Follow Up Due'], ['3', '3rd or later Follow Up Due'], ['upcoming', 'Follow-up coming up, not due yet'], ['complete', 'Follow-ups finished'], ['none', 'No follow-ups set']].map(([id, label]) => ({ id, label }));
   const who = [{ id: 'me', label: 'Assigned to me' }].concat((REF.staff || []).filter(n => n !== ME.name).map(n => ({ id: 'n:' + n, label: n })));
   const sorts = [['newest', 'Sort: newest first'], ['due', 'Sort: follow-up due soonest'], ['step', 'Sort: latest follow-up first'], ['name', 'Sort: name A to Z']].map(([id, label]) => ({ id, label }));
-  return '<select class="nx-sel sm" id="slFu" aria-label="Follow-up status">' + selectOpts(st, SL.fu, 'All follow-up statuses') + '</select>' +
-    '<select class="nx-sel sm" id="slWho" aria-label="Follow-up assigned to">' + selectOpts(who, SL.who, 'Assigned to anyone') + '</select>' +
-    '<select class="nx-sel sm" id="slSort" aria-label="Sort leads">' + selectOpts(sorts, SL.sort) + '</select>';
+  return {
+    fu: '<select class="nx-sel sm" id="slFu" aria-label="Follow-up status">' + selectOpts(st, SL.fu, 'All follow-up statuses') + '</select>',
+    who: '<select class="nx-sel sm" id="slWho" aria-label="Follow-up assigned to">' + selectOpts(who, SL.who, 'Assigned to anyone') + '</select>',
+    sort: '<select class="nx-sel sm" id="slSort" aria-label="Sort leads">' + selectOpts(sorts, SL.sort) + '</select>'
+  };
 }
-const SL = { q: '', stage: '', qual: '', unf: '', fu: '', who: '', sort: 'newest', kind: 'student', view: 'all', page: 0, size: 50 };
+/* The toolbar after the search box. Students and Search keep their two dropdowns. Leads show only the things used all day (sort, and the
+   follow-up buttons below); stage, qualification, unfinished, follow-up status and assigned-to fold under "More filters", which shows how many are on. */
+const SL_MORE = ['stage', 'qual', 'unf', 'fu', 'who'];
+const slMoreN = () => SL_MORE.filter(k => SL[k]).length;
+function slFilterBar(kind) {
+  const stage = '<select class="nx-sel sm" id="slStage">' + selectOpts(stageFilterOpts(kind), SL.stage, 'Any stage') + '</select>';
+  const qual = '<select class="nx-sel sm" id="slQual">' + selectOpts(REF.quals.filter(q => q.active), SL.qual, 'Any qualification') + '</select>';
+  if (kind !== 'lead') return stage + qual + '<button class="nx-btn quiet sm" id="slClear">Clear</button></div>';
+  const f = fuControlsHtml(), fld = (l, h) => '<label class="nx-fld"><span>' + l + '</span>' + h + '</label>';
+  const unf = '<select class="nx-sel sm" id="slUnf" aria-label="Unfinished leads"><option value=""' + (SL.unf ? '' : ' selected') + '>All leads</option><option value="mine"' + (SL.unf === 'mine' ? ' selected' : '') + '>Unfinished, flagged to me</option><option value="all"' + (SL.unf === 'all' ? ' selected' : '') + '>Unfinished, anyone</option></select>';
+  return f.sort + '<button type="button" class="nx-btn sm" id="slMore" aria-expanded="' + !!SL.more + '" aria-controls="slPanel">' + ico('sliders') + '<span id="slMoreL">More filters' + (slMoreN() ? ' (' + slMoreN() + ')' : '') + '</span></button><button class="nx-btn quiet sm" id="slClear">Clear</button></div>' +
+    '<div class="nx-filtergrid" id="slPanel"' + (SL.more ? '' : ' hidden') + '>' + fld('Stage', stage) + fld('Qualification', qual) + fld('Unfinished leads', unf) + fld('Follow-up status', f.fu) + fld('Assigned to', f.who) + '</div>' +
+    '<div class="nx-toolbar" id="slChips" role="group" aria-label="Follow-ups due" style="padding-top:0;border-top:0"></div>';
+}
+const SL = { q: '', stage: '', qual: '', unf: '', fu: '', who: '', sort: 'newest', kind: 'student', view: 'all', page: 0, size: 50, more: false };
 route(/^\/(students|leads|search)(?:\?(.*))?$/, async m => {
   const mode = m[1], qs = new URLSearchParams(m[2] || '');
   const kind = mode === 'leads' ? 'lead' : mode === 'students' ? 'student' : 'all';
-  if (SL.kind !== kind) { SL.kind = kind; SL.page = 0; SL.view = 'all'; SL.q = SL.stage = SL.qual = SL.unf = SL.fu = SL.who = ''; SL.sort = 'newest'; }
+  if (SL.kind !== kind) { SL.kind = kind; SL.page = 0; SL.view = 'all'; SL.q = SL.stage = SL.qual = SL.unf = SL.fu = SL.who = ''; SL.sort = 'newest'; SL.more = false; }
   if (qs.get('view') === 'follow' && kind === 'lead') SL.view = 'follow';
   if (qs.get('fu') && kind === 'lead') { SL.fu = qs.get('fu'); SL.view = 'all'; SL.page = 0; if (SL.sort === 'newest') SL.sort = 'due'; }
   if (qs.get('unf')) { SL.unf = qs.get('unf'); SL.page = 0; }
@@ -128,7 +144,8 @@ route(/^\/(students|leads|search)(?:\?(.*))?$/, async m => {
     const body = $('#slBody');
     const syncView = () => {
       $$('#slSeg button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === SL.view)));
-      $$('#slQ,#slStage,#slQual,#slUnf,#slFu,#slWho,#slSort,#slChips,#slClear').forEach(x => { x.hidden = SL.view === 'follow'; });
+      $$('#slQ,#slSort,#slMore,#slChips,#slClear').forEach(x => { x.hidden = SL.view === 'follow'; });
+      const pn = $('#slPanel'); if (pn) pn.hidden = SL.view === 'follow' || !SL.more;
     };
     /* the follow-up status tags with a count each; pressing one filters the list to it */
     const drawChips = (n) => {
@@ -143,11 +160,17 @@ route(/^\/(students|leads|search)(?:\?(.*))?$/, async m => {
       drawChips(n);
     };
     const refreshN = async () => { const n = await leadsFollowupCount(); const c = $('#slFuN'); if (c && n != null) { c.textContent = n; c.hidden = !n; } };
+    const syncMore = () => {   /* leads only: the More filters label and when Clear shows */
+      if (kind !== 'lead') return;
+      const n = slMoreN(), l = $('#slMoreL'), c = $('#slClear');
+      if (l) l.textContent = 'More filters' + (n ? ' (' + n + ')' : '');
+      if (c && SL.view !== 'follow') c.hidden = !(n || SL.q || SL.sort !== 'newest');
+    };
     const load = async () => {
       holdBody(body);
       try {
         if (kind === 'lead' && SL.view === 'follow') { syncView(); await leadsFollowupLoad(body, $('#slFoot'), () => { load(); }); refreshN(); return; }
-        if (kind === 'lead') syncView();
+        if (kind === 'lead') { syncView(); syncMore(); }
         const q = safeQ(SL.q); const digits = cleanPhone(q); const today = sydToday();
         const fuInner = kind === 'lead' && (['due', '1', '2', '3', 'upcoming', 'complete'].includes(SL.fu) || !!SL.who);
         let query = 'select=id,student_no,first_name,last_name,email,phone,agent_id,created_at,needs_details,flagged_to,nex_student_paid!inner(paid_total),nex_enrolments' + (SL.stage || SL.qual ? '!inner' : '') + '(id,stage,qualification_id,fee,year,enrolled_on)' + (kind === 'lead' ? ',' + (fuInner ? FU_EMBED.replace('nex_lead_followup(', 'nex_lead_followup!inner(') : FU_EMBED) : '') + '&deleted_at=is.null&order=' + (kind === 'lead' ? (FU_SORT[SL.sort] || FU_SORT.newest) : 'created_at.desc');
@@ -166,18 +189,18 @@ route(/^\/(students|leads|search)(?:\?(.*))?$/, async m => {
         if (rows.length) pays = await sel('nex_payments', 'select=student_id,amount,verify_status&student_id=in.' + inList(rows.map(r => r.id)));
         const paid = {}; pays.forEach(p => { if (payConfirmed(p)) paid[p.student_id] = (paid[p.student_id] || 0) + Number(p.amount); });
         const filtered = SL.q || SL.stage || SL.qual || SL.fu || SL.who;
-        body.innerHTML = rows.length ? '<div class="nx-tablewrap"><table class="nx-table"><thead><tr><th>' + (kind === 'lead' ? 'Lead' : kind === 'student' ? 'Student' : 'Name') + '</th><th class="nx-c-phone">Phone</th><th class="nx-c-qual">Qualification</th><th class="nx-c-stage">Stage</th><th class="nx-c-fee">Fee and paid</th>' + (kind === 'lead' ? '<th class="nx-c-fu">Follow-up</th>' : '') + '<th class="nx-c-date">Enrolled</th><th class="nx-c-agent">Agent</th>' + (kind === 'lead' ? '<th></th>' : '') + '</tr></thead><tbody>' +
+        body.innerHTML = rows.length ? '<div class="nx-tablewrap"><table class="nx-table"><thead><tr><th>' + (kind === 'lead' ? 'Lead' : kind === 'student' ? 'Student' : 'Name') + '</th>' + (kind === 'lead' ? '' : '<th class="nx-c-phone">Phone</th>') + '<th class="nx-c-qual">Qualification</th><th class="nx-c-stage">Stage</th><th class="nx-c-fee">Paid and fee</th>' + (kind === 'lead' ? '<th class="nx-c-fu">Follow-up</th>' : '') + (kind === 'lead' ? '<th></th>' : '<th class="nx-c-date">Enrolled</th><th class="nx-c-agent">Agent</th>') + '</tr></thead><tbody>' +
           rows.map(s => {
             const en = (s.nex_enrolments || []).slice().sort((a, b) => String(b.enrolled_on || '').localeCompare(String(a.enrolled_on || '')))[0] || {};
             const fee = (s.nex_enrolments || []).reduce((t, e) => t + Number(e.fee || 0), 0), pd = paid[s.id] || 0;
             const pct = fee ? Math.min(100, Math.round(pd / fee * 100)) : 0;
             const idx = PATH.indexOf(en.stage), isStu = kindOf(s.nex_student_paid) === 'student';
-            return '<tr class="nx-tr" data-id="' + s.id + '"><td><div class="nx-who"><span class="nx-avatar">' + esc(initials(fullName(s))) + '</span><div><b>' + esc(fullName(s)) + (s.needs_details ? ' <span class="nx-pill warn" title="Started from a call; details still needed. Flagged to ' + esc(s.flagged_to || 'the logger') + '">Unfinished' + (s.flagged_to ? ' · ' + esc(s.flagged_to) : '') + '</span>' : '') + (kind === 'all' ? ' <span class="nx-pill ' + (isStu ? 'accent' : 'info') + '">' + (isStu ? 'Student' : 'Lead') + '</span>' : '') + '</b><span>' + esc(s.email || 'No email') + (s.nex_enrolments && s.nex_enrolments.length > 1 ? ' · ' + s.nex_enrolments.length + ' enrolments' : '') + '</span></div></div></td>' +
-              '<td class="nx-num nx-c-phone">' + esc(fmtPhone(s.phone)) + '</td><td class="nx-c-qual"><span class="nx-clamp">' + esc(qualShort(en.qualification_id) || '–') + '</span></td>' +
+            return '<tr class="nx-tr" data-id="' + s.id + '"><td><div class="nx-who"><span class="nx-avatar">' + esc(initials(fullName(s))) + '</span><div><b>' + esc(fullName(s)) + (s.needs_details ? ' <span class="nx-pill warn" title="Started from a call; details still needed. Flagged to ' + esc(s.flagged_to || 'the logger') + '">Unfinished' + (s.flagged_to ? ' · ' + esc(s.flagged_to) : '') + '</span>' : '') + (kind === 'all' ? ' <span class="nx-pill ' + (isStu ? 'accent' : 'info') + '">' + (isStu ? 'Student' : 'Lead') + '</span>' : '') + '</b><span>' + esc(kind === 'lead' ? [s.email || 'No email', fmtPhone(s.phone)].filter(Boolean).join(' · ') : (s.email || 'No email')) + (s.nex_enrolments && s.nex_enrolments.length > 1 ? ' · ' + s.nex_enrolments.length + ' enrolments' : '') + '</span></div></div></td>' +
+              (kind === 'lead' ? '' : '<td class="nx-num nx-c-phone">' + esc(fmtPhone(s.phone)) + '</td>') + '<td class="nx-c-qual"><span class="nx-clamp">' + esc(qualShort(en.qualification_id) || '–') + '</span>' + (kind === 'lead' ? (t => t ? '<div class="nx-sub" title="' + esc(t) + '">' + esc(t) + '</div>' : '')([en.enrolled_on ? 'Enrolled ' + fmtDate(en.enrolled_on) : '', agentName(s.agent_id)].filter(Boolean).join(' · ')) : '') + '</td>' +
               '<td class="nx-c-stage">' + (en.stage ? '<div class="nx-stagecell">' + pill('enrolment', en.stage) + '<div class="nx-mini">' + PATH.map((p, i) => '<i class="' + (idx >= 0 && i <= idx ? 'on' : '') + '"></i>').join('') + '</div></div>' : '<span class="nx-muted">–</span>') + '</td>' +
               '<td class="nx-c-fee">' + (fee || pd ? '<div class="nx-meter"><div class="nx-meter-bar"><i class="' + (pd < fee ? 'warn' : '') + '" style="width:' + pct + '%"></i></div><small>' + money(pd) + ' of ' + money(fee) + '</small></div>' : '<span class="nx-muted">–</span>') + '</td>' +
               (kind === 'lead' ? '<td class="nx-c-fu">' + fuCellHtml(s.nex_lead_followup, today) + '</td>' : '') +
-              '<td class="nx-c-date">' + esc(fmtDate(en.enrolled_on) || '–') + '</td><td class="nx-c-agent">' + esc(agentName(s.agent_id) || '–') + '</td>' + (kind === 'lead' ? '<td><button class="nx-btn sm" data-bk="' + s.id + '">Book class</button></td>' : '') + '</tr>';
+              (kind === 'lead' ? '' : '<td class="nx-c-date">' + esc(fmtDate(en.enrolled_on) || '–') + '</td><td class="nx-c-agent">' + esc(agentName(s.agent_id) || '–') + '</td>') + (kind === 'lead' ? '<td><button class="nx-btn sm" data-bk="' + s.id + '">Book class</button></td>' : '') + '</tr>';
           }).join('') + '</tbody></table></div>' :
           empty('No ' + noun + ' found', filtered ? 'Try a different search or clear the filters.' : kind === 'lead' ? 'Everyone in Yatra has paid $200 or more.' : kind === 'student' ? 'Nobody has paid $200 yet. New people start as leads.' : 'Nobody is in Yatra yet.', kind === 'lead' && !filtered ? '<a class="nx-btn primary" href="#/leads?new=1">' + ico('plus') + 'New lead</a>' : '');
         const from = total ? SL.page * SL.size + 1 : 0, to = SL.page * SL.size + rows.length;
@@ -199,6 +222,7 @@ route(/^\/(students|leads|search)(?:\?(.*))?$/, async m => {
     $$('#slSeg button').forEach(b => b.onclick = () => { SL.view = b.dataset.v; SL.page = 0; load(); });
     [['#slFu', 'fu'], ['#slWho', 'who'], ['#slSort', 'sort']].forEach(([id, key]) => { const el = $(id); if (el) el.onchange = e => { SL[key] = e.target.value; SL.page = 0; if (key === 'fu' && SL.fu && SL.sort === 'newest') { SL.sort = 'due'; $('#slSort').value = 'due'; } load(); }; });
     $('#slClear').onclick = () => { SL.q = SL.stage = SL.qual = SL.unf = SL.fu = SL.who = ''; SL.sort = 'newest'; SL.page = 0; $('#slQ').value = ''; $('#slStage').value = ''; $('#slQual').value = ''; ['#slUnf', '#slFu', '#slWho'].forEach(id => { const el = $(id); if (el) el.value = ''; }); const so = $('#slSort'); if (so) so.value = 'newest'; load(); };
+    const sm = $('#slMore'); if (sm) sm.onclick = () => { SL.more = !SL.more; $('#slPanel').hidden = !SL.more; sm.setAttribute('aria-expanded', String(!!SL.more)); };
     const nb = $('#slNew'); if (nb) nb.onclick = () => newStudent();
     viewWait(load());
     refreshChips();
@@ -208,7 +232,7 @@ route(/^\/(students|leads|search)(?:\?(.*))?$/, async m => {
     : kind === 'student' ? pageHead('user', 'Paid $200 or more', 'Students', '')
     : pageHead('search', 'Leads and students', 'Search', '');
   return head +
-    '<div class="nx-card"><div class="nx-toolbar" style="border-top:0">' + (kind === 'lead' ? '<div class="nx-seg" id="slSeg" role="group" aria-label="Show"><button type="button" data-v="all" aria-pressed="' + (SL.view === 'all') + '">All leads</button><button type="button" data-v="follow" aria-pressed="' + (SL.view === 'follow') + '">Need to follow up <span class="nx-count" id="slFuN" hidden></span></button></div>' : '') + '<input class="nx-in sm" style="min-width:280px" id="slQ" placeholder="Search ' + (kind === 'all' ? 'name, email or phone' : noun + ' by name, email or phone') + '" value="' + esc(SL.q) + '"><select class="nx-sel sm" id="slStage">' + selectOpts(stageFilterOpts(kind), SL.stage, 'Any stage') + '</select><select class="nx-sel sm" id="slQual">' + selectOpts(REF.quals.filter(q => q.active), SL.qual, 'Any qualification') + '</select>' + (kind === 'lead' ? '<select class="nx-sel sm" id="slUnf" aria-label="Unfinished leads"><option value=""' + (SL.unf ? '' : ' selected') + '>All leads</option><option value="mine"' + (SL.unf === 'mine' ? ' selected' : '') + '>Unfinished, flagged to me</option><option value="all"' + (SL.unf === 'all' ? ' selected' : '') + '>Unfinished, anyone</option></select>' : '') + (kind === 'lead' ? fuControlsHtml() : '') + '<button class="nx-btn quiet sm" id="slClear">Clear</button></div>' + (kind === 'lead' ? '<div class="nx-toolbar" id="slChips" role="group" aria-label="Follow-ups due" style="padding-top:0;border-top:0"></div>' : '') +
+    '<div class="nx-card"><div class="nx-toolbar" style="border-top:0">' + (kind === 'lead' ? '<div class="nx-seg" id="slSeg" role="group" aria-label="Show"><button type="button" data-v="all" aria-pressed="' + (SL.view === 'all') + '">All leads</button><button type="button" data-v="follow" aria-pressed="' + (SL.view === 'follow') + '">Need to follow up <span class="nx-count" id="slFuN" hidden></span></button></div>' : '') + '<input class="nx-in sm" style="min-width:280px" id="slQ" placeholder="Search ' + (kind === 'all' ? 'name, email or phone' : noun + ' by name, email or phone') + '" value="' + esc(SL.q) + '">' + slFilterBar(kind) +
     '<div id="slBody"></div><div class="nx-foot" id="slFoot"><span></span></div></div>';
 });
 
