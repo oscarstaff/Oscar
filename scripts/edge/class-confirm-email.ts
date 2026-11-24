@@ -1,9 +1,11 @@
 // The First Aid and CPR class confirmation email (used by the nex-send-class-confirm edge function).
-// Deliberately PLAIN: no logo, tables, buttons, gradients or tracking. Heavily designed HTML tends to land in spam, so this reads like an email typed by a person.
+// Deliberately PLAIN: no tables, buttons, gradients or tracking; the only picture is the logo under the signature. Heavily designed HTML tends to land in spam, so this reads like an email typed by a person.
 // It is still HTML (never text only) so the important parts can be bold and highlighted; the plain-text wording (draft() in index.ts) is sent alongside it.
 const ADDRESS = "Unit 5, 5 King Street, Rockdale, NSW 2216";
 const PARKING = "1 Market Street Rockdale";
 const PHONE = "0402462830";
+const LOGO_URL = "https://oscarstaff.github.io/Oscar/assets/otc-email-logo.png";   // the logo sits under the signature; it is hosted with the app (assets/otc-email-logo.png)
+const logo = () => `<p style="margin:0"><img src="${LOGO_URL}" width="200" alt="Oscars Training Centre" style="display:block;width:200px;max-width:100%;height:auto;border:0"></p>`;
 const FEES: [string, string][] = [
   ["Certificate III in Individual Support (Ageing & Disability) including First Aid & CPR", "$1,300"],
   ["Certificate IV Ageing Support with Medication including First Aid & CPR", "$1,500"],
@@ -48,6 +50,7 @@ ${p(`Please make the ${mark("payment the day before")} coming to the class for y
 <ul style="margin:0 0 14px;padding-left:22px">${li("Account Name: <b>Oscar Training Centre</b>")}${li(`BSB: ${mark("062235")}`)}${li(`Account Number: ${mark("11104627")}`)}${li("Description/Reference: <b>[Your Name] + The Certificate you are proceeding with</b>")}</ul>
 ${p(`Kindly, send us a ${mark("screenshot of the payment")} before you attend the classes once made. If you are paying from someone else's account, make sure to have them include your full name and Date of Birth in the reference.`)}
 ${p(`For any assistance please do not hesitate to contact us at <b>${PHONE}</b>.`)}
-${p(`Oscars Training Centre First Aid and CPR Team`)}
+<p style="margin:0 0 14px">Kind Regards,<br>Oscars Training Centre<br>First Aid Team<br>P: 0402 462 830<br>E: <a href="mailto:firstaidcpr.oscarstraining@gmail.com">firstaidcpr.oscarstraining@gmail.com</a></p>
+${logo()}
 </div>`;
 }

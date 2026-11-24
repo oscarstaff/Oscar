@@ -1,7 +1,9 @@
 // The "documents required before your placement" email (used by the nex-send-placement-docs edge function).
-// Deliberately PLAIN: no logo, tables, buttons, gradients or tracking. Heavily designed HTML tends to land in spam, so this reads like an email typed by a person.
+// Deliberately PLAIN: no tables, buttons, gradients or tracking; the only picture is the logo under the signature. Heavily designed HTML tends to land in spam, so this reads like an email typed by a person.
 // It is still HTML (never text only) so the important parts can be bold and highlighted; the plain-text wording (draft() in index.ts) is sent alongside it.
 const PHONE_SHOWN = "0402 608 052";
+const LOGO_URL = "https://oscarstaff.github.io/Oscar/assets/otc-email-logo.png";   // the logo sits under the signature; it is hosted with the app (assets/otc-email-logo.png)
+const logo = () => `<p style="margin:0"><img src="${LOGO_URL}" width="200" alt="Oscars Training Centre" style="display:block;width:200px;max-width:100%;height:auto;border:0"></p>`;
 const MYGOV = "https://my.gov.au";
 const POLICE = "https://afpnationalpolicechecks.converga.com.au/";
 const NHHI = "https://nhhi.southrock.com/cgi-bin-secure/Home.cgi";
@@ -36,6 +38,7 @@ ${p(`Please ensure these documents are ready before placement and send them to u
 ${p(`If you haven&rsquo;t already submitted your ${mark("Passport and Visa")}, please submit them now as they are requirements for placement.`)}
 ${p(`Please complete the modules on a ${mark("laptop or PC")} so the certificates download properly.`)}
 ${p(`If you have questions, please call us at <b>${PHONE_SHOWN}</b>. Thank you.`)}
-${p(`Oscars Training Centre Placement Team`)}
+<p style="margin:0 0 14px">Regards,<br>Oscars Training Centre</p>
+${logo()}
 </div>`;
 }
