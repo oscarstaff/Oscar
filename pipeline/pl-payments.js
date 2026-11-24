@@ -125,13 +125,12 @@ function openQueueDrawer(r, reload) {
     '<div><label class="nx-lbl" for="pdPl">Placement</label><select class="nx-sel" id="pdPl">' + selectOpts(opts('placement_queue', true), r.placement_status, 'Not set') + '</select><div class="nx-help">Follows the placement plan flag that Evershine sets on the class booking: Yes or not set = Plc Interested, No = PLC NYC, Done = Plc Completed.</div></div>' +
     '<div><label class="nx-lbl" for="pdQs">Queue status</label><select class="nx-sel" id="pdQs">' + selectOpts(opts('payment_queue', true), r.queue_status, 'Not set') + '</select></div>' +
     '<div><label class="nx-lbl" for="pdSt">Processing step</label><select class="nx-sel" id="pdSt">' + selectOpts(opts('processing', true), r.processing_step) + '</select></div>' +
-    '<div><label class="nx-lbl" for="pdAs">Assigned to</label><select class="nx-sel" id="pdAs">' + selectOpts(REF.staff, r.assigned_to, 'Nobody') + '</select></div>' +
     '<div><label class="nx-lbl" for="pdNote">Note</label><textarea class="nx-ta" id="pdNote">' + esc(r.note || '') + '</textarea></div>' +
     '<div class="nx-btnrow">' + (canPay() ? '<button class="nx-btn primary" id="pdSave">Save</button>' : '') + (s ? '<a class="nx-btn" href="#/students/' + s.id + '">Open student</a>' : (canPay() ? '<button class="nx-btn" id="pdLink">Link to student</button>' : '')) + '</div>' + (canPay() ? '' : '<div class="nx-help">Only the Processing and Accounts teams can change payments.</div>') + '<div class="nx-err" id="pdErr"></div></div></div>';
   if (!canPay()) $$('#pdPl, #pdQs, #pdSt, #pdAs, #pdNote', d).forEach(x => { x.disabled = true; });
   $('#pdX').onclick = () => { d.hidden = true; PY.sel = null; $$('#pyBody .nx-tr').forEach(tr => tr.classList.remove('sel')); };
   if ($('#pdSave')) $('#pdSave').onclick = async () => {
-    try { await upd('nex_payment_queue', 'id=eq.' + r.id, { placement_status: $('#pdPl').value || null, queue_status: $('#pdQs').value || null, processing_step: $('#pdSt').value || null, assigned_to: $('#pdAs').value || null, note: $('#pdNote').value.trim() || null, updated_by: ME.name }); toast('Saved'); d.hidden = true; PY.sel = null; render(); }
+    try { await upd('nex_payment_queue', 'id=eq.' + r.id, { placement_status: $('#pdPl').value || null, queue_status: $('#pdQs').value || null, processing_step: $('#pdSt').value || null, note: $('#pdNote').value.trim() || null, updated_by: ME.name }); toast('Saved'); d.hidden = true; PY.sel = null; render(); }
     catch (err) { $('#pdErr').textContent = err.message; }
   };
   const lk = $('#pdLink'); if (lk) lk.onclick = () => linkPayment(p, r);
