@@ -115,23 +115,26 @@ function fuControlsHtml() {
 }
 /* The toolbar after the search box. Students and Search keep their two dropdowns. Leads show only the things used all day (sort, and the
    follow-up buttons below); stage, qualification, unfinished and follow-up status fold under "More filters", which shows how many are on. */
-const SL_MORE = ['stage', 'qual', 'unf', 'fu'];
+const SL_MORE = ['stage', 'qual', 'year', 'unf', 'fu'];
+/* the enrolment years to filter by: this year back to 2025, when the first checklist was kept */
+const slYears = () => { const y = new Date().getFullYear(), o = []; for (let i = y; i >= 2025; i--) o.push({ id: String(i), label: String(i) }); return o; };
 const slMoreN = () => SL_MORE.filter(k => SL[k]).length;
 function slFilterBar(kind) {
   const stage = '<select class="nx-sel sm" id="slStage">' + selectOpts(stageFilterOpts(kind), SL.stage, 'Any stage') + '</select>';
   const qual = '<select class="nx-sel sm" id="slQual">' + selectOpts(REF.quals.filter(q => q.active), SL.qual, 'Any qualification') + '</select>';
-  if (kind !== 'lead') return stage + qual + '<button class="nx-btn quiet sm" id="slClear">Clear</button></div>';
+  const yr = '<select class="nx-sel sm" id="slYear" aria-label="Enrolment year">' + selectOpts(slYears(), SL.year, 'Any year') + '</select>';
+  if (kind !== 'lead') return stage + qual + yr + '<button class="nx-btn quiet sm" id="slClear">Clear</button></div>';
   const f = fuControlsHtml(), fld = (l, h) => '<label class="nx-fld"><span>' + l + '</span>' + h + '</label>';
   const unf = '<select class="nx-sel sm" id="slUnf" aria-label="Unfinished leads"><option value=""' + (SL.unf ? '' : ' selected') + '>All leads</option><option value="mine"' + (SL.unf === 'mine' ? ' selected' : '') + '>Unfinished, flagged to me</option><option value="all"' + (SL.unf === 'all' ? ' selected' : '') + '>Unfinished, anyone</option></select>';
   return f.sort + '<button type="button" class="nx-btn sm" id="slMore" aria-expanded="' + !!SL.more + '" aria-controls="slPanel">' + ico('sliders') + '<span id="slMoreL">More filters' + (slMoreN() ? ' (' + slMoreN() + ')' : '') + '</span></button><button class="nx-btn quiet sm" id="slClear">Clear</button></div>' +
-    '<div class="nx-filtergrid" id="slPanel"' + (SL.more ? '' : ' hidden') + '>' + fld('Stage', stage) + fld('Qualification', qual) + fld('Unfinished leads', unf) + fld('Follow-up status', f.fu) + '</div>' +
+    '<div class="nx-filtergrid" id="slPanel"' + (SL.more ? '' : ' hidden') + '>' + fld('Stage', stage) + fld('Qualification', qual) + fld('Year', yr) + fld('Unfinished leads', unf) + fld('Follow-up status', f.fu) + '</div>' +
     '<div class="nx-toolbar" id="slChips" role="group" aria-label="Follow-ups due" style="padding-top:0;border-top:0"></div>';
 }
-const SL = { q: '', stage: '', qual: '', unf: '', fu: '', sort: 'newest', kind: 'student', view: 'all', page: 0, size: 50, more: false };
+const SL = { q: '', stage: '', qual: '', year: '', unf: '', fu: '', sort: 'newest', kind: 'student', view: 'all', page: 0, size: 50, more: false };
 route(/^\/(students|leads|search)(?:\?(.*))?$/, async m => {
   const mode = m[1], qs = new URLSearchParams(m[2] || '');
   const kind = mode === 'leads' ? 'lead' : mode === 'students' ? 'student' : 'all';
-  if (SL.kind !== kind) { SL.kind = kind; SL.page = 0; SL.view = 'all'; SL.q = SL.stage = SL.qual = SL.unf = SL.fu = ''; SL.sort = 'newest'; SL.more = false; }
+  if (SL.kind !== kind) { SL.kind = kind; SL.page = 0; SL.view = 'all'; SL.q = SL.stage = SL.qual = SL.year = SL.unf = SL.fu = ''; SL.sort = 'newest'; SL.more = false; }
   if (qs.get('view') === 'follow' && kind === 'lead') SL.view = 'follow';
   if (qs.get('fu') && kind === 'lead') { SL.fu = qs.get('fu'); SL.view = 'all'; SL.page = 0; if (SL.sort === 'newest') SL.sort = 'due'; }
   if (qs.get('unf')) { SL.unf = qs.get('unf'); SL.page = 0; }
@@ -171,7 +174,7 @@ route(/^\/(students|leads|search)(?:\?(.*))?$/, async m => {
         if (kind === 'lead') { syncView(); syncMore(); }
         const q = safeQ(SL.q); const digits = cleanPhone(q); const today = sydToday();
         const fuInner = kind === 'lead' && ['due', '1', '2', '3', 'upcoming', 'complete'].includes(SL.fu);
-        let query = 'select=id,student_no,first_name,last_name,email,phone,agent_id,created_at,needs_details,flagged_to,nex_student_paid!inner(paid_total),nex_enrolments' + (SL.stage || SL.qual ? '!inner' : '') + '(id,stage,qualification_id,fee,year,enrolled_on)' + (kind === 'lead' ? ',' + (fuInner ? FU_EMBED.replace('nex_lead_followup(', 'nex_lead_followup!inner(') : FU_EMBED) : '') + '&deleted_at=is.null&order=' + (kind === 'lead' ? (FU_SORT[SL.sort] || FU_SORT.newest) : 'created_at.desc');
+        let query = 'select=id,student_no,first_name,last_name,email,phone,agent_id,created_at,needs_details,flagged_to,nex_student_paid!inner(paid_total),nex_enrolments' + (SL.stage || SL.qual || SL.year ? '!inner' : '') + '(id,stage,qualification_id,fee,year,enrolled_on)' + (kind === 'lead' ? ',' + (fuInner ? FU_EMBED.replace('nex_lead_followup(', 'nex_lead_followup!inner(') : FU_EMBED) : '') + '&deleted_at=is.null&order=' + (kind === 'lead' ? (FU_SORT[SL.sort] || FU_SORT.newest) : 'created_at.desc');
         if (kind !== 'all') query += '&nex_student_paid.paid_total=' + (kind === 'lead' ? 'lt.' : 'gte.') + STUDENT_MIN;
         if (kind === 'lead' && SL.unf) query += '&needs_details=eq.true' + (SL.unf === 'mine' ? '&flagged_to=eq.' + encodeURIComponent(ME.name) : '');
         if (kind === 'lead') {
@@ -180,12 +183,13 @@ route(/^\/(students|leads|search)(?:\?(.*))?$/, async m => {
         }
         if (SL.stage) query += '&nex_enrolments.stage=eq.' + encodeURIComponent(SL.stage);
         if (SL.qual) query += '&nex_enrolments.qualification_id=eq.' + SL.qual;
+        if (SL.year) query += '&nex_enrolments.year=eq.' + SL.year;
         if (q) query += '&or=(' + personSearchParts(q, digits).join(',') + ')';
         const { rows, total } = await selPage('nex_students', query, SL.page * SL.size, SL.page * SL.size + SL.size - 1);
         let pays = [];
         if (rows.length) pays = await sel('nex_payments', 'select=student_id,amount,verify_status&student_id=in.' + inList(rows.map(r => r.id)));
         const paid = {}; pays.forEach(p => { if (payConfirmed(p)) paid[p.student_id] = (paid[p.student_id] || 0) + Number(p.amount); });
-        const filtered = SL.q || SL.stage || SL.qual || SL.fu;
+        const filtered = SL.q || SL.stage || SL.qual || SL.year || SL.fu;
         body.innerHTML = rows.length ? '<div class="nx-tablewrap"><table class="nx-table' + (kind === 'lead' ? ' nx-leads' : '') + '"><thead><tr><th>' + (kind === 'lead' ? 'Lead' : kind === 'student' ? 'Student' : 'Name') + '</th>' + (kind === 'lead' ? '' : '<th class="nx-c-phone">Phone</th>') + '<th class="nx-c-qual">Qualification</th><th class="nx-c-stage">Stage</th><th class="nx-c-fee">Paid and fee</th>' + (kind === 'lead' ? '<th class="nx-c-fu">Follow-up</th>' : '') + (kind === 'lead' ? '<th></th>' : '<th class="nx-c-date">Enrolled</th><th class="nx-c-agent">Agent</th>') + '</tr></thead><tbody>' +
           rows.map(s => {
             const en = (s.nex_enrolments || []).slice().sort((a, b) => String(b.enrolled_on || '').localeCompare(String(a.enrolled_on || '')))[0] || {};
@@ -215,10 +219,11 @@ route(/^\/(students|leads|search)(?:\?(.*))?$/, async m => {
     $('#slQ').addEventListener('input', e => { clearTimeout(t); t = setTimeout(() => { SL.q = e.target.value; SL.page = 0; load(); }, 300); });
     $('#slStage').onchange = e => { SL.stage = e.target.value; SL.page = 0; load(); };
     $('#slQual').onchange = e => { SL.qual = e.target.value; SL.page = 0; load(); };
+    $('#slYear').onchange = e => { SL.year = e.target.value; SL.page = 0; load(); };
     const un = $('#slUnf'); if (un) un.onchange = e => { SL.unf = e.target.value; SL.page = 0; load(); };
     $$('#slSeg button').forEach(b => b.onclick = () => { SL.view = b.dataset.v; SL.page = 0; load(); });
     [['#slFu', 'fu'], ['#slSort', 'sort']].forEach(([id, key]) => { const el = $(id); if (el) el.onchange = e => { SL[key] = e.target.value; SL.page = 0; if (key === 'fu' && SL.fu && SL.sort === 'newest') { SL.sort = 'due'; $('#slSort').value = 'due'; } load(); }; });
-    $('#slClear').onclick = () => { SL.q = SL.stage = SL.qual = SL.unf = SL.fu = ''; SL.sort = 'newest'; SL.page = 0; $('#slQ').value = ''; $('#slStage').value = ''; $('#slQual').value = ''; ['#slUnf', '#slFu'].forEach(id => { const el = $(id); if (el) el.value = ''; }); const so = $('#slSort'); if (so) so.value = 'newest'; load(); };
+    $('#slClear').onclick = () => { SL.q = SL.stage = SL.qual = SL.year = SL.unf = SL.fu = ''; SL.sort = 'newest'; SL.page = 0; $('#slQ').value = ''; $('#slStage').value = ''; $('#slQual').value = ''; $('#slYear').value = ''; ['#slUnf', '#slFu'].forEach(id => { const el = $(id); if (el) el.value = ''; }); const so = $('#slSort'); if (so) so.value = 'newest'; load(); };
     const sm = $('#slMore'); if (sm) sm.onclick = () => { SL.more = !SL.more; $('#slPanel').hidden = !SL.more; sm.setAttribute('aria-expanded', String(!!SL.more)); };
     const nb = $('#slNew'); if (nb) nb.onclick = () => newStudent();
     viewWait(load());
