@@ -2,7 +2,7 @@
 // POST { booking_id, preview?: true, force?: true }  or  { quota: true } (how many sends the mailbox has left today)
 // The recipient is ALWAYS the email on the booking (or the linked student); the caller cannot choose it.
 // Sent through a THIRD Apps Script mail relay (NEX_MAIL3_URL / NEX_MAIL3_KEY) that runs under the First Aid and CPR team's Google account.
-// The email is sent as a designed HTML message (email.ts) with the plain-text wording (draft() below) as the fallback part.
+// The email is sent as a deliberately plain HTML message (email.ts: simple paragraphs, bold and highlighted key points, no images or buttons, so it stays out of spam) with the plain-text wording (draft() below) as the other part.
 // Attachments: the active rows in nex_mail_attachments (purpose class_confirm), uploaded by hub admins in YatraLine > Admin.
 // They are read from the private class-files bucket with the CALLER's token, so storage rules still apply.
 // Auth: the caller's token must say role=authenticated and not be expired; every read and write goes through RLS with that token,

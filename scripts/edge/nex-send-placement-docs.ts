@@ -3,7 +3,7 @@
 // The class booking must have Placement plan = Yes. The recipient is ALWAYS the email on the booking (or the linked student);
 // the caller cannot choose it. Sent through a SECOND Apps Script mail relay (NEX_MAIL2_URL / NEX_MAIL2_KEY) that runs under the
 // placement team's Google account, so it is a different sender from the enrolment follow-ups.
-// The email is sent as a designed HTML message (email.ts) with the plain-text wording (draft() below) as the fallback part.
+// The email is sent as a deliberately plain HTML message (email.ts: simple paragraphs, bold and highlighted key points, no images or buttons, so it stays out of spam) with the plain-text wording (draft() below) as the other part.
 // Attachments: the active rows in nex_mail_attachments (purpose placement_docs), uploaded by hub admins in YatraLine > Admin.
 // They are read from the private placement-files bucket with the CALLER's token, so storage rules still apply.
 // Auth: the caller's token must say role=authenticated and not be expired; every read and write goes through RLS with that token,
