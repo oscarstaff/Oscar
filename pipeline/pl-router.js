@@ -55,9 +55,9 @@ function miscInit() {
     const cur = '#' + baseOf(location.hash.replace(/^#/, '') || '/');
     let grp = '';
     m.innerHTML = MISC.map(x => (x[2] !== grp ? (grp = x[2], '<div class="nx-menu-h" role="presentation">' + x[2] + '</div>') : '') + '<a role="menuitem" tabindex="-1" href="' + x[0] + '"' + (x[0] === cur ? ' aria-current="page"' : '') + '>' + ico(MISC_ICO[x[0]] || 'list') + x[1] + '</a>').join('');
-    const r = b.getBoundingClientRect();
-    m.hidden = false; m.style.top = Math.round(r.bottom + 4) + 'px';
-    m.style.left = Math.round(Math.max(8, Math.min(r.left, window.innerWidth - m.offsetWidth - 8))) + 'px';
+    const r = b.getBoundingClientRect(); const z = parseFloat(getComputedStyle(document.body).zoom) || 1;
+    m.hidden = false; m.style.top = Math.round(r.bottom / z + 4) + 'px';
+    m.style.left = Math.round(Math.max(8, Math.min(r.left / z, window.innerWidth / z - m.offsetWidth - 8))) + 'px';
     b.setAttribute('aria-expanded', 'true');
     const it = items(); if (it.length) it[focusLast ? it.length - 1 : 0].focus({ preventScroll: true });
   };
