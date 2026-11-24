@@ -341,8 +341,8 @@ route(/^\/students\/([0-9a-f-]{36})$/, async m => {
   const [queue, refunds, reqs, plcs, hist, aud0, docs, delB, welcome, notes, twins] = await Promise.all([
     eids.length ? sel('nex_payment_queue', 'select=*&enrolment_id=in.' + inList(eids)) : [],
     eids.length ? sel('nex_refunds', 'select=*&enrolment_id=in.' + inList(eids) + '&order=refunded_on.desc') : [],
-    eids.length ? sel('nex_placement_requests', 'select=*,nex_facilities(name)&archived_at=is.null&enrolment_id=in.' + inList(eids) + '&order=created_at.desc') : [],
-    eids.length ? sel('nex_placements', 'select=*,nex_facilities(name)&enrolment_id=in.' + inList(eids) + '&order=created_at.desc') : [],
+    eids.length ? sel('nex_placement_requests', 'select=*,nex_facilities(name)&enrolment_id=in.' + inList(eids) + '&order=created_at.desc') : [],
+    eids.length ? sel('nex_placements', 'select=*,nex_facilities(name)&archived_at=is.null&enrolment_id=in.' + inList(eids) + '&order=created_at.desc') : [],
     eids.length ? sel('nex_status_history', 'select=*&entity_id=in.' + inList(eids) + '&order=changed_at.desc&limit=40') : [],
     sel('nex_audit', 'select=*&row_id=in.' + inList([id].concat(eids, pays.map(p => p.id), books.map(b => b.id), followups.map(f => f.id), tasks.map(t => t.id))) + '&order=changed_at.desc&limit=100'),
     eids.length ? sel('nex_enrolment_docs', 'select=*&enrolment_id=in.' + inList(eids)).catch(() => []) : [],
