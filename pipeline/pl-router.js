@@ -55,9 +55,9 @@ function miscInit() {
     const cur = '#' + baseOf(location.hash.replace(/^#/, '') || '/');
     let grp = '';
     m.innerHTML = MISC.map(x => (x[2] !== grp ? (grp = x[2], '<div class="nx-menu-h" role="presentation">' + x[2] + '</div>') : '') + '<a role="menuitem" tabindex="-1" href="' + x[0] + '"' + (x[0] === cur ? ' aria-current="page"' : '') + '>' + ico(MISC_ICO[x[0]] || 'list') + x[1] + '</a>').join('');
-    const r = b.getBoundingClientRect();
-    m.hidden = false; m.style.top = Math.round(r.bottom + 4) + 'px';
-    m.style.left = Math.round(Math.max(8, Math.min(r.left, window.innerWidth - m.offsetWidth - 8))) + 'px';
+    const r = b.getBoundingClientRect(); const z = parseFloat(getComputedStyle(document.body).zoom) || 1;
+    m.hidden = false; m.style.top = Math.round(r.bottom / z + 4) + 'px';
+    m.style.left = Math.round(Math.max(8, Math.min(r.left / z, window.innerWidth / z - m.offsetWidth - 8))) + 'px';
     b.setAttribute('aria-expanded', 'true');
     const it = items(); if (it.length) it[focusLast ? it.length - 1 : 0].focus({ preventScroll: true });
   };
@@ -173,7 +173,9 @@ async function boot() {
   document.addEventListener('visibilitychange', () => { if (!document.hidden) keepToken(); });
   /* these three do not depend on each other, so they go out together (each one used to wait for the one before it) */
   const mfa = mfaGate();
-  const meP = loadMe().then(() => { ME.team = STAFF.team || ''; }, () => { ME.team = ''; });   /* the team decides who may mark attendance and handle payments */
+  const meP = loadMe().then(() => { ME.team = STAFF.team || ''; }, () => { ME.team = ''; });
+  /* is Yatra view-only for this person? (admins never are) */
+  const voP = ME.admin ? Promise.resolve() : api('rpc/nex_can_act', { method: 'POST', body: {} }).then(x => x.json()).then(v => { ME.viewOnly = v === false; }, () => {});   /* the team decides who may mark attendance and handle payments */
   await sessionAlive();
   if (locked) return;
   setInterval(sessionAlive, 60000);
@@ -181,6 +183,8 @@ async function boot() {
   await mfa;
   if (locked) return;
   $('#whoName').textContent = ME.name || 'Signed in'; $('#whoAva').textContent = initials(ME.name);
+  await voP;
+  if (ME.viewOnly) { const n = $('#nav'); if (n && !$('#voBar')) n.insertAdjacentHTML('afterend', '<div class="nx-vobar" id="voBar" role="status"><b>View only for now.</b> You can look around, but changes are switched off.</div>'); }
   $('#app').hidden = false;
   { const sk = $('#skipLink'); if (sk) sk.addEventListener('click', () => { const v = $('#view'); if (v) v.focus(); }); }
   $('#gSearch').addEventListener('submit', e => { e.preventDefault(); const q = $('#gSearchIn').value.trim(); go('#/search' + (q ? '?q=' + encodeURIComponent(q) : '')); });

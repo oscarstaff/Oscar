@@ -1392,6 +1392,30 @@ html[data-fx="lite"][data-theme^="glass"] .nx-card.nx-pagehead{background:none;b
 html[data-fx="lite"][data-theme^="glass"] .modal{box-shadow:0 12px 40px rgba(10,20,60,.35)}
 html[data-fx="lite"][data-theme^="glass"] .modal-bg{background:rgba(11,31,75,.5)}
 }
+
+/* ===== Fill the screen (24 Nov 2026) =====
+   1. The page area is at least as tall as the window, and the last card on a page grows to the bottom (lists scroll inside the page as before).
+   2. On big screens the whole app scales up (text, rows, spacing) in steps, so it looks full instead of small. Phones and laptops are untouched. */
+:root{--nx-z:1}
+@media (min-width:1440px){:root{--nx-z:1.05}}
+@media (min-width:1680px){:root{--nx-z:1.12}}
+@media (min-width:1920px){:root{--nx-z:1.2}}
+@media (min-width:2400px){:root{--nx-z:1.4}}
+@media (min-width:3000px){:root{--nx-z:1.6}}
+@media screen and (min-width:1440px){
+  body.nx{zoom:var(--nx-z)}
+  .modal-b{max-height:calc(min(68vh,100dvh - 150px)/var(--nx-z))}
+  .nx-nexi{max-height:calc(min(620px,100vh - 120px)/var(--nx-z))}
+}
+#app:not([hidden]){display:flex;flex-direction:column;min-height:calc(100vh/var(--nx-z) - 2px)}
+#app:not([hidden])>.nx-main#view{flex:1 0 auto}
+#view>:last-child:is(.nx-card,.nx-two,.nx-cols,.nx-split){flex:1 0 auto}
+#view>.nx-two:last-child,#view>.nx-cols:last-child,#view>.nx-split:last-child{align-items:stretch}
+#view>.nx-two:last-child>.nx-stack>.nx-card:last-child,#view>.nx-two:last-child>.nx-card{flex:1 0 auto}
+.nx-main{padding-bottom:40px}
+.nx-vobar{margin:12px var(--nx-gutter) 0;padding:10px 16px;background:var(--nx-warn-weak);color:var(--nx-warn);border:1px solid var(--nx-warn);font-size:14px}
+.nx-vobar b{font-weight:600}
+@media print{body.nx{zoom:1!important}#app:not([hidden]){min-height:0}}
 </style>
 </head>
 <body class="nx">
