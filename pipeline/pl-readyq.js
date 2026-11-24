@@ -213,10 +213,11 @@ async function renderReady(body) {
   const bindIn = (id, k, ev) => { const el = $('#' + id, body); el.addEventListener(ev || 'change', () => { RD[k] = el.value; syncBar(); draw(); }); };
   $('#rdMore', body).onclick = () => { RD.more = !RD.more; $('#rdPanel', body).hidden = !RD.more; $('#rdMore', body).setAttribute('aria-expanded', String(!!RD.more)); };
   syncBar();
-  bindIn('rdQ', 'q', 'input'); bindIn('rdArea', 'area', 'input'); ['rdStatus:status', 'rdFrom:from', 'rdTo:to', 'rdWait:wait', 'rdSt:st', 'rdShift:shift', 'rdReady:ready', 'rdFlag:flag'].forEach(x => { const [i, k] = x.split(':'); bindIn(i, k); });
+  bindIn('rdQ', 'q', 'input'); bindIn('rdArea', 'area', 'input'); ['rdFrom:from', 'rdTo:to', 'rdWait:wait', 'rdSt:st', 'rdShift:shift', 'rdReady:ready', 'rdFlag:flag'].forEach(x => { const [i, k] = x.split(':'); bindIn(i, k); });
+  { const el = $('#rdStatus', body); el.addEventListener('change', () => { RD.status = el.value; renderReady(body); }); }   /* the documents filter is applied by the database, so changing it loads that group */
   $('#rdClear', body).onclick = () => { Object.assign(RD, { q: '', status: 'complete', from: '', to: '', st: '', area: '', shift: '', ready: '', wait: '', flag: '' }); renderReady(body); };
   const [got, min] = await Promise.all([
-    selAll('nex_placement_queue', 'select=*&has_placement=eq.false&hold=eq.false&stage=not.in.(' + PP_ENDED + ')&order=enrolment_id'),
+    selAll('nex_placement_queue', 'select=*&has_placement=eq.false&hold=eq.false&stage=not.in.(' + PP_ENDED + ')' + (RD.status === 'complete' ? '&placement_docs_missing=eq.0' : RD.status === 'incomplete' ? '&placement_docs_missing=gt.0' : '') + '&order=enrolment_id'),
     btMin().catch(() => 500)
   ]);
   if (!body.isConnected || $('#rdList', body) == null) return;

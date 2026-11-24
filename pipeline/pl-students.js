@@ -9,7 +9,7 @@ const PATH = ['checklist_sent', 'docs_completed', 'processed', 'placement', 'cer
 /* ---------- Overview ---------- */
 route(/^\/$/, async () => {
   const today = sydToday();
-  const [nStu, nLead, nOpenEnr, nQueue, nUnm, nDue, sessions, pmRows, nVer, nCash, nFu] = await Promise.all([
+  const [nStu, nLead, nOpenEnr, nQueue, nUnm, nDue, sessions, pmRows, nVer, nCash, nFu, nReady] = await Promise.all([
     countKind('student'),
     countKind('lead'),
     count('nex_enrolments', 'deleted_at=is.null&stage=not.in.(certificate_issued,not_interested)'),
@@ -20,28 +20,32 @@ route(/^\/$/, async () => {
     placementMailLoad().catch(() => []),
     canVerify() ? count('nex_payments', 'verify_status=eq.pending_verification') : 0,
     ME.admin ? count('nex_payments', 'handover_status=eq.awaiting') : 0,
-    leadFuCount('due').catch(() => 0)
+    leadFuCount('due').catch(() => 0),
+    (ME.admin || teamIs('Placement')) ? count('nex_placement_queue', 'has_placement=eq.false&hold=eq.false&placement_docs_missing=eq.0&stage=not.in.(' + PP_ENDED + ')').catch(() => 0) : 0
   ]);
   let counts = {};
   if (sessions.length) {
     const bk = await sel('nex_class_bookings', 'select=session_id&session_id=in.' + inList(sessions.map(s => s.id)));
     bk.forEach(b => counts[b.session_id] = (counts[b.session_id] || 0) + 1);
   }
+  const forTeams = (...t) => ME.admin || !String(ME.team || '').trim() || teamIs(...t);   /* Needs attention shows each person only what their team works on; admins (and anyone with no team set) see everything */
   const att = (href, n, label, sub, tone) => '<a class="nx-att' + (n ? '' : ' zero') + '" href="' + href + '"><span class="nx-big n ' + (n ? tone : '') + '">' + (n ? n : ico('check')) + '</span><span class="t"><b>' + label + '</b><small>' + (n ? sub : 'All clear') + '</small></span>' + ico('next') + '</a>';
   const first = (ME.name || '').split(' ')[0] || 'Overview';
   let tipsGone = false; try { tipsGone = localStorage.getItem('nex_tips_v1') === '1'; } catch (e) {}
   const tips = tipsGone ? '' : '<div class="nx-card nx-tips"><div class="nx-card-h"><h3>Finding your way around</h3><button class="nx-btn quiet sm" id="tipsHide">Hide this</button></div><ul class="nx-tiplist"><li><b>Search from anywhere.</b> Type a name, email or phone number in the bar at the top.</li><li><b>Everything about a person is on their page.</b> Enrolments, payments, bookings, placement and follow-ups, with a history of every change.</li><li><b>Book First Aid seats from First Aid.</b> Pick the day, press a free seat, and the flags show what is still outstanding.</li><li><b>Leads become students at $200.</b> New people start under Leads and move to Students once their payments reach $200.</li></ul></div>';
   afterRender(() => bindPlacementMail(pmRows));
+  afterRender(() => { const r = $('#attReady'); if (r) r.addEventListener('click', () => { PL.tab = 'ready'; PL.page = 0; PL.status = ''; }); });
   afterRender(() => { const h = $('#tipsHide'); if (h) h.onclick = () => { try { localStorage.setItem('nex_tips_v1', '1'); } catch (e) {} const c = h.closest('.nx-tips'); if (c) c.remove(); }; });
   return pageHead('home', nStu.toLocaleString('en-AU') + (nStu === 1 ? ' student' : ' students') + ' and ' + nLead.toLocaleString('en-AU') + (nLead === 1 ? ' lead' : ' leads'), 'Welcome back, ' + first, '<a class="nx-btn primary" href="#/leads?new=1">' + ico('plus') + 'New lead</a>') +
     tips + placementMailCard(pmRows) + '<div class="nx-two"><div class="nx-stack"><div class="nx-card"><div class="nx-card-h"><h3>Needs attention</h3></div><div class="nx-attlist">' +
     att('#/tasks', nDue, 'My tasks due', 'today or overdue', 'bad') +
-    att('#/leads?fu=due', nFu, 'Lead follow-ups due', '1st, 2nd or 3rd, today or overdue', 'bad') +
-    att('#/payments?view=unmatched', nUnm, 'Unmatched payments', 'no student linked', 'warn') +
-    att('#/payments', nQueue, 'Payments to process', 'in the processing queue', 'accent') +
+    (forTeams('Enrolment') ? att('#/leads?fu=due', nFu, 'Lead follow-ups due', '1st, 2nd or 3rd, today or overdue', 'bad') : '') +
+    (forTeams('Accounts', 'Processing') ? att('#/payments?view=unmatched', nUnm, 'Unmatched payments', 'no student linked', 'warn') : '') +
+    (forTeams('Processing', 'Accounts') ? att('#/payments', nQueue, 'Payments to process', 'in the processing queue', 'accent') : '') +
     (canVerify() ? att('#/payments?view=verify', nVer, 'Bank payments to verify', 'waiting for Accounts', 'warn') : '') +
     (ME.admin ? att('#/payments?view=cash', nCash, 'Cash receipts to check', 'handover waiting for an admin', 'warn') : '') +
-    att('#/students', nOpenEnr, 'Open enrolments', 'not yet issued or closed', 'accent') + '</div></div></div>' +
+    (forTeams('Placement') ? att('#/placement', nReady, 'Ready to place', 'placement documents all received', 'accent').replace('<a class="nx-att', '<a id="attReady" class="nx-att') : '') +
+    (forTeams('Enrolment', 'Processing', 'Accounts') ? att('#/students', nOpenEnr, 'Open enrolments', 'not yet issued or closed', 'accent') : '') + '</div></div></div>' +
     '<div class="nx-stack"><div class="nx-card"><div class="nx-card-h"><h3>Upcoming classes</h3><a href="#/firstaid">All classes</a></div>' +
     (sessions.length ? '<ul class="nx-list">' + sessions.map(s => { const d = fmtDay(s.class_date); const n = counts[s.id] || 0; return '<li><a href="#/firstaid/' + s.id + '"><b>' + d.wd + ' ' + d.dm + '</b><small>' + (s.kind === 'renewal' ? 'Renewal / signature' : 'First Aid & CPR') + (s.trainer ? ' · ' + esc(s.trainer) : '') + '</small></a><span class="nx-pill ' + (n >= s.seats ? 'bad' : n >= s.seats - 5 ? 'warn' : 'accent') + '">' + n + ' / ' + s.seats + '</span></li>'; }).join('') + '</ul>' : empty('No classes scheduled', 'Add the next class day in First Aid.')) + '</div></div>' +
     '</div>';
@@ -337,7 +341,7 @@ route(/^\/students\/([0-9a-f-]{36})$/, async m => {
   const [queue, refunds, reqs, plcs, hist, aud0, docs, delB, welcome, notes, twins] = await Promise.all([
     eids.length ? sel('nex_payment_queue', 'select=*&enrolment_id=in.' + inList(eids)) : [],
     eids.length ? sel('nex_refunds', 'select=*&enrolment_id=in.' + inList(eids) + '&order=refunded_on.desc') : [],
-    eids.length ? sel('nex_placement_requests', 'select=*,nex_facilities(name)&enrolment_id=in.' + inList(eids) + '&order=created_at.desc') : [],
+    eids.length ? sel('nex_placement_requests', 'select=*,nex_facilities(name)&archived_at=is.null&enrolment_id=in.' + inList(eids) + '&order=created_at.desc') : [],
     eids.length ? sel('nex_placements', 'select=*,nex_facilities(name)&enrolment_id=in.' + inList(eids) + '&order=created_at.desc') : [],
     eids.length ? sel('nex_status_history', 'select=*&entity_id=in.' + inList(eids) + '&order=changed_at.desc&limit=40') : [],
     sel('nex_audit', 'select=*&row_id=in.' + inList([id].concat(eids, pays.map(p => p.id), books.map(b => b.id), followups.map(f => f.id), tasks.map(t => t.id))) + '&order=changed_at.desc&limit=100'),
