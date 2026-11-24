@@ -173,7 +173,9 @@ async function boot() {
   document.addEventListener('visibilitychange', () => { if (!document.hidden) keepToken(); });
   /* these three do not depend on each other, so they go out together (each one used to wait for the one before it) */
   const mfa = mfaGate();
-  const meP = loadMe().then(() => { ME.team = STAFF.team || ''; }, () => { ME.team = ''; });   /* the team decides who may mark attendance and handle payments */
+  const meP = loadMe().then(() => { ME.team = STAFF.team || ''; }, () => { ME.team = ''; });
+  /* is Yatra view-only for this person? (admins never are) */
+  const voP = ME.admin ? Promise.resolve() : api('rpc/nex_can_act', { method: 'POST', body: {} }).then(x => x.json()).then(v => { ME.viewOnly = v === false; }, () => {});   /* the team decides who may mark attendance and handle payments */
   await sessionAlive();
   if (locked) return;
   setInterval(sessionAlive, 60000);
@@ -181,6 +183,8 @@ async function boot() {
   await mfa;
   if (locked) return;
   $('#whoName').textContent = ME.name || 'Signed in'; $('#whoAva').textContent = initials(ME.name);
+  await voP;
+  if (ME.viewOnly) { const n = $('#nav'); if (n && !$('#voBar')) n.insertAdjacentHTML('afterend', '<div class="nx-vobar" id="voBar" role="status"><b>View only for now.</b> You can look around, but changes are switched off.</div>'); }
   $('#app').hidden = false;
   { const sk = $('#skipLink'); if (sk) sk.addEventListener('click', () => { const v = $('#view'); if (v) v.focus(); }); }
   $('#gSearch').addEventListener('submit', e => { e.preventDefault(); const q = $('#gSearchIn').value.trim(); go('#/search' + (q ? '?q=' + encodeURIComponent(q) : '')); });

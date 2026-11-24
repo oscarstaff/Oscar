@@ -11,7 +11,7 @@ const ss = {
   get(k) { try { return sessionStorage.getItem(k) || ''; } catch (e) { return ''; } },
   set(k, v) { try { sessionStorage.setItem(k, v); } catch (e) {} }
 };
-const ME = { name: '', admin: false, team: '' };
+const ME = { name: '', admin: false, team: '', viewOnly: false };
 /* team rules (the database enforces these too; hiding the buttons just saves people an error)
    delete/archive: hub admins only · class flags on a booking (quiz, paid, plans, signature): Evershine · received payments: Processing and Accounts. Hub admins can do all of it.
    Class statuses (attended, no show, cancelled, rescheduled) are open to everyone. */
@@ -234,8 +234,13 @@ function watchSession() {
   document.addEventListener('visibilitychange', () => { if (!document.hidden) check(); });
 }
 function offlineError() { const e = new Error("Can't reach the server. Check your internet connection and try again."); e.offline = true; return e; }
+/* view-only lock (24 Nov 2026): while the database switch nex_config.view_only is on, staff who are not admins can look but not change anything.
+   The database refuses the changes too; this check just stops them early with a clear message. These few paths stay open: reads sent as POST, view logging, and a person's own profile and quiz results. */
+const VIEW_ONLY_MSG = 'Yatra is view-only right now. You can look around, but changes are switched off.';
+const VO_OPEN = /^(rpc\/(nex_can_act|nex_view_allowed|nex_get_details|nex_placement_min_paid|nex_mfa_[a-z_]+)|nex_view_log|nex_live_ping|staff_credentials|staff_avatars|training_quiz_results|custom_quiz_results)(\?|$)/;
 async function api(path, opt) {
   opt = opt || {};
+  if (ME.viewOnly && opt.method && !/^(GET|HEAD)$/.test(opt.method) && !VO_OPEN.test(path)) throw new Error(VIEW_ONLY_MSG);
   const doFetch = async () => fetch(SB + '/rest/v1/' + path, {
     method: opt.method || 'GET',
     headers: Object.assign({ apikey: KEY, Authorization: 'Bearer ' + await bearer(), 'Content-Type': 'application/json' }, opt.headers || {}),
@@ -256,6 +261,7 @@ async function api(path, opt) {
 }
 /* call a Yatra edge function as the signed-in person; failures keep the function's own message and code */
 async function fn(name, body) {
+  if (ME.viewOnly && !(body && (body.preview || body.quota))) throw new Error(VIEW_ONLY_MSG);
   undoBad();   /* an edge function sends emails and the like: that cannot be undone */
   const doFetch = async () => fetch(SB + '/functions/v1/' + name, { method: 'POST', headers: { apikey: KEY, Authorization: 'Bearer ' + await bearer(), 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
   let r;
