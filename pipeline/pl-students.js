@@ -79,14 +79,14 @@ function fuInfo(raw, today) {
   const fu = Array.isArray(raw) ? raw[0] : raw;
   if (!fu || !fu.total_count) return { key: 'none', label: 'No follow-ups set', tone: '', sub: '' };
   if (!fu.open_count || !fu.step) return { key: 'complete', label: 'Follow-ups finished', tone: 'ok', sub: '', tip: fu.total_count + ' done · booked, on hold, not interested or docs completed' };   /* the reason is a hover, not a second line */
-  const nth = FU_NTH(fu.step), who = fu.assigned_to ? ' · ' + String(fu.assigned_to).trim().split(/\s+/)[0] : '';   /* first name only so it fits on one line; the full name is in the hover title */
+  const nth = FU_NTH(fu.step), who = '';   /* follow-ups are not assigned to anyone: whoever has the lead open works them */   /* first name only so it fits on one line; the full name is in the hover title */
   if (fu.due_day < today) { const n = Math.round((new Date(today + 'T12:00:00') - new Date(fu.due_day + 'T12:00:00')) / 864e5); return { key: 'due' + fu.step, label: nth + ' Follow Up Due', tone: 'bad', sub: n + (n === 1 ? ' day' : ' days') + ' overdue' + who }; }
   if (fu.due_day === today) return { key: 'due' + fu.step, label: nth + ' Follow Up Due', tone: 'warn', sub: 'Due today' + who };
   return { key: 'upcoming', label: nth + ' follow-up', tone: 'info', sub: 'Due ' + fmtDay(fu.due_day).dm + who };
 }
 function fuCellHtml(raw, today) {
-  const i = fuInfo(raw, today), f0 = Array.isArray(raw) ? raw[0] : raw; i.full = (f0 && f0.assigned_to) || '';
-  return '<span class="nx-pill ' + i.tone + '"' + (i.tip ? ' title="' + esc(i.tip) + '"' : '') + '>' + esc(i.label) + '</span>' + (i.sub ? '<div class="nx-muted nx-fusub" title="' + esc(i.sub + (i.full ? ' (' + i.full + ')' : '')) + '">' + esc(i.sub) + '</div>' : '');
+  const i = fuInfo(raw, today);
+  return '<span class="nx-pill ' + i.tone + '"' + (i.tip ? ' title="' + esc(i.tip) + '"' : '') + '>' + esc(i.label) + '</span>' + (i.sub ? '<div class="nx-muted nx-fusub" title="' + esc(i.sub) + '">' + esc(i.sub) + '</div>' : '');
 }
 /* the filter text for one follow-up state, to add to a nex_students query that embeds nex_lead_followup!inner */
 function fuFilter(which, today) {
@@ -107,17 +107,15 @@ async function leadFuCount(which) {
 /* the follow-up controls on the Leads toolbar */
 function fuControlsHtml() {
   const st = [['due', 'Any follow-up due now'], ['1', '1st Follow Up Due'], ['2', '2nd Follow Up Due'], ['3', '3rd or later Follow Up Due'], ['upcoming', 'Follow-up coming up, not due yet'], ['complete', 'Follow-ups finished'], ['none', 'No follow-ups set']].map(([id, label]) => ({ id, label }));
-  const who = [{ id: 'me', label: 'Assigned to me' }].concat((REF.staff || []).filter(n => n !== ME.name).map(n => ({ id: 'n:' + n, label: n })));
   const sorts = [['newest', 'Sort: newest first'], ['due', 'Sort: follow-up due soonest'], ['step', 'Sort: latest follow-up first'], ['name', 'Sort: name A to Z']].map(([id, label]) => ({ id, label }));
   return {
     fu: '<select class="nx-sel sm" id="slFu" aria-label="Follow-up status">' + selectOpts(st, SL.fu, 'All follow-up statuses') + '</select>',
-    who: '<select class="nx-sel sm" id="slWho" aria-label="Follow-up assigned to">' + selectOpts(who, SL.who, 'Assigned to anyone') + '</select>',
     sort: '<select class="nx-sel sm" id="slSort" aria-label="Sort leads">' + selectOpts(sorts, SL.sort) + '</select>'
   };
 }
 /* The toolbar after the search box. Students and Search keep their two dropdowns. Leads show only the things used all day (sort, and the
-   follow-up buttons below); stage, qualification, unfinished, follow-up status and assigned-to fold under "More filters", which shows how many are on. */
-const SL_MORE = ['stage', 'qual', 'unf', 'fu', 'who'];
+   follow-up buttons below); stage, qualification, unfinished and follow-up status fold under "More filters", which shows how many are on. */
+const SL_MORE = ['stage', 'qual', 'unf', 'fu'];
 const slMoreN = () => SL_MORE.filter(k => SL[k]).length;
 function slFilterBar(kind) {
   const stage = '<select class="nx-sel sm" id="slStage">' + selectOpts(stageFilterOpts(kind), SL.stage, 'Any stage') + '</select>';
@@ -126,14 +124,14 @@ function slFilterBar(kind) {
   const f = fuControlsHtml(), fld = (l, h) => '<label class="nx-fld"><span>' + l + '</span>' + h + '</label>';
   const unf = '<select class="nx-sel sm" id="slUnf" aria-label="Unfinished leads"><option value=""' + (SL.unf ? '' : ' selected') + '>All leads</option><option value="mine"' + (SL.unf === 'mine' ? ' selected' : '') + '>Unfinished, flagged to me</option><option value="all"' + (SL.unf === 'all' ? ' selected' : '') + '>Unfinished, anyone</option></select>';
   return f.sort + '<button type="button" class="nx-btn sm" id="slMore" aria-expanded="' + !!SL.more + '" aria-controls="slPanel">' + ico('sliders') + '<span id="slMoreL">More filters' + (slMoreN() ? ' (' + slMoreN() + ')' : '') + '</span></button><button class="nx-btn quiet sm" id="slClear">Clear</button></div>' +
-    '<div class="nx-filtergrid" id="slPanel"' + (SL.more ? '' : ' hidden') + '>' + fld('Stage', stage) + fld('Qualification', qual) + fld('Unfinished leads', unf) + fld('Follow-up status', f.fu) + fld('Assigned to', f.who) + '</div>' +
+    '<div class="nx-filtergrid" id="slPanel"' + (SL.more ? '' : ' hidden') + '>' + fld('Stage', stage) + fld('Qualification', qual) + fld('Unfinished leads', unf) + fld('Follow-up status', f.fu) + '</div>' +
     '<div class="nx-toolbar" id="slChips" role="group" aria-label="Follow-ups due" style="padding-top:0;border-top:0"></div>';
 }
-const SL = { q: '', stage: '', qual: '', unf: '', fu: '', who: '', sort: 'newest', kind: 'student', view: 'all', page: 0, size: 50, more: false };
+const SL = { q: '', stage: '', qual: '', unf: '', fu: '', sort: 'newest', kind: 'student', view: 'all', page: 0, size: 50, more: false };
 route(/^\/(students|leads|search)(?:\?(.*))?$/, async m => {
   const mode = m[1], qs = new URLSearchParams(m[2] || '');
   const kind = mode === 'leads' ? 'lead' : mode === 'students' ? 'student' : 'all';
-  if (SL.kind !== kind) { SL.kind = kind; SL.page = 0; SL.view = 'all'; SL.q = SL.stage = SL.qual = SL.unf = SL.fu = SL.who = ''; SL.sort = 'newest'; SL.more = false; }
+  if (SL.kind !== kind) { SL.kind = kind; SL.page = 0; SL.view = 'all'; SL.q = SL.stage = SL.qual = SL.unf = SL.fu = ''; SL.sort = 'newest'; SL.more = false; }
   if (qs.get('view') === 'follow' && kind === 'lead') SL.view = 'follow';
   if (qs.get('fu') && kind === 'lead') { SL.fu = qs.get('fu'); SL.view = 'all'; SL.page = 0; if (SL.sort === 'newest') SL.sort = 'due'; }
   if (qs.get('unf')) { SL.unf = qs.get('unf'); SL.page = 0; }
@@ -172,14 +170,13 @@ route(/^\/(students|leads|search)(?:\?(.*))?$/, async m => {
         if (kind === 'lead' && SL.view === 'follow') { syncView(); await leadsFollowupLoad(body, $('#slFoot'), () => { load(); }); refreshN(); return; }
         if (kind === 'lead') { syncView(); syncMore(); }
         const q = safeQ(SL.q); const digits = cleanPhone(q); const today = sydToday();
-        const fuInner = kind === 'lead' && (['due', '1', '2', '3', 'upcoming', 'complete'].includes(SL.fu) || !!SL.who);
+        const fuInner = kind === 'lead' && ['due', '1', '2', '3', 'upcoming', 'complete'].includes(SL.fu);
         let query = 'select=id,student_no,first_name,last_name,email,phone,agent_id,created_at,needs_details,flagged_to,nex_student_paid!inner(paid_total),nex_enrolments' + (SL.stage || SL.qual ? '!inner' : '') + '(id,stage,qualification_id,fee,year,enrolled_on)' + (kind === 'lead' ? ',' + (fuInner ? FU_EMBED.replace('nex_lead_followup(', 'nex_lead_followup!inner(') : FU_EMBED) : '') + '&deleted_at=is.null&order=' + (kind === 'lead' ? (FU_SORT[SL.sort] || FU_SORT.newest) : 'created_at.desc');
         if (kind !== 'all') query += '&nex_student_paid.paid_total=' + (kind === 'lead' ? 'lt.' : 'gte.') + STUDENT_MIN;
         if (kind === 'lead' && SL.unf) query += '&needs_details=eq.true' + (SL.unf === 'mine' ? '&flagged_to=eq.' + encodeURIComponent(ME.name) : '');
         if (kind === 'lead') {
           query += fuFilter(SL.fu, today);
           if (SL.fu === 'none') query += '&nex_lead_followup=is.null';
-          if (SL.who) query += '&nex_lead_followup.assigned_to=eq.' + encodeURIComponent(SL.who === 'me' ? ME.name : SL.who.slice(2));
         }
         if (SL.stage) query += '&nex_enrolments.stage=eq.' + encodeURIComponent(SL.stage);
         if (SL.qual) query += '&nex_enrolments.qualification_id=eq.' + SL.qual;
@@ -188,7 +185,7 @@ route(/^\/(students|leads|search)(?:\?(.*))?$/, async m => {
         let pays = [];
         if (rows.length) pays = await sel('nex_payments', 'select=student_id,amount,verify_status&student_id=in.' + inList(rows.map(r => r.id)));
         const paid = {}; pays.forEach(p => { if (payConfirmed(p)) paid[p.student_id] = (paid[p.student_id] || 0) + Number(p.amount); });
-        const filtered = SL.q || SL.stage || SL.qual || SL.fu || SL.who;
+        const filtered = SL.q || SL.stage || SL.qual || SL.fu;
         body.innerHTML = rows.length ? '<div class="nx-tablewrap"><table class="nx-table' + (kind === 'lead' ? ' nx-leads' : '') + '"><thead><tr><th>' + (kind === 'lead' ? 'Lead' : kind === 'student' ? 'Student' : 'Name') + '</th>' + (kind === 'lead' ? '' : '<th class="nx-c-phone">Phone</th>') + '<th class="nx-c-qual">Qualification</th><th class="nx-c-stage">Stage</th><th class="nx-c-fee">Paid and fee</th>' + (kind === 'lead' ? '<th class="nx-c-fu">Follow-up</th>' : '') + (kind === 'lead' ? '<th></th>' : '<th class="nx-c-date">Enrolled</th><th class="nx-c-agent">Agent</th>') + '</tr></thead><tbody>' +
           rows.map(s => {
             const en = (s.nex_enrolments || []).slice().sort((a, b) => String(b.enrolled_on || '').localeCompare(String(a.enrolled_on || '')))[0] || {};
@@ -220,8 +217,8 @@ route(/^\/(students|leads|search)(?:\?(.*))?$/, async m => {
     $('#slQual').onchange = e => { SL.qual = e.target.value; SL.page = 0; load(); };
     const un = $('#slUnf'); if (un) un.onchange = e => { SL.unf = e.target.value; SL.page = 0; load(); };
     $$('#slSeg button').forEach(b => b.onclick = () => { SL.view = b.dataset.v; SL.page = 0; load(); });
-    [['#slFu', 'fu'], ['#slWho', 'who'], ['#slSort', 'sort']].forEach(([id, key]) => { const el = $(id); if (el) el.onchange = e => { SL[key] = e.target.value; SL.page = 0; if (key === 'fu' && SL.fu && SL.sort === 'newest') { SL.sort = 'due'; $('#slSort').value = 'due'; } load(); }; });
-    $('#slClear').onclick = () => { SL.q = SL.stage = SL.qual = SL.unf = SL.fu = SL.who = ''; SL.sort = 'newest'; SL.page = 0; $('#slQ').value = ''; $('#slStage').value = ''; $('#slQual').value = ''; ['#slUnf', '#slFu', '#slWho'].forEach(id => { const el = $(id); if (el) el.value = ''; }); const so = $('#slSort'); if (so) so.value = 'newest'; load(); };
+    [['#slFu', 'fu'], ['#slSort', 'sort']].forEach(([id, key]) => { const el = $(id); if (el) el.onchange = e => { SL[key] = e.target.value; SL.page = 0; if (key === 'fu' && SL.fu && SL.sort === 'newest') { SL.sort = 'due'; $('#slSort').value = 'due'; } load(); }; });
+    $('#slClear').onclick = () => { SL.q = SL.stage = SL.qual = SL.unf = SL.fu = ''; SL.sort = 'newest'; SL.page = 0; $('#slQ').value = ''; $('#slStage').value = ''; $('#slQual').value = ''; ['#slUnf', '#slFu'].forEach(id => { const el = $(id); if (el) el.value = ''; }); const so = $('#slSort'); if (so) so.value = 'newest'; load(); };
     const sm = $('#slMore'); if (sm) sm.onclick = () => { SL.more = !SL.more; $('#slPanel').hidden = !SL.more; sm.setAttribute('aria-expanded', String(!!SL.more)); };
     const nb = $('#slNew'); if (nb) nb.onclick = () => newStudent();
     viewWait(load());
@@ -385,7 +382,7 @@ function sideCards(c) {
     (c.plcs.length || c.reqs.length ? '<div class="nx-related">' + c.plcs.slice(0, 3).map(p => '<div><span><b>' + esc((p.nex_facilities || {}).name || p.facility_text || 'Placement') + '</b><small>' + (p.start_date ? 'Starts ' + esc(fmtDate(p.start_date)) : 'No start date') + '</small></span>' + pill('placement_stage', p.status) + '</div>').join('') +
       c.reqs.slice(0, 3).map(r => '<div><span><b>' + esc((r.nex_facilities || {}).name || r.facility_text || 'Request') + '</b><small>' + (r.self_placement ? 'Self placement' : 'Request') + (r.emailed_on ? ' · emailed ' + esc(fmtDate(r.emailed_on)) : '') + '</small></span>' + pill('placement', r.status) + '</div>').join('') + '</div>' : empty('No placement yet')) + '</div>' +
     '<div class="nx-card"><div class="nx-card-h"><h3>Follow-ups</h3><span class="nx-btnrow">' + (!c.isStudent && !c.followups.some(f => f.kind === 'lead_cycle') ? '<button class="nx-btn sm" data-a="startCycle">Start follow-ups</button>' : '') + (!open.length && (c.isStudent || c.followups.some(f => f.kind === 'lead_cycle')) ? '<button class="nx-btn sm" data-a="addFu">' + ico('plus') + (fuDocsDone(c) ? 'Add payment follow-up' : 'Add follow-up') + '</button>' : '') + '</span></div>' +
-    (open.length ? '<div class="nx-related">' + open.slice().sort((a, b) => String(a.due_at || '9').localeCompare(String(b.due_at || '9'))).map(f => { const late = f.due_at && new Date(f.due_at).toLocaleDateString('en-CA', { timeZone: TZ }) < sydToday(); return '<div><span><b>' + esc(f.note) + '</b><small' + (late ? ' class="nx-neg"' : '') + '>' + (f.due_at ? 'Due ' + esc(fmtDate(f.due_at)) + (late ? ' (overdue)' : '') : 'No date') + (f.assigned_to ? ' · ' + esc(f.assigned_to) : '') + '</small></span><span class="nx-btnrow">' + (f.kind === 'lead_cycle' && f.step && f.step <= 3 ? '<button class="nx-btn sm" data-a="emailFu" data-step="' + f.step + '">' + ico('mail') + 'Send email</button>' : '') + '<button class="nx-btn sm" data-a="doneFu" data-id="' + f.id + '">Done</button></span></div>'; }).join('') + '</div>' : (doneFu.length ? '' : empty('Nothing to follow up'))) + fuHistory + '</div>' +
+    (open.length ? '<div class="nx-related">' + open.slice().sort((a, b) => String(a.due_at || '9').localeCompare(String(b.due_at || '9'))).map(f => { const late = f.due_at && new Date(f.due_at).toLocaleDateString('en-CA', { timeZone: TZ }) < sydToday(); return '<div><span><b>' + esc(f.note) + '</b><small' + (late ? ' class="nx-neg"' : '') + '>' + (f.due_at ? 'Due ' + esc(fmtDate(f.due_at)) + (late ? ' (overdue)' : '') : 'No date') + '</small></span><span class="nx-btnrow">' + (f.kind === 'lead_cycle' && f.step && f.step <= 3 ? '<button class="nx-btn sm" data-a="emailFu" data-step="' + f.step + '">' + ico('mail') + 'Send email</button>' : '') + '<button class="nx-btn sm" data-a="doneFu" data-id="' + f.id + '">Done</button></span></div>'; }).join('') + '</div>' : (doneFu.length ? '' : empty('Nothing to follow up'))) + fuHistory + '</div>' +
     '<div class="nx-card"><div class="nx-card-h"><h3>Tasks</h3><button class="nx-btn sm" data-a="addTask">Add</button></div>' +
     (c.tasks.length ? '<div class="nx-related">' + c.tasks.map(t => { const late = t.due_on && t.due_on < sydToday(); return '<div><span><b>' + esc(t.title) + '</b><small' + (late ? ' class="nx-neg"' : '') + '>' + (t.due_on ? 'Due ' + esc(fmtDate(t.due_on)) + (late ? ' (overdue)' : '') : 'No date') + ' · ' + esc(tkLabel(TK_PRI, t.priority)) + (t.assigned_to ? ' · ' + esc(t.assigned_to) : '') + '</small></span><button class="nx-btn sm" data-a="doneTask" data-id="' + t.id + '">Done</button></div>'; }).join('') + '</div>' : empty('No open tasks')) + '</div>';
 }
