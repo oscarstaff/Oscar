@@ -361,4 +361,5 @@ function personSearchParts(q, digits) {
   if (digits && digits.length >= 4) parts.push('phone.ilike.*' + digits + '*');
   return parts;
 }
-function safeQ(q) { return String(q || '').replace(/[,()*%\\:"]/g, ' ').trim(); }
+/* strip what would break a search: , ( ) * % \ : " for the filter itself, and & # + = ? ; which would cut or change the web address the search travels in (a payer name like "A & B" used to give "failed to parse logic tree") */
+function safeQ(q) { return String(q || '').replace(/[,()*%\\:"&#+=?;]/g, ' ').replace(/\s+/g, ' ').trim(); }
