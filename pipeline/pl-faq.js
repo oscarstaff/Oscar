@@ -15,7 +15,7 @@ const NEXI_FAQ = [
     ['How do I add an enrolment?', 'Open the person, then press Enrolment at the top of their page. One person can have several enrolments, each with its own qualification, fee and stage.', null],
     ['How do I change contact or personal details?', 'Open the person and use Edit contact, or Edit personal details under Personal and sensitive. Every look at the sensitive details and every change is logged.', null],
     ['How do I remove someone?', 'Only hub admins can archive or delete anything. If someone needs to go, ask a hub admin; archived people disappear from the lists but their records are kept.', null],
-    ['Who can change a class booking?', 'Anyone can book a person into a class and mark Attended, No show, Cancelled or Rescheduled. Only the Evershine team (and hub admins) can change the flags on a booking: quiz sent, quiz done, paid, placement plan, education plan and signature.', null],
+    ['Who can change a class booking?', 'Anyone can book a person into a class and mark Attended, No show, Cancelled or Rescheduled. Only the Evershine team (and hub admins) can change the flags on a booking: quiz sent, quiz done, paid, placement plan and signature.', null],
     ['Who can add or change payments?', 'Only the Processing and Accounts teams (and hub admins) can record a payment, link it to a student, or work the payment queue. Everyone else can see them.', null]
   ]],
   ['Payments', [

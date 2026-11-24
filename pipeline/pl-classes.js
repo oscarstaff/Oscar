@@ -129,10 +129,19 @@ function bkBindFollow(root, rows, after) {
 /* Leads, "Need to follow up" tab: everyone who was a no show, cancelled or rescheduled without a new class day (leads, students, walk-ins) */
 const BK_FU_Q = '&status=in.(no_show,cancelled,rescheduled)&followup_done_at=is.null&rescheduled_to=is.null';
 const bkFuLive = r => !r.nex_students || !r.nex_students.deleted_at;   /* people moved to the archive drop off the list; walk-ins have no student record and stay */
+let BKF_DAY = '';   /* the class day picked on the Need to follow up tab ('' = every day) */
 async function leadsFollowupLoad(body, foot, after) {
-  const rows = (await selAll('nex_class_bookings', 'select=*,nex_class_sessions(class_date,kind),nex_students(id,deleted_at)' + BK_FU_Q + '&order=attendance_at.desc.nullslast')).filter(bkFuLive);
-  if (!rows.length) { body.innerHTML = empty('Nobody to follow up', 'No shows, cancellations and reschedules without a new class day show up here.'); foot.innerHTML = '<span></span>'; return 0; }
-  body.innerHTML = bkFollowTable(rows, {}); foot.innerHTML = '<span>' + rows.length + ' to follow up</span>';
+  const all = (await selAll('nex_class_bookings', 'select=*,nex_class_sessions(class_date,kind),nex_students(id,deleted_at)' + BK_FU_Q + '&order=attendance_at.desc.nullslast')).filter(bkFuLive);
+  if (!all.length) { BKF_DAY = ''; body.innerHTML = empty('Nobody to follow up', 'No shows, cancellations and reschedules without a new class day show up here.'); foot.innerHTML = '<span></span>'; return 0; }
+  const dayOf = r => (r.nex_class_sessions || {}).class_date || '', cnt = {};
+  all.forEach(r => { const d = dayOf(r); if (d) cnt[d] = (cnt[d] || 0) + 1; });
+  const days = Object.keys(cnt).sort().reverse();
+  if (BKF_DAY && !cnt[BKF_DAY]) BKF_DAY = '';   /* that day has been cleared since */
+  const rows = BKF_DAY ? all.filter(r => dayOf(r) === BKF_DAY) : all;
+  const bar = '<div class="nx-toolbar" style="border-top:0"><label class="nx-fld" style="flex-direction:row;align-items:center;gap:8px"><span>Class day</span><select class="nx-sel sm" id="bkfDay" aria-label="Class day">' +
+    '<option value="">All class days (' + all.length + ')</option>' + days.map(d => { const f = fmtDay(d); return '<option value="' + d + '"' + (d === BKF_DAY ? ' selected' : '') + '>' + esc(f.wd + ' ' + f.dm + ' (' + cnt[d] + ')') + '</option>'; }).join('') + '</select></label></div>';
+  body.innerHTML = bar + bkFollowTable(rows, {}); foot.innerHTML = '<span>' + rows.length + ' to follow up' + (BKF_DAY ? ' from ' + esc(fmtDate(BKF_DAY)) : '') + '</span>';
+  const sel_ = $('#bkfDay', body); if (sel_) sel_.onchange = () => { BKF_DAY = sel_.value; if (after) after(); };
   bkBindFollow(body, rows, after); $$('.nx-tr', body).forEach(tr => tr.onclick = e => { const b = rows.find(x => x.id === tr.dataset.bk); if (b && b.student_id) go('#/students/' + b.student_id); });
   return rows.length;
 }
