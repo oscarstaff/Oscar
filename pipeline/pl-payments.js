@@ -4,7 +4,7 @@
 /* =========================================================
    Payments and First Aid
    ========================================================= */
-const PY = { view: 'toprocess', q: '', qs: '', page: 0, size: 50, sel: null };   /* qs = the Queue status filter ('' = all, '__none' = not set) */
+const PY = { view: 'all', q: '', qs: '', page: 0, size: 50, sel: null };   /* qs = the Queue status filter ('' = all, '__none' = not set) */
 
 route(/^\/payments(?:\?(.*))?$/, async m => {
   const qs = new URLSearchParams(m[1] || '');
@@ -19,7 +19,7 @@ route(/^\/payments(?:\?(.*))?$/, async m => {
     ME.admin ? count('nex_payments', 'handover_status=eq.awaiting') : 0
   ]);
   afterRender(() => bindPayments());
-  const seg = [['toprocess', 'To process', cTo], ['processed', 'Processed', cDone], ['verify', 'To verify', cVer]].concat(ME.admin ? [['cash', 'Cash receipts', cCash]] : [], [['unmatched', 'Unmatched', cUnm], ['all', 'All payments', null]]);
+  const seg = [['all', 'All payments', null], ['toprocess', 'To process', cTo], ['processed', 'Processed', cDone], ['verify', 'To verify', cVer]].concat(ME.admin ? [['cash', 'Cash receipts', cCash]] : [], [['unmatched', 'Unmatched', cUnm]]);
   return pageHead('cash', 'Payments', 'Payment queue', '<button class="nx-btn primary" id="pyAdd">' + ico('plus') + 'Record payment</button>') +
     '<div class="nx-split"><div class="nx-card"><div class="nx-toolbar" style="border-top:0"><div class="nx-seg" id="pySeg">' + seg.map(([k, l, n]) => '<button data-v="' + k + '" aria-pressed="' + (PY.view === k) + '">' + l + (n != null ? ' <span class="nx-count">' + n + '</span>' : '') + '</button>').join('') + '</div><input class="nx-in sm" id="pyQ" style="min-width:220px" placeholder="Search name or reference" value="' + esc(PY.q) + '"><select class="nx-sel sm" id="pyQs" aria-label="Queue status"' + (['toprocess', 'processed'].indexOf(PY.view) < 0 ? ' hidden' : '') + '><option value="">All queue statuses</option><option value="__none"' + (PY.qs === '__none' ? ' selected' : '') + '>Not set</option>' + selectOpts(opts('payment_queue'), PY.qs) + '</select></div>' +
     '<div id="pyBody"></div><div class="nx-foot" id="pyFoot"><span></span></div></div><div class="nx-drawer" id="pyDrawer" hidden></div></div>';
