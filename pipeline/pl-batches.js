@@ -89,26 +89,82 @@ async function renderBatches(body, stale) {
   ]);
   if ((stale && stale()) || PL.tab !== 'batches' || !body.isConnected) return;   /* the person went to another tab while this loaded */
   const startOf = c => btStart(c.nex_batches, c);
+  const othersIds = new Set(cards.filter(c => c.is_others).map(c => c.id)), othersPlaces = places.filter(p => othersIds.has(p.batch_facility_id) && btLive(p));
+  cards.splice(0, cards.length, ...cards.filter(c => !c.is_others));   /* every Others confirmed card is shown as the one standing card below: those students start on their own dates */
   cards.sort((a, b) => startOf(a).localeCompare(startOf(b)) || (a.is_others - b.is_others) || btCardName(a).localeCompare(btCardName(b)));
   const cut = btAddDays(today, -14), shown = cards.filter(c => BT.past || startOf(c) >= cut), hidden = cards.length - cards.filter(c => startOf(c) >= cut).length;
   const live = places.filter(btLive).length, nCare = cards.filter(c => !c.is_others && startOf(c) >= cut).length;
   const head = '<div class="nx-toolbar" style="border-top:0">' +
     '<span class="nx-muted">' + nCare + (nCare === 1 ? ' aged care' : ' aged cares') + ' coming up or just started · ' + live + ' students placed in all</span>' +
     '<span class="nx-btnrow" style="margin-left:auto">' + (hidden || BT.past ? '<button class="nx-btn sm" id="btPast" aria-pressed="' + !!BT.past + '">' + (BT.past ? 'Hide earlier' : 'Show earlier (' + hidden + ')') + '</button>' : '') +
-    '<button class="nx-btn sm" id="btOthers">+ Others confirmed</button><button class="nx-btn sm primary" id="btAdd">' + ico('plus') + 'Add aged care</button></span></div>';
-  const grid = shown.length ? '<div class="nx-bgrid">' + shown.map(c => acCardHtml(c, places, today, asked)).join('') + '</div>'
-    : '<div class="nx-card-b">' + empty('No aged cares yet', 'Add an aged care and the date you want students to start. Each one gets its own card, and you add students inside it.', '<button class="nx-btn primary" id="btAdd2">' + ico('plus') + 'Add aged care</button>') + '</div>';
+    '<button class="nx-btn sm primary" id="btAdd">' + ico('plus') + 'Add aged care</button></span></div>';
+  const grid = '<div class="nx-bgrid">' + othersCardHtml(othersPlaces, today) + shown.map(c => acCardHtml(c, places, today, asked)).join('') + '</div>' + (shown.length ? ''
+    : '<div class="nx-card-b">' + empty('No aged cares yet', 'Add an aged care and the date you want students to start. Each one gets its own card, and you add students inside it.', '<button class="nx-btn primary" id="btAdd2">' + ico('plus') + 'Add aged care</button>') + '</div>');
   body.innerHTML = head + grid;
   $('#btAdd').onclick = () => agedCareNew();
   if ($('#btAdd2')) $('#btAdd2').onclick = () => agedCareNew();
-  $('#btOthers').onclick = () => formModal('Others confirmed', [{ k: 'starts_on', label: 'Start date', type: 'date', value: today, required: true, full: true, help: 'A card for students who found their own aged care, for the week starting this day.' }], async v => {
-    const b = await btBatchFor(v.starts_on);
-    if ((await sel('nex_batch_facilities', 'select=id&is_others=eq.true&batch_id=eq.' + b.id)).length) throw new Error('There is already an Others confirmed card for that day.');
-    await ins('nex_batch_facilities', { batch_id: b.id, is_others: true }, true); toast('Added'); btRefresh();
-  });
   if ($('#btPast')) $('#btPast').onclick = () => { BT.past = !BT.past; btRefresh(); };
   $$('.nx-bcard', body).forEach(b => b.onclick = () => go('#/placement/aged-care/' + b.dataset.bf));
 }
+
+/* ---------- Others confirmed: students who found their own aged care ----------
+   One standing card. Each student has their OWN start date (it is on their placement), so the card is not tied to a day. */
+function othersCardHtml(list, today) {
+  const next = list.map(p => p.start_date).filter(d => d && d >= today).sort()[0], n = list.length;
+  return '<button type="button" class="nx-bcard others" data-bf="others" data-tone="later">' +
+    '<span class="nx-ac-top"><span class="nx-ac-date"><small>Others</small><b>' + n + '</b><i>' + (n === 1 ? 'student' : 'students') + '</i></span><span class="nx-ac-name"><b>Others confirmed</b>' +
+    '<small>Students who found their own aged care</small><em>' + (next ? 'Next start ' + esc(btShort(next)) : 'Each student has their own start date') + '</em></span></span></button>';
+}
+/* the Others confirmed card for the batch that starts on this day (batch and card are made when they do not exist yet) */
+async function btOthersFor(date) {
+  const b = await btBatchFor(date);
+  let card = (await sel('nex_batch_facilities', 'select=*&is_others=eq.true&batch_id=eq.' + b.id))[0];
+  if (!card) card = await ins('nex_batch_facilities', { batch_id: b.id, is_others: true });
+  return { batch: b, card };
+}
+/* A self-placement request was just set to Request granted: ask for the start date and notes, then move the student into Others confirmed. */
+function othersConfirmedAsk(r, after) {
+  const s = (r.nex_enrolments || {}).nex_students, name = s ? fullName(s) : '', fac = (r.nex_facilities || {}).name || r.facility_text || '';
+  if (!r.enrolment_id) { toast('Link this request to a student first, then you can move them to Others confirmed.', true); return; }
+  formModal('Move to Others confirmed', [
+    { k: 'start_date', label: 'Start date', type: 'date', required: true, full: true },
+    { k: 'note', label: 'Notes / Orientation', type: 'textarea', full: true, placeholder: 'Orientation date and time, who to see, anything else to remember' }
+  ], async v => {
+    const { batch, card } = await btOthersFor(v.start_date);
+    if ((await sel('nex_placements', 'select=id,status&enrolment_id=eq.' + r.enrolment_id + '&batch_id=eq.' + batch.id)).some(btLive)) throw new Error('This student is already placed for that week. Open Others confirmed to change them.');
+    await ins('nex_placements', { enrolment_id: r.enrolment_id, batch_id: batch.id, batch_facility_id: card.id, facility_id: r.facility_id || null, facility_text: r.facility_text || (r.nex_facilities || {}).name || null, status: 'site_date_allocated', start_date: v.start_date, note: v.note }, true);
+    toast((name || 'Student') + ' moved to Others confirmed'); if (after) await after(); else render();
+  }, 'Move to Others confirmed', '<div class="nx-card-b" style="padding:0 0 10px"><b>' + esc(name || 'This student') + '</b>' + (fac ? ' at <b>' + esc(fac) + '</b>' : '') + ': request granted. Each student has their own start date.</div>');
+}
+
+route(/^\/placement\/aged-care\/others$/, async () => {
+  PL.tab = 'batches';
+  const cards = await sel('nex_batch_facilities', 'select=id&is_others=eq.true&limit=1000'), ids = cards.map(c => c.id), today = sydToday();
+  const places = ids.length ? await sel('nex_placements', 'select=*,nex_enrolments(student_id,nex_students(id,first_name,last_name))&batch_facility_id=in.(' + ids.join(',') + ')&order=start_date.asc.nullslast,created_at.asc&limit=1000') : [];
+  const live = places.filter(btLive), gone = places.filter(p => !btLive(p)), next = live.map(p => p.start_date).filter(d => d && d >= today).sort()[0];
+  const row = p => { const s = btStudent(p); return '<li><div>' + (s ? '<a href="#/students/' + s.id + '"><b>' + esc(fullName(s)) + '</b></a>' : '–') + ' <span class="nx-pill ' + (p.start_date && p.start_date >= today ? 'accent' : '') + '">' + (p.start_date ? 'Starts ' + esc(btDate(p.start_date)) : 'No start date') + '</span>' +
+    '<small>' + esc([p.facility_text, statusLabel('placement_stage', p.status), p.note].filter(Boolean).join(' · ')) + '</small></div>' +
+    '<span class="nx-btnrow"><button class="nx-btn sm" data-ed="' + p.id + '">Edit</button>' + (btLive(p) ? '<button class="nx-btn sm" data-wd="' + p.id + '">Withdraw</button>' : '') + '</span></li>'; };
+  afterRender(() => {
+    $('#acAdd').onclick = () => formModal('Add a student to Others confirmed', [{ k: 'start_date', label: 'Their start date', type: 'date', required: true, full: true }], async v => {
+      const { batch, card } = await btOthersFor(v.start_date);
+      const mine = await sel('nex_placements', 'select=*&batch_facility_id=eq.' + card.id);
+      setTimeout(() => batchAddStudent(batch, card, mine, async () => { render(); }), 350);
+    }, 'Continue');
+    $$('#acStu [data-ed]').forEach(b => b.onclick = () => placementEdit(places.find(x => x.id === b.dataset.ed), { is_others: true }, async () => { render(); }));
+    $$('#acStu [data-wd]').forEach(b => b.onclick = async () => {
+      const p = places.find(x => x.id === b.dataset.wd), s = btStudent(p);
+      if (!await confirmBox('Withdraw from Others confirmed', (s ? fullName(s) : 'This student') + ' will be marked withdrawn.', 'Withdraw', true)) return;
+      try { await upd('nex_placements', 'id=eq.' + p.id, { status: 'withdrawn' }); render(); } catch (e) { toast(e.message, true); }
+    });
+  });
+  return '<div class="nx-crumbs"><a href="#/placement">Placement</a> / <a href="#/placement">Batches</a> / <span>Others confirmed</span></div>' +
+    '<div class="nx-card nx-achead" data-tone="later"><span class="nx-ac-date big"><small>Others</small><b>' + live.length + '</b><i>' + (live.length === 1 ? 'student' : 'students') + '</i></span>' +
+    '<div class="nx-achead-t"><div class="nx-eyebrow">Students who found their own aged care' + (next ? ' · next start ' + esc(btShort(next)) : '') + '</div><h1 class="nx-title">Others confirmed</h1><div class="nx-muted">Every student has their own start date. A student arrives here when their self-placement request is set to Request granted.</div></div></div>' +
+    '<div class="nx-card" id="acStu"><div class="nx-card-h"><h3>Students (' + live.length + ')</h3><button type="button" class="nx-btn sm primary" id="acAdd">' + ico('plus') + 'Add student</button></div><div style="padding:6px 16px 16px">' +
+    (live.length ? '<ul class="nx-list">' + live.map(row).join('') + '</ul>' : '<div class="nx-help">Nobody is here yet.</div>') +
+    (gone.length ? '<details style="margin-top:10px"><summary class="nx-muted">Withdrawn or closed (' + gone.length + ')</summary><ul class="nx-list">' + gone.map(row).join('') + '</ul></details>' : '') + '</div></div>';
+});
 
 /* the fields of an aged care: used by Add (pick the aged care first) and by Edit details on its own page */
 function acFields(c, adding) {
@@ -206,7 +262,7 @@ route(/^\/placement\/aged-care\/([0-9a-f-]{36})$/, async m => {
 
 function placementEdit(p, card, done) {
   if (!p) return;
-  const f = [{ k: 'shift', label: 'Shift', type: 'select', options: BT_SHIFTS.map(([id, label]) => ({ id, label })), value: p.shift, required: true },
+  const f = [{ k: 'shift', label: 'Shift', type: 'select', options: BT_SHIFTS.map(([id, label]) => ({ id, label })), value: p.shift, required: !card.is_others },   /* Others confirmed students come in without a shift */
     { k: 'status', label: 'Stage', type: 'select', options: opts('placement_stage', true), value: p.status, blank: 'Not set' },
     { k: 'start_date', label: 'Start date', type: 'date', value: p.start_date }];
   if (card.is_others) f.push({ k: 'facility_text', label: 'Aged care they found', value: p.facility_text, full: true });

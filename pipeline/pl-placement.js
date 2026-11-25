@@ -33,6 +33,9 @@ function bindPlacement() {
       if (PL.tab === 'requests') {
         let query = 'select=*,nex_facilities(name),nex_enrolments(student_id,nex_students(id,first_name,last_name))&order=created_at.desc'; if (PL.status) query += '&status=eq.' + PL.status; if (q) query += '&or=(facility_text.ilike.*' + q + '*,student_name.ilike.*' + q + '*)';
         ({ rows, total } = await selPage('nex_placement_requests', query, from, to)); if (stale()) return;
+        const eids = rows.filter(r => r.enrolment_id).map(r => r.enrolment_id);   /* who is already in a batch or Others confirmed, so a granted self-placement can offer the move */
+        const placedE = new Set(eids.length ? (await sel('nex_placements', 'select=enrolment_id,status&batch_id=not.is.null&enrolment_id=in.' + inList(eids))).filter(btLive).map(p => p.enrolment_id) : []);
+        if (stale()) return;
         /* three columns, one thing each. What used to be pills, a second row of buttons and a note column is now one quiet line of small text,
            and "Link student" / "Add facility" sit beside the thing they fix. The note and everything else is in Update. */
         html = rows.length ? '<div class="nx-tablewrap"><table class="nx-table tight nx-reqs"><thead><tr><th>Student</th><th>Facility</th><th>Status</th><th></th></tr></thead><tbody>' + rows.map(r => {
@@ -46,7 +49,8 @@ function bindPlacement() {
             (safeUrl(r.form_url) ? (r.created_by === 'Google Form' || !r.self_placement || r.emailed_on ? ' · ' : '') + '<a href="' + esc(safeUrl(r.form_url)) + '" target="_blank" rel="noopener noreferrer">Open form</a>' : '');
           return '<tr><td>' + who + contact + '</td><td><b>' + esc(fac || '–') + '</b>' + (where ? '<div class="nx-sub" title="' + esc(where) + '">' + esc(where) + '</div>' : '') +
             (meta ? '<div class="nx-sub">' + meta + '</div>' : '') + (!r.facility_id && r.facility_text ? '<div class="nx-sub"><button type="button" class="nx-linkbtn" data-af="' + r.id + '">Add to facilities</button></div>' : '') + '</td>' +
-            '<td><select class="nx-sel sm" data-st="' + r.id + '" aria-label="Status">' + selectOpts(opts('placement', true), r.status || '', 'Not set') + '</select></td>' +
+            '<td><select class="nx-sel sm" data-st="' + r.id + '" aria-label="Status">' + selectOpts(opts('placement', true), r.status || '', 'Not set') + '</select>' +
+            (r.status === 'replied_granted' && r.self_placement && r.enrolment_id ? (placedE.has(r.enrolment_id) ? '<div class="nx-sub">In a batch</div>' : '<div class="nx-sub"><button type="button" class="nx-linkbtn" data-mv="' + r.id + '">Move to Others confirmed</button></div>') : '') + '</td>' +
             '<td><button class="nx-btn sm" data-ed="' + r.id + '">Update</button></td></tr>'; }).join('') + '</tbody></table></div>' : empty('No placement requests');
         body._rows = rows;
       } else if (PL.tab === 'placements') {
@@ -81,9 +85,11 @@ function bindPlacement() {
         $$('[data-ln]', body).forEach(b => b.onclick = () => { const r = rows.find(x => x.id === b.dataset.ln);   /* attach a form answer to the student's record */
           pickEnrolment('Which student is ' + (r.student_name || 'this') + '?', async (en) => { try { await upd('nex_placement_requests', 'id=eq.' + r.id, { enrolment_id: en.id, student_name: null, student_email: null, student_phone: null }); toast('Linked'); load(); } catch (e) { toast(e.message, true); } }, r.student_name || r.student_email || '');
         });
+        $$('[data-mv]', body).forEach(b => b.onclick = () => othersConfirmedAsk(rows.find(x => x.id === b.dataset.mv), async () => { load(); }));
         $$('[data-st]', body).forEach(el => el.onchange = async () => {   /* change the status right in the list */
           const r = rows.find(x => x.id === el.dataset.st), was = r.status || '';
-          try { await upd('nex_placement_requests', 'id=eq.' + r.id, { status: el.value || null }); r.status = el.value || null; toast('Status updated'); } catch (e) { el.value = was; toast(e.message, true); }
+          try { await upd('nex_placement_requests', 'id=eq.' + r.id, { status: el.value || null }); r.status = el.value || null; toast('Status updated'); } catch (e) { el.value = was; toast(e.message, true); return; }
+          if (r.status === 'replied_granted' && was !== 'replied_granted' && r.self_placement) othersConfirmedAsk(r, async () => { load(); });   /* a granted self-placement goes to Others confirmed, with its own start date */
         });
       }
       if (PL.tab === 'blacklist') { /* already set */ }
@@ -128,6 +134,7 @@ async function requestForm(r, en, st) {
     if (r.id) await upd('nex_placement_requests', 'id=eq.' + r.id, v);
     else await ins('nex_placement_requests', Object.assign({ enrolment_id: en.id, created_by: ME.name }, v), true);
     toast('Saved'); render();
+    if (r.id && v.status === 'replied_granted' && r.status !== 'replied_granted' && v.self_placement) setTimeout(() => othersConfirmedAsk(Object.assign({}, r, v)), 400);   /* after this window has closed */
   }, null, (r.student_name && !r.enrolment_id ? '<div class="nx-card-b" style="padding:0 0 10px"><b>Student on the form (not linked yet):</b> ' + esc([r.student_name, r.student_email, r.student_phone].filter(Boolean).join(' · ')) + '</div>' : '') + plInfoHtml(info));
 }
 /* The aged care details the student gave on the self-sought form (stored in form_info), as labelled lines */
