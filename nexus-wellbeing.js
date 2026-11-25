@@ -101,7 +101,7 @@ const WB_TEXT = {
   }
 };
 
-function _wbRender(item, name, today) {
+function _wbRender(item, name, today, isTest) {
   const t = WB_TEXT[item.key];
   let el = document.getElementById('wbModal'); if (el) el.remove();
   el = document.createElement('div'); el.id = 'wbModal'; el.setAttribute('role', 'alertdialog'); el.setAttribute('aria-modal', 'true'); el.setAttribute('aria-labelledby', 'wbTitle');
@@ -121,7 +121,7 @@ function _wbRender(item, name, today) {
   document.getElementById('wbOk').onclick = close;
   const mb = document.getElementById('wbMoreBtn');
   if (mb) mb.onclick = function () { document.getElementById('wbMore').style.display = 'block'; mb.style.display = 'none'; };
-  _wbMarkShown(name, item.key, today);
+  if (!isTest) _wbMarkShown(name, item.key, today);   /* a test popup never counts as "shown" */
   try { document.getElementById('wbOk').focus(); } catch (e) { /* ignore */ }
 }
 
@@ -132,6 +132,15 @@ async function checkWellbeing() {
   if (document.getElementById('rcnModal')) return;                 /* a roster notice is open: do not stack popups, try again next time */
   _wbBusy = true;
   try {
+    /* Admin test link: open Nexus with ?wbtest=late_some, ?wbtest=late_a_lot or ?wbtest=sick_calls to see that popup on your own screen.
+       Hub admins only, shows on your screen only, saves nothing, and does not use up the real popup. */
+    let want = null;
+    try { want = new URLSearchParams(location.search).get('wbtest'); } catch (e) { /* ignore */ }
+    if (want && WB_TEXT[want]) {
+      const rows = await sbGet('staff_settings', '?name=eq.' + encodeURIComponent(name) + '&select=is_hub_admin&limit=1');
+      if (Array.isArray(rows) && rows[0] && rows[0].is_hub_admin === true) _wbRender({ key: want, n: 1 }, name, '2000-01-01', true);
+      return;
+    }
     const today = _wbSyd(Date.now()).ymd;
     const q = encodeURIComponent(name);
     const from14 = _wbAddDays(today, -WB.someWindow);
