@@ -135,7 +135,11 @@ async function checkWellbeing() {
     /* Admin test link: open Nexus with ?wbtest=late_some, ?wbtest=late_a_lot or ?wbtest=sick_calls to see that popup on your own screen.
        Hub admins only, shows on your screen only, saves nothing, and does not use up the real popup. */
     let want = null;
-    try { want = new URLSearchParams(location.search).get('wbtest'); } catch (e) { /* ignore */ }
+    try {
+      /* works both as index.html?wbtest=sick_calls and as index.html#home/?wbtest=sick_calls */
+      want = new URLSearchParams(location.search).get('wbtest');
+      if (!want) { const m = /[?&]wbtest=([a-z_]+)/.exec(location.hash || ''); want = m ? m[1] : null; }
+    } catch (e) { /* ignore */ }
     if (want && WB_TEXT[want]) {
       const rows = await sbGet('staff_settings', '?name=eq.' + encodeURIComponent(name) + '&select=is_hub_admin&limit=1');
       if (Array.isArray(rows) && rows[0] && rows[0].is_hub_admin === true) _wbRender({ key: want, n: 1 }, name, '2000-01-01', true);
