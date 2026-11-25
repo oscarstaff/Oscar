@@ -15,8 +15,8 @@
    Days on approved leave are skipped. A gap over 6 hours is treated as a missed clock-in, not lateness. */
 const WB = {
   link: 'https://www.beyondblue.org.au/mental-health/work/burnout',
-  linkLabel: 'Burnout prevention advice (Beyond Blue)',
-  helpLine: 'Need to talk to someone now? Beyond Blue: 1300 22 4636 (24/7).',
+  linkLabel: 'Burnout prevention advice',
+  helpLine: 'Advice is from Beyond Blue. Need to talk to someone now? Call them on 1300 22 4636 (24/7).',
   someMin: 10, someDays: 3, someWindow: 14,
   lotMin: 60, lotDays: 2, lotWindow: 7,
   sickCalls: 1, sickWindow: 10,
@@ -101,28 +101,76 @@ const WB_TEXT = {
   }
 };
 
+const WB_ICON = {
+  late_some: '<circle cx="12" cy="12" r="9"/><path d="M9 10h.01M15 10h.01M9.5 15a3.5 3.5 0 0 0 5 0"/>',
+  late_a_lot: '<path d="M3 17h1m16 0h1M5.6 10.6l.7.7m12.1-.7l-.7.7M8 17a4 4 0 0 1 8 0M3 21h18M12 9V3l3 3m-6 0l3-3"/>',
+  sick_calls: '<path d="M19.5 12.572L12 20l-7.5-7.428a5 5 0 1 1 7.5-6.566a5 5 0 1 1 7.5 6.572"/>'
+};
+
+const WB_CSS = '' +
+  '@keyframes wbFade{from{opacity:0}to{opacity:1}}@keyframes wbFadeOut{from{opacity:1}to{opacity:0}}' +
+  '@keyframes wbPop{0%{opacity:0;transform:translateY(28px) scale(.94)}100%{opacity:1;transform:none}}' +
+  '@keyframes wbPopOut{to{opacity:0;transform:translateY(14px) scale(.97)}}' +
+  '@keyframes wbSheet{from{transform:translateY(100%)}to{transform:none}}@keyframes wbSheetOut{to{transform:translateY(100%)}}' +
+  '@keyframes wbUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}' +
+  '@keyframes wbIcon{0%{opacity:0;transform:scale(.4) rotate(-12deg)}60%{transform:scale(1.12) rotate(2deg)}100%{opacity:1;transform:none}}' +
+  '@keyframes wbRing{0%{opacity:.5;transform:scale(1)}100%{opacity:0;transform:scale(1.75)}}' +
+  '#wbModal{position:fixed;inset:0;z-index:100000;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(15,23,42,.52);animation:wbFade .24s ease-out both}' +
+  '#wbModal.wb-out{animation:wbFadeOut .2s ease-in both}' +
+  '#wbModal .wb-card{position:relative;box-sizing:border-box;width:min(420px,100%);max-height:90vh;overflow:auto;border-radius:22px;padding:30px 24px 22px;background:var(--ui-surface,#fff);color:var(--ui-ink,#0f172a);box-shadow:0 28px 80px rgba(15,23,42,.38);outline:none;animation:wbPop .5s cubic-bezier(.16,1,.3,1) both}' +
+  '#wbModal.wb-out .wb-card{animation:wbPopOut .2s ease-in both}' +
+  '#wbModal .wb-card.late_some{--wb:#0f766e}#wbModal .wb-card.late_a_lot{--wb:#b45309}#wbModal .wb-card.sick_calls{--wb:#be123c}' +
+  '#wbModal .wb-ico{position:relative;width:60px;height:60px;border-radius:50%;margin:0 0 16px;display:flex;align-items:center;justify-content:center;background:color-mix(in srgb,var(--wb) 14%,transparent);color:var(--wb);animation:wbIcon .6s .12s cubic-bezier(.34,1.4,.64,1) both}' +
+  '#wbModal .wb-ico:after{content:"";position:absolute;inset:0;border-radius:50%;border:2px solid var(--wb);opacity:0;animation:wbRing 1.1s .45s ease-out 1 both}' +
+  '#wbModal .wb-ico svg{width:30px;height:30px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}' +
+  '#wbModal .wb-i{animation:wbUp .55s cubic-bezier(.16,1,.3,1) both;animation-delay:calc(.18s + var(--i,0) * .07s)}' +
+  '#wbModal .wb-t{font-size:21px;line-height:1.25;font-weight:800;margin:0 0 8px;letter-spacing:-.01em}' +
+  '#wbModal .wb-d{font-size:15px;line-height:1.6;margin:0 0 18px;color:var(--ui-ink-2,#334155)}' +
+  '#wbModal .wb-more{display:none;font-size:14px;line-height:1.55;margin:0 0 16px;padding:12px 14px;border-radius:12px;background:color-mix(in srgb,var(--wb) 10%,transparent);animation:wbUp .4s cubic-bezier(.16,1,.3,1) both}' +
+  '#wbModal .wb-btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;box-sizing:border-box;min-height:48px;padding:12px 16px;margin:0 0 10px;border:0;border-radius:14px;font:inherit;font-size:15px;font-weight:700;cursor:pointer;text-decoration:none;transition:transform .15s ease,background-color .15s ease,box-shadow .15s ease}' +
+  '#wbModal .wb-btn:active{transform:scale(.98)}' +
+  '#wbModal .wb-main{background:var(--wb);color:#fff}#wbModal .wb-main:hover{box-shadow:0 6px 18px color-mix(in srgb,var(--wb) 40%,transparent);transform:translateY(-1px)}' +
+  '#wbModal .wb-alt{background:color-mix(in srgb,var(--wb) 10%,transparent);color:inherit}#wbModal .wb-alt:hover{background:color-mix(in srgb,var(--wb) 18%,transparent)}' +
+  '#wbModal .wb-btn:focus-visible,#wbModal .wb-x:focus-visible{outline:3px solid color-mix(in srgb,var(--wb) 45%,transparent);outline-offset:2px}' +
+  '#wbModal .wb-btn svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}' +
+  '#wbModal .wb-x{position:absolute;top:12px;right:12px;width:36px;height:36px;border:0;border-radius:50%;background:transparent;color:var(--ui-ink-3,#64748b);font-size:22px;line-height:1;cursor:pointer;transition:background-color .15s}' +
+  '#wbModal .wb-x:hover{background:color-mix(in srgb,var(--wb) 12%,transparent)}' +
+  '#wbModal .wb-f{font-size:12.5px;line-height:1.5;margin:6px 0 0;color:var(--ui-ink-3,#64748b)}' +
+  '@media (max-width:520px){#wbModal{align-items:flex-end;padding:0}#wbModal .wb-card{width:100%;border-radius:24px 24px 0 0;padding:28px 22px calc(22px + env(safe-area-inset-bottom,0px));animation:wbSheet .5s cubic-bezier(.16,1,.3,1) both}#wbModal.wb-out .wb-card{animation:wbSheetOut .22s ease-in both}}' +
+  '@media (prefers-reduced-motion:reduce){#wbModal,#wbModal .wb-card,#wbModal .wb-i,#wbModal .wb-ico,#wbModal .wb-ico:after,#wbModal .wb-more{animation-duration:.01s!important;animation-delay:0s!important}#wbModal .wb-btn{transition:none}}';
+
 function _wbRender(item, name, today, isTest) {
   const t = WB_TEXT[item.key];
   let el = document.getElementById('wbModal'); if (el) el.remove();
+  if (!document.getElementById('wbStyle')) { const st = document.createElement('style'); st.id = 'wbStyle'; st.textContent = WB_CSS; document.head.appendChild(st); }
   el = document.createElement('div'); el.id = 'wbModal'; el.setAttribute('role', 'alertdialog'); el.setAttribute('aria-modal', 'true'); el.setAttribute('aria-labelledby', 'wbTitle');
-  el.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:16px';
-  el.innerHTML = '<div style="width:min(440px,100%);max-height:86vh;overflow:auto;border-radius:18px;padding:22px;background:var(--ui-surface,#fff);color:var(--ui-ink,#0f172a);box-shadow:0 20px 60px rgba(0,0,0,.4)">' +
-    '<div id="wbTitle" style="font-size:18px;font-weight:800;margin:0 0 8px">' + _wbEsc(t.title) + '</div>' +
-    '<div style="font-size:14px;line-height:1.55;margin:0 0 14px">' + _wbEsc(t.body) + '</div>' +
-    '<div id="wbMore" style="display:none;font-size:13.5px;line-height:1.5;margin:0 0 14px;padding:10px 12px;border-radius:10px;background:var(--ui-surface-2,#f1f5f9)">' + _wbEsc(t.moreText || '') + '</div>' +
-    '<a href="' + WB.link + '" target="_blank" rel="noopener noreferrer" style="display:block;text-align:center;padding:12px;border-radius:12px;font-size:14px;font-weight:800;text-decoration:none;background:var(--ui-accent,#2563eb);color:#fff;margin:0 0 8px">' + _wbEsc(WB.linkLabel) + '</a>' +
-    (t.more ? '<button type="button" id="wbMoreBtn" style="width:100%;padding:11px;margin:0 0 8px;border:1px solid var(--ui-line,#cbd5e1);border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;background:transparent;color:inherit">' + _wbEsc(t.more) + '</button>' : '') +
-    '<button type="button" id="wbOk" style="width:100%;padding:11px;border:1px solid var(--ui-line,#cbd5e1);border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;background:transparent;color:inherit">' + _wbEsc(t.ok) + '</button>' +
-    '<div style="font-size:12px;opacity:.7;margin:12px 0 0;line-height:1.45">' + _wbEsc(WB.helpLine) + ' This message is only shown to you. Nobody else is told.</div></div>';
+  el.innerHTML = '<div class="wb-card ' + item.key + '" tabindex="-1">' +
+    '<button type="button" class="wb-x" id="wbX" aria-label="Close">&times;</button>' +
+    '<div class="wb-ico" aria-hidden="true"><svg viewBox="0 0 24 24">' + WB_ICON[item.key] + '</svg></div>' +
+    '<div class="wb-i wb-t" id="wbTitle" style="--i:0">' + _wbEsc(t.title) + '</div>' +
+    '<div class="wb-i wb-d" style="--i:1">' + _wbEsc(t.body) + '</div>' +
+    '<div class="wb-more" id="wbMore">' + _wbEsc(t.moreText || '') + '</div>' +
+    '<a class="wb-i wb-btn wb-main" style="--i:2" href="' + WB.link + '" target="_blank" rel="noopener noreferrer">' + _wbEsc(WB.linkLabel) +
+      '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6M11 13l9-9M15 4h5v5"/></svg></a>' +
+    (t.more ? '<button type="button" class="wb-i wb-btn wb-alt" style="--i:3" id="wbMoreBtn">' + _wbEsc(t.more) + '</button>' : '') +
+    '<button type="button" class="wb-i wb-btn wb-alt" style="--i:4" id="wbOk">' + _wbEsc(t.ok) + '</button>' +
+    '<div class="wb-i wb-f" style="--i:5">' + _wbEsc(WB.helpLine) + ' This message is only shown to you. Nobody else is told.</div></div>';
   document.body.appendChild(el);
-  const close = function () { const m = document.getElementById('wbModal'); if (m) m.remove(); document.removeEventListener('keydown', onKey); };
   const onKey = function (e) { if (e.key === 'Escape') close(); };
+  const close = function () {
+    document.removeEventListener('keydown', onKey);
+    const m = document.getElementById('wbModal'); if (!m) return;
+    m.classList.add('wb-out');
+    setTimeout(function () { const x = document.getElementById('wbModal'); if (x) x.remove(); }, 230);
+  };
   document.addEventListener('keydown', onKey);
   document.getElementById('wbOk').onclick = close;
+  document.getElementById('wbX').onclick = close;
+  el.addEventListener('click', function (e) { if (e.target === el) close(); });
   const mb = document.getElementById('wbMoreBtn');
   if (mb) mb.onclick = function () { document.getElementById('wbMore').style.display = 'block'; mb.style.display = 'none'; };
   if (!isTest) _wbMarkShown(name, item.key, today);   /* a test popup never counts as "shown" */
-  try { document.getElementById('wbOk').focus(); } catch (e) { /* ignore */ }
+  try { el.querySelector('.wb-card').focus({ preventScroll: true }); } catch (e) { /* ignore */ }
 }
 
 /* Read the test key ONCE, the moment this file loads. Nexus rewrites the address to a plain #home while it starts up,
