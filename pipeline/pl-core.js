@@ -278,8 +278,8 @@ async function selPage(table, q, from, to) {
   const total = parseInt(cr.split('/')[1], 10);
   return { rows: await r.json(), total: isNaN(total) ? null : total };
 }
-async function count(table, q) {
-  const r = await api(table + '?select=id' + (q ? '&' + q : ''), { method: 'HEAD', headers: { Prefer: 'count=exact', Range: '0-0', 'Range-Unit': 'items' } });
+async function count(table, q, col) {
+  const r = await api(table + '?select=' + (col || 'id') + (q ? '&' + q : ''), { method: 'HEAD', headers: { Prefer: 'count=exact', Range: '0-0', 'Range-Unit': 'items' } });
   const cr = r.headers.get('Content-Range') || '';
   const n = parseInt(cr.split('/')[1], 10);
   return isNaN(n) ? 0 : n;
