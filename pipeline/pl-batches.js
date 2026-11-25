@@ -54,6 +54,8 @@ async function btBatchFor(date) {   /* the batch that starts on this day (made w
   return f || await ins('nex_batches', { starts_on: date });
 }
 function acDateTile(start, big) { const d = btParts(start); return '<span class="nx-ac-date' + (big ? ' big' : '') + '"><small>' + esc(d.mon) + '</small><b>' + esc(d.day) + '</b><i>' + esc(d.wd) + '</i></span>'; }
+/* the operator's logo colour (nex_facilities.brand_color); no colour set = the timing colours as before */
+function acBrand(c) { const k = (c.nex_facilities || {}).brand_color; return /^#[0-9a-f]{6}$/i.test(k || '') ? ' data-brand style="--brand:' + k + '"' : ''; }
 function acFact(icon, label, val) { return '<span class="nx-ac-f">' + ico(icon) + '<span><small>' + esc(label) + '</small><b' + (val ? '' : ' class="nx-muted"') + '>' + (val ? esc(val) : 'Not set') + '</b></span></span>'; }
 
 function acCardHtml(c, places, today, asked) {
@@ -68,7 +70,7 @@ function acCardHtml(c, places, today, asked) {
     '<span class="nx-pill ' + (c.info_sent_on ? 'ok' : '') + '">Info ' + (c.info_sent_on ? 'sent' : 'not sent') + '</span>' +
     (c.logbook ? '<span class="nx-pill ' + (c.logbook === 'sent' ? 'ok' : (c.logbook === 'scheduled' ? 'info' : 'warn')) + '">Logbook ' + esc(c.logbook.replace('_', ' ')) + '</span>' : '') +
     (nAsked ? '<span class="nx-pill accent">' + nAsked + ' asked for this</span>' : '');
-  return '<button type="button" class="nx-bcard' + (c.is_others ? ' others' : '') + '" data-bf="' + c.id + '" data-tone="' + w.tone + '">' +
+  return '<button type="button" class="nx-bcard' + (c.is_others ? ' others' : '') + '" data-bf="' + c.id + '" data-tone="' + w.tone + '"' + acBrand(c) + '>' +
     '<span class="nx-ac-top">' + acDateTile(start) + '<span class="nx-ac-name"><b>' + esc(btCardName(c)) + '</b>' +
       '<small>' + esc(c.is_others ? 'Students who found their own aged care' : ((c.nex_facilities || {}).suburb || '')) + '</small><em>' + esc(w.text) + '</em></span></span>' +
     '<span class="nx-ac-body">' +
@@ -83,7 +85,7 @@ function acCardHtml(c, places, today, asked) {
 async function renderBatches(body, stale) {
   const today = sydToday();
   const [cards, places, asked] = await Promise.all([
-    sel('nex_batch_facilities', 'select=*,nex_facilities(name,suburb),nex_batches(id,starts_on,name,note)&limit=1000'),
+    sel('nex_batch_facilities', 'select=*,nex_facilities(name,suburb,brand_color),nex_batches(id,starts_on,name,note)&limit=1000'),
     sel('nex_placements', 'select=id,status,shift,batch_facility_id&batch_facility_id=not.is.null&limit=5000'),
     sel('nex_placement_queue', 'select=*&has_placement=eq.false&hold=eq.false&want_start=gte.' + btAddDays(today, -40) + '&order=enrolment_id&limit=1000').catch(() => [])
   ]);
@@ -202,7 +204,7 @@ async function agedCareNew(facilityId) {
 route(/^\/placement\/aged-care\/([0-9a-f-]{36})$/, async m => {
   PL.tab = 'batches';   /* "Back" lands on the Batches tab */
   const id = m[1], today = sydToday();
-  const card = (await sel('nex_batch_facilities', 'select=*,nex_facilities(name,suburb,address,contact_name,phone),nex_batches(id,starts_on,name,note)&id=eq.' + id))[0];
+  const card = (await sel('nex_batch_facilities', 'select=*,nex_facilities(name,suburb,address,contact_name,phone,brand_color),nex_batches(id,starts_on,name,note)&id=eq.' + id))[0];
   if (!card) return pageHead('pin', 'Placement', 'Aged care', '') + '<div class="nx-card"><div class="nx-card-b">' + empty('This aged care is not here any more', 'It may have been removed from the list.', '<a class="nx-btn primary" href="#/placement">Back to Batches</a>') + '</div></div>';
   const batch = card.nex_batches, fac = card.nex_facilities || {}, start = btStart(batch, card), w = acWhen(start, today);
   const [places, askedAll] = await Promise.all([
@@ -251,7 +253,7 @@ route(/^\/placement\/aged-care\/([0-9a-f-]{36})$/, async m => {
     };
   });
   return '<div class="nx-crumbs"><a href="#/placement">Placement</a> / <a href="#/placement">Batches</a> / <span>' + esc(btCardName(card)) + '</span></div>' +
-    '<div class="nx-card nx-achead" data-tone="' + w.tone + '">' + acDateTile(start, true) +
+    '<div class="nx-card nx-achead" data-tone="' + w.tone + '"' + acBrand(card) + '>' + acDateTile(start, true) +
     '<div class="nx-achead-t"><div class="nx-eyebrow">' + esc(card.is_others ? 'Others confirmed' : 'Aged care') + ' · ' + esc(w.text) + '</div><h1 class="nx-title">' + esc(btCardName(card)) + '</h1>' +
     ((where || who) ? '<div class="nx-muted">' + esc([where, who].filter(Boolean).join(' · ')) + '</div>' : '') + '</div>' +
     '<div class="nx-btnrow"><button class="nx-btn" id="acEdit">' + ico('edit') + 'Edit details</button></div></div>' +
