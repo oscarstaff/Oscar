@@ -11,17 +11,18 @@ route(/^\/payments(?:\?(.*))?$/, async m => {
   if (qs.get('view')) { PY.view = qs.get('view'); PY.page = 0; PY.sel = null; history.replaceState(null, '', '#/payments'); }
   if (PY.view === 'attention') PY.view = 'toprocess';   /* the old Needs attention tab is now the Queue status filter */
   if (PY.view === 'cash' && !ME.admin) PY.view = 'toprocess';   /* the cash receipts go to the admins */
-  const [cTo, cDone, cUnm, cVer, cCash] = await Promise.all([
-    count('nex_payment_queue', 'processing_step=neq.processed'),
+  const [cDr, cTo, cDone, cUnm, cVer, cCash] = await Promise.all([
+    count('nex_payment_queue', 'processing_step=in.(draft_not_made,draft_made)'),
+    count('nex_payment_queue', 'processing_step=eq.ready_to_process'),
     count('nex_payment_queue', 'processing_step=eq.processed'),
     count('nex_payments', 'student_id=is.null'),
     count('nex_payments', 'verify_status=eq.pending_verification'),
     ME.admin ? count('nex_payments', 'handover_status=eq.awaiting') : 0
   ]);
   afterRender(() => bindPayments());
-  const seg = [['all', 'All payments', null], ['toprocess', 'To process', cTo], ['processed', 'Processed', cDone], ['verify', 'To verify', cVer]].concat(ME.admin ? [['cash', 'Cash receipts', cCash]] : [], [['unmatched', 'Unmatched', cUnm]]);
+  const seg = [['all', 'All payments', null], ['drafts', 'Drafts', cDr], ['toprocess', 'To process', cTo], ['processed', 'Processed', cDone], ['verify', 'To verify', cVer]].concat(ME.admin ? [['cash', 'Cash receipts', cCash]] : [], [['unmatched', 'Unmatched', cUnm]]);
   return pageHead('cash', 'Payments', 'Payment queue', '<button class="nx-btn primary" id="pyAdd">' + ico('plus') + 'Record payment</button>') +
-    '<div class="nx-split"><div class="nx-card"><div class="nx-toolbar" style="border-top:0"><div class="nx-seg" id="pySeg">' + seg.map(([k, l, n]) => '<button data-v="' + k + '" aria-pressed="' + (PY.view === k) + '">' + l + (n != null ? ' <span class="nx-count">' + n + '</span>' : '') + '</button>').join('') + '</div><input class="nx-in sm" id="pyQ" style="min-width:220px" placeholder="Search name or reference" value="' + esc(PY.q) + '"><select class="nx-sel sm" id="pyQs" aria-label="Queue status"' + (['toprocess', 'processed'].indexOf(PY.view) < 0 ? ' hidden' : '') + '><option value="">All queue statuses</option><option value="__none"' + (PY.qs === '__none' ? ' selected' : '') + '>Not set</option>' + selectOpts(opts('payment_queue'), PY.qs) + '</select></div>' +
+    '<div class="nx-split"><div class="nx-card"><div class="nx-toolbar" style="border-top:0"><div class="nx-seg" id="pySeg">' + seg.map(([k, l, n]) => '<button data-v="' + k + '" aria-pressed="' + (PY.view === k) + '">' + l + (n != null ? ' <span class="nx-count">' + n + '</span>' : '') + '</button>').join('') + '</div><input class="nx-in sm" id="pyQ" style="min-width:220px" placeholder="Search name or reference" value="' + esc(PY.q) + '"><select class="nx-sel sm" id="pyQs" aria-label="Queue status"' + (['drafts', 'toprocess', 'processed'].indexOf(PY.view) < 0 ? ' hidden' : '') + '><option value="">All queue statuses</option><option value="__none"' + (PY.qs === '__none' ? ' selected' : '') + '>Not set</option>' + selectOpts(opts('payment_queue'), PY.qs) + '</select></div>' +
     '<div id="pyBody"></div><div class="nx-foot" id="pyFoot"><span></span></div></div><div class="nx-drawer" id="pyDrawer" hidden></div></div>';
 });
 
@@ -83,7 +84,8 @@ function bindPayments() {
           rows.map(p => '<tr><td>' + esc(fmtDate(p.paid_on)) + '</td><td>' + esc(p.payer_name || '–') + '</td><td class="nx-money">' + money(p.amount) + '</td><td>' + esc(p.method || '–') + '</td><td>' + esc(p.reference || '–') + '</td><td>' + (p.student_id ? '<a href="#/students/' + p.student_id + '">Open</a>' : '<span class="nx-pill warn">Unmatched</span>') + '</td><td>' + payStatusHtml(p) + '</td><td>' + payActions(p) + '</td></tr>').join('') + '</tbody></table></div>' : empty(PY.view === 'unmatched' ? 'Every payment is linked to a student' : PY.view === 'verify' ? 'Nothing waiting for verification' : PY.view === 'cash' ? 'No cash receipts waiting for a check' : 'No payments found');
       } else {
         let query = 'select=*,nex_payments(id,amount,paid_on,payer_name,reference,method,student_id),nex_enrolments(id,student_id,qualification_id,fee,nex_students(id,first_name,last_name,email),pays:nex_payments(id,amount,paid_on,created_at))&order=nex_payments(paid_on).asc.nullslast,created_at.asc,id.asc';
-        if (PY.view === 'toprocess') query += '&processing_step=neq.processed';
+        if (PY.view === 'toprocess') query += '&processing_step=eq.ready_to_process';
+        else if (PY.view === 'drafts') query += '&processing_step=in.(draft_not_made,draft_made)';
         else query += '&processing_step=eq.processed';
         if (PY.qs === '__none') query += '&queue_status=is.null'; else if (PY.qs) query += '&queue_status=eq.' + encodeURIComponent(PY.qs);
         /* the search runs in the database (not on the 50 rows on screen), so the counts and the page buttons stay right */
@@ -107,7 +109,7 @@ function bindPayments() {
       $$('[data-hand]', body).forEach(b => b.onclick = () => handoverCheck(rowsCache.find(x => x.id === b.dataset.hand), load));
     } catch (e) { body.innerHTML = empty('Could not load payments', e.message); }
   };
-  $$('#pySeg button').forEach(b => b.onclick = () => { PY.view = b.dataset.v; PY.page = 0; PY.sel = null; $('#pyDrawer').hidden = true; $('#pyQs').hidden = ['toprocess', 'processed'].indexOf(PY.view) < 0; $$('#pySeg button').forEach(x => x.setAttribute('aria-pressed', String(x === b))); load(); });
+  $$('#pySeg button').forEach(b => b.onclick = () => { PY.view = b.dataset.v; PY.page = 0; PY.sel = null; $('#pyDrawer').hidden = true; $('#pyQs').hidden = ['drafts', 'toprocess', 'processed'].indexOf(PY.view) < 0; $$('#pySeg button').forEach(x => x.setAttribute('aria-pressed', String(x === b))); load(); });
   let t = 0; $('#pyQ').addEventListener('input', e => { clearTimeout(t); t = setTimeout(() => { PY.q = e.target.value; PY.page = 0; load(); }, 300); });
   $('#pyQs').onchange = e => { PY.qs = e.target.value; PY.page = 0; load(); };
   if ($('#pyAdd')) $('#pyAdd').onclick = () => globalAddPayment();
