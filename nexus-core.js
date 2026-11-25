@@ -1242,6 +1242,7 @@ async function enterHub(){
       maybeShowTour();
     }, 300);
     try{ checkShiftChangeNotices(); }catch(e){}
+    try{ setTimeout(function(){ if(typeof checkWellbeing==='function') checkWellbeing(); }, 4000); }catch(e){}
   }).catch(function(e){ console.warn('boot data', e); });
   if(typeof applySavedTextColor === 'function') applySavedTextColor();
   loadGlobalGeofence();
