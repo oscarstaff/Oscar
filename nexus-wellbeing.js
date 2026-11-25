@@ -9,7 +9,7 @@
    Rules (change the numbers here and nowhere else):
      late_some   : 10 to 59 min late on 3 or more shifts in the last 14 days        -> "Everything okay?"
      late_a_lot  : 60 min or more late on 2 or more shifts in the last 7 days        -> "Would a later start help? Is your health okay?"
-     sick_calls  : 1 or more same-day sick calls in the last 10 days                 -> "Speak to a manager if it is getting worse"
+     sick_calls  : 1 or more APPROVED same-day sick leaves in the last 10 days                 -> "Speak to a manager if it is getting worse"
    Only one popup is shown at a time; the most serious comes first (sick_calls, then late_a_lot, then late_some).
    "Late" = first clock-in of the day minus the rostered start, in real minutes (no rounding, no grace).
    Days on approved leave are skipped. A gap over 6 hours is treated as a missed clock-in, not lateness. */
@@ -62,7 +62,7 @@ function wbEvaluate(shifts, ins, leaves, today) {
     else if (late >= WB.someMin && ymd >= someFrom) some++;
   });
   const sick = (leaves || []).filter(function (l) {
-    return l.reason_type === 'Sick leave' && (l.status === 'approved' || l.status === 'pending') && l.from_date >= sickFrom && l.from_date <= today &&
+    return l.reason_type === 'Sick leave' && l.status === 'approved' && l.from_date >= sickFrom && l.from_date <= today &&
       l.submitted_at && _wbSyd(l.submitted_at).ymd === l.from_date;       /* same-day call: sent on the day the leave starts */
   }).length;
   const out = [];
@@ -138,7 +138,7 @@ async function checkWellbeing() {
     const [shifts, ins, leaves] = await Promise.all([
       sbGet('roster_shifts', '?staff_name=eq.' + q + '&status=eq.assigned&shift_date=gte.' + from14 + '&shift_date=lt.' + today + '&select=shift_date,start_time&limit=200'),
       sbGet('clock_log', '?staff_name=eq.' + q + '&action=eq.in&ts=gte.' + _wbAddDays(from14, -1) + 'T00:00:00Z&select=ts&order=ts.asc&limit=600'),
-      sbGet('leave_submissions', '?staff_name=eq.' + q + '&to_date=gte.' + from14 + '&status=in.(approved,pending)&select=from_date,to_date,status,reason_type,submitted_at&limit=100')
+      sbGet('leave_submissions', '?staff_name=eq.' + q + '&to_date=gte.' + from14 + '&status=eq.approved&select=from_date,to_date,status,reason_type,submitted_at&limit=100')
     ]);
     if (!Array.isArray(shifts) || !Array.isArray(ins) || !Array.isArray(leaves)) return;
     const hit = wbEvaluate(shifts, ins, leaves, today).find(function (h) { return !_wbRecentlyShown(name, h.key, today); });
