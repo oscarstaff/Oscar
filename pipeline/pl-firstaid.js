@@ -41,9 +41,35 @@ function fbRows(live) {
   const by = { name: nm, name_desc: (a, c) => nm(c, a), seat: (a, c) => ((a.seat_no || 1e9) - (c.seat_no || 1e9)) || nm(a, c), new: (a, c) => String(c.created_at || '').localeCompare(String(a.created_at || '')) || nm(a, c) };
   return list.sort(by[CB.sort] || nm);
 }
+/* Flags a person who is booked more than once. Same class day (twice in this class, or in another class that day) = red "Duplicate booking".
+   Another upcoming class day = amber "Also booked 2 Dec" linking to that class (it can be right, e.g. CPR one day and First Aid the next, so it is only a heads-up).
+   FB_DUP maps a booking id to the ready-made pill; it is rebuilt each time the day is opened. */
+let FB_DUP = {};
+async function fbDupFlags(cur, books, today) {
+  FB_DUP = {};
+  if (!cur || cur.class_date < today) return;   /* a class that has passed has nothing left to warn about */
+  const live = books.filter(b => !bkOff(b.status) && b.booking_type !== 'agent_group');
+  if (!live.length) return;
+  const sid = new Set(), em = new Set(), ph = new Set();
+  live.forEach(b => { if (b.student_id) sid.add(b.student_id); if (b.email) em.add(b.email.toLowerCase()); if (b.phone) ph.add(b.phone); });
+  const parts = [];
+  if (sid.size) parts.push('student_id.in.' + inList(Array.from(sid)));
+  if (em.size) parts.push('email.in.' + inList(Array.from(em)));
+  if (ph.size) parts.push('phone.in.' + inList(Array.from(ph)));
+  const others = parts.length ? await sel('nex_class_bookings', 'select=id,session_id,student_id,email,phone,status,booking_type,nex_class_sessions!inner(class_date,kind)&nex_class_sessions.class_date=gte.' + today + '&nex_class_sessions.kind=neq.renewal&session_id=neq.' + cur.id + '&or=(' + parts.join(',') + ')&limit=1000') : [];
+  const same = (a, c) => (a.student_id && a.student_id === c.student_id) || (a.email && c.email && a.email.toLowerCase() === c.email.toLowerCase()) || (a.phone && a.phone === c.phone);
+  live.forEach(b => {
+    const twin = live.some(x => x.id !== b.id && same(b, x));
+    const mine = others.filter(o => !bkOff(o.status) && o.booking_type !== 'agent_group' && same(b, o));
+    const sameDay = mine.filter(o => o.nex_class_sessions.class_date === cur.class_date);
+    if (twin || sameDay.length) { FB_DUP[b.id] = '<span class="nx-pill bad" title="This person has more than one booking on this class day. Keep one and cancel the other.">Duplicate booking</span>'; return; }
+    const days = new Map(); mine.forEach(o => { if (!days.has(o.session_id)) days.set(o.session_id, o.nex_class_sessions.class_date); });
+    if (days.size) FB_DUP[b.id] = Array.from(days.entries()).sort((a, c) => a[1].localeCompare(c[1])).map(([id, d]) => '<a class="nx-pill warn" href="#/firstaid/' + id + '" title="Also booked on another class day. Open that class.">Also booked ' + esc(fmtDay(d).dm) + '</a>').join('');
+  });
+}
 function fbRow(cur, b, i, payBy, showSeats) {
   const off = bkOff(b.status);
-  return '<tr class="nx-tr' + (b.conf_sent && !off ? ' nx-conf' : '') + '" data-b="' + b.id + '">' + (showSeats ? '<td class="nx-chk"><input type="checkbox" data-sel="' + b.id + '"' + (FB_SEL.has(b.id) ? ' checked' : '') + ' aria-label="Select ' + esc(b.name) + '"></td>' : '') + '<td class="nx-num">' + (i + 1) + '</td><td class="nx-namecell"><div class="nx-nameline"><b>' + (b.nex_students ? '<a href="#/students/' + b.nex_students.id + '">' + esc(b.name) + '</a>' : esc(b.name)) + '</b>' + (b.booking_type === 'student' ? '<span class="nx-tag"' + (b.created_by ? ' title="Booked by ' + esc(b.created_by) + '"' : '') + '>Student</span>' : '<span class="nx-tag walk" title="' + esc([b.agent_id ? agentName(b.agent_id) : '', b.created_by ? 'Booked by ' + b.created_by : ''].filter(Boolean).join(' · ')) + '">' + (b.booking_type === 'walk_in' ? 'Walk-in' : 'Agent group') + '</span>') + (cur.kind !== 'renewal' && Array.isArray(b.sections) && b.sections.length ? '<span class="nx-tag part" title="Attends only: ' + esc(FA_SECTIONS.filter(x => b.sections.includes(x[0])).map(x => x[1]).join(', ')) + '">' + esc(FA_SECTIONS.filter(x => b.sections.includes(x[0])).map(x => x[2]).join(' + ')) + '</span>' : '') + '</div><span class="nx-sub" title="' + esc([fmtPhone(b.phone), b.email].filter(Boolean).join(' · ')) + '">' + esc([fmtPhone(b.phone), b.email].filter(Boolean).join(' · ') || 'No contact details') + '</span><span class="nx-sub">' + esc(bkBookedBy(b)) + '</span></td>' +
+  return '<tr class="nx-tr' + (b.conf_sent && !off ? ' nx-conf' : '') + '" data-b="' + b.id + '">' + (showSeats ? '<td class="nx-chk"><input type="checkbox" data-sel="' + b.id + '"' + (FB_SEL.has(b.id) ? ' checked' : '') + ' aria-label="Select ' + esc(b.name) + '"></td>' : '') + '<td class="nx-num">' + (i + 1) + '</td><td class="nx-namecell"><div class="nx-nameline"><b>' + (b.nex_students ? '<a href="#/students/' + b.nex_students.id + '">' + esc(b.name) + '</a>' : esc(b.name)) + '</b>' + (FB_DUP[b.id] || '') + (b.booking_type === 'student' ? '<span class="nx-tag"' + (b.created_by ? ' title="Booked by ' + esc(b.created_by) + '"' : '') + '>Student</span>' : '<span class="nx-tag walk" title="' + esc([b.agent_id ? agentName(b.agent_id) : '', b.created_by ? 'Booked by ' + b.created_by : ''].filter(Boolean).join(' · ')) + '">' + (b.booking_type === 'walk_in' ? 'Walk-in' : 'Agent group') + '</span>') + (cur.kind !== 'renewal' && Array.isArray(b.sections) && b.sections.length ? '<span class="nx-tag part" title="Attends only: ' + esc(FA_SECTIONS.filter(x => b.sections.includes(x[0])).map(x => x[1]).join(', ')) + '">' + esc(FA_SECTIONS.filter(x => b.sections.includes(x[0])).map(x => x[2]).join(' + ')) + '</span>' : '') + '</div><span class="nx-sub" title="' + esc([fmtPhone(b.phone), b.email].filter(Boolean).join(' · ')) + '">' + esc([fmtPhone(b.phone), b.email].filter(Boolean).join(' · ') || 'No contact details') + '</span><span class="nx-sub">' + esc(bkBookedBy(b)) + '</span></td>' +
       '<td>' + bookingPayCell(b, payBy[b.student_id]) + '</td><td>' + attCell(b) + '</td>' +
       '<td class="nx-flagcell"><div class="nx-flags">' + bookingFlags(cur, b, showSeats && !off) + '</div></td>' +
       (showSeats ? '<td class="nx-seatcell">' + (b.seat_no ? '<b>Seat ' + b.seat_no + '</b>' : (off ? '' : '<button class="nx-btn sm" data-seat="' + b.id + '" title="Give the next free seat">Allocate</button>')) + '</td>' : '') +
@@ -72,6 +98,7 @@ route(/^\/firstaid(?:\/([0-9a-f-]{36}))?$/, async m => {
   if (sessions.length) { const rows = await selAll('nex_class_bookings', 'select=session_id,status&session_id=in.' + inList(sessions.map(s => s.id))); rows.forEach(b => { if (!bkOff(b.status)) cnt[b.session_id] = (cnt[b.session_id] || 0) + 1; }); }
   let books = [];
   if (cur) books = await sel('nex_class_bookings', 'select=*,nex_students(id,first_name,last_name)&session_id=eq.' + cur.id + '&order=created_at.asc');
+  await fbDupFlags(cur, books, today).catch(() => { FB_DUP = {}; });
   const o = (v, cur, l) => '<option value="' + esc(v) + '"' + (cur === v ? ' selected' : '') + '>' + esc(l) + '</option>';
   const filtered = !!(CF.trainer || CF.from || CF.to);
   const bar = '<div class="nx-card"><div class="nx-toolbar" style="border-top:0;flex-wrap:wrap"><select class="nx-sel sm" id="cfTrainer" aria-label="Trainer">' + o('', CF.trainer, 'All trainers') + trainerNames.map(n => o(n, CF.trainer, n)).join('') + '</select>' +
