@@ -18,7 +18,16 @@ const NOTES = [
   "Certificate IV in Disability applicants must have completed CHC33021 Certificate III in Individual Support (Ageing & Disability). Please include a copy.",
   "First Aid, CPR and Manual Handling classes are held at Rockdale.",
 ];
-const SIGN = ["Kind regards,", "Oscars Training Centre Support"];
+// The Student Centre Team signature (same lines as the support mailbox signature). The plain-text copy and the HTML copy say the same thing.
+const SIGN = [
+  "Best Regards,",
+  "Student Centre Team",
+  "Phone: 0481487715 / 0481487720",
+  "Landline: 0295997373",
+  "Email: support@studentscenter.com.au",
+  "       studentcentres2020@gmail.com",
+  "Address: Suite 5/5 King St, Rockdale, NSW, 2216",
+];
 const CLOSING = "We can't process your enrolment until we receive the form and all documents. If you have any questions, please do not hesitate to contact us at " + PHONE + ".";
 
 // first = the lead's first name; with no name the email just says "Hello,"
@@ -53,6 +62,10 @@ const LOGO_URL = "https://oscarstaff.github.io/Oscar/assets/otc-email-logo.png";
 const logo = () => `<p style="margin:0"><img src="${LOGO_URL}" width="200" alt="Oscars Training Centre" style="display:block;width:200px;max-width:100%;height:auto;border:0"></p>`;
 const mark = (t: string) => `<b style="background-color:#fff3a3">${t}</b>`;
 const H = (n: string, t: string) => `<p style="margin:22px 0 8px;font-size:16px;font-weight:bold;color:#1559d6">${n} ${t}</p>`;
+const MAPS = "https://www.google.com/maps/search/5+King+St,+Rockdale,+NSW,+2216";
+// Orange bold sign-off, then the contact lines in bold dark text with blue links (plain HTML, no table or image).
+const signHtml = () => `<p style="margin:22px 0 0;color:#d9640a"><b>Best Regards,<br>Student Centre Team</b></p>
+<p style="margin:0 0 16px;color:#222222"><b>Phone: 0481487715 / 0481487720<br>Landline: 0295997373<br>Email: <a href="mailto:support@studentscenter.com.au" style="color:#1a56c4">support@studentscenter.com.au</a><br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="mailto:studentcentres2020@gmail.com" style="color:#1a56c4">studentcentres2020@gmail.com</a><br>Address: Suite 5/<a href="${MAPS}" style="color:#1a56c4">5 King St, Rockdale, NSW, 2216</a></b></p>`;
 const BOX = "margin:0 0 14px;padding:12px 16px;background-color:#f3f6fc;border:1px solid #cfd9ee;border-radius:6px";
 
 // Plain HTML only (no buttons, tracking or tables): bold coloured step headings, the form link in a pale box, the key items highlighted, the logo under the signature.
@@ -73,7 +86,7 @@ ${H("Step 2:", "Reply with the following documents")}
 <p style="margin:22px 0 8px;font-size:16px;font-weight:bold;color:#1559d6">Please note</p>
 <ul style="margin:0 0 14px;padding-left:22px">${NOTES.map((n) => li(esc(n))).join("")}</ul>
 ${p(`<b>We can't process your enrolment until we receive the form and all documents.</b> If you have any questions, please do not hesitate to contact us at <a href="tel:${PHONE}" style="color:#0e4a82">${PHONE}</a>.`)}
-<p style="margin:0 0 14px;color:#d9640a"><b>${SIGN[0]}</b><br><b>${SIGN[1]}</b><br>P: ${PHONE}</p>
+${signHtml()}
 ${logo()}
 </div>`;
 }
