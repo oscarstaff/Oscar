@@ -104,6 +104,7 @@ function bindPayments() {
       $('#pyFoot').innerHTML = '<span>' + (total != null ? (total ? fromN + '–' + toN + ' of ' + total.toLocaleString('en-AU') : '') : rows.length + ' shown') + (capNote ? ' · Many people match. Type more of the name to narrow it down.' : '') + '</span><span class="nx-btnrow"><button class="nx-btn sm" id="pyPrev"' + (PY.page ? '' : ' disabled') + '>Previous</button><button class="nx-btn sm" id="pyNext"' + (total != null && toN >= total ? ' disabled' : '') + '>Next</button></span>';
       $('#pyPrev').onclick = () => { PY.page--; load(); }; $('#pyNext').onclick = () => { PY.page++; load(); };
       $$('[data-link]', body).forEach(b => b.onclick = () => linkPayment(rowsCache.find(x => x.id === b.dataset.link)));
+      $$('[data-editpay]', body).forEach(b => b.onclick = () => editPayment(rowsCache.find(x => x.id === b.dataset.editpay), load));
       $$('[data-vok]', body).forEach(b => b.onclick = () => verifyPayment(rowsCache.find(x => x.id === b.dataset.vok), 'confirmed', load));
       $$('[data-vno]', body).forEach(b => b.onclick = () => verifyPayment(rowsCache.find(x => x.id === b.dataset.vno), 'rejected', load));
       $$('[data-hand]', body).forEach(b => b.onclick = () => handoverCheck(rowsCache.find(x => x.id === b.dataset.hand), load));
@@ -155,6 +156,28 @@ function linkPayment(p, queueRow) {
   }, p.payer_name || '');
 }
 
+/* fix a payment that was keyed or imported wrongly (date, amount, method, reference, note). The toast offers Undo; the change is kept in the audit trail. */
+function editPayment(p, after) {
+  if (!p) return;
+  const f = [
+    { k: 'paid_on', label: 'Payment date', type: 'date', value: p.paid_on || '', required: true },
+    { k: 'amount', label: 'Amount ($)', type: 'number', value: p.amount, required: true },
+    { k: 'amount_help', type: 'help', text: 'Check the amount against the payment processing sheet before you change it.' },
+    { k: 'method', label: 'Method', type: 'select', options: payMethodOpts(), value: p.method || '', blank: 'Not set' },
+    { k: 'reference', label: 'Reference', value: p.reference || '', placeholder: 'Bank reference or receipt' }, { k: 'note', label: 'Note', value: p.note || '' }];
+  return formModal('Edit payment · ' + (p.payer_name || 'payment'), f, async v => {
+    const patch = {};
+    if (v.paid_on && v.paid_on !== p.paid_on) patch.paid_on = v.paid_on;
+    if (v.amount !== '' && v.amount != null && Number(v.amount) !== Number(p.amount)) { if (!(Number(v.amount) > 0)) throw new Error('Enter an amount above $0.'); patch.amount = Number(v.amount); }
+    if ((v.method || null) !== (p.method || null)) patch.method = v.method || null;
+    if ((v.reference || null) !== (p.reference || null)) patch.reference = v.reference || null;
+    if ((v.note || null) !== (p.note || null)) patch.note = v.note || null;
+    if (!Object.keys(patch).length) return toast('Nothing changed');
+    await upd('nex_payments', 'id=eq.' + p.id, patch);
+    toast('Payment updated'); if (after) after(); else render();
+  }, 'Save changes');
+}
+
 function globalAddPayment() {
   /* one form: type the student's phone or email (or name). If they are already in Yatra their details fill in and the payment goes against their enrolment. */
   const f = [
@@ -193,6 +216,7 @@ function payActions(p) {
   const b = [];
   if (!p.student_id && canPay()) b.push('<button class="nx-btn sm" data-link="' + p.id + '">Link to student</button>');
   if (p.verify_status === 'pending_verification' && canVerify()) b.push('<button class="nx-btn sm primary" data-vok="' + p.id + '">Verify</button><button class="nx-btn sm" data-vno="' + p.id + '">Not found</button>');
+  if (canPay()) b.push('<button class="nx-btn sm" data-editpay="' + p.id + '">' + ico('edit') + 'Edit</button>');
   if (p.handover_status === 'awaiting' && ME.admin && p.student_id) b.push('<button class="nx-btn sm primary" data-hand="' + p.id + '">Handover checked</button>');
   return b.length ? '<div class="nx-btnrow">' + b.join('') + '</div>' : '';
 }
