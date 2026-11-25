@@ -13,7 +13,7 @@ route(/^\/$/, async () => {
     countKind('student'),
     countKind('lead'),
     count('nex_enrolments', 'deleted_at=is.null&stage=not.in.(certificate_issued,not_interested)'),
-    count('nex_payment_queue', 'processing_step=neq.processed'),
+    count('nex_payment_queue', 'processing_step=eq.ready_to_process'),
     count('nex_payments', 'student_id=is.null'),
     count('nex_tasks', 'status=neq.done&due_on=lte.' + today + '&assigned_to=eq.' + encodeURIComponent(ME.name)),
     sel('nex_class_sessions', 'select=*&kind=neq.renewal&class_date=gte.' + today + '&order=class_date&limit=4'),
@@ -41,7 +41,7 @@ route(/^\/$/, async () => {
     att('#/tasks', nDue, 'My tasks due', 'today or overdue', 'bad') +
     (forTeams('Enrolment') ? att('#/leads?fu=due', nFu, 'Lead follow-ups due', '1st, 2nd or 3rd, today or overdue', 'bad') : '') +
     (forTeams('Accounts', 'Processing') ? att('#/payments?view=unmatched', nUnm, 'Unmatched payments', 'no student linked', 'warn') : '') +
-    (forTeams('Processing', 'Accounts') ? att('#/payments', nQueue, 'Payments to process', 'in the processing queue', 'accent') : '') +
+    (forTeams('Processing', 'Accounts') ? att('#/payments?view=toprocess', nQueue, 'Payments to process', 'marked Ready for Processing', 'accent') : '') +
     (canVerify() ? att('#/payments?view=verify', nVer, 'Bank payments to verify', 'waiting for Accounts', 'warn') : '') +
     (ME.admin ? att('#/payments?view=cash', nCash, 'Cash receipts to check', 'handover waiting for an admin', 'warn') : '') +
     (forTeams('Placement') ? att('#/placement', nReady, 'Ready to place', 'placement documents all received', 'accent').replace('<a class="nx-att', '<a id="attReady" class="nx-att') : '') +
