@@ -360,7 +360,11 @@ function identityLookup(m, cfg) {
       if (list.length) {
         const sig = list.map(x => x.r.id).sort().join(',');
         if (sig === dismissed) { show(''); return; }
-        show('<div class="nx-idpick"><div class="nx-idpick-h"><span>' + (hasStrong ? 'Already in Yatra. Tap the right person to use their details, or carry on if this is someone new.' : 'Already in Yatra with a similar name. Tap to use their details, or carry on if this is someone new.') + '</span><button type="button" class="nx-idpick-x" data-dismiss>Dismiss</button></div><div class="nx-idpick-list">' + list.map(x => '<button type="button" class="nx-pick" data-id="' + x.r.id + '"><span><b>' + esc(fullName(x.r)) + '</b><small>' + esc([fmtPhone(x.r.phone), x.r.email].filter(Boolean).join(' · ') || 'No contact details') + ' · ' + esc(x.why.join(', ')) + '</small></span><span class="nx-tag">Use</span></button>').join('') + '</div></div>');
+        /* a slim one-line notice that takes almost no room; the people are in a small pop-over that opens only when asked, so the form never jumps and the next field is never covered */
+        const n = list.length, tell = (hasStrong ? 'Already in Yatra' : 'Similar name in Yatra') + ' · ' + n + (n === 1 ? ' match' : ' matches');
+        show('<div class="nx-idchip"><button type="button" class="nx-idchip-b" data-open aria-expanded="false"><span class="nx-idchip-t">' + tell + '</span><span class="nx-idchip-v">Review</span></button><button type="button" class="nx-idpick-x" data-dismiss>Dismiss</button><div class="nx-idpop" hidden><div class="nx-idpop-h">' + (hasStrong ? 'Tap the right person to use their details, or carry on if this is someone new.' : 'Tap to use their details, or carry on if this is someone new.') + '</div>' + list.map(x => '<button type="button" class="nx-pick" data-id="' + x.r.id + '"><span><b>' + esc(fullName(x.r)) + '</b><small>' + esc([fmtPhone(x.r.phone), x.r.email].filter(Boolean).join(' · ') || 'No contact details') + ' · ' + esc(x.why.join(', ')) + '</small></span><span class="nx-tag">Use</span></button>').join('') + '</div></div>');
+        const pop = $('.nx-idpop', box), opener = $('[data-open]', box);
+        opener.onclick = () => { pop.hidden = !pop.hidden; opener.setAttribute('aria-expanded', String(!pop.hidden)); };
         $('[data-dismiss]', box).onclick = () => { dismissed = sig; show(''); };
         $$('.nx-pick', box).forEach(b => b.onclick = () => choose(list.find(x => x.r.id === b.dataset.id).r, false));
         return;
@@ -368,6 +372,7 @@ function identityLookup(m, cfg) {
       show((goodPhone || goodEmail) ? '<div class="nx-idnew">' + esc(cfg.newMsg || 'Not in Yatra yet. Saving will add a new person.') + '</div>' : (box.dataset.hint ? '<div class="nx-idnew">' + esc(box.dataset.hint) + '</div>' : ''));
     } catch (err) { if (my === token) show(''); }
   };
+  root.addEventListener('click', e => { const pop = $('.nx-idpop', box); if (pop && !pop.hidden && !box.contains(e.target)) { pop.hidden = true; const o = $('[data-open]', box); if (o) o.setAttribute('aria-expanded', 'false'); } });
   const kick = () => { clearTimeout(timer); timer = setTimeout(run, 350); };
   ['first', 'last', 'name', 'phone', 'email'].forEach(k => { const e = el(k); if (e) { e.addEventListener('input', kick); e.addEventListener('change', kick); } });
   if (box.dataset.hint) show('<div class="nx-idnew">' + esc(box.dataset.hint) + '</div>');
