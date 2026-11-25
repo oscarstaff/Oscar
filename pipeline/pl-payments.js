@@ -4,7 +4,7 @@
 /* =========================================================
    Payments and First Aid
    ========================================================= */
-const PY = { view: 'toprocess', q: '', qs: '', page: 0, size: 50, sel: null };   /* qs = the Queue status filter ('' = all, '__none' = not set) */
+const PY = { view: 'all', q: '', qs: '', page: 0, size: 50, sel: null };   /* qs = the Queue status filter ('' = all, '__none' = not set) */
 
 route(/^\/payments(?:\?(.*))?$/, async m => {
   const qs = new URLSearchParams(m[1] || '');
@@ -19,7 +19,7 @@ route(/^\/payments(?:\?(.*))?$/, async m => {
     ME.admin ? count('nex_payments', 'handover_status=eq.awaiting') : 0
   ]);
   afterRender(() => bindPayments());
-  const seg = [['toprocess', 'To process', cTo], ['processed', 'Processed', cDone], ['verify', 'To verify', cVer]].concat(ME.admin ? [['cash', 'Cash receipts', cCash]] : [], [['unmatched', 'Unmatched', cUnm], ['all', 'All payments', null]]);
+  const seg = [['all', 'All payments', null], ['toprocess', 'To process', cTo], ['processed', 'Processed', cDone], ['verify', 'To verify', cVer]].concat(ME.admin ? [['cash', 'Cash receipts', cCash]] : [], [['unmatched', 'Unmatched', cUnm]]);
   return pageHead('cash', 'Payments', 'Payment queue', '<button class="nx-btn primary" id="pyAdd">' + ico('plus') + 'Record payment</button>') +
     '<div class="nx-split"><div class="nx-card"><div class="nx-toolbar" style="border-top:0"><div class="nx-seg" id="pySeg">' + seg.map(([k, l, n]) => '<button data-v="' + k + '" aria-pressed="' + (PY.view === k) + '">' + l + (n != null ? ' <span class="nx-count">' + n + '</span>' : '') + '</button>').join('') + '</div><input class="nx-in sm" id="pyQ" style="min-width:220px" placeholder="Search name or reference" value="' + esc(PY.q) + '"><select class="nx-sel sm" id="pyQs" aria-label="Queue status"' + (['toprocess', 'processed'].indexOf(PY.view) < 0 ? ' hidden' : '') + '><option value="">All queue statuses</option><option value="__none"' + (PY.qs === '__none' ? ' selected' : '') + '>Not set</option>' + selectOpts(opts('payment_queue'), PY.qs) + '</select></div>' +
     '<div id="pyBody"></div><div class="nx-foot" id="pyFoot"><span></span></div></div><div class="nx-drawer" id="pyDrawer" hidden></div></div>';
@@ -82,7 +82,7 @@ function bindPayments() {
         body.innerHTML = rows.length ? '<div class="nx-tablewrap"><table class="nx-table tight"><thead><tr><th>Date</th><th>Paid by</th><th>Amount</th><th>Method</th><th>Reference</th><th>Student</th><th>Status</th><th></th></tr></thead><tbody>' +
           rows.map(p => '<tr><td>' + esc(fmtDate(p.paid_on)) + '</td><td>' + esc(p.payer_name || '–') + '</td><td class="nx-money">' + money(p.amount) + '</td><td>' + esc(p.method || '–') + '</td><td>' + esc(p.reference || '–') + '</td><td>' + (p.student_id ? '<a href="#/students/' + p.student_id + '">Open</a>' : '<span class="nx-pill warn">Unmatched</span>') + '</td><td>' + payStatusHtml(p) + '</td><td>' + payActions(p) + '</td></tr>').join('') + '</tbody></table></div>' : empty(PY.view === 'unmatched' ? 'Every payment is linked to a student' : PY.view === 'verify' ? 'Nothing waiting for verification' : PY.view === 'cash' ? 'No cash receipts waiting for a check' : 'No payments found');
       } else {
-        let query = 'select=*,nex_payments(id,amount,paid_on,payer_name,reference,method,student_id),nex_enrolments(id,student_id,qualification_id,fee,nex_students(id,first_name,last_name,email),pays:nex_payments(id,amount,paid_on,created_at))&order=created_at.desc,id.desc';
+        let query = 'select=*,nex_payments(id,amount,paid_on,payer_name,reference,method,student_id),nex_enrolments(id,student_id,qualification_id,fee,nex_students(id,first_name,last_name,email),pays:nex_payments(id,amount,paid_on,created_at))&order=nex_payments(paid_on).asc.nullslast,created_at.asc,id.asc';
         if (PY.view === 'toprocess') query += '&processing_step=neq.processed';
         else query += '&processing_step=eq.processed';
         if (PY.qs === '__none') query += '&queue_status=is.null'; else if (PY.qs) query += '&queue_status=eq.' + encodeURIComponent(PY.qs);
@@ -93,9 +93,9 @@ function bindPayments() {
         if (mine !== seq) return;
         rowsCache = rows;
         const stepIdx = k => ['draft_not_made', 'draft_made', 'ready_to_process', 'processed'].indexOf(k);
-        body.innerHTML = rows.length ? '<div class="nx-tablewrap"><table class="nx-table tight"><thead><tr><th>Student</th><th>Paid</th><th>Amount</th><th>Placement</th><th>Queue status</th><th>Processing</th><th>Added</th><th>Updated</th></tr></thead><tbody>' +
+        body.innerHTML = rows.length ? '<div class="nx-tablewrap"><table class="nx-table tight"><thead><tr><th>Student</th><th>Paid</th><th>Amount</th><th>Placement</th><th>Queue status</th><th>Processing</th><th>Updated</th></tr></thead><tbody>' +
           rows.map(r => { const p = r.nex_payments || {}, e = r.nex_enrolments || {}, s = e.nex_students || null; const si = stepIdx(r.processing_step);
-            return '<tr class="nx-tr ' + (PY.sel === r.id ? 'sel' : '') + '" data-id="' + r.id + '"><td><div class="nx-who"><span class="nx-avatar">' + esc(initials(s ? fullName(s) : p.payer_name)) + '</span><div><b>' + esc(s ? fullName(s) : (p.payer_name || 'Unknown')) + '</b><span>' + esc(s ? s.email || '' : 'Not matched') + '</span></div></div></td><td>' + esc(fmtDate(p.paid_on)) + '</td><td class="nx-money">' + money(p.amount) + (e.fee && p.id ? (x => x ? '<div class="nx-muted nx-inst">' + esc(x.label) + '</div>' : '')(instalmentOf(e.fee, e.pays, p.id)) : '') + '</td><td>' + pill('placement_queue', r.placement_status) + '</td><td>' + pill('payment_queue', r.queue_status) + '</td><td>' + '<div class="nx-stagecell">' + pill('processing', r.processing_step) + '<div class="nx-steps">' + [0, 1, 2, 3].map(i => '<i class="' + (i <= si ? 'on' : '') + '"></i>').join('') + '</div></div></td><td>' + esc(fmtDT(r.created_at)) + '</td><td>' + esc(fmtDT(r.updated_at)) + '</td></tr>'; }).join('') + '</tbody></table></div>' : empty('Nothing here', q || PY.qs ? 'No entries match your search or filter.' : PY.view === 'toprocess' ? 'The queue is clear.' : 'No entries in this list.');
+            return '<tr class="nx-tr ' + (PY.sel === r.id ? 'sel' : '') + '" data-id="' + r.id + '"><td><div class="nx-who"><span class="nx-avatar">' + esc(initials(s ? fullName(s) : p.payer_name)) + '</span><div><b>' + esc(s ? fullName(s) : (p.payer_name || 'Unknown')) + '</b><span>' + esc(s ? s.email || '' : 'Not matched') + '</span></div></div></td><td>' + esc(fmtDate(p.paid_on)) + '</td><td class="nx-money">' + money(p.amount) + (e.fee && p.id ? (x => x ? '<div class="nx-muted nx-inst">' + esc(x.label) + '</div>' : '')(instalmentOf(e.fee, e.pays, p.id)) : '') + '</td><td>' + pill('placement_queue', r.placement_status) + '</td><td>' + pill('payment_queue', r.queue_status) + '</td><td>' + '<div class="nx-stagecell">' + pill('processing', r.processing_step) + '<div class="nx-steps">' + [0, 1, 2, 3].map(i => '<i class="' + (i <= si ? 'on' : '') + '"></i>').join('') + '</div></div></td><td>' + esc(fmtDT(r.updated_at)) + '</td></tr>'; }).join('') + '</tbody></table></div>' : empty('Nothing here', q || PY.qs ? 'No entries match your search or filter.' : PY.view === 'toprocess' ? 'The queue is clear.' : 'No entries in this list.');
         $$('.nx-tr', body).forEach(tr => tr.onclick = () => openQueueDrawer(rowsCache.find(x => x.id === tr.dataset.id), load));
       }
       const fromN = total ? from + 1 : 0, toN = from + rows.length;

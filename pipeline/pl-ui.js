@@ -320,7 +320,7 @@ function identityLookup(m, cfg) {
   const el = k => (cfg.ids[k] ? $('#' + cfg.ids[k], root) : null);
   const val = k => { const e = el(k); return e ? e.value.trim() : ''; };
   const put = (k, v) => { const e = el(k); if (e && v != null && v !== '') e.value = v; };
-  let chosen = null, timer = 0, token = 0; const refused = new Set();
+  let chosen = null, timer = 0, token = 0, dismissed = ''; const refused = new Set();   /* dismissed = the list of people the warning was closed on; it comes back only if the matches change */
   const keyOf = s => (s.phone || '') + '|' + (s.email || '');
   const show = html => { box.innerHTML = html; };
   /* choosing a person fills in ALL their details, name included, over whatever was typed so far */
@@ -358,7 +358,10 @@ function identityLookup(m, cfg) {
       const fits = r => !toks.length || toks.every(t => fullName(r).toLowerCase().indexOf(t.toLowerCase()) >= 0);
       if (only.length === 1 && fits(only[0].r)) return choose(only[0].r, true);
       if (list.length) {
-        show('<div class="nx-idpick"><div>' + (hasStrong ? 'Already in Yatra. Tap the right person to use their details, or carry on if this is someone new.' : 'Already in Yatra with a similar name. Tap to use their details, or carry on if this is someone new.') + '</div>' + list.map(x => '<button type="button" class="nx-pick" data-id="' + x.r.id + '"><span><b>' + esc(fullName(x.r)) + '</b><small>' + esc([fmtPhone(x.r.phone), x.r.email].filter(Boolean).join(' · ') || 'No contact details') + ' · ' + esc(x.why.join(', ')) + '</small></span><span class="nx-tag">Use</span></button>').join('') + '</div>');
+        const sig = list.map(x => x.r.id).sort().join(',');
+        if (sig === dismissed) { show(''); return; }
+        show('<div class="nx-idpick"><div class="nx-idpick-h"><span>' + (hasStrong ? 'Already in Yatra. Tap the right person to use their details, or carry on if this is someone new.' : 'Already in Yatra with a similar name. Tap to use their details, or carry on if this is someone new.') + '</span><button type="button" class="nx-idpick-x" data-dismiss>Dismiss</button></div><div class="nx-idpick-list">' + list.map(x => '<button type="button" class="nx-pick" data-id="' + x.r.id + '"><span><b>' + esc(fullName(x.r)) + '</b><small>' + esc([fmtPhone(x.r.phone), x.r.email].filter(Boolean).join(' · ') || 'No contact details') + ' · ' + esc(x.why.join(', ')) + '</small></span><span class="nx-tag">Use</span></button>').join('') + '</div></div>');
+        $('[data-dismiss]', box).onclick = () => { dismissed = sig; show(''); };
         $$('.nx-pick', box).forEach(b => b.onclick = () => choose(list.find(x => x.r.id === b.dataset.id).r, false));
         return;
       }

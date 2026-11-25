@@ -21,7 +21,7 @@ route(/^\/$/, async () => {
     canVerify() ? count('nex_payments', 'verify_status=eq.pending_verification') : 0,
     ME.admin ? count('nex_payments', 'handover_status=eq.awaiting') : 0,
     leadFuCount('due').catch(() => 0),
-    (ME.admin || teamIs('Placement')) ? count('nex_placement_queue', 'has_placement=eq.false&hold=eq.false&placement_docs_missing=eq.0&stage=not.in.(' + PP_ENDED + ')').catch(() => 0) : 0
+    (ME.admin || teamIs('Placement')) ? count('nex_placement_queue', 'has_placement=eq.false&hold=eq.false&placement_docs_missing=eq.0&stage=not.in.(' + PP_ENDED + ')', 'enrolment_id').catch(() => 0) : 0
   ]);
   let counts = {};
   if (sessions.length) {
@@ -194,10 +194,12 @@ route(/^\/(students|leads|search)(?:\?(.*))?$/, async m => {
         if (SL.year) query += '&nex_enrolments.year=eq.' + SL.year;
         if (q) query += '&or=(' + personSearchParts(q, digits).join(',') + ')';
         const { rows, total } = await selPage('nex_students', query, SL.page * SL.size, SL.page * SL.size + SL.size - 1);
-        let pays = [];
-        if (rows.length) pays = await sel('nex_payments', 'select=student_id,amount,verify_status&student_id=in.' + inList(rows.map(r => r.id)));
         const twinN = {};   /* same-name flag: how many other people in Yatra share this name (same letters, any order); same name is not always the same person */
-        if (rows.length) { try { (await sel('nex_name_twins', 'select=student_id&student_id=in.' + inList(rows.map(r => r.id)))).forEach(t => { twinN[t.student_id] = (twinN[t.student_id] || 0) + 1; }); } catch (e) {} }
+        const ids = rows.map(r => r.id);   /* the payments and the same-name flags are fetched together, not one after the other */
+        const [pays] = rows.length ? await Promise.all([
+          sel('nex_payments', 'select=student_id,amount,verify_status&student_id=in.' + inList(ids)),
+          sel('nex_name_twins', 'select=student_id&student_id=in.' + inList(ids)).then(tw => tw.forEach(t => { twinN[t.student_id] = (twinN[t.student_id] || 0) + 1; })).catch(() => {})
+        ]) : [[]];
         const paid = {}; pays.forEach(p => { if (payConfirmed(p)) paid[p.student_id] = (paid[p.student_id] || 0) + Number(p.amount); });
         const filtered = SL.q || SL.stage || SL.qual || SL.year || SL.fu || (kind === 'lead' && (SL.from || SL.to || SL.unf));
         body.innerHTML = rows.length ? '<div class="nx-tablewrap"><table class="nx-table' + (kind === 'lead' ? ' nx-leads' : '') + '"><thead><tr><th>' + (kind === 'lead' ? 'Lead' : kind === 'student' ? 'Student' : 'Name') + '</th>' + (kind === 'lead' ? '' : '<th class="nx-c-phone">Phone</th>') + '<th class="nx-c-qual">Qualification</th><th class="nx-c-stage">Stage</th><th class="nx-c-fee">Paid and fee</th>' + (kind === 'lead' ? '<th class="nx-c-fu">Follow-up</th>' : '') + (kind === 'lead' ? '<th></th>' : '<th class="nx-c-date">Enrolled</th><th class="nx-c-agent">Agent</th>') + '</tr></thead><tbody>' +
