@@ -54,7 +54,8 @@ function doPost(e) {
     var fromName = String(p.fromName || 'Oscars Training Centre').replace(/[\r\n"<>]+/g, ' ').trim().slice(0, 80);
     var alias = String(props.getProperty('NEX_MAIL_FROM') || '').trim();
 
-    send_({ to: to, subject: subject, text: text, replyTo: EMAIL_RE_.test(reply) ? reply : '', fromName: fromName, fromAddr: EMAIL_RE_.test(alias) ? alias : '' });
+    var html = p.html ? String(p.html).slice(0, 60000) : '';   // optional ready-made HTML (the enrolment email); without it the text is turned into simple HTML
+    send_({ to: to, subject: subject, text: text, html: html, replyTo: EMAIL_RE_.test(reply) ? reply : '', fromName: fromName, fromAddr: EMAIL_RE_.test(alias) ? alias : '' });
     return out_({ ok: true, remaining: quotaLeft_() });
   } catch (err) {
     return out_({ ok: false, error: String(err && err.message ? err.message : err).slice(0, 200) });
@@ -65,7 +66,7 @@ function doPost(e) {
 // The email goes out as plain text plus an HTML copy. Gmail hard-wraps plain text at about 70
 // characters, which looks narrow on a wide screen; the HTML copy flows to the full width.
 function send_(m) {
-  var html = toHtml_(m.text);
+  var html = m.html || toHtml_(m.text);
   if (typeof Gmail !== 'undefined' && Gmail.Users && Gmail.Users.Messages) {
     var from = m.fromAddr || Session.getEffectiveUser().getEmail();
     var bd = 'nex_' + Utilities.getUuid().replace(/-/g, '');

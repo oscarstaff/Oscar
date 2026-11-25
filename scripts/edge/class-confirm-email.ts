@@ -1,10 +1,9 @@
-// The First Aid and CPR class confirmation email (used by the nex-send-class-confirm edge function).
-// Deliberately PLAIN: no tables, buttons, gradients or tracking; the only picture is the logo under the signature. Heavily designed HTML tends to land in spam, so this reads like an email typed by a person.
-// It is still HTML (never text only) so the important parts can be bold and highlighted; the plain-text wording (draft() in index.ts) is sent alongside it.
+// The First Aid and CPR class confirmation email (used by the nex-send-class-confirm edge function; deployed as email.ts next to index.ts). Plain HTML rules: no buttons, no tracking,
+// only the logo as a picture; headings are bold coloured text, the key facts sit in one pale box, and the money details in another.
 const ADDRESS = "Unit 5, 5 King Street, Rockdale, NSW 2216";
-const PARKING = "1 Market Street Rockdale";
-const PHONE = "0402462830";
-const LOGO_URL = "https://oscarstaff.github.io/Oscar/assets/otc-email-logo.png";   // the logo sits under the signature; it is hosted with the app (assets/otc-email-logo.png)
+const PARKING = "1 Market Street, Rockdale";
+const PHONE = "0402 462 830";
+const LOGO_URL = "https://oscarstaff.github.io/Oscar/assets/otc-email-logo.png";
 const logo = () => `<p style="margin:0"><img src="${LOGO_URL}" width="200" alt="Oscars Training Centre" style="display:block;width:200px;max-width:100%;height:auto;border:0"></p>`;
 const FEES: [string, string][] = [
   ["Certificate III in Individual Support (Ageing & Disability) including First Aid & CPR", "$1,300"],
@@ -15,41 +14,47 @@ const FEES: [string, string][] = [
   ["CPR", "$55"],
   ["Manual Handling", "$80"],
 ];
-
-export function esc(s: string) {
-  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-}
+export function esc(s: string) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-export type ClassInfo = { iso?: string; start?: string; end?: string; lines?: string[]; span?: string };   // lines = one row per section this person attends (with times); span = overall time
-// the weekday is worked out from the date itself, so it cannot disagree with it
+export type ClassInfo = { iso?: string; start?: string; end?: string; lines?: string[]; span?: string };
 function weekday(date: string, iso?: string) {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || "") || (() => { const x = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(date || ""); return x ? [x[0], x[3], x[2], x[1]] : null; })();
   return m ? DAYS[new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]))).getUTCDay()] : "";
 }
-// the key facts are bold on a pale yellow marker; everything else is ordinary text
 const mark = (t: string) => `<b style="background-color:#fff3a3">${t}</b>`;
+const H = (t: string) => `<p style="margin:22px 0 8px;font-size:16px;font-weight:bold;color:#1559d6">${t}</p>`;
+const BOX = "margin:0 0 14px;padding:12px 16px;background-color:#f3f6fc;border:1px solid #cfd9ee;border-radius:6px";
 
 export function classConfirmHtml(first: string, date: string, time: string, c: ClassInfo = {}): string {
   const name = esc(first || "Student");
   const wd = weekday(date, c.iso);
   const when = esc((wd ? wd + " " : "") + date);
-  const li = (t: string) => `<li style="margin:0 0 4px">${t}</li>`;
-  const sections = c.lines && c.lines.length
-    ? `<p style="margin:0 0 14px">Your sections and times:</p><ul style="margin:0 0 14px;padding-left:22px">${c.lines.map((l) => li(mark(esc(l)))).join("")}</ul>` : "";
-  const fees = FEES.map(([n, p]) => li(`${esc(n)}: <b>${esc(p)}</b>`)).join("");
   const p = (t: string) => `<p style="margin:0 0 14px">${t}</p>`;
-  return `<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.5;color:#222222">
+  const li = (t: string) => `<li style="margin:0 0 4px">${t}</li>`;
+  const row = (k: string, v: string) => `<p style="margin:0 0 6px"><span style="color:#555555">${k}:</span> ${v}</p>`;
+  const sections = c.lines && c.lines.length
+    ? `<p style="margin:10px 0 4px"><span style="color:#555555">Your sections and times:</span></p><ul style="margin:0;padding-left:22px">${c.lines.map((l) => li(`<b>${esc(l)}</b>`)).join("")}</ul>` : "";
+  const fees = FEES.map(([n, pr]) => li(`${esc(n)}: <b>${esc(pr)}</b>`)).join("");
+  return `<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.55;color:#222222">
 ${p(`Dear ${name},`)}
-${p(`Thank you for choosing us for your training certificate. As discussed, your class is confirmed for ${mark(when)} (Time: ${mark(esc(c.span || time))}) at ${esc(ADDRESS)}. Please <b>arrive 10 - 15 minutes early</b> for your registration to avoid lining up.`)}
-${sections}${p(`Parking: ${esc(PARKING)}`)}
-${p(`<b>QUIZ FOR FIRST AID/CPR/MANUAL HANDLING:</b><br>Please check the attached PDF for quiz access guidance.`)}
-${p(`Please make the ${mark("payment the day before")} coming to the class for your easiness.`)}
-<p style="margin:0 0 6px"><b>Fees:</b></p>
+${p(`Thank you for choosing us for your training certificate. As discussed, <b>your class is confirmed</b>. Here are the details:`)}
+<div style="${BOX}">
+${row("Date", mark(when))}${row("Time", mark(esc(c.span || time)))}${row("Place", esc(ADDRESS))}${row("Parking", esc(PARKING))}
+<p style="margin:0">Please <b>arrive 10 - 15 minutes early</b> for your registration, so you do not have to line up.</p>
+${sections}
+</div>
+${H("Quiz for First Aid / CPR / Manual Handling")}
+${p("Please check the attached PDF for quiz access guidance.")}
+${H("Fees")}
 <ul style="margin:0 0 14px;padding-left:22px">${fees}</ul>
-<p style="margin:0 0 6px"><b>Payment Details (COMMONWEALTH Bank):</b></p>
-<ul style="margin:0 0 14px;padding-left:22px">${li("Account Name: <b>Oscar Training Centre</b>")}${li(`BSB: ${mark("062235")}`)}${li(`Account Number: ${mark("11104627")}`)}${li("Description/Reference: <b>[Your Name] + The Certificate you are proceeding with</b>")}</ul>
-${p(`Kindly, send us a ${mark("screenshot of the payment")} before you attend the classes once made. If you are paying from someone else's account, make sure to have them include your full name and Date of Birth in the reference.`)}
-${p(`For any assistance please do not hesitate to contact us at <b>${PHONE}</b>.`)}
+${H("Payment")}
+${p(`Please make your ${mark("payment the day before")} the class. Payment details (Commonwealth Bank):`)}
+<div style="${BOX}">
+${row("Account name", "<b>Oscar Training Centre</b>")}${row("BSB", mark("062235"))}${row("Account number", mark("11104627"))}
+<p style="margin:0"><span style="color:#555555">Reference:</span> <b>[Your Name] + the certificate you are proceeding with</b></p>
+</div>
+${p(`Once paid, kindly send us a ${mark("screenshot of the payment")} before you attend the class. If you are paying from someone else's account, ask them to include your full name and date of birth in the reference.`)}
+${p(`For any assistance please contact us on <b>${PHONE}</b>.`)}
 <p style="margin:0 0 14px">Kind Regards,<br>Oscars Training Centre<br>First Aid Team<br>P: 0402 462 830<br>E: <a href="mailto:firstaidcpr.oscarstraining@gmail.com">firstaidcpr.oscarstraining@gmail.com</a></p>
 ${logo()}
 </div>`;
