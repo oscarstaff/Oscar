@@ -229,6 +229,7 @@ async function renderReady(body) {
 const HD = { q: '' };
 async function renderHold(body) {
   const rows = await sel('nex_placement_profile', 'select=*,nex_students(id,first_name,last_name,phone,email,deleted_at)&hold=eq.true&order=hold_on.desc.nullslast&limit=500');
+  if (PL.tab !== 'hold' || !body.isConnected) return;   /* the person has moved to another tab while this loaded */
   const today = sydToday();
   body.innerHTML = '<div class="nx-toolbar" style="border-top:0"><input class="nx-in sm" id="hdQ" placeholder="Search a name or reason" value="' + esc(HD.q) + '" style="min-width:200px"><span class="nx-muted">' + rows.length + ' on hold</span>' +
     '<span class="nx-btnrow" style="margin-left:auto"><button class="nx-btn sm primary" id="hdAdd">' + ico('plus') + 'Put a student on hold</button></span></div><div id="hdList"></div>';

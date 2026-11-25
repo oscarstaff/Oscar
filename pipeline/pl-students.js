@@ -119,7 +119,7 @@ function fuControlsHtml() {
 }
 /* The toolbar after the search box. Students and Search keep their two dropdowns. Leads show only the things used all day (sort, and the
    follow-up buttons below); stage, qualification, unfinished and follow-up status fold under "More filters", which shows how many are on. */
-const SL_MORE = ['stage', 'qual', 'year', 'unf', 'fu'];
+const SL_MORE = ['stage', 'qual', 'year', 'unf', 'fu', 'from', 'to'];
 /* the enrolment years to filter by: this year back to 2025, when the first checklist was kept */
 const slYears = () => { const y = new Date().getFullYear(), o = []; for (let i = y; i >= 2025; i--) o.push({ id: String(i), label: String(i) }); return o; };
 const slMoreN = () => SL_MORE.filter(k => SL[k]).length;
@@ -131,14 +131,14 @@ function slFilterBar(kind) {
   const f = fuControlsHtml(), fld = (l, h) => '<label class="nx-fld"><span>' + l + '</span>' + h + '</label>';
   const unf = '<select class="nx-sel sm" id="slUnf" aria-label="Unfinished leads"><option value=""' + (SL.unf ? '' : ' selected') + '>All leads</option><option value="mine"' + (SL.unf === 'mine' ? ' selected' : '') + '>Unfinished, flagged to me</option><option value="all"' + (SL.unf === 'all' ? ' selected' : '') + '>Unfinished, anyone</option></select>';
   return f.sort + '<button type="button" class="nx-btn sm" id="slMore" aria-expanded="' + !!SL.more + '" aria-controls="slPanel">' + ico('sliders') + '<span id="slMoreL">More filters' + (slMoreN() ? ' (' + slMoreN() + ')' : '') + '</span></button><button class="nx-btn quiet sm" id="slClear">Clear</button></div>' +
-    '<div class="nx-filtergrid" id="slPanel"' + (SL.more ? '' : ' hidden') + '>' + fld('Stage', stage) + fld('Qualification', qual) + fld('Year', yr) + fld('Unfinished leads', unf) + fld('Follow-up status', f.fu) + '</div>' +
+    '<div class="nx-filtergrid" id="slPanel"' + (SL.more ? '' : ' hidden') + '>' + fld('Stage', stage) + fld('Qualification', qual) + fld('Year', yr) + fld('Unfinished leads', unf) + fld('Follow-up status', f.fu) + fld('First contact on, from', '<input class="nx-in sm" type="date" id="slFrom" value="' + esc(SL.from) + '">') + fld('First contact on, to', '<input class="nx-in sm" type="date" id="slTo" value="' + esc(SL.to) + '">') + '</div>' +
     '<div class="nx-toolbar" id="slChips" role="group" aria-label="Follow-ups due" style="padding-top:0;border-top:0"></div>';
 }
-const SL = { q: '', stage: '', qual: '', year: '', unf: '', fu: '', sort: 'newest', kind: 'student', view: 'all', page: 0, size: 50, more: false };
+const SL = { q: '', stage: '', qual: '', year: '', unf: '', fu: '', from: '', to: '', sort: 'newest', kind: 'student', view: 'all', page: 0, size: 50, more: false };
 route(/^\/(students|leads|search)(?:\?(.*))?$/, async m => {
   const mode = m[1], qs = new URLSearchParams(m[2] || '');
   const kind = mode === 'leads' ? 'lead' : mode === 'students' ? 'student' : 'all';
-  if (SL.kind !== kind) { SL.kind = kind; SL.page = 0; SL.view = 'all'; SL.q = SL.stage = SL.qual = SL.year = SL.unf = SL.fu = ''; SL.sort = 'newest'; SL.more = false; }
+  if (SL.kind !== kind) { SL.kind = kind; SL.page = 0; SL.view = 'all'; SL.q = SL.stage = SL.qual = SL.year = SL.unf = SL.fu = SL.from = SL.to = ''; SL.sort = 'newest'; SL.more = false; }
   if (qs.get('view') === 'follow' && kind === 'lead') SL.view = 'follow';
   if (qs.get('fu') && kind === 'lead') { SL.fu = qs.get('fu'); SL.view = 'all'; SL.page = 0; if (SL.sort === 'newest') SL.sort = 'due'; }
   if (qs.get('unf')) { SL.unf = qs.get('unf'); SL.page = 0; }
@@ -178,12 +178,16 @@ route(/^\/(students|leads|search)(?:\?(.*))?$/, async m => {
         if (kind === 'lead') { syncView(); syncMore(); }
         const q = safeQ(SL.q); const digits = cleanPhone(q); const today = sydToday();
         const fuInner = kind === 'lead' && ['due', '1', '2', '3', 'upcoming', 'complete'].includes(SL.fu);
-        let query = 'select=id,student_no,first_name,last_name,email,phone,agent_id,created_at,needs_details,flagged_to,nex_student_paid!inner(paid_total),nex_enrolments' + (SL.stage || SL.qual || SL.year ? '!inner' : '') + '(id,stage,qualification_id,fee,year,enrolled_on)' + (kind === 'lead' ? ',' + (fuInner ? FU_EMBED.replace('nex_lead_followup(', 'nex_lead_followup!inner(') : FU_EMBED) : '') + '&deleted_at=is.null&order=' + (kind === 'lead' ? (FU_SORT[SL.sort] || FU_SORT.newest) : 'created_at.desc');
+        let query = 'select=id,student_no,first_name,last_name,email,phone,agent_id,referred_by,created_at,needs_details,flagged_to,nex_student_paid!inner(paid_total),nex_enrolments' + (SL.stage || SL.qual || SL.year ? '!inner' : '') + '(id,stage,qualification_id,fee,year,enrolled_on)' + (kind === 'lead' ? ',' + (fuInner ? FU_EMBED.replace('nex_lead_followup(', 'nex_lead_followup!inner(') : FU_EMBED) : '') + '&deleted_at=is.null&order=' + (kind === 'lead' ? (FU_SORT[SL.sort] || FU_SORT.newest) : 'created_at.desc');
         if (kind !== 'all') query += '&nex_student_paid.paid_total=' + (kind === 'lead' ? 'lt.' : 'gte.') + STUDENT_MIN;
         if (kind === 'lead' && SL.unf) query += '&needs_details=eq.true' + (SL.unf === 'mine' ? '&flagged_to=eq.' + encodeURIComponent(ME.name) : '');
         if (kind === 'lead') {
           query += fuFilter(SL.fu, today);
           if (SL.fu === 'none') query += '&nex_lead_followup=is.null';
+        }
+        if (kind === 'lead' && (SL.from || SL.to)) {   /* the day they first got in touch, from and to (both ends included); if the two are the wrong way round they are swapped */
+          const a = SL.from && SL.to && SL.from > SL.to ? SL.to : SL.from, b = SL.from && SL.to && SL.from > SL.to ? SL.from : SL.to;
+          if (a) query += '&first_contact_on=gte.' + a; if (b) query += '&first_contact_on=lte.' + b;
         }
         if (SL.stage) query += '&nex_enrolments.stage=eq.' + encodeURIComponent(SL.stage);
         if (SL.qual) query += '&nex_enrolments.qualification_id=eq.' + SL.qual;
@@ -195,7 +199,7 @@ route(/^\/(students|leads|search)(?:\?(.*))?$/, async m => {
         const twinN = {};   /* same-name flag: how many other people in Yatra share this name (same letters, any order); same name is not always the same person */
         if (rows.length) { try { (await sel('nex_name_twins', 'select=student_id&student_id=in.' + inList(rows.map(r => r.id)))).forEach(t => { twinN[t.student_id] = (twinN[t.student_id] || 0) + 1; }); } catch (e) {} }
         const paid = {}; pays.forEach(p => { if (payConfirmed(p)) paid[p.student_id] = (paid[p.student_id] || 0) + Number(p.amount); });
-        const filtered = SL.q || SL.stage || SL.qual || SL.year || SL.fu;
+        const filtered = SL.q || SL.stage || SL.qual || SL.year || SL.fu || (kind === 'lead' && (SL.from || SL.to || SL.unf));
         body.innerHTML = rows.length ? '<div class="nx-tablewrap"><table class="nx-table' + (kind === 'lead' ? ' nx-leads' : '') + '"><thead><tr><th>' + (kind === 'lead' ? 'Lead' : kind === 'student' ? 'Student' : 'Name') + '</th>' + (kind === 'lead' ? '' : '<th class="nx-c-phone">Phone</th>') + '<th class="nx-c-qual">Qualification</th><th class="nx-c-stage">Stage</th><th class="nx-c-fee">Paid and fee</th>' + (kind === 'lead' ? '<th class="nx-c-fu">Follow-up</th>' : '') + (kind === 'lead' ? '<th></th>' : '<th class="nx-c-date">Enrolled</th><th class="nx-c-agent">Agent</th>') + '</tr></thead><tbody>' +
           rows.map(s => {
             const en = (s.nex_enrolments || []).slice().sort((a, b) => String(b.enrolled_on || '').localeCompare(String(a.enrolled_on || '')))[0] || {};
@@ -203,7 +207,7 @@ route(/^\/(students|leads|search)(?:\?(.*))?$/, async m => {
             const pct = fee ? Math.min(100, Math.round(pd / fee * 100)) : 0;
             const idx = PATH.indexOf(en.stage), isStu = kindOf(s.nex_student_paid) === 'student';
             return '<tr class="nx-tr" data-id="' + s.id + '"><td><div class="nx-who"><span class="nx-avatar">' + esc(initials(fullName(s))) + '</span><div><b>' + esc(fullName(s)) + (twinN[s.id] ? ' <span class="nx-pill warn" title="' + twinN[s.id] + ' other ' + (twinN[s.id] === 1 ? 'person' : 'people') + ' in Yatra with the same or a similar name (same letters, any order). Open the profile to compare; it is not always the same person.">Same name' + (twinN[s.id] > 1 ? ' ×' + (twinN[s.id] + 1) : '') + '</span>' : '') + (s.needs_details ? ' <span class="nx-pill warn" title="Started from a call; details still needed. Flagged to ' + esc(s.flagged_to || 'the logger') + '">Unfinished' + (s.flagged_to ? ' · ' + esc(s.flagged_to) : '') + '</span>' : '') + (kind === 'all' ? ' <span class="nx-pill ' + (isStu ? 'accent' : 'info') + '">' + (isStu ? 'Student' : 'Lead') + '</span>' : '') + '</b><span>' + esc(kind === 'lead' ? [s.email || 'No email', fmtPhone(s.phone)].filter(Boolean).join(' · ') : (s.email || 'No email')) + (s.nex_enrolments && s.nex_enrolments.length > 1 ? ' · ' + s.nex_enrolments.length + ' enrolments' : '') + '</span></div></div></td>' +
-              (kind === 'lead' ? '' : '<td class="nx-num nx-c-phone">' + esc(fmtPhone(s.phone)) + '</td>') + '<td class="nx-c-qual"><span class="nx-clamp">' + esc(qualShort(en.qualification_id) || '–') + '</span>' + (kind === 'lead' ? (t => t ? '<div class="nx-sub" title="' + esc(t) + '">' + esc(t) + '</div>' : '')([en.enrolled_on ? 'Enrolled ' + fmtDate(en.enrolled_on) : '', agentName(s.agent_id)].filter(Boolean).join(' · ')) : '') + '</td>' +
+              (kind === 'lead' ? '' : '<td class="nx-num nx-c-phone">' + esc(fmtPhone(s.phone)) + '</td>') + '<td class="nx-c-qual"><span class="nx-clamp">' + esc(qualShort(en.qualification_id) || '–') + '</span>' + (kind === 'lead' ? (t => t ? '<div class="nx-sub" title="' + esc(t) + '">' + esc(t) + '</div>' : '')([en.enrolled_on ? 'Enrolled ' + fmtDate(en.enrolled_on) : '', agentName(s.agent_id), s.referred_by ? 'Referred by ' + s.referred_by : ''].filter(Boolean).join(' · ')) : '') + '</td>' +
               '<td class="nx-c-stage">' + (en.stage ? '<div class="nx-stagecell">' + pill('enrolment', en.stage) + '<div class="nx-mini">' + PATH.map((p, i) => '<i class="' + (idx >= 0 && i <= idx ? 'on' : '') + '"></i>').join('') + '</div></div>' : '<span class="nx-muted">–</span>') + '</td>' +
               '<td class="nx-c-fee">' + (fee || pd ? '<div class="nx-meter"><div class="nx-meter-bar"><i class="' + (pd < fee ? 'warn' : '') + '" style="width:' + pct + '%"></i></div><small>' + money(pd) + ' of ' + money(fee) + '</small></div>' : '<span class="nx-muted">–</span>') + '</td>' +
               (kind === 'lead' ? '<td class="nx-c-fu">' + fuCellHtml(s.nex_lead_followup, today) + '</td>' : '') +
@@ -226,10 +230,11 @@ route(/^\/(students|leads|search)(?:\?(.*))?$/, async m => {
     $('#slStage').onchange = e => { SL.stage = e.target.value; SL.page = 0; load(); };
     $('#slQual').onchange = e => { SL.qual = e.target.value; SL.page = 0; load(); };
     $('#slYear').onchange = e => { SL.year = e.target.value; SL.page = 0; load(); };
+    [['#slFrom', 'from'], ['#slTo', 'to']].forEach(([id, key]) => { const el = $(id); if (el) el.onchange = e => { SL[key] = e.target.value; SL.page = 0; load(); }; });
     const un = $('#slUnf'); if (un) un.onchange = e => { SL.unf = e.target.value; SL.page = 0; load(); };
     $$('#slSeg button').forEach(b => b.onclick = () => { SL.view = b.dataset.v; SL.page = 0; load(); });
     [['#slFu', 'fu'], ['#slSort', 'sort']].forEach(([id, key]) => { const el = $(id); if (el) el.onchange = e => { SL[key] = e.target.value; SL.page = 0; if (key === 'fu' && SL.fu && SL.sort === 'newest') { SL.sort = 'due'; $('#slSort').value = 'due'; } load(); }; });
-    $('#slClear').onclick = () => { SL.q = SL.stage = SL.qual = SL.year = SL.unf = SL.fu = ''; SL.sort = 'newest'; SL.page = 0; $('#slQ').value = ''; $('#slStage').value = ''; $('#slQual').value = ''; $('#slYear').value = ''; ['#slUnf', '#slFu'].forEach(id => { const el = $(id); if (el) el.value = ''; }); const so = $('#slSort'); if (so) so.value = 'newest'; load(); };
+    $('#slClear').onclick = () => { SL.q = SL.stage = SL.qual = SL.year = SL.unf = SL.fu = SL.from = SL.to = ''; SL.sort = 'newest'; SL.page = 0; $('#slQ').value = ''; $('#slStage').value = ''; $('#slQual').value = ''; $('#slYear').value = ''; ['#slUnf', '#slFu', '#slFrom', '#slTo'].forEach(id => { const el = $(id); if (el) el.value = ''; }); const so = $('#slSort'); if (so) so.value = 'newest'; load(); };
     const sm = $('#slMore'); if (sm) sm.onclick = () => { SL.more = !SL.more; $('#slPanel').hidden = !SL.more; sm.setAttribute('aria-expanded', String(!!SL.more)); };
     const nb = $('#slNew'); if (nb) nb.onclick = () => newStudent();
     viewWait(load());
@@ -250,6 +255,7 @@ function studentFields(s) {
     { k: 'first_name', label: 'First name', value: s.first_name, required: true }, { k: 'last_name', label: 'Last name', value: s.last_name },
     { k: 'phone', label: 'Phone', type: 'tel', value: s.phone }, { k: 'email', label: 'Email', type: 'email', value: s.email },
     { k: 'phone2', label: 'Second phone', type: 'tel', value: s.phone2 }, { k: 'agent_id', label: 'Agent', type: 'select', options: REF.agents.filter(a => a.active), value: s.agent_id, blank: 'Self / no agent' },
+    { k: 'referred_by', label: 'Referred by', value: s.referred_by, placeholder: 'Name of the person who sent them to us' },
     { k: 'outside_sydney', type: 'check', label: 'Outside Sydney', value: s.outside_sydney, full: true, help: 'Counted in the Outside Sydney row of the Conversion report.' }
   ];
 }
@@ -276,7 +282,7 @@ function dupeBox(m, d, again) {
 }
 function newStudent() {
   const base = studentFields(), by = k => base.find(x => x.k === k);
-  const f = [by('first_name'), by('last_name'), by('phone'), by('email'), by('phone2'), by('agent_id')].concat([
+  const f = [by('first_name'), by('last_name'), by('phone'), by('email'), by('phone2'), by('agent_id'), by('referred_by')].concat([
     { k: 'qualification_id', label: 'Qualification', type: 'select', options: REF.quals.filter(q => q.active), blank: 'Add later' },
     { k: 'fee', label: 'Agreed fee ($)', type: 'number' },
     { k: 'stage', label: 'Stage', type: 'select', options: stageOpts(false, 'checklist_sent'), value: 'checklist_sent', blank: 'Not set' },
@@ -366,7 +372,7 @@ route(/^\/students\/([0-9a-f-]{36})$/, async m => {
     (twins.length ? '<div class="nx-card nx-unfbar"><div class="nx-note">' + ico('bell') + '<span><b>Same or similar name in Yatra.</b> ' + twins.map(x => '<a href="#/students/' + x.id + '">' + esc(fullName(x)) + '</a> (' + (kindOf(x.nex_student_paid) === 'student' ? 'Student' : 'Lead') + ' ' + esc(String(x.student_no || '')) + (x.email || x.phone ? ' · ' + esc([x.email, fmtPhone(x.phone)].filter(Boolean).join(' · ')) : '') + ')').join(', ') + '. Same or similar name does not always mean the same person; check the email and phone before merging or paying anyone.</span></div></div>' : '') +
     (s.needs_details ? '<div class="nx-card nx-unfbar"><div class="nx-note">' + ico('bell') + '<span><b>Unfinished lead.</b> Started from a call' + (s.flagged_to ? ' logged by <b>' + esc(s.flagged_to) + '</b>' : '') + '. Add their email, course and any other details, then mark it complete.</span> <button class="nx-btn sm primary" data-a="doneDetails">' + ico('check') + 'Mark complete</button></div></div>' : '') +
     '<div class="nx-card"><div class="nx-hl"><span class="nx-avatar">' + esc(initials(fullName(s))) + '</span><div><div class="nx-eyebrow">' + (isStudent ? 'Student ' : 'Lead ') + esc(String(s.student_no || '')) + '</div><h1 class="nx-title">' + esc(fullName(s)) + ' <span class="nx-pill ' + (isStudent ? 'accent' : 'info') + '">' + (isStudent ? 'Student' : 'Lead') + '</span></h1></div>' +
-    '<dl class="nx-facts">' + fact('Email', esc(s.email || '')) + fact('Phone', esc(fmtPhone(s.phone))) + fact('Agent', esc(agentName(s.agent_id))) + fact('Paid and fee', totalFee || totalPaid ? money(totalPaid) + ' of ' + money(totalFee) : '') + fact('Added', esc(fmtDate(s.created_at))) + (!isStudent && s.first_contact_on ? fact('First contact', esc(fmtDate(s.first_contact_on))) : '') + '</dl>' +
+    '<dl class="nx-facts">' + fact('Email', esc(s.email || '')) + fact('Phone', esc(fmtPhone(s.phone))) + fact('Agent', esc(agentName(s.agent_id))) + (s.referred_by ? fact('Referred by', esc(s.referred_by)) : '') + fact('Paid and fee', totalFee || totalPaid ? money(totalPaid) + ' of ' + money(totalFee) : '') + fact('Added', esc(fmtDate(s.created_at))) + (!isStudent && s.first_contact_on ? fact('First contact', esc(fmtDate(s.first_contact_on))) : '') + '</dl>' +
     '<div class="nx-btnrow"><button class="nx-btn" data-a="editStu">' + ico('edit') + 'Edit</button><button class="nx-btn" data-a="addEnr">' + ico('plus') + 'Enrolment</button>' + (isStudent ? '' : '<button class="nx-btn primary" data-a="bookFA">' + ico('aid') + 'Book class</button>') + '' + (ME.admin ? '<button class="nx-btn quiet" data-a="archive">' + ico('archive') + 'Archive</button>' : '') + '</div></div>' +
     (main.id ? '<div style="padding:0 16px 16px"><ol class="nx-path">' + PATH.map((p, i) => '<li class="' + (i < idx ? 'done' : i === idx ? 'now' : '') + '">' + (i < idx ? ico('check') : '') + esc(statusLabel('enrolment', p)) + '</li>').join('') + '</ol>' + (idx < 0 && main.stage ? '<div style="margin-top:8px">Current stage: ' + pill('enrolment', main.stage) + '</div>' : '') + '</div>' : '') + '</div>' +
     '<div class="nx-cols"><div class="nx-colmain"><div class="nx-card"><div class="nx-tabs" role="tablist">' +

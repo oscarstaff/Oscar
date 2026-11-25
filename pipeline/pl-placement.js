@@ -15,8 +15,10 @@ route(/^\/placement$/, async () => {
 
 function bindPlacement() {
   const body = $('#plBody');
+  let LOADSEQ = 0;   /* a slower earlier load must never paint over the tab that was clicked after it (Ready showed the Batches cards that way) */
   const labels = { batches: '', requests: 'New self-request', facilities: 'New facility', blacklist: 'Add to blacklist' };
   const load = async () => {
+    const seq = ++LOADSEQ, stale = () => seq !== LOADSEQ || !body.isConnected;
     const bt = PL.tab === 'batches' || PL.tab === 'ready' || PL.tab === 'hold';     /* these three draw their own toolbar */
     $('#plAdd').hidden = bt || PL.tab === 'placements'; $('#plQ').hidden = bt; $('#plFoot').hidden = bt;
     if (!bt) $('#plAddL').textContent = labels[PL.tab];
@@ -26,11 +28,11 @@ function bindPlacement() {
     try {
       if (PL.tab === 'ready') { await renderReady(body); return; }
       if (PL.tab === 'hold') { await renderHold(body); return; }
-      if (bt) { await renderBatches(body); return; }
+      if (bt) { await renderBatches(body, stale); return; }
       const q = safeQ(PL.q), from = PL.page * PL.size, to = from + PL.size - 1; let rows, total, html;
       if (PL.tab === 'requests') {
         let query = 'select=*,nex_facilities(name),nex_enrolments(student_id,nex_students(id,first_name,last_name))&order=created_at.desc'; if (PL.status) query += '&status=eq.' + PL.status; if (q) query += '&or=(facility_text.ilike.*' + q + '*,student_name.ilike.*' + q + '*)';
-        ({ rows, total } = await selPage('nex_placement_requests', query, from, to));
+        ({ rows, total } = await selPage('nex_placement_requests', query, from, to)); if (stale()) return;
         /* three columns, one thing each. What used to be pills, a second row of buttons and a note column is now one quiet line of small text,
            and "Link student" / "Add facility" sit beside the thing they fix. The note and everything else is in Update. */
         html = rows.length ? '<div class="nx-tablewrap"><table class="nx-table tight nx-reqs"><thead><tr><th>Student</th><th>Facility</th><th>Status</th><th></th></tr></thead><tbody>' + rows.map(r => {
@@ -49,7 +51,7 @@ function bindPlacement() {
         body._rows = rows;
       } else if (PL.tab === 'placements') {
         let query = 'select=*,nex_facilities(name),nex_enrolments(student_id,nex_students(id,first_name,last_name))&archived_at=is.null&order=start_date.desc.nullslast,created_at.desc'; if (PL.status) query += '&status=eq.' + PL.status; if (q) query += '&facility_text=ilike.*' + q + '*';
-        ({ rows, total } = await selPage('nex_placements', query, from, to));
+        ({ rows, total } = await selPage('nex_placements', query, from, to)); if (stale()) return;
         html = rows.length ? '<div class="nx-card-b nx-muted" style="padding-top:6px">Students are placed from the Batches tab, inside each aged care card. This list follows them once they are placed: update dates, hours and status here.</div><div class="nx-tablewrap"><table class="nx-table tight"><thead><tr><th>Student</th><th>Facility</th><th>Starts</th><th>Ends</th><th>Hours</th><th>Status</th><th></th></tr></thead><tbody>' + rows.map(r => { const s = (r.nex_enrolments || {}).nex_students; return '<tr><td>' + (s ? '<a href="#/students/' + s.id + '"><b>' + esc(fullName(s)) + '</b></a>' : '–') + '</td><td>' + esc((r.nex_facilities || {}).name || r.facility_text || '–') + '</td><td>' + esc(fmtDate(r.start_date) || '–') + '</td><td>' + esc(fmtDate(r.end_date) || '–') + '</td><td class="nx-num">' + esc(r.hours || '–') + '</td><td>' + pill('placement_stage', r.status) + '</td><td><button class="nx-btn sm" data-ed="' + r.id + '">Update</button></td></tr>'; }).join('') + '</tbody></table></div>' : empty('Nobody placed yet', 'Students are placed from a Batch: open an aged care card and add them there. They appear here once placed.');
         $$('[data-ed]', body).forEach(b => b.onclick = () => placementForm(rows.find(x => x.id === b.dataset.ed)));
       } else if (PL.tab === 'facilities') {
@@ -57,6 +59,7 @@ function bindPlacement() {
         let query = 'select=*&order=name.asc'; if (q) query += '&name=ilike.*' + q + '*';
         if (map) query += '&limit=1000';
         if (map) { rows = await sel('nex_facilities', query); total = rows.length; } else ({ rows, total } = await selPage('nex_facilities', query, from, to));
+        if (stale()) return;
         const bar = '<div class="nx-card-b" style="padding-bottom:0"><div class="nx-seg" id="plFv"><button data-v="list" aria-pressed="' + !map + '">List</button><button data-v="map" aria-pressed="' + map + '">Map</button></div></div>';
         html = map ? bar + '<div id="plMapHost"></div>' : rows.length ? bar + '<div class="nx-tablewrap"><table class="nx-table tight"><thead><tr><th>Facility</th><th>Suburb</th><th>Contact</th><th>Phone</th><th>Email</th><th></th></tr></thead><tbody>' + rows.map(r => '<tr><td><b>' + esc(r.name) + '</b></td><td>' + esc(r.suburb || '–') + '</td><td>' + esc(r.contact_name || '–') + '</td><td>' + esc(r.phone || '–') + '</td><td>' + esc(r.email || '–') + '</td><td><button class="nx-btn sm" data-ed="' + r.id + '">Edit</button></td></tr>').join('') + '</tbody></table></div>' : bar + empty('No facilities', 'Add the homes you place students with.');
         body.innerHTML = html;
@@ -65,7 +68,7 @@ function bindPlacement() {
         $$('[data-ed]', body).forEach(b => b.onclick = () => facilityForm(rows.find(x => x.id === b.dataset.ed)));
       } else {
         let query = 'select=*,nex_facilities(name)&order=added_at.desc'; if (q) query += '&or=(student_name.ilike.*' + q + '*,facility_text.ilike.*' + q + '*)';
-        ({ rows, total } = await selPage('nex_blacklist', query, from, to));
+        ({ rows, total } = await selPage('nex_blacklist', query, from, to)); if (stale()) return;
         html = rows.length ? '<div class="nx-tablewrap"><table class="nx-table tight"><thead><tr><th>Student or facility</th><th>Where allocated</th><th>Reason</th><th>Added</th><th></th></tr></thead><tbody>' + rows.map(r => '<tr><td><b>' + esc(r.student_name || (r.nex_facilities || {}).name || r.facility_text || '–') + '</b><div class="nx-muted" style="font-size:12px">' + esc(r.email || '') + '</div></td><td>' + esc(r.allocated_at || '–') + '</td><td>' + esc(r.reason || '–') + '</td><td>' + esc(fmtDate(r.added_at)) + '<div class="nx-muted" style="font-size:12px">' + esc(r.added_by || '') + '</div></td><td>' + (ME.admin ? '<button class="nx-btn sm" data-rm="' + r.id + '">Remove</button>' : '') + '</td></tr>').join('') + '</tbody></table></div>' : empty('Blacklist is empty');
         body.innerHTML = html; $$('[data-rm]', body).forEach(b => b.onclick = async () => { if (await confirmBox('Remove from blacklist', 'Remove this entry?', 'Remove', true)) { try { await del('nex_blacklist', 'id=eq.' + b.dataset.rm); toast('Removed'); load(); } catch (e) { toast(e.message, true); } } });
       }
