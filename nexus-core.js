@@ -1444,7 +1444,7 @@ function setActiveNavChild(tab){
 }
 
 function goTo(p){
-  if(p === 'diary' || p === 'tasks'){ p = 'home'; }
+  if(p === 'diary' || p === 'tasks' || p === 'achievements'){ p = 'home'; }   /* Team achievements now live in Yatra */
   /* My Time was split: Leave is its own page; Availability + hours live on My Hours. */
   let _hoursTab = null;
   if(p === 'schedule') p = 'leave';
@@ -1495,8 +1495,7 @@ function goTo(p){
   if(p==="myhours"){ if(typeof initReportsPage==='function') initReportsPage(); showHoursTab(_hoursTab||'hours'); }
   if(p==="teamreport"){ if(typeof initReportsPage==='function') initReportsPage(); if(typeof initTeamReport==='function') initTeamReport(); }
   if(p==="profile")loadProfilePage();
-  if(p==="home"){if(typeof nxApplyReportMenuCache==='function') nxApplyReportMenuCache();loadHomeData();loadClockState();loadWhatsNew();loadHomeCalendar();loadHomeAttention();renderTodayChip();loadHomeAchievements();}
-  if(p==="achievements"){loadAchievementsPage();}
+  if(p==="home"){if(typeof nxApplyReportMenuCache==='function') nxApplyReportMenuCache();loadHomeData();loadClockState();loadWhatsNew();loadHomeCalendar();loadHomeAttention();renderTodayChip();}
   if(p==="notifs"){renderNotifsPage();}
   
   if(p==="training"){renderMyTraining();}

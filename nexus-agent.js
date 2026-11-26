@@ -414,7 +414,7 @@ var nxAgent = (function(){
       try{
         var s=await _computeMyStreak(), cur=(s&&s.current)||0, best=(s&&s.best)||0;
         if(!cur && !best) return {text:'No streak yet. It builds as you work your rostered shifts.'};
-        return {text:cur?('You are on a streak of '+plural(cur,'shift')+'.'):'Your streak is at zero right now.', lines:[best?'Your best is '+plural(best,'shift')+'.':''].filter(Boolean), go:[{label:'See achievements', run:function(){ goTo('achievements'); }}]};
+        return {text:cur?('You are on a streak of '+plural(cur,'shift')+'.'):'Your streak is at zero right now.', lines:[best?'Your best is '+plural(best,'shift')+'.':''].filter(Boolean)};
       }catch(e){ return sorry(); }
     }},
     {id:'next', g:'Shifts & leave', label:'My next shift', run:async function(){
