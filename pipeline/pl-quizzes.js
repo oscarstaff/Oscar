@@ -229,6 +229,7 @@ function manageQuiz(t) {
     const counts = { all: S.names.length, access: S.names.filter(n => S.access.has(n)).length, noaccess: S.names.filter(n => !S.access.has(n)).length, passed: S.names.filter(n => stateOf(n) === 'passed').length, failed: S.names.filter(n => stateOf(n) === 'failed').length };
     const list = S.names.filter(n => (!q || n.toLowerCase().includes(q)) && (S.f === 'all' || (S.f === 'access' ? S.access.has(n) : S.f === 'noaccess' ? !S.access.has(n) : stateOf(n) === S.f)));
     host.innerHTML = '<div class="nx-muted" style="margin-bottom:8px"><b>' + counts.access + '</b> with access · <b>' + counts.passed + '</b> passed · <b>' + counts.failed + '</b> failed' + (t.draft ? ' · <span class="nx-tag">Draft</span>' : '') + '</div>' +
+      '<div class="nx-btnrow" style="margin-bottom:10px"><button class="nx-btn sm" id="qmEdit">Edit questions</button>' + (t.kind === 'custom' && t.draft ? '<button class="nx-btn sm primary" id="qmPub">Publish quiz</button>' : '') + '<button class="nx-btn sm quiet" id="qmDelQ">Delete quiz</button></div>' +
       '<div class="nx-btnrow" style="margin-bottom:10px"><button class="nx-btn sm" id="qmAll">Give access to all</button><button class="nx-btn sm" id="qmNone">Revoke all</button><button class="nx-btn sm" id="qmCsv">Download report (CSV)</button></div>' +
       '<div class="nx-toolbar" style="border-top:0;padding-left:0;padding-right:0"><div class="nx-seg" id="qmSeg" role="group" aria-label="Show">' + [['all', 'All'], ['access', 'Access'], ['noaccess', 'No access'], ['passed', 'Passed'], ['failed', 'Failed']].map(([v, l]) => '<button type="button" data-v="' + v + '" aria-pressed="' + (S.f === v) + '">' + l + ' <span class="nx-count">' + counts[v] + '</span></button>').join('') + '</div><span class="nx-grow"></span><input class="nx-in sm" id="qmQ" placeholder="Search staff" value="' + esc(S.q) + '"></div>' +
       '<div style="max-height:52vh;overflow:auto">' + (list.length ? '<table class="nx-table tight auto"><tbody>' + list.map(n => {
@@ -242,6 +243,9 @@ function manageQuiz(t) {
     $$('[data-det]', host).forEach(b => b.onclick = () => detail(b.dataset.det));
     $$('[data-acc]', host).forEach(b => b.onclick = () => { const n = b.dataset.acc; act(async () => { if (S.access.has(n)) await del('quiz_access', 'quiz_id=eq.' + encodeURIComponent(t.id) + '&staff_name=eq.' + encodeURIComponent(n)); else await ins('quiz_access', { staff_name: n, quiz_id: t.id, granted_by: ME.name }); }, S.access.has(n) ? 'Access revoked for ' + n : 'Access given to ' + n); });
     $$('[data-retake]', host).forEach(b => b.onclick = async () => { const n = b.dataset.retake, r = S.latest[n]; if (!r) return; if (!(await confirmBox('Allow ' + n + ' to retake?', 'Their latest attempt (' + r.score + ' / ' + r.total + ') is deleted so they can take the quiz again.', 'Allow retake', true))) return; act(() => del(QM_RES(t), 'id=eq.' + r.id), n + ' can retake the quiz'); });
+    $('#qmEdit', host).onclick = () => { m.close(); quizEditor(t.kind === 'standard' ? { mode: 'std', pass: t.pass_pct, questions: t.questions } : { mode: 'edit', id: t.id, docId: t.doc && t.doc.id, title: t.title, pass: t.pass_pct, questions: t.questions }); };
+    const pubB = $('#qmPub', host); if (pubB) pubB.onclick = () => qbPublish(t, S.access, m);
+    $('#qmDelQ', host).onclick = () => qbDelete(t, m);
     $('#qmAll', host).onclick = async () => {
       if (!(await confirmBox('Give everyone access?', 'Every staff member will be able to take this quiz.', 'Give access'))) return;
       const toAdd = S.names.filter(n => !S.access.has(n)); if (!toAdd.length) { toast('Everyone already has access'); return; }
@@ -293,4 +297,123 @@ function takeQuiz(t) {
     };
   };
   paint();
+}
+
+/* ---------- Quiz builder (admins): write or AI-generate questions, edit, publish, delete. Same tables Nexus used. ---------- */
+const QB_MAX_Q = 40;
+function qbBlank() { return { q: '', options: ['', '', '', ''], correct: 0 }; }
+/* cfg: { mode: 'new' | 'edit' | 'std', id, docId, title, pass, questions }. New quizzes are saved as drafts; publishing is in Manage. */
+function quizEditor(cfg) {
+  const S = { title: cfg.title || '', pass: cfg.pass || 80, qs: JSON.parse(JSON.stringify(cfg.questions && cfg.questions.length ? cfg.questions : [qbBlank()])) };
+  const m = openModal({
+    title: cfg.mode === 'new' ? 'New quiz' : cfg.mode === 'std' ? 'Edit the standard quiz' : 'Edit questions', wide: true, noFocus: true, body: '<div id="qeHost"></div>',
+    buttons: [{ label: 'Cancel', close: true }, { label: cfg.mode === 'new' ? 'Save as draft' : 'Save', primary: true, run: async mm => {
+      if (cfg.mode !== 'std' && !S.title.trim()) { const e = new Error('Please give the quiz a title.'); e.fieldEl = $('#qeTitle', mm.el); throw e; }
+      const pass = Math.round(Number(S.pass));
+      if (!(pass >= 1 && pass <= 100)) { const e = new Error('The pass mark must be between 1 and 100.'); e.fieldEl = $('#qePass', mm.el); throw e; }
+      for (let i = 0; i < S.qs.length; i++) {
+        const q = S.qs[i];
+        if (!q.q.trim()) { const e = new Error('Question ' + (i + 1) + ' is empty.'); e.fieldEl = $('[data-q="' + i + '"]', mm.el); throw e; }
+        const bad = q.options.findIndex(o => !String(o).trim());
+        if (bad >= 0) { const e = new Error('Question ' + (i + 1) + ' has an empty answer.'); e.fieldEl = $('[data-o="' + i + '_' + bad + '"]', mm.el); throw e; }
+      }
+      const questions = S.qs.map(q => ({ q: q.q.trim(), options: q.options.map(o => String(o).trim()), correct: q.correct }));
+      if (cfg.mode === 'new') {
+        await ins('custom_quizzes', { document_id: cfg.docId || null, title: S.title.trim(), pass_pct: pass, questions, created_by: ME.name, status: 'draft' });
+        toast('Quiz saved as a draft. Open Manage to give access and publish it.');
+      } else if (cfg.mode === 'edit') {
+        await upd('custom_quizzes', 'id=eq.' + encodeURIComponent(cfg.id), { title: S.title.trim(), pass_pct: pass, questions });
+        toast('Quiz updated');
+      } else {
+        const ex = await sel('quiz_overrides', 'select=id&quiz_id=eq.' + STD_QUIZ.id + '&limit=1');
+        if (ex && ex[0]) await upd('quiz_overrides', 'id=eq.' + ex[0].id, { questions, pass_pct: pass, updated_at: new Date().toISOString(), updated_by: ME.name });
+        else await ins('quiz_overrides', { quiz_id: STD_QUIZ.id, questions, pass_pct: pass, updated_by: ME.name });
+        toast('Standard quiz updated');
+      }
+      render();
+    } }]
+  });
+  const host = $('#qeHost', m.el), scroller = $('.modal-b', m.el);
+  const paint = () => {
+    const top = scroller ? scroller.scrollTop : 0;
+    host.innerHTML = '<div class="nx-form">' +
+      (cfg.mode !== 'std' ? '<div class="full"><label class="nx-lbl" for="qeTitle">Quiz title *</label><input class="nx-in" id="qeTitle" value="' + esc(S.title) + '"></div>' : '') +
+      '<div><label class="nx-lbl" for="qePass">Pass mark (%) *</label><input class="nx-in" id="qePass" type="number" min="1" max="100" value="' + esc(S.pass) + '"></div>' +
+      (cfg.mode !== 'new' ? '<div class="full"><div class="nx-help">People who already took this quiz keep their score. Their answer review will use the questions as saved now.</div></div>' : '') + '</div>' +
+      S.qs.map((q, i) => '<div class="nx-card" style="margin-top:12px"><div class="nx-card-b"><div class="nx-btnrow" style="justify-content:space-between;margin-bottom:8px"><b>Question ' + (i + 1) + '</b>' + (S.qs.length > 1 ? '<button type="button" class="nx-btn sm quiet" data-rmq="' + i + '">Remove question</button>' : '') + '</div>' +
+        '<textarea class="nx-ta" data-q="' + i + '" aria-label="Question ' + (i + 1) + '" placeholder="Type the question">' + esc(q.q) + '</textarea>' +
+        '<div class="nx-help" style="margin:8px 0 4px">Tick the correct answer.</div>' +
+        q.options.map((o, k) => '<div class="nx-btnrow" style="margin-bottom:6px;flex-wrap:nowrap"><input type="radio" name="qc' + i + '" data-c="' + i + '_' + k + '" aria-label="Answer ' + (k + 1) + ' is correct"' + (q.correct === k ? ' checked' : '') + '><input class="nx-in" data-o="' + i + '_' + k + '" aria-label="Answer ' + (k + 1) + '" placeholder="Answer ' + (k + 1) + '" value="' + esc(o) + '">' + (q.options.length > 2 ? '<button type="button" class="nx-btn sm quiet" data-rmo="' + i + '_' + k + '" aria-label="Remove answer ' + (k + 1) + '">×</button>' : '') + '</div>').join('') +
+        (q.options.length < 4 ? '<button type="button" class="nx-btn sm" data-addo="' + i + '">Add an answer</button>' : '') + '</div></div>').join('') +
+      '<div style="margin-top:12px">' + (S.qs.length < QB_MAX_Q ? '<button type="button" class="nx-btn" id="qeAdd">Add a question</button>' : '') + '</div>';
+    if (scroller) scroller.scrollTop = top;
+  };
+  host.addEventListener('input', e => {
+    const t = e.target;
+    if (t.id === 'qeTitle') S.title = t.value; else if (t.id === 'qePass') S.pass = t.value;
+    else if (t.dataset.q != null) S.qs[+t.dataset.q].q = t.value;
+    else if (t.dataset.o != null) { const [i, k] = t.dataset.o.split('_').map(Number); S.qs[i].options[k] = t.value; }
+  });
+  host.addEventListener('change', e => { const t = e.target; if (t.dataset.c != null) { const [i, k] = t.dataset.c.split('_').map(Number); S.qs[i].correct = k; } });
+  host.addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.id === 'qeAdd') S.qs.push(qbBlank());
+    else if (b.dataset.rmq != null) S.qs.splice(+b.dataset.rmq, 1);
+    else if (b.dataset.addo != null) S.qs[+b.dataset.addo].options.push('');
+    else if (b.dataset.rmo != null) { const [i, k] = b.dataset.rmo.split('_').map(Number), q = S.qs[i]; q.options.splice(k, 1); if (q.correct === k) q.correct = 0; else if (q.correct > k) q.correct--; }
+    else return;
+    paint();
+  });
+  paint();
+  return m;
+}
+/* AI: Gemini (the generate-quiz edge function) reads the document and writes 10 questions you review before saving. */
+async function quizFromAi(doc) {
+  const wait = openModal({ title: 'Reading your document…', footer: false, noFocus: true, body: '<p style="margin:0">Gemini is reading it and writing 10 questions. This usually takes 15 to 30 seconds. Please keep this open.</p>' });
+  const manual = () => quizEditor({ mode: 'new', docId: doc.id, title: 'Quiz: ' + (doc.title || 'Untitled'), pass: 80, questions: [qbBlank()] });
+  try {
+    let b64 = '', mime = '';
+    const id = docDriveId(doc.url);
+    if (id) {
+      const j = await docCall({ action: 'fetchDoc', id });
+      if (!j.ok) throw new Error(j.error === 'unauthorized' ? 'Drive did not accept your sign-in. Refresh Yatra and try again.' : 'Could not read the document from Drive (' + (j.error || 'no reply') + ')');
+      b64 = j.base64 || ''; mime = j.mime || '';
+    }
+    const data = await fn('generate-quiz', { pdf_base64: b64, doc_mime: mime, document_url: doc.url, document_title: doc.title, num_questions: 10, pass_pct: 80 });
+    wait.close();
+    if (!data || !Array.isArray(data.questions) || !data.questions.length) { toast('The AI sent no questions. You can write the quiz yourself.', true); manual(); return; }
+    quizEditor({ mode: 'new', docId: doc.id, title: 'Quiz: ' + (doc.title || 'Untitled'), pass: data.pass_pct || 80, questions: data.questions });
+    toast('Made ' + data.questions.length + ' questions. Check them, then save.', false, false);
+  } catch (e) { wait.close(); toast('The AI could not make a quiz: ' + (e.message || e) + '. You can write it yourself.', true); manual(); }
+}
+function quizModeChoice(doc) {
+  const m = openModal({ title: 'Make a quiz for this document', footer: false, noFocus: true,
+    body: '<p style="margin:0 0 12px">How do you want to write the questions for <b>' + esc(doc.title || 'this document') + '</b>?</p><div class="nx-btnrow" style="flex-direction:column;align-items:stretch;gap:8px"><button class="nx-btn primary" id="qmAi">Write them with AI (you review before saving)</button><button class="nx-btn" id="qmMan">Write them myself</button><button class="nx-btn quiet" id="qmSkip">No quiz</button></div>' });
+  $('#qmAi', m.el).onclick = () => { m.close(); quizFromAi(doc); };
+  $('#qmMan', m.el).onclick = () => { m.close(); quizEditor({ mode: 'new', docId: doc.id, title: 'Quiz: ' + (doc.title || 'Untitled'), pass: 80, questions: [qbBlank()] }); };
+  $('#qmSkip', m.el).onclick = () => m.close();
+  return m;
+}
+/* delete that does not mind there being nothing to delete (a quiz nobody took has no results) */
+async function qbDelAny(table, match) { try { await del(table, match); } catch (e) { if (!/Nothing was deleted/.test(e.message || '')) throw e; } }
+async function qbPublish(t, access, m) {
+  if (!(await confirmBox('Publish this quiz?', 'Staff with access will see it and get a notification (' + access.size + ' people have access now).', 'Publish'))) return;
+  try {
+    await upd('custom_quizzes', 'id=eq.' + encodeURIComponent(t.id), { status: 'published' });
+    let sent = 0;
+    for (const n of access) {
+      try { await fn('send-push', { staff_name: n, title: 'New quiz available', body: 'A new compliance quiz has been published: ' + t.title, url: './nex.html#/quizzes', tag: 'quiz-published-' + t.id }); sent++; } catch (e) { /* a missing push never stops the publish */ }
+    }
+    toast('Quiz published. ' + sent + ' of ' + access.size + ' notified.', false, false); m.close(); render();
+  } catch (e) { toast(e.message || 'Could not publish.', true); }
+}
+async function qbDelete(t, m) {
+  const std = t.kind === 'standard';
+  if (!(await confirmBox(std ? 'Delete the Standard Knowledge Quiz?' : 'Delete this quiz?', std ? 'This removes everyone’s access, all attempts and any edits made to the questions.' : 'All attempts and access for this quiz are deleted too.', 'Delete quiz', true))) return;
+  try {
+    if (std) { await qbDelAny('training_quiz_results', 'quiz_id=eq.' + STD_QUIZ.id); await qbDelAny('quiz_access', 'quiz_id=eq.' + STD_QUIZ.id); await qbDelAny('quiz_overrides', 'quiz_id=eq.' + STD_QUIZ.id); }
+    else { await qbDelAny('custom_quiz_results', 'quiz_id=eq.' + encodeURIComponent(t.id)); await qbDelAny('quiz_access', 'quiz_id=eq.' + encodeURIComponent(t.id)); await del('custom_quizzes', 'id=eq.' + encodeURIComponent(t.id)); }
+    undoBad();   /* many tables and rows at once, so a toast never offers Undo */
+    toast('Quiz deleted', false, false); m.close(); render();
+  } catch (e) { toast(e.message || 'Could not delete the quiz.', true); }
 }

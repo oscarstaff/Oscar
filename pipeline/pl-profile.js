@@ -35,6 +35,7 @@ async function addDocument() {
     title: 'Add a document',
     body: '<div class="nx-form"><div class="full"><label class="nx-lbl" for="ad_t">Title *</label><input class="nx-in" id="ad_t" placeholder="e.g. Infection control policy"></div>' +
       '<div class="full"><label class="nx-lbl" for="ad_f">File * (up to 6 MB)</label><input class="nx-in" id="ad_f" type="file"></div>' +
+      '<div class="full"><label class="nx-check"><input type="checkbox" id="ad_quiz"> Make a quiz from this document after uploading</label></div>' +
       '<div class="full"><div class="nx-lbl">Who can see it</div><div class="nx-help" style="margin:0 0 6px">Leave all unticked to share with everyone.</div>' + teams.map((t, i) => '<label class="nx-check" style="display:inline-flex;margin:0 14px 6px 0"><input type="checkbox" class="ad_team" value="' + esc(t) + '"> ' + esc(t) + '</label>').join('') + '</div></div>',
     buttons: [{ label: 'Cancel', close: true }, { label: 'Upload', primary: true, run: async mm => {
       const title = $('#ad_t', mm.el).value.trim(), file = ($('#ad_f', mm.el).files || [])[0];
@@ -46,10 +47,12 @@ async function addDocument() {
       if (!j.ok) throw new Error(j.error === 'unauthorized' ? 'Drive did not accept your sign-in. Refresh Yatra and try again.' : j.error || 'Drive upload failed');
       const url = j.url || (j.id ? 'https://drive.google.com/file/d/' + j.id + '/view' : '');
       if (!url) throw new Error('Drive gave no link for the file');
-      try { await ins('documents', { title, category: 'General', url, teams: tm, uploaded_by: ME.name, is_new: true }); }
+      let made = null;
+      try { made = await ins('documents', { title, category: 'General', url, teams: tm, uploaded_by: ME.name, is_new: true }); }
       catch (e) { throw new Error('The file reached Drive but the entry was not saved (' + (e.message || e) + '). Please try again.'); }
       undoBad();   /* the file is now in Drive, so a toast never offers Undo */
       toast('Document added.', false, false); render();
+      if ($('#ad_quiz', mm.el).checked && made && made.id) setTimeout(() => quizModeChoice({ id: made.id, title, url }), 400);
     } }]
   });
   return m;
@@ -79,6 +82,7 @@ route(/^\/documents$/, async () => {
   DC.rows = docs || [];
   const mine = (docs || []).filter(d => ME.admin || !Array.isArray(d.teams) || !d.teams.length || (me.team && d.teams.includes(me.team)));
   const hasQuiz = {}; (quizzes || []).forEach(q => { if (q.document_id && q.status !== 'draft') hasQuiz[q.document_id] = true; });
+  const anyQuiz = {}; (quizzes || []).forEach(q => { if (q.document_id) anyQuiz[q.document_id] = true; });
   afterRender(() => {
     const body = $('#dcBody');
     const paint = () => {
@@ -86,14 +90,15 @@ route(/^\/documents$/, async () => {
       const list = mine.filter(d => !q || String(d.title || '').toLowerCase().includes(q) || String(d.category || '').toLowerCase().includes(q));
       body.innerHTML = list.length ? '<div class="nx-tablewrap"><table class="nx-table tight auto"><thead><tr><th>Document</th><th>Category</th><th>For</th><th>Added</th><th></th></tr></thead><tbody>' + list.map(d => {
         const u = safeUrl(d.url);
-        return '<tr><td><b>' + (u ? '<a href="#" data-opendoc="' + esc(d.id) + '">' + esc(d.title || 'Untitled') + '</a>' : esc(d.title || 'Untitled')) + '</b>' + (hasQuiz[d.id] ? ' <span class="nx-tag walk">Has a quiz</span>' : '') + '</td><td>' + esc(d.category || '–') + '</td><td>' + (Array.isArray(d.teams) && d.teams.length ? d.teams.map(t => '<span class="nx-tag">' + esc(t) + '</span>').join(' ') : 'Everyone') + '</td><td>' + esc(fmtDate(d.created_at)) + (d.uploaded_by ? ' <span class="nx-muted">· ' + esc(d.uploaded_by) + '</span>' : '') + '</td><td class="nx-right">' + (u ? '<a class="nx-btn sm" href="#" data-opendoc="' + esc(d.id) + '">Open</a>' : '<span class="nx-muted">No link</span>') + (ME.admin ? ' <button class="nx-btn sm quiet" data-deldoc="' + esc(d.id) + '">Delete</button>' : '') + '</td></tr>';
+        return '<tr><td><b>' + (u ? '<a href="#" data-opendoc="' + esc(d.id) + '">' + esc(d.title || 'Untitled') + '</a>' : esc(d.title || 'Untitled')) + '</b>' + (hasQuiz[d.id] ? ' <span class="nx-tag walk">Has a quiz</span>' : '') + '</td><td>' + esc(d.category || '–') + '</td><td>' + (Array.isArray(d.teams) && d.teams.length ? d.teams.map(t => '<span class="nx-tag">' + esc(t) + '</span>').join(' ') : 'Everyone') + '</td><td>' + esc(fmtDate(d.created_at)) + (d.uploaded_by ? ' <span class="nx-muted">· ' + esc(d.uploaded_by) + '</span>' : '') + '</td><td class="nx-right">' + (u ? '<a class="nx-btn sm" href="#" data-opendoc="' + esc(d.id) + '">Open</a>' : '<span class="nx-muted">No link</span>') + (ME.admin && !anyQuiz[d.id] ? ' <button class="nx-btn sm" data-mkquiz="' + esc(d.id) + '">Make quiz</button>' : '') + (ME.admin ? ' <button class="nx-btn sm quiet" data-deldoc="' + esc(d.id) + '">Delete</button>' : '') + '</td></tr>';
       }).join('') + '</tbody></table></div>' : empty(q ? 'No documents match' : 'No documents yet', q ? 'Try a different word.' : ME.admin ? 'Use Add document to upload the first one.' : 'Documents your team needs will show here.');
     };
     let t = 0; $('#dcQ').addEventListener('input', e => { clearTimeout(t); t = setTimeout(() => { DC.q = e.target.value; paint(); }, 200); });
     body.addEventListener('click', e => {
-      const o = e.target.closest('[data-opendoc]'), x = e.target.closest('[data-deldoc]');
+      const o = e.target.closest('[data-opendoc]'), x = e.target.closest('[data-deldoc]'), k = e.target.closest('[data-mkquiz]');
       if (o) { e.preventDefault(); const d = DC.rows.find(r => String(r.id) === o.dataset.opendoc); if (d) openDoc(d.url, d.title); }
       else if (x) deleteDocumentRow(x.dataset.deldoc);
+      else if (k) { const d = DC.rows.find(r => String(r.id) === k.dataset.mkquiz); if (d) quizModeChoice(d); }
     });
     const addB = $('#dcAdd'); if (addB) addB.addEventListener('click', addDocument);
     paint();
