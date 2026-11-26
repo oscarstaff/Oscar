@@ -7,8 +7,10 @@ const DOC_SCRIPT = 'https://script.google.com/macros/s/AKfycby0Bq97bCZAsmnruXFuJ
 const DOC_MAX = 6 * 1024 * 1024;
 function docScriptUrl() { let u = ''; try { u = localStorage.getItem('oscars_sheet_url') || ''; } catch (e) { /* storage blocked */ } return /^https:\/\/script\.google\.com\//.test(u) ? u : DOC_SCRIPT; }
 function docDriveId(url) { const m = /drive\.google\.com\/(?:file\/d\/|open\?id=|uc\?[^#]*id=)([A-Za-z0-9_-]{10,})/.exec(String(url || '')); return m ? m[1] : null; }
+/* Apps Script wants the shared gateway token plus the signed-in person's access token (it checks who is an admin). Nexus adds both to every call by itself; Yatra adds them here. */
+const GAS_TOKEN = 'oscars_gas_83235a5f0c1f6ba32b18235e2b2d544ac137167d';
 async function docCall(body) {
-  const r = await fetch(docScriptUrl(), { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(body) });
+  const r = await fetch(docScriptUrl(), { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(Object.assign({}, body, { token: GAS_TOKEN, sbAccessToken: await bearer() })) });
   if (!r.ok) throw new Error('Drive answered HTTP ' + r.status);
   return r.json();
 }
@@ -18,7 +20,7 @@ async function openDoc(url, title) {
   toast('Opening ' + (title || 'document') + '…');
   try {
     const j = await docCall({ action: 'fetchDoc', id });
-    if (!j.ok) throw new Error(j.error || 'Drive would not give the file');
+    if (!j.ok) throw new Error(j.error === 'unauthorized' ? 'Drive did not accept your sign-in. Refresh Yatra and try again.' : j.error || 'Drive would not give the file');
     const bytes = Uint8Array.from(atob(j.base64), c => c.charCodeAt(0));
     const blobUrl = URL.createObjectURL(new Blob([bytes], { type: j.mime || 'application/octet-stream' }));
     window.open(blobUrl, '_blank', 'noopener');
@@ -41,7 +43,7 @@ async function addDocument() {
       if (file.size > DOC_MAX) throw new Error('That file is over 6 MB. Please shrink it first.');
       const tm = $$('.ad_team:checked', mm.el).map(c => c.value);
       const j = await docCall({ action: 'uploadDoc', filename: file.name, mime: file.type || 'application/octet-stream', base64: await readB64(file), uploadedBy: ME.name });
-      if (!j.ok) throw new Error(j.error || 'Drive upload failed');
+      if (!j.ok) throw new Error(j.error === 'unauthorized' ? 'Drive did not accept your sign-in. Refresh Yatra and try again.' : j.error || 'Drive upload failed');
       const url = j.url || (j.id ? 'https://drive.google.com/file/d/' + j.id + '/view' : '');
       if (!url) throw new Error('Drive gave no link for the file');
       try { await ins('documents', { title, category: 'General', url, teams: tm, uploaded_by: ME.name, is_new: true }); }
