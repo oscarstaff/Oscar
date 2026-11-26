@@ -104,7 +104,7 @@ async function savePhoto(file) {
   STAFF.loaded = false; PV_CACHE = null;
 }
 
-/* ---------- Team achievements (same feed as Nexus: trainings passed, Glow for a perfect fortnight, call milestones) ---------- */
+/* ---------- Team achievements (moved here from Nexus: trainings passed, Glow for a perfect fortnight, call milestones) ---------- */
 function achAgo(iso) {
   const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
   if (!(days > 0)) return 'today'; if (days === 1) return 'yesterday'; if (days < 7) return days + ' days ago';
@@ -138,7 +138,7 @@ route(/^\/achievements$/, async () => {
   const face = n => pic[n] ? '<span class="nx-avatar has-photo" style="background-image:url(&quot;' + esc(pic[n]) + '&quot;)"></span>' : '<span class="nx-avatar">' + esc(initials(n)) + '</span>';
   const what = e => e.type === 'glow' ? ['warn', 'Glow', 'earned Glow, a perfect fortnight'] : e.type === 'calls' ? ['info', 'Calls', 'logged ' + (e.n || 0).toLocaleString('en-AU') + ' calls'] : ['ok', 'Training', 'passed a training quiz'];
   const shown = ev.slice(0, 150);
-  return pageHead('star', 'Same feed as Nexus', 'Team achievements', '') +
+  return pageHead('star', 'Trainings, Glow and call milestones', 'Team achievements', '') +
     (glowing.length ? '<div class="nx-card"><div class="nx-card-h"><div><h3>Glowing this fortnight</h3><div class="nx-muted">A perfect punctuality score in the last finished fortnight.</div></div></div><div class="nx-card-b nx-glowrow">' + glowing.map(n => '<a class="nx-who nx-wholink" href="' + esc(staffHref(n)) + '">' + face(n) + '<b>' + gn(n) + '</b></a>').join('') + '</div></div>' : '') +
     '<div class="nx-card"><div class="nx-card-h"><h3>Recently earned</h3></div>' + (shown.length ? '<ul class="nx-list nx-achlist">' + shown.map(e => { const w = what(e); return '<li><a class="nx-who nx-wholink" href="' + esc(staffHref(e.name)) + '">' + face(e.name) + '<span class="nx-achtxt"><b>' + gn(e.name) + '</b> ' + esc(w[2]) + '</span></a><span class="nx-btnrow"><span class="nx-pill ' + w[0] + '">' + w[1] + '</span><span class="nx-muted nx-achago">' + esc(achAgo(e.date)) + '</span></span></li>'; }).join('') + '</ul>' : empty('No achievements yet', 'Passed quizzes, perfect fortnights and call milestones show up here.')) + '</div>';
 });
