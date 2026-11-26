@@ -163,7 +163,7 @@ async function renderNotifsPage(){
 
 function handleNotifClick(id, link){
   if(typeof NotifManager !== 'undefined' && NotifManager.markRead) NotifManager.markRead(id);
-  const validPages = ['home','schedule','leave','availability','shifts','myhours','teamreport','engagement','documents','training','calendar','myreports','notifs','profile'];
+  const validPages = ['home','schedule','leave','availability','shifts','myhours','teamreport','engagement','calendar','myreports','notifs','profile'];
   if(link && validPages.indexOf(link) >= 0){
     goTo(link);
   } else if(link){
@@ -248,12 +248,6 @@ const TOUR_STEPS = [
     body: 'Tap here to open My Time. Shifts shows your roster and open shifts. My Hours shows your timesheet for any date range, and is where you set your Availability.',
     advance: 'tap',
     afterTap: function(){ /* navigation handled by the element's own onclick */ }
-  },
-  {
-    target: '#bn-library',
-    title: 'Library',
-    body: 'Training quizzes, compliance checks, guides and documents all live in the Library. Tap to open it.',
-    advance: 'tap'
   },
   {
     target: '#bn-leave',

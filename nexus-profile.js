@@ -2,23 +2,16 @@ let _staffDirData = [];
 
 async function ensureStaffDirData(force){
   if(!force && _staffDirData && _staffDirData.length) return _staffDirData;
-  const [names, creds, settings, quizAccess, quizResults, passedCustom, passedTraining, punctHistory, callMs, teamMoveRows] = await Promise.all([
+  const [names, creds, settings, passedCustom, passedTraining, punctHistory, callMs, teamMoveRows] = await Promise.all([
     sbGet('staff_names','?order=name.asc'),
     sbGet('staff_credentials','?select=staff_name,team,pronouns'),
     sbGet('staff_settings','?select=name,is_hub_admin'),
-    myIsAdmin ? sbGet('quiz_access','?quiz_id=eq.checklist_v1') : Promise.resolve([]),
-    myIsAdmin ? sbGet('training_quiz_results','?quiz_id=eq.checklist_v1&order=created_at.desc') : Promise.resolve([]),
     sbGet('custom_quiz_results','?select=staff_name,quiz_id&passed=is.true'),
     sbGet('training_quiz_results','?select=staff_name,quiz_id&passed=is.true'),
     sbGet('punctuality_history','?select=staff_name,score,x,fort_start&order=fort_start.desc&limit=2000'),
     sbGet('call_milestones','?select=staff_name,milestone'),
     sbGet('staff_team_history','?select=staff_name,from_team,to_team,changed_at&order=changed_at.desc&limit=500')
   ]);
-  const quizAccessSet = new Set((quizAccess||[]).map(function(q){return q.staff_name;}));
-  const quizResultMap = {};
-  (quizResults||[]).forEach(function(r){ if(!quizResultMap[r.staff_name]) quizResultMap[r.staff_name] = r; });
-  window._sdQuizAccess = quizAccessSet;
-  window._sdQuizResults = quizResultMap;
   const passedSets = {};
   function _addPass(r){
     if(!r || !r.staff_name || !r.quiz_id) return;
@@ -131,8 +124,6 @@ function closeProfilePage(){
 async function openStaffDirectory(){
   document.getElementById('staffDirectoryOverlay').style.display='flex';
   document.getElementById('staffDirList').innerHTML='<div style="text-align:center;color:var(--ui-ink-4,#94a3b8);padding:32px;font-size:13px;">'+nxSkel('list',6)+'</div>';
-  const _bb = document.getElementById('sdQuizBulkBar');
-  if(_bb) _bb.style.display = "none";
   try{
     await ensureStaffDirData(true);
     console.log('[directory] loaded', _staffDirData.length, 'staff');
@@ -409,24 +400,9 @@ function renderStaffDirectory(list){
         const ava=p.staff_name.split(' ').map(function(w){return w[0];}).join('').slice(0,2).toUpperCase();
         const pron=p.pronouns?' <span style="font-size:10px;color:var(--ui-ink-4,#94a3b8);font-weight:400;">('+esc(p.pronouns)+')</span>':'';
         const badge=p.is_admin?' <span title="Admin" style="color:#92400e;display:inline-flex;vertical-align:middle;">'+(window.adminIcon?window.adminIcon(13):'ADMIN')+'</span>':'';
-        let quizBlock = '';
-        if(false && myIsAdmin){
-          const hasAccess = (window._sdQuizAccess && window._sdQuizAccess.has(p.staff_name));
-          const result = (window._sdQuizResults && window._sdQuizResults[p.staff_name]);
-          let statusBadge = '';
-          if(result){
-            const badgeStyle = result.passed
-              ? 'font-size:9px;font-weight:700;color:#059669;background:#d1fae5;padding:2px 6px;border-radius:8px;margin-left:4px;cursor:pointer;border:none;font-family:inherit;'
-              : 'font-size:9px;font-weight:700;color:#991b1b;background:#fee2e2;padding:2px 6px;border-radius:8px;margin-left:4px;cursor:pointer;border:none;font-family:inherit;';
-            statusBadge = '<button onclick="event.stopPropagation();viewQuizAttemptDetail(\''+p.staff_name.replace(/'/g,"\\'")+'\','+result.id+')" title="Review this attempt" style="'+badgeStyle+'">'+(result.passed?'✓ ':'✕ ')+result.score+'/'+result.total+'</button>';
-          }
-          const toggleBtn = '<button onclick="event.stopPropagation();toggleQuizAccess(\''+p.staff_name.replace(/'/g,"\\'")+'\',\'checklist_v1\','+(!hasAccess)+');setTimeout(openStaffDirectory,400);" title="'+(hasAccess?'Revoke quiz access':'Grant quiz access')+'" style="background:'+(hasAccess?'#dc2626':'#10b981')+';color:#fff;border:none;border-radius:6px;padding:3px 8px;font-size:10px;font-weight:700;cursor:pointer;font-family:inherit;flex-shrink:0;">'+(hasAccess?'Revoke quiz':'Give quiz')+'</button>';
-          quizBlock = '<div style="display:flex;align-items:center;gap:4px;flex-shrink:0;">'+statusBadge+toggleBtn+'</div>';
-        }
         return '<div onclick="openProfilePage(\''+p.staff_name.replace(/'/g,"&#39;")+'\')" style="display:flex;align-items:center;gap:10px;padding:8px 8px;border-radius:8px;cursor:pointer;transition:background .1s;" onmouseover="this.style.background=\'#f8fafc\'" onmouseout="this.style.background=\'\'" >'+
           renderStaffAvatar(p.staff_name, 32)+
           '<div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:600;color:var(--ui-ink,#0f172a);">'+renderStaffName(p.staff_name, esc)+pron+badge+(window.achBadgesInline?window.achBadgesInline(p.staff_name):'')+'</div></div>'+
-          quizBlock+
           (myIsAdmin?'':'<svg width="14" height="14" viewBox="0 0 20 20" fill="#cbd5e1"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>')+
           '</div>';
       }).join('');
@@ -1168,9 +1144,9 @@ async function pollForNewActivity(){
             id: 'quiz-'+q.id,
             type: 'quiz',
             title: 'New training assigned',
-            body: nice + (q.granted_by ? ' — assigned by '+q.granted_by : ''),
+            body: nice + (q.granted_by ? ' — assigned by '+q.granted_by : '') + '. Open Yatra, then Quizzes.',
             ts: new Date(q.granted_at).getTime(),
-            link: 'learning'
+            link: null
           });
         });
       }catch(e){}

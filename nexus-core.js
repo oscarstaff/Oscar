@@ -535,329 +535,7 @@ function showHoursTab(tab){
 }
 
 let myTeam = '';
-let docsData = [];
-let _lastUploadedDocId = null;
-let _quizBuilder = null;
-
-
-
-
-let docSelectedFileP=null;
-function _driveIdFromUrl(url){
-  if(!url) return '';
-  const m = String(url).match(/\/file\/d\/([a-zA-Z0-9_-]+)/) ||
-            String(url).match(/[?&]id=([a-zA-Z0-9_-]+)/) ||
-            String(url).match(/\/d\/([a-zA-Z0-9_-]+)/);
-  return m ? m[1] : '';
-}
-async function fetchDriveDocBase64(driveId){
-  if(!driveId) throw new Error('No Drive id');
-  const sheetUrl = localStorage.getItem('oscars_sheet_url') || 'https://script.google.com/macros/s/AKfycby0Bq97bCZAsmnruXFuJuCqXQE_kOxhYE2KFuJnVzLXtT5CV0Y12k5176dxZbdaYVGE/exec';
-  const r = await fetch(sheetUrl, {
-    method:'POST',
-    headers:{'Content-Type':'text/plain;charset=utf-8'},
-    body: JSON.stringify({ action:'fetchDoc', id: driveId })
-  });
-  if(!r.ok) throw new Error('Drive fetch failed: '+r.status);
-  const j = await r.json();
-  if(!j.ok) throw new Error(j.error || 'Drive fetch failed');
-  return j;
-}
-async function downloadPrivateDoc(url, title){
-  const id = _driveIdFromUrl(url);
-  if(!id){
-    const a=document.createElement('a'); a.href=url; a.download=(title||'document'); a.rel='noopener';
-    document.body.appendChild(a); a.click(); a.remove(); return;
-  }
-  try{
-    showToast && showToast('Downloading '+(title||'document')+'…','info');
-    const j = await fetchDriveDocBase64(id);
-    const bytes = Uint8Array.from(atob(j.base64), c=>c.charCodeAt(0));
-    const blob = new Blob([bytes], {type: j.mime || 'application/octet-stream'});
-    const blobUrl = URL.createObjectURL(blob);
-    const a=document.createElement('a');
-    a.href=blobUrl;
-    a.download = j.name || (title||'document');
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(()=>URL.revokeObjectURL(blobUrl), 60000);
-  }catch(e){
-    showToast && showToast('Could not download: '+e.message,'error');
-  }
-}
-async function openPrivateDoc(url, title){
-  const id = _driveIdFromUrl(url);
-  if(!id){ window.open(url,'_blank','noopener'); return; }
-  try{
-    showToast && showToast('Opening '+(title||'document')+'…','info');
-    const j = await fetchDriveDocBase64(id);
-    const bytes = Uint8Array.from(atob(j.base64), c=>c.charCodeAt(0));
-    const blob = new Blob([bytes], {type: j.mime || 'application/octet-stream'});
-    const blobUrl = URL.createObjectURL(blob);
-    window.open(blobUrl,'_blank','noopener');
-    setTimeout(()=>URL.revokeObjectURL(blobUrl), 60000);
-  }catch(e){
-    showToast && showToast('Could not open: '+e.message,'error');
-  }
-}
-
-async function loadDocuments(){
-  try{
-    window._docQuizzes = await sbGet('custom_quizzes', '?order=created_at.desc');
-    window._myCustomQuizResults = await sbGet('custom_quiz_results', '?staff_name=eq.'+encodeURIComponent(me));
-  }catch(e){ window._docQuizzes = []; window._myCustomQuizResults = []; }
-
-  const el = document.getElementById('docsList');
-  const adminArea = document.getElementById('docsAdminUpload');
-  const sub = document.getElementById('docsSub');
-  if(!el) return;
-  if(adminArea) adminArea.style.display = myIsAdmin ? 'block' : 'none';
-  el.innerHTML = '<div class="skel-card"><div class="skel skel-line" style="width:55%;height:14px;"></div><div class="skel skel-line" style="width:90%;"></div><div class="skel skel-line skel-meta"></div></div><div class="skel-card"><div class="skel skel-line" style="width:42%;height:14px;"></div><div class="skel skel-line" style="width:80%;"></div></div>';
-  try{
-    if(!myTeam){
-      try{
-        const creds = await sbGet('staff_credentials','?staff_name=eq.'+encodeURIComponent(me)+'&select=team');
-        myTeam = (creds.length && creds[0] && creds[0].team) ? creds[0].team : '';
-      }catch(e){ myTeam = ''; }
-    }
-    if(!window.myTeams){
-      window.myTeams = myTeam ? [myTeam] : [];
-    }
-    if(sub) sub.textContent = myTeam ? 'Documents for ' + myTeam + ' team' : 'All documents';
-
-    const r = await fetch(SB+'/rest/v1/documents?order=created_at.desc',{
-      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Accept':'application/json'}
-    });
-    if(!r.ok){ el.innerHTML='<div style="color:#dc2626;text-align:center;padding:24px;font-size:13px;">Could not load documents ('+r.status+').</div>'; return; }
-    docsData = await r.json();
-
-    const filtered = myIsAdmin ? docsData : docsData.filter(d => {
-      if(!d.teams || d.teams.length === 0) return true;
-      if(!myTeam) return false;
-      return Array.isArray(d.teams) ? d.teams.includes(myTeam) : false;
-    });
-
-    renderDocs(filtered);
-    if(myIsAdmin) loadDocTeamPicker();
-  }catch(e){
-    console.warn('loadDocuments error:', e);
-    el.innerHTML = '<div style="color:#dc2626;text-align:center;padding:24px;font-size:13px;">Could not load documents. Check your connection.</div>';
-  }
-}
-
-function renderDocs(docs){
-  const el=document.getElementById('docsList');
-  if(!el)return;
-  if(!docs.length){el.innerHTML='<div style="text-align:center;padding:40px 20px;"><svg width="40" height="40" viewBox="0 0 20 20" fill="#e2e8f0" style="margin:0 auto 12px;display:block;"><path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clip-rule="evenodd"/></svg><div style="font-size:14px;font-weight:600;color:var(--ui-ink-2b,#475569);margin-bottom:6px;">No documents yet</div><div style="font-size:12px;color:var(--ui-ink-4,#94a3b8);">Documents shared with your team will appear here.</div></div>';return;}
-  const pdfSvg='<svg width="18" height="18" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clip-rule="evenodd"/></svg>';
-  const linkSvg='<svg width="18" height="18" viewBox="0 0 20 20" fill="currentColor"><path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z"/><path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z"/></svg>';
-  el.innerHTML='<div style="display:flex;flex-direction:column;gap:8px;">'+docs.map(function(d){
-    const age=(new Date()-new Date(d.created_at))/(1000*60*60*24);
-    const isNew=age<3;
-    const url=d.url||'#';
-    const ext=url.split('.').pop().toLowerCase();
-    let iconClass='doc-icon-link', iconSvg=linkSvg;
-    if(ext==='pdf'||url.includes('/documents/')){iconClass='doc-icon-pdf';iconSvg=pdfSvg;}
-    else if(['doc','docx'].includes(ext)||url.includes('docs.google')){iconClass='doc-icon-doc';iconSvg=pdfSvg;}
-    else if(['png','jpg','jpeg','gif','webp'].includes(ext)){iconClass='doc-icon-img';iconSvg=linkSvg;}
-    const teamTags=(d.teams&&d.teams.length)?d.teams.map(function(t){return'<span class="doc-team-tag">'+t+'</span>';}).join(''):'';
-    const deleteBtn=myIsAdmin?'<button class="doc-delete" data-id="'+d.id+'" onclick="event.preventDefault();event.stopPropagation();deleteDocument(this.dataset.id)">Delete</button>':'';
-    const quizzes = (window._docQuizzes||[]).filter(function(q){return q.document_id===d.id;});
-    let quizBtn = '';
-    if(quizzes.length){
-      quizBtn = '<button onclick="event.preventDefault();event.stopPropagation();goTo(\'training\');setTimeout(function(){scrollToTrainingItem(\''+quizzes[0].id+'\');},300);" style="background:#eff6ff;color:#1e40af;border:1px solid #bfdbfe;border-radius:6px;padding:4px 10px;font-size:10.5px;font-weight:700;font-family:inherit;cursor:pointer;margin-right:6px;">Has Quiz</button>';
-    } else {
-      quizBtn = '<span style="background:var(--ui-surface-3,#f1f5f9);color:var(--ui-ink-4,#94a3b8);font-size:10px;font-weight:600;padding:3px 8px;border-radius:6px;margin-right:6px;">No Quiz</span>';
-    }
-    const isStorageFile=url.includes('/storage/v1/object/public/');
-    const isDriveFile=!!_driveIdFromUrl(url);
-    const linkAttr = isDriveFile
-      ? 'href="#" onclick="event.preventDefault();openPrivateDoc(\''+url.replace(/'/g,"\\'")+'\',\''+esc(d.title).replace(/'/g,"\\'")+'\')"'
-      : (isStorageFile?'href="'+url+'" download':'href="'+url+'" target="_blank" rel="noopener"');
-    return'<a '+linkAttr+' class="doc-item">'+
-      '<div class="doc-icon '+iconClass+'">'+iconSvg+'</div>'+
-      '<div style="flex:1;min-width:0;">'+
-        '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">'+
-          '<span class="doc-title">'+esc(d.title)+'</span>'+
-          (isNew?'<span class="doc-badge-new">New</span>':'')+
-        '</div>'+
-        (teamTags?'<div style="margin-top:4px;display:flex;flex-wrap:wrap;gap:3px;max-height:24px;overflow:hidden;">'+teamTags+'</div>':'')+
-      '</div>'+quizBtn+deleteBtn+'</a>';
-  }).join('')+'</div>';
-}
-
-
-
-function filterDocs(){
-  const q=document.getElementById('docsSearch').value.toLowerCase().trim();
-  if(!q){renderDocs(myIsAdmin?docsData:docsData.filter(d=>!d.teams||d.teams.length===0||(myTeam&&d.teams.includes(myTeam))));return;}
-  renderDocs(docsData.filter(d=>d.title.toLowerCase().includes(q)||(d.category||'').toLowerCase().includes(q)));
-}
-
-async function loadDocTeamPicker(){
-  try{
-    const rows=await sbGet('staff_credentials','?select=team&team=not.is.null');
-    const teams=[...new Set(rows.map(r=>r.team).filter(Boolean))].sort();
-    const picker=document.getElementById('docTeamPicker');
-    if(!picker)return;
-    picker.innerHTML=teams.map(t=>'<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;color:var(--ui-ink-2b,#475569);"><input type="checkbox" class="doc-team-cb" value="'+t+'"> '+t+'</label>').join('');
-  }catch(e){console.warn(e);}
-}
-
-let docSelectedFile = null;
-
-function handleDocFileSelect(input){
-  if(input.files&&input.files[0]) setDocFile(input.files[0]);
-}
-function handleDocDrop(e){
-  e.preventDefault();
-  document.getElementById('docDropZone').style.borderColor='#e2e8f0';
-  document.getElementById('docDropZone').style.background='';
-  if(e.dataTransfer.files&&e.dataTransfer.files[0]) setDocFile(e.dataTransfer.files[0]);
-}
-function setDocFile(file){
-  docSelectedFile=file;
-  const label=document.getElementById('docDropLabel');
-  const zone=document.getElementById('docDropZone');
-  if(label){
-    label.textContent=file.name;
-    label.style.color='var(--accent)';
-  }
-  zone.style.borderColor='var(--accent)';
-  zone.style.background='var(--accent-dim)';
-  const titleEl=document.getElementById('docTitle');
-  if(titleEl&&!titleEl.value){
-    titleEl.value=file.name.replace(/\.[^.]+$/,'').replace(/[-_]/g,' ');
-  }
-}
-
-async function uploadDocument(){
-  const title=document.getElementById('docTitle').value.trim();
-  const err=document.getElementById('docErr'),ok=document.getElementById('docOk');
-  const progress=document.getElementById('docProgress');
-  const progressBar=document.getElementById('docProgressBar');
-  const progressLabel=document.getElementById('docProgressLabel');
-  err.classList.remove('show');ok.classList.remove('show');
-  if(!title){err.textContent='Please enter a title.';err.classList.add('show');return;}
-  if(!docSelectedFile){err.textContent='Please select a file to upload.';err.classList.add('show');return;}
-  const teams=Array.from(document.querySelectorAll('.doc-team-cb:checked')).map(cb=>cb.value);
-  const btn=document.getElementById('docUploadBtn');
-  btn.disabled=true;btn.innerHTML='<span class="sp"></span> Uploading...';
-  if(progress)progress.style.display='block';
-  try{
-    if(progressLabel)progressLabel.textContent='Uploading '+esc(docSelectedFile.name)+' to Drive...';
-    if(progressBar)progressBar.style.width='15%';
-    const fileData = await new Promise(function(resolve, reject){
-      const reader = new FileReader();
-      reader.onload = function(){
-        const base64 = reader.result.split(',')[1];
-        resolve(base64);
-      };
-      reader.onerror = reject;
-      reader.readAsDataURL(docSelectedFile);
-    });
-    if(progressBar)progressBar.style.width='40%';
-    const sheetUrl = localStorage.getItem('oscars_sheet_url') || 'https://script.google.com/macros/s/AKfycby0Bq97bCZAsmnruXFuJuCqXQE_kOxhYE2KFuJnVzLXtT5CV0Y12k5176dxZbdaYVGE/exec';
-    if(progressLabel)progressLabel.textContent='Sending to Drive...';
-    if(progressBar)progressBar.style.width='60%';
-    const uploadRes = await fetch(sheetUrl, {
-      method:'POST',
-      headers:{'Content-Type':'text/plain;charset=utf-8'},
-      body: JSON.stringify({
-        action: 'uploadDoc',
-        filename: docSelectedFile.name,
-        mime: docSelectedFile.type || 'application/octet-stream',
-        base64: fileData,
-        uploadedBy: me
-      })
-    });
-    if(!uploadRes.ok){
-      throw new Error('Drive upload failed: '+uploadRes.status);
-    }
-    const uploadJson = await uploadRes.json();
-    if(!uploadJson.ok){
-      throw new Error(uploadJson.error || 'Drive upload failed');
-    }
-    if(progressBar)progressBar.style.width='80%';
-    const fileUrl = uploadJson.url || (uploadJson.id ? 'https://drive.google.com/file/d/'+uploadJson.id+'/view' : '');
-    if(!fileUrl) throw new Error('Drive upload returned no file id/url');
-    if(progressLabel)progressLabel.textContent='Saving document info...';
-    const res=await fetch(SB+'/rest/v1/documents',{
-      method:'POST',
-      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=representation'},
-      body:JSON.stringify({title,category:'General',url:fileUrl,teams,uploaded_by:me,is_new:true})
-    });
-    if(progressBar)progressBar.style.width='100%';
-    if(res.ok||res.status===201){
-      try{
-        const created = await res.json();
-        if(created && created[0]) _lastUploadedDocId = created[0].id;
-      }catch(e){}
-      ok.textContent='Document uploaded successfully!';ok.classList.add('show');
-      const attachQuizCb = document.getElementById('docAttachQuiz');
-      if(attachQuizCb && attachQuizCb.checked && _lastUploadedDocId){
-        showQuizModeChoice(_lastUploadedDocId, document.getElementById('docTitle').value, fileUrl);
-        attachQuizCb.checked = false;
-      }
-      document.getElementById('docTitle').value='';
-      document.getElementById('docFile').value='';
-      document.getElementById('docDropLabel').textContent='Click to choose a file or drag it here';
-      document.getElementById('docDropLabel').style.color='';
-      document.getElementById('docDropZone').style.borderColor='#e2e8f0';
-      document.getElementById('docDropZone').style.background='';
-      document.querySelectorAll('.doc-team-cb').forEach(cb=>cb.checked=false);
-      docSelectedFile=null;
-      setTimeout(()=>{if(progress)progress.style.display='none';if(progressBar)progressBar.style.width='0%';},800);
-      await loadDocuments();
-    }else throw new Error('Failed to save document info: '+res.status);
-  }catch(e){
-    console.warn(e);
-    err.textContent=e.message||'Upload failed. Please try again.';
-    err.classList.add('show');
-    if(progress)progress.style.display='none';
-    if(progressBar)progressBar.style.width='0%';
-  }finally{
-    btn.disabled=false;btn.textContent='Upload Document';
-  }
-}
-
-/* Drive file id from a stored document link (…/file/d/<id>/view or …?id=<id>); null when it isn't a Drive link. */
-function _docDriveId(url){
-  const s=String(url||'');
-  const m=/drive\.google\.com\/(?:file\/d\/|open\?id=|uc\?[^#]*id=)([A-Za-z0-9_-]{10,})/.exec(s);
-  return m?m[1]:null;
-}
-/* Deleting a document also moves its file to the Drive trash (recoverable there for 30 days).
-   Apps Script does the Drive part (deleteDoc in Docs.gs, hub admins only). The Nexus entry is only
-   removed once Drive has let go of the file, so a file can't be left behind with no entry pointing at it.
-   If Drive refuses, you can still remove the entry on its own. */
-async function deleteDocument(id){
-  const d=(docsData||[]).find(function(x){ return String(x.id)===String(id); });
-  const fileId=d?_docDriveId(d.url):null;
-  if(!(await nxConfirm(fileId?'The file is also moved to the Drive trash, where it can be restored for 30 days.':'This removes the document from Nexus.',{title:'Delete this document?',okText:'Delete',danger:true}))) return;
-  if(fileId){
-    let j=null, why0='no reply from Apps Script';
-    try{
-      const sheetUrl=localStorage.getItem('oscars_sheet_url')||'https://script.google.com/macros/s/AKfycby0Bq97bCZAsmnruXFuJuCqXQE_kOxhYE2KFuJnVzLXtT5CV0Y12k5176dxZbdaYVGE/exec';
-      const res=await fetch(sheetUrl,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'deleteDoc',fileId:fileId})});
-      if(res.ok){ j=await res.json(); } else { why0='Apps Script answered HTTP '+res.status; }
-    }catch(e){ console.warn('deleteDoc',e); why0='could not read the reply ('+(e&&e.message||e)+')'; }
-    if(!(j&&j.ok)){
-      if(j&&j.error==='forbidden'){ await nxAlert('Only hub admins can delete documents.',{title:'Admins only'}); return; }
-      const why=(j&&j.error==='not found')?'The file wasn’t found in Drive (it may already be gone, or the script can’t see it).'
-              :(j&&j.error==='not a document')?'That file isn’t in the Documents folder, so Nexus won’t touch it.'
-              :'Drive wouldn’t remove the file.\n\nApps Script said: '+((j&&j.error)||why0);
-      if(!(await nxConfirm(why+'\n\nRemove it from Nexus anyway? The file will stay in Drive.',{title:'Couldn’t remove the file from Drive',okText:'Remove from Nexus',danger:true}))) return;
-    }
-  }
-  try{
-    const r=await fetch(SB+'/rest/v1/documents?id=eq.'+encodeURIComponent(id),{method:'DELETE',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Prefer':'return=representation'}});
-    const out=r.ok?await r.json().catch(function(){return null;}):null;
-    if(!r.ok||!Array.isArray(out)||!out.length) throw new Error('refused '+r.status);
-    await loadDocuments();
-  }catch(e){console.warn(e);nxAlert('Couldn’t delete that document. Please try again.',{title:'Delete failed'});}
-}
-
-
+/* Documents, Learnings and quizzes now live in Yatra (Documents, Quizzes). */
 
 async function getAuthIdentity(){
   try{
@@ -1253,9 +931,8 @@ async function enterHub(){
   loadBirthdays();
   setTimeout(maybeBirthdayCelebration, 1400);
   const hash=_bootHash;
-  const validPages=['home','schedule','profile','announcements','calendar','training','documents','myreports','notifs','leave','availability','hub','shifts','myhours','teamreport'];
-  const hashMap={documents:'profile'};
-  goTo(validPages.includes(hash)?hash:(hashMap[hash]||'home'));
+  const validPages=['home','schedule','profile','announcements','calendar','myreports','notifs','leave','availability','hub','shifts','myhours','teamreport'];
+  goTo(validPages.includes(hash)?hash:'home');
   showProfileSection("account");
 }
 
@@ -1301,30 +978,6 @@ function openSubtabChooser(config){
     document.addEventListener('click', closeOnTap, true);
     document.addEventListener('touchstart', closeOnTap, true);
   }, 50);
-}
-
-function openLibrary(){
-  openSubtabChooser({
-    title: 'Library',
-    navGroupId: 'navg-learning',
-    defaultTab: 'training',
-    options: [
-      {
-        label: 'Learnings',
-        sub: 'Quizzes & compliance checks',
-        bg: '#eff6ff',
-        icon: '<svg width="18" height="18" viewBox="0 0 20 20" fill="#3b82f6"><path d="M10.394 2.08a1 1 0 00-.788 0l-7 3a1 1 0 000 1.84L5.25 8.051a.999.999 0 01.356-.257l4-1.714a1 1 0 11.788 1.838L7.667 9.088l1.94.831a1 1 0 00.787 0l7-3a1 1 0 000-1.838l-7-3zM3.31 9.397L5 10.12v4.102a8.969 8.969 0 00-1.05-.174 1 1 0 01-.89-.89 11.115 11.115 0 01.25-3.762zM9.3 16.573A9.026 9.026 0 007 14.935v-3.957l1.818.78a3 3 0 002.364 0l5.508-2.361a11.026 11.026 0 01.25 3.762 1 1 0 01-.89.89 8.968 8.968 0 00-5.35 2.524 1 1 0 01-1.4 0zM6 18a1 1 0 001-1v-2.065a8.935 8.935 0 00-2-.712V17a1 1 0 001 1z"/></svg>',
-        action: "goTo('training');"
-      },
-      {
-        label: 'Documents',
-        sub: 'Training guides & resources',
-        bg: '#fef3c7',
-        icon: '<svg width="18" height="18" viewBox="0 0 20 20" fill="#d97706"><path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clip-rule="evenodd"/></svg>',
-        action: "goTo('documents');"
-      }
-    ]
-  });
 }
 
 /**
@@ -1416,9 +1069,7 @@ function _setBottomNavActive(page){
   const groupMap = {
     'shifts':'schedule',
     'myhours':'schedule',
-    'availability':'schedule',
-    'training':'library',
-    'documents':'library'
+    'availability':'schedule'
   };
   const target = groupMap[page] || page;
   document.querySelectorAll('.bn-item').forEach(function(b){
@@ -1444,7 +1095,7 @@ function setActiveNavChild(tab){
 }
 
 function goTo(p){
-  if(p === 'diary' || p === 'tasks' || p === 'achievements'){ p = 'home'; }   /* Team achievements now live in Yatra */
+  if(p === 'diary' || p === 'tasks' || p === 'achievements' || p === 'training' || p === 'learning' || p === 'documents' || p === 'library'){ p = 'home'; }   /* Team achievements, Training and Documents now live in Yatra */
   /* My Time was split: Leave is its own page; Availability + hours live on My Hours. */
   let _hoursTab = null;
   if(p === 'schedule') p = 'leave';
@@ -1484,7 +1135,7 @@ function goTo(p){
   }
   setActiveNavChild(p);
   if(typeof _setBottomNavActive==='function') _setBottomNavActive(p);
-  const titles={home:'Home',leave:'Leave',shifts:'Shifts',myhours:'My Hours',myreports:'Manager Tools',teamreport:'Team Report',schedule:'Schedule',profile:'Profile','profile-view':'Profile',announcements:'Announcements',engagement:'Engagement',documents:'Documents',messages:'Messages',achievements:'Team Achievements'};
+  const titles={home:'Home',leave:'Leave',shifts:'Shifts',myhours:'My Hours',myreports:'Manager Tools',teamreport:'Team Report',schedule:'Schedule',profile:'Profile','profile-view':'Profile',announcements:'Announcements',engagement:'Engagement',messages:'Messages',achievements:'Team Achievements'};
   const appName='Nexus';
   document.title='Nexus · '+(titles[p]||'Nexus');
   if(history.replaceState)history.replaceState(null,'','#'+p);
@@ -1498,9 +1149,6 @@ function goTo(p){
   if(p==="home"){if(typeof nxApplyReportMenuCache==='function') nxApplyReportMenuCache();loadHomeData();loadClockState();loadWhatsNew();loadHomeCalendar();loadHomeAttention();renderTodayChip();}
   if(p==="notifs"){renderNotifsPage();}
   
-  if(p==="training"){renderMyTraining();}
-
-  if(p==="documents"){loadDocuments();refreshQuizStrip();}
   /* Tasks feature removed */
     if(p==="myreports"){ initReportsPage(); if(typeof showMgrView==='function') showMgrView(typeof _repRead==='function' ? _repRead('nx_rep_mgr') : null); }
   
