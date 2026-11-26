@@ -1,10 +1,80 @@
 'use strict';
 /* pl-profile.js · Yatra · Documents, Profile, Team achievements, Staff profile view.
    One of the Yatra files loaded by nex.html (list and order: PL_FILES in the loader). All of them share one global scope. */
-/* ---------- Documents (read and open; upload and delete stay in Nexus) ---------- */
+/* ---------- Documents (open for everyone; admins upload and delete) ----------
+   Files live in a private Google Drive folder. Apps Script (same web app Nexus used) does the Drive part: uploadDoc, deleteDoc, fetchDoc. */
+const DOC_SCRIPT = 'https://script.google.com/macros/s/AKfycby0Bq97bCZAsmnruXFuJuCqXQE_kOxhYE2KFuJnVzLXtT5CV0Y12k5176dxZbdaYVGE/exec';
+const DOC_MAX = 6 * 1024 * 1024;
+function docScriptUrl() { let u = ''; try { u = localStorage.getItem('oscars_sheet_url') || ''; } catch (e) { /* storage blocked */ } return /^https:\/\/script\.google\.com\//.test(u) ? u : DOC_SCRIPT; }
+function docDriveId(url) { const m = /drive\.google\.com\/(?:file\/d\/|open\?id=|uc\?[^#]*id=)([A-Za-z0-9_-]{10,})/.exec(String(url || '')); return m ? m[1] : null; }
+async function docCall(body) {
+  const r = await fetch(docScriptUrl(), { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(body) });
+  if (!r.ok) throw new Error('Drive answered HTTP ' + r.status);
+  return r.json();
+}
+async function openDoc(url, title) {
+  const id = docDriveId(url);
+  if (!id) { const u = safeUrl(url); if (u) window.open(u, '_blank', 'noopener'); return; }
+  toast('Opening ' + (title || 'document') + '…');
+  try {
+    const j = await docCall({ action: 'fetchDoc', id });
+    if (!j.ok) throw new Error(j.error || 'Drive would not give the file');
+    const bytes = Uint8Array.from(atob(j.base64), c => c.charCodeAt(0));
+    const blobUrl = URL.createObjectURL(new Blob([bytes], { type: j.mime || 'application/octet-stream' }));
+    window.open(blobUrl, '_blank', 'noopener');
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+  } catch (e) { toast('Could not open it: ' + (e.message || e), true); }
+}
+function readB64(file) { return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1] || ''); r.onerror = () => rej(new Error('Could not read the file')); r.readAsDataURL(file); }); }
+async function addDocument() {
+  const dir = await staffDir().catch(() => ({}));
+  const teams = Array.from(new Set(Object.keys(dir).map(n => dir[n].team).filter(Boolean))).sort();
+  const m = openModal({
+    title: 'Add a document',
+    body: '<div class="nx-form"><div class="full"><label class="nx-lbl" for="ad_t">Title *</label><input class="nx-in" id="ad_t" placeholder="e.g. Infection control policy"></div>' +
+      '<div class="full"><label class="nx-lbl" for="ad_f">File * (up to 6 MB)</label><input class="nx-in" id="ad_f" type="file"></div>' +
+      '<div class="full"><div class="nx-lbl">Who can see it</div><div class="nx-help" style="margin:0 0 6px">Leave all unticked to share with everyone.</div>' + teams.map((t, i) => '<label class="nx-check" style="display:inline-flex;margin:0 14px 6px 0"><input type="checkbox" class="ad_team" value="' + esc(t) + '"> ' + esc(t) + '</label>').join('') + '</div></div>',
+    buttons: [{ label: 'Cancel', close: true }, { label: 'Upload', primary: true, run: async mm => {
+      const title = $('#ad_t', mm.el).value.trim(), file = ($('#ad_f', mm.el).files || [])[0];
+      if (!title) { const e = new Error('Please enter a title.'); e.fieldEl = $('#ad_t', mm.el); throw e; }
+      if (!file) { const e = new Error('Please choose a file.'); e.fieldEl = $('#ad_f', mm.el); throw e; }
+      if (file.size > DOC_MAX) throw new Error('That file is over 6 MB. Please shrink it first.');
+      const tm = $$('.ad_team:checked', mm.el).map(c => c.value);
+      const j = await docCall({ action: 'uploadDoc', filename: file.name, mime: file.type || 'application/octet-stream', base64: await readB64(file), uploadedBy: ME.name });
+      if (!j.ok) throw new Error(j.error || 'Drive upload failed');
+      const url = j.url || (j.id ? 'https://drive.google.com/file/d/' + j.id + '/view' : '');
+      if (!url) throw new Error('Drive gave no link for the file');
+      try { await ins('documents', { title, category: 'General', url, teams: tm, uploaded_by: ME.name, is_new: true }); }
+      catch (e) { throw new Error('The file reached Drive but the entry was not saved (' + (e.message || e) + '). Please try again.'); }
+      undoBad();   /* the file is now in Drive, so a toast never offers Undo */
+      toast('Document added.', false, false); render();
+    } }]
+  });
+  return m;
+}
+async function deleteDocumentRow(id) {
+  const d = (DC.rows || []).find(x => String(x.id) === String(id)); if (!d) return;
+  const fid = docDriveId(d.url);
+  if (!(await confirmBox('Delete this document?', fid ? 'The file also moves to the Drive trash, where it can be restored for 30 days.' : 'This removes the document from the list.', 'Delete', true))) return;
+  try {
+    if (fid) {
+      let j = null, why = 'no reply from Apps Script';
+      try { j = await docCall({ action: 'deleteDoc', fileId: fid }); } catch (e) { why = e.message || String(e); }
+      if (!(j && j.ok)) {
+        if (j && j.error === 'forbidden') { toast('Only hub admins can delete documents.', true); return; }
+        const msg = j && j.error === 'not found' ? 'The file was not found in Drive (it may already be gone).' : j && j.error === 'not a document' ? 'That file is not in the Documents folder, so it will not be touched.' : 'Drive would not remove the file (' + ((j && j.error) || why) + ').';
+        if (!(await confirmBox('Could not remove the file from Drive', msg + ' Remove it from the list anyway? The file stays in Drive.', 'Remove from list', true))) return;
+      }
+    }
+    await del('documents', 'id=eq.' + encodeURIComponent(id));
+    undoBad();
+    toast('Document deleted.', false, false); render();
+  } catch (e) { toast(e.message || 'Could not delete that document.', true); }
+}
 const DC = { q: '' };
 route(/^\/documents$/, async () => {
   const [me, docs, quizzes] = await Promise.all([loadMe(), sel('documents', 'select=id,title,category,url,teams,uploaded_by,created_at&order=created_at.desc'), sel('custom_quizzes', 'select=id,document_id,status').catch(() => [])]);
+  DC.rows = docs || [];
   const mine = (docs || []).filter(d => ME.admin || !Array.isArray(d.teams) || !d.teams.length || (me.team && d.teams.includes(me.team)));
   const hasQuiz = {}; (quizzes || []).forEach(q => { if (q.document_id && q.status !== 'draft') hasQuiz[q.document_id] = true; });
   afterRender(() => {
@@ -14,14 +84,20 @@ route(/^\/documents$/, async () => {
       const list = mine.filter(d => !q || String(d.title || '').toLowerCase().includes(q) || String(d.category || '').toLowerCase().includes(q));
       body.innerHTML = list.length ? '<div class="nx-tablewrap"><table class="nx-table tight auto"><thead><tr><th>Document</th><th>Category</th><th>For</th><th>Added</th><th></th></tr></thead><tbody>' + list.map(d => {
         const u = safeUrl(d.url);
-        return '<tr><td><b>' + (u ? '<a href="' + esc(u) + '" target="_blank" rel="noopener noreferrer">' + esc(d.title || 'Untitled') + '</a>' : esc(d.title || 'Untitled')) + '</b>' + (hasQuiz[d.id] ? ' <span class="nx-tag walk">Has a quiz</span>' : '') + '</td><td>' + esc(d.category || '–') + '</td><td>' + (Array.isArray(d.teams) && d.teams.length ? d.teams.map(t => '<span class="nx-tag">' + esc(t) + '</span>').join(' ') : 'Everyone') + '</td><td>' + esc(fmtDate(d.created_at)) + (d.uploaded_by ? ' <span class="nx-muted">· ' + esc(d.uploaded_by) + '</span>' : '') + '</td><td class="nx-right">' + (u ? '<a class="nx-btn sm" href="' + esc(u) + '" target="_blank" rel="noopener noreferrer">Open</a>' : '<span class="nx-muted">No link</span>') + '</td></tr>';
-      }).join('') + '</tbody></table></div>' : empty(q ? 'No documents match' : 'No documents yet', q ? 'Try a different word.' : 'Documents are added in Nexus and show here for your team.');
+        return '<tr><td><b>' + (u ? '<a href="#" data-opendoc="' + esc(d.id) + '">' + esc(d.title || 'Untitled') + '</a>' : esc(d.title || 'Untitled')) + '</b>' + (hasQuiz[d.id] ? ' <span class="nx-tag walk">Has a quiz</span>' : '') + '</td><td>' + esc(d.category || '–') + '</td><td>' + (Array.isArray(d.teams) && d.teams.length ? d.teams.map(t => '<span class="nx-tag">' + esc(t) + '</span>').join(' ') : 'Everyone') + '</td><td>' + esc(fmtDate(d.created_at)) + (d.uploaded_by ? ' <span class="nx-muted">· ' + esc(d.uploaded_by) + '</span>' : '') + '</td><td class="nx-right">' + (u ? '<a class="nx-btn sm" href="#" data-opendoc="' + esc(d.id) + '">Open</a>' : '<span class="nx-muted">No link</span>') + (ME.admin ? ' <button class="nx-btn sm quiet" data-deldoc="' + esc(d.id) + '">Delete</button>' : '') + '</td></tr>';
+      }).join('') + '</tbody></table></div>' : empty(q ? 'No documents match' : 'No documents yet', q ? 'Try a different word.' : ME.admin ? 'Use Add document to upload the first one.' : 'Documents your team needs will show here.');
     };
     let t = 0; $('#dcQ').addEventListener('input', e => { clearTimeout(t); t = setTimeout(() => { DC.q = e.target.value; paint(); }, 200); });
+    body.addEventListener('click', e => {
+      const o = e.target.closest('[data-opendoc]'), x = e.target.closest('[data-deldoc]');
+      if (o) { e.preventDefault(); const d = DC.rows.find(r => String(r.id) === o.dataset.opendoc); if (d) openDoc(d.url, d.title); }
+      else if (x) deleteDocumentRow(x.dataset.deldoc);
+    });
+    const addB = $('#dcAdd'); if (addB) addB.addEventListener('click', addDocument);
     paint();
   });
-  return pageHead('doc', ME.admin ? 'All teams' : me.team ? 'Documents for the ' + me.team + ' team' : 'Documents for everyone', 'Documents', '') +
-    '<div class="nx-card"><div class="nx-toolbar" style="border-top:0"><input class="nx-in sm" style="min-width:280px" id="dcQ" placeholder="Search documents" value="' + esc(DC.q) + '"><span class="nx-grow"></span><span class="nx-muted">Upload and delete in Nexus</span></div><div id="dcBody"></div></div>';
+  return pageHead('doc', ME.admin ? 'All teams' : me.team ? 'Documents for the ' + me.team + ' team' : 'Documents for everyone', 'Documents', ME.admin && !ME.viewOnly ? '<button class="nx-btn primary" id="dcAdd">Add document</button>' : '') +
+    '<div class="nx-card"><div class="nx-toolbar" style="border-top:0"><input class="nx-in sm" style="min-width:280px" id="dcQ" placeholder="Search documents" value="' + esc(DC.q) + '"><span class="nx-grow"></span></div><div id="dcBody"></div></div>';
 });
 
 /* ---------- Profile (the parts that are about you; password, themes and notifications stay in Nexus) ---------- */
