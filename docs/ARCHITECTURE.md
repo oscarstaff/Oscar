@@ -31,7 +31,7 @@ In load order.
 | `pl-tasks` | Task Manager |
 | `pl-admin` | Admin tab: status lists, qualifications, agents, audit |
 | `pl-staff` | Who am I as staff (`loadMe`, team) |
-| `pl-quizzes` | Quizzes (copied from Nexus) |
+| `pl-quizzes` | Quizzes: taking them, and admin Manage (access, results, retakes, CSV report). Builder/editor still in Nexus until stage 3 |
 | `pl-profile` | Documents (admins upload and delete; files live in private Google Drive via the Apps Script web app, so the CSP allows `script.google.com`), Profile, Team achievements, Staff profile view |
 | `pl-teamreport` | Team report |
 | `pl-faq` | Pip FAQ questions and help panel |
