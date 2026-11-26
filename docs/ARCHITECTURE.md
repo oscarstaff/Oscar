@@ -32,7 +32,7 @@ In load order.
 | `pl-admin` | Admin tab: status lists, qualifications, agents, audit |
 | `pl-staff` | Who am I as staff (`loadMe`, team) |
 | `pl-quizzes` | Quizzes (copied from Nexus) |
-| `pl-profile` | Documents, Profile, Team achievements, Staff profile view |
+| `pl-profile` | Documents (admins upload and delete; files live in private Google Drive via the Apps Script web app, so the CSP allows `script.google.com`), Profile, Team achievements, Staff profile view |
 | `pl-teamreport` | Team report |
 | `pl-faq` | Pip FAQ questions and help panel |
 | `pl-convreport` | Conversion report |
