@@ -123,7 +123,8 @@ function ico(name) {
     admin: '<path d="M12 3 5 6v5c0 5 3 8.5 7 10 4-1.5 7-5 7-10V6z"/><circle cx="12" cy="10.5" r="2"/><path d="M8.5 16c.6-1.8 2-2.5 3.5-2.5s2.9.7 3.5 2.5"/>',
     sliders: '<path d="M4 7h9M17 7h3M4 17h3M11 17h9M4 12h5M13 12h7"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/><circle cx="11" cy="12" r="2"/>',
     notebook: '<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 3v18M12.5 8.5h3M12.5 12.5h3"/>',
-    lock: '<rect x="5" y="11" width="14" height="9" rx="2.5"/><path d="M8 11V8a4 4 0 018 0v3"/>', home: '<path d="M4 11l8-7 8 7v9H4z"/>'
+    lock: '<rect x="5" y="11" width="14" height="9" rx="2.5"/><path d="M8 11V8a4 4 0 018 0v3"/>', home: '<path d="M4 11l8-7 8 7v9H4z"/>',
+    ban: '<circle cx="12" cy="12" r="9"/><path d="M5.7 5.7l12.6 12.6"/>'
   };
   return '<svg class="nx-ico" viewBox="0 0 24 24" aria-hidden="true">' + (P[name] || '') + '</svg>';
 }
