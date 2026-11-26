@@ -1511,7 +1511,6 @@ function showSystemNotification(title, body, taskId, typeKey){
   if(typeof NotifManager !== 'undefined'){
     let link = null;
     if(typeKey === 'announcements') link = 'announcements';
-    else if(typeKey === 'quiz') link = 'learning';
     else if(typeKey === 'leave-approved' || typeKey === 'leave-declined') link = 'schedule';
     else if(typeKey === 'availability-expiry') link = 'availability';
     NotifManager.push({

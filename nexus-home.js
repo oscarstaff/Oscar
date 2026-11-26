@@ -63,22 +63,22 @@ async function loadHomeAttention(){
     }catch(e){}
 
     try{
-      const [quizzes, results] = await Promise.all([
-        sbGet('custom_quizzes','?order=created_at.desc'),
-        sbGet('custom_quiz_results','?staff_name=eq.'+encodeURIComponent(me)+'&select=quiz_id,passed')
+      const [quizzes, results, access] = await Promise.all([
+        sbGet('custom_quizzes','?select=id,status&order=created_at.desc'),
+        sbGet('custom_quiz_results','?staff_name=eq.'+encodeURIComponent(me)+'&select=quiz_id,passed'),
+        sbGet('quiz_access','?staff_name=eq.'+encodeURIComponent(me)+'&select=quiz_id')
       ]);
       const passedIds = new Set((results||[]).filter(r=>r.passed).map(r=>r.quiz_id));
+      const mine = new Set((access||[]).map(a=>a.quiz_id));
       const pending = (quizzes||[]).filter(function(q){
-        if(passedIds.has(q.id)) return false;
-        if(q.teams && q.teams.length && myTeam && !q.teams.includes(myTeam)) return false;
-        return true;
+        return mine.has(q.id) && q.status!=='draft' && !passedIds.has(q.id);
       });
       if(pending.length){
         items.push({
           color:'#8b5cf6', icon:'quiz',
           title: pending.length===1 ? '1 training quiz to complete' : pending.length+' training quizzes to complete',
-          sub: 'Tap to open your training',
-          action: function(){ goTo('training'); }
+          sub: 'Quizzes are in Yatra. Tap to open it.',
+          action: function(){ const c=document.getElementById('hubcard-nex'); if(c) c.click(); else showToast('Quizzes are in Yatra. Ask an admin to give you access to it.'); }
         });
       }
     }catch(e){}

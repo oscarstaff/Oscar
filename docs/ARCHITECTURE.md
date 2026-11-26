@@ -47,6 +47,8 @@ In load order.
 
 `theme.js` is separate (colours and theme).
 
+Training (quizzes) and Documents no longer exist in Nexus (`index.html`, `nexus-*.js`). They live only in Yatra (`pl-quizzes`, `pl-profile`). Old Nexus links to them land on Home. Staff need Yatra access to take quizzes.
+
 Other things in the repo:
 - `scripts/edge/` : Supabase edge functions that send email (`nex-send-welcome`, `nex-send-followup`, `nex-send-class-confirm`, `nex-send-placement-docs`, plus the email templates). Emails are plain HTML, not designed, never text-only, with the key parts highlighted.
 - `scripts/*.gs` : Google Apps Script files (mail relays and the form-sync scripts for the enrolment and self-placement forms). These are pasted into Apps Script by hand and redeployed; merging a PR does not update them.

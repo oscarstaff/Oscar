@@ -17,7 +17,7 @@
   var KEY = 'oscars_sb';
   /* ids that already have a hover label in index.html's compact-sidebar CSS */
   var HAS_TIP = { 'nav-home':1, 'nav-schedule':1, 'nav-updates':1, 'nav-myreports':1, 'nav-leave':1,
-                  'nav-tasks':1, 'nav-documents':1, 'nav-profile':1, 'nav-team':1 };
+                  'nav-tasks':1, 'nav-profile':1, 'nav-team':1 };
   var CHEV_L = '<svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5l-5 5 5 5"/></svg>';
   var CHEV_R = '<svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 5l5 5-5 5"/></svg>';
 
@@ -66,7 +66,7 @@
     Array.prototype.forEach.call(document.querySelectorAll('.nav-group.sb-fly'), function(g){ g.classList.remove('sb-fly'); });
   }
 
-  /* Collapsed rail: a group parent (My Time, Library) opens its children as a flyout beside the rail. */
+  /* Collapsed rail: a group parent (My Time) opens its children as a flyout beside the rail. */
   function wrapGroups(){
     var orig = window.toggleNavGroup;
     if(typeof orig !== 'function' || orig._sbWrapped) return;

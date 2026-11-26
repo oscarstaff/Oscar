@@ -2,9 +2,9 @@
    NEXUS · NEXI, the helper for everyone (phones and computers); team leads and admins also get report tools
    · phones: a round button in the top bar opens a bottom sheet; computers: a round button bottom-right opens a panel. "Hi {name}, I'm Nexi"
    · Nexi ONLY answers a fixed menu of questions (no free chat, no AI service, no key, no cost). Two of them
-     (hours between two dates, search documents) show a tiny form first.
+     (hours between two dates) show a tiny form first.
    · every answer is worked out by code from Nexus data the signed-in person can already see
-     (clock log, roster, leave, team, documents, quizzes); nothing is stored and nothing is sent anywhere
+     (clock log, roster, leave, team); nothing is stored and nothing is sent anywhere
    · add a question: push one entry into ASK below: {id, g:'group', label, run(vals) -> {text, lines?, go?}}
      optional form:{intro, fields:[{id,label,type,value,placeholder}], submit, summary(vals)}
    REVERT: remove the <script> for this file.
@@ -64,30 +64,6 @@ var nxAgent = (function(){
     var c=await sbGet('staff_credentials','?staff_name=eq.'+encodeURIComponent(who())+'&select=team');
     return (c&&c[0]&&c[0].team)||'';
   }
-  /* documents this person is allowed to see (same rule as the Documents page) */
-  async function visibleDocs(){
-    var team=await myTeamName();
-    var docs=await sbGet('documents','?order=created_at.desc');
-    return (docs||[]).filter(function(d){
-      if(amAdmin()) return true;
-      if(!d.teams || !d.teams.length) return true;
-      return !!team && Array.isArray(d.teams) && d.teams.indexOf(team)>-1;
-    });
-  }
-  async function quizState(){
-    var res=await Promise.all([
-      sbGet('custom_quizzes','?order=created_at.desc'),
-      sbGet('custom_quiz_results','?staff_name=eq.'+encodeURIComponent(who())+'&order=created_at.desc'),
-      amAdmin() ? Promise.resolve(null) : sbGet('quiz_access','?staff_name=eq.'+encodeURIComponent(who()))
-    ]);
-    var access = res[2] ? new Set(res[2].map(function(a){ return a.quiz_id; })) : null;
-    var quizzes=(res[0]||[]).filter(function(q){
-      if(q.status==='draft') return false;
-      return !access || access.has(q.id);
-    });
-    return {quizzes:quizzes, results:res[1]||[]};
-  }
-
   /* ── team leads and admins ─────────────────────────────────────────────── */
   function isLead(){ try{ return (typeof trIsLead==='function') ? !!trIsLead() : amAdmin(); }catch(e){ return false; } }
   /* who the person can report on: admins = everyone, leads = their own team */
@@ -546,53 +522,6 @@ var nxAgent = (function(){
       var bs=''; try{ if(typeof formatNepaliDate==='function') bs=formatNepaliDate(now); }catch(e){}
       var lines=[greg]; if(bs) lines.push('Nepali date: '+bs);
       return {text:'It is '+time+' in Kathmandu.', lines:lines};
-    }},
-    {id:'docs', g:'Library', label:'Latest documents', run:async function(){
-      try{
-        var docs=await visibleDocs();
-        if(!docs.length) return {text:'No documents have been shared with you yet.'};
-        var lines=docs.slice(0,5).map(function(d){
-          var isNew=(Date.now()-new Date(d.created_at))<3*864e5;
-          return d.title+' · '+fmtShortDate(d.created_at)+(isNew?' · New':'');
-        });
-        return {text: docs.length===1 ? 'There’s 1 document for you.' : 'The latest of '+docs.length+' documents for you:', lines:lines, go:[{label:'Open Documents', run:function(){ goTo('documents'); }}]};
-      }catch(e){ return sorry(); }
-    }},
-    {id:'docfind', g:'Library', label:'Find a document',
-      form:{ intro:'What are you looking for?', submit:'Search',
-        fields:function(){ return [{id:'q',label:'Word in the title',type:'text',value:'',placeholder:'e.g. leave, policy, form'}]; },
-        summary:function(v){ return '“'+v.q+'”'; } },
-      run:async function(v){
-        var q=String(v.q||'').trim().toLowerCase();
-        if(!q) return {text:'Type a word to search for and try again.'};
-        try{
-          var words=q.split(/\s+/);
-          var hits=(await visibleDocs()).filter(function(d){ var hay=((d.title||'')+' '+(d.category||'')).toLowerCase(); return words.every(function(w){ return hay.indexOf(w)>-1; }); });
-          if(!hits.length) return {text:'I couldn’t find a document matching “'+v.q+'”.', go:[{label:'Browse Documents', run:function(){ goTo('documents'); }}]};
-          return {text: hits.length===1 ? 'I found 1 document.' : 'I found '+hits.length+' documents.', lines:listMore(hits.map(function(d){ return d.title+(d.category?' · '+d.category:''); }),6), go:[{label:'Open Documents', run:function(){ goTo('documents'); }}]};
-        }catch(e){ return sorry(); }
-      }},
-    {id:'quizzes', g:'Library', label:'Quizzes I still need to do', run:async function(){
-      try{
-        var s=await quizState();
-        var passed=new Set(s.results.filter(function(r){ return r.passed; }).map(function(r){ return r.quiz_id; }));
-        var tried=new Set(s.results.map(function(r){ return r.quiz_id; }));
-        var todo=s.quizzes.filter(function(q){ return !passed.has(q.id); });
-        if(!todo.length) return {text: s.quizzes.length ? 'You’re all caught up. Every quiz is passed.' : 'No quizzes have been given to you.', go:s.quizzes.length?[{label:'Open Learnings', run:function(){ goTo('training'); }}]:null};
-        return {text: todo.length===1 ? '1 quiz to do.' : todo.length+' quizzes to do.', lines:listMore(todo.map(function(q){ return q.title+(tried.has(q.id)?' · retake':''); }),5), go:[{label:'Open Learnings', run:function(){ goTo('training'); }}]};
-      }catch(e){ return sorry(); }
-    }},
-    {id:'quizres', g:'Library', label:'My quiz results', run:async function(){
-      try{
-        var s=await quizState(), titles={};
-        s.quizzes.forEach(function(q){ titles[q.id]=q.title; });
-        var seen={}, latest=[];
-        s.results.forEach(function(r){ if(!seen[r.quiz_id]){ seen[r.quiz_id]=1; latest.push(r); } });   /* newest first */
-        if(!latest.length) return {text:'You haven’t taken a quiz yet.', go:[{label:'Open Learnings', run:function(){ goTo('training'); }}]};
-        var pass=latest.filter(function(r){ return r.passed; }).length;
-        var lines=listMore(latest.map(function(r){ return (titles[r.quiz_id]||'Quiz')+' · '+(r.total?r.score+'/'+r.total+' · ':'')+(r.passed?'Passed':'Not passed'); }),5);
-        return {text:'You’ve passed '+pass+' of '+latest.length+'.', lines:lines, go:[{label:'Open Learnings', run:function(){ goTo('training'); }}]};
-      }catch(e){ return sorry(); }
     }},
     {id:'teamrep', g:'Leads & admins', lead:true, label:'Generate Team Report',
       form:{ intro:'Which week? I’ll build the Team Report and you can download the PDF.', submit:'Generate',
