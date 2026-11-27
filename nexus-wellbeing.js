@@ -2,8 +2,10 @@
    A private, kind nudge for the person who is logged in. After sign-in we look at THEIR OWN last
    two weeks of clock-ins against THEIR OWN roster, and at THEIR OWN same-day sick calls. If a pattern
    shows up, they see one popup with a link to burnout-prevention advice. It is only ever shown on
-   their own screen: nothing is sent to anyone, nothing is saved in the database, and managers are
-   not told. (The only thing kept is "popup shown on <date>" in this browser, so it does not repeat.)
+   their own screen and nothing is sent to anyone. A log row (name, popup type, time) is saved to
+   wellbeing_popup_log, which only hub admins can read (ShiftOps > Employees > Wellbeing).
+   NOTE: the popup footer (WB_TEXT / _wbRender) still says "Nobody else is told", which is no longer true.
+   "popup shown on <date>" is also kept in this browser, so it does not repeat.
    It never blocks anything: "Close" always works, and every failure path just shows nothing.
 
    Rules (change the numbers here and nowhere else):
@@ -169,7 +171,10 @@ function _wbRender(item, name, today, isTest) {
   el.addEventListener('click', function (e) { if (e.target === el) close(); });
   const mb = document.getElementById('wbMoreBtn');
   if (mb) mb.onclick = function () { document.getElementById('wbMore').style.display = 'block'; mb.style.display = 'none'; };
-  if (!isTest) _wbMarkShown(name, item.key, today);   /* a test popup never counts as "shown" */
+  if (!isTest) {                                       /* a test popup never counts as "shown" and is never logged */
+    _wbMarkShown(name, item.key, today);
+    try { if (typeof sbPost === 'function') Promise.resolve(sbPost('wellbeing_popup_log', { staff_name: name, rule: item.key, n: item.n || null })).catch(function () {}); } catch (e) { /* the log never blocks the popup */ }
+  }
   try { el.querySelector('.wb-card').focus({ preventScroll: true }); } catch (e) { /* ignore */ }
 }
 
