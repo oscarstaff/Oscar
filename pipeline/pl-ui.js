@@ -162,7 +162,7 @@ function confirmBox(title, msg, okLabel, danger) {
 /* ---------- Email dialog: one person or many ----------
    Opens at once at a fixed size (nothing resizes or stacks on top of it), loads the list and the mailbox's remaining sends in the
    background, previews inline, and sends with progress shown in place. A few emails go out at the same time, so a bulk send is not one slow wait.
-   cfg: { title, fn: edge function name, load: async () => [{ id, name, sub, off, offNote, sentNote }], onDone, empty }
+   cfg: { title, fn: edge function name, key: the id field the function reads (default booking_id), load: async () => [{ id, name, sub, off, offNote, sentNote }], onDone, empty }
    The function is called as { booking_id, preview }, { booking_id, force } and { quota: true }. */
 function mailDialog(cfg) {
   let didSend = false, sending = false, rows = [], quota = null, quotaErr = '';
@@ -198,7 +198,7 @@ function mailDialog(cfg) {
     const id = b.dataset.pv, box = q('prev');
     box.textContent = 'Loading preview…';
     try {
-      const pv = previews[id] || (previews[id] = await fn(cfg.fn, { booking_id: id, preview: true }));
+      const pv = previews[id] || (previews[id] = await fn(cfg.fn, { [cfg.key || 'booking_id']: id, preview: true }));
       const files = pv.attachments || [];
       const head = '<div class="nx-muted nx-md-ph">To ' + esc(pv.to) + ' · ' + esc(pv.subject) + '</div>';
       const foot2 = '<div class="nx-muted nx-md-pf">' + (files.length ? 'Attached: ' + files.map(x => esc(x.file_name)).join(', ') : '<b>No file is attached.</b> A hub admin can add one in Admin.') + '</div>';
@@ -223,7 +223,7 @@ function mailDialog(cfg) {
       while (!stop) {
         const i = next++; if (i >= ids.length) return;
         const id = ids[i], row = rows.find(r => r.id === id); chip(id, 'Sending…', 'info');
-        try { const r = await fn(cfg.fn, { booking_id: id, force: !!(row && row.sentNote) }); ok++; didSend = true; chip(id, 'Sent', 'ok'); if (typeof r.remaining === 'number') quota = r.remaining; }
+        try { const r = await fn(cfg.fn, { [cfg.key || 'booking_id']: id, force: !!(row && row.sentNote) }); ok++; didSend = true; chip(id, 'Sent', 'ok'); if (typeof r.remaining === 'number') quota = r.remaining; }
         catch (err) {
           if (err.code === 'daily_limit' || err.code === 'not_configured') { stop = err.message; chip(id, 'Not sent', 'bad', err.message); }
           else { bad++; chip(id, 'Failed', 'bad', err.message); const sub = $('[data-sub="' + id + '"]', m.el); if (sub) { sub.textContent = err.message; sub.classList.add('nx-neg'); } }

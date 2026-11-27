@@ -290,7 +290,7 @@ function newStudent() {
     { k: 'stage', label: 'Stage', type: 'select', options: stageOpts(false, 'checklist_sent'), value: 'checklist_sent', blank: 'Not set' },
     { k: 'enrolled_on', label: 'Enrolled on', type: 'date', value: sydToday() },
     { k: 'send_welcome', label: 'Send the enrolment email now', type: 'check', value: false, full: true, help: 'Not sent by itself. Tick it to email the steps and documents list to this lead (needs an email address).' }
-  ]);
+  ].filter(x => x.k !== 'send_welcome' || canWelcomeMail()));
   let warned = false, existing = null, lk = null;
   const save = async (v, m) => {
     existing = lk ? lk.get() : null;
@@ -346,7 +346,7 @@ route(/^\/students\/([0-9a-f-]{36})$/, async m => {
   /* the sensitive details come through a function that logs who looked (admins see this) and stops bulk opening */
   const limited = !!(det && det.limited), d = (det && det.details) || {};
   const eids = enr.map(e => e.id);
-  const [queue, refunds, reqs, plcs, hist, aud0, docs, delB, welcome, notes, twins] = await Promise.all([
+  const [queue, refunds, reqs, plcs, hist, aud0, docs, delB, welcome, notes, twins, plcMail, plcLog, confMail] = await Promise.all([
     eids.length ? sel('nex_payment_queue', 'select=*&enrolment_id=in.' + inList(eids)) : [],
     eids.length ? sel('nex_refunds', 'select=*&enrolment_id=in.' + inList(eids) + '&order=refunded_on.desc') : [],
     eids.length ? sel('nex_placement_requests', 'select=*,nex_facilities(name)&enrolment_id=in.' + inList(eids) + '&order=created_at.desc') : [],
@@ -357,7 +357,10 @@ route(/^\/students\/([0-9a-f-]{36})$/, async m => {
     sel('nex_audit', 'select=*&table_name=eq.nex_class_bookings&action=eq.DELETE&old_row->>student_id=eq.' + encodeURIComponent(id) + '&order=changed_at.desc&limit=20').catch(() => []),   /* a deleted booking is no longer in the list above, so its record is found by the student it belonged to */
     sel('nex_welcome_mail', 'select=status,to_email,sent_at,last_error,created_by,attempts&student_id=eq.' + id).catch(() => []),   /* the enrolment email sent when the lead was added */
     sel('nex_student_notes', 'select=*&student_id=eq.' + id + '&order=created_at.desc&limit=200').catch(() => []),   /* notes staff typed on the Activity tab */
-    sel('nex_name_twins', 'select=twin_id&student_id=eq.' + id).then(async t => t.length ? sel('nex_students', 'select=id,first_name,last_name,email,phone,student_no,nex_student_paid(paid_total)&deleted_at=is.null&id=in.' + inList(t.map(x => x.twin_id))) : []).catch(() => [])   /* same-name card */
+    sel('nex_name_twins', 'select=twin_id&student_id=eq.' + id).then(async t => t.length ? sel('nex_students', 'select=id,first_name,last_name,email,phone,student_no,nex_student_paid(paid_total)&deleted_at=is.null&id=in.' + inList(t.map(x => x.twin_id))) : []).catch(() => []),   /* same-name card */
+    sel('nex_placement_doc_mail', 'select=to_email,created_by,updated_by,updated_at&status=eq.sent&student_id=eq.' + id).catch(() => []),   /* placement checklist emails sent from the Placement box */
+    sel('nex_placement_email_log', 'select=to_email,created_by,updated_by:created_by,updated_at:created_at&status=eq.sent&student_id=eq.' + id).catch(() => []),   /* ...and from this page (table is made by scripts/sql/email-resend-team-lock.sql) */
+    books.length ? sel('nex_class_confirm_mail', 'select=booking_id,created_by,updated_by,updated_at&status=eq.sent&booking_id=in.' + inList(books.map(b => b.id))).catch(() => []) : []   /* class confirmation emails */
   ]);
   const aud = aud0.concat(delB).sort((a, b) => String(b.changed_at).localeCompare(String(a.changed_at)));
   const main = enr[0] || {};
@@ -366,7 +369,7 @@ route(/^\/students\/([0-9a-f-]{36})$/, async m => {
   const grossPaid = sumPaid(pays);
   const isStudent = grossPaid >= STUDENT_MIN;
   const totalPaid = grossPaid - refunds.reduce((t, r) => t + Number(r.amount), 0);
-  const ctx = { pp: ppRows[0] || null, facs, s, d, limited, enr, pays, books, followups: followups.filter(f => f.kind !== 'moved_to_task'), tasks, queue, refunds, reqs, plcs, hist, aud, docs, calls, logs, isStudent, welcome: welcome[0] || null, notes };
+  const ctx = { pp: ppRows[0] || null, facs, s, d, limited, enr, pays, books, followups: followups.filter(f => f.kind !== 'moved_to_task'), tasks, queue, refunds, reqs, plcs, hist, aud, docs, calls, logs, isStudent, welcome: welcome[0] || null, notes, plcMail, plcLog, confMail };
 
   afterRender(() => { bindStudent(ctx); setNav(isStudent ? '!/students' : '!/leads'); });
   const fact = (k, v) => '<div><dt>' + k + '</dt><dd>' + (v || '<span class="nx-muted">–</span>') + '</dd></div>';
@@ -522,20 +525,48 @@ function tabDetails(c) {
   return section('Contact', '<dl class="nx-fields">' + field('First name', esc(s.first_name)) + field('Last name', esc(s.last_name)) + field('Email', esc(s.email)) + field('Phone', esc(fmtPhone(s.phone))) + field('Second phone', esc(fmtPhone(s.phone2))) + field('Agent', esc(agentName(s.agent_id))) + field('Outside Sydney', s.outside_sydney ? 'Yes' : 'No') + '</dl><div style="padding:0 16px 16px"><button class="nx-btn sm" data-a="editStu">' + ico('edit') + 'Edit contact</button></div>') +
     sens +
     welcomeSection(c) +
+    placementMailSection(c) +
+    classMailSection(c) +
     (c.s.source_note ? section('Source note', '<div style="padding:16px">' + esc(c.s.source_note) + '</div>') : '');
 }
 /* the enrolment email (steps and documents list, from the support mailbox): sent when staff tick the box on the New lead form, or press the button here */
 /* PAUSED for students only: every student from the Jan-Sep import already had their enrolment email, so the button is greyed out on a student's page. Leads can be sent (or sent again) with the button. Set to false to turn it back on for students too. */
 const WELCOME_PAUSED = true;
 function welcomeSection(c) {
-  const w = c.welcome, s = c.s, paused = WELCOME_PAUSED && c.isStudent;
+  const w = c.welcome, s = c.s, paused = WELCOME_PAUSED && c.isStudent, mine = canWelcomeMail();
   const when = w && w.sent_at ? fmtDT(w.sent_at) : '';
-  const state = !w ? (s.email ? '<span class="nx-pill">Not sent</span> <span class="nx-muted">It is not sent by itself. Tick "Send the enrolment email now" when adding a lead, or use the button.</span>' : '<span class="nx-muted">Add an email address to this person to send it.</span>')
-    : w.status === 'sent' ? '<span class="nx-pill ok">Sent</span> <span class="nx-muted">' + esc(when) + ' to ' + esc(w.to_email) + ' from support</span>'
+  const state = !w ? (s.email ? '<span class="nx-pill">Not sent</span> <span class="nx-muted">' + (mine ? 'It is not sent by itself. Tick "Send the enrolment email now" when adding a lead, or use the button.' : 'It has not been sent.') + '</span>' : '<span class="nx-muted">Add an email address to this person to send it.</span>')
+    : w.status === 'sent' ? '<span class="nx-pill ok">Sent</span> <span class="nx-muted">' + esc(when) + ' to ' + esc(w.to_email) + ' from support' + (w.created_by ? ' · queued by ' + esc(w.created_by) : '') + '</span>'
     : w.status === 'failed' ? '<span class="nx-pill bad">Not sent</span> <span class="nx-muted">' + esc(w.last_error || 'It could not be sent.') + '</span>'
     : '<span class="nx-pill warn">Sending</span> <span class="nx-muted">To ' + esc(w.to_email) + '. It goes out within a few minutes.' + (w.last_error ? ' ' + esc(w.last_error) : '') + '</span>';
-  const can = s.email && !(w && (w.status === 'pending' || w.status === 'sending'));
-  return section('Enrolment email', '<div style="padding:16px">' + state + '</div>' + (can ? '<div style="padding:0 16px 16px"><button class="nx-btn sm" data-a="welcomeSend"' + (paused ? ' disabled style="opacity:.45;cursor:not-allowed" title="Paused: the existing students were already emailed"' : '') + '>' + ico('mail') + (w && w.status === 'sent' ? 'Send again' : 'Send enrolment email') + '</button>' + (paused ? ' <span class="nx-muted">Paused for students. Existing students were already emailed.</span>' : '') + '</div>' : ''));
+  const can = s.email && mine && !(w && (w.status === 'pending' || w.status === 'sending'));
+  return section('Enrolment email', '<div style="padding:16px">' + state + '</div>' + (can ? '<div style="padding:0 16px 16px"><button class="nx-btn sm" data-a="welcomeSend"' + (paused ? ' disabled style="opacity:.45;cursor:not-allowed" title="Paused: the existing students were already emailed"' : '') + '>' + ico('mail') + (w && w.status === 'sent' ? 'Send again' : 'Send enrolment email') + '</button>' + (paused ? ' <span class="nx-muted">Paused for students. Existing students were already emailed.</span>' : '') + '</div>'
+    : s.email && !mine ? '<div style="padding:0 16px 16px" class="nx-muted">' + ico('lock') + ' Only the Enrolment team can send this email.</div>' : ''));
+}
+/* the placement checklist email (documents needed before placement, from the placement mailbox). Only the Placement team (and admins) can send it or send it again.
+   It is sent to the email on the student's record. If it was sent from the Placement box on the Overview, that shows here too. */
+function lastPlacementMail(c) {
+  return (c.plcMail || []).concat(c.plcLog || []).sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)))[0] || null;
+}
+function placementMailSection(c) {
+  const s = c.s, last = lastPlacementMail(c), mine = canPlacementMail(), by = last && (last.updated_by || last.created_by);
+  const state = last ? '<span class="nx-pill ok">Sent</span> <span class="nx-muted">' + esc(fmtDT(last.updated_at)) + ' to ' + esc(last.to_email || s.email || '') + ' from placement' + (by ? ' · by ' + esc(by) : '') + '</span>'
+    : s.email ? '<span class="nx-pill">Not sent</span>' : '<span class="nx-muted">Add an email address to this person to send it.</span>';
+  return section('Placement email', '<div style="padding:16px">' + state + '</div>' +
+    (s.email && mine ? '<div style="padding:0 16px 16px"><button class="nx-btn sm" data-a="plcSend">' + ico('mail') + (last ? 'Send again' : 'Send placement email') + '</button></div>'
+      : s.email ? '<div style="padding:0 16px 16px" class="nx-muted">' + ico('lock') + ' Only the Placement team can send this email.</div>' : ''));
+}
+/* the First Aid and CPR confirmation, one per class booking. Only the Evershine team (and admins) can send it or send it again. */
+function classMailSection(c) {
+  const live = (c.books || []).filter(b => !bkOff(b.status)); if (!live.length) return '';
+  const by = {}; (c.confMail || []).forEach(x => { by[x.booking_id] = x; });
+  const mine = canClassMail(), date = b => (b.nex_class_sessions || {}).class_date || '';
+  const rows = live.slice().sort((a, b) => date(b).localeCompare(date(a))).map(b => {
+    const x = by[b.id], to = (b.email || c.s.email || '').trim(), who = x && (x.updated_by || x.created_by);
+    return '<li><span><b>Class ' + esc(date(b) ? fmtDate(date(b)) : 'date not set') + '</b><small class="nx-muted" style="display:block">' + (x ? 'Sent ' + esc(fmtDT(x.updated_at)) + (who ? ' by ' + esc(who) : '') : 'Not sent') + (to ? '' : ' · no email address') + '</small></span>' +
+      (mine && to ? '<button type="button" class="nx-btn sm" data-a="confSend" data-id="' + esc(b.id) + '">' + ico('mail') + (x ? 'Send again' : 'Send') + '</button>' : '') + '</li>';
+  }).join('');
+  return section('Class confirmation email', '<ul class="nx-list">' + rows + '</ul>' + (mine ? '' : '<div style="padding:0 16px 16px" class="nx-muted">' + ico('lock') + ' Only the Evershine team can send this email.</div>'));
 }
 /* the document list for an enrolment comes from its course (nex_qualifications.doc_group) */
 function docTypesFor(e) {
@@ -672,9 +703,21 @@ async function studentAction(a, ds, c) {
     return;
   }
   if (a === 'welcomeSend') {
+    if (!canWelcomeMail()) return toast('Only the Enrolment team can send the enrolment email.', true);
     if (WELCOME_PAUSED && c.isStudent) return toast('Enrolment emails are paused for students. Existing students were already emailed.', true);
     if (c.welcome && c.welcome.status === 'sent' && !(await confirmBox('Send again', 'They were already sent the enrolment email. Send it to ' + s.email + ' again?', 'Send again'))) return;
     await api('rpc/nex_queue_welcome', { method: 'POST', body: { p_student: s.id } }); toast('Enrolment email is on its way'); return render();
+  }
+  if (a === 'plcSend') {
+    if (!canPlacementMail()) return toast('Only the Placement team can send the placement email.', true);
+    return mailDialog({ title: 'Placement email: ' + fullName(s), fn: 'nex-send-placement-docs', key: 'student_id', htmlPreview: true, empty: 'There is no email address on this record.', onDone: () => render(),
+      load: async () => { const last = lastPlacementMail(c), by = last && (last.updated_by || last.created_by);
+        return [{ id: s.id, name: fullName(s), sub: s.email || '', off: !s.email, offNote: 'No email address', sentNote: last ? 'Already sent' + (by ? ' by ' + by : '') + ' on ' + fmtDate(last.updated_at) + '. Tick to send again' : '' }]; } });
+  }
+  if (a === 'confSend') {
+    if (!canClassMail()) return toast('Only the Evershine team can send the class confirmation.', true);
+    const bk = c.books.find(b => b.id === ds.id); if (!bk) return;
+    return confirmEmail(null, c.books, bk);
   }
   if (a === 'addEnr') return enrolmentForm(s, null, c.isStudent);
   if (a === 'editEnr') return enrolmentForm(s, c.enr.find(e => e.id === ds.id), c.isStudent);
