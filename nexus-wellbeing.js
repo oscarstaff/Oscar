@@ -9,9 +9,9 @@
    It never blocks anything: "Close" always works, and every failure path just shows nothing.
 
    Rules (change the numbers here and nowhere else):
-     late_some   : 10 to 59 min late on 3 or more shifts in the last 14 days        -> "Everything okay?"
+     late_some   : 15 to 59 min late on 3 or more shifts in the last 14 days        -> "Everything okay?"
      late_a_lot  : 60 min or more late on 2 or more shifts in the last 7 days        -> "Would a later start help? Is your health okay?"
-     sick_calls  : 1 or more APPROVED same-day sick leaves in the last 10 days                 -> "Speak to a manager if it is getting worse"
+     sick_calls  : 2 or more APPROVED same-day sick leaves in the last 14 days                -> "Speak to a manager if it is getting worse"
    Only one popup is shown at a time; the most serious comes first (sick_calls, then late_a_lot, then late_some).
    "Late" = first clock-in of the day minus the rostered start, in real minutes (no rounding, no grace).
    Days on approved leave are skipped. A gap over 6 hours is treated as a missed clock-in, not lateness. */
@@ -19,9 +19,9 @@ const WB = {
   link: 'https://www.beyondblue.org.au/mental-health/work/burnout',
   linkLabel: 'Burnout prevention advice',
   helpLine: 'Advice is from Beyond Blue. Need to talk to someone now? Call them on 1300 22 4636 (24/7).',
-  someMin: 10, someDays: 3, someWindow: 14,
+  someMin: 15, someDays: 3, someWindow: 14,
   lotMin: 60, lotDays: 2, lotWindow: 7,
-  sickCalls: 1, sickWindow: 10,
+  sickCalls: 2, sickWindow: 14,
   maxLateMin: 360,
   cooldownDays: 7
 };
