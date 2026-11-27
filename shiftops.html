@@ -8555,9 +8555,13 @@ const _tmpPw=(()=>{const c='abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456
      body:JSON.stringify({action:'adminSetPw',staff:fullName,newPassword:_tmpPw,token:GAS_TOKEN,sbAccessToken:_soTok()})
       });
       const j=await resp.json().catch(()=>({}));
-  if(j&&j.ok){ showToast(email&&email.indexOf('@')>0
-  ? ` ${fullName} added. A set-password email is on its way.`
-  : ` ${fullName} added. Temp password: ${_tmpPw} (copy it now, it won't show again)`); }
+if(j&&j.ok){
+  if(email&&email.indexOf('@')>0){
+    showToast(` ${fullName} added. A set-password email is on its way.`);
+  } else {
+    window.prompt(`${fullName} added. Temp password (copy it now, it won't show again):`, _tmpPw);
+  }
+}
       else { showToast(` ${fullName} added, but auth setup failed: ${(j&&j.error)||'error'}. Use Set Password.`); }
     }catch(e){ showToast(` ${fullName} added, but auth setup failed. Use Set Password to fix.`); }
 
