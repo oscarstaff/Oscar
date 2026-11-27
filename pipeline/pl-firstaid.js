@@ -449,7 +449,7 @@ function bookingForm(cur, b, books) {
       studentId = lead.id; newLead = !!lead.created;
     }
     try {
-      if (b.id) { await upd('nex_class_bookings', 'id=eq.' + b.id, Object.assign(v, { student_id: studentId })); if (newSt !== (b.status || '') && newSt && (bkOff(newSt) || newSt === 'attended' || (newSt === 'booked' && (bkOff(b.status) || b.status === 'attended')))) await bkMark(b, newSt); }
+      if (b.id) { await upd('nex_class_bookings', 'id=eq.' + b.id, Object.assign(v, { student_id: studentId })); if (newSt !== (b.status || '') && newSt && (bkOff(newSt) || newSt === 'attended' || (newSt === 'booked' && (bkOff(b.status) || b.status === 'attended')))) { const wasOff = bkOff(b.status); await bkMark(b, newSt); if (newSt === 'booked' && wasOff) await bkSeatBack(b); } }
       else await ins('nex_class_bookings', Object.assign({ session_id: cur.id, student_id: studentId, created_by: ME.name }, v), true);
     } catch (e) { throw e; }
     toast(newLead ? 'Booking saved. ' + v.name + ' was added as a new lead.' : 'Booking saved'); render();

@@ -56,9 +56,29 @@ function bkBookedBy(b) { return 'Booked by ' + (b.created_by || 'System (automat
 /* an attendance mark can be changed or undone by whoever made it, or by an admin; not by another person or team */
 const bkCanChange = b => !!(ME.admin || !b || !b.attendance_by || b.attendance_by === ME.name);
 const bkUndoBtn = (b, cls) => '<button class="nx-btn sm ' + (cls || '') + '" data-ud="' + b.id + '"' + (bkCanChange(b) ? '' : ' disabled title="Marked by ' + esc(b.attendance_by) + '. Only they or an admin can undo it."') + '>Undo</button>';
+/* A cancelled, no-show or rescheduled booking loses its seat. When it is put back to Booked, give a seat back: the one it had
+   (found in its change history) if that seat is still free, otherwise the lowest free seat. A booking that never had a seat stays
+   without one. This never blocks the rebooking itself: it returns the seat number, or null (the Allocate button still works). */
+async function bkSeatBack(b) {
+  try {
+    const was = await sel('nex_audit', 'select=old_row&table_name=eq.nex_class_bookings&row_id=eq.' + b.id + '&action=eq.UPDATE&old_row->>seat_no=not.is.null&order=changed_at.desc&limit=1');
+    const prev = was[0] && was[0].old_row ? parseInt(was[0].old_row.seat_no, 10) : 0;
+    if (!prev) return null;
+    const ses = await sel('nex_class_sessions', 'select=seats&id=eq.' + b.session_id);
+    const cap = (ses[0] && ses[0].seats) || 50;
+    for (let t = 0; t < 4; t++) {
+      const taken = new Set((await sel('nex_class_bookings', 'select=seat_no&session_id=eq.' + b.session_id + '&seat_no=not.is.null&limit=1000')).map(r => r.seat_no));
+      let n = prev; if (taken.has(n) || n > cap) { n = 1; while (taken.has(n) && n <= cap) n++; }
+      if (n > cap) return null;
+      try { await upd('nex_class_bookings', 'id=eq.' + b.id, { seat_no: n }); b.seat_no = n; return n; }
+      catch (e) { if (!/duplicate|unique/i.test(e.message)) return null; }   /* somebody took that seat a moment ago: look again */
+    }
+  } catch (e) { /* the booking is already back on the list */ }
+  return null;
+}
 async function bkUndo(b, after) {
   if (!bkCanChange(b)) return toast('Marked by ' + b.attendance_by + '. Only they or an admin can undo it.', true);
-  try { await bkMark(b, 'booked'); toast('Back to booked'); if (after) after(); else render(); } catch (e) { toast(e.message, true); }
+  try { const wasOff = bkOff(b.status); await bkMark(b, 'booked'); const seat = wasOff ? await bkSeatBack(b) : null; toast('Back to booked' + (seat ? ' · seat ' + seat : '')); if (after) after(); else render(); } catch (e) { toast(e.message, true); }
 }
 async function bkHandled(b, after) {
   try { await upd('nex_class_bookings', 'id=eq.' + b.id, { followup_done_at: new Date().toISOString(), followup_done_by: ME.name }); toast('Marked handled'); if (after) after(); else render(); } catch (e) { toast(e.message, true); }
