@@ -3347,6 +3347,7 @@ body.avail-editing #availGrid .avail-chip.av2:hover{ background:color-mix(in srg
           <div class="sub-tab" id="subtab-leave" onclick="showSubTab('leave')" style="position:relative">Leave Requests<span id="leaveSubBadge" style="display:none;background:var(--warn);color:#fff;border-radius:10px;padding:1px 6px;font-size:8px;font-weight:800;font-family:var(--mono);margin-left:5px"></span></div>
           <div class="sub-tab" id="subtab-leavesummary" onclick="showSubTab('leavesummary')">Leave Summary</div>
           <div class="sub-tab" id="subtab-health" onclick="showSubTab('health')" style="position:relative">Health<span id="healthBadge" style="display:none;background:var(--danger,#e5484d);color:#fff;border-radius:10px;padding:1px 6px;font-size:8px;font-weight:800;font-family:var(--mono);margin-left:5px"></span></div>
+          <div class="sub-tab" id="subtab-wellbeing" data-tl-hide="1" onclick="showSubTab('wellbeing')">Wellbeing</div>
         </div>
         <div id="subsection-list">
           <div class="staff-list" id="staffList"></div>
@@ -3373,6 +3374,16 @@ body.avail-editing #availGrid .avail-chip.av2:hover{ background:color-mix(in srg
             <button onclick="loadHealthChecks()" class="btn btn-ghost" style="padding:7px 14px;font-size:12px;">Re-check</button>
           </div>
           <div id="healthContent" style="margin-top:12px;"></div>
+        </div>
+        <div id="subsection-wellbeing" data-tl-hide="1" style="display:none">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px;flex-wrap:wrap;">
+            <div>
+              <div style="font-size:15px;font-weight:700;">Wellbeing check-ins</div>
+              <div style="font-size:12px;color:var(--text-dim);line-height:1.5;max-width:560px;">Who was shown a wellbeing popup in Nexus, which one, and when. Only admins can see this. It records that the popup appeared, not how the person answered.</div>
+            </div>
+            <button onclick="loadWellbeingLog()" class="btn btn-ghost" style="padding:7px 14px;font-size:12px;">Refresh</button>
+          </div>
+          <div id="wbLogContent" style="margin-top:12px;"></div>
         </div>
       </div>
 
@@ -9606,7 +9617,7 @@ async function exportPDF(dayFilter=null){
 
 // ── TABS & NAV ────────────────────────────────────────────────────────────
 function showSubTab(id){
-  ['list','teamview','manageteams','leave','leavesummary','health'].forEach(s=>{
+  ['list','teamview','manageteams','leave','leavesummary','health','wellbeing'].forEach(s=>{
     const el=document.getElementById(`subsection-${s}`);
     const tab=document.getElementById(`subtab-${s}`);
     if(el)el.style.display=s===id?'block':'none';
@@ -9617,7 +9628,60 @@ function showSubTab(id){
   if(id==='leave')renderLeave();
   if(id==='leavesummary')renderLeaveSummary();
   if(id==='health')loadHealthChecks();
+  if(id==='wellbeing')loadWellbeingLog();
   try{ applyTeamLeadLock(); }catch(e){}
+}
+
+// ── WELLBEING LOG (admin) ──────────────────────────────────────────────────
+// Reads wellbeing_popup_log (written by Nexus when a check-in popup is shown).
+// RLS lets only hub admins read it, so anyone else just gets an empty list.
+const _WBL_LABEL={late_some:'Late to a few shifts',late_a_lot:'More than an hour late',sick_calls:'Called in sick'};
+let _wbLogRows=[], _wbLogRule='', _wbLogQ='';
+async function loadWellbeingLog(){
+  const box=document.getElementById('wbLogContent'); if(!box) return;
+  box.innerHTML='<div style="font-size:12.5px;color:var(--text-dim);">Loading…</div>';
+  try{
+    const tok=(typeof _soTok==='function'&&_soTok())?_soTok():SUPABASE_KEY;
+    const r=await fetch(SUPABASE_URL+'/rest/v1/wellbeing_popup_log?select=staff_name,rule,n,shown_at&order=shown_at.desc&limit=1000',
+      {headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+tok}});
+    if(!r.ok){
+      box.innerHTML='<div style="font-size:13px;color:var(--text-dim);padding:18px 0;">'+(r.status===404
+        ? 'The log table does not exist yet. Run scripts/sql/wellbeing-popup-log.sql in Supabase first.'
+        : 'Could not load the log (error '+r.status+').')+'</div>';
+      return;
+    }
+    _wbLogRows=await r.json().catch(function(){ return []; });
+    if(!Array.isArray(_wbLogRows)) _wbLogRows=[];
+  }catch(e){ box.innerHTML='<div style="font-size:13px;color:var(--text-dim);padding:18px 0;">Could not load the log. Check your connection and try again.</div>'; return; }
+  _wbLogRender();
+}
+function _wbLogSetRule(k){ _wbLogRule=k; _wbLogRender(); }
+function _wbLogSetQ(v){ _wbLogQ=v; _wbLogRender(true); }
+function _wbLogRender(keepFocus){
+  const box=document.getElementById('wbLogContent'); if(!box) return;
+  const e=_cdEsc, q=_wbLogQ.trim().toLowerCase();
+  const rows=_wbLogRows.filter(function(r){ return (!_wbLogRule||r.rule===_wbLogRule)&&(!q||String(r.staff_name||'').toLowerCase().indexOf(q)>=0); });
+  const cnt={}; _wbLogRows.forEach(function(r){ cnt[r.rule]=(cnt[r.rule]||0)+1; });
+  const pill=function(k,l,n){ return '<div class="role-pill'+(_wbLogRule===k?' active':'')+'" onclick="_wbLogSetRule(\''+k+'\')">'+l+' <span class="rp-n">'+n+'</span></div>'; };
+  const fmt=function(t){ try{ return new Date(t).toLocaleString('en-AU',{timeZone:'Australia/Sydney',day:'numeric',month:'short',year:'numeric',hour:'numeric',minute:'2-digit'}); }catch(x){ return ''; } };
+  let h='<div class="role-filter-bar" role="group" aria-label="Filter by popup">'+pill('','All',_wbLogRows.length)+
+    Object.keys(_WBL_LABEL).map(function(k){ return pill(k,_WBL_LABEL[k],cnt[k]||0); }).join('')+'</div>'+
+    '<input id="wbLogQ" type="search" placeholder="Search by name" value="'+e(_wbLogQ)+'" oninput="_wbLogSetQ(this.value)" aria-label="Search by name" style="margin:10px 0 12px;padding:8px 12px;border:1px solid var(--border);border-radius:9px;background:var(--surface);color:var(--text);font:inherit;font-size:13px;width:min(320px,100%);">';
+  if(!rows.length){
+    h+='<div style="padding:28px 0;color:var(--text-dim);font-size:13px;">'+(_wbLogRows.length?'Nothing matches.':'No wellbeing popups have been shown yet.')+'</div>';
+  } else {
+    h+='<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;">'+
+      '<div style="display:grid;grid-template-columns:minmax(120px,1.2fr) minmax(140px,1.4fr) minmax(130px,1fr);gap:12px;padding:9px 16px;font-size:11px;color:var(--text-dim);border-bottom:1px solid var(--border);"><span>Staff</span><span>Popup</span><span>Shown (Sydney time)</span></div>'+
+      rows.map(function(r,i){
+        return '<div style="display:grid;grid-template-columns:minmax(120px,1.2fr) minmax(140px,1.4fr) minmax(130px,1fr);gap:12px;padding:10px 16px;font-size:13px;align-items:center;'+(i?'border-top:1px solid var(--border);':'')+'">'+
+          '<span style="font-weight:600;">'+e(r.staff_name)+'</span>'+
+          '<span>'+e(_WBL_LABEL[r.rule]||r.rule)+(r.n?' <span style="color:var(--text-dim)">('+e(r.n)+')</span>':'')+'</span>'+
+          '<span style="color:var(--text-dim);font-variant-numeric:tabular-nums;">'+e(fmt(r.shown_at))+'</span></div>';
+      }).join('')+'</div>'+
+      (_wbLogRows.length>=1000?'<div style="font-size:12px;color:var(--text-dim);margin-top:8px;">Showing the latest 1000.</div>':'');
+  }
+  box.innerHTML=h;
+  if(keepFocus){ const i=document.getElementById('wbLogQ'); if(i){ i.focus(); try{ i.setSelectionRange(i.value.length,i.value.length); }catch(x){} } }
 }
 
 // ── SYSTEM HEALTH ──────────────────────────────────────────────
