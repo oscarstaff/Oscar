@@ -1,10 +1,8 @@
-// The First Aid and CPR class confirmation email (used by the nex-send-class-confirm edge function; deployed as email.ts next to index.ts). Plain HTML rules: no buttons, no tracking,
-// only the logo as a picture; headings are bold coloured text, the key facts sit in one pale box, and the money details in another.
+// The First Aid and CPR class confirmation email (used by the nex-send-class-confirm edge function; deployed as email.ts next to index.ts). Plain HTML rules: no buttons, no tracking, no pictures
+// (no remote logo, no yellow highlighting: both make an email look like marketing to spam filters); headings are bold coloured text, the key facts sit in one pale box, and the money details in another.
 const ADDRESS = "Unit 5, 5 King Street, Rockdale, NSW 2216";
 const PARKING = "1 Market Street, Rockdale";
 const PHONE = "0402 462 830";
-const LOGO_URL = "https://oscarstaff.github.io/Oscar/assets/otc-email-logo.png";
-const logo = () => `<p style="margin:0"><img src="${LOGO_URL}" width="200" alt="Oscars Training Centre" style="display:block;width:200px;max-width:100%;height:auto;border:0"></p>`;
 const FEES: [string, string][] = [
   ["Certificate III in Individual Support (Ageing & Disability) including First Aid & CPR", "$1,300"],
   ["Certificate IV Ageing Support with Medication including First Aid & CPR", "$1,500"],
@@ -21,7 +19,7 @@ function weekday(date: string, iso?: string) {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || "") || (() => { const x = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(date || ""); return x ? [x[0], x[3], x[2], x[1]] : null; })();
   return m ? DAYS[new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]))).getUTCDay()] : "";
 }
-const mark = (t: string) => `<b style="background-color:#fff3a3">${t}</b>`;
+const mark = (t: string) => `<b>${t}</b>`;   // key facts are bold, not highlighted
 const H = (t: string) => `<p style="margin:22px 0 8px;font-size:16px;font-weight:bold;color:#1559d6">${t}</p>`;
 const BOX = "margin:0 0 14px;padding:12px 16px;background-color:#f3f6fc;border:1px solid #cfd9ee;border-radius:6px";
 
@@ -56,6 +54,5 @@ ${row("Account name", "<b>Oscar Training Centre</b>")}${row("BSB", mark("062235"
 ${p(`Once paid, kindly send us a ${mark("screenshot of the payment")} before you attend the class. If you are paying from someone else's account, ask them to include your full name and date of birth in the reference.`)}
 ${p(`For any assistance please contact us on <b>${PHONE}</b>.`)}
 <p style="margin:0 0 14px">Kind Regards,<br>Oscars Training Centre<br>First Aid Team<br>P: 0402 462 830<br>E: <a href="mailto:firstaidcpr.oscarstraining@gmail.com">firstaidcpr.oscarstraining@gmail.com</a></p>
-${logo()}
 </div>`;
 }
