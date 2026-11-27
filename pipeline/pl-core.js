@@ -17,6 +17,11 @@ const ME = { name: '', admin: false, team: '', viewOnly: false };
    Class statuses (attended, no show, cancelled, rescheduled) are open to everyone. */
 const teamIs = (...t) => { const mine = String(ME.team || '').trim().toLowerCase(); return t.some(x => x.toLowerCase() === mine); };
 const canFlag = () => !!ME.admin || teamIs('Evershine');
+/* who may send (or send again) each email. The edge functions and the database check the same teams; hiding the buttons just saves people an error.
+   Enrolment email: Enrolment and Follow-Up. Placement checklist: Placement. First Aid and CPR confirmation: Evershine. Admins can send all of them. */
+const canWelcomeMail = () => !!ME.admin || teamIs('Enrolment', 'Follow-Up');
+const canPlacementMail = () => !!ME.admin || teamIs('Placement');
+const canClassMail = () => !!ME.admin || teamIs('Evershine');
 const canPay = () => !!ME.admin || teamIs('Processing', 'Accounts');
 const canVerify = () => !!ME.admin || teamIs('Accounts');        /* Accounts check a bank payment against the bank statement (admins can too) */
 const canCash = () => true;                                         /* anyone may ADD a payment. Only Processing and Accounts change one, and Accounts verify everything but cash */

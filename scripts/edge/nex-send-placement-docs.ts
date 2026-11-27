@@ -1,7 +1,8 @@
 // YatraLine: send the "documents needed before placement" email to a student, from the PLACEMENT mailbox.
-// POST { booking_id, preview?: true, force?: true }  or  { quota: true } (how many sends are left today)
-// The class booking must have Placement plan = Yes. The recipient is ALWAYS the email on the booking (or the linked student);
-// the caller cannot choose it. Sent through a SECOND Apps Script mail relay (NEX_MAIL2_URL / NEX_MAIL2_KEY) that runs under the
+// POST { booking_id, preview?: true, force?: true }  or  { student_id, preview?: true, force?: true }  or  { quota: true } (how many sends are left today)
+// With booking_id the class booking must have Placement plan = Yes (the Overview box). With student_id (the button on the student's page) no booking is needed:
+// it is the same email sent to the email on the student's record, logged in nex_placement_email_log, and any of their bookings still waiting in the Overview box are marked sent too.
+// The recipient is ALWAYS the email on the booking or the student record; the caller cannot choose it. Sending again needs force (the page asks first). Sent through a SECOND Apps Script mail relay (NEX_MAIL2_URL / NEX_MAIL2_KEY) that runs under the
 // placement team's Google account, so it is a different sender from the enrolment follow-ups.
 // The email is sent as a deliberately plain HTML message (email.ts: simple paragraphs, bold and highlighted key points, no images or buttons, so it stays out of spam) with the plain-text wording (draft() below) as the other part.
 // Attachments: the active rows in nex_mail_attachments (purpose placement_docs), uploaded by hub admins in YatraLine > Admin.
@@ -96,7 +97,9 @@ serve(async (req) => {
 
     const b = await req.json().catch(() => ({}));
     const bookingId = String(b.booking_id || "");
-    if (!b.quota && !UUID_RE.test(bookingId)) return json({ error: "Missing booking." }, 400);
+    const studentId = String(b.student_id || "");
+    const byStudent = !UUID_RE.test(bookingId) && UUID_RE.test(studentId);
+    if (!b.quota && !UUID_RE.test(bookingId) && !byStudent) return json({ error: "Missing booking or student." }, 400);
 
     // the permission check and every read below are independent, so they run at the same time instead of one after another
     const teamP = rest("rpc/nex_team_ok", jwt, { method: "POST", body: JSON.stringify({ p_teams: ["Placement"] }) }).then((v) => v === true).catch(() => false);
@@ -105,30 +108,51 @@ serve(async (req) => {
       if (!MAIL_URL || !MAIL_KEY) return json({ error: "not_configured", message: NOT_SET }, 503);
       return json({ ok: true, remaining: await remainingToday() });
     }
-    const [allowed, bkRows, priorRows, list] = await Promise.all([
-      teamP,
-      rest(`nex_class_bookings?id=eq.${bookingId}&select=id,name,email,student_id,placement_plan,nex_students(first_name,email)`, jwt),
-      rest(`nex_placement_doc_mail?booking_id=eq.${bookingId}&select=status,created_by,updated_at`, jwt),
-      attachmentList(jwt).catch(() => [] as any[]),
-    ]);
-    if (!allowed) return json({ error: "forbidden", message: "Only the Placement team can send this email." }, 403);
-
-    const bk = bkRows[0];
-    if (!bk) return json({ error: "Booking not found." }, 404);
-    if (bk.placement_plan !== "yes") return json({ error: "not_yes", message: "Placement plan is not set to Yes on this booking." }, 409);
-    const stu = Array.isArray(bk.nex_students) ? bk.nex_students[0] : bk.nex_students;
-    const to = String(bk.email || (stu && stu.email) || "").trim();
+    let to = "", first = "", bk: any = null, prior: any = null, list: any[] = [], logOk = true;
+    if (byStudent) {
+      const [allowed, stuRows, docRows, logRows, files0] = await Promise.all([
+        teamP,
+        rest(`nex_students?id=eq.${studentId}&deleted_at=is.null&select=id,first_name,email`, jwt),
+        rest(`nex_placement_doc_mail?student_id=eq.${studentId}&status=eq.sent&select=status,created_by,updated_at&order=updated_at.desc&limit=1`, jwt).catch(() => [] as any[]),
+        rest(`nex_placement_email_log?student_id=eq.${studentId}&select=status,created_by,updated_at:created_at&order=created_at.desc&limit=1`, jwt).catch(() => null),
+        attachmentList(jwt).catch(() => [] as any[]),
+      ]);
+      if (!allowed) return json({ error: "forbidden", message: "Only the Placement team can send this email." }, 403);
+      const st = stuRows[0];
+      if (!st) return json({ error: "Student not found." }, 404);
+      to = String(st.email || "").trim();
+      first = String(st.first_name || "").trim().split(/\s+/)[0];
+      logOk = Array.isArray(logRows);
+      const last = [docRows[0], logOk ? logRows[0] : null].filter(Boolean).sort((x: any, y: any) => String(y.updated_at).localeCompare(String(x.updated_at)))[0];
+      prior = last || null;
+      list = files0;
+    } else {
+      const [allowed, bkRows, priorRows, files0] = await Promise.all([
+        teamP,
+        rest(`nex_class_bookings?id=eq.${bookingId}&select=id,name,email,student_id,placement_plan,nex_students(first_name,email)`, jwt),
+        rest(`nex_placement_doc_mail?booking_id=eq.${bookingId}&select=status,created_by,updated_at`, jwt),
+        attachmentList(jwt).catch(() => [] as any[]),
+      ]);
+      if (!allowed) return json({ error: "forbidden", message: "Only the Placement team can send this email." }, 403);
+      bk = bkRows[0];
+      if (!bk) return json({ error: "Booking not found." }, 404);
+      if (bk.placement_plan !== "yes") return json({ error: "not_yes", message: "Placement plan is not set to Yes on this booking." }, 409);
+      const stu = Array.isArray(bk.nex_students) ? bk.nex_students[0] : bk.nex_students;
+      to = String(bk.email || (stu && stu.email) || "").trim();
+      first = String((stu && stu.first_name) || bk.name || "").trim().split(/\s+/)[0];
+      prior = priorRows[0] || null;
+      list = files0;
+    }
     if (!EMAIL_RE.test(to)) return json({ error: "no_email", message: "There is no valid email address on file." }, 422);
-    const first = String((stu && stu.first_name) || bk.name || "").trim().split(/\s+/)[0];
 
     const year = new Intl.DateTimeFormat("en-AU", { timeZone: "Australia/Sydney", year: "numeric" }).format(new Date());
     const d = draft(first, year);
     const html = placementDocsHtml(first, year);
-    const prior = priorRows[0] || null;
     const attachments = list.map((a: any) => ({ file_name: a.file_name, size_bytes: a.size_bytes }));
     if (b.preview) return json({ ok: true, to, subject: d.subject, body: d.body, html, prior, attachments });
     if (prior && prior.status === "sent" && !b.force) return json({ error: "already_sent", message: `This email was already sent${prior.created_by ? " by " + prior.created_by : ""}.`, prior }, 409);
     if (!MAIL_URL || !MAIL_KEY) return json({ error: "not_configured", message: NOT_SET }, 503);
+    if (byStudent && !logOk) return json({ error: "not_ready", message: "The placement email log is not set up yet, so nothing was sent. An admin needs to run scripts/sql/email-resend-team-lock.sql in Supabase." }, 503);
 
     let files: { name: string; type: string; data: string }[] = [];
     try { files = await loadAttachments(jwt, list); } catch (e) { return json({ error: "attachment_failed", message: (e as Error).message }, 502); }
@@ -147,10 +171,22 @@ serve(async (req) => {
       return json({ error: "mail_failed", message: (mj && mj.error) ? `The mail script said: ${String(mj.error).slice(0, 200)}` : "The mail script did not accept the email." }, 502);
     }
 
-    await rest("nex_placement_doc_mail?on_conflict=booking_id", jwt, {
-      method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
-      body: JSON.stringify({ booking_id: bookingId, student_id: bk.student_id || null, to_email: to, status: "sent", subject: d.subject }),
-    });
+    if (byStudent) {
+      await rest("nex_placement_email_log", jwt, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ student_id: studentId, to_email: to, status: "sent", subject: d.subject }) });
+      // any of this student's bookings still waiting in the Overview box are done now, so nobody emails them a second time
+      try {
+        const waiting = await rest(`nex_class_bookings?student_id=eq.${studentId}&placement_plan=eq.yes&select=id`, jwt);
+        if (Array.isArray(waiting) && waiting.length) {
+          await rest("nex_placement_doc_mail?on_conflict=booking_id", jwt, { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+            body: JSON.stringify(waiting.map((w: any) => ({ booking_id: w.id, student_id: studentId, to_email: to, status: "sent", subject: d.subject }))) });
+        }
+      } catch { /* the email is sent and logged; the Overview box can be cleared with Skip */ }
+    } else {
+      await rest("nex_placement_doc_mail?on_conflict=booking_id", jwt, {
+        method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+        body: JSON.stringify({ booking_id: bookingId, student_id: bk.student_id || null, to_email: to, status: "sent", subject: d.subject }),
+      });
+    }
     return json({ ok: true, sent: true, to, attached: files.length, remaining: typeof mj.remaining === "number" ? mj.remaining : null });
   } catch (e) {
     return json({ error: "server", message: (e as Error).message || "Something went wrong." }, 500);
