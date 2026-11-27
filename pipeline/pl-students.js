@@ -525,17 +525,17 @@ function tabDetails(c) {
     (c.s.source_note ? section('Source note', '<div style="padding:16px">' + esc(c.s.source_note) + '</div>') : '');
 }
 /* the enrolment email (steps and documents list, from the support mailbox): sent when staff tick the box on the New lead form, or press the button here */
-/* PAUSED: every student from the Jan-Sep import already had their enrolment email, so the button is greyed out. Set to false to turn it back on. */
+/* PAUSED for students only: every student from the Jan-Sep import already had their enrolment email, so the button is greyed out on a student's page. Leads can be sent (or sent again) with the button. Set to false to turn it back on for students too. */
 const WELCOME_PAUSED = true;
 function welcomeSection(c) {
-  const w = c.welcome, s = c.s;
+  const w = c.welcome, s = c.s, paused = WELCOME_PAUSED && c.isStudent;
   const when = w && w.sent_at ? fmtDT(w.sent_at) : '';
   const state = !w ? (s.email ? '<span class="nx-pill">Not sent</span> <span class="nx-muted">It is not sent by itself. Tick "Send the enrolment email now" when adding a lead, or use the button.</span>' : '<span class="nx-muted">Add an email address to this person to send it.</span>')
     : w.status === 'sent' ? '<span class="nx-pill ok">Sent</span> <span class="nx-muted">' + esc(when) + ' to ' + esc(w.to_email) + ' from support</span>'
     : w.status === 'failed' ? '<span class="nx-pill bad">Not sent</span> <span class="nx-muted">' + esc(w.last_error || 'It could not be sent.') + '</span>'
     : '<span class="nx-pill warn">Sending</span> <span class="nx-muted">To ' + esc(w.to_email) + '. It goes out within a few minutes.' + (w.last_error ? ' ' + esc(w.last_error) : '') + '</span>';
   const can = s.email && !(w && (w.status === 'pending' || w.status === 'sending'));
-  return section('Enrolment email', '<div style="padding:16px">' + state + '</div>' + (can ? '<div style="padding:0 16px 16px"><button class="nx-btn sm" data-a="welcomeSend"' + (WELCOME_PAUSED ? ' disabled style="opacity:.45;cursor:not-allowed" title="Paused: the existing students were already emailed"' : '') + '>' + ico('mail') + (w && w.status === 'sent' ? 'Send again' : 'Send enrolment email') + '</button>' + (WELCOME_PAUSED ? ' <span class="nx-muted">Paused for now. Existing students were already emailed.</span>' : '') + '</div>' : ''));
+  return section('Enrolment email', '<div style="padding:16px">' + state + '</div>' + (can ? '<div style="padding:0 16px 16px"><button class="nx-btn sm" data-a="welcomeSend"' + (paused ? ' disabled style="opacity:.45;cursor:not-allowed" title="Paused: the existing students were already emailed"' : '') + '>' + ico('mail') + (w && w.status === 'sent' ? 'Send again' : 'Send enrolment email') + '</button>' + (paused ? ' <span class="nx-muted">Paused for students. Existing students were already emailed.</span>' : '') + '</div>' : ''));
 }
 /* the document list for an enrolment comes from its course (nex_qualifications.doc_group) */
 function docTypesFor(e) {
@@ -672,7 +672,7 @@ async function studentAction(a, ds, c) {
     return;
   }
   if (a === 'welcomeSend') {
-    if (WELCOME_PAUSED) return toast('Enrolment emails are paused for now.', true);
+    if (WELCOME_PAUSED && c.isStudent) return toast('Enrolment emails are paused for students. Existing students were already emailed.', true);
     if (c.welcome && c.welcome.status === 'sent' && !(await confirmBox('Send again', 'They were already sent the enrolment email. Send it to ' + s.email + ' again?', 'Send again'))) return;
     await api('rpc/nex_queue_welcome', { method: 'POST', body: { p_student: s.id } }); toast('Enrolment email is on its way'); return render();
   }
