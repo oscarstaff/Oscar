@@ -1,0 +1,191 @@
+/* ═══ APPLE LAYER ══════════════════════════════════════════════════════════
+   After Apple's HIG / "Designing Fluid Interfaces": system type with
+   size-specific tracking, neutral system greys, a translucent toolbar the
+   page scrolls under, segmented controls with a sliding thumb, instant press
+   feedback, symmetric critically-damped motion (no overshoot on things the
+   user didn't throw), and full respect for reduced motion / transparency /
+   increased contrast. Accent is system blue; green is kept for success only.
+   ═════════════════════════════════════════════════════════════════════════ */
+:root{
+  --ease-spring: cubic-bezier(.32,.72,0,1);   /* ≈ critically damped spring, response ~0.35s */
+  --sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --display: -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: var(--sans);
+}
+/* dark — Apple's elevated dark greys */
+html:root:not([data-theme="light"]){
+  --bg:#000000; --surface:#1c1c1e; --surface2:#232325; --surface3:#2c2c2e;
+  --border:#38383a; --border2:#48484a;
+  --text:#f5f5f7; --text-mid:#d1d1d6; --text-dim:#a1a1a6; --muted:#8e8e93;
+  --seg-fill:rgba(118,118,128,.24); --seg-thumb:#636366;
+  --material:rgba(28,28,30,.72); --menu-material:rgba(44,44,46,.94); --material-solid:#1c1c1e; --hairline:rgba(84,84,88,.65);
+  --scrim:rgba(0,0,0,.48);
+  /* accent: system blue (dark) */
+  --accent:#0a7aff; --accent-dim:rgba(10,122,255,.16); --accent-border:rgba(10,122,255,.5);
+  --accent2:#409cff; --accent-text:#64acff; --accent-deep:#0060df; --on-accent:#ffffff;
+  --success:#30d158; --success-dim:rgba(48,209,88,.14);
+  --ring:0 0 0 3px rgba(10,122,255,.38);
+  --glow-success:none;
+}
+/* light — Apple's grouped greys */
+html:root[data-theme="light"]{
+  --bg:#f5f5f7; --surface:#ffffff; --surface2:#f9f9fb; --surface3:#f0f0f3;
+  --border:#e5e5ea; --border2:#d2d2d7;
+  --text:#1d1d1f; --text-mid:#424245; --text-dim:#6e6e73; --muted:#737378;
+  --seg-fill:rgba(118,118,128,.12); --seg-thumb:#ffffff;
+  --material:rgba(255,255,255,.72); --menu-material:rgba(250,250,252,.95); --material-solid:#ffffff; --hairline:rgba(60,60,67,.18);
+  --scrim:rgba(0,0,0,.28);
+  /* accent: system blue (light) — white on it is 4.7:1, text-blue on white 5.6:1 */
+  --accent:#0071e3; --accent-dim:rgba(0,113,227,.10); --accent-border:rgba(0,113,227,.34);
+  --accent2:#0077ed; --accent-text:#0066cc; --accent-deep:#0058b9; --on-accent:#ffffff;
+  --success:#1c7c36; --success-dim:rgba(28,124,54,.10);
+  --ring:0 0 0 3px rgba(0,113,227,.28);
+  --glow-success:none;
+}
+
+/* ── Typography: system face, tracking by size, tight leading on headings ── */
+body{ font-family:var(--sans) !important; letter-spacing:-.006em; -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
+  font-variant-numeric:tabular-nums; text-rendering:optimizeLegibility; }
+.section-title, #availGrid .avail-header .section-title{ font-family:var(--display) !important; letter-spacing:-.022em !important; line-height:1.15; font-weight:700 !important; }
+.card-title, .role-view-title, .modal-title{ font-family:var(--display) !important; letter-spacing:-.014em !important; }
+.ds-num, .stat-num, .stats-strip b{ letter-spacing:-.02em; }
+.sa-period, .avail-who-s, .pro-sub, .ds-lbl, .av-week, .sa-upd{ letter-spacing:0; }
+
+/* ── Toolbar: a translucent material the page scrolls under ── */
+.shell{ position:relative; }
+.appbar{ position:absolute !important; top:0; left:0; right:0; z-index:60;
+  background:var(--material) !important; -webkit-backdrop-filter:saturate(180%) blur(20px); backdrop-filter:saturate(180%) blur(20px) !important;
+  border-bottom:1px solid transparent !important; transition:border-color .2s ease, box-shadow .2s ease; }
+.appbar.is-scrolled{ border-bottom-color:var(--hairline) !important; }
+.main{ padding-top:52px; scroll-padding-top:64px; }
+.brand-name{ letter-spacing:-.015em; }
+
+/* ── Segmented controls with a sliding thumb ── */
+.seg.seg{ position:relative; display:inline-flex !important; align-items:center; gap:0 !important; padding:2px !important;
+  background:var(--seg-fill) !important; border:0 !important; border-radius:9px !important; box-shadow:none !important; width:auto !important; }
+.sub-tabs-bar.seg{ margin:0 0 18px !important; }
+.appbar-nav.seg{ margin-left:12px; }
+.seg.seg > .sub-tab, .seg.seg > .nav-item{ position:relative; z-index:1; background:none !important; border:0 !important; border-radius:7px !important;
+  padding:5px 14px !important; margin:0 !important; font-size:13px !important; font-weight:500 !important; color:var(--text-mid) !important;
+  box-shadow:none !important; transform:none; transition:color .2s ease, transform .12s ease !important; white-space:nowrap; line-height:1.4; }
+.seg.seg > .sub-tab:hover, .seg.seg > .nav-item:hover{ color:var(--text) !important; background:none !important; }
+.seg.seg > .active{ color:var(--text) !important; font-weight:600 !important; }
+.seg.seg > .sub-tab::after, .seg.seg > .nav-item::before{ display:none !important; }
+.seg-thumb{ position:absolute; z-index:0; top:2px; bottom:2px; left:0; width:0; border-radius:7px; background:var(--seg-thumb);
+  box-shadow:0 3px 8px rgba(0,0,0,.12), 0 3px 1px rgba(0,0,0,.04), 0 0 0 .5px rgba(0,0,0,.04); pointer-events:none; opacity:0; }
+.seg.seg-ready .seg-thumb{ opacity:1; transition:transform .38s var(--ease-spring), width .38s var(--ease-spring); }
+/* sub-tab separators like UISegmentedControl, hidden next to the thumb */
+.seg.seg > .sub-tab + .sub-tab::before, .seg.seg > .nav-item + .nav-item::after{ content:''; position:absolute; left:0; top:25%; bottom:25%; width:1px; background:var(--hairline); transition:opacity .2s; }
+.seg.seg > .active::before, .seg.seg > .active + *::before, .seg.seg > .active::after, .seg.seg > .active + *::after{ opacity:0; }
+
+/* ── Response: feedback on press, instantly ── */
+.btn, .role-pill, .ds-tile, .lv-btn, .av2-edit, .tools-menu-item, .cd-chip, .sub-tab, .nav-item{
+  transition:transform .14s ease, background-color .15s ease, color .15s ease, border-color .15s ease, opacity .15s ease, box-shadow .15s ease; }
+:is(.btn, .role-pill, .ds-tile, .lv-btn, .av2-edit, .seg.seg > .sub-tab, .seg.seg > .nav-item):active{ transform:scale(.97) !important; transition-duration:60ms !important; }
+.btn{ font-weight:600 !important; letter-spacing:-.006em; }
+.btn:active{ filter:brightness(.96); }
+:focus-visible{ outline:3px solid color-mix(in srgb,var(--accent) 45%,transparent) !important; outline-offset:2px; border-radius:8px; }
+
+/* ── Modals: dim to focus; rise in and settle back out along the same path ── */
+.modal-overlay{ background:var(--scrim) !important; -webkit-backdrop-filter:blur(3px); backdrop-filter:blur(3px) !important; transition:opacity .28s ease !important; }
+.modal{ animation:none !important; opacity:0; transform:translateY(18px) scale(.97);
+  transition:transform .42s var(--ease-spring), opacity .24s ease !important; border-radius:14px !important; border:1px solid var(--border) !important;
+  box-shadow:0 24px 60px -12px rgba(0,0,0,.35), 0 2px 6px rgba(0,0,0,.08) !important; }
+.modal-overlay.open .modal{ opacity:1; transform:none; }
+
+/* ── Menus: a material that grows from its trigger, interruptible ── */
+.tools-menu{ display:block !important; visibility:hidden; opacity:0; transform:scale(.94); transform-origin:top right; pointer-events:none;
+  animation:none !important; background:color-mix(in srgb,var(--material-solid) 97%,transparent) !important; -webkit-backdrop-filter:saturate(180%) blur(40px); backdrop-filter:saturate(180%) blur(40px);
+  box-shadow:0 12px 32px -6px rgba(0,0,0,.28), 0 0 0 .5px rgba(0,0,0,.06) !important;
+  border:1px solid var(--border) !important; border-radius:12px !important; padding:4px; min-width:200px;
+  transition:opacity .18s ease, transform .3s var(--ease-spring), visibility 0s linear .3s; }
+.tools-menu.open{ visibility:visible; opacity:1; transform:none; pointer-events:auto; transition:opacity .18s ease, transform .3s var(--ease-spring), visibility 0s; }
+.tools-menu-item{ border-radius:8px; border:0 !important; box-shadow:none !important; background:transparent !important; padding:8px 12px; font-size:13px; color:var(--text) !important; }
+.tools-menu-item:hover{ background:var(--accent) !important; color:var(--on-accent,#fff) !important; }
+.tools-menu-item:hover svg{ color:inherit; }
+
+/* ── Toast: a capsule that rises from the bottom edge and leaves the same way ── */
+.toast{ left:50% !important; right:auto !important; bottom:24px !important; max-width:min(440px,calc(100vw - 32px)) !important;
+  transform:translate(-50%,16px) !important; opacity:0; border-radius:999px !important; padding:10px 18px !important; text-align:center;
+  background:rgba(29,29,31,.86) !important; color:#fff !important; -webkit-backdrop-filter:saturate(180%) blur(20px); backdrop-filter:saturate(180%) blur(20px);
+  font-size:13px !important; box-shadow:0 10px 30px -8px rgba(0,0,0,.35) !important; transition:opacity .2s ease, transform .4s var(--ease-spring) !important; }
+.toast.show{ transform:translate(-50%,0) !important; opacity:1; }
+html:root:not([data-theme="light"]) .toast{ background:rgba(58,58,60,.88) !important; }
+
+/* ── Surfaces: quiet cards, consistent corners ── */
+.card, .role-view-card, .sa-card, .coverage, .ds-tile, .stats-strip, .lv-card{ border-color:var(--border) !important; }
+.form-input, input[type="text"], input[type="date"], input[type="time"], input[type="number"], select, textarea{
+  border-radius:8px !important; transition:border-color .15s ease, box-shadow .15s ease; }
+.form-input:focus, input:focus, select:focus, textarea:focus{ border-color:var(--accent) !important; box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 22%,transparent) !important; outline:none !important; }
+
+/* scrollbars that stay out of the way */
+.main::-webkit-scrollbar{ width:11px; height:11px; }
+.main::-webkit-scrollbar-thumb{ background:rgba(128,128,128,.38); border-radius:10px; border:3px solid transparent; background-clip:content-box; }
+.main::-webkit-scrollbar-track{ background:transparent; }
+
+
+.stats-strip .stat-value.green{ color:var(--accent-text) !important; }
+
+/* ── Profile chip + popover ── */
+#topbarWhoami.who{ position:relative; display:block; font-size:13px; color:var(--text); }
+.who-btn{ display:flex; align-items:center; gap:9px; height:38px; padding:3px 11px 3px 3px; border-radius:999px; border:0; background:transparent; color:var(--text);
+  cursor:pointer; font:inherit; transition:background .18s ease, transform .3s var(--ease-spring); }
+.who-btn:hover, .who-btn[aria-expanded="true"]{ background:var(--seg-fill); }
+.who-btn:active{ transform:scale(.97); transition-duration:.08s; }
+.who-ava{ width:32px; height:32px; border-radius:50%; display:grid; place-items:center; flex:none; font-size:12.5px; font-weight:600; letter-spacing:.01em;
+  background-size:cover; background-position:center; box-shadow:inset 0 0 0 .5px rgba(0,0,0,.14); }
+.who-ava-lg{ width:52px; height:52px; font-size:19px; }
+.who-txt{ display:flex; flex-direction:column; align-items:flex-start; line-height:1.18; min-width:0; text-align:left; }
+.who-txt b{ font-weight:600; font-size:13px; letter-spacing:-.01em; max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.who-txt i{ font-style:normal; font-size:11px; color:var(--text-dim); max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.who-chev{ color:var(--text-dim); flex:none; transition:transform .35s var(--ease-spring); }
+.who-btn[aria-expanded="true"] .who-chev{ transform:rotate(180deg); }
+.who-menu{ position:absolute; right:0; top:calc(100% + 8px); width:300px; z-index:70; padding:6px;
+  visibility:hidden; opacity:0; transform:scale(.94); transform-origin:top right; pointer-events:none;
+  background:color-mix(in srgb,var(--material-solid) 97%,transparent); -webkit-backdrop-filter:saturate(180%) blur(40px); backdrop-filter:saturate(180%) blur(40px);
+  border:1px solid var(--border); border-radius:14px; box-shadow:0 16px 40px -8px rgba(0,0,0,.32), 0 0 0 .5px rgba(0,0,0,.06);
+  transition:opacity .18s ease, transform .3s var(--ease-spring), visibility 0s linear .3s; }
+.who-menu.open{ visibility:visible; opacity:1; transform:none; pointer-events:auto; transition:opacity .18s ease, transform .3s var(--ease-spring), visibility 0s; }
+.who-head{ display:flex; align-items:center; gap:13px; padding:12px 10px 12px; }
+.who-id{ min-width:0; display:flex; flex-direction:column; align-items:flex-start; gap:2px; }
+.who-nm{ font-size:16px; font-weight:700; letter-spacing:-.02em; line-height:1.2; max-width:196px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.who-fn{ font-size:12px; color:var(--text-dim); }
+.who-badge{ margin-top:5px; font-size:11px; font-weight:600; padding:2px 9px; border-radius:999px; background:var(--accent-dim); color:var(--accent-text); }
+.who-badge-team-lead{ background:var(--seg-fill); color:var(--text-mid); }
+.who-rows{ padding:2px 10px 6px; }
+.who-row{ display:flex; justify-content:space-between; gap:16px; padding:7px 0; font-size:12.5px; border-top:.5px solid var(--hairline); }
+.who-row:first-child{ border-top:0; }
+.who-row span{ color:var(--text-dim); flex:none; }
+.who-row b{ font-weight:500; text-align:right; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.who-sep{ height:.5px; background:var(--hairline); margin:4px 10px; }
+.who-act{ width:100%; display:flex; align-items:center; justify-content:space-between; gap:12px; padding:8px 10px; border:0; border-radius:8px; background:transparent; color:var(--text);
+  font:inherit; font-size:13px; text-align:left; cursor:pointer; transition:background .12s ease; }
+.who-act em{ font-style:normal; color:var(--text-dim); }
+.who-act:hover{ background:var(--accent); color:var(--on-accent); }
+.who-act:hover em{ color:inherit; opacity:.85; }
+@media (max-width:900px){
+  #topbarWhoami.who{ display:block !important; }
+  .who-txt, .who-chev{ display:none; }
+  .who-btn{ padding:3px; }
+  .who-menu{ width:min(300px, calc(100vw - 24px)); }
+}
+@media (prefers-reduced-motion: reduce){ .who-menu{ transform:none !important; } .who-chev{ transition:none; } }
+@media (prefers-reduced-transparency: reduce){ .who-menu{ background:var(--material-solid); -webkit-backdrop-filter:none; backdrop-filter:none; } }
+
+/* ── Accessibility preferences ── */
+@media (prefers-reduced-motion: reduce){
+  .seg.seg-ready .seg-thumb{ transition:none; }
+  .modal{ transform:none !important; transition:opacity .2s ease !important; }
+  .tools-menu{ transform:none !important; }
+  .toast{ transform:translate(-50%,0) !important; }
+  :is(.btn, .role-pill, .ds-tile, .lv-btn, .av2-edit, .seg.seg > *):active{ transform:none !important; }
+}
+@media (prefers-reduced-transparency: reduce){
+  .appbar, .tools-menu{ background:var(--material-solid) !important; -webkit-backdrop-filter:none; backdrop-filter:none !important; }
+  .toast{ background:#1d1d1f !important; -webkit-backdrop-filter:none; backdrop-filter:none; }
+  .modal-overlay{ -webkit-backdrop-filter:none; backdrop-filter:none !important; }
+}
+@media (prefers-contrast: more){
+  :root{ --border:var(--border2); --hairline:var(--border2); }
+  .appbar, .tools-menu{ background:var(--material-solid) !important; }
+}
