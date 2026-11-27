@@ -43,7 +43,7 @@ serve(async (req) => {
     const stale = new Date(Date.now() - 10 * 60 * 1000).toISOString();
     await rest(`nex_welcome_mail?status=eq.sending&updated_at=lt.${stale}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "pending" }) }).catch(() => null);
 
-    const rows: any[] = await rest(`nex_welcome_mail?or=(status.eq.pending,and(status.eq.failed,attempts.lt.${MAX_TRIES}))&select=student_id,to_email,attempts,created_at&order=created_at&limit=20`);
+    const rows: any[] = await rest(`nex_welcome_mail?or=(status.eq.pending,and(status.eq.failed,attempts.lt.${MAX_TRIES}))&select=student_id,to_email,attempts,created_at,created_by&order=created_at&limit=20`);
     let sent = 0, failed = 0, skipped = 0;
     for (const row of rows) {
       // take the row: only one run can win this update
@@ -63,10 +63,12 @@ serve(async (req) => {
       }
       let first = "";
       try { const st = await rest(`nex_students?id=eq.${row.student_id}&select=first_name`); first = String((st && st[0] && st[0].first_name) || "").trim().split(/\s+/)[0].replace(/[\u0000-\u001f<>]/g, "").slice(0, 40); } catch { /* send without a name */ }
+      // sign with the first name of the staff member who added the lead (created_by is their name); blank for imports
+      const sender = String(row.created_by || "").trim().split(/\s+/)[0].replace(/[\u0000-\u001f<>]/g, "").slice(0, 40);
       try {
         const mr = await fetch(MAIL_URL, {
           method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, redirect: "follow",
-          body: JSON.stringify({ key: MAIL_KEY, to, subject: WELCOME_SUBJECT, text: welcomeText(first), html: welcomeHtml(first), fromName: FROM_NAME }),
+          body: JSON.stringify({ key: MAIL_KEY, to, subject: WELCOME_SUBJECT, text: welcomeText(first, sender), html: welcomeHtml(first, sender), fromName: FROM_NAME }),
         });
         const mt = await mr.text();
         let mj: any = null;

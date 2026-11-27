@@ -19,8 +19,7 @@ const NOTES = [
   "First Aid, CPR and Manual Handling classes are held at Rockdale.",
 ];
 // The Student Centre Team signature (same lines as the support mailbox signature). The plain-text copy and the HTML copy say the same thing.
-const SIGN = [
-  "Best Regards,",
+const SIGN_TAIL = [
   "Student Centre Team",
   "Phone: 0481487715 / 0481487720",
   "Landline: 0295997373",
@@ -28,13 +27,15 @@ const SIGN = [
   "       studentcentres2020@gmail.com",
   "Address: Suite 5/5 King St, Rockdale, NSW, 2216",
 ];
+// sender = first name of the staff member who added the lead (blank when it was added by an import or the system: then it is just the team)
+const signText = (sender: string) => ["Best Regards,", ...(sender ? [sender] : []), ...SIGN_TAIL];
 const ADDRESS = "Suite 5/5 King St, Rockdale, NSW, 2216";
 const CLOSING = "We can't process your enrolment until we receive the form and all documents. If you have any questions, please do not hesitate to contact us at " + PHONE + ".";
 
 // first = the lead's first name; with no name the email just says "Hello,"
 const hi = (first: string) => (first ? `Dear ${first},` : "Hello,");
 
-export function welcomeText(first = ""): string {
+export function welcomeText(first = "", sender = ""): string {
   return [
     hi(first),
     "",
@@ -54,16 +55,17 @@ export function welcomeText(first = ""): string {
     "",
     CLOSING,
     "",
-    ...SIGN,
+    ...signText(sender),
   ].join("\n");
 }
 
 const esc = (s: string) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+const LOGO_URL = "https://oscarstaff.github.io/Oscar/assets/students-center-email-logo.png";
 const MAPS = "https://www.google.com/maps/search/5+King+St,+Rockdale,+NSW,+2216";
 
 // A plain email, the way a person would type it in Gmail: normal text, bold step headings, real numbered and bulleted lists
-// (each item on its own line), and the signature as simple lines. No logo, boxes, buttons or tables.
-export function welcomeHtml(first = ""): string {
+// (each item on its own line), and the signature as simple lines. The Students Center logo sits under the signature; no boxes, buttons or tables.
+export function welcomeHtml(first = "", sender = ""): string {
   const a = (u: string, t: string) => `<a href="${u}">${esc(t)}</a>`;
   const withUsi = (d: string) => esc(d).replace("www.usi.gov.au", a("https://www.usi.gov.au", "www.usi.gov.au"));
   const p = (t: string) => `<p style="margin:0 0 14px">${t}</p>`;
@@ -82,7 +84,9 @@ ${p("<b>Please note:</b>")}
 ${list("ul", NOTES.map(esc))}
 ${p(`<b>We can't process your enrolment until we receive the form and all documents.</b> If you have any questions, please do not hesitate to contact us at ${a("tel:" + PHONE, PHONE)}.`)}
 <p style="margin:0 0 2px">Best Regards,</p>
+${sender ? `<p style="margin:0 0 2px"><b>${esc(sender)}</b></p>` : ""}
 <p style="margin:0 0 2px"><b>Student Centre Team</b></p>
 <p style="margin:0">Phone: 0481487715 / 0481487720<br>Landline: 0295997373<br>Email: ${a("mailto:support@studentscenter.com.au", "support@studentscenter.com.au")}<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;${a("mailto:studentcentres2020@gmail.com", "studentcentres2020@gmail.com")}<br>Address: ${a(MAPS, ADDRESS)}</p>
+<p style="margin:14px 0 0"><img src="${LOGO_URL}" width="190" alt="Students Center, Journey to Excellence" style="display:block;width:190px;max-width:100%;height:auto;border:0"></p>
 </div>`;
 }
