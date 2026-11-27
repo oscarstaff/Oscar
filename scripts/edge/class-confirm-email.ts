@@ -22,7 +22,7 @@ function weekday(date: string, iso?: string) {
   return m ? DAYS[new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]))).getUTCDay()] : "";
 }
 const mark = (t: string) => `<b>${t}</b>`;   // key facts are bold, not highlighted
-const H = (t: string) => `<p style="margin:22px 0 8px;font-size:16px;font-weight:bold;color:#1559d6">${t}</p>`;
+const H = (t: string) => `<p style="margin:22px 0 8px;font-size:14px;font-weight:bold;color:#1559d6">${t}</p>`;
 const BOX = "margin:0 0 14px;padding:12px 16px;background-color:#f3f6fc;border:1px solid #cfd9ee;border-radius:6px";
 
 export function classConfirmHtml(first: string, date: string, time: string, c: ClassInfo = {}): string {
@@ -35,7 +35,7 @@ export function classConfirmHtml(first: string, date: string, time: string, c: C
   const sections = c.lines && c.lines.length
     ? `<p style="margin:10px 0 4px"><span style="color:#555555">Your sections and times:</span></p><ul style="margin:0;padding-left:22px">${c.lines.map((l) => li(`<b>${esc(l)}</b>`)).join("")}</ul>` : "";
   const fees = FEES.map(([n, pr]) => li(`${esc(n)}: <b>${esc(pr)}</b>`)).join("");
-  return `<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.55;color:#222222">
+  return `<div style="font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.55;color:#222222">
 ${p(`Dear ${name},`)}
 ${p(`Thank you for choosing us for your training certificate. As discussed, <b>your class is confirmed</b>. Here are the details:`)}
 <div style="${BOX}">

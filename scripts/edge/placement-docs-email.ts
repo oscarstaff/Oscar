@@ -30,7 +30,7 @@ export function placementDocsHtml(first: string, year: string): string {
     `<b>Basics of Infection Control Module for Aged Care</b> (not the &ldquo;Train the Trainer&rdquo; module). Complete here: ${a(NHHI)}`,
     `<b>NDIS Orientation Module</b>. Complete here: ${a(NDIS)}`,
   ];
-  return `<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.5;color:#222222">
+  return `<div style="font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.5;color:#222222">
 ${p(`Dear ${name},`)}
 ${p(`Please ensure these documents are ready before placement and send them to us as soon as possible. ${mark("Your placement waiting time begins once all required documents are submitted.")} Please check the <b>attachment</b> for help in accessing the online learning modules.`)}
 <p style="margin:0 0 8px"><b>Required Documents:</b></p>
