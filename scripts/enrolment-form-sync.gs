@@ -40,9 +40,22 @@ function setup() {
   Logger.log('Trigger installed on the ' + (t.ss ? 'response sheet' : 'form') + '. Submit a test response to try it.');
 }
 
+/* Google's own services sometimes answer "We're sorry, a server error occurred. Please wait a bit and try again." Trying again a moment later almost always works,
+   so every call that talks to Google or YatraLine goes through this: up to 4 tries, waiting 1, 2 and 4 seconds in between. Sending the same answer twice is safe (repeats are ignored). */
+function retry_(fn) {
+  let err;
+  for (let i = 0; i < 4; i++) {
+    try { return fn(); } catch (e) { err = e; if (i < 3) Utilities.sleep(1000 * Math.pow(2, i)); }
+  }
+  throw err;
+}
+
 function onFormSubmit(e) {   // sheet trigger
-  const sh = e.range.getSheet();
-  sendRow_(sh.getRange(1, 1, 1, sh.getLastColumn()).getDisplayValues()[0], sh.getRange(e.range.getRow(), 1, 1, sh.getLastColumn()).getDisplayValues()[0]);
+  const rows = retry_(() => {
+    const sh = e.range.getSheet(), n = sh.getLastColumn();
+    return [sh.getRange(1, 1, 1, n).getDisplayValues()[0], sh.getRange(e.range.getRow(), 1, 1, n).getDisplayValues()[0]];
+  });
+  sendRow_(rows[0], rows[1]);
 }
 
 function formRow_(resp) {   // a Form response as [headings, answers], the same shape as a sheet row
@@ -113,10 +126,14 @@ function sendRow_(head, row) {
   Object.keys(MAP).forEach(k => f[k] = pick_(head, row, MAP[k]));
   if (!f.name && !f.email && !f.email2 && !f.phone) return { result: 'empty' };
   const dedupe = Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, 'enrol|' + String(row[0] || '') + '|' + (f.email || f.email2 || f.name)));
-  const res = UrlFetchApp.fetch(SB_URL + '/rest/v1/rpc/nex_enrolment_form_intake', {
-    method: 'post', contentType: 'application/json', muteHttpExceptions: true,
-    headers: { apikey: SB_ANON, Authorization: 'Bearer ' + SB_ANON },
-    payload: JSON.stringify({ p_key: key, p_fields: f, p_dedupe: dedupe })
+  const res = retry_(() => {
+    const r = UrlFetchApp.fetch(SB_URL + '/rest/v1/rpc/nex_enrolment_form_intake', {
+      method: 'post', contentType: 'application/json', muteHttpExceptions: true,
+      headers: { apikey: SB_ANON, Authorization: 'Bearer ' + SB_ANON },
+      payload: JSON.stringify({ p_key: key, p_fields: f, p_dedupe: dedupe })
+    });
+    if (r.getResponseCode() >= 500) throw new Error('YatraLine said ' + r.getResponseCode());   // a busy moment on their side: try again
+    return r;
   });
   if (res.getResponseCode() >= 300) throw new Error('YatraLine said ' + res.getResponseCode() + ': ' + res.getContentText().slice(0, 300));
   return JSON.parse(res.getContentText() || '{}');
