@@ -3861,7 +3861,6 @@ const GAS_TOKEN='oscars_gas_83235a5f0c1f6ba32b18235e2b2d544ac137167d';
 // After deploying LeaveEmailRelay.gs, paste its /exec URL below. The token
 // must match MAIL_TOKEN inside that script exactly.
 const MAIL_EXEC_URL='https://script.google.com/macros/s/AKfycbyfr16rfoX-kj30XxJu53wkJrFz6ZixQOylpIqcfbtjVhZBJUFYpBQ_5i9lZSi8PjI-Zw/exec';
-const MAIL_TOKEN='oscars_mail_921793e91a49d14b120c9053065e94c7065ae583';
 
 // ── Shift-open notification rules ───────────────────────────────────────
 // Who hears about an open shift:
@@ -7361,7 +7360,7 @@ async function notifyShiftOpen(fromStaff, info){
       headers:{'Content-Type':'text/plain;charset=utf-8'},
       body:JSON.stringify({
         action:'sendShiftOpen',
-        token:MAIL_TOKEN,
+      
         recipients:to,
         team:team,
         shiftDate:info.shift_date,
@@ -8550,12 +8549,15 @@ async function saveStaff(){
     // Create the staff's real auth account (temp password, forced reset on first login)
     // so they can actually log in under auth-only mode.
     try{
+const _tmpPw=(()=>{const c='abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';const b=new Uint8Array(16);crypto.getRandomValues(b);return Array.from(b,x=>c[x%c.length]).join('')+'!';})();
       const resp=await fetch(GAS_EXEC_URL,{
         method:'POST',headers:{'Content-Type':'text/plain'},
-        body:JSON.stringify({action:'adminSetPw',staff:fullName,newPassword:'Oscars2026!',token:GAS_TOKEN,sbAccessToken:_soTok()})
+     body:JSON.stringify({action:'adminSetPw',staff:fullName,newPassword:_tmpPw,token:GAS_TOKEN,sbAccessToken:_soTok()})
       });
       const j=await resp.json().catch(()=>({}));
-      if(j&&j.ok){ showToast(` ${fullName} added — temp password: Oscars2026!`); }
+  if(j&&j.ok){ showToast(email&&email.indexOf('@')>0
+  ? ` ${fullName} added. A set-password email is on its way.`
+  : ` ${fullName} added. Temp password: ${_tmpPw} (copy it now, it won't show again)`); }
       else { showToast(` ${fullName} added, but auth setup failed: ${(j&&j.error)||'error'}. Use Set Password.`); }
     }catch(e){ showToast(` ${fullName} added, but auth setup failed. Use Set Password to fix.`); }
 
@@ -10509,7 +10511,7 @@ function sendAdminLeaveEmail(staffId,from,to,reason,reasonType){
         headers:{'Content-Type':'text/plain;charset=utf-8'},
         body:JSON.stringify({
           action:'sendLeaveEmail',
-          token:MAIL_TOKEN,
+        
           to:to_email,
           name:nm,
           status:'approved',
@@ -10899,7 +10901,7 @@ function _applyLeaveUpdateNow(id,status,declineReason){
               headers:{'Content-Type':'text/plain;charset=utf-8'},
               body:JSON.stringify({
                 action:'sendLeaveEmail',
-                token:MAIL_TOKEN,
+           
                 to:to,
                 name:nm,
                 status:status,
