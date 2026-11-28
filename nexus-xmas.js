@@ -77,9 +77,13 @@ const XM_CSS = '' +
   '#xmModal .xm-msg.bad{background:rgba(190,18,60,.1);color:#9f1239}' +
   '#xmModal h3{font-size:14px;margin:14px 0 6px}' +
   '#xmModal .xm-who{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 4px;font-size:14px;font-weight:700}' +
-  '#xmPill{position:fixed;right:16px;bottom:16px;z-index:300;min-height:40px;padding:8px 14px;border:0;border-radius:999px;background:#15803d;color:#fff;font:inherit;font-size:13.5px;font-weight:700;box-shadow:0 6px 20px rgba(15,23,42,.28);cursor:pointer}' +
-  '#xmPill:focus-visible{outline:3px solid rgba(21,128,61,.5);outline-offset:3px}' +
-  '@media (max-width:700px){#xmPill{bottom:calc(72px + env(safe-area-inset-bottom,0px))}}' +
+  '.xm-slot:empty{display:none}' +
+  '.xm-slot-desk{margin:0 0 12px}' +
+  '.xm-slot-phone{display:none}' +
+  '.xm-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:40px;padding:8px 14px;border:0;border-radius:10px;background:#15803d;color:#fff;font:inherit;font-size:13.5px;font-weight:700;line-height:1.2;cursor:pointer}' +
+  '.xm-slot-desk .xm-btn{width:100%}' +
+  '.xm-btn:focus-visible{outline:3px solid rgba(21,128,61,.5);outline-offset:2px}' +
+  '@media (max-width:700px){.xm-slot-desk{display:none}.xm-slot-phone:not(:empty){display:block;flex:0 0 auto;align-self:flex-end;margin-left:auto}.xm-slot-phone .xm-btn{min-height:44px;max-width:86px;min-height:42px;padding:5px 8px;font-size:12px;line-height:1.15;text-align:center;border-radius:9px}}' +
   '@media (prefers-reduced-motion:reduce){#xmModal,#xmModal .xm-card{animation-duration:.01s!important}}';
 function _xmCss() { if (document.getElementById('xmCss')) return; const s = document.createElement('style'); s.id = 'xmCss'; s.textContent = XM_CSS; document.head.appendChild(s); }
 
@@ -281,11 +285,13 @@ async function checkXmas() {
     const st = await _xmState(name);
     if (!st) return;                                                    /* the SQL has not been run: show nothing */
     _xmCss();
-    if (!document.getElementById('xmPill')) {
-      const b = document.createElement('button'); b.type = 'button'; b.id = 'xmPill'; b.textContent = 'Christmas photo game';
+    ['xmSlotCal', 'xmSlotClock'].forEach(function (id) {
+      const slot = document.getElementById(id);
+      if (!slot || slot.querySelector('.xm-btn')) return;
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'xm-btn'; b.textContent = 'Christmas photo game';
       b.onclick = function () { openXmas(); };
-      document.body.appendChild(b);
-    }
+      slot.appendChild(b);
+    });
     const answered = st.out || st.photos.length > 0;
     let seen = ''; try { seen = localStorage.getItem('nxxm:' + name) || ''; } catch (e) { /* ignore */ }
     if (!answered && seen !== _xmToday() && !document.getElementById('wbModal') && !document.getElementById('rcnModal') && !document.getElementById('xmModal')) openXmas(true);
