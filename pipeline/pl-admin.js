@@ -5,7 +5,7 @@
 const AD = { ctx: 'enrolment' };
 const CTX_NAMES = { enrolment: 'Enrolment stages', payment_queue: 'Payment queue statuses', placement_queue: 'Payment queue placement statuses', processing: 'Processing steps', placement: 'Placement request statuses', placement_stage: 'Placement stages', booking: 'First Aid booking statuses' };
 route(/^\/admin$/, async () => {
-  if (!ME.admin) { go('#/'); return null; }   /* Admin is for hub admins only */
+  if (!ME.admin) { go('#/'); return null; }   /* Admin is for Yatra admins (hub admins count too) */
   await loadRef(true);
   afterRender(() => bindAdmin());
   return pageHead('admin', 'Admin', 'Lists and settings', '') +
@@ -13,7 +13,7 @@ route(/^\/admin$/, async () => {
     '<div class="nx-two"><div class="nx-card"><div class="nx-card-h"><h3>Qualifications</h3><button class="nx-btn primary sm" id="adNewQual">' + ico('plus') + 'Add</button></div><ul class="nx-list">' + REF.quals.map(q => '<li><span><b>' + esc(q.name) + '</b><small>' + esc(q.code) + (q.default_fee ? ' · usual fee ' + money(q.default_fee) : '') + (q.active ? '' : ' · hidden') + '</small></span><button class="nx-btn sm" data-q="' + q.id + '">Edit</button></li>').join('') + '</ul></div>' +
     '<div class="nx-card"><div class="nx-card-h"><h3>Agents</h3><button class="nx-btn primary sm" id="adNewAgent">' + ico('plus') + 'Add</button></div>' + (REF.agents.length ? '<ul class="nx-list">' + REF.agents.map(a => '<li><span><b>' + esc(a.name) + '</b><small>' + esc([a.phone, a.email].filter(Boolean).join(' · ') || 'No contact details') + (a.active ? '' : ' · hidden') + '</small></span><button class="nx-btn sm" data-ag="' + a.id + '">Edit</button></li>').join('') + '</ul>' : empty('No agents yet', 'Add the agents students come through.')) + '</div></div>' +
     '<div class="nx-card"><div class="nx-card-h"><div><h3>Trainers</h3><div class="nx-muted">The Class page picks the trainer from this list, so every class day (and the pay history built from it) uses the same spelling. Renaming a trainer here renames them on their class days too.</div></div><button class="nx-btn primary sm" id="adNewTrainer">' + ico('plus') + 'Add</button></div>' + (REF.trainers.length ? '<ul class="nx-list">' + REF.trainers.map(t => '<li><span><b>' + esc(t.name) + '</b>' + (t.active ? '' : '<small>Hidden from the dropdown. Past class days keep the name.</small>') + '</span><button class="nx-btn sm" data-tr="' + t.id + '">Edit</button></li>').join('') + '</ul>' : empty('No trainers yet', 'Add the trainers who run the classes.')) + '</div>' +
-    secCard() + mailFilesCard('placement') + mailFilesCard('class') + '<div class="nx-card"><div class="nx-card-b"><b>Who can open Yatra</b><div class="nx-muted">Access is the Yatra card on the Nodes page. Admins give it to staff with the Yatra tick in ShiftOps, on each person’s edit panel.</div></div></div>' +
+    yaCard() + secCard() + mailFilesCard('placement') + mailFilesCard('class') + '<div class="nx-card"><div class="nx-card-b"><b>Who can open Yatra</b><div class="nx-muted">Access is the Yatra card on the Nodes page. Admins give it to staff with the Yatra tick in ShiftOps, on each person’s edit panel.</div></div></div>' +
   (ME.admin ? '<div class="nx-card"><div class="nx-card-h"><div><h3>Who opened student records</h3><div class="nx-muted">The latest 100 times a staff member opened a student. A repeat look within 10 minutes is counted once. More than 150 different students in an hour (or 800 in a day) pauses a person’s access to personal details and shows here as Blocked. Only admins can see this.</div></div></div><div id="adViews"><div class="nx-card-b"><div class="nx-skel" style="width:60%"></div></div></div></div>' : '');
 });
 function bindAdmin() {
@@ -32,7 +32,7 @@ function bindAdmin() {
   $('#adNewQual').onclick = () => qualForm(null); $('#adNewAgent').onclick = () => agentForm(null);
   $$('[data-q]').forEach(b => b.onclick = () => qualForm(REF.quals.find(x => x.id === b.dataset.q)));
   $$('[data-ag]').forEach(b => b.onclick = () => agentForm(REF.agents.find(x => x.id === b.dataset.ag)));
-  showStatus(); bindSec(); bindMailFiles();
+  showStatus(); bindYa(); bindSec(); bindMailFiles();
   if (ME.admin && $('#adViews')) {
     sel('nex_view_log', 'select=viewed_by,viewed_at,student_id,blocked,nex_students(first_name,last_name,student_no)&order=viewed_at.desc&limit=100').then(rows => {
       const box = $('#adViews'); if (!box) return;
@@ -71,6 +71,37 @@ async function mfShow(kind) {
     });
     box._rows = rows;
   } catch (e) { box.innerHTML = empty('Could not load', e.message); }
+}
+/* ---------- Yatra admins (hub admins only) ----------
+   A Yatra admin can delete and archive, change lists and trainers, and is exempt from the team locks and the view-only switch, inside Yatra only.
+   Hub admins are always Yatra admins. Only a hub admin can change who is one (the database enforces this too). */
+function yaCard() {
+  if (!ME.hub) return '';
+  return '<div class="nx-card"><div class="nx-card-h"><div><h3>Yatra admins</h3><div class="nx-muted">Tick a person to make them an admin in Yatra only. They do not get any extra access in Nexus. Hub admins are always Yatra admins.</div></div></div><div id="adYa" class="nx-card-b"><div class="nx-skel" style="width:60%"></div></div></div>';
+}
+async function bindYa() {
+  const box = $('#adYa'); if (!box) return;
+  try {
+    const [people, sets] = await Promise.all([sel('staff_credentials', 'select=staff_name,team&order=staff_name.asc'), sel('staff_settings', 'select=id,name,is_hub_admin,is_yatra_admin')]);
+    const by = {}; (sets || []).forEach(x => { by[x.name] = x; });
+    const rows = (people || []).filter(x => x.staff_name);
+    box.innerHTML = rows.length ? '<div class="nx-tablewrap"><table class="nx-table auto tight"><thead><tr><th>Staff member</th><th>Team</th><th>Admin in Yatra</th></tr></thead><tbody>' + rows.map(r => {
+      const st = by[r.staff_name] || {};
+      const cell = st.is_hub_admin === true ? '<span class="nx-pill ok">Hub admin</span>' :
+        '<label class="nx-check"><input type="checkbox" data-ya="' + esc(r.staff_name) + '"' + (st.is_yatra_admin === true ? ' checked' : '') + '> Yatra admin</label>';
+      return '<tr><td>' + esc(r.staff_name) + '</td><td>' + esc(r.team || '') + '</td><td>' + cell + '</td></tr>';
+    }).join('') + '</tbody></table></div>' : empty('No staff found', 'Staff appear here once they have a Nexus login.');
+    $$('[data-ya]', box).forEach(cb => cb.onchange = async () => {
+      const name = cb.dataset.ya, on = cb.checked; cb.disabled = true;
+      try {
+        const st = by[name];
+        if (st && st.id) await upd('staff_settings', 'id=eq.' + st.id, { is_yatra_admin: on });
+        else { await ins('staff_settings', { name, is_yatra_admin: on }, true); }
+        toast(on ? name + ' is now a Yatra admin' : name + ' is no longer a Yatra admin');
+        bindYa();
+      } catch (e) { cb.checked = !on; cb.disabled = false; toast(e.message, true); }
+    });
+  } catch (e) { if (e.message !== 'session') box.innerHTML = empty('Could not load', e.message); }
 }
 function bindMailFiles() { Object.keys(MF_KINDS).forEach(bindMailFilesOf); }
 function bindMailFilesOf(kind) {

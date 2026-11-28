@@ -11,7 +11,7 @@ const ss = {
   get(k) { try { return sessionStorage.getItem(k) || ''; } catch (e) { return ''; } },
   set(k, v) { try { sessionStorage.setItem(k, v); } catch (e) {} }
 };
-const ME = { name: '', admin: false, team: '', viewOnly: false };
+const ME = { name: '', admin: false, hub: false, team: '', viewOnly: false };   /* admin = Yatra admin (hub admins count too); hub = Nexus hub admin */
 /* team rules (the database enforces these too; hiding the buttons just saves people an error)
    delete/archive: hub admins only · class flags on a booking (quiz, paid, plans, signature): Evershine · received payments: Processing and Accounts. Hub admins can do all of it.
    Class statuses (attended, no show, cancelled, rescheduled) are open to everyone. */
@@ -209,7 +209,7 @@ const IDLE_MS = 60 * 60 * 1000, MAX_SESSION_MS = 12 * 60 * 60 * 1000;
 let locked = false, lastActive = Date.now();
 function endSession(why) {
   if (locked) return; locked = true;
-  ['nex_sb_at', 'nex_sb_rt', 'ngate_nex', 'nex_user', 'nex_is_admin', 'nex_t0'].forEach(k => { try { sessionStorage.removeItem(k); } catch (e) {} });
+  ['nex_sb_at', 'nex_sb_rt', 'ngate_nex', 'nex_user', 'nex_is_admin', 'nex_is_hub', 'nex_t0'].forEach(k => { try { sessionStorage.removeItem(k); } catch (e) {} });
   const v = $('#view'); if (v) v.innerHTML = '';
   const m = $('#modalRoot'); if (m) m.innerHTML = '';
   const d = $('#drawerRoot'); if (d) d.innerHTML = '';
