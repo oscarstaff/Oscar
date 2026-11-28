@@ -420,8 +420,10 @@ const ENROL_WEEKEND={start:'09:00',end:'16:00'};
 //   min:     the number of people each team needs on a weekday
 const ENROL_COVER={
   always:{ 'Sagun Pant':'Enrolment' },
-  helpers:{ 'Placement':['Kushal Piya'], 'Enrolment':['Monica Kawadi','Prashna Sapkota','Prabhushan KC','Presna Aryal'] },
-  min:{ 'Placement':3, 'Enrolment':6 }
+  helpers:{ 'Placement':['Kushal Piya'], 'Enrolment':['Monica Kawadi','Prashna Sapkota','Presna Aryal','Prabhushan KC'] },
+  // Monica and Prashna only help when their own team has more than 4 on that day. Presna and Prabhushan are last resorts.
+  lend:{ 'Monica Kawadi':['Evershine',4], 'Prashna Sapkota':['Evershine',4] },
+  min:{ 'Placement':3, 'Enrolment':5 }   // Enrolment: 2 on Checklist + 2 on Front Desk + 1 on Email
 };
 
 // Pure planner (no page access) so it can be tested on its own.
@@ -469,22 +471,24 @@ function enrolPlan(o){
   ['Placement','Enrolment'].forEach(function(T){
     const need=cover.min&&cover.min[T]; if(!need||!teamIn[T]) return;
     for(let d=0;d<5;d++){
-      const count=function(){
+      const count=function(team){
         let n=0;
         o.people.forEach(function(p){
           const have=(o.existing(p.id,d)||[]).filter(function(b){return b.type!=='leave';});
           const add=out.add.filter(function(a){return a.p.id===p.id&&a.d===d;})[0];
           if(!have.length&&!add) return;
           const tag=have.length?(have[0]._team||''):(add.tag||'');
-          if((tag||p.team)===T) n++;
+          if((tag||p.team)===team) n++;
         });
         return n;
       };
-      let n=count();
+      let n=count(T);
       (cover.helpers&&cover.helpers[T]||[]).forEach(function(name){
         if(n>=need) return;
+        const lend=cover.lend&&cover.lend[name];
+        if(lend&&count(lend[0])<=lend[1]) return;   // their own team has no spare people today
         const a=out.add.filter(function(x){return x.p.name===name&&x.d===d&&!x.tag;})[0];
-        if(a){ a.tag=T; n=count(); }
+        if(a){ a.tag=T; n=count(T); }
       });
       if(n<need){
         const ready=(cover.helpers&&cover.helpers[T]||[]).filter(function(name){
