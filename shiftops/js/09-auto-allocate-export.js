@@ -403,3 +403,114 @@ async function exportPDF(dayFilter=null){
 }
 
 
+
+// ── ENROLMENT ROSTER MAKER ────────────────────────────────────────────────
+// Builds a draft for the week that is open, for any week: everyone on the Enrolment team is put on every day
+// they are available (that week's availability, including a change that starts that week and one-off weeks),
+// within the hours they gave. Leave and shifts already on the roster are kept as they are. Nothing reaches staff until the
+// roster is published. Hours over a person's max are warned about, not blocked.
+const ENROL_TEAM='Enrolment';
+// People who are never rostered on a day by the maker (0 = Monday ... 6 = Sunday). Edit here to change.
+const ENROL_RULES={ 'Baruna Poudel':{noDays:[4]} };
+const ENROL_DEFAULT={start:'09:00',end:'19:00'};   // used when someone is "available" without set hours (weekends are set to 9 to 4 by the availability screen)
+
+// Pure planner (no page access) so it can be tested on its own.
+//   people: [{id,name,maxHours}]   getAvail(id,day) -> {type:'all'|'custom'|'no'|'unset',start,end}
+//   existing(id,day) -> [{type,start,end}]   rules: ENROL_RULES-shaped   overwrite: bool
+function enrolPlan(o){
+  const mins=function(t){const p=String(t).split(':');return (+p[0])*60+(+p[1]||0);};
+  const hrs=function(b){return Math.max(0,(mins(b.end)-mins(b.start))/60);};
+  const out={add:[],skipped:[],kept:[],hours:{},perDay:[0,0,0,0,0,0,0]};
+  o.people.forEach(function(p){
+    let h=0;
+    for(let d=0;d<7;d++){
+      const rule=(o.rules&&o.rules[p.name])||{};
+      const have=(o.existing(p.id,d)||[]);
+      const leave=have.some(function(b){return b.type==='leave';});
+      const real=have.filter(function(b){return b.type!=='leave';});
+      if(leave){ out.skipped.push({p:p,d:d,why:'on leave'}); continue; }
+      if(rule.noDays&&rule.noDays.indexOf(d)>-1){
+        out.skipped.push({p:p,d:d,why:'not rostered on this day'});
+        real.forEach(function(b){h+=hrs(b);out.perDay[d]++;});   // a shift already there still counts
+        continue;
+      }
+      const av=o.getAvail(p.id,d)||{type:'unset'};
+      if(av.type!=='all'&&av.type!=='custom'){
+        out.skipped.push({p:p,d:d,why:av.type==='no'?'not available':'availability not set'});
+        real.forEach(function(b){h+=hrs(b);out.perDay[d]++;});
+        continue;
+      }
+      if(real.length&&!o.overwrite){
+        out.kept.push({p:p,d:d});
+        real.forEach(function(b){h+=hrs(b);}); out.perDay[d]++;
+        continue;
+      }
+      const start=av.type==='custom'?av.start:ENROL_DEFAULT.start, end=av.type==='custom'?av.end:ENROL_DEFAULT.end;
+      if(!start||!end||mins(start)>=mins(end)){ out.skipped.push({p:p,d:d,why:'availability hours are not valid'}); continue; }
+      out.add.push({p:p,d:d,start:start,end:end,replaces:real.length>0});
+      h+=hrs({start:start,end:end}); out.perDay[d]++;
+    }
+    out.hours[p.id]=h;
+  });
+  out.over=o.people.filter(function(p){return p.maxHours&&out.hours[p.id]>p.maxHours+0.01;})
+                   .map(function(p){return {p:p,h:out.hours[p.id],mx:p.maxHours};});
+  return out;
+}
+
+let _enrolLast=null;
+function _enrolPeople(){
+  return staff.filter(function(s){return s.team===ENROL_TEAM&&!s.isOfficeManager&&s.isManager!=='office';})
+              .sort(function(a,b){return a.first.localeCompare(b.first)||a.last.localeCompare(b.last);});
+}
+function _enrolRun(){
+  const overwrite=false;   // shifts already on the roster are never changed or replaced
+  const people=_enrolPeople().map(function(s){return {id:s.id,name:s.first+' '+s.last,maxHours:Number(s.maxHours)||0};});
+  _enrolLast=enrolPlan({people:people,rules:ENROL_RULES,overwrite:overwrite,
+    getAvail:function(id,d){return getAvail(id,d);},
+    existing:function(id,d){return (shifts[id]&&shifts[id][d])||[];}});
+  const r=_enrolLast, f=function(n){return String(Math.round(n*10)/10);};
+  const ws=currentWeekStart, we=addDays(ws,6), nm=function(p){return p.name.split(' ')[0];};
+  let h='<div style="font-size:13px;color:var(--text-dim);margin-bottom:12px">Week of '+fmtDate(ws)+' to '+fmtDate(we)+' · '+people.length+' staff. This is a draft: staff only see it once you publish the roster.</div>';
+  h+='<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-bottom:14px">'+DAYS_FULL.map(function(dn,i){
+    return '<div style="text-align:center;padding:8px 2px;background:var(--bg);border:1px solid var(--border);border-radius:8px"><div style="font-size:10px;color:var(--text-dim)">'+dn.slice(0,3)+'</div><div style="font-size:18px;font-weight:700">'+r.perDay[i]+'</div></div>';}).join('')+'</div>';
+  h+='<div class="alloc-section-title">What will be added</div><div style="display:flex;flex-direction:column;gap:4px;margin-bottom:12px;font-size:12.5px">';
+  people.forEach(function(p){
+    const mine=r.add.filter(function(a){return a.p.id===p.id;});
+    h+='<div style="display:flex;gap:10px;justify-content:space-between;padding:6px 9px;background:var(--bg);border-radius:6px"><b>'+p.name+'</b><span style="color:var(--text-dim);text-align:right">'+
+      (mine.length?mine.map(function(a){return DAYS_FULL[a.d].slice(0,3)+' '+a.start+'-'+a.end;}).join(' · '):'nothing new')+' · '+f(r.hours[p.id])+'h</span></div>';
+  });
+  h+='</div>';
+  const notes=[];
+  r.over.forEach(function(x){notes.push('<b>'+nm(x.p)+'</b> would be on '+f(x.h)+'h this week (max '+x.mx+'h).');});
+  r.skipped.filter(function(x){return x.why==='on leave'||x.why==='not rostered on this day';}).forEach(function(x){notes.push(nm(x.p)+': '+DAYS_FULL[x.d].slice(0,3)+' skipped ('+x.why+').');});
+  if(r.kept.length) notes.push(r.kept.length+' day'+(r.kept.length===1?'':'s')+' already have a shift and are left as they are.');
+  if(notes.length) h+='<div class="alloc-section-title">Worth a look</div><div style="font-size:12.5px;line-height:1.6;margin-bottom:10px">'+notes.join('<br>')+'</div>';
+  document.getElementById('enrolBody').innerHTML=h;
+  const none=!r.add.length;
+  document.getElementById('enrolGo').disabled=none;
+  document.getElementById('enrolGo').textContent=none?'Nothing to add':'Add '+r.add.length+' shift'+(r.add.length===1?'':'s')+' as a draft';
+  document.getElementById('enrolErr').textContent='';
+}
+function openEnrolmentRoster(){
+  if(document.body.classList.contains('tl-readonly')){ showToast('Team leads cannot change the roster'); return; }
+  if(!_enrolPeople().length){ showToast('No Enrolment staff found'); return; }
+  _enrolRun(); openModal('enrolModal');
+}
+async function enrolApply(){
+  const r=_enrolLast, btn=document.getElementById('enrolGo'), err=document.getElementById('enrolErr');
+  if(!r||!r.add.length) return;
+  err.textContent=''; btn.disabled=true;
+  try{
+    for(const a of r.add){
+      if(!shifts[a.p.id]) shifts[a.p.id]={};
+      const blk={start:a.start,end:a.end,type:parseInt(a.start.split(':')[0])<12?'morning':parseInt(a.start.split(':')[0])<17?'afternoon':'evening',role:staffRoleLabel(staff.find(function(s){return s.id===a.p.id;}))};
+      shifts[a.p.id][a.d]=[blk];
+      queueShift(a.p.id,a.d,blk);
+    }
+    markDirty(); renderAll();
+    const n=await flushShiftQueue();
+    if(!n){ err.textContent='The shifts were not saved. Check your connection and try again.'; btn.disabled=false; try{loadWeekShiftsFromDB(currentWeekStart);}catch(e){} return; }
+    loadWeekShiftsFromDB(currentWeekStart);
+    closeModal('enrolModal');
+  }catch(e){ err.textContent='Something went wrong: '+(e&&e.message?e.message:e); btn.disabled=false; }
+}
