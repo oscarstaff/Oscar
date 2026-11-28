@@ -5,8 +5,8 @@
 -- After:  a second flag (is_yatra_admin) makes someone an admin in Yatra only.
 --         Hub admins are still Yatra admins, so nobody loses anything. Only hub admins can change either flag.
 --
--- Stays hub-admin only (not moved): two-step login controls (nex_mfa_roster, nex_set_mfa_required, nex_admin_reset_mfa),
--- permanently wiping a student (nex_wipe_student), and everything in Nexus itself.
+-- A Yatra admin can use Yatra like a hub admin: everything below that Yatra's screens rely on moves to the new check.
+-- Hub-admin-only still: changing the three admin flags themselves, and everything in Nexus itself.
 
 -- 1. the new flag
 alter table public.staff_settings add column if not exists is_yatra_admin boolean not null default false;
@@ -72,6 +72,18 @@ stable security definer
 set search_path to 'public', 'pg_temp'
 as $$ select coalesce(auth.role(),'') in ('','service_role') or coalesce(public.is_current_user_yatra_admin(), false) $$;
 
+-- Yatra admins can always open Yatra, like hub admins (other apps are unchanged)
+create or replace function public.has_app_access(p_app text)
+returns boolean
+language sql
+stable security definer
+set search_path to 'public', 'pg_temp'
+as $$
+  select coalesce(public.is_current_user_hub_admin(), false)
+      or (p_app = 'nex' and coalesce(public.is_current_user_yatra_admin(), false))
+      or exists (select 1 from public.app_access a where a.app = p_app and lower(btrim(a.staff_name)) = lower(btrim(public.current_staff_name())));
+$$;
+
 -- 5. Yatra functions that exempt admins: point them at the new check (re-running does nothing more)
 do $$
 declare r record; def text;
@@ -80,25 +92,31 @@ begin
     select p.oid, p.proname
       from pg_proc p join pg_namespace s on s.oid = p.pronamespace
      where s.nspname = 'public' and p.prokind = 'f'
-       and p.proname in ('nex_batch_guard','nex_class_closed_guard','nex_enrol_stage_rules','nex_placement_docs_gate','crm_status')
+       and p.proname in ('nex_batch_guard','nex_class_closed_guard','nex_enrol_stage_rules','nex_placement_docs_gate','crm_status',
+                     'nex_mfa_roster','nex_set_mfa_required','nex_admin_reset_mfa','nex_wipe_student')
   loop
     def := pg_get_functiondef(r.oid);
     if def like '%is_current_user_hub_admin%' then
-      execute replace(def, 'is_current_user_hub_admin', 'is_current_user_yatra_admin');
+      def := replace(def, 'is_current_user_hub_admin', 'is_current_user_yatra_admin');
+      def := replace(def, 'Hub admin only', 'Admin only');
+      def := replace(def, 'Only hub admins can permanently delete', 'Only admins can permanently delete');
+      def := replace(def, 'select s.is_hub_admin from', 'select (s.is_hub_admin or s.is_yatra_admin) from');   -- the two-step login list includes Yatra admins
+      execute def;
       raise notice 'updated function %', r.proname;
     end if;
   end loop;
 end $$;
 
--- 6. Yatra table rules (delete, doc types, trainers, audit and the like): point them at the new check
+-- 6. Yatra table rules, plus the shared tables and file stores that Yatra's Documents, Quizzes and email-attachment screens write to
 do $$
 declare r record; q text; w text; clause text;
 begin
   for r in
-    select tablename, policyname, cmd, qual, with_check
+    select schemaname, tablename, policyname, cmd, qual, with_check
       from pg_policies
-     where schemaname = 'public' and tablename like 'nex\_%'
-       and (coalesce(qual,'') || coalesce(with_check,'')) like '%is_current_user_hub_admin%'
+     where (coalesce(qual,'') || coalesce(with_check,'')) like '%is_current_user_hub_admin%'
+       and ( (schemaname = 'public' and (tablename like 'nex\_%' or tablename in ('documents','custom_quizzes','quiz_access','quiz_overrides')))
+          or (schemaname = 'storage' and tablename = 'objects' and (policyname like 'class\_files\_%' or policyname like 'placement\_files\_%')) )
   loop
     q := replace(r.qual,       'is_current_user_hub_admin', 'is_current_user_yatra_admin');
     w := replace(r.with_check, 'is_current_user_hub_admin', 'is_current_user_yatra_admin');
@@ -106,14 +124,18 @@ begin
     if r.cmd in ('SELECT','DELETE','UPDATE','ALL') and q is not null then clause := clause || ' using (' || q || ')'; end if;
     if r.cmd in ('INSERT','UPDATE','ALL') and w is not null then clause := clause || ' with check (' || w || ')'; end if;
     if clause <> '' then
-      execute format('alter policy %I on public.%I%s', r.policyname, r.tablename, clause);
-      raise notice 'updated policy %.%', r.tablename, r.policyname;
+      begin
+        execute format('alter policy %I on %I.%I%s', r.policyname, r.schemaname, r.tablename, clause);
+        raise notice 'updated policy %.%', r.tablename, r.policyname;
+      exception when others then
+        raise notice 'could NOT update policy %.% (%)', r.tablename, r.policyname, sqlerrm;
+      end;
     end if;
   end loop;
 end $$;
 
 -- To make someone a Yatra admin: Yatra > Admin > "Yatra admins" (hub admins only), or:
 --   update public.staff_settings set is_yatra_admin = true where name = 'Their Name';
--- To check what is left on the hub admin check inside Yatra (should only be the two-step login and wipe functions):
---   select p.proname from pg_proc p join pg_namespace s on s.oid=p.pronamespace
---    where s.nspname='public' and p.prokind='f' and p.proname like 'nex\_%' and pg_get_functiondef(p.oid) like '%is_current_user_hub_admin%';
+-- To see anything still on the hub admin check inside Yatra (policies and functions):
+--   select tablename, policyname from pg_policies where (coalesce(qual,'')||coalesce(with_check,'')) like '%is_current_user_hub_admin%' and (tablename like 'nex\_%' or policyname like '%files%');
+--   select p.proname from pg_proc p join pg_namespace s on s.oid=p.pronamespace where s.nspname='public' and p.prokind='f' and p.proname like 'nex\_%' and pg_get_functiondef(p.oid) like '%is_current_user_hub_admin%';

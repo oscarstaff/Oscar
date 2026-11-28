@@ -6,7 +6,7 @@ const NEXI_FAQ = [
   ['Getting around', [
     ['What is Yatra?', 'Yatra is where Oscars keeps track of leads and students: their enrolments, payments, First Aid bookings and placements. Rosters, clock-ins and leave are still in Nexus.', null],
     ['How do I find someone?', 'Type a name, email or phone number in the bar at the top and press Enter. Search covers leads and students together and labels each result.', ['#/search', 'Open search']],
-    ['Where is the Admin tab?', 'Admin is only shown to hub admins. It holds the status lists, qualifications, agents and the two-step sign-in settings.', null],
+    ['Where is the Admin tab?', 'Admin is only shown to Yatra admins. It holds the status lists, qualifications, agents and the two-step sign-in settings.', null],
     ['Why did Yatra lock me out?', 'Yatra locks after 15 minutes without activity, and your sign-in from Nexus lasts about an hour. Go back to Nexus and open Yatra again from the Nodes page.', null]
   ]],
   ['Leads and students', [
@@ -14,16 +14,16 @@ const NEXI_FAQ = [
     ['How do I add a new person?', 'Open Leads and press New lead. Everyone starts as a lead. Start with their phone number or email: if they are already in Yatra, their details fill in and you add to that person instead of making a duplicate.', ['#/leads?new=1', 'Add a lead']],
     ['How do I add an enrolment?', 'Open the person, then press Enrolment at the top of their page. One person can have several enrolments, each with its own qualification, fee and stage.', null],
     ['How do I change contact or personal details?', 'Open the person and use Edit contact, or Edit personal details under Personal and sensitive. Every look at the sensitive details and every change is logged.', null],
-    ['How do I remove someone?', 'Only hub admins can archive or delete anything. If someone needs to go, ask a hub admin; archived people disappear from the lists but their records are kept.', null],
-    ['Who can change a class booking?', 'Anyone can book a person into a class and mark Attended, No show, Cancelled or Rescheduled. Only the Evershine team (and hub admins) can change the flags on a booking: quiz sent, quiz done, paid, placement plan and signature.', null],
-    ['Who can add or change payments?', 'Only the Processing and Accounts teams (and hub admins) can record a payment, link it to a student, or work the payment queue. Everyone else can see them.', null]
+    ['How do I remove someone?', 'Only admins can archive or delete anything. If someone needs to go, ask an admin; archived people disappear from the lists but their records are kept.', null],
+    ['Who can change a class booking?', 'Anyone can book a person into a class and mark Attended, No show, Cancelled or Rescheduled. Only the Evershine team (and admins) can change the flags on a booking: quiz sent, quiz done, paid, placement plan and signature.', null],
+    ['Who can add or change payments?', 'Only the Processing and Accounts teams (and admins) can record a payment, link it to a student, or work the payment queue. Everyone else can see them.', null]
   ]],
   ['Payments', [
     ['How do I tick off documents someone has sent?', 'Open the person and go to the Enrolments and payments tab. The documents its course needs are listed right under each enrolment. Tick a document when you have received it. The tab title shows how many are still missing. Placement documents are on the Placement tab, and are not needed while the Placement status in the payment queue is Confirmed no PLC, PLC NYC or Placement Not Required.', ['#/students', 'Open Students']],
     ['How do I record a payment?', 'Open Payments and press Record payment. Type the phone or email of the student and their details and enrolment fill in. Or open the person, go to Enrolments and payments, and press Payment on the right enrolment.', ['#/payments', 'Open Payments']],
     ['What is an unmatched payment?', 'A payment that is not linked to a person yet. It does not count towards anyone’s $200 until you match it. The Unmatched view in Payments lists them.', ['#/payments?view=unmatched', 'Show unmatched']],
     ['How do refunds work?', 'Open the person, go to Enrolments and payments, and press Refund on the enrolment. The refund is recorded against that enrolment and shows in their history.', null],
-    ['What do the payment statuses mean?', 'Each status and its meaning is listed in Admin under Status lists. Ask a hub admin if you cannot see that tab.', null]
+    ['What do the payment statuses mean?', 'Each status and its meaning is listed in Admin under Status lists. Ask an admin if you cannot see that tab.', null]
   ]],
   ['First Aid and placement', [
     ['How do I book a First Aid seat?', 'Open First Aid, pick the class day, then press a free seat and choose the student. You can also press Book on the First Aid card on a person’s page.', ['#/firstaid', 'Open First Aid']],

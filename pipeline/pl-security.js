@@ -43,7 +43,7 @@ async function bindSec() {
     const st = await (await api('rpc/nex_mfa_state', { method: 'POST', body: {} })).json();
     const mine = (await mfaList())[0] || null, strong = aalNow() === 'aal2';
     let h = '<div class="nx-row-s"><div><b>Your account</b><div class="nx-muted">' + (mine ? 'Two-step login is set up for you.' : 'Not set up yet. Open Yatra from the Nexus Nodes page to set it up.') + '</div></div></div>';
-    if (ME.hub) {   /* two-step login controls stay with Nexus hub admins */
+    if (ME.admin) {
       let roster = [];
       try { roster = await (await api('rpc/nex_mfa_roster', { method: 'POST', body: {} })).json(); } catch (e) {} if (!Array.isArray(roster)) roster = [];
       const unset = roster.filter(r => !r.enrolled).length;
