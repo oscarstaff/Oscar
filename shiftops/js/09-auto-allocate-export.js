@@ -503,6 +503,46 @@ function enrolPlan(o){
   return out;
 }
 
+// Job roles (Work allocation). Front Desk 2, Checklist 2, Email 1, Follow-up is whoever is left.
+// Email only goes to emailOk. lastResort people are used only when nobody else on the team can do Email, and only for Email.
+const ENROL_ROLES={ team:'Enrolment', emailOk:['Kushal','Nidhi','Presna','Prabhushan'], lastResort:['Presna','Prabhushan'], front:2, check:2 };
+const ENROL_ROLE_KEYS=['C','F','U','E'];
+const ENROL_ROLE_NAMES={C:'Checklist',F:'Front Desk',U:'Follow-up',E:'Email'};
+// Pure (no page access). o.days: [{pool:[first names], extra:[first names who could be pulled in for Email]}]
+//   o.counts: {C:{name:n},...} turns done recently   o.prev: {C:[names],...} the day before   o.lastEmail: {name:order}
+function enrolRoles(o){
+  const cfg=o.cfg||ENROL_ROLES, cnt={}, prev={}, lastE=Object.assign({},o.lastEmail), out=[];
+  ENROL_ROLE_KEYS.forEach(function(k){cnt[k]=Object.assign({},o.counts&&o.counts[k]);prev[k]=((o.prev&&o.prev[k])||[]).slice();});
+  o.days.forEach(function(day,i){
+    const P=day.pool.slice(), res={C:[],F:[],U:[],E:[],pulled:[]}, prevRole={};
+    ENROL_ROLE_KEYS.forEach(function(k){prev[k].forEach(function(n){prevRole[n]=k;});});
+    let el=P.filter(function(n){return cfg.emailOk.indexOf(n)>-1;});
+    if(!el.length){
+      const x=cfg.lastResort.filter(function(n){return (day.extra||[]).indexOf(n)>-1;})[0];
+      if(x){ el=[x]; res.pulled.push(x); P.push(x); }
+    }
+    if(el.length){
+      const sc=function(n){return (cnt.E[n]||0)+(prevRole[n]==='E'?5:0);}, lr=function(n){return lastE[n]===undefined?-9:lastE[n];};
+      el.sort(function(a,b){return sc(a)-sc(b)||lr(a)-lr(b)||a.localeCompare(b);});
+      res.E=[el[0]]; P.splice(P.indexOf(el[0]),1);
+    }
+    [['F',cfg.front],['C',cfg.check]].forEach(function(rn){
+      const k=rn[0], sc=function(n){return (cnt[k][n]||0)*2+(prevRole[n]===k?5:0)+(prevRole[n]==='E'?2:0);};
+      P.sort(function(a,b){return sc(a)-sc(b)||a.localeCompare(b);});
+      res[k]=P.splice(0,rn[1]);
+    });
+    res.U=P.slice();
+    ENROL_ROLE_KEYS.forEach(function(k){res[k].forEach(function(n){cnt[k][n]=(cnt[k][n]||0)+1;});prev[k]=res[k].slice();});
+    res.E.forEach(function(n){lastE[n]=1000+i;});
+    out.push(res);
+  });
+  return out;
+}
+function enrolRoleText(res){
+  const line=function(k){return res[k].length?ENROL_ROLE_NAMES[k]+' - '+res[k].join(' & '):'';};
+  return ['C','F','U','E'].map(line).filter(Boolean).join('\n');
+}
+
 let _enrolLast=null, _enrolOff={};   // _enrolOff: teams the user has un-ticked
 function _enrolAll(){
   return staff.filter(function(s){return !s.isOfficeManager&&s.isManager!=='office';})
@@ -544,11 +584,97 @@ function _enrolRun(){
   r.short.forEach(function(x){notes.push('<b>'+_enrolEsc(x.team)+'</b> has only '+x.have+' of '+x.need+' on '+DAYS_FULL[x.d]+'.'+(x.ready.length?' '+_enrolEsc(x.ready.map(nmS).join(', '))+' already '+(x.ready.length===1?'has':'have')+' a shift that day: set it to '+_enrolEsc(x.team)+' by hand.':''));});
   if(r.kept.length) notes.push(r.kept.length+' day'+(r.kept.length===1?'':'s')+' already have a shift and are left as they are.');
   if(notes.length) h+='<div class="alloc-section-title">Worth a look</div><div style="font-size:12.5px;line-height:1.6;margin-bottom:10px">'+notes.join('<br>')+'</div>';
+  h+='<div id="enrolRoles" style="margin-top:6px"></div>';
   document.getElementById('enrolBody').innerHTML=h;
-  const none=!r.add.length;
-  document.getElementById('enrolGo').disabled=none;
-  document.getElementById('enrolGo').textContent=none?'Nothing to add':'Add '+r.add.length+' shift'+(r.add.length===1?'':'s')+' as a draft';
+  _enrolRoleOut=null; _enrolBtn();
   document.getElementById('enrolErr').textContent='';
+  _enrolRolesRun();
+}
+let _enrolHist={wk:null,rows:null}, _enrolRoleOut=null;
+function _enrolBtn(){
+  const r=_enrolLast, b=document.getElementById('enrolGo'); if(!r||!b) return;
+  const nr=(_enrolRoleOut||[]).filter(function(x){return x.text&&!x.skip;}).length, ns=r.add.length, bits=[];
+  if(ns) bits.push(ns+' shift'+(ns===1?'':'s'));
+  if(nr) bits.push('job roles for '+nr+' day'+(nr===1?'':'s'));
+  b.disabled=!bits.length; b.textContent=bits.length?'Add '+bits.join(' and ')+' as a draft':'Nothing to add';
+}
+// Who is on Enrolment each weekday: Enrolment staff plus anyone set to work for Enrolment, after the draft is added.
+function _enrolPool(d,r){
+  const pool=[], extra=[], assumed=[], placeShort={};
+  r.short.forEach(function(x){ if(x.team==='Placement'&&x.d===d) x.ready.forEach(function(n){placeShort[n]=true;}); });
+  _enrolAll().forEach(function(s){
+    const nm=s.first+' '+s.last, all=(shifts[s.id]&&shifts[s.id][d])||[];
+    const blocks=all.filter(function(b){return b.type!=='leave';}), leave=all.some(function(b){return b.type==='leave';});
+    const add=r.add.filter(function(a){return a.p.id===s.id&&a.d===d;})[0];
+    if(leave||(!blocks.length&&!add)) return;
+    if(ENROL_ROLES.lastResort.indexOf(s.first)>-1){ extra.push(s.first); return; }
+    if(placeShort[nm]){ assumed.push(s.first+' is on Placement'); return; }
+    const tag=blocks.length?(blocks[0]._team||''):(add?add.tag:'');
+    const eff=(ENROL_COVER.always&&ENROL_COVER.always[nm])||tag||s.team;
+    if(eff===ENROL_ROLES.team) pool.push(s.first);
+  });
+  return {pool:pool,extra:extra,assumed:assumed};
+}
+function _enrolCanon(n){
+  const t=String(n||'').trim(); if(!t) return '';
+  if(/^prabhu$/i.test(t)) return 'Prabhushan';
+  const hit=_enrolAll().filter(function(s){return _waSame(s.first,t);})[0];
+  return hit?hit.first:t;
+}
+async function _enrolRolesRun(){
+  const host=document.getElementById('enrolRoles'), r=_enrolLast; if(!host||!r) return;
+  host.innerHTML='<div style="font-size:12.5px;color:var(--text-dim)">Working out job roles...</div>';
+  try{
+    const ws=_isoDate(currentWeekStart);
+    if(_enrolHist.wk!==ws){
+      _enrolHist.rows=await _waFetch(_isoDate(addDays(new Date(currentWeekStart),-21)),_waDate(6)); _enrolHist.wk=ws;
+    }
+    if(document.getElementById('enrolRoles')!==host||_enrolLast!==r) return;
+    const rows=(_enrolHist.rows||[]).filter(function(x){return x.section==='work';}).sort(function(a,b){return a.alloc_date<b.alloc_date?-1:1;});
+    const counts={C:{},F:{},U:{},E:{}}, lastEmail={}; let prev={C:[],F:[],U:[],E:[]}, order=0;
+    const mine={};
+    rows.forEach(function(x){
+      if(x.alloc_date>=ws){ mine[x.alloc_date]=(x.body||'').trim(); return; }
+      const day={C:[],F:[],U:[],E:[]}; let any=false;
+      _waParse(x.body).forEach(function(l){
+        const k=({checklist:'C',frontdesk:'F',followup:'U',email:'E'})[String(l.role).toLowerCase().replace(/[^a-z]/g,'')];
+        if(!k) return;
+        l.names.forEach(function(n){ const c=_enrolCanon(n); if(!c) return; any=true; day[k].push(c); counts[k][c]=(counts[k][c]||0)+1; if(k==='E') lastEmail[c]=order; });
+      });
+      if(any){ prev=day; order++; }
+    });
+    const days=[], info=[];
+    for(let d=0;d<5;d++){ const p=_enrolPool(d,r); days.push({pool:p.pool,extra:p.extra}); info.push(p); }
+    const res=enrolRoles({days:days,counts:counts,prev:prev,lastEmail:lastEmail});
+    _enrolRoleOut=res.map(function(x,d){
+      const iso=_waDate(d), have=mine[iso]||'';
+      return {d:d,text:days[d].pool.length?enrolRoleText(x):'',skip:!!have,have:have,res:x,info:info[d]};
+    });
+    let h='<div class="alloc-section-title">Job roles (Work allocation)</div><div style="font-size:12.5px;line-height:1.55">';
+    _enrolRoleOut.forEach(function(x){
+      h+='<div style="padding:6px 9px;background:var(--bg);border-radius:6px;margin-bottom:4px"><b>'+DAYS_FULL[x.d].slice(0,3)+'</b> ';
+      if(x.skip) h+='<span style="color:var(--text-dim)">already has job roles, left alone</span>';
+      else if(!x.text) h+='<span style="color:var(--text-dim)">nobody on Enrolment</span>';
+      else{
+        h+='<span style="color:var(--text-dim)">'+_enrolEsc(x.text).replace(/\n/g,'<br>')+'</span>';
+        const nt=[];
+        if(x.res.pulled.length) nt.push(_enrolEsc(x.res.pulled.join(', '))+' pulled in for Email only (nobody else on Enrolment can). Set the shift to Enrolment.');
+        x.info.assumed.forEach(function(a){nt.push(_enrolEsc(a)+' that day (set the shift by hand).');});
+        if(!x.res.E.length) nt.push('Nobody available can do Email.');
+        if(nt.length) h+='<div style="font-size:11.5px;color:#b45309;margin-top:2px">'+nt.join('<br>')+'</div>';
+      }
+      h+='</div>';
+    });
+    host.innerHTML=h+'</div><div style="font-size:11.5px;color:var(--text-dim);margin-top:4px">These go into the Work allocation card as a draft for the empty days. Check them, then press Save changes there.</div>';
+    _enrolBtn();
+  }catch(e){ host.innerHTML='<div style="font-size:12.5px;color:#d33">Could not work out job roles: '+_enrolEsc(e&&e.message?e.message:e)+'. The shifts can still be added.</div>'; }
+}
+async function _enrolWriteRoles(){
+  const out=(_enrolRoleOut||[]).filter(function(x){return x.text&&!x.skip;}); if(!out.length) return 0;
+  try{ await waSync(true); }catch(e){}
+  out.forEach(function(x){ const k=_waKey(_waDate(x.d),'work'); if(!(_wa.rows[k]||'').trim()) _wa.draft[k]=x.text; });
+  _wa.msg='Job roles added as a draft for the empty days. Check them, then press Save changes.'; waRender();
+  return out.length;
 }
 function openEnrolmentRoster(){
   if(document.body.classList.contains('tl-readonly')){ showToast('Team leads cannot change the roster'); return; }
@@ -557,19 +683,23 @@ function openEnrolmentRoster(){
 }
 async function enrolApply(){
   const r=_enrolLast, btn=document.getElementById('enrolGo'), err=document.getElementById('enrolErr');
-  if(!r||!r.add.length) return;
+  const roles=(_enrolRoleOut||[]).some(function(x){return x.text&&!x.skip;});
+  if(!r||(!r.add.length&&!roles)) return;
   err.textContent=''; btn.disabled=true;
   try{
-    for(const a of r.add){
-      if(!shifts[a.p.id]) shifts[a.p.id]={};
-      const blk={_team:a.tag||'',start:a.start,end:a.end,type:parseInt(a.start.split(':')[0])<12?'morning':parseInt(a.start.split(':')[0])<17?'afternoon':'evening',role:(a.tag&&ENROL_COVER.always&&ENROL_COVER.always[a.p.name])?a.tag:staffRoleLabel(staff.find(function(s){return s.id===a.p.id;}))};
-      shifts[a.p.id][a.d]=[blk];
-      queueShift(a.p.id,a.d,blk);
+    if(r.add.length){
+      for(const a of r.add){
+        if(!shifts[a.p.id]) shifts[a.p.id]={};
+        const blk={_team:a.tag||'',start:a.start,end:a.end,type:parseInt(a.start.split(':')[0])<12?'morning':parseInt(a.start.split(':')[0])<17?'afternoon':'evening',role:(a.tag&&ENROL_COVER.always&&ENROL_COVER.always[a.p.name])?a.tag:staffRoleLabel(staff.find(function(s){return s.id===a.p.id;}))};
+        shifts[a.p.id][a.d]=[blk];
+        queueShift(a.p.id,a.d,blk);
+      }
+      markDirty(); renderAll();
+      const n=await flushShiftQueue();
+      if(!n){ err.textContent='The shifts were not saved. Check your connection and try again.'; btn.disabled=false; try{loadWeekShiftsFromDB(currentWeekStart);}catch(e){} return; }
+      loadWeekShiftsFromDB(currentWeekStart);
     }
-    markDirty(); renderAll();
-    const n=await flushShiftQueue();
-    if(!n){ err.textContent='The shifts were not saved. Check your connection and try again.'; btn.disabled=false; try{loadWeekShiftsFromDB(currentWeekStart);}catch(e){} return; }
-    loadWeekShiftsFromDB(currentWeekStart);
     closeModal('enrolModal');
+    if(roles) await _enrolWriteRoles();
   }catch(e){ err.textContent='Something went wrong: '+(e&&e.message?e.message:e); btn.disabled=false; }
 }
