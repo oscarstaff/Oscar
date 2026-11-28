@@ -402,8 +402,8 @@ async function checkForgetfulPopup(_try){
     if(!('Notification' in window) || !('PushManager' in window)) return;
     if(Notification.permission === 'denied') return;
     /* wait for any blocking notice first, then try again */
-    if(document.getElementById('snModal') || document.getElementById('autoOutNotice')){
-      if((_try||0) < 6) setTimeout(function(){ checkForgetfulPopup((_try||0)+1); }, 5000);
+    if(document.getElementById('snModal') || document.getElementById('autoOutNotice') || document.getElementById('xmModal') || window._xmBlocking){   /* the Christmas photo game popup goes first */
+      if((_try||0) < 24) setTimeout(function(){ checkForgetfulPopup((_try||0)+1); }, 5000);
       return;
     }
     const d = new Date(Date.now()+10*3600*1000); /* Sydney-ish today for date math */
