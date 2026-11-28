@@ -321,7 +321,7 @@ async function waSave(){
   _wa.draft={}; _wa.msg='Saved. Enrolment staff can now see it in Nexus.'; waRender();
 }
 
-const SHIFTOPS_BUILD='2026-11-28-v59-roster-maker-all-teams';
+const SHIFTOPS_BUILD='2026-11-28-v60-roster-maker-job-roles';
 console.log('%c[ShiftOps build '+SHIFTOPS_BUILD+' loaded]','background:#0071e3;color:#fff;padding:2px 8px;border-radius:4px;font-weight:700;');
 // Start every session in the FULL (admin) view. The team-lead read-only lock is
 // only ever added later, and only once the role is positively confirmed as team
