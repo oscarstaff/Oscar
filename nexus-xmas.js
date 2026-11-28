@@ -6,7 +6,7 @@
    If the SQL has not been run yet, nothing shows at all.
    The popup opens once a day for people who have not answered yet; the small "Christmas photo game" button stays until XM.closes. */
 const XM = {
-  enabled: false,                       /* LOCKED for now: nothing shows to anyone. Change to true when you are ready to open it. */
+  enabled: true,                        /* false = locked: nothing shows to anyone and no requests are made */
   title: 'Guess the Childhood Picture',
   bucket: 'xmas-photos',
   maxPhotos: 5,
@@ -99,7 +99,7 @@ function _xmShell(html) {
   return el;
 }
 function _xmKey(e) { if (e.key === 'Escape') _xmClose(); }
-function _xmClose() { document.removeEventListener('keydown', _xmKey); const m = document.getElementById('xmModal'); if (m) m.remove(); }
+function _xmClose() { document.removeEventListener('keydown', _xmKey); const m = document.getElementById('xmModal'); if (m) m.remove(); _xmRelease(); }
 
 /* ---- the screen every staff member sees ---- */
 async function openXmas(auto) {
@@ -265,11 +265,17 @@ async function openXmasOrganiser() {
   };
 }
 
-/* ---- after sign-in: the small button, and the popup once a day for people who have not answered ---- */
+/* ---- after sign-in: the small button, and the popup once a day for people who have not answered ----
+   This popup goes FIRST. Until it has decided (and, if it opens, until it is closed) window._xmBlocking is true, and the
+   wellbeing popup and the "turn on push reminders" clock popup wait their turn (they check it and try again in a moment). */
+window._xmBlocking = !!(XM.enabled && _xmOpen());
+function _xmRelease() { window._xmBlocking = false; }
+setTimeout(function () { if (!document.getElementById('xmModal')) _xmRelease(); }, 15000);   /* safety: never hold the other popups back for long */
 let _xmBusy = false;
 async function checkXmas() {
   const name = (typeof me !== 'undefined' && me) || window.me;
-  if (!XM.enabled || !name || _xmBusy || !_xmOpen()) return;
+  if (!XM.enabled || !name || !_xmOpen()) { _xmRelease(); return; }
+  if (_xmBusy) return;
   _xmBusy = true;
   try {
     const st = await _xmState(name);
@@ -284,5 +290,5 @@ async function checkXmas() {
     let seen = ''; try { seen = localStorage.getItem('nxxm:' + name) || ''; } catch (e) { /* ignore */ }
     if (!answered && seen !== _xmToday() && !document.getElementById('wbModal') && !document.getElementById('rcnModal') && !document.getElementById('xmModal')) openXmas(true);
   } catch (e) { console.warn('checkXmas', e); }
-  finally { _xmBusy = false; }
+  finally { _xmBusy = false; if (!document.getElementById('xmModal')) _xmRelease(); }
 }

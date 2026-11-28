@@ -190,9 +190,11 @@ const WB_TEST_KEY = (function () {
 })();
 
 let _wbBusy = false;
-async function checkWellbeing() {
+async function checkWellbeing(_try) {
   const name = (typeof me !== 'undefined' && me) || window.me;
   if (!name || _wbBusy || document.getElementById('wbModal')) return;
+  /* the Christmas photo game popup goes first: wait until it has decided and been closed, then check */
+  if (window._xmBlocking || document.getElementById('xmModal')) { if ((_try || 0) < 40) setTimeout(function () { checkWellbeing((_try || 0) + 1); }, 2000); return; }
   if (document.getElementById('rcnModal')) return;                 /* a roster notice is open: do not stack popups, try again next time */
   _wbBusy = true;
   try {

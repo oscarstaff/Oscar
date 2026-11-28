@@ -921,7 +921,7 @@ async function enterHub(){
     }, 300);
     try{ checkShiftChangeNotices(); }catch(e){}
     try{ setTimeout(function(){ if(typeof checkWellbeing==='function') checkWellbeing(); }, 4000); }catch(e){}
-    try{ setTimeout(function(){ if(typeof checkXmas==='function') checkXmas(); }, 7000); }catch(e){}
+    try{ setTimeout(function(){ if(typeof checkXmas==='function') checkXmas(); }, 1500); }catch(e){}   /* the Christmas photo game popup goes before the clock reminder (2.5s) and wellbeing (4s) ones */
   }).catch(function(e){ console.warn('boot data', e); });
   if(typeof applySavedTextColor === 'function') applySavedTextColor();
   loadGlobalGeofence();
