@@ -11,6 +11,9 @@ const XM = {
   bucket: 'xmas-photos',
   maxPhotos: 5,
   maxBytes: 5 * 1024 * 1024,
+  opensAt: '2026-11-30T12:00:00+11:00', /* before this moment staff can click the button but only see the "wait for an email" message (Sydney time) */
+  opensText: 'Monday 12:00 PM',
+  emailFrom: 'Sanny',
   closes: '2026-12-25',                 /* last day (Sydney) the button and the popup show; change the date here */
   types: { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' },
   organiserLabel: 'Sanskar'
@@ -20,6 +23,7 @@ function _xmEsc(v) { return String(v == null ? '' : v).replace(/[&<>"]/g, functi
 function _xmH(extra) { return Object.assign({ apikey: KEY, Authorization: 'Bearer ' + _sbBearer() }, extra || {}); }
 function _xmToday() { return new Intl.DateTimeFormat('en-CA', { timeZone: 'Australia/Sydney' }).format(new Date()); }
 function _xmOpen() { return _xmToday() <= XM.closes; }
+function _xmLive() { return Date.now() >= Date.parse(XM.opensAt); }
 function _xmMB(n) { return (n / 1048576).toFixed(1) + ' MB'; }
 function _xmUid() { try { return typeof _myAuthUid === 'function' ? _myAuthUid() : null; } catch (e) { return null; } }
 function _xmToast(m) { try { if (typeof showToast === 'function') showToast(m); } catch (e) { /* ignore */ } }
@@ -108,6 +112,12 @@ function _xmClose() { document.removeEventListener('keydown', _xmKey); const m =
 /* ---- the screen every staff member sees ---- */
 async function openXmas(auto) {
   const name = (typeof me !== 'undefined' && me) || window.me; if (!name || !XM.enabled) return;
+  if (!_xmLive() && !(await _xmIsOrganiser())) {                     /* not open yet: everyone except the organiser sees this */
+    _xmShell('<h2 id="xmTitle">' + _xmEsc(XM.title) + '</h2><div class="xm-msg">Not open yet. Wait for an email from ' + _xmEsc(XM.emailFrom) + '. It opens ' + _xmEsc(XM.opensText) + '.</div>' +
+      '<button type="button" class="xm-btn xm-main" id="xmOk">OK</button>');
+    document.getElementById('xmOk').onclick = _xmClose;
+    return;
+  }
   _xmShell('<h2 id="xmTitle">' + _xmEsc(XM.title) + '</h2><p class="xm-small">Loading…</p>');
   const st = await _xmState(name);
   if (!st) { _xmClose(); _xmToast('The photo game is not set up yet.'); return; }
@@ -272,9 +282,19 @@ async function openXmasOrganiser() {
 /* ---- after sign-in: the small button, and the popup once a day for people who have not answered ----
    This popup goes FIRST. Until it has decided (and, if it opens, until it is closed) window._xmBlocking is true, and the
    wellbeing popup and the "turn on push reminders" clock popup wait their turn (they check it and try again in a moment). */
-window._xmBlocking = !!(XM.enabled && _xmOpen());
+window._xmBlocking = !!(XM.enabled && _xmOpen() && _xmLive());
 function _xmRelease() { window._xmBlocking = false; }
 setTimeout(function () { if (!document.getElementById('xmModal')) _xmRelease(); }, 15000);   /* safety: never hold the other popups back for long */
+function _xmAddButtons() {
+  _xmCss();
+  ['xmSlotCal', 'xmSlotClock'].forEach(function (id) {
+    const slot = document.getElementById(id);
+    if (!slot || slot.querySelector('.xm-btn')) return;
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'xm-btn'; b.textContent = 'Christmas photo game';
+    b.onclick = function () { openXmas(); };
+    slot.appendChild(b);
+  });
+}
 let _xmBusy = false;
 async function checkXmas() {
   const name = (typeof me !== 'undefined' && me) || window.me;
@@ -282,16 +302,10 @@ async function checkXmas() {
   if (_xmBusy) return;
   _xmBusy = true;
   try {
+    if (!_xmLive()) { _xmAddButtons(); return; }                        /* before opening: just the button, no popup, no database calls */
     const st = await _xmState(name);
     if (!st) return;                                                    /* the SQL has not been run: show nothing */
-    _xmCss();
-    ['xmSlotCal', 'xmSlotClock'].forEach(function (id) {
-      const slot = document.getElementById(id);
-      if (!slot || slot.querySelector('.xm-btn')) return;
-      const b = document.createElement('button'); b.type = 'button'; b.className = 'xm-btn'; b.textContent = 'Christmas photo game';
-      b.onclick = function () { openXmas(); };
-      slot.appendChild(b);
-    });
+    _xmAddButtons();
     const answered = st.out || st.photos.length > 0;
     let seen = ''; try { seen = localStorage.getItem('nxxm:' + name) || ''; } catch (e) { /* ignore */ }
     if (!answered && seen !== _xmToday() && !document.getElementById('wbModal') && !document.getElementById('rcnModal') && !document.getElementById('xmModal')) openXmas(true);
