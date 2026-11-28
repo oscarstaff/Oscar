@@ -112,16 +112,24 @@ function _xmClose() { document.removeEventListener('keydown', _xmKey); const m =
 /* ---- the screen every staff member sees ---- */
 async function openXmas(auto) {
   const name = (typeof me !== 'undefined' && me) || window.me; if (!name || !XM.enabled) return;
-  if (!_xmLive() && !(await _xmIsOrganiser())) {                     /* not open yet: everyone except the organiser sees this */
+  const waitMsg = function () {                                       /* shown the instant the button is tapped: no waiting on the network first */
     _xmShell('<h2 id="xmTitle">' + _xmEsc(XM.title) + '</h2><div class="xm-msg">Not open yet. Wait for an email from ' + _xmEsc(XM.emailFrom) + '. It opens ' + _xmEsc(XM.opensText) + '.</div>' +
       '<button type="button" class="xm-btn xm-main" id="xmOk">OK</button>');
     document.getElementById('xmOk').onclick = _xmClose;
-    return;
+  };
+  if (!_xmLive()) {
+    if (_xmOrgCache === true) { /* organiser: carry on to the real screen */ }
+    else {
+      waitMsg();
+      if (_xmOrgCache === false) return;
+      if (!(await _xmIsOrganiser())) return;                         /* first tap before the check came back: the message is already up */
+      if (!document.getElementById('xmOk')) return;                  /* they closed it meanwhile */
+    }
   }
   _xmShell('<h2 id="xmTitle">' + _xmEsc(XM.title) + '</h2><p class="xm-small">Loading…</p>');
-  const st = await _xmState(name);
+  const both = await Promise.all([_xmState(name), _xmIsOrganiser()]);   /* in parallel, not one after the other */
+  const st = both[0], org = both[1];
   if (!st) { _xmClose(); _xmToast('The photo game is not set up yet.'); return; }
-  const org = await _xmIsOrganiser();
   const full = st.photos.length >= XM.maxPhotos, left = XM.maxPhotos - st.photos.length, open = _xmOpen();
   const intro = '<p>Our Christmas team game. Send a photo or two of yourself as a child, and everyone guesses who is who. Only ' + _xmEsc(XM.organiserLabel) + ' can see who takes part and the photos. They are shown in the game without names and deleted when it is over.</p>';
   let body;
@@ -287,6 +295,7 @@ function _xmRelease() { window._xmBlocking = false; }
 setTimeout(function () { if (!document.getElementById('xmModal')) _xmRelease(); }, 15000);   /* safety: never hold the other popups back for long */
 function _xmAddButtons() {
   _xmCss();
+  _xmIsOrganiser();                                                   /* warm the answer so the first tap is instant */
   ['xmSlotCal', 'xmSlotClock'].forEach(function (id) {
     const slot = document.getElementById(id);
     if (!slot || slot.querySelector('.xm-btn')) return;
