@@ -1475,12 +1475,14 @@ html[data-fx="lite"][data-theme^="glass"] .modal-bg{background:rgba(11,31,75,.5)
       if(!(r.ok&&(await r.json())===true)){fail('You do not have access to this app.');return;}
       var nr=await rpc('current_staff_name'); var name=nr.ok?await nr.json():null;
       if(!name){fail('Could not verify your identity.');return;}
-      var ar=await rpc('is_current_user_hub_admin'); var isAdmin=ar.ok?(await ar.json())===true:false;
+      var hr=await rpc('is_current_user_hub_admin'); var isHub=hr.ok?(await hr.json())===true:false;
+      var ar=await rpc('is_current_user_yatra_admin'); var isAdmin=ar.ok?(await ar.json())===true:isHub;   /* until the database has the Yatra admin check, hub admins stay admins */
       sessionStorage.setItem('ngate_'+APP,'1');
       sessionStorage.setItem('nex_user',name);
       sessionStorage.setItem('nex_sb_at',at);
       /* the hub's refresh token is deliberately NOT kept: two apps rotating one refresh token ends the hub session */
-      sessionStorage.setItem('nex_is_admin',isAdmin?'1':'0');
+      sessionStorage.setItem('nex_is_admin',isAdmin?'1':'0');   /* Yatra admin (hub admins count) */
+      sessionStorage.setItem('nex_is_hub',isHub?'1':'0');       /* hub admin: two-step login controls, wiping, document upload */
       sessionStorage.setItem('nex_t0',String(Date.now()));
       pass();
     }catch(e){ fail('Access check failed.'); console.warn('gate',e); }

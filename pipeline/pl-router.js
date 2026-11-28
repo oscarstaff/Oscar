@@ -167,7 +167,8 @@ function pressFeedback() {
 
 /* ---------- boot ---------- */
 async function boot() {
-  ME.name = ss.get('nex_user'); ME.admin = ss.get('nex_is_admin') === '1';
+  ME.name = ss.get('nex_user'); ME.admin = ss.get('nex_is_admin') === '1';   /* Yatra admin */
+  ME.hub = ss.get('nex_is_hub') === null ? ME.admin : ss.get('nex_is_hub') === '1';   /* hub admin (an older session has no value yet: treat as the same) */
   watchSession();
   setInterval(keepToken, 60000);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) keepToken(); });
