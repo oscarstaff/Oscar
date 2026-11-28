@@ -103,7 +103,7 @@ route(/^\/documents$/, async () => {
     const addB = $('#dcAdd'); if (addB) addB.addEventListener('click', addDocument);
     paint();
   });
-  return pageHead('doc', ME.admin ? 'All teams' : me.team ? 'Documents for the ' + me.team + ' team' : 'Documents for everyone', 'Documents', ME.hub && !ME.viewOnly ? '<button class="nx-btn primary" id="dcAdd">Add document</button>' : '') +
+  return pageHead('doc', ME.admin ? 'All teams' : me.team ? 'Documents for the ' + me.team + ' team' : 'Documents for everyone', 'Documents', ME.admin && !ME.viewOnly ? '<button class="nx-btn primary" id="dcAdd">Add document</button>' : '') +
     '<div class="nx-card"><div class="nx-toolbar" style="border-top:0"><input class="nx-in sm" style="min-width:280px" id="dcQ" placeholder="Search documents" value="' + esc(DC.q) + '"><span class="nx-grow"></span></div><div id="dcBody"></div></div>';
 });
 
