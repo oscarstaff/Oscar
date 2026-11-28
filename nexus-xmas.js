@@ -6,6 +6,7 @@
    If the SQL has not been run yet, nothing shows at all.
    The popup opens once a day for people who have not answered yet; the small "Christmas photo game" button stays until XM.closes. */
 const XM = {
+  enabled: false,                       /* LOCKED for now: nothing shows to anyone. Change to true when you are ready to open it. */
   title: 'Guess the Childhood Picture',
   bucket: 'xmas-photos',
   maxPhotos: 5,
@@ -102,7 +103,7 @@ function _xmClose() { document.removeEventListener('keydown', _xmKey); const m =
 
 /* ---- the screen every staff member sees ---- */
 async function openXmas(auto) {
-  const name = (typeof me !== 'undefined' && me) || window.me; if (!name) return;
+  const name = (typeof me !== 'undefined' && me) || window.me; if (!name || !XM.enabled) return;
   _xmShell('<h2 id="xmTitle">' + _xmEsc(XM.title) + '</h2><p class="xm-small">Loading…</p>');
   const st = await _xmState(name);
   if (!st) { _xmClose(); _xmToast('The photo game is not set up yet.'); return; }
@@ -268,7 +269,7 @@ async function openXmasOrganiser() {
 let _xmBusy = false;
 async function checkXmas() {
   const name = (typeof me !== 'undefined' && me) || window.me;
-  if (!name || _xmBusy || !_xmOpen()) return;
+  if (!XM.enabled || !name || _xmBusy || !_xmOpen()) return;
   _xmBusy = true;
   try {
     const st = await _xmState(name);
