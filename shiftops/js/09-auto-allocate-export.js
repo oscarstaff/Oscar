@@ -420,9 +420,9 @@ const ENROL_WEEKEND={start:'09:00',end:'16:00'};
 //   min:     the number of people each team needs on a weekday
 const ENROL_COVER={
   always:{ 'Sagun Pant':'Enrolment' },
-  helpers:{ 'Placement':['Kushal Piya'], 'Enrolment':['Monica Kawadi','Prashna Sapkota','Presna Aryal','Prabhushan KC'] },
-  // Monica and Prashna only help when their own team has more than 4 on that day. Presna and Prabhushan are last resorts.
-  lend:{ 'Monica Kawadi':['Evershine',4], 'Prashna Sapkota':['Evershine',4] },
+  helpers:{ 'Placement':['Kushal Piya'], 'Enrolment':['Presna Aryal','Prabhushan KC'] },   // last resorts, only when the team is still short
+  // Evershine keeps 4 people in. Anyone above that on a weekday is lent to Enrolment, taking turns through the week.
+  lend:{ from:'Evershine', keep:4, to:'Enrolment', people:['Monica Kawadi','Prashna Sapkota'] },
   min:{ 'Placement':3, 'Enrolment':5 }   // Enrolment: 2 on Checklist + 2 on Front Desk + 1 on Email
 };
 
@@ -466,29 +466,29 @@ function enrolPlan(o){
     }
     out.hours[p.id]=h;
   });
-  // Top up the teams that are short on a weekday, Placement first so Kushal goes there before Enrolment.
+  // Who is on which team on a weekday: an existing shift's "works for" tag, a tag the maker is adding, or their own team.
+  const teamCount=function(team,d){
+    let n=0;
+    o.people.forEach(function(p){
+      const have=(o.existing(p.id,d)||[]).filter(function(b){return b.type!=='leave';});
+      const add=out.add.filter(function(a){return a.p.id===p.id&&a.d===d;})[0];
+      if(!have.length&&!add) return;
+      const tag=have.length?(have[0]._team||''):(add.tag||'');
+      if((tag||p.team)===team) n++;
+    });
+    return n;
+  };
   const teamIn={}; o.people.forEach(function(p){teamIn[p.team]=true;});
-  ['Placement','Enrolment'].forEach(function(T){
+  out.lent=[[],[],[],[],[]]; out.lentByHand=[[],[],[],[],[]];
+  // Top up the teams that are short on a weekday, Placement first so Kushal goes there before anything else.
+  const topUp=function(T){
     const need=cover.min&&cover.min[T]; if(!need||!teamIn[T]) return;
     for(let d=0;d<5;d++){
-      const count=function(team){
-        let n=0;
-        o.people.forEach(function(p){
-          const have=(o.existing(p.id,d)||[]).filter(function(b){return b.type!=='leave';});
-          const add=out.add.filter(function(a){return a.p.id===p.id&&a.d===d;})[0];
-          if(!have.length&&!add) return;
-          const tag=have.length?(have[0]._team||''):(add.tag||'');
-          if((tag||p.team)===team) n++;
-        });
-        return n;
-      };
-      let n=count(T);
+      let n=teamCount(T,d);
       (cover.helpers&&cover.helpers[T]||[]).forEach(function(name){
         if(n>=need) return;
-        const lend=cover.lend&&cover.lend[name];
-        if(lend&&count(lend[0])<=lend[1]) return;   // their own team has no spare people today
         const a=out.add.filter(function(x){return x.p.name===name&&x.d===d&&!x.tag;})[0];
-        if(a){ a.tag=T; n=count(T); }
+        if(a){ a.tag=T; n=teamCount(T,d); }
       });
       if(n<need){
         const ready=(cover.helpers&&cover.helpers[T]||[]).filter(function(name){
@@ -497,7 +497,28 @@ function enrolPlan(o){
         out.short.push({team:T,d:d,have:n,need:need,ready:ready});
       }
     }
-  });
+  };
+  topUp('Placement');
+  // Lend spare Evershine people to Enrolment (Mon to Fri). Monica and Prashna take turns.
+  const L=cover.lend;
+  if(L&&teamIn[L.to]){
+    const turns={}; L.people.forEach(function(n){turns[n]=0;});
+    for(let d=0;d<5;d++){
+      const spare=teamCount(L.from,d)-L.keep; if(spare<=0) continue;
+      const order=L.people.map(function(n,i){return {n:n,i:i};}).sort(function(a,b){return turns[a.n]-turns[b.n]||a.i-b.i;});
+      order.forEach(function(c){
+        if(out.lent[d].length>=spare) return;
+        const p=o.people.filter(function(x){return x.name===c.n;})[0]; if(!p) return;
+        const have=(o.existing(p.id,d)||[]).filter(function(b){return b.type!=='leave';});
+        const add=out.add.filter(function(a){return a.p.id===p.id&&a.d===d;})[0];
+        if(!have.length&&!add) return;
+        if(have.length){ if(have[0]._team&&have[0]._team!==L.from) return; out.lentByHand[d].push(c.n); }
+        else{ if(add.tag&&add.tag!==L.from) return; add.tag=L.to; }
+        out.lent[d].push(c.n); turns[c.n]++;
+      });
+    }
+  }
+  topUp('Enrolment');
   out.over=o.people.filter(function(p){return p.maxHours&&out.hours[p.id]>p.maxHours+0.01;})
                    .map(function(p){return {p:p,h:out.hours[p.id],mx:p.maxHours};});
   return out;
@@ -609,6 +630,11 @@ function _enrolPool(d,r){
     if(leave||(!blocks.length&&!add)) return;
     if(ENROL_ROLES.lastResort.indexOf(s.first)>-1){ extra.push(s.first); return; }
     if(placeShort[nm]){ assumed.push(s.first+' is on Placement'); return; }
+    if((r.lent&&r.lent[d]||[]).indexOf(nm)>-1){
+      pool.push(s.first);
+      if((r.lentByHand&&r.lentByHand[d]||[]).indexOf(nm)>-1) assumed.push(s.first+' is lent from Evershine');
+      return;
+    }
     const tag=blocks.length?(blocks[0]._team||''):(add?add.tag:'');
     const eff=(ENROL_COVER.always&&ENROL_COVER.always[nm])||tag||s.team;
     if(eff===ENROL_ROLES.team) pool.push(s.first);
