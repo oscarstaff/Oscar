@@ -429,11 +429,13 @@ let _shiftQueue=[];
 function queueShift(staffId, dayIdx, sh){
   const name=_nameForStaffId(staffId);
   if(!name || !sh || sh.type==='leave') return;
-  _shiftQueue.push({ _sid:staffId, _day:dayIdx, _blk:sh,
+  const row={ _sid:staffId, _day:dayIdx, _blk:sh,
     staff_name:name, shift_date:_shiftDateFor(dayIdx),
     start_time:sh.start, end_time:sh.end, role:sh.role||null, status:'assigned',
     created_by:(typeof currentUser!=='undefined'&&currentUser)?currentUser:null,
-    updated_by:(typeof currentUser!=='undefined'&&currentUser)?currentUser:null });
+    updated_by:(typeof currentUser!=='undefined'&&currentUser)?currentUser:null };
+  if(sh._team) row.works_for_team=sh._team;   // only when set, so other callers behave as before
+  _shiftQueue.push(row);
 }
 async function flushShiftQueue(){
   if(!_shiftQueue.length) return 0;
